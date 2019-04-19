@@ -1,41 +1,21 @@
 #ifndef MINER_HPP_
 #define MINER_HPP_
-#include "pattern.h"
-//#include "mining_tuple.h"
 #include "quick_pattern.h"
+#include "canonical_graph.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 #include "galois/substrate/PerThreadStorage.h"
 
-typedef unsigned SimpleElement;
-typedef std::vector<Element_In_Tuple> Embedding;
-//typedef std::vector<SimpleElement> BaseEmbedding;
-class BaseEmbedding: public std::vector<SimpleElement> {
-public:
-	inline unsigned get_hash() const {
-		bliss::UintSeqHash h;
-		for(unsigned i = 0; i < size(); ++i)
-			h.update(data()[i]);
-		return h.get_value();
-	}
-};
 typedef std::unordered_map<Quick_Pattern, unsigned> QpMap;
 typedef std::unordered_map<Canonical_Graph, unsigned> CgMap;
+typedef std::unordered_map<Quick_Pattern, HashIntSets> QPatternMap;
+typedef std::unordered_map<Canonical_Graph, HashIntSets> CPatternMap;
 typedef std::unordered_map<BaseEmbedding, unsigned> SimpleMap;
 typedef galois::substrate::PerThreadStorage<QpMap> LocalQpMap;
 typedef galois::substrate::PerThreadStorage<CgMap> LocalCgMap;
 typedef galois::substrate::PerThreadStorage<SimpleMap> LocalSimpleMap;
 typedef galois::InsertBag<Embedding> EmbeddingQueue;
 typedef galois::InsertBag<BaseEmbedding> BaseEmbeddingQueue;
-
-namespace std {
-	template<>
-	struct hash<BaseEmbedding> {
-		std::size_t operator()(const BaseEmbedding& emb) const {
-			return std::hash<int>()(emb.get_hash());
-		}
-	};
-}
 
 class Miner {
 public:
@@ -74,7 +54,7 @@ public:
 					// number of vertices must be smaller than k.
 					// check if this is automorphism
 					if(num_vertices <= max_size && !is_automorphism(emb, i, id, dst, vertex_existed)) {
-						Element_In_Tuple new_element(dst, (BYTE)num_vertices, edge_label, dst_label, (BYTE)i);
+						ElementType new_element(dst, (BYTE)num_vertices, edge_label, dst_label, (BYTE)i);
 						// insert the new extended embedding into the queue
 						emb.push_back(new_element);
 						queue.push_back(emb);
@@ -123,11 +103,20 @@ public:
 		// otherwise add this quick pattern into the map, and set the count as one
 		} else qp_map[qp] = 1;
 	}
+	void quick_aggregate_each(Embedding& emb, QPatternMap& qp_map) {
+		Quick_Pattern qp(sizeof_tuple);
+		turn_quick_pattern_pure(emb, qp, label_flag);
+		if (qp_map.find(qp) == qp_map.end())
+			qp_map[qp].resize(emb.size());
+		for (unsigned i = 0; i < emb.size(); i ++)
+			qp_map[qp][i].insert(emb[i].vertex_id);
+		qp.clean();
+	}
 	void canonical_aggregate(QpMap qp_map, CgMap cg_map) {
 		for (auto it = qp_map.begin(); it != qp_map.end(); ++it) {
 			Quick_Pattern qp = it->first;
 			unsigned s = it->second;
-			Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
+			Canonical_Graph* cg = turn_canonical_graph(qp, false);
 			qp.clean();
 			if (cg_map.find(*cg) != cg_map.end()) {
 				cg_map[*cg] = cg_map[*cg] + s;
@@ -138,7 +127,7 @@ public:
 	// aggregate quick patterns into canonical patterns
 	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& cg_map) {
 		// turn the quick pattern into its canonical pattern
-		Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
+		Canonical_Graph* cg = turn_canonical_graph(qp, false);
 		qp.clean();
 		// if this pattern already exists, increase its count
 		if (cg_map.find(*cg) != cg_map.end()) {
@@ -147,6 +136,18 @@ public:
 		} else cg_map[*cg] = num;
 		delete cg;
 	}
+	void canonical_aggregate_each(Quick_Pattern qp, HashIntSets domainSets, CPatternMap& cg_map) {
+		Canonical_Graph* cg = turn_canonical_graph(qp, false);
+		qp.clean();
+		if (cg_map.find(*cg) == cg_map.end())
+			cg_map[*cg].resize(qp.get_size());
+		for (unsigned i = 0; i < domainSets.size(); i ++) {
+			unsigned qp_idx = cg->get_quick_pattern_index(i);
+			cg_map[*cg][i].insert(domainSets[qp_idx].begin(), domainSets[qp_idx].end());
+		}
+		delete cg;
+	}
+
 	void aggregate_clique(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
 		SimpleMap simple_agg;
 		for (auto emb : in_queue) {
@@ -179,7 +180,7 @@ public:
 		for (auto emb : in_queue) {
 			Quick_Pattern qp(sizeof_tuple);
 			turn_quick_pattern_pure(emb, qp, label_flag);
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(qp, false);
+			Canonical_Graph* cf = turn_canonical_graph(qp, false);
 			qp.clean();
 			assert(cg_map.find(*cf) != cg_map.end());
 			if(cg_map[*cf] >= threshold) {
@@ -195,7 +196,7 @@ public:
 		Quick_Pattern qp(sizeof_tuple);
 		turn_quick_pattern_pure(emb, qp, label_flag);
 		// find the pattern (canonical graph) of this embedding
-		Canonical_Graph* cf = Pattern::turn_canonical_graph(qp, false);
+		Canonical_Graph* cf = turn_canonical_graph(qp, false);
 		qp.clean();
 		// compare the count of this pattern with the threshold
 		// TODO: this is not the correct support counting for FSM
@@ -205,8 +206,25 @@ public:
 			out_queue.push_back(emb);
 		delete cf;
 	}
+	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CPatternMap &cg_map) {
+		Quick_Pattern qp(sizeof_tuple);
+		turn_quick_pattern_pure(emb, qp, label_flag);
+		Canonical_Graph* cf = turn_canonical_graph(qp, false);
+		qp.clean();
+		assert(cg_map.find(*cf) != cg_map.end());
+		bool is_frequent = true;
+		unsigned numOfDomains = cg_map[*cf].size();
+		for (unsigned i = 0; i < numOfDomains; i ++) {
+			if (cg_map[*cf][i].size() < threshold) {
+				is_frequent = false;
+				break;
+			}
+		}
+		if (is_frequent) out_queue.push_back(emb);
+		delete cf;
+	}
 	void set_threshold(unsigned minsup) { threshold = minsup; }
-	void update_embedding_size() { sizeof_tuple += sizeof(Element_In_Tuple); }
+	void update_embedding_size() { sizeof_tuple += sizeof(ElementType); }
 	void update_base_embedding_size() { sizeof_tuple += sizeof(SimpleElement); }
 	inline int get_sizeof_embedding() { return sizeof_tuple; }
 	void printout_embedding(int level, Embedding emb) {
@@ -243,7 +261,6 @@ private:
 	Graph *graph;
 #if 0
 	std::vector<LabeledEdge> edge_list;
-/*
 	void construct_edgelist() {
 		for (GNode src : *graph) {
 			auto& src_label = graph->getData(src);
@@ -256,52 +273,14 @@ private:
 		}
 		assert(edge_list.size() == graph->sizeEdges());
 	}
-*/
-	std::vector<Embedding> edge_hashmap;
-	void build_edge_hashmap(int n_edges, int start_vertex, std::vector<LabeledEdge> edge_list) {
-		for(int pos = 0; pos < n_edges; pos ++) {
-			LabeledEdge e = edge_list[pos];
-			edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, (BYTE)0, e.target_label));
-		}
-	}
-	bool gen_an_out_tuple(MTuple_join & in_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
-		bool vertex_existed = true;
-		auto num_vertices = vertices_set.size();
-		if(vertices_set.find(element.vertex_id) == vertices_set.end()){
-			num_vertices += 1;
-			vertex_existed = false;
-		}
-		in_tuple.push(&element);
-		in_tuple.set_num_vertices(num_vertices);
-		return vertex_existed;
-	}
-	void gen_an_out_tuple(MTuple_join_simple & in_tuple, Base_Element & element) {
-		in_tuple.push(&element);
-	}
-	void turn_quick_pattern_pure(MTuple & sub_graph, Quick_Pattern & qp, bool label_flag) {
-		std::memcpy(qp.get_elements(), sub_graph.get_elements(), qp.get_size() * sizeof(Element_In_Tuple));
-		std::unordered_map<VertexId, VertexId> map;
-		VertexId new_id = 1;
-		for(unsigned i = 0; i < qp.get_size(); i++) {
-			Element_In_Tuple& element = qp.at(i);
-			if(!label_flag) element.vertex_label = (BYTE)0;
-			VertexId old_id = element.vertex_id;
-			auto iterator = map.find(old_id);
-			if(iterator == map.end()) {
-				element.set_vertex_id(new_id);
-				map[old_id] = new_id++;
-			} else element.set_vertex_id(iterator->second);
-		}
-	}
 #endif
 
-	void turn_quick_pattern_pure(const Embedding & sub_graph, Quick_Pattern & qp, bool label_flag) {
-		std::memcpy(qp.get_elements(), sub_graph.data(), qp.get_size() * sizeof(Element_In_Tuple));
+	void turn_quick_pattern_pure(const Embedding & emb, Quick_Pattern & qp, bool label_flag) {
+		std::memcpy(qp.get_elements(), emb.data(), qp.get_size() * sizeof(ElementType));
 		std::unordered_map<VertexId, VertexId> map;
 		VertexId new_id = 1;
 		for(unsigned i = 0; i < qp.get_size(); i++) {
-			Element_In_Tuple& element = qp.at(i);
-			if(!label_flag) element.vertex_label = (BYTE)0;
+			auto& element = qp.at(i);
 			VertexId old_id = element.vertex_id;
 			auto iterator = map.find(old_id);
 			if(iterator == map.end()) {
@@ -310,26 +289,87 @@ private:
 			} else element.set_vertex_id(iterator->second);
 		}
 	}
-	inline bool is_automorphism(Embedding & sub_graph, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
+	inline bool is_automorphism(Embedding & emb, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
 		//check with the first element
-		if(dst < sub_graph.front().vertex_id) return true;
+		if(dst < emb.front().vertex_id) return true;
 		//check loop edge
-		if(dst == sub_graph[sub_graph[history].history_info].vertex_id) return true;
+		if(dst == emb[emb[history].history_info].vertex_id) return true;
 		//check to see if there already exists the vertex added; if so, just allow to add edge which is (smaller id -> bigger id)
 		if(vertex_existed && src > dst) return true;
 		std::pair<VertexId, VertexId> added_edge(src, dst);
-		for(unsigned index = history + 1; index < sub_graph.size(); ++index) {
+		for(unsigned index = history + 1; index < emb.size(); ++index) {
 			std::pair<VertexId, VertexId> edge;
-			getEdge(sub_graph, index, edge);
+			getEdge(emb, index, edge);
 			int cmp = compare(added_edge, edge);
 			if(cmp <= 0) return true;
 		}
 		return false;
 	}
-	inline void getEdge(Embedding & sub_graph, unsigned index, std::pair<VertexId, VertexId>& edge) {
-		Element_In_Tuple tuple = sub_graph[index];
-		edge.first = sub_graph[tuple.history_info].vertex_id;
-		edge.second = tuple.vertex_id;
+	bliss::AbstractGraph* turn_canonical_graph_bliss(Quick_Pattern & qp, const bool is_directed) {
+		bliss::AbstractGraph* ag = 0;
+		//read graph from quick pattern
+		ag = readGraph(qp, is_directed);
+		//turn to canonical form
+		bliss::AbstractGraph* cf = turnCanonical(ag);
+		delete ag;
+		ag = 0;
+		return cf;
+	}
+	Canonical_Graph* turn_canonical_graph(Quick_Pattern & qp, const bool is_directed) {
+		bliss::AbstractGraph* cf_bliss = turn_canonical_graph_bliss(qp, is_directed);
+		Canonical_Graph* cf = new Canonical_Graph(cf_bliss, is_directed);
+		delete cf_bliss;
+		return cf;
+	}
+	static void report_aut(void* param, const unsigned n, const unsigned* aut) {
+		assert(param);
+		//fprintf((FILE*) param, "Generator: ");
+		//bliss::print_permutation((FILE*) param, n, aut, 1);
+		//fprintf((FILE*) param, "\n");
+	}
+	bliss::AbstractGraph* turnCanonical(bliss::AbstractGraph* ag) {
+		//canonical labeling
+		bliss::Stats stats;
+		const unsigned * cl = ag->canonical_form(stats, &report_aut, stdout);
+		//permute to canonical form
+		bliss::AbstractGraph* cf = ag->permute(cl);
+//		delete[] cl;
+		return cf;
+	}
+	bliss::AbstractGraph* readGraph(Quick_Pattern & qp, bool opt_directed) {
+		bliss::AbstractGraph* g = 0;
+		//get the number of vertices
+		std::unordered_map<VertexId, BYTE> vertices;
+		for(unsigned int index = 0; index < qp.get_size(); ++index) {
+			auto element = qp.at(index);
+#ifdef ENABLE_LABEL
+			vertices[element.vertex_id] = element.vertex_label;
+#else
+			vertices[element.vertex_id] = 0;
+#endif
+		}
+		//construct graph
+		const unsigned number_vertices = vertices.size();
+		assert(!opt_directed);
+		if(opt_directed) g = new bliss::Digraph(vertices.size());
+		else g = new bliss::Graph(vertices.size());
+		//set vertices
+		for(unsigned i = 0; i < number_vertices; ++i)
+			g->change_color(i, (unsigned)vertices[i + 1]);
+		//read edges
+		assert(qp.get_size() > 1);
+		for(unsigned index = 1; index < qp.get_size(); ++index) {
+			auto element = qp.at(index);
+			VertexId from = qp.at(element.history_info).vertex_id;
+			VertexId to = element.vertex_id;
+			g->add_edge(from - 1, to - 1, index);
+		}
+		return g;
+	}
+	inline void getEdge(Embedding & emb, unsigned index, std::pair<VertexId, VertexId>& edge) {
+		auto ele = emb[index];
+		edge.first = emb[ele.history_info].vertex_id;
+		edge.second = ele.vertex_id;
 		assert(edge.first != edge.second);
 	}
 	inline void swap(std::pair<VertexId, VertexId>& pair) {

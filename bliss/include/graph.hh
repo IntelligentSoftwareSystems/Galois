@@ -148,7 +148,7 @@ public:
    * them in the first place as they are not ignored immediately but will
    * consume memory and computation resources for a while.
    */
-  virtual void add_edge(const unsigned int source, const unsigned int target) = 0;
+  virtual void add_edge(const unsigned int source, const unsigned int target, int index) = 0;
 
   /**
    * Change the color of the vertex \a vertex to \a color.
@@ -193,7 +193,7 @@ public:
    * \a perm must contain N=this.get_nof_vertices() elements and be a bijection
    * on {0,1,...,N-1}, otherwise the result is undefined or a segfault.
    */
-  virtual AbstractGraph* permute(const unsigned int* const perm) const = 0;
+  virtual AbstractGraph* permute(const unsigned* const perm) const = 0;
   virtual AbstractGraph* permute(const std::vector<unsigned int>& perm) const = 0;
 
   /**
@@ -522,7 +522,8 @@ protected:
 };
 
 
-
+//typedef unsigned IndexEdge;
+typedef std::pair<unsigned, unsigned> IndexEdge;
 /**
  * \brief The class for undirected, vertex colored graphs.
  *
@@ -564,31 +565,24 @@ public:
     shs_flm
   } SplittingHeuristic;
 
-
-
   //moved from protected scope by Zhiqiang
   class Vertex {
   public:
     Vertex();
     ~Vertex();
-    void add_edge(const unsigned int other_vertex);
+    void add_edge(const unsigned other_vertex, int idx);
     void remove_duplicate_edges(std::vector<bool>& tmp);
     void sort_edges();
 
-    unsigned int color;
-    std::vector<unsigned int> edges;
-    unsigned int nof_edges() const {return edges.size(); }
+    unsigned color;
+    //std::vector<unsigned> edges;
+    std::vector<IndexEdge> edges; // cxh: add the edge ids from the embedding
+    unsigned nof_edges() const {return edges.size(); }
   };
 
   //added by Zhiqiang
-  std::vector<Vertex> & get_vertices_rstream(){
-	  return vertices;
-  }
-
-  void sort_edges_rstream(){
-	  sort_edges();
-  }
-
+  std::vector<Vertex> & get_vertices_rstream() { return vertices; }
+  void sort_edges_rstream() { sort_edges(); }
 
 protected:
   std::vector<Vertex> vertices;
@@ -736,7 +730,7 @@ public:
    * them in the first place as they are not ignored immediately but will
    * consume memory and computation resources for a while.
    */
-  void add_edge(const unsigned int v1, const unsigned int v2);
+  void add_edge(const unsigned int v1, const unsigned int v2, int index = 0);
 
   /**
    * Change the color of the vertex \a vertex to \a color.
@@ -981,7 +975,7 @@ public:
    * them in the first place as they are not ignored immediately but will
    * consume memory and computation resources for a while.
    */
-  void add_edge(const unsigned int source, const unsigned int target);
+  void add_edge(const unsigned int source, const unsigned int target, int index = 0);
 
   /**
    * Change the color of the vertex 'vertex' to 'color'.

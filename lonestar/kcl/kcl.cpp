@@ -34,7 +34,6 @@
 #include <fstream>
 #define USE_SIMPLE
 #define DEBUG 0
-#define ENABLE_LABEL 0
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph";
@@ -106,7 +105,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 
 		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		queue.clear();
-#if 0
+#if 1
 		miner.aggregate_clique(queue2, queue); // sequential implementaion
 #else
 		// Parallel aggregation

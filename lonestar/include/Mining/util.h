@@ -18,7 +18,7 @@ void genGraph(MGraph &mg, Graph &g) {
 		//int num_neighbors = mg.out_degree(i);
 		g.fixEndEdge(i, row_end);
 		for (int offset = row_begin; offset < row_end; offset ++) {
-			#if ENABLE_LABEL
+			#ifdef ENABLE_LABEL
 				g.constructEdge(offset, mg.get_dest(offset), mg.get_weight(offset));
 			#else
 				g.constructEdge(offset, mg.get_dest(offset), 0);

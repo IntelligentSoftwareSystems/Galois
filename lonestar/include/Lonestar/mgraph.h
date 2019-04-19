@@ -64,11 +64,7 @@ public:
 				int src    = atoi(result[1].c_str());
 				int dst    = atoi(result[2].c_str());
 				int elabel = atoi(result[3].c_str());
-				if(labels_.size() <= src || labels_.size() <= dst) {
-					std::cerr << "Format Error:  define vertex lists before edges, from: " << src 
-						<< "; to: " << dst << "; vertex count: " << labels_.size() << std::endl;
-					exit(1);
-				}
+				assert(labels_.size() > src && labels_.size() > dst);
 				if (src == dst) continue; // remove self-loop
 				if (edge_set.find(std::pair<int, int>(src, dst)) == edge_set.end()) {
 					edge_set.insert(std::pair<int, int>(src, dst));

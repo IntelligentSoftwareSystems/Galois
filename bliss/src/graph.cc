@@ -5,11 +5,11 @@
 #include <list>
 #include <algorithm>
 
-#include "defs.hh"
-#include "timer.hh"
+//#include "defs.hh"
+//#include "timer.hh"
 #include "graph.hh"
 #include "partition.hh"
-#include "utils.hh"
+//#include "utils.hh"
 
 /*
   Copyright (c) 2003-2015 Tommi Junttila
@@ -32,6 +32,40 @@
 
 
 namespace bliss {
+
+void fatal_error(const char* fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	fprintf(stderr,"Bliss fatal error: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\nAborting!\n");
+	va_end(ap);
+	exit(1);
+}
+#if defined(BLISS_CONSISTENCY_CHECKS)
+static bool is_permutation(const unsigned int N, const unsigned int* perm) {
+	if(N == 0) return true;
+	std::vector<bool> m(N, false);
+	for(unsigned int i = 0; i < N; i++) {
+		if(perm[i] >= N) return false;
+		if(m[perm[i]]) return false;
+		m[perm[i]] = true;
+	}
+	return true;
+}
+#endif
+static bool is_permutation(const std::vector<unsigned int>& perm) {
+	const unsigned int N = perm.size();
+	if(N == 0)
+		return true;
+	std::vector<bool> m(N, false);
+	for(unsigned int i = 0; i < N; i++) {
+		if(perm[i] >= N) return false;
+		if(m[perm[i]]) return false;
+		m[perm[i]] = true;
+	}
+	return true;
+}
 
 #define _INTERNAL_ERROR() fatal_error("%s:%d: internal error",__FILE__,__LINE__)
 #define _OUT_OF_MEMORY() fatal_error("%s:%d: out of memory",__FILE__,__LINE__)
@@ -677,15 +711,15 @@ AbstractGraph::search(const bool canonical, Stats& stats)
    * This saves some cycles. */
   compute_eqref_hash = false;
 
-  Timer timer1;
+  //Timer timer1;
 
   make_initial_equitable_partition();
 
 
   if(verbstr and verbose_level >= 2)
     {
-      fprintf(verbstr, "Initial partition computed in %.2f seconds\n",
-	      timer1.get_duration());
+      fprintf(verbstr, "Initial partition computed in %.2f seconds\n", 0.0);
+	    //  timer1.get_duration());
       fflush(verbstr);
     }
   
@@ -1203,8 +1237,8 @@ AbstractGraph::search(const bool canonical, Stats& stats)
 
 #if defined(BLISS_VERIFY_EQUITABLEDNESS)
       /* The new partition should be equitable */
-      if(!is_equitable())
-	fatal_error("consistency check failed - partition after refinement is not equitable");
+	if(!is_equitable())
+		fatal_error("consistency check failed - partition after refinement is not equitable");
 #endif
 
       /*
@@ -1776,25 +1810,13 @@ AbstractGraph::find_automorphisms(Stats& stats,
     }
 }
 
-
-const unsigned int *
-AbstractGraph::canonical_form(Stats& stats,
-			      void (*hook)(void *user_param,
-					   unsigned int n,
-					   const unsigned int *aut),
-			      void *user_param)
-{
-
-  report_hook = hook;
-  report_user_param = user_param;
-
-  search(true, stats);
-
-  return best_path_labeling;
+const unsigned * AbstractGraph::canonical_form(Stats& stats, 
+	void (*hook)(void *user_param, unsigned int n, const unsigned int *aut), void *user_param) {
+	report_hook = hook;
+	report_user_param = user_param;
+	search(true, stats);
+	return best_path_labeling;
 }
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -1939,7 +1961,7 @@ Digraph::add_vertex(const unsigned int color)
 
 
 void
-Digraph::add_edge(const unsigned int vertex1, const unsigned int vertex2)
+Digraph::add_edge(const unsigned int vertex1, const unsigned int vertex2, int index)
 {
   assert(vertex1 < get_nof_vertices());
   assert(vertex2 < get_nof_vertices());
@@ -3907,59 +3929,39 @@ Digraph::nucr_find_first_component(const unsigned int level,
  *
  *-------------------------------------------------------------------------*/
 
-Graph::Vertex::Vertex()
-{
-  color = 0;
+Graph::Vertex::Vertex() { color = 0;}
+Graph::Vertex::~Vertex() { ; }
+
+void Graph::Vertex::add_edge(const unsigned other_vertex, int index) {
+	//edges.push_back(other_vertex);
+	edges.push_back(std::make_pair(other_vertex, index));
 }
 
-
-Graph::Vertex::~Vertex()
-{
-  ;
-}
-
-
-void
-Graph::Vertex::add_edge(const unsigned int other_vertex)
-{
-  edges.push_back(other_vertex);
-}
-
-
-void
-Graph::Vertex::remove_duplicate_edges(std::vector<bool>& tmp)
-{
+void Graph::Vertex::remove_duplicate_edges(std::vector<bool>& tmp) {
 #if defined(BLISS_CONSISTENCY_CHECKS)
-  /* Pre-conditions  */
-  for(unsigned int i = 0; i < tmp.size(); i++) assert(tmp[i] == false);
+	/* Pre-conditions  */
+	for(unsigned int i = 0; i < tmp.size(); i++) assert(tmp[i] == false);
 #endif
-  for(std::vector<unsigned int>::iterator iter = edges.begin();
-      iter != edges.end(); )
-    {
-      const unsigned int dest_vertex = *iter;
-      if(tmp[dest_vertex] == true)
-	{
-	  /* A duplicate edge found! */
-	  iter = edges.erase(iter);
+	for(std::vector<IndexEdge>::iterator iter = edges.begin(); iter != edges.end(); ) {
+		//const unsigned int dest_vertex = *iter;
+		const unsigned int dest_vertex = iter->first; //cxh
+		if(tmp[dest_vertex] == true) {
+			/* A duplicate edge found! */
+			iter = edges.erase(iter);
+		} else {
+			/* Not seen earlier, mark as seen */
+			tmp[dest_vertex] = true;
+			iter++;
+		}
 	}
-      else
-	{
-	  /* Not seen earlier, mark as seen */
-	  tmp[dest_vertex] = true;
-	  iter++;
+	/* Clear tmp */
+	for(std::vector<IndexEdge>::iterator iter = edges.begin(); iter != edges.end(); iter++) {
+		tmp[iter->first] = false;// cxh
+		//tmp[*iter] = false;
 	}
-    }
-
-  /* Clear tmp */
-  for(std::vector<unsigned int>::iterator iter = edges.begin();
-      iter != edges.end();
-      iter++)
-    {
-      tmp[*iter] = false;
-    }
 #if defined(BLISS_CONSISTENCY_CHECKS)
-  /* Post-conditions  */
-  for(unsigned int i = 0; i < tmp.size(); i++) assert(tmp[i] == false);
+	/* Post-conditions  */
+	for(unsigned int i = 0; i < tmp.size(); i++) assert(tmp[i] == false);
 #endif
 }
 
@@ -3970,13 +3972,9 @@ Graph::Vertex::remove_duplicate_edges(std::vector<bool>& tmp)
  * Time complexity: O(e log(e)), where e is the number of edges
  * leaving the vertex.
  */
-void
-Graph::Vertex::sort_edges()
-{
-  std::sort(edges.begin(), edges.end());
+void Graph::Vertex::sort_edges() {
+	std::sort(edges.begin(), edges.end());
 }
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -3984,48 +3982,29 @@ Graph::Vertex::sort_edges()
  *
  *-------------------------------------------------------------------------*/
 
-
-Graph::Graph(const unsigned int nof_vertices)
-{
-  vertices.resize(nof_vertices);
-  sh = shs_flm;
+Graph::Graph(const unsigned nof_vertices) {
+	vertices.resize(nof_vertices);
+	sh = shs_flm;
 }
 
+Graph::~Graph() { ; }
 
-Graph::~Graph()
-{
-  ;
+unsigned Graph::add_vertex(const unsigned color) {
+	const unsigned int vertex_num = vertices.size();
+	vertices.resize(vertex_num + 1);
+	vertices.back().color = color;
+	return vertex_num;
 }
 
-
-unsigned int
-Graph::add_vertex(const unsigned int color)
-{
-  const unsigned int vertex_num = vertices.size();
-  vertices.resize(vertex_num + 1);
-  vertices.back().color = color;
-  return vertex_num;
+void Graph::add_edge(const unsigned vertex1, const unsigned vertex2, int index) {
+	//fprintf(stderr, "(%u,%u) ", vertex1, vertex2);
+	vertices[vertex1].add_edge(vertex2, index);
+	vertices[vertex2].add_edge(vertex1, -index);
 }
 
-
-void
-Graph::add_edge(const unsigned int vertex1, const unsigned int vertex2)
-{
-  //fprintf(stderr, "(%u,%u) ", vertex1, vertex2);
-  vertices[vertex1].add_edge(vertex2);
-  vertices[vertex2].add_edge(vertex1);
+void Graph::change_color(const unsigned vertex, const unsigned color) {
+	vertices[vertex].color = color;
 }
-
-
-void
-Graph::change_color(const unsigned int vertex, const unsigned int color)
-{
-  vertices[vertex].color = color;
-}
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -4196,172 +4175,134 @@ Graph::read_dimacs(FILE* const fp, FILE* const errstr)
 }
 
 
-void
-Graph::write_dimacs(FILE* const fp)
-{
-  remove_duplicate_edges();
-  sort_edges();
+void Graph::write_dimacs(FILE* const fp) {
+	remove_duplicate_edges();
+	sort_edges();
 
-  /* First count the total number of edges */
-  unsigned int nof_edges = 0;
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex &v = vertices[i];
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int dest_i = *ei;
-	  if(dest_i < i)
-	    continue;
-	  nof_edges++;
+	/* First count the total number of edges */
+	unsigned int nof_edges = 0;
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		Vertex &v = vertices[i];
+		for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+			//const unsigned int dest_i = *ei;
+			const unsigned int dest_i = ei->first; // cxh
+			if(dest_i < i) continue;
+			nof_edges++;
+		}
 	}
-    }
 
-  /* Output the "header" line */
-  fprintf(fp, "p edge %u %u\n", get_nof_vertices(), nof_edges);
+	/* Output the "header" line */
+	fprintf(fp, "p edge %u %u\n", get_nof_vertices(), nof_edges);
 
-  /* Print the color of each vertex */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex &v = vertices[i];
-      fprintf(fp, "n %u %u\n", i+1, v.color);
-      /*
-      if(v.color != 0)
-	{
-	  fprintf(fp, "n %u %u\n", i+1, v.color);
+	/* Print the color of each vertex */
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		Vertex &v = vertices[i];
+		fprintf(fp, "n %u %u\n", i+1, v.color);
+		/*
+		   if(v.color != 0)
+		   {
+		   fprintf(fp, "n %u %u\n", i+1, v.color);
+		   }
+		   */
 	}
-      */
-    }
 
-  /* Print the edges */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex &v = vertices[i];
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int dest_i = *ei;
-	  if(dest_i < i)
-	    continue;
-	  fprintf(fp, "e %u %u\n", i+1, dest_i+1);
+	/* Print the edges */
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		Vertex &v = vertices[i];
+		for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+			//const unsigned int dest_i = *ei;
+			const unsigned int dest_i = ei->first; // cxh
+			if(dest_i < i) continue;
+			fprintf(fp, "e %u %u\n", i+1, dest_i+1);
+		}
 	}
-    }
+}
+
+void Graph::sort_edges() {
+	for(unsigned int i = 0; i < get_nof_vertices(); i++)
+		vertices[i].sort_edges();
 }
 
 
-
-void
-Graph::sort_edges()
-{
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    vertices[i].sort_edges();
-}
-
-
-int
-Graph::cmp(Graph& other)
-{
-  /* Compare the numbers of vertices */
-  if(get_nof_vertices() < other.get_nof_vertices())
-    return -1;
-  if(get_nof_vertices() > other.get_nof_vertices())
-    return 1;
-  /* Compare vertex colors */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      if(vertices[i].color < other.vertices[i].color)
-	return -1;
-      if(vertices[i].color > other.vertices[i].color)
-	return 1;
-    }
-  /* Compare vertex degrees */
-  remove_duplicate_edges();
-  other.remove_duplicate_edges();
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      if(vertices[i].nof_edges() < other.vertices[i].nof_edges())
-	return -1;
-      if(vertices[i].nof_edges() > other.vertices[i].nof_edges())
-	return 1;
-    }
-  /* Compare edges */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex &v1 = vertices[i];
-      Vertex &v2 = other.vertices[i];
-      v1.sort_edges();
-      v2.sort_edges();
-      std::vector<unsigned int>::const_iterator ei1 = v1.edges.begin();
-      std::vector<unsigned int>::const_iterator ei2 = v2.edges.begin();
-      while(ei1 != v1.edges.end())
-	{
-	  if(*ei1 < *ei2)
-	    return -1;
-	  if(*ei1 > *ei2)
-	    return 1;
-	  ei1++;
-	  ei2++;
+int Graph::cmp(Graph& other) {
+	/* Compare the numbers of vertices */
+	if(get_nof_vertices() < other.get_nof_vertices())
+		return -1;
+	if(get_nof_vertices() > other.get_nof_vertices())
+		return 1;
+	/* Compare vertex colors */
+	for(unsigned i = 0; i < get_nof_vertices(); i++) {
+		if(vertices[i].color < other.vertices[i].color)
+			return -1;
+		if(vertices[i].color > other.vertices[i].color)
+			return 1;
 	}
-    }
-  return 0;
+	/* Compare vertex degrees */
+	remove_duplicate_edges();
+	other.remove_duplicate_edges();
+	for(unsigned i = 0; i < get_nof_vertices(); i++) {
+		if(vertices[i].nof_edges() < other.vertices[i].nof_edges())
+			return -1;
+		if(vertices[i].nof_edges() > other.vertices[i].nof_edges())
+			return 1;
+	}
+	/* Compare edges */
+	for(unsigned i = 0; i < get_nof_vertices(); i++) {
+		Vertex &v1 = vertices[i];
+		Vertex &v2 = other.vertices[i];
+		v1.sort_edges();
+		v2.sort_edges();
+		std::vector<IndexEdge>::const_iterator ei1 = v1.edges.begin();
+		std::vector<IndexEdge>::const_iterator ei2 = v2.edges.begin();
+		while(ei1 != v1.edges.end()) {
+			//if(*ei1 < *ei2) return -1;
+			if(ei1->first < ei2->first) return -1;
+			//if(*ei1 > *ei2) return 1;
+			if(ei1->first > ei2->first) return 1;
+			ei1++;
+			ei2++;
+		}
+	}
+	return 0;
 }
 
-
-Graph*
-Graph::permute(const std::vector<unsigned int>& perm) const
-{
+Graph* Graph::permute(const std::vector<unsigned>& perm) const {
 #if defined(BLISS_CONSISTENCY_CHECKS)
 #endif
-
-  Graph* const g = new Graph(get_nof_vertices());
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      const Vertex& v = vertices[i];
-      Vertex& permuted_v = g->vertices[perm[i]];
-      permuted_v.color = v.color;
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int dest_v = *ei;
-	  permuted_v.add_edge(perm[dest_v]);
+	Graph* const g = new Graph(get_nof_vertices());
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		const Vertex& v = vertices[i];
+		Vertex& permuted_v = g->vertices[perm[i]];
+		permuted_v.color = v.color;
+		for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+			//const unsigned dest_v = *ei;
+			const unsigned dest_v = ei->first;
+			permuted_v.add_edge(perm[dest_v], 0);
+		}
+		permuted_v.sort_edges();
 	}
-      permuted_v.sort_edges();
-    }
-  return g;
+	return g;
 }
 
-Graph*
-Graph::permute(const unsigned int* perm) const
-{
+Graph* Graph::permute(const unsigned* perm) const {
 #if defined(BLISS_CONSISTENCY_CHECKS)
   if(!is_permutation(get_nof_vertices(), perm))
     _INTERNAL_ERROR();
 #endif
-
   Graph* const g = new Graph(get_nof_vertices());
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      const Vertex& v = vertices[i];
-      Vertex& permuted_v = g->vertices[perm[i]];
-      permuted_v.color = v.color;
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int dest_v = *ei;
-	  permuted_v.add_edge(perm[dest_v]);
-	}
-      permuted_v.sort_edges();
-    }
+  for(unsigned i = 0; i < get_nof_vertices(); i++) {
+	  const Vertex& v = vertices[i];
+	  Vertex& permuted_v = g->vertices[perm[i]];
+	  permuted_v.color = v.color;
+	  for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+		  const unsigned dest_v = (*ei).first;
+		  const int eid = (*ei).second;
+		  permuted_v.add_edge(perm[dest_v], eid);
+	  }
+	  permuted_v.sort_edges();
+  }
   return g;
 }
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -4369,102 +4310,61 @@ Graph::permute(const unsigned int* perm) const
  *
  *-------------------------------------------------------------------------*/
 
-
-void
-Graph::write_dot(const char* const filename)
-{
-  FILE *fp = fopen(filename, "w");
-  if(fp)
-    {
-      write_dot(fp);
-      fclose(fp);
-    }
-}
-
-void
-Graph::write_dot(FILE* const fp)
-{
-  remove_duplicate_edges();
-
-  fprintf(fp, "graph g {\n");
-
-  unsigned int vnum = 0;
-  for(std::vector<Vertex>::iterator vi = vertices.begin();
-      vi != vertices.end();
-      vi++, vnum++)
-    {
-      Vertex& v = *vi;
-      fprintf(fp, "v%u [label=\"%u:%u\"];\n", vnum, vnum, v.color);
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int vnum2 = *ei;
-	  if(vnum2 > vnum)
-	    fprintf(fp, "v%u -- v%u\n", vnum, vnum2);
+void Graph::write_dot(const char* const filename) {
+	FILE *fp = fopen(filename, "w");
+	if(fp) {
+		write_dot(fp);
+		fclose(fp);
 	}
-    }
-
-  fprintf(fp, "}\n");
 }
 
-
-
-
-
-
-
-
+void Graph::write_dot(FILE* const fp) {
+	remove_duplicate_edges();
+	fprintf(fp, "graph g {\n");
+	unsigned int vnum = 0;
+	for(std::vector<Vertex>::iterator vi = vertices.begin(); vi != vertices.end(); vi++, vnum++) {
+		Vertex& v = *vi;
+		fprintf(fp, "v%u [label=\"%u:%u\"];\n", vnum, vnum, v.color);
+		for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+			//const unsigned int vnum2 = *ei;
+			const unsigned int vnum2 = ei->first; //cxh
+			if(vnum2 > vnum)
+				fprintf(fp, "v%u -- v%u\n", vnum, vnum2);
+		}
+	}
+	fprintf(fp, "}\n");
+}
 /*-------------------------------------------------------------------------
  *
  * Get a hash value for the graph.
  *
  *-------------------------------------------------------------------------*/
-
-unsigned int
-Graph::get_hash()
-{
-  remove_duplicate_edges();
-  sort_edges();
-
-  UintSeqHash h;
-
-  h.update(get_nof_vertices());
-
-  /* Hash the color of each vertex */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      h.update(vertices[i].color);
-    }
-
-  /* Hash the edges */
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex &v = vertices[i];
-      for(std::vector<unsigned int>::const_iterator ei = v.edges.begin();
-	  ei != v.edges.end();
-	  ei++)
-	{
-	  const unsigned int dest_i = *ei;
-	  if(dest_i < i)
-	    continue;
-	  h.update(i);
-	  h.update(dest_i);
+unsigned int Graph::get_hash() {
+	remove_duplicate_edges();
+	sort_edges();
+	UintSeqHash h;
+	h.update(get_nof_vertices());
+	/* Hash the color of each vertex */
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		h.update(vertices[i].color);
 	}
-    }
-
-  return h.get_value();
+	/* Hash the edges */
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		Vertex &v = vertices[i];
+		for(std::vector<IndexEdge>::const_iterator ei = v.edges.begin(); ei != v.edges.end(); ei++) {
+			//const unsigned int dest_i = *ei;
+			const unsigned int dest_i = ei->first; // cxh
+			if(dest_i < i)
+				continue;
+			h.update(i);
+			h.update(dest_i);
+		}
+	}
+	return h.get_value();
 }
 
-
-
-
-
-void
-Graph::remove_duplicate_edges()
-{
+void Graph::remove_duplicate_edges() {
   std::vector<bool> tmp(vertices.size(), false);
-
   for(std::vector<Vertex>::iterator vi = vertices.begin();
       vi != vertices.end();
       vi++)
@@ -4475,10 +4375,6 @@ Graph::remove_duplicate_edges()
       (*vi).remove_duplicate_edges(tmp);
     }
 }
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -4510,24 +4406,15 @@ Graph::degree_invariant(const Graph* const g, const unsigned int v)
  * Return 1 if the vertex v has a self-loop, 0 otherwise
  * Time complexity: O(E_v), where E_v is the number of edges leaving v
  */
-unsigned int
-Graph::selfloop_invariant(const Graph* const g, const unsigned int v)
-{
-  const Vertex& vertex = g->vertices[v];
-  for(std::vector<unsigned int>::const_iterator ei = vertex.edges.begin();
-      ei != vertex.edges.end();
-      ei++)
-    {
-      if(*ei == v)
-	return 1;
-    }
-  return 0;
+unsigned int Graph::selfloop_invariant(const Graph* const g, const unsigned int v) {
+	const Vertex& vertex = g->vertices[v];
+	for(std::vector<IndexEdge>::const_iterator ei = vertex.edges.begin();
+			ei != vertex.edges.end(); ei++) {
+		//if(*ei == v) return 1;
+		if(ei->first == v) return 1; // cxh
+	}
+	return 0;
 }
-
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -4604,10 +4491,11 @@ Graph::split_neighbourhood_of_cell(Partition::Cell* const cell)
     {
       const Vertex& v = vertices[*ep++];
       
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j != 0; j--)
 	{
-	  const unsigned int dest_vertex = *ei++;
+	  //const unsigned int dest_vertex = *ei++;
+	  const unsigned int dest_vertex = (ei++)->first; // cxh
 	  Partition::Cell * const neighbour_cell = p.get_cell(dest_vertex);
 	  if(neighbour_cell->is_unit())
 	    continue;
@@ -4726,10 +4614,11 @@ Graph::split_neighbourhood_of_unit_cell(Partition::Cell* const unit_cell)
 
   const Vertex& v = vertices[p.elements[unit_cell->first]];
 
-  std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+  std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
   for(unsigned int j = v.nof_edges(); j > 0; j--)
     {
-      const unsigned int dest_vertex = *ei++;
+      //const unsigned int dest_vertex = *ei++;
+      const unsigned int dest_vertex = (ei++)->first; // cxh
       Partition::Cell * const neighbour_cell = p.get_cell(dest_vertex);
       
       if(neighbour_cell->is_unit()) {
@@ -4896,67 +4785,41 @@ Graph::split_neighbourhood_of_unit_cell(Partition::Cell* const unit_cell)
  * Performance: very slow, use only for debugging purposes.
  *
  *-------------------------------------------------------------------------*/
-
-bool Graph::is_equitable() const
-{
-  const unsigned int N = get_nof_vertices();
-  if(N == 0)
-    return true;
-
-  std::vector<unsigned int> first_count = std::vector<unsigned int>(N, 0);
-  std::vector<unsigned int> other_count = std::vector<unsigned int>(N, 0);
-
-  for(Partition::Cell *cell = p.first_cell; cell; cell = cell->next)
-    {
-      if(cell->is_unit())
-	continue;
-      
-      unsigned int *ep = p.elements + cell->first;
-      const Vertex &first_vertex = vertices[*ep++];
-
-      /* Count how many edges lead from the first vertex to
-       * the neighbouring cells */
-      for(std::vector<unsigned int>::const_iterator ei =
-	    first_vertex.edges.begin();
-	  ei != first_vertex.edges.end();
-	  ei++)
-	{
-	  first_count[p.get_cell(*ei)->first]++;
-	}
-
-      /* Count and compare to the edges of the other vertices */
-      for(unsigned int i = cell->length; i > 1; i--)
-	{
-	  const Vertex &vertex = vertices[*ep++];
-	  for(std::vector<unsigned int>::const_iterator ei =
-		vertex.edges.begin();
-	      ei != vertex.edges.end();
-	      ei++)
-	    {
-	      other_count[p.get_cell(*ei)->first]++;
-	    }
-	  for(Partition::Cell *cell2 = p.first_cell;
-	      cell2;
-	      cell2 = cell2->next)
-	    {
-	      if(first_count[cell2->first] != other_count[cell2->first])
-		{
-		  /* Not equitable */
-		  return false;
+bool Graph::is_equitable() const {
+	const unsigned int N = get_nof_vertices();
+	if(N == 0) return true;
+	std::vector<unsigned int> first_count = std::vector<unsigned int>(N, 0);
+	std::vector<unsigned int> other_count = std::vector<unsigned int>(N, 0);
+	for(Partition::Cell *cell = p.first_cell; cell; cell = cell->next) {
+		if(cell->is_unit()) continue;
+		unsigned int *ep = p.elements + cell->first;
+		const Vertex &first_vertex = vertices[*ep++];
+		/* Count how many edges lead from the first vertex to
+		 * the neighbouring cells */
+		for(std::vector<IndexEdge>::const_iterator ei = first_vertex.edges.begin(); ei != first_vertex.edges.end(); ei++) {
+			//first_count[p.get_cell(*ei)->first]++;
+			first_count[p.get_cell(ei->first)->first]++; // cxh
 		}
-	      other_count[cell2->first] = 0;
-	    }
+		/* Count and compare to the edges of the other vertices */
+		for(unsigned int i = cell->length; i > 1; i--) {
+			const Vertex &vertex = vertices[*ep++];
+			for(std::vector<IndexEdge>::const_iterator ei = vertex.edges.begin(); ei != vertex.edges.end(); ei++) {
+				//other_count[p.get_cell(*ei)->first]++;
+				other_count[p.get_cell(ei->first)->first]++; // cxh
+			}
+			for(Partition::Cell *cell2 = p.first_cell; cell2; cell2 = cell2->next) {
+				if(first_count[cell2->first] != other_count[cell2->first]) {
+					/* Not equitable */
+					return false;
+				}
+				other_count[cell2->first] = 0;
+			}
+		}
+		/* Reset first_count */
+		for(unsigned int i = 0; i < N; i++) first_count[i] = 0;
 	}
-      /* Reset first_count */
-      for(unsigned int i = 0; i < N; i++)
-	first_count[i] = 0;
-    }
-  return true;
+	return true;
 }
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -5101,10 +4964,11 @@ Graph::sh_first_max_neighbours()
       if(opt_use_comprec and p.cr_get_level(cell->first) != cr_level)
 	continue;
       const Vertex& v = vertices[p.elements[cell->first]];
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j > 0; j--)
 	{
-	  Partition::Cell * const neighbour_cell = p.get_cell(*ei++);
+	  //Partition::Cell * const neighbour_cell = p.get_cell(*ei++);
+	  Partition::Cell * const neighbour_cell = p.get_cell((ei++)->first); // cxh
 	  if(neighbour_cell->is_unit())
 	    continue;
 	  neighbour_cell->max_ival++;
@@ -5152,10 +5016,11 @@ Graph::sh_first_smallest_max_neighbours()
 	continue;
 	
       const Vertex& v = vertices[p.elements[cell->first]];
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j > 0; j--)
 	{
-	  Partition::Cell* const neighbour_cell = p.get_cell(*ei++);
+	  //Partition::Cell* const neighbour_cell = p.get_cell(*ei++);
+	  Partition::Cell* const neighbour_cell = p.get_cell((ei++)->first); // cxh
 	  if(neighbour_cell->is_unit())
 	    continue;
 	  neighbour_cell->max_ival++;
@@ -5188,9 +5053,7 @@ Graph::sh_first_smallest_max_neighbours()
  * Assumes that the partition p is equitable.
  * Assumes that the max_ival fields of the cells are all 0.
  */
-Partition::Cell*
-Graph::sh_first_largest_max_neighbours()
-{
+Partition::Cell* Graph::sh_first_largest_max_neighbours() {
   Partition::Cell* best_cell = 0;
   int best_value = -1;
   unsigned int best_size = 0;
@@ -5204,10 +5067,11 @@ Graph::sh_first_largest_max_neighbours()
       if(opt_use_comprec and p.cr_get_level(cell->first) != cr_level)
 	continue;
       const Vertex& v = vertices[p.elements[cell->first]];
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j > 0; j--)
 	{
-	  Partition::Cell* const neighbour_cell = p.get_cell(*ei++);
+	  //Partition::Cell* const neighbour_cell = p.get_cell(*ei++);
+	  Partition::Cell* const neighbour_cell = p.get_cell((ei++)->first); // cxh
 	  if(neighbour_cell->is_unit())
 	    continue;
 	  neighbour_cell->max_ival++;
@@ -5232,25 +5096,6 @@ Graph::sh_first_largest_max_neighbours()
     }
   return best_cell;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /*-------------------------------------------------------------------------
  *
@@ -5278,74 +5123,53 @@ Graph::initialize_certificate()
  *
  *-------------------------------------------------------------------------*/
 
-bool
-Graph::is_automorphism(unsigned int* const perm)
-{
-  std::set<unsigned int, std::less<unsigned int> > edges1;
-  std::set<unsigned int, std::less<unsigned int> > edges2;
+bool Graph::is_automorphism(unsigned int* const perm) {
+	std::set<unsigned int, std::less<unsigned int> > edges1;
+	std::set<unsigned int, std::less<unsigned int> > edges2;
 
 #if defined(BLISS_CONSISTENCY_CHECKS)
-  if(!is_permutation(get_nof_vertices(), perm))
-    _INTERNAL_ERROR();
+	if(!is_permutation(get_nof_vertices(), perm))
+		_INTERNAL_ERROR();
 #endif
 
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      Vertex& v1 = vertices[i];
-      edges1.clear();
-      for(std::vector<unsigned int>::iterator ei = v1.edges.begin();
-	  ei != v1.edges.end();
-	  ei++)
-	edges1.insert(perm[*ei]);
-      
-      Vertex& v2 = vertices[perm[i]];
-      edges2.clear();
-      for(std::vector<unsigned int>::iterator ei = v2.edges.begin();
-	  ei != v2.edges.end();
-	  ei++)
-	edges2.insert(*ei);
-
-      if(!(edges1 == edges2))
-	return false;
-    }
-
-  return true;
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		Vertex& v1 = vertices[i];
+		edges1.clear();
+		for(std::vector<IndexEdge>::iterator ei = v1.edges.begin(); ei != v1.edges.end(); ei++)
+			//edges1.insert(perm[*ei]);
+			edges1.insert(perm[ei->first]); // cxh
+		Vertex& v2 = vertices[perm[i]];
+		edges2.clear();
+		for(std::vector<IndexEdge>::iterator ei = v2.edges.begin(); ei != v2.edges.end(); ei++)
+			//edges2.insert(*ei);
+			edges2.insert(ei->first); // cxh
+		if(!(edges1 == edges2)) return false;
+	}
+	return true;
 }
 
 
 
 
-bool
-Graph::is_automorphism(const std::vector<unsigned int>& perm) const
-{
-
-  if(!(perm.size() == get_nof_vertices() and is_permutation(perm)))
-    return false;
-
-  std::set<unsigned int, std::less<unsigned int> > edges1;
-  std::set<unsigned int, std::less<unsigned int> > edges2;
-
-  for(unsigned int i = 0; i < get_nof_vertices(); i++)
-    {
-      const Vertex& v1 = vertices[i];
-      edges1.clear();
-      for(std::vector<unsigned int>::const_iterator ei = v1.edges.begin();
-	  ei != v1.edges.end();
-	  ei++)
-	edges1.insert(perm[*ei]);
-      
-      const Vertex& v2 = vertices[perm[i]];
-      edges2.clear();
-      for(std::vector<unsigned int>::const_iterator ei = v2.edges.begin();
-	  ei != v2.edges.end();
-	  ei++)
-	edges2.insert(*ei);
-
-      if(!(edges1 == edges2))
-	return false;
-    }
-
-  return true;
+bool Graph::is_automorphism(const std::vector<unsigned int>& perm) const {
+	if(!(perm.size() == get_nof_vertices() and is_permutation(perm)))
+		return false;
+	std::set<unsigned int, std::less<unsigned int> > edges1;
+	std::set<unsigned int, std::less<unsigned int> > edges2;
+	for(unsigned int i = 0; i < get_nof_vertices(); i++) {
+		const Vertex& v1 = vertices[i];
+		edges1.clear();
+		for(std::vector<IndexEdge>::const_iterator ei = v1.edges.begin(); ei != v1.edges.end(); ei++)
+			//edges1.insert(perm[*ei]);
+			edges1.insert(perm[ei->first]); // cxh
+		const Vertex& v2 = vertices[perm[i]];
+		edges2.clear();
+		for(std::vector<IndexEdge>::const_iterator ei = v2.edges.begin(); ei != v2.edges.end(); ei++)
+			//edges2.insert(*ei);
+			edges2.insert(ei->first); // cxh
+		if(!(edges1 == edges2)) return false;
+	}
+	return true;
 }
 
 
@@ -5383,10 +5207,11 @@ Graph::nucr_find_first_component(const unsigned int level)
       Partition::Cell* const cell = component[i];
 	  
       const Vertex& v = vertices[p.elements[cell->first]];
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j > 0; j--)
 	{
-	  const unsigned int neighbour = *ei++;
+	  //const unsigned int neighbour = *ei++;
+	  const unsigned int neighbour = (ei++)->first; // cxh
 	  
 	  Partition::Cell* const neighbour_cell = p.get_cell(neighbour);
 
@@ -5483,10 +5308,11 @@ Graph::nucr_find_first_component(const unsigned int level,
       Partition::Cell* const cell = comp[i];
 
       const Vertex& v = vertices[p.elements[cell->first]];
-      std::vector<unsigned int>::const_iterator ei = v.edges.begin();
+      std::vector<IndexEdge>::const_iterator ei = v.edges.begin();
       for(unsigned int j = v.nof_edges(); j > 0; j--)
 	{
-	  const unsigned int neighbour = *ei++;
+	  //const unsigned int neighbour = *ei++;
+	  const unsigned int neighbour = (ei++)->first; // cxh
 	  
 	  Partition::Cell* const neighbour_cell = p.get_cell(neighbour);
 
@@ -5602,8 +5428,5 @@ Graph::nucr_find_first_component(const unsigned int level,
 
   return true;
 }
-
-
-
 
 }

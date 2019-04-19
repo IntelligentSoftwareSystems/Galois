@@ -15,8 +15,8 @@ friend std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick
 public:
 	Quick_Pattern() { }
 	Quick_Pattern(unsigned int size_of_tuple) {
-		size = size_of_tuple / sizeof(Element_In_Tuple);
-		elements = new Element_In_Tuple[size];
+		size = size_of_tuple / sizeof(ElementType);
+		elements = new ElementType[size];
 	}
 	~Quick_Pattern() {}
 	//operator for map
@@ -24,8 +24,8 @@ public:
 		//compare edges
 		assert(size == other.size);
 		for (unsigned int i = 0; i < size; ++i) {
-			const Element_In_Tuple & t1 = elements[i];
-			const Element_In_Tuple & t2 = other.elements[i];
+			const ElementType & t1 = elements[i];
+			const ElementType & t2 = other.elements[i];
 			int cmp_element = t1.cmp(t2);
 			if(cmp_element != 0) {
 				return false;
@@ -50,21 +50,23 @@ public:
 		for (unsigned int i = 0; i < size; ++i) {
 			auto element = elements[i];
 			h.update(element.vertex_id);
+#ifdef ENABLE_LABEL
 			h.update(element.vertex_label);
+#endif
 			h.update(element.history_info);
 		}
 		return h.get_value();
 	}
-	Element_In_Tuple& at(unsigned int index) const {
+	ElementType& at(unsigned int index) const {
 		return elements[index];
 	}
 	inline unsigned int get_size() const { return size; }
-	inline Element_In_Tuple* get_elements() { return elements; }
+	inline ElementType* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
 
 private:
 	unsigned int size;
-	Element_In_Tuple* elements;
+	ElementType* elements;
 };
 
 std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern) {

@@ -33,7 +33,7 @@
 #include <iostream>
 #include <fstream>
 
-#define ENABLE_LABEL 1
+#define ENABLE_LABEL
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining";
@@ -79,8 +79,8 @@ void init(Graph& graph, EmbeddingQueue &queue) {
 				if (src < dst) {
 					auto& dst_label = graph.getData(dst);
 					Embedding new_emb;
-					new_emb.push_back(Element_In_Tuple(src, 0, src_label));
-					new_emb.push_back(Element_In_Tuple(dst, 0, dst_label));
+					new_emb.push_back(ElementType(src, 0, src_label));
+					new_emb.push_back(ElementType(dst, 0, dst_label));
 					queue.push_back(new_emb);
 				}
 			}
@@ -241,7 +241,7 @@ int main(int argc, char** argv) {
 	std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 	//print_graph(graph);
-	unsigned sizeof_emb = 2 * sizeof(Element_In_Tuple);
+	unsigned sizeof_emb = 2 * sizeof(ElementType);
 	Miner miner(true, sizeof_emb, &graph);
 	miner.set_threshold(minsup);
 	galois::reportPageAlloc("MeminfoPre");

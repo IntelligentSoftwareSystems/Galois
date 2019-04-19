@@ -1,19 +1,68 @@
-/*
- * type.hpp
- *
- *  Created on: Mar 6, 2017
- *      Author: kai
- */
+#ifndef TYPE_HPP_
+#define TYPE_HPP_
+//#include "common.hpp"
+#include <atomic>
+#include <sys/syscall.h>
+#include <iostream>
+#include <assert.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <thread>
+#include <fcntl.h>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <fstream>
+#include <cassert>
+#include <vector>
+#include <ostream>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <time.h>
+#include <signal.h>
+#include <ctime>
+#include <sstream>
+#include <iomanip>
+#include <functional>
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <stdlib.h>
+#include <exception>
+#include <algorithm>
+#include <climits>
+#include <memory>
+#include <cstring>
+#include <malloc.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
 
-#ifndef CORE_TYPE_HPP_
-#define CORE_TYPE_HPP_
-#include "common.hpp"
 // bliss headers
 #include "defs.hh"
 #include "graph.hh"
 #include "utils.hh"
 #include "bignum.hh"
 #include "uintseqhash.hh"
+
+typedef uint32_t uint32;
+typedef int32_t int32;
+#if !(__APPLE__ & __MACH__)
+typedef uint64_t uint64;
+typedef int64_t int64;
+#else
+typedef size_t uint64;
+typedef size_t int64;
+#endif
+typedef uint16_t uint16;
+typedef int16_t int16;
+typedef int8_t int8;
+typedef uint8_t uint8;
+
 typedef int VertexId;
 typedef float Weight;
 typedef unsigned char BYTE;
@@ -21,6 +70,8 @@ typedef unsigned char BYTE;
 struct Edge {
 	VertexId src;
 	VertexId target;
+	unsigned eid;
+	Edge(VertexId _src, VertexId _target, unsigned _eid) : src(_src), target(_target), eid(_eid) {}
 	Edge(VertexId _src, VertexId _target) : src(_src), target(_target) {}
 	Edge() : src(0), target(0) {}
 	~Edge(){}
@@ -71,26 +122,24 @@ struct LabeledEdge {
  *     4 bytes          1   1   1    1
  *
  * */
-struct Element_In_Tuple {
+struct LabeledElement {
 	VertexId vertex_id;
 	BYTE key_index;
 	BYTE edge_label;
 	BYTE vertex_label;
 	BYTE history_info;
-	Element_In_Tuple() { }
-	Element_In_Tuple(VertexId _vertex_id) :
+	LabeledElement() { }
+	LabeledElement(VertexId _vertex_id) :
 		vertex_id(_vertex_id), key_index(0), edge_label(0), vertex_label(0), history_info(0) { }
-	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
+	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
 		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) { }
-	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 				vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
-	Element_In_Tuple(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+	LabeledElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
-	~Element_In_Tuple() { }
-	inline void set_vertex_id(VertexId new_id) {
-		vertex_id = new_id;
-	}
-	inline int cmp(const Element_In_Tuple& other) const {
+	~LabeledElement() { }
+	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
+	inline int cmp(const LabeledElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;
 		if(vertex_id > other.vertex_id) return 1;
@@ -110,13 +159,13 @@ struct Element_In_Tuple {
 	}
 };
 
-inline std::ostream & operator<<(std::ostream & strm, const Element_In_Tuple& element) {
+inline std::ostream & operator<<(std::ostream & strm, const LabeledElement& element) {
 	strm << "[" << element.vertex_id << ", " << (int)element.key_index << ", " << (int)element.edge_label << ", "
 			<< (int)element.vertex_label << ", " << (int)element.history_info << "]";
 	return strm;
 }
 
-inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_In_Tuple>& tuple) {
+inline std::ostream & operator<<(std::ostream & strm, const std::vector<LabeledElement>& tuple) {
 	if(tuple.empty()){
 		strm << "(empty)";
 		return strm;
@@ -156,4 +205,77 @@ inline std::ostream & operator<<(std::ostream & strm, const std::vector<Base_Ele
 	return strm;
 }
 
-#endif /* CORE_TYPE_HPP_ */
+struct StructuralElement {
+	VertexId vertex_id;
+	BYTE history_info;
+	StructuralElement() { }
+	StructuralElement(VertexId _vertex_id) : vertex_id(_vertex_id), history_info(0) { }
+	StructuralElement(VertexId _vertex_id, BYTE _history) : vertex_id(_vertex_id), history_info(_history) { }
+	StructuralElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+		vertex_id(_vertex_id), history_info(_history) { }
+	StructuralElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+		vertex_id(_vertex_id), history_info(_history) { }
+	~StructuralElement() { }
+	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
+	inline int cmp(const StructuralElement& other) const {
+		//compare vertex id
+		if(vertex_id < other.vertex_id) return -1;
+		if(vertex_id > other.vertex_id) return 1;
+		//compare history info
+		if(history_info < other.history_info) return -1;
+		if(history_info > other.history_info) return 1;
+		return 0;
+	}
+};
+
+inline std::ostream & operator<<(std::ostream & strm, const StructuralElement& element) {
+	strm << "[" << element.vertex_id << ", " << (int)element.history_info << "]";
+	return strm;
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const std::vector<StructuralElement>& embedding) {
+	if (embedding.empty()) {
+		strm << "(empty)";
+		return strm;
+	}
+	strm << "(";
+	for (auto it = embedding.begin(); it != embedding.end() - 1; ++ it)
+		strm << (*it) << ", ";
+	strm << embedding.back();
+	strm << ")";
+	return strm;
+}
+
+typedef unsigned SimpleElement;
+#ifdef ENABLE_LABEL
+#define ElementType LabeledElement
+#else
+#define ElementType StructuralElement
+#endif
+
+typedef std::set<int> IntSet;
+typedef std::unordered_set<int> HashIntSet;
+typedef std::vector<std::unordered_set<int> > HashIntSets;
+
+typedef std::vector<ElementType> Embedding;
+//typedef std::vector<SimpleElement> BaseEmbedding;
+class BaseEmbedding: public std::vector<SimpleElement> {
+public:
+	inline unsigned get_hash() const {
+		bliss::UintSeqHash h;
+		for(unsigned i = 0; i < size(); ++i)
+			h.update(data()[i]);
+		return h.get_value();
+	}
+};
+
+namespace std {
+	template<>
+	struct hash<BaseEmbedding> {
+		std::size_t operator()(const BaseEmbedding& emb) const {
+			return std::hash<int>()(emb.get_hash());
+		}
+	};
+}
+
+#endif /* TYPE_HPP_ */

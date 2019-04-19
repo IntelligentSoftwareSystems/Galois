@@ -1,14 +1,7 @@
 set(sources
-		src/bliss.cc
-		src/bliss_C.cc
-		src/defs.cc
 		src/graph.cc
-		src/heap.cc
 		src/orbit.cc
 		src/partition.cc
-		src/timer.cc
-		src/uintseqhash.cc
-		src/utils.cc
 )
 
 add_library(bliss STATIC ${sources})

@@ -33,7 +33,6 @@
 #include <iostream>
 #include <fstream>
 #define DEBUG 0
-#define ENABLE_LABEL 0
 
 const char* name = "Motif";
 const char* desc = "Counts the motifs in a graph";
@@ -75,8 +74,8 @@ void initialization(Graph& graph, EmbeddingQueue &queue) {
 				if(src < dst) {
 					// create a new embedding
 					Embedding new_emb;
-					new_emb.push_back(Element_In_Tuple(src));
-					new_emb.push_back(Element_In_Tuple(dst));
+					new_emb.push_back(ElementType(src));
+					new_emb.push_back(ElementType(dst));
 					queue.push_back(new_emb);
 				}
 			}
@@ -209,7 +208,8 @@ int main(int argc, char** argv) {
 	} else { printf("Unkown file format\n"); exit(1); }
 	//print_graph(graph);
 	// the initial size of a embedding is 2 (nodes) for single-edge embeddings
-	unsigned sizeof_embedding = 2 * sizeof(Element_In_Tuple);
+	unsigned sizeof_embedding = 2 * sizeof(ElementType);
+	galois::gPrint("Embedding Element size: ", sizeof(ElementType), "\n");
 	// a miner defines the operators (join and aggregation)
 	Miner miner(false, sizeof_embedding, &graph);
 	Tinitial.stop();

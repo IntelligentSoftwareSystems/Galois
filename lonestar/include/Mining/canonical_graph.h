@@ -33,8 +33,8 @@ public:
 		//compare edges
 		assert(tuple.size() == other_cg.tuple.size());
 		for(unsigned i = 0; i < tuple.size(); ++i){
-			const Element_In_Tuple & t1 = tuple[i];
-			const Element_In_Tuple & t2 = other_cg.tuple[i];
+			const auto & t1 = tuple[i];
+			const auto & t2 = other_cg.tuple[i];
 			int cmp_element = t1.cmp(t2);
 			if(cmp_element != 0){
 				return cmp_element;
@@ -42,30 +42,18 @@ public:
 		}
 		return 0;
 	}
-	inline unsigned int get_hash() const {
-		return hash_value;
-	}
-	inline int get_number_vertices() const {
-		return number_of_vertices;
-	}
+	inline unsigned int get_hash() const { return hash_value; }
+	inline int get_number_vertices() const { return number_of_vertices; }
 	//operator for map
-	inline bool operator==(const Canonical_Graph& other) const {
-		return cmp(other) == 0;
-	}
-	inline std::vector<Element_In_Tuple>& get_tuple() {
-		return tuple;
-	}
-	inline std::vector<Element_In_Tuple> get_tuple_const() const {
-		return tuple;
-	}
-	inline void set_number_vertices(int num_vertices) {
-		number_of_vertices = num_vertices;
-	}
-	inline void set_hash_value(unsigned int hash) {
-		hash_value = hash;
-	}
+	inline bool operator==(const Canonical_Graph& other) const { return cmp(other) == 0; }
+	inline Embedding& get_tuple() { return tuple; }
+	inline Embedding get_tuple_const() const { return tuple; }
+	inline void set_number_vertices(int num_vertices) { number_of_vertices = num_vertices; }
+	inline void set_hash_value(unsigned int hash) { hash_value = hash; }
+	inline unsigned get_quick_pattern_index(unsigned i) { return qp_idx[i]; }
 private:
-	std::vector<Element_In_Tuple> tuple;
+	Embedding tuple;
+	std::vector<unsigned> qp_idx;
 	int number_of_vertices;
 	unsigned int hash_value;
 	void construct_cg(bliss::AbstractGraph* ag, bool is_directed) {
@@ -91,6 +79,7 @@ private:
 			Edge edge = min_heap.top();
 			push_element(edge, map, vertices);
 			//std::cout << "tuple: " << tuple << std::endl;
+			//if (edge.eid > 0) qp_idx[i] = edge.eid;
 			min_heap.pop();
 			add_neighbours(edge, min_heap, vertices, set);
 		}
@@ -99,7 +88,7 @@ private:
 		for(unsigned i = 0; i < vertices.size(); ++i) {
 			if(!vertices[i].edges.empty()) {
 				for(auto v: vertices[i].edges) {
-					min_heap.push(Edge(i, v));
+					min_heap.push(Edge(i, v.first, v.second));
 				}
 				set.insert(i);
 				return i;
@@ -109,18 +98,18 @@ private:
 	}
 	void push_first_element(VertexId first, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
 		map[first] = 0;
-		tuple.push_back(Element_In_Tuple(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
+		tuple.push_back(ElementType(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
 	}
 	void push_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
 		assert(edge.src < edge.target);
 		if(map.find(edge.src) != map.end()) {
-			tuple.push_back(Element_In_Tuple(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
+			tuple.push_back(ElementType(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
 			if(map.find(edge.target) == map.end()) {
 				int s = tuple.size() - 1;
 				map[edge.target] = s;
 			}
 		} else if(map.find(edge.target) != map.end()) {
-			tuple.push_back(Element_In_Tuple(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
+			tuple.push_back(ElementType(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
 			if(map.find(edge.src) == map.end()) {
 				int s = tuple.size() - 1;
 				map[edge.src] = s;
@@ -139,9 +128,9 @@ private:
 	void add_neighbours(VertexId srcId, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices, std::unordered_set<VertexId>& set) {
 		if(set.find(srcId) == set.end()){
 			for(auto v: vertices[srcId].edges){
-				VertexId target = v;
+				VertexId target = v.first;
 				if(set.find(target) == set.end()){
-					Edge edge(srcId, target);
+					Edge edge(srcId, target, v.second);
 					edge.swap();
 					min_heap.push(edge);
 				}

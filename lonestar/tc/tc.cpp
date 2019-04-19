@@ -34,7 +34,6 @@
 #include <fstream>
 #define USE_SIMPLE
 #define DEBUG 0
-#define ENABLE_LABEL 0
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph ((only works for undirected neighbor-sorted graphs)";
