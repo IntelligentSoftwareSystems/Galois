@@ -17,28 +17,18 @@ public:
 	~Canonical_Graph() {}
 	int cmp(const Canonical_Graph& other_cg) const {
 		//compare the numbers of vertices
-		if(get_number_vertices() < other_cg.get_number_vertices()) {
-			return -1;
-		}
-		if(get_number_vertices() > other_cg.get_number_vertices()) {
-			return 1;
-		}
+		if(get_number_vertices() < other_cg.get_number_vertices()) return -1;
+		if(get_number_vertices() > other_cg.get_number_vertices()) return 1;
 		//compare hash value
-		if(get_hash() < other_cg.get_hash()) {
-			return -1;
-		}
-		if(get_hash() > other_cg.get_hash()) {
-			return 1;
-		}
+		if(get_hash() < other_cg.get_hash()) return -1;
+		if(get_hash() > other_cg.get_hash()) return 1;
 		//compare edges
-		assert(tuple.size() == other_cg.tuple.size());
-		for(unsigned i = 0; i < tuple.size(); ++i){
-			const auto & t1 = tuple[i];
-			const auto & t2 = other_cg.tuple[i];
+		assert(embedding.size() == other_cg.embedding.size());
+		for(unsigned i = 0; i < embedding.size(); ++i) {
+			const auto & t1 = embedding[i];
+			const auto & t2 = other_cg.embedding[i];
 			int cmp_element = t1.cmp(t2);
-			if(cmp_element != 0){
-				return cmp_element;
-			}
+			if(cmp_element != 0) return cmp_element;
 		}
 		return 0;
 	}
@@ -46,14 +36,14 @@ public:
 	inline int get_number_vertices() const { return number_of_vertices; }
 	//operator for map
 	inline bool operator==(const Canonical_Graph& other) const { return cmp(other) == 0; }
-	inline Embedding& get_tuple() { return tuple; }
-	inline Embedding get_tuple_const() const { return tuple; }
+	inline Embedding& get_embedding() { return embedding; }
+	inline Embedding get_embedding_const() const { return embedding; }
 	inline void set_number_vertices(int num_vertices) { number_of_vertices = num_vertices; }
 	inline void set_hash_value(unsigned int hash) { hash_value = hash; }
 	inline unsigned get_quick_pattern_index(unsigned i) { return qp_idx[i]; }
 private:
-	Embedding tuple;
-	std::vector<unsigned> qp_idx;
+	Embedding embedding;
+	std::vector<int> qp_idx;
 	int number_of_vertices;
 	unsigned int hash_value;
 	void construct_cg(bliss::AbstractGraph* ag, bool is_directed) {
@@ -62,10 +52,10 @@ private:
 			number_of_vertices = ag->get_nof_vertices();
 			hash_value = ag->get_hash();
 			//std::cout << number_of_vertices << ", " << hash_value << std::endl;
-			transform_to_tuple(ag);
+			transform_to_embedding(ag);
 		}
 	}
-	void transform_to_tuple(bliss::AbstractGraph* ag) {
+	void transform_to_embedding(bliss::AbstractGraph* ag) {
 		bliss::Graph* graph = (bliss::Graph*) ag;
 		std::unordered_set<VertexId> set;
 		std::unordered_map<VertexId, BYTE> map;
@@ -75,11 +65,19 @@ private:
 		VertexId first_src = init_heapAndset(vertices, min_heap, set);
 		assert(first_src != -1);
 		push_first_element(first_src, map, vertices);
+#ifdef USE_DOMAIN
+		bool is_first_edge = true;
+#endif
 		while(!min_heap.empty()) {
 			Edge edge = min_heap.top();
+			//std::cout << "embedding: " << embedding << std::endl;
+#ifdef USE_DOMAIN
+			if (is_first_edge) {
+				qp_idx.push_back(edge.src_domain);
+				is_first_edge = false;
+			}
+#endif
 			push_element(edge, map, vertices);
-			//std::cout << "tuple: " << tuple << std::endl;
-			//if (edge.eid > 0) qp_idx[i] = edge.eid;
 			min_heap.pop();
 			add_neighbours(edge, min_heap, vertices, set);
 		}
@@ -88,7 +86,11 @@ private:
 		for(unsigned i = 0; i < vertices.size(); ++i) {
 			if(!vertices[i].edges.empty()) {
 				for(auto v: vertices[i].edges) {
-					min_heap.push(Edge(i, v.first, v.second));
+#ifdef USE_DOMAIN
+					min_heap.push(Edge(i, v.first, v.second.first, v.second.second));
+#else
+					min_heap.push(Edge(i, v));
+#endif
 				}
 				set.insert(i);
 				return i;
@@ -98,20 +100,26 @@ private:
 	}
 	void push_first_element(VertexId first, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
 		map[first] = 0;
-		tuple.push_back(ElementType(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
+		embedding.push_back(ElementType(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
 	}
 	void push_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
 		assert(edge.src < edge.target);
 		if(map.find(edge.src) != map.end()) {
-			tuple.push_back(ElementType(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
+			embedding.push_back(ElementType(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
+#ifdef USE_DOMAIN
+			qp_idx.push_back(edge.target_domain);
+#endif
 			if(map.find(edge.target) == map.end()) {
-				int s = tuple.size() - 1;
+				int s = embedding.size() - 1;
 				map[edge.target] = s;
 			}
 		} else if(map.find(edge.target) != map.end()) {
-			tuple.push_back(ElementType(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
+			embedding.push_back(ElementType(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
+#ifdef USE_DOMAIN
+			qp_idx.push_back(edge.src_domain);
+#endif
 			if(map.find(edge.src) == map.end()) {
-				int s = tuple.size() - 1;
+				int s = embedding.size() - 1;
 				map[edge.src] = s;
 			}
 		} else {
@@ -127,10 +135,18 @@ private:
 
 	void add_neighbours(VertexId srcId, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices, std::unordered_set<VertexId>& set) {
 		if(set.find(srcId) == set.end()){
-			for(auto v: vertices[srcId].edges){
+			for(auto v: vertices[srcId].edges) {
+#ifdef USE_DOMAIN
 				VertexId target = v.first;
-				if(set.find(target) == set.end()){
-					Edge edge(srcId, target, v.second);
+#else
+				VertexId target = v;
+#endif
+				if(set.find(target) == set.end()) {
+#ifdef USE_DOMAIN
+					Edge edge(srcId, target, v.second.first, v.second.second);
+#else
+					Edge edge(srcId, target);
+#endif
 					edge.swap();
 					min_heap.push(edge);
 				}
@@ -141,7 +157,7 @@ private:
 };
 
 std::ostream & operator<<(std::ostream & strm, const Canonical_Graph& cg) {
-	strm << "{" << cg.get_tuple_const() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
+	strm << "{" << cg.get_embedding_const() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
 	return strm;
 }
 

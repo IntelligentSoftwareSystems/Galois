@@ -41,11 +41,16 @@ namespace bliss {
 
 namespace bliss {
 
+typedef std::pair<unsigned,unsigned> Index;
+#ifdef USE_DOMAIN
+typedef std::pair<unsigned, Index> IndexEdge;
+#else
+typedef unsigned IndexEdge;
+#endif
 /**
  * \brief Statistics returned by the bliss search algorithm.
  */
-class Stats
-{
+class Stats {
   friend class AbstractGraph;
   /** \internal The size of the automorphism group. */
   BigNum group_size;
@@ -65,8 +70,7 @@ class Stats
   /** \internal The maximal depth of the search tree. */
   unsigned long int max_level;
   /** */
-  void reset()
-  {
+  void reset() {
     group_size.assign(1);
     group_size_approx = 1.0;
     nof_nodes = 0;
@@ -109,18 +113,11 @@ public:
   unsigned long int get_max_level() const {return max_level;}
 };
 
-
-
-
-
-
 /**
  * \brief An abstract base class for different types of graphs.
  */
-class AbstractGraph
-{
+class AbstractGraph {
   friend class Partition;
-
 public:
   AbstractGraph();
   virtual ~AbstractGraph();
@@ -148,7 +145,7 @@ public:
    * them in the first place as they are not ignored immediately but will
    * consume memory and computation resources for a while.
    */
-  virtual void add_edge(const unsigned int source, const unsigned int target, int index) = 0;
+  virtual void add_edge(const unsigned int source, const unsigned int target, Index index) = 0;
 
   /**
    * Change the color of the vertex \a vertex to \a color.
@@ -284,8 +281,6 @@ public:
     opt_use_long_prune = active;
   }
 
-
-
 protected:
   /** \internal
    * How much verbose output is produced (0 means none) */
@@ -410,8 +405,6 @@ protected:
    */
   bool compute_eqref_hash;
   UintSeqHash eqref_hash;
-
-
   /** \internal
    * Check whether the current partition p is equitable.
    * Performance: very slow, use only for debugging purposes.
@@ -422,7 +415,6 @@ protected:
   unsigned int *first_path_labeling_inv;
   Orbit         first_path_orbits;
   unsigned int *first_path_automorphism;
-
   unsigned int *best_path_labeling;
   unsigned int *best_path_labeling_inv;
   Orbit         best_path_orbits;
@@ -432,33 +424,20 @@ protected:
   void update_labeling_and_its_inverse(unsigned int * const lab,
 				       unsigned int * const lab_inv);
   void update_orbit_information(Orbit &o, const unsigned int *perm);
-
   void reset_permutation(unsigned int *perm);
-
   /* Mainly for debugging purposes */
   virtual bool is_automorphism(unsigned int* const perm);
-
   std::vector<unsigned int> certificate_current_path;
   std::vector<unsigned int> certificate_first_path;
   std::vector<unsigned int> certificate_best_path;
-
   unsigned int certificate_index;
   virtual void initialize_certificate() = 0;
-
   virtual void remove_duplicate_edges() = 0;
   virtual void make_initial_equitable_partition() = 0;
   virtual Partition::Cell* find_next_cell_to_be_splitted(Partition::Cell *cell) = 0;
-
-
   void search(const bool canonical, Stats &stats);
-
-
-  void (*report_hook)(void *user_param,
-		      unsigned int n,
-		      const unsigned int *aut);
+  void (*report_hook)(void *user_param, unsigned int n, const unsigned int *aut);
   void *report_user_param;
-
-
   /*
    *
    * Nonuniform component recursion (NUCR)
@@ -515,22 +494,14 @@ protected:
    * The number of vertices in the component \a cr_component
    */
   unsigned int cr_component_elements;
-
-
-
-
 };
 
-
-//typedef unsigned IndexEdge;
-typedef std::pair<unsigned, unsigned> IndexEdge;
 /**
  * \brief The class for undirected, vertex colored graphs.
  *
  * Multiple edges between vertices are not allowed (i.e., are ignored).
  */
-class Graph : public AbstractGraph
-{
+class Graph : public AbstractGraph {
 public:
   /**
    * The possible splitting heuristics.
@@ -570,7 +541,11 @@ public:
   public:
     Vertex();
     ~Vertex();
-    void add_edge(const unsigned other_vertex, int idx);
+#ifdef USE_DOMAIN
+    void add_edge(const unsigned other_vertex, Index idx);
+#else
+    void add_edge(const unsigned other_vertex);
+#endif
     void remove_duplicate_edges(std::vector<bool>& tmp);
     void sort_edges();
 
@@ -612,7 +587,6 @@ protected:
   static unsigned int selfloop_invariant(const Graph* const g,
 					 const unsigned int v);
 
-
   bool refine_according_to_invariant(unsigned int (*inv)(const Graph* const g,
 							 const unsigned int v));
 
@@ -636,22 +610,14 @@ protected:
   Partition::Cell* sh_first_max_neighbours();
   Partition::Cell* sh_first_smallest_max_neighbours();
   Partition::Cell* sh_first_largest_max_neighbours();
-
-
   void make_initial_equitable_partition();
-
   void initialize_certificate();
-  
   bool is_automorphism(unsigned int* const perm);
-
-
   bool nucr_find_first_component(const unsigned int level);
   bool nucr_find_first_component(const unsigned int level,
 				 std::vector<unsigned int>& component,
 				 unsigned int& component_elements,
 				 Partition::Cell*& sh_return);
-
-
 
 public:
   /**
@@ -678,24 +644,24 @@ public:
    * \return        a new Graph object or 0 if reading failed for some
    *                reason
    */
-  static Graph* read_dimacs(FILE* const fp, FILE* const errstr = stderr);
+  static Graph* read_dimacs(FILE* const fp, FILE* const errstr = stderr) { return NULL; }
 
   /**
    * Write the graph to a file in a variant of the DIMACS format.
    * See the <A href="http://www.tcs.hut.fi/Software/bliss/">bliss website</A>
    * for the definition of the file format.
    */
-  void write_dimacs(FILE* const fp);
+  void write_dimacs(FILE* const fp) {}
 
   /**
    * \copydoc AbstractGraph::write_dot(FILE * const fp)
    */
-  void write_dot(FILE* const fp);
+  void write_dot(FILE* const fp) {}
 
   /**
    * \copydoc AbstractGraph::write_dot(const char * const file_name)
    */
-  void write_dot(const char* const file_name);
+  void write_dot(const char* const file_name) {}
 
   /**
    * \copydoc AbstractGraph::is_automorphism(const std::vector<unsigned int>& perm) const
@@ -730,7 +696,7 @@ public:
    * them in the first place as they are not ignored immediately but will
    * consume memory and computation resources for a while.
    */
-  void add_edge(const unsigned int v1, const unsigned int v2, int index = 0);
+  void add_edge(const unsigned int v1, const unsigned int v2, Index index);
 
   /**
    * Change the color of the vertex \a vertex to \a color.
@@ -754,261 +720,7 @@ public:
    * for both graphs.
    */
   void set_splitting_heuristic(const SplittingHeuristic shs) {sh = shs; }
-  
-
 };
-
-
-
-/**
- * \brief The class for directed, vertex colored graphs.
- *
- * Multiple edges between vertices are not allowed (i.e., are ignored).
- */
-class Digraph : public AbstractGraph
-{
-public:
-  /**
-   * The possible splitting heuristics.
-   * The selected splitting heuristics affects the computed canonical
-   * labelings; therefore, if you want to compare whether two graphs
-   * are isomorphic by computing and comparing (for equality) their
-   * canonical versions, be sure to use the same splitting heuristics
-   * for both graphs.
-   */
-  typedef enum {
-    /** First non-unit cell.
-     * Very fast but may result in large search spaces on difficult graphs.
-     * Use for large but easy graphs. */
-    shs_f = 0,
-    /** First smallest non-unit cell.
-     * Fast, should usually produce smaller search spaces than shs_f. */
-    shs_fs,
-    /** First largest non-unit cell.
-     * Fast, should usually produce smaller search spaces than shs_f. */
-    shs_fl,
-    /** First maximally non-trivially connected non-unit cell.
-     * Not so fast, should usually produce smaller search spaces than shs_f,
-     * shs_fs, and shs_fl. */
-    shs_fm,
-    /** First smallest maximally non-trivially connected non-unit cell.
-     * Not so fast, should usually produce smaller search spaces than shs_f,
-     * shs_fs, and shs_fl. */
-    shs_fsm,
-    /** First largest maximally non-trivially connected non-unit cell.
-     * Not so fast, should usually produce smaller search spaces than shs_f,
-     * shs_fs, and shs_fl. */
-    shs_flm
-  } SplittingHeuristic;
-
-
-  //moved from protected scope by Zhiqiang
-  class Vertex {
-  public:
-    Vertex();
-    ~Vertex();
-    void add_edge_to(const unsigned int dest_vertex);
-    void add_edge_from(const unsigned int source_vertex);
-    void remove_duplicate_edges(std::vector<bool>& tmp);
-    void sort_edges();
-    unsigned int color;
-    std::vector<unsigned int> edges_out;
-    std::vector<unsigned int> edges_in;
-    unsigned int nof_edges_in() const {return edges_in.size(); }
-    unsigned int nof_edges_out() const {return edges_out.size(); }
-  };
-
-  //added by Zhiqiang
-  std::vector<Vertex> & get_vertices_rstream(){
-	  return vertices;
-  }
-
-  void sort_edges_rstream(){
-	  sort_edges();
-  }
-
-protected:
-  std::vector<Vertex> vertices;
-  void remove_duplicate_edges();
-
-  /** \internal
-   * Partition independent invariant.
-   * Returns the color of the vertex.
-   * Time complexity: O(1).
-   */
-  static unsigned int vertex_color_invariant(const Digraph* const g,
-					     const unsigned int v);
-  /** \internal
-   * Partition independent invariant.
-   * Returns the indegree of the vertex.
-   * DUPLICATE EDGES MUST HAVE BEEN REMOVED BEFORE.
-   * Time complexity: O(1).
-   */
-  static unsigned int indegree_invariant(const Digraph* const g,
-					 const unsigned int v);
-  /** \internal
-   * Partition independent invariant.
-   * Returns the outdegree of the vertex.
-   * DUPLICATE EDGES MUST HAVE BEEN REMOVED BEFORE.
-   * Time complexity: O(1).
-   */
-  static unsigned int outdegree_invariant(const Digraph* const g,
-					  const unsigned int v);
-  /** \internal
-   * Partition independent invariant.
-   * Returns 1 if there is an edge from the vertex to itself, 0 if not.
-   * Time complexity: O(k), where k is the number of edges leaving the vertex.
-   */
-  static unsigned int selfloop_invariant(const Digraph* const g,
-					 const unsigned int v);
-
-  /** \internal
-   * Refine the partition \a p according to
-   * the partition independent invariant \a inv.
-   */
-  bool refine_according_to_invariant(unsigned int (*inv)(const Digraph* const g,
-							 const unsigned int v));
-
-  /*
-   * Routines needed when refining the partition p into equitable
-   */
-  bool split_neighbourhood_of_unit_cell(Partition::Cell* const);
-  bool split_neighbourhood_of_cell(Partition::Cell* const);
-
-
-  /** \internal
-   * \copydoc AbstractGraph::is_equitable() const
-   */
-  bool is_equitable() const;
-
-  /* Splitting heuristics, documented in more detail in the cc-file. */
-  SplittingHeuristic sh;
-  Partition::Cell* find_next_cell_to_be_splitted(Partition::Cell *cell);
-  Partition::Cell* sh_first();
-  Partition::Cell* sh_first_smallest();
-  Partition::Cell* sh_first_largest();
-  Partition::Cell* sh_first_max_neighbours();
-  Partition::Cell* sh_first_smallest_max_neighbours();
-  Partition::Cell* sh_first_largest_max_neighbours();
-
-  void make_initial_equitable_partition();
-
-  void initialize_certificate();
-
-  bool is_automorphism(unsigned int* const perm);
-
-  void sort_edges();
-
-  bool nucr_find_first_component(const unsigned int level);
-  bool nucr_find_first_component(const unsigned int level,
-				 std::vector<unsigned int>& component,
-				 unsigned int& component_elements,
-				 Partition::Cell*& sh_return);
-
-public:
-  /**
-   * Create a new directed graph with \a N vertices and no edges.
-   */
-  Digraph(const unsigned int N = 0);
-
-  /**
-   * Destroy the graph.
-   */
-  ~Digraph();
-
-  /**
-   * Read the graph from the file \a fp in a variant of the DIMACS format.
-   * See the <A href="http://www.tcs.hut.fi/Software/bliss/">bliss website</A>
-   * for the definition of the file format.
-   * Note that in the DIMACS file the vertices are numbered from 1 to N while
-   * in this C++ API they are from 0 to N-1.
-   * Thus the vertex n in the file corresponds to the vertex n-1 in the API.
-   * \param fp      the file stream for the graph file
-   * \param errstr  if non-null, the possible error messages are printed
-   *                in this file stream
-   * \return        a new Digraph object or 0 if reading failed for some
-   *                reason
-   */
-  static Digraph* read_dimacs(FILE* const fp, FILE* const errstr = stderr);
-
-  /**
-   * \copydoc AbstractGraph::write_dimacs(FILE * const fp)
-   */
-  void write_dimacs(FILE* const fp);
-
-
-  /**
-   * \copydoc AbstractGraph::write_dot(FILE *fp)
-   */
-  void write_dot(FILE * const fp);
-
-  /**
-   * \copydoc AbstractGraph::write_dot(const char * const file_name)
-   */
-  void write_dot(const char * const file_name);
-
-  /**
-   * \copydoc AbstractGraph::is_automorphism(const std::vector<unsigned int>& perm) const
-   */
-  bool is_automorphism(const std::vector<unsigned int>& perm) const;
-
-
-
-  /**
-   * \copydoc AbstractGraph::get_hash()
-   */ 
-  virtual unsigned int get_hash();
-
-  /**
-   * Return the number of vertices in the graph.
-   */
-  unsigned int get_nof_vertices() const {return vertices.size(); }
-  
-  /**
-   * Add a new vertex with color 'color' in the graph and return its index.
-   */
-  unsigned int add_vertex(const unsigned int color = 0);
-
-  /**
-   * Add an edge from the vertex \a source to the vertex \a target.
-   * Duplicate edges are ignored but try to avoid introducing
-   * them in the first place as they are not ignored immediately but will
-   * consume memory and computation resources for a while.
-   */
-  void add_edge(const unsigned int source, const unsigned int target, int index = 0);
-
-  /**
-   * Change the color of the vertex 'vertex' to 'color'.
-   */
-  void change_color(const unsigned int vertex, const unsigned int color);
-
-  /**
-   * Compare this graph with the graph \a other.
-   * Returns 0 if the graphs are equal, and a negative (positive) integer
-   * if this graph is "smaller than" ("greater than", resp.) than \a other.
-   */
-  int cmp(Digraph& other);
-
-  /**
-   * Set the splitting heuristic used by the automorphism and canonical
-   * labeling algorithm.
-   * The selected splitting heuristics affects the computed canonical
-   * labelings; therefore, if you want to compare whether two graphs
-   * are isomorphic by computing and comparing (for equality) their
-   * canonical versions, be sure to use the same splitting heuristics
-   * for both graphs.
-   */
-  void set_splitting_heuristic(SplittingHeuristic shs) {sh = shs; }
-
-  /**
-   * \copydoc AbstractGraph::permute(const unsigned int* const perm) const
-   */
-  Digraph* permute(const unsigned int* const perm) const;  
-  Digraph* permute(const std::vector<unsigned int>& perm) const;
-};
-
-
-
 
 }
 

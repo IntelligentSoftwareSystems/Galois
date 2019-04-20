@@ -118,11 +118,11 @@ void MotifSolver(Graph& graph, Miner &miner) {
 
 		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
-		QpMap qp_map; // quick patterns map
+		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		//miner.quick_aggregate(queue, qp_map); // sequential implementaion
 
 		// Parallel quick pattern aggregation
-		LocalQpMap qp_localmap; // quick patterns local map for each thread
+		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
 		galois::for_each(
 			galois::iterate(queue),
 			[&](const Embedding& emb, auto& ctx) {
@@ -134,7 +134,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		);
 		// merging results sequentially
 		for (unsigned i = 0; i < qp_localmap.size(); i++) {
-			QpMap qp_lmap = *qp_localmap.getLocal(i);
+			QpMapFreq qp_lmap = *qp_localmap.getLocal(i);
 			for (auto element : qp_lmap) {
 				if (qp_map.find(element.first) != qp_map.end())
 					qp_map[element.first] += element.second;
@@ -144,7 +144,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		}
 
 		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
-		CgMap cg_map; // canonical graph map
+		CgMapFreq cg_map; // canonical graph map for couting the frequency
 		//miner.canonical_aggregate(qp_map, cg_map);
 		/*
 		// sequential implementation
@@ -156,7 +156,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		//*/
 
 		// Parallel canonical pattern aggregation
-		LocalCgMap cg_localmap; // canonical graph local map for each thread
+		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(
 			galois::iterate(qp_map),
 			[&](std::pair<Quick_Pattern, int> qp) {
@@ -170,7 +170,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		);
 		// merging results sequentially
 		for (unsigned i = 0; i < cg_localmap.size(); i++) {
-			CgMap cg_lmap = *cg_localmap.getLocal(i);
+			CgMapFreq cg_lmap = *cg_localmap.getLocal(i);
 			for (auto element : cg_lmap) {
 				if (cg_map.find(element.first) != cg_map.end())
 					cg_map[element.first] += element.second;

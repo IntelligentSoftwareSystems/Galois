@@ -14,8 +14,8 @@ class Quick_Pattern {
 friend std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern);
 public:
 	Quick_Pattern() { }
-	Quick_Pattern(unsigned int size_of_tuple) {
-		size = size_of_tuple / sizeof(ElementType);
+	Quick_Pattern(unsigned subgraph_size) {
+		size = subgraph_size/ sizeof(ElementType);
 		elements = new ElementType[size];
 	}
 	~Quick_Pattern() {}
@@ -23,7 +23,7 @@ public:
 	bool operator==(const Quick_Pattern& other) const {
 		//compare edges
 		assert(size == other.size);
-		for (unsigned int i = 0; i < size; ++i) {
+		for (unsigned i = 0; i < size; ++i) {
 			const ElementType & t1 = elements[i];
 			const ElementType & t2 = other.elements[i];
 			int cmp_element = t1.cmp(t2);
@@ -35,19 +35,18 @@ public:
 	}
 	operator size_t() const {
 		size_t a = 0;
-		for (unsigned int i = 0; i < size; ++i) {
+		for (unsigned i = 0; i < size; ++i) {
 			auto element = elements[i];
 			a += element.vertex_id;
 		}
 		return a; 
 	}
-	//operator int() const { return 0; }
-	unsigned int get_hash() const {
+	unsigned get_hash() const {
 		//TODO
 		bliss::UintSeqHash h;
 		h.update(size);
 		//hash vertex labels and edges
-		for (unsigned int i = 0; i < size; ++i) {
+		for (unsigned i = 0; i < size; ++i) {
 			auto element = elements[i];
 			h.update(element.vertex_id);
 #ifdef ENABLE_LABEL
@@ -57,15 +56,15 @@ public:
 		}
 		return h.get_value();
 	}
-	ElementType& at(unsigned int index) const {
+	ElementType& at(unsigned index) const {
 		return elements[index];
 	}
-	inline unsigned int get_size() const { return size; }
+	inline unsigned get_size() const { return size; }
 	inline ElementType* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
 
 private:
-	unsigned int size;
+	unsigned size;
 	ElementType* elements;
 };
 
@@ -75,9 +74,8 @@ std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_patter
 		return strm;
 	}
 	strm << "(";
-	for(unsigned int index = 0; index < quick_pattern.get_size() - 1; ++index) {
+	for(unsigned index = 0; index < quick_pattern.get_size() - 1; ++index)
 		strm << quick_pattern.elements[index] << ", ";
-	}
 	strm << quick_pattern.elements[quick_pattern.get_size() - 1];
 	strm << ")";
 	return strm;

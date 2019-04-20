@@ -70,11 +70,14 @@ typedef unsigned char BYTE;
 struct Edge {
 	VertexId src;
 	VertexId target;
-	unsigned eid;
-	Edge(VertexId _src, VertexId _target, unsigned _eid) : src(_src), target(_target), eid(_eid) {}
+#ifdef USE_DOMAIN
+	unsigned src_domain;
+	unsigned target_domain;
+	Edge(VertexId _src, VertexId _target, unsigned _src_domain, unsigned _target_domain) : src(_src), target(_target), src_domain(_src_domain), target_domain(_target_domain) {}
+#endif
 	Edge(VertexId _src, VertexId _target) : src(_src), target(_target) {}
 	Edge() : src(0), target(0) {}
-	~Edge(){}
+	~Edge() {}
 	std::string toString() {
 		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
 	}
@@ -83,6 +86,11 @@ struct Edge {
 			VertexId tmp = src;
 			src = target;
 			target = tmp;
+#ifdef USE_DOMAIN
+			unsigned domain = src_domain;
+			src_domain = target_domain;
+			target_domain = domain;
+#endif
 		}
 	}
 };

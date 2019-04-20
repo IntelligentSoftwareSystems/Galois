@@ -6,20 +6,24 @@
 #include "galois/Galois.h"
 #include "galois/substrate/PerThreadStorage.h"
 
-typedef std::unordered_map<Quick_Pattern, unsigned> QpMap;
-typedef std::unordered_map<Canonical_Graph, unsigned> CgMap;
-typedef std::unordered_map<Quick_Pattern, HashIntSets> QPatternMap;
-typedef std::unordered_map<Canonical_Graph, HashIntSets> CPatternMap;
-typedef std::unordered_map<BaseEmbedding, unsigned> SimpleMap;
-typedef galois::substrate::PerThreadStorage<QpMap> LocalQpMap;
-typedef galois::substrate::PerThreadStorage<CgMap> LocalCgMap;
+typedef unsigned Frequency;
+typedef HashIntSets DomainSupport;
+typedef std::unordered_map<Quick_Pattern, Frequency> QpMapFreq; // mapping quick pattern to its frequency
+typedef std::unordered_map<Canonical_Graph, Frequency> CgMapFreq; // mapping canonical pattern to its frequency
+typedef std::unordered_map<Quick_Pattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
+typedef std::unordered_map<Canonical_Graph, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
+typedef std::unordered_map<BaseEmbedding, Frequency> SimpleMap;
+typedef galois::substrate::PerThreadStorage<QpMapDomain> LocalQpMapDomain;
+typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
+typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
+typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
 typedef galois::substrate::PerThreadStorage<SimpleMap> LocalSimpleMap;
 typedef galois::InsertBag<Embedding> EmbeddingQueue;
 typedef galois::InsertBag<BaseEmbedding> BaseEmbeddingQueue;
 
 class Miner {
 public:
-	Miner(bool label_f, int tuple_size, Graph *g) : label_flag(label_f), sizeof_tuple(tuple_size) {
+	Miner(bool label_f, unsigned emb_size, Graph *g) : label_flag(label_f), embedding_size(emb_size) {
 		graph = g;
 		//construct_edgelist();
 		//edge_hashmap.resize(g->size());
@@ -29,10 +33,11 @@ public:
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
 	void extend_edge(unsigned max_size, Embedding emb, EmbeddingQueue &queue) {
 		unsigned size = emb.size();
+		// get the number of distinct vertices in the embedding
 		std::unordered_set<VertexId> vertices_set;
 		vertices_set.reserve(size);
 		for(unsigned i = 0; i < size; i ++) vertices_set.insert(emb[i].vertex_id);
-		std::unordered_set<VertexId> set;
+		std::unordered_set<VertexId> set; // uesd to make sure each distinct vertex is expanded only once
 		// for each vertex in the embedding
 		for(unsigned i = 0; i < size; ++i) {
 			VertexId id = emb[i].vertex_id;
@@ -66,9 +71,9 @@ public:
 	}
 	// given an embedding, extend it with one more vertex. Used for k-cliques
 	void extend_vertex(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
-		int n = emb.size();
-		for(int i = 0; i < n; ++i) {
-			int id = emb[i];
+		unsigned n = emb.size();
+		for(unsigned i = 0; i < n; ++i) {
+			SimpleElement id = emb[i];
 			for(auto e : graph->edges(id)) {
 				GNode dst = graph->getEdgeDst(e);
 				// extend vertex in ascending order to avoid unnecessary enumeration
@@ -80,10 +85,10 @@ public:
 			}
 		}
 	}
-	void quick_aggregate(EmbeddingQueue queue, QpMap qp_map) {
+	void quick_aggregate(EmbeddingQueue queue, QpMapFreq qp_map) {
 		qp_map.clear();
 		for (auto emb : queue) {
-			Quick_Pattern qp(sizeof_tuple);
+			Quick_Pattern qp(embedding_size);
 			turn_quick_pattern_pure(emb, qp, label_flag);
 			if (qp_map.find(qp) != qp_map.end()) {
 				qp_map[qp] += 1;
@@ -92,8 +97,8 @@ public:
 		}
 	}
 	// aggregate embeddings into quick patterns
-	void quick_aggregate_each(const Embedding& emb, QpMap& qp_map) {
-		Quick_Pattern qp(sizeof_tuple);
+	void quick_aggregate_each(const Embedding& emb, QpMapFreq& qp_map) {
+		Quick_Pattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp, label_flag);
 		// update count for this quick pattern
 		if (qp_map.find(qp) != qp_map.end()) {
@@ -103,8 +108,8 @@ public:
 		// otherwise add this quick pattern into the map, and set the count as one
 		} else qp_map[qp] = 1;
 	}
-	void quick_aggregate_each(Embedding& emb, QPatternMap& qp_map) {
-		Quick_Pattern qp(sizeof_tuple);
+	void quick_aggregate_each(const Embedding& emb, QpMapDomain& qp_map) {
+		Quick_Pattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp, label_flag);
 		if (qp_map.find(qp) == qp_map.end())
 			qp_map[qp].resize(emb.size());
@@ -112,37 +117,39 @@ public:
 			qp_map[qp][i].insert(emb[i].vertex_id);
 		qp.clean();
 	}
-	void canonical_aggregate(QpMap qp_map, CgMap cg_map) {
+	void canonical_aggregate(QpMapFreq qp_map, CgMapFreq cg_map) {
 		for (auto it = qp_map.begin(); it != qp_map.end(); ++it) {
 			Quick_Pattern qp = it->first;
 			unsigned s = it->second;
 			Canonical_Graph* cg = turn_canonical_graph(qp, false);
 			qp.clean();
-			if (cg_map.find(*cg) != cg_map.end()) {
-				cg_map[*cg] = cg_map[*cg] + s;
-			} else cg_map[*cg] = s;
+			if (cg_map.find(*cg) != cg_map.end()) cg_map[*cg] += s;
+			else cg_map[*cg] = s;
 			delete cg;
 		}
 	}
 	// aggregate quick patterns into canonical patterns
-	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& cg_map) {
+	void canonical_aggregate_each(Quick_Pattern qp, Frequency freq, CgMapFreq& cg_map) {
 		// turn the quick pattern into its canonical pattern
 		Canonical_Graph* cg = turn_canonical_graph(qp, false);
 		qp.clean();
 		// if this pattern already exists, increase its count
-		if (cg_map.find(*cg) != cg_map.end()) {
-			cg_map[*cg] = cg_map[*cg] + num;
+		if (cg_map.find(*cg) != cg_map.end()) cg_map[*cg] += freq;
 		// otherwise add this pattern into the map, and set the count as 's'
-		} else cg_map[*cg] = num;
+		else cg_map[*cg] = freq;
 		delete cg;
 	}
-	void canonical_aggregate_each(Quick_Pattern qp, HashIntSets domainSets, CPatternMap& cg_map) {
+	void canonical_aggregate_each(Quick_Pattern qp, DomainSupport domainSets, CgMapDomain& cg_map) {
+		assert(qp.get_size() == domainSets.size());
+		unsigned numDomains = qp.get_size();
+		// turn the quick pattern into its canonical pattern
 		Canonical_Graph* cg = turn_canonical_graph(qp, false);
 		qp.clean();
 		if (cg_map.find(*cg) == cg_map.end())
-			cg_map[*cg].resize(qp.get_size());
-		for (unsigned i = 0; i < domainSets.size(); i ++) {
+			cg_map[*cg].resize(numDomains);
+		for (unsigned i = 0; i < numDomains; i ++) {
 			unsigned qp_idx = cg->get_quick_pattern_index(i);
+			assert(qp_idx >= 0 && qp_idx < numDomains);
 			cg_map[*cg][i].insert(domainSets[qp_idx].begin(), domainSets[qp_idx].end());
 		}
 		delete cg;
@@ -176,9 +183,9 @@ public:
 		else sm[emb] = 1;
 	}
 	// check if the pattern of each embedding in the queue is frequent
-	void filter(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMap &cg_map) {
+	void filter(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMapFreq &cg_map) {
 		for (auto emb : in_queue) {
-			Quick_Pattern qp(sizeof_tuple);
+			Quick_Pattern qp(embedding_size);
 			turn_quick_pattern_pure(emb, qp, label_flag);
 			Canonical_Graph* cf = turn_canonical_graph(qp, false);
 			qp.clean();
@@ -191,9 +198,9 @@ public:
 	}
 	// filtering for FSM
 	// check if the pattern of a given embedding is frequent, if yes, insert it to the queue
-	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMap &cg_map) {
+	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMapFreq &cg_map) {
 		// find the quick pattern of this embedding
-		Quick_Pattern qp(sizeof_tuple);
+		Quick_Pattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp, label_flag);
 		// find the pattern (canonical graph) of this embedding
 		Canonical_Graph* cf = turn_canonical_graph(qp, false);
@@ -206,8 +213,8 @@ public:
 			out_queue.push_back(emb);
 		delete cf;
 	}
-	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CPatternMap &cg_map) {
-		Quick_Pattern qp(sizeof_tuple);
+	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMapDomain &cg_map) {
+		Quick_Pattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp, label_flag);
 		Canonical_Graph* cf = turn_canonical_graph(qp, false);
 		qp.clean();
@@ -224,9 +231,9 @@ public:
 		delete cf;
 	}
 	void set_threshold(unsigned minsup) { threshold = minsup; }
-	void update_embedding_size() { sizeof_tuple += sizeof(ElementType); }
-	void update_base_embedding_size() { sizeof_tuple += sizeof(SimpleElement); }
-	inline int get_sizeof_embedding() { return sizeof_tuple; }
+	void update_embedding_size() { embedding_size += sizeof(ElementType); }
+	void update_base_embedding_size() { embedding_size += sizeof(SimpleElement); }
+	inline unsigned get_embedding_size() { return embedding_size; }
 	void printout_embedding(int level, Embedding emb) {
 		if(emb.size() == 0) {
 			std::cout << "(empty)";
@@ -249,14 +256,37 @@ public:
 		std::cout << emb[emb.size() - 1];
 		std::cout << ")\n";
 	}
-	void printout_agg(CgMap cg_map) {
+	void printout_agg(const CgMapFreq cg_map) {
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 			std::cout << "{" << it->first << " --> " << it->second << std::endl;
+	}
+	// counting the minimal image based support
+	unsigned support_count(HashIntSets domainSets) {
+		unsigned numDomains = domainSets.size();
+		unsigned support = 0xFFFFFFFF;
+		// get the minimal domain size
+		for (unsigned j = 0; j < numDomains; j ++)
+			if (domainSets[j].size() < support)
+				support = domainSets[j].size();
+		return support;
+	}
+	void printout_agg(const CgMapDomain cg_map) {
+		std::vector<unsigned> support(cg_map.size());
+		int i = 0;
+		for (auto it = cg_map.begin(); it != cg_map.end(); ++it) {
+			support[i] = support_count(it->second);
+			i ++;
+		}
+		i = 0;
+		for (auto it = cg_map.begin(); it != cg_map.end(); ++it) {
+			std::cout << "{" << it->first << " --> " << support[i] << std::endl;
+			i ++;
+		}
 	}
 
 private:
 	bool label_flag;
-	int sizeof_tuple;
+	unsigned embedding_size;
 	unsigned threshold;
 	Graph *graph;
 #if 0
@@ -307,9 +337,9 @@ private:
 	}
 	bliss::AbstractGraph* turn_canonical_graph_bliss(Quick_Pattern & qp, const bool is_directed) {
 		bliss::AbstractGraph* ag = 0;
-		//read graph from quick pattern
+		// read graph from quick pattern
 		ag = readGraph(qp, is_directed);
-		//turn to canonical form
+		// turn to canonical form
 		bliss::AbstractGraph* cf = turnCanonical(ag);
 		delete ag;
 		ag = 0;
@@ -330,7 +360,7 @@ private:
 	bliss::AbstractGraph* turnCanonical(bliss::AbstractGraph* ag) {
 		//canonical labeling
 		bliss::Stats stats;
-		const unsigned * cl = ag->canonical_form(stats, &report_aut, stdout);
+		const unsigned * cl = ag->canonical_form(stats, &report_aut, stdout); // this is expensive
 		//permute to canonical form
 		bliss::AbstractGraph* cf = ag->permute(cl);
 //		delete[] cl;
@@ -340,7 +370,7 @@ private:
 		bliss::AbstractGraph* g = 0;
 		//get the number of vertices
 		std::unordered_map<VertexId, BYTE> vertices;
-		for(unsigned int index = 0; index < qp.get_size(); ++index) {
+		for(unsigned index = 0; index < qp.get_size(); ++index) {
 			auto element = qp.at(index);
 #ifdef ENABLE_LABEL
 			vertices[element.vertex_id] = element.vertex_label;
@@ -351,19 +381,22 @@ private:
 		//construct graph
 		const unsigned number_vertices = vertices.size();
 		assert(!opt_directed);
-		if(opt_directed) g = new bliss::Digraph(vertices.size());
-		else g = new bliss::Graph(vertices.size());
+		//if(opt_directed) g = new bliss::Digraph(vertices.size());
+		//else
+			g = new bliss::Graph(vertices.size());
 		//set vertices
 		for(unsigned i = 0; i < number_vertices; ++i)
 			g->change_color(i, (unsigned)vertices[i + 1]);
 		//read edges
+		//std::cout << "read edges\n";
 		assert(qp.get_size() > 1);
 		for(unsigned index = 1; index < qp.get_size(); ++index) {
 			auto element = qp.at(index);
 			VertexId from = qp.at(element.history_info).vertex_id;
 			VertexId to = element.vertex_id;
-			g->add_edge(from - 1, to - 1, index);
+			g->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.history_info, index));
 		}
+		//std::cout << "done read edges\n";
 		return g;
 	}
 	inline void getEdge(Embedding & emb, unsigned index, std::pair<VertexId, VertexId>& edge) {
@@ -394,7 +427,7 @@ void printout_embeddings(int level, Miner& miner, BaseEmbeddingQueue& queue, boo
 void printout_embeddings(int level, Miner& miner, EmbeddingQueue& queue, bool verbose = false) {
 #endif
 	int num_embeddings = std::distance(queue.begin(), queue.end());
-	unsigned embedding_size = miner.get_sizeof_embedding();
+	unsigned embedding_size = miner.get_embedding_size();
 	std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size=" << embedding_size << ")" << std::endl;
 	if(verbose) for (auto embedding : queue) miner.printout_embedding(level, embedding);
 }
