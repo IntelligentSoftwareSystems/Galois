@@ -109,8 +109,10 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
-	// Parallel quick aggregation
 	QpMap qp_map; // quick pattern map
+	//miner.quick_aggregate(queue, qp_map);
+///*
+	// Parallel quick aggregation
 	LocalQpMap qp_localmap; // quick pattern local map for each thread
 	galois::for_each(
 		galois::iterate(queue),
@@ -138,6 +140,8 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 #endif
 		}
 	}
+//*/
+	//std::cout << "Quick_aggregation: num_quick_patterns = " << qp_map.size() << "\n";
 
 	// Parallel canonical aggregation
 	//std::cout << "Aggregating canonical patterns\n";
@@ -183,8 +187,8 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 }
 
 void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
-	std::cout << "Filtering: num_patterns = " << cg_map.size() << " num_embeddings = " 
-		<< std::distance(in_queue.begin(), in_queue.end()) << "\n";
+	//std::cout << "Filtering: num_patterns = " << cg_map.size() << " num_embeddings = " 
+	//	<< std::distance(in_queue.begin(), in_queue.end()) << "\n";
 	//miner.filter(in_queue, out_queue, cg_map);
 	///*
 	galois::for_each(

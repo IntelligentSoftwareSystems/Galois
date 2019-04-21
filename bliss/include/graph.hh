@@ -40,7 +40,7 @@ namespace bliss {
 #include "uintseqhash.hh"
 
 namespace bliss {
-
+//#define USE_DOMAIN
 typedef std::pair<unsigned,unsigned> Index;
 #ifdef USE_DOMAIN
 typedef std::pair<unsigned, Index> IndexEdge;

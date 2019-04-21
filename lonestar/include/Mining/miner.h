@@ -85,22 +85,37 @@ public:
 			}
 		}
 	}
-	void quick_aggregate(EmbeddingQueue queue, QpMapFreq qp_map) {
-		qp_map.clear();
+	void quick_aggregate(EmbeddingQueue &queue, QpMapFreq &qp_map) {
 		for (auto emb : queue) {
 			Quick_Pattern qp(embedding_size);
 			turn_quick_pattern_pure(emb, qp, label_flag);
 			if (qp_map.find(qp) != qp_map.end()) {
 				qp_map[qp] += 1;
 				qp.clean();
-			} else { qp_map[qp] = 1; }
+			} else qp_map[qp] = 1;
+		}
+	}
+	void quick_aggregate(EmbeddingQueue &queue, QpMapDomain &qp_map) {
+		for (auto emb : queue) {
+			Quick_Pattern qp(embedding_size);
+			turn_quick_pattern_pure(emb, qp, label_flag);
+			if (qp_map.find(qp) != qp_map.end()) {
+				for (unsigned i = 0; i < emb.size(); i ++)
+					qp_map[qp][i].insert(emb[i].vertex_id);
+				qp.clean();
+			} else {
+				qp_map[qp].resize(emb.size());
+				for (unsigned i = 0; i < emb.size(); i ++)
+					qp_map[qp][i].insert(emb[i].vertex_id);
+			}
 		}
 	}
 	// aggregate embeddings into quick patterns
 	void quick_aggregate_each(const Embedding& emb, QpMapFreq& qp_map) {
 		Quick_Pattern qp(embedding_size);
+		// turn this embedding into its quick pattern
 		turn_quick_pattern_pure(emb, qp, label_flag);
-		// update count for this quick pattern
+		// update frequency for this quick pattern
 		if (qp_map.find(qp) != qp_map.end()) {
 			// if this quick pattern already exists, increase its count
 			qp_map[qp] += 1;
@@ -111,20 +126,22 @@ public:
 	void quick_aggregate_each(const Embedding& emb, QpMapDomain& qp_map) {
 		Quick_Pattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp, label_flag);
+		bool qp_existed = false;
 		if (qp_map.find(qp) == qp_map.end())
 			qp_map[qp].resize(emb.size());
+		else qp_existed = true;
 		for (unsigned i = 0; i < emb.size(); i ++)
 			qp_map[qp][i].insert(emb[i].vertex_id);
-		qp.clean();
+		if (qp_existed) qp.clean();
 	}
-	void canonical_aggregate(QpMapFreq qp_map, CgMapFreq cg_map) {
+	void canonical_aggregate(QpMapFreq qp_map, CgMapFreq &cg_map) {
 		for (auto it = qp_map.begin(); it != qp_map.end(); ++it) {
 			Quick_Pattern qp = it->first;
-			unsigned s = it->second;
+			unsigned freq = it->second;
 			Canonical_Graph* cg = turn_canonical_graph(qp, false);
 			qp.clean();
-			if (cg_map.find(*cg) != cg_map.end()) cg_map[*cg] += s;
-			else cg_map[*cg] = s;
+			if (cg_map.find(*cg) != cg_map.end()) cg_map[*cg] += freq;
+			else cg_map[*cg] = freq;
 			delete cg;
 		}
 	}
@@ -135,7 +152,7 @@ public:
 		qp.clean();
 		// if this pattern already exists, increase its count
 		if (cg_map.find(*cg) != cg_map.end()) cg_map[*cg] += freq;
-		// otherwise add this pattern into the map, and set the count as 's'
+		// otherwise add this pattern into the map, and set the count as 'freq'
 		else cg_map[*cg] = freq;
 		delete cg;
 	}
@@ -154,7 +171,6 @@ public:
 		}
 		delete cg;
 	}
-
 	void aggregate_clique(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
 		SimpleMap simple_agg;
 		for (auto emb : in_queue) {
@@ -394,7 +410,9 @@ private:
 			auto element = qp.at(index);
 			VertexId from = qp.at(element.history_info).vertex_id;
 			VertexId to = element.vertex_id;
+			//std::cout << "add edge " << index << " ...\n";
 			g->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.history_info, index));
+			//std::cout << "edge added\n";
 		}
 		//std::cout << "done read edges\n";
 		return g;

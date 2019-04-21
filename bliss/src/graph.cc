@@ -1670,9 +1670,9 @@ unsigned Graph::add_vertex(const unsigned color) {
 }
 
 void Graph::add_edge(const unsigned vertex1, const unsigned vertex2, Index index) {
-	//fprintf(stderr, "(%u,%u) ", vertex1, vertex2);
+	//printf("Adding edge (%u -> %u)\n", vertex1, vertex2);
 #ifdef USE_DOMAIN
-	vertices[vertex1].add_edge(vertex2, std::make_pair(index.first, index.second));
+	vertices[vertex1].add_edge(vertex2, index);
 	vertices[vertex2].add_edge(vertex1, std::make_pair(index.second, index.first));
 #else
 	vertices[vertex1].add_edge(vertex2);
