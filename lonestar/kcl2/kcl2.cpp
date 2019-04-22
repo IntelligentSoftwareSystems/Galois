@@ -59,105 +59,120 @@ typedef Graph::GraphNode GNode;
 #include "Mining/miner.h"
 #include "Lonestar/mgraph.h"
 #include "Mining/util.h"
+#include "Lonestar/subgraph.h"
 #define CHUNK_SIZE 256
+int core;
+typedef std::vector<unsigned> UintVec;
+typedef galois::substrate::PerThreadStorage<Subgraph> LocalSubgraph;
+typedef galois::substrate::PerThreadStorage<UintVec> LocalVector;
 
-// insert edges into the worklist (task queue)
-void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
-	printf("\n=============================== Init ===============================\n");
-	galois::do_all(
-		galois::iterate(graph.begin(), graph.end()),
-		[&](const GNode& src) {
-			for (auto e : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e);
-				if (src < dst) {
-					BaseEmbedding new_emb;
-					new_emb.push_back(src);
-					new_emb.push_back(dst);
-					queue.push_back(new_emb);
-				}
-			}
-		},
-		galois::chunk_size<512>(), galois::steal(), galois::loopname("Initialization")
-	);
+void mksub(Graph &g, GNode u, Subgraph &sg, UintVec &new_id, UintVec &old_id, unsigned k) {
+	if (old_id.empty()) {
+		new_id.resize(g.size());
+		old_id.resize(core);
+		for (unsigned i = 0; i < g.size(); i ++) new_id[i] = (unsigned)-1;
+	}
+	for (unsigned i = 0; i < sg.n[k-1]; i ++) sg.lab[i] = 0;
+	unsigned j = 0;
+	for (auto e : g.edges(u)) {
+		GNode v = g.getEdgeDst(e);
+		new_id[v] = j;
+		old_id[j] = v;
+		sg.lab[j] = k-1;
+		sg.vertices[k-1][j] = j;
+		sg.d[k-1][j] = 0;//new degrees
+		j ++;
+	}
+	sg.n[k-1] = j;
+	for (unsigned i = 0; i < sg.n[k-1]; i ++) {//reodering adjacency list and computing new degrees
+		unsigned v = old_id[i];
+		for (auto e : g.edges(v)) {
+			GNode w = g.getEdgeDst(e);
+			j = new_id[w];
+			if (j != (unsigned)-1)
+				sg.adj[sg.core * i + sg.d[k-1][i]++] = j;
+		}
+	}
+	for (auto e : g.edges(u)) {
+		GNode v = g.getEdgeDst(e);
+		new_id[v] = (unsigned)-1;
+	}
 }
 
-void KclSolver(Graph& graph, Miner &miner) {
-	std::cout << "=============================== Start ===============================\n";
-	BaseEmbeddingQueue queue, queue2;
-	initialization(graph, queue);
-	printout_embeddings(0, miner, queue, DEBUG);
-	unsigned level = 1;
-	while (level < k-1) {
-		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
-		queue2.clear();
-		galois::for_each(
-			galois::iterate(queue),
-			[&](const BaseEmbedding& emb, auto& ctx) {
-				miner.extend_vertex(emb, queue2);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("ExtendVertex")
-		);
-		miner.update_base_embedding_size(); // increase the embedding size since one more edge added
-		printout_embeddings(level, miner, queue2, DEBUG);
-
-		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
-		queue.clear();
-#if 1
-		miner.aggregate_clique(queue2, queue); // sequential implementaion
-/*
-		SimpleConcurrentMap map;
-		galois::for_each(
-			galois::iterate(queue2),
-			[&](BaseEmbedding& emb, auto& ctx) {
-				miner.aggregate_clique_each(emb, map, queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-//*/
-#else
-		// Parallel aggregation
-		LocalSimpleMap lmap;
-		SimpleMap map;
-		galois::for_each(
-			galois::iterate(queue2),
-			[&](BaseEmbedding& emb, auto& ctx) {
-				miner.aggregate_clique_each(emb, *(lmap.getLocal()), queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-		for (unsigned i = 0; i < lmap.size(); i++) {
-			SimpleMap sm = *lmap.getLocal(i);
-			for (auto element : sm) {
-				auto it = map.find(element.first);
-				if (it != map.end()) {
-					if(it->second + element.second == it->first.size() - 1) {
-						queue.push_back(it->first);
-						map.erase(it);
-					} else map[element.first] += element.second;
-				} else
-					map[element.first] = element.second;
+void kclique_thread(unsigned l, Subgraph &sg, galois::GAccumulator<long long> &num) {
+	if (l == 2) {
+		for(unsigned i = 0; i < sg.n[2]; i++) { //list all edges
+			unsigned u = sg.vertices[2][i];
+			unsigned end = u * sg.core + sg.d[2][u];
+			for (unsigned j = u * sg.core; j < end; j ++) {
+				num += 1; //listing here!!!
 			}
 		}
-#endif
-		printout_embeddings(level, miner, queue, DEBUG);
-		level ++;
-		//std::cout << "Number of " << level+1 << "-cliques is: " << std::distance(queue.begin(), queue.end()) << "\n";
+		return;
 	}
-	std::cout << "\n=============================== Done ===============================\n\n";
+	printf("TODO\n");
+	for(unsigned i = 0; i < sg.n[l]; i ++) {
+		unsigned u = sg.vertices[l][i];
+		//printf("%u %u\n",i,u);
+		sg.n[l-1] = 0;
+		unsigned end = u*sg.core+sg.d[l][u];
+		for (unsigned j = u*sg.core; j < end; j ++) {//relabeling vertices and forming U'.
+			unsigned v = sg.adj[j];
+			if (sg.lab[v] == l) {
+				sg.lab[v] = l-1;
+				sg.vertices[l-1][sg.n[l-1]++] = v;
+				sg.d[l-1][v] = 0;//new degrees
+			}
+		}
+		for (unsigned j = 0; j < sg.n[l-1]; j ++) {//reodering adjacency list and computing new degrees
+			unsigned v = sg.vertices[l-1][j];
+			end = sg.core * v + sg.d[l][v];
+			for (unsigned k = sg.core * v; k < end; k ++) {
+				unsigned w = sg.adj[k];
+				if (sg.lab[w] == l-1) {
+					sg.d[l-1][v] ++;
+				}
+				else {
+					sg.adj[k--] = sg.adj[--end];
+					sg.adj[end] = w;
+				}
+			}
+		}
+		kclique_thread(l-1, sg, num);
+		for (unsigned j = 0; j < sg.n[l-1]; j ++) {//restoring labels
+			unsigned v = sg.vertices[l-1][j];
+			sg.lab[v] = l;
+		}
+	}
+}
+
+void KclSolver(Graph& graph) {
+	galois::GAccumulator<long long> total_num;
+	total_num.reset();
+	LocalSubgraph lsub;
+	LocalVector lold, lnew;
+	for (unsigned i = 0; i < lsub.size(); i++)
+		lsub.getLocal(i)->allocate(core, k);
+	galois::for_each(
+		galois::iterate(graph.begin(), graph.end()),
+		[&](const GNode& u, auto& ctx) {
+			Subgraph *sg = lsub.getLocal();
+			UintVec *new_id = lnew.getLocal();
+			UintVec *old_id = lold.getLocal();
+			//Subgraph sg(core, k);
+			mksub(graph, u, *sg, *new_id, *old_id, k);
+			kclique_thread(k-1, *sg, total_num);
+		},
+		galois::chunk_size<512>(), galois::steal(), galois::loopname("KclSolver")
+	);
+	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
 }
 
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
+	MGraph mgraph(true);
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
 	if (filetype == "txt") {
@@ -173,28 +188,27 @@ int main(int argc, char** argv) {
 		mgraph.read_mtx(filename.c_str(), true); //symmetrize
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
+		printf("Currently .gr file not supported\n");
+		exit(1);
 		printf("Reading .gr file: %s\n", filename.c_str());
 		galois::graphs::readGraph(graph, filename);
 		for (GNode n : graph) graph.getData(n) = 1;
 	} else { printf("Unkown file format\n"); exit(1); }
+	core = mgraph.get_core();
 	//print_graph(graph);
-	unsigned sizeof_embedding = 2 * sizeof(SimpleElement);
-	Miner miner(false, sizeof_embedding, &graph);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	galois::reportPageAlloc("MeminfoPre");
-	galois::StatTimer T;
-	T.start();
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
 	switch (algo) {
 		case nodeiterator:
-			KclSolver(graph, miner);
+			KclSolver(graph);
 			break;
 		case edgeiterator:
 			break;
 		default:
 			std::cerr << "Unknown algo: " << algo << "\n";
 	}
-	T.stop();
-	galois::reportPageAlloc("MeminfoPost");
+	Tcomp.stop();
 	return 0;
 }

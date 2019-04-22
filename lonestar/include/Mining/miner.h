@@ -2,6 +2,8 @@
 #define MINER_HPP_
 #include "quick_pattern.h"
 #include "canonical_graph.h"
+//#include "hash_map.h"
+//#include "concurrent_map.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 #include "galois/substrate/PerThreadStorage.h"
@@ -13,6 +15,8 @@ typedef std::unordered_map<Canonical_Graph, Frequency> CgMapFreq; // mapping can
 typedef std::unordered_map<Quick_Pattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
 typedef std::unordered_map<Canonical_Graph, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
 typedef std::unordered_map<BaseEmbedding, Frequency> SimpleMap;
+//typedef CTSL::HashMap<BaseEmbedding, Frequency> SimpleConcurrentMap;
+//typedef utils::concurrent_map<BaseEmbedding, Frequency> SimpleConcurrentMap;
 typedef galois::substrate::PerThreadStorage<QpMapDomain> LocalQpMapDomain;
 typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
 typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
@@ -198,6 +202,25 @@ public:
 		}
 		else sm[emb] = 1;
 	}
+	/*
+	// check each embedding to find the cliques
+	void aggregate_clique_each(BaseEmbedding emb, SimpleConcurrentMap& scm, BaseEmbeddingQueue &out_queue) {
+		unsigned freq;
+		if(scm.find(emb, freq)) {
+			if(freq == emb.size() - 2) {
+				out_queue.push_back(emb);
+				scm.erase(emb);
+			} else {
+				scm.fetch_and_add(emb, 1, freq);
+				if (freq == emb.size() - 1) {
+					out_queue.push_back(emb);
+					scm.erase(emb);
+				}
+			}
+		}
+		else scm.insert(emb, 1);
+	}
+	//*/
 	// check if the pattern of each embedding in the queue is frequent
 	void filter(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMapFreq &cg_map) {
 		for (auto emb : in_queue) {

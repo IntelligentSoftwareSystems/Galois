@@ -5,12 +5,15 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include "core.h"
 
+typedef int IndexT;
+typedef int ValueT;
 struct MEdge {
-	int src;
-	int dst;
-	int elabel;
-	//unsigned id;
+	IndexT src;
+	IndexT dst;
+	ValueT elabel;
+	//IndexT id;
 	MEdge() : src(0), dst(0), elabel(0) {}
 	MEdge(int from, int to, int el) :
 		src(from), dst(to), elabel(el) {}
@@ -24,8 +27,9 @@ typedef std::vector<MEdge> MEdgeList;
 
 class MGraph {
 public:
-	MGraph() : symmetrize_(false), directed_(false) {}
-	MGraph(bool sym) : symmetrize_(sym), directed_(false) {}
+	MEdgeList el;
+	MGraph() : need_relabel_edges(false), symmetrize_(false), directed_(false) {}
+	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), symmetrize_(false), directed_(false) {}
 	int * out_rowptr() const { return rowptr_; }
 	int * out_colidx() const { return colidx_; }
 	int * labels() { return labels_.data(); }
@@ -33,12 +37,13 @@ public:
 	int get_offset(int n) { return rowptr_[n]; }
 	int get_dest(int n) { return colidx_[n]; }
 	int get_weight(int n) { return weight_[n]; }
+	int get_core() { return core; }
 	int out_degree(int n) const { return rowptr_[n+1] - rowptr_[n]; }
 	bool directed() const { return directed_; }
 	int num_vertices() const { return num_vertices_; }
 	int num_edges() const { return num_edges_; }
 
-	void read_txt(const char *filename) {
+	void read_txt(const char *filename, bool symmetrize = true) {
 		std::ifstream is;
 		is.open(filename, std::ios::in);
 		char line[1024];
@@ -69,7 +74,7 @@ public:
 				if (edge_set.find(std::pair<int, int>(src, dst)) == edge_set.end()) {
 					edge_set.insert(std::pair<int, int>(src, dst));
 					el.push_back(MEdge(src, dst, elabel));
-					if(directed_ == false) {
+					if(symmetrize) {
 						edge_set.insert(std::pair<int, int>(dst, src));
 						el.push_back(MEdge(dst, src, elabel));
 					}
@@ -183,13 +188,13 @@ public:
 				edge_stream >> v;
 				int w = 1;
 				el.push_back(MEdge(u - 1, v - 1, w));
-				if (undirected || symmetrize)
+				if (symmetrize)
 					el.push_back(MEdge(v - 1, u - 1, w));
 			} else {
 				int v;
 				edge_stream >> v;
 				el.push_back(MEdge(u - 1, v - 1, 1));
-				if (undirected || symmetrize)
+				if (symmetrize)
 					el.push_back(MEdge(v - 1, u - 1, 1));
 			}
 		}
@@ -218,6 +223,7 @@ public:
 	}
 
 private:
+	bool need_relabel_edges;
 	bool symmetrize_; // whether to symmetrize a directed graph
 	bool directed_;
 	int num_vertices_;
@@ -225,10 +231,11 @@ private:
 	int *rowptr_;
 	int *colidx_;
 	int *weight_;
+	int core;
 	//int *in_rowptr_;
 	//int *in_colidx_;
+	std::vector<int> rank;
 	std::vector<int> labels_;
-	MEdgeList el;
 	std::vector<std::vector<MEdge> > vertices;
 
 	std::vector<int> CountDegrees(const MEdgeList &el, bool transpose) {
@@ -244,6 +251,7 @@ private:
 	}
 	void MakeCSRFromEL(bool transpose) {
 		std::vector<int> degrees = CountDegrees(el, transpose);
+		core = *(std::max_element(degrees.begin(), degrees.end()));
 		std::vector<int> offsets = PrefixSum(degrees);
 		num_edges_ = offsets[num_vertices_];
 		weight_ = new int[num_edges_];
@@ -262,10 +270,59 @@ private:
 			}
 		}
 	}
+	//computing degeneracy ordering and core value
+	void ord_core() {
+		rank.resize(num_vertices_);
+		unsigned *d0 = (unsigned *)calloc(num_vertices_, sizeof(unsigned));
+		IndexT *cd0 = (IndexT*)malloc((num_vertices_ + 1)*sizeof(IndexT));
+		IndexT *adj0 = (IndexT*)malloc(2*num_edges_*sizeof(IndexT));
+		for (int i = 0; i < num_edges_; i ++) {
+			d0[el[i].src]++;
+			d0[el[i].dst]++;
+		}
+		cd0[0] = 0;
+		for (int i = 1; i < num_vertices_ + 1; i ++) {
+			cd0[i] = cd0[i-1] + d0[i-1];
+			d0[i-1] = 0;
+		}
+		for (int i = 0; i < num_edges_; i ++) {
+			adj0[ cd0[el[i].src] + d0[ el[i].src]++] = el[i].dst;
+			adj0[ cd0[el[i].dst] + d0[ el[i].dst]++] = el[i].src;
+		}
+		bheap heap;
+		heap.mkheap(num_vertices_, d0);
+		int r = 0;
+		for (int i = 0; i < num_vertices_; i ++) {
+			keyvalue kv = heap.popmin();
+			rank[kv.key] = num_vertices_ - (++r);
+			for (IndexT j = cd0[kv.key]; j < cd0[kv.key + 1]; j ++) {
+				heap.update(adj0[j]);
+			}
+		}
+		free(d0);
+		free(cd0);
+		free(adj0);
+	}
+	void RelabelEdges() {
+		ord_core();
+		for (int i = 0; i < num_edges_; i ++) {
+			int source = rank[el[i].src];
+			int target = rank[el[i].dst];
+			if (source < target) {
+				int tmp = source;
+				source = target;
+				target = tmp;
+			}
+			el[i].src = source;
+			el[i].dst = target;
+		}
+	}
 	void MakeCSR(bool transpose) {
 		std::vector<int> degrees(num_vertices_);
 		for (int i = 0; i < num_vertices_; i ++)
 			degrees[i] = vertices[i].size();
+		core = *(std::max_element(degrees.begin(), degrees.end()));
+		printf("core value (max truncated degree) = %u\n", core);
 		std::vector<int> offsets = PrefixSum(degrees);
 		assert(num_edges_ == offsets[num_vertices_]);
 		weight_ = new int[num_edges_];
@@ -333,6 +390,7 @@ private:
 		}
 	}
 	void MakeGraphFromEL() {
+		if (need_relabel_edges) RelabelEdges();
 		//MakeCSRFromEL(false);
 		SquishGraph();
 		MakeCSR(false);
