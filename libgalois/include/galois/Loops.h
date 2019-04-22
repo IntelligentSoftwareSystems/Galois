@@ -48,10 +48,10 @@ namespace galois {
  */
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
+void for_each(const RangeFunc& rangeMaker, FunctionTy &&fn,
               const Args&... args) {
   auto tpl = std::make_tuple(args...);
-  runtime::for_each_gen(rangeMaker(tpl), fn, tpl);
+  runtime::for_each_gen(rangeMaker(tpl), std::forward<FunctionTy>(fn), tpl);
 }
 
 /**

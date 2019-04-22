@@ -143,6 +143,31 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
+template <typename FuncTy>
+struct ForEachFuncReference {
+  using FuncReferenceType = FuncTy const &;
+};
+
+template <typename FuncNoRef>
+struct ForEachFuncReference<FuncNoRef const> {
+  using FuncReferenceType = FuncNoRef const &;
+};
+
+template <typename FuncNoRef>
+struct ForEachFuncReference<FuncNoRef const &> {
+  using FuncReferenceType = FuncNoRef const &;
+};
+
+template <typename FuncNoRef>
+struct ForEachFuncReference<FuncNoRef &> {
+  using FuncReferenceType = FuncNoRef &;
+};
+
+template <typename FuncNoRef>
+struct ForEachFuncReference<FuncNoRef &&> {
+  using FuncReferenceType = FuncNoRef const &;
+};
+
 // TODO(ddn): Implement wrapper to allow calling without UserContext
 // TODO(ddn): Check for operators that implement both with and without context
 template <class WorkListTy, class FunctionTy, typename ArgsTy>
@@ -166,10 +191,10 @@ protected:
   struct ThreadLocalBasics {
 
     UserContextAccess<value_type> facing;
-    FunctionTy function;
+    typename ForEachFuncReference<FunctionTy>::FuncReferenceType function;
     SimpleRuntimeContext ctx;
 
-    explicit ThreadLocalBasics(const FunctionTy& fn)
+    explicit ThreadLocalBasics(typename ForEachFuncReference<FunctionTy>::FuncReferenceType fn)
         : facing(), function(fn), ctx() {}
   };
 
@@ -177,7 +202,7 @@ protected:
 
   struct ThreadLocalData : public ThreadLocalBasics, public LoopStat {
 
-    ThreadLocalData(const FunctionTy& fn, const char* ln)
+    ThreadLocalData(typename ForEachFuncReference<FunctionTy>::FuncReferenceType fn, const char* ln)
         : ThreadLocalBasics(fn), LoopStat(ln) {}
   };
 
@@ -189,7 +214,7 @@ protected:
   substrate::Barrier& barrier;
 
   WorkListTy wl;
-  FunctionTy origFunction;
+  typename ForEachFuncReference<FunctionTy>::FuncReferenceType origFunction;
   const char* loopname;
   bool broke;
 
@@ -357,7 +382,7 @@ protected:
   struct T2 {};
 
   template <typename... WArgsTy>
-  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs)
+  ForEachExecutor(T2, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args, WArgsTy... wargs)
       : term(substrate::getSystemTermination(activeThreads)),
         barrier(getBarrier(activeThreads)), wl(std::forward<WArgsTy>(wargs)...),
         origFunction(f), loopname(galois::internal::getLoopName(args)),
@@ -365,17 +390,17 @@ protected:
         execTime(loopname, "Execute") {}
 
   template <typename WArgsTy, int... Is>
-  ForEachExecutor(T1, const FunctionTy& f, const ArgsTy& args,
+  ForEachExecutor(T1, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<Is...>)
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, const FunctionTy& f, const ArgsTy& args,
+  ForEachExecutor(T1, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args)
+  ForEachExecutor(typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args)
       : ForEachExecutor(
             T1{}, f, args, get_by_supertype<wl_tag>(args).args,
             typename make_int_seq<std::tuple_size<decltype(
@@ -501,7 +526,7 @@ struct reiterator<WLTy, IterTy,
 
 // TODO(ddn): Think about folding in range into args too
 template <typename RangeTy, typename FunctionTy, typename ArgsTy>
-void for_each_impl(const RangeTy& range, const FunctionTy& fn,
+void for_each_impl(const RangeTy& range, FunctionTy&& fn,
                    const ArgsTy& args) {
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type
       value_type;
@@ -511,10 +536,10 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn,
       type ::template retype<value_type>
           WorkListTy;
   // typedef typename WorkListTy::value_type g;
-  typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
+  typedef ForEachExecutor<WorkListTy, decltype(std::forward<FunctionTy>(fn)), ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
-  WorkTy W(fn, args);
+  WorkTy W(std::forward<FunctionTy>(fn), args);
   W.init(range);
   substrate::getThreadPool().run(activeThreads,
                                  [&W, &range]() { W.initThread(range); },
@@ -527,7 +552,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn,
 
 //! Normalize arguments to for_each
 template <typename RangeTy, typename FunctionTy, typename TupleTy>
-void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+void for_each_gen(const RangeTy& r, FunctionTy &&fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const*, TupleTy>::value,
                 "old loopname");
@@ -563,7 +588,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
     timer.start();
 
-    runtime::for_each_impl(r, fn, xtpl);
+    runtime::for_each_impl(r, std::forward<FunctionTy>(fn), xtpl);
 
     timer.stop();
 
@@ -588,7 +613,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
     timer.start();
 
-    runtime::for_each_impl(r, fn, xtpl);
+    runtime::for_each_impl(r, std::forward<FunctionTy>(fn), xtpl);
 
     timer.stop();
   }

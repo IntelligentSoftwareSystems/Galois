@@ -1209,7 +1209,7 @@ struct SyncALSalgo {
             PerThrdV& rhs)
         : self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) {}
 
-    void operator()(size_t col, galois::UserContext<size_t>& ctx) {
+    void operator()(size_t col, galois::UserContext<size_t>& ctx) const {
       self.update(g, col, WT, HT, xtxs, rhs);
     }
   };

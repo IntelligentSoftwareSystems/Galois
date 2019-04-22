@@ -133,9 +133,9 @@ class PQuadTree {
 
   template <typename IterTy>
   struct PAdd {
-    void operator()(WorkItem<IterTy>& w) { w(); }
+    void operator()(WorkItem<IterTy>& w) const { w(); }
     void operator()(WorkItem<IterTy>& w,
-                    galois::UserContext<WorkItem<IterTy>>&) {
+                    galois::UserContext<WorkItem<IterTy>>&) const {
       w();
     }
   };

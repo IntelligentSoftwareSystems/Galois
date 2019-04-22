@@ -20,7 +20,7 @@
 namespace galois {
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
+void for_each(const RangeFunc& rangeMaker, FunctionTy&& fn,
               const Args&... args);
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
