@@ -17,9 +17,9 @@
 
 struct LocalStatus {
 	int thread_id;
-	int task_split_level;
-	int embeddings_regeneration_level;
-	int current_dfs_level;
+	unsigned task_split_level;
+	unsigned embeddings_regeneration_level;
+	unsigned current_dfs_level;
 	int frequent_patterns_count;
 	bool is_running;
 	DFSCode DFS_CODE;
@@ -78,7 +78,7 @@ public:
 	}
 	std::string to_string() const {
 		std::stringstream ss;
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			ss << at(i)->to_string() << "; ";
 		}
 		return ss.str();
@@ -96,7 +96,7 @@ public:
 	}
 	std::string to_string() const {
 		std::stringstream ss;
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			ss << (*this)[i].to_string() << "; ";
 		} // for i
 		return ss.str();
@@ -129,16 +129,19 @@ public:
 	}
 	std::string to_string() const {
 		std::stringstream ss;
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			ss << (*this)[i].to_string() << "; ";
 		} // for i
 		return ss.str();
 	} // Embeddings::to_string
 
 	std::string print_global_vid(Graph &g) {
+		std::stringstream ss;
 		for(std::vector<Emb>::iterator it = this->begin(); it != this->end(); ++it) {
 			std::cout << (*it).to_string_global_vid(g) << std::endl;
+			ss << (*it).to_string_global_vid(g) << std::endl;
 		}
+		return ss.str();
 	}
 };
 
@@ -162,7 +165,7 @@ public:
 	}
 	std::string to_string() const {
 		std::stringstream ss;
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			ss << (*this)[i].to_string() << "; ";
 		} // for i
 		return ss.str();
@@ -183,7 +186,7 @@ public:
 		}
 		return false;
 	}
-	bool hasVertex(unsigned int id) { return (bool)vertex.count(id); }
+	bool hasVertex(unsigned id) { return (bool)vertex.count(id); }
 	//void build(Graph &, Emb *);
 	//void build(Graph &, const std::vector<Embeddings2>&, int, int);
 	EmbVector() { }
@@ -224,14 +227,14 @@ public:
 	std::string to_string() const {
 		std::stringstream ss;
 		//ostream_iterator<
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			ss << at(i).to_string() << "; ";
 		}
 		return ss.str();
 	}
 	std::string to_string_global_vid(Graph &g) const {
 		std::stringstream ss;
-		for(int i = 0; i < size(); i++) {
+		for(size_t i = 0; i < size(); i++) {
 			//ss << "e(" << g[(*this)[i].from].global_vid << "," << g[(*this)[i].to].global_vid << "," << (*this)[i].elabel  << ");";
 		}
 		return ss.str();
@@ -265,11 +268,11 @@ typedef std::map<int, graph_id_list_t>   edge_gid_list1_t;
 typedef std::map<int, edge_gid_list1_t>  edge_gid_list2_t;
 typedef std::map<int, edge_gid_list2_t>  edge_gid_list3_t;
 
-bool get_forward_rmpath(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e, int minlabel, History& history, EdgeList &result) {
+bool get_forward_rmpath(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e, LabelT minlabel, History& history, EdgeList &result) {
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	assert(e->from >= 0 && e->from < graph.size());
-	int tolabel = graph.getData(e->to);
+	LabelT tolabel = graph.getData(e->to);
 	//Graph::edge_iterator first = graph.edge_begin(e->from, galois::MethodFlag::UNPROTECTED);
 	//Graph::edge_iterator last = graph.edge_end(e->from, galois::MethodFlag::UNPROTECTED);
 	//for (auto it = first; it != last; ++ it) {
@@ -286,13 +289,13 @@ bool get_forward_rmpath(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *
 	return (!result.empty());
 }
 
-bool get_forward_rmpath(CGraph &graph, LabEdge *e, int minlabel, History& history, EdgeList &result) {
+bool get_forward_rmpath(CGraph &graph, LabEdge *e, LabelT minlabel, History& history, EdgeList &result) {
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	assert(e->from >= 0 && e->from < graph.size());
-	int tolabel = graph[e->to].label;
+	LabelT tolabel = graph[e->to].label;
 	for(Vertex::const_edge_iterator it = graph[e->from].edge.begin(); it != graph[e->from].edge.end(); ++it) {
-		int tolabel2 = graph[it->to].label;
+		LabelT tolabel2 = graph[it->to].label;
 		if(e->to == it->to || minlabel > tolabel2 || history.hasVertex(it->to))
 			continue;
 		if(e->elabel < it->elabel || (e->elabel == it->elabel && tolabel <= tolabel2))
@@ -304,7 +307,7 @@ bool get_forward_rmpath(CGraph &graph, LabEdge *e, int minlabel, History& histor
 // e (from, elabel, to)
 // this function takes a "pure" forward edge, that is: an edge that 
 // extends the last node of the right-most path, i.e., the right-most node.
-bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e, int minlabel, History& history, EdgeList &result) {
+bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e, LabelT minlabel, History& history, EdgeList &result) {
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	// Walk all edges leaving from vertex e->to.
@@ -314,7 +317,7 @@ bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e,
 	for (auto it : graph.edges(e->to)) {
 		GNode dst = graph.getEdgeDst(it);
 		assert(dst >= 0 && dst < graph.size());
-		auto elabel = graph.getEdgeData(it);
+		//auto elabel = graph.getEdgeData(it);
 		auto& dst_label = graph.getData(dst);
 		if(minlabel > dst_label || history.hasVertex(dst)) continue;
 		LabEdge *eptr = &(edge_list[*it]);
@@ -323,7 +326,7 @@ bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e,
 	return (!result.empty());
 }
 
-bool get_forward_pure(CGraph &graph, LabEdge *e, int minlabel, History& history, EdgeList &result) {
+bool get_forward_pure(CGraph &graph, LabEdge *e, LabelT minlabel, History& history, EdgeList &result) {
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	// Walk all edges leaving from vertex e->to.
@@ -345,7 +348,7 @@ bool get_forward_root(CGraph &graph, const Vertex &v, EdgeList &result) {
 	return (!result.empty());
 }
 
-bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const uint32_t src, EdgeList &result) {
+bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const VeridT src, EdgeList &result) {
 	result.clear();
 	auto& src_label = graph.getData(src);
 	//Graph::edge_iterator first = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
@@ -354,7 +357,7 @@ bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const uint3
 	for (auto it : graph.edges(src)) {
 		GNode dst = graph.getEdgeDst(it);
 		assert(dst >= 0 && dst < graph.size());
-		auto elabel = graph.getEdgeData(it);
+		//auto elabel = graph.getEdgeData(it);
 		auto& dst_label = graph.getData(dst);
 		if(src_label <= dst_label) {
 			LabEdge * eptr = &(edge_list[*it]);
@@ -383,7 +386,7 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1
 	assert(e1->from >= 0 && e1->from < graph.size());
 	assert(e1->to >= 0 && e1->to < graph.size());
 	assert(e2->to >= 0 && e2->to < graph.size());
-	int src = e2->to;
+	VeridT src = e2->to;
 	//Graph::edge_iterator first = graph.edge_begin(src);
 	//Graph::edge_iterator last = graph.edge_end(src);
 	//for (auto it = first; it != last; ++ it) {
@@ -391,9 +394,8 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1
 		GNode dst = graph.getEdgeDst(it);
 		auto elabel = graph.getEdgeData(it);
 		//if(history.hasEdge(LabEdge(src, dst, elabel, *it))) continue;
-		if(history.hasEdge(*it)) continue;
-		if((dst == e1->from) && ((e1->elabel < elabel) || (e1->elabel == elabel) &&
-			(graph.getData(e1->to) <= graph.getData(e2->to)))) {
+		if (history.hasEdge(*it)) continue;
+		if ((dst == e1->from) && ((e1->elabel < elabel) || ((e1->elabel == elabel) && (graph.getData(e1->to) <= graph.getData(e2->to))))) {
 			return &(edge_list[*it]);
 		}
 	}
@@ -406,9 +408,8 @@ LabEdge *get_backward(CGraph &graph, LabEdge* e1, LabEdge* e2, History& history)
 	assert(e1->to >= 0 && e1->to < graph.size());
 	assert(e2->to >= 0 && e2->to < graph.size());
 	for(Vertex::const_edge_iterator it = graph[e2->to].edge.begin(); it != graph[e2->to].edge.end(); ++it) {
-		if(history.hasEdge(it->id)) continue;
-		if((it->to == e1->from) && ((e1->elabel < it->elabel) || (e1->elabel == it->elabel) &&
-			(graph[e1->to].label <= graph[e2->to].label))) {
+		if (history.hasEdge(it->id)) continue;
+		if ((it->to == e1->from) && ((e1->elabel < it->elabel) || ((e1->elabel == it->elabel) && (graph[e1->to].label <= graph[e2->to].label)))) {
 			return const_cast<LabEdge*>(&(*it));
 		} // if(...)
 	} // for(it)
@@ -418,11 +419,11 @@ LabEdge *get_backward(CGraph &graph, LabEdge* e1, LabEdge* e2, History& history)
 bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &DFS_CODE, History& history, EdgeList &result) {
 	result.clear();
 	//forward extenstion from dfs_from <=> from
-	int dfs_from = DFS_CODE.back().from;
-	int from;
+	VeridT dfs_from = DFS_CODE.back().from;
+	VeridT from  = (VeridT)-1;
 	//skip the last one in dfs code
 	// get the "from" vertex id from the history
-	for(int i = DFS_CODE.size() - 2; i >= 0; i-- ) {
+	for(size_t i = DFS_CODE.size() - 2; i >= 0; i-- ) {
 		if( dfs_from == DFS_CODE[i].from) {
 			from = history[i]->from;
 			break;
@@ -432,6 +433,7 @@ bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &D
 			break;
 		}
 	}
+	assert (from != (VeridT)-1);
 	DFS dfs = DFS_CODE.back();
 	for (auto it : graph.edges(from)) {
 		GNode dst = graph.getEdgeDst(it);
@@ -443,16 +445,16 @@ bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &D
 }
 
 LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &DFS_CODE,  History& history) {
-	std::map<int, int> vertex_id_map;
-	for(int i = 0; i<history.size(); i++) {
+	std::map<VeridT, VeridT> vertex_id_map;
+	for(size_t i = 0; i<history.size(); i++) {
 		if(vertex_id_map.count(DFS_CODE[i].from) == 0)
 			vertex_id_map[DFS_CODE[i].from] = history[i]->from;
 		if(vertex_id_map.count(DFS_CODE[i].to) == 0)
 			vertex_id_map[DFS_CODE[i].to]   = history[i]->to;
 	}
 	//now add the backward edge using the last entry of the DFS code
-	int from = vertex_id_map[DFS_CODE.back().from];
-	int to   = vertex_id_map[DFS_CODE.back().to];
+	VeridT from = vertex_id_map[DFS_CODE.back().from];
+	VeridT to   = vertex_id_map[DFS_CODE.back().to];
 	for (auto it : graph.edges(from)) {
 		GNode dst = graph.getEdgeDst(it);
 		if(dst == to) return &(edge_list[*it]);

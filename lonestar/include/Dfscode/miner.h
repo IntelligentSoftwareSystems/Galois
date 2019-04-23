@@ -31,14 +31,36 @@ public:
 			dfs_task_queue.push_back(tmp);
 			dfs_task_queue_shared.push_back(tmp);
 		}
+		construct_edgelist();
 	}
 	virtual ~Miner() {}
+	// returns the total number of frequent patterns
 	size_t get_count() {
 		size_t total = 0;
 		for(int i = 0; i < nthreads; i++)
 			total += frequent_patterns_count[i];
 		return total;
 	}
+	void construct_edgelist() {
+		unsigned eid = 0;
+		for (Graph::iterator it = graph->begin(); it != graph->end(); it ++) {
+			GNode src = *it;
+			//auto& src_label = graph->getData(src);
+			Graph::edge_iterator first = graph->edge_begin(src);
+			Graph::edge_iterator last = graph->edge_end(src);
+			// foe each edge of this vertex
+			for (auto e = first; e != last; ++ e) {
+				GNode dst = graph->getEdgeDst(e);
+				auto& elabel = graph->getEdgeData(e);
+				//auto& dst_label = graph->getData(dst);
+				LabEdge edge(src, dst, elabel, eid);
+				edge_list.push_back(edge);
+				eid ++;
+			}
+		}
+		assert(edge_list.size() == graph->sizeEdges());
+	}
+/*
 	void construct_cgraph() {
 		cgraph.resize(graph->size());
 		for (Graph::iterator it = graph->begin(); it != graph->end(); it ++) {
@@ -58,50 +80,32 @@ public:
 		cgraph.max_local_vid = cgraph.size() - 1;
 		cgraph.buildEdge();
 	}
-	void construct_edgelist() {
-		int eid = 0;
-		for (Graph::iterator it = graph->begin(); it != graph->end(); it ++) {
-			GNode src = *it;
-			auto& src_label = graph->getData(src);
-			Graph::edge_iterator first = graph->edge_begin(src);
-			Graph::edge_iterator last = graph->edge_end(src);
-			// foe each edge of this vertex
-			for (auto e = first; e != last; ++ e) {
-				GNode dst = graph->getEdgeDst(e);
-				auto& elabel = graph->getEdgeData(e);
-				auto& dst_label = graph->getData(dst);
-				LabEdge edge(src, dst, elabel, eid);
-				edge_list.push_back(edge);
-				eid ++;
-			}
-		}
-		assert(edge_list.size() == graph->sizeEdges());
-	}
-	void project(Projected &emb_list, int dfs_level, LocalStatus &gprv) {
-		if(dfs_level >= max_level) return;
-		if(use_threshold) {
+//*/
+	// edge extension by DFS traversal: recursive call
+	void grow(Projected &emb_list, unsigned dfs_level, LocalStatus &gprv) {
+		if (dfs_level >= max_level) return; // TODO: check the number of vertices in the embedding
+		if (use_threshold) {
 			unsigned sup = support(emb_list, gprv);
-			if(sup < minimal_support) return;
+			if (sup < minimal_support) return;
 		}
-		if(is_min(gprv) == false) return;
-		if(use_threshold) {
+		if (is_min(gprv) == false) return; // check if this pattern is canonical: minimal DFSCode
+		if (use_threshold) {
 			gprv.frequent_patterns_count ++;
-			//frequent_patterns_count[thread_id]++;
-		} else
-			std::cout << "motif_count = " << emb_list.size() << std::endl;
-		const RMPath &rmpath = gprv.DFS_CODE.buildRMPath();
-		int minlabel = gprv.DFS_CODE[0].fromlabel;
-		int maxtoc = gprv.DFS_CODE[rmpath[0]].to;
+			// list frequent patterns here!!!
+		} else std::cout << "motif_count = " << emb_list.size() << std::endl;
+		const RMPath &rmpath = gprv.DFS_CODE.buildRMPath(); // build the right-most path of this pattern
+		LabelT minlabel = gprv.DFS_CODE[0].fromlabel; 
+		VeridT maxtoc = gprv.DFS_CODE[rmpath[0]].to; // right-most vertex
 		Projected_map3 new_fwd_root;
 		Projected_map2 new_bck_root;
 		EdgeList edges;
 		gprv.current_dfs_level = dfs_level;
-		for(unsigned n = 0; n < emb_list.size(); ++n) {
+		for(size_t n = 0; n < emb_list.size(); ++n) {
 			unsigned id = emb_list[n].id;
 			PDFS *cur = &emb_list[n];
 			History history(cur);
 			// backward
-			for(int i = (int)rmpath.size() - 1; i >= 1; --i) {
+			for(size_t i = rmpath.size() - 1; i >= 1; --i) {
 #ifdef USE_CGRAPH
 				LabEdge *e = get_backward(cgraph, history[rmpath[i]], history[rmpath[0]], history);
 #else
@@ -122,7 +126,7 @@ public:
 				}
 			}
 			// backtracked forward
-			for(int i = 0; i < (int)rmpath.size(); ++i) {
+			for(size_t i = 0; i < rmpath.size(); ++i) {
 #ifdef USE_CGRAPH
 				if(get_forward_rmpath(cgraph, history[rmpath[i]], minlabel, history, edges)) {
 					for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
@@ -140,11 +144,11 @@ public:
 		if(gprv.dfs_task_queue.size() <= dfs_level) {
 			gprv.dfs_task_queue.push_back(tmp);
 		}
-		// Test all extended substructures.
+		// insert all extended subgraphs into the task queue
 		// backward
 		for(Projected_iterator2 to = new_bck_root.begin(); to != new_bck_root.end(); ++to) {
 			for(Projected_iterator1 elabel = to->second.begin(); elabel != to->second.end(); ++elabel) {
-				DFS dfs(maxtoc, to->first, -1, elabel->first, -1);
+				DFS dfs(maxtoc, to->first, (LabelT)-1, elabel->first, (LabelT)-1);
 				gprv.dfs_task_queue[dfs_level].push_back(dfs);
 			}
 		}
@@ -152,11 +156,12 @@ public:
 		for(Projected_riterator3 from = new_fwd_root.rbegin(); from != new_fwd_root.rend(); ++from) {
 			for(Projected_iterator2 elabel = from->second.begin(); elabel != from->second.end(); ++elabel) {
 				for(Projected_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
-					DFS dfs(from->first, maxtoc + 1, -1, elabel->first, tolabel->first);
+					DFS dfs(from->first, maxtoc + 1, (LabelT)-1, elabel->first, tolabel->first);
 					gprv.dfs_task_queue[dfs_level].push_back(dfs);
 				}
 			}
 		}
+		// grow to the next level
 		while(gprv.dfs_task_queue[dfs_level].size() > 0) {
 			#ifdef ENABLE_LB
 			if(nthreads > 1) threads_load_balance(gprv);
@@ -166,16 +171,16 @@ public:
 			gprv.current_dfs_level = dfs_level;
 			gprv.DFS_CODE.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel);
 			if(dfs.is_backward())
-				project(new_bck_root[dfs.to][dfs.elabel], dfs_level + 1, gprv);
+				grow(new_bck_root[dfs.to][dfs.elabel], dfs_level + 1, gprv);
 			else
-				project(new_fwd_root[dfs.from][dfs.elabel][dfs.tolabel], dfs_level + 1, gprv);
+				grow(new_fwd_root[dfs.from][dfs.elabel][dfs.tolabel], dfs_level + 1, gprv);
 			gprv.DFS_CODE.pop();
 		}
 		return;
 	}
-
-	void regenerate_embeddings(Projected &projected, int dfs_level, LocalStatus &gprv) {
-		for(int i = 0; gprv.dfs_task_queue[dfs_level].size() > 0; i++) {
+	// This is used for load balancing
+	void regenerate_embeddings(Projected &projected, unsigned dfs_level, LocalStatus &gprv) {
+		for(size_t i = 0; gprv.dfs_task_queue[dfs_level].size() > 0; i++) {
 			gprv.current_dfs_level = dfs_level;
 			#ifdef ENABLE_LB
 			if(num_threads > 1) threads_load_balance(gprv);
@@ -184,7 +189,7 @@ public:
 			gprv.dfs_task_queue[dfs_level].pop_front();
 			gprv.DFS_CODE.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel);
 			Projected new_root;
-			for(unsigned n = 0; n < projected.size(); ++n) {
+			for(size_t n = 0; n < projected.size(); ++n) {
 				unsigned id = projected[n].id;
 				PDFS *cur = &projected[n];
 				History history(cur);
@@ -199,9 +204,9 @@ public:
 					}
 				}
 			}
-			if(gprv.embeddings_regeneration_level > dfs_level) {
+			if (gprv.embeddings_regeneration_level > dfs_level) {
 				regenerate_embeddings(new_root, dfs_level + 1, gprv);
-			} else project(new_root, dfs_level + 1, gprv);
+			} else grow(new_root, dfs_level + 1, gprv);
 			gprv.DFS_CODE.pop();
 		}
 	}
@@ -223,7 +228,7 @@ protected:
 		Map2D node_id_counts;
 		for(Projected::iterator cur = projected.begin(); cur != projected.end(); ++cur) {
 			PDFS *em = &(*cur);
-			int dfsindex = gprv.DFS_CODE.size() - 1;
+			size_t dfsindex = gprv.DFS_CODE.size() - 1;
 			while(em != NULL) {
 				if(gprv.DFS_CODE[dfsindex].to > gprv.DFS_CODE[dfsindex].from) {    //forward edge
 					node_id_counts[gprv.DFS_CODE[dfsindex].to][em->edge->to]++;
@@ -243,14 +248,14 @@ protected:
 		if(min == 0xffffffff) min = 0;
 		return min;
 	}
-
+	// check whether a DFSCode is minimal or not, i.e. canonical check (minimal DFSCode is canonical)
 	bool is_min(LocalStatus &gprv) {
 		if(gprv.DFS_CODE.size() == 1) return true;
 		gprv.DFS_CODE.toGraph(gprv.GRAPH_IS_MIN);
 		gprv.DFS_CODE_IS_MIN.clear();
 		Projected_map3 root;
 		EdgeList edges;
-		for(unsigned from = 0; from < gprv.GRAPH_IS_MIN.size(); ++from) {
+		for(size_t from = 0; from < gprv.GRAPH_IS_MIN.size(); ++from) {
 			if(get_forward_root(gprv.GRAPH_IS_MIN, gprv.GRAPH_IS_MIN[from], edges)) {
 			//if(get_forward_root(gprv.GRAPH_IS_MIN, from, edges)) {
 				for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
@@ -268,17 +273,17 @@ protected:
 
 	bool project_is_min(LocalStatus &gprv, Projected &projected) {
 		const RMPath& rmpath = gprv.DFS_CODE_IS_MIN.buildRMPath();
-		int minlabel         = gprv.DFS_CODE_IS_MIN[0].fromlabel;
-		int maxtoc           = gprv.DFS_CODE_IS_MIN[rmpath[0]].to;
+		LabelT minlabel         = gprv.DFS_CODE_IS_MIN[0].fromlabel;
+		VeridT maxtoc           = gprv.DFS_CODE_IS_MIN[rmpath[0]].to;
 
 		// SUBBLOCK 1
 		{
 			Projected_map1 root;
 			bool flg = false;
-			int newto = 0;
+			VeridT newto = 0;
 
-			for(int i = rmpath.size() - 1; !flg  && i >= 1; --i) {
-				for(unsigned n = 0; n < projected.size(); ++n) {
+			for(size_t i = rmpath.size() - 1; !flg  && i >= 1; --i) {
+				for(size_t n = 0; n < projected.size(); ++n) {
 					PDFS *cur = &projected[n];
 					History history(cur);
 					LabEdge *e = get_backward(gprv.GRAPH_IS_MIN, history[rmpath[i]], history[rmpath[0]], history);
@@ -292,7 +297,7 @@ protected:
 
 			if(flg) {
 				Projected_iterator1 elabel = root.begin();
-				gprv.DFS_CODE_IS_MIN.push(maxtoc, newto, -1, elabel->first, -1);
+				gprv.DFS_CODE_IS_MIN.push(maxtoc, newto, (LabelT)-1, elabel->first, (LabelT)-1);
 				if(gprv.DFS_CODE[gprv.DFS_CODE_IS_MIN.size() - 1] != gprv.DFS_CODE_IS_MIN[gprv.DFS_CODE_IS_MIN.size() - 1]) return false;
 				return project_is_min(gprv, elabel->second);
 			}
@@ -301,11 +306,11 @@ protected:
 		// SUBBLOCK 2
 		{
 			bool flg = false;
-			int newfrom = 0;
+			VeridT newfrom = 0;
 			Projected_map2 root;
 			EdgeList edges;
 
-			for(unsigned n = 0; n < projected.size(); ++n) {
+			for(size_t n = 0; n < projected.size(); ++n) {
 				PDFS *cur = &projected[n];
 				History history(cur);
 				if(get_forward_pure(gprv.GRAPH_IS_MIN, history[rmpath[0]], minlabel, history, edges)) {
@@ -316,8 +321,8 @@ protected:
 						//root[(*it)->elabel][gprv.GRAPH_IS_MIN.getData((*it)->to)].push(0, *it, cur);
 				} // if get_forward_pure
 			} // for n
-			for(int i = 0; !flg && i < (int)rmpath.size(); ++i) {
-				for(unsigned n = 0; n < projected.size(); ++n) {
+			for(size_t i = 0; !flg && i < rmpath.size(); ++i) {
+				for(size_t n = 0; n < projected.size(); ++n) {
 					PDFS *cur = &projected[n];
 					History history(cur);
 					if(get_forward_rmpath(gprv.GRAPH_IS_MIN, history[rmpath[i]], minlabel, history, edges)) {
@@ -333,7 +338,7 @@ protected:
 			if(flg) {
 				Projected_iterator2 elabel  = root.begin();
 				Projected_iterator1 tolabel = elabel->second.begin();
-				gprv.DFS_CODE_IS_MIN.push(newfrom, maxtoc + 1, -1, elabel->first, tolabel->first);
+				gprv.DFS_CODE_IS_MIN.push(newfrom, maxtoc + 1, (LabelT)-1, elabel->first, tolabel->first);
 				if(gprv.DFS_CODE[gprv.DFS_CODE_IS_MIN.size() - 1] != gprv.DFS_CODE_IS_MIN[gprv.DFS_CODE_IS_MIN.size() - 1]) return false;
 				return project_is_min(gprv, tolabel->second);
 			} // if(flg)

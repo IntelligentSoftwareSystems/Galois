@@ -1,6 +1,5 @@
 #ifndef __DFS_CODE_HPP__
 #define __DFS_CODE_HPP__
-
 #include <string>
 #include <vector>
 #include <cstdio>
@@ -9,29 +8,42 @@
 #include <iostream>
 #include <stdexcept>
 #include "types.hpp"
-#include "serializable.hpp"
 
-using std::string;
+/*
 using std::runtime_error;
-using std::stringstream;
-
-//class Graph;
-class Projected;
-class History;
-
 class method_unimplemented : public std::runtime_error {
 public:
   method_unimplemented(const char *err) : runtime_error(std::string("Method ") + err + "not implemented") {
   }
 };
 
+class serializable_buffer {
+public:
+  virtual size_t get_serialized_size() const = 0;
+  virtual size_t get_serialized_size(char *buffer, size_t buffer_size) const = 0;
+  virtual size_t serialize(char *buffer, size_t buffer_size) const = 0;
+  virtual size_t deserialize(char *buffer, size_t buffer_size) = 0;
+};
+
+class serializable_stream {
+public:
+  virtual size_t serialize(std::ostream &) const = 0;
+  virtual size_t deserialize(std::istream &) = 0;
+};
+
+class serializable : public serializable_buffer, public serializable_stream {
+public:
+  virtual ~serializable() {
+  }
+};
+//*/
 class DFS {
 public:
-	int from;
-	int to;
-	int fromlabel;
-	int elabel;
-	int tolabel;
+	VeridT from;
+	VeridT to;
+	LabelT fromlabel;
+	LabelT elabel;
+	LabelT tolabel;
 	friend bool operator==(const DFS &d1, const DFS &d2) {
 		return (d1.from == d2.from && d1.to == d2.to && d1.fromlabel == d2.fromlabel
 				&& d1.elabel == d2.elabel && d1.tolabel == d2.tolabel);
@@ -58,16 +70,28 @@ public:
 	}
 
 	DFS() : from(0), to(0), fromlabel(0), elabel(0), tolabel(0) {}
-	DFS(int from, int to, int fromlabel, int elabel, int tolabel) : from(from), to(to), fromlabel(fromlabel), elabel(elabel), tolabel(tolabel) {}
+	DFS(VeridT from, VeridT to, LabelT fromlabel, LabelT elabel, LabelT tolabel) : from(from), to(to), fromlabel(fromlabel), elabel(elabel), tolabel(tolabel) {}
 	DFS(char *buffer, int size);
 	DFS(const DFS &d) : from(d.from), to(d.to), fromlabel(d.fromlabel), elabel(d.elabel), tolabel(d.tolabel) {}
+	//std::string to_string(bool print_edge_type = true) const;
+	std::string to_string(bool print_edge_type = true) const {
+		std::stringstream ss;
+		if(print_edge_type) {
+			if(is_forward()) ss << "F";
+			else ss << "B";
+		}
+		ss << "(" << from << " " << to << " " << fromlabel << " " << elabel << " " << tolabel << ")";
+		return ss.str();
+	}
+	bool is_forward() const { return from < to; }
+	bool is_backward() const { return from > to; }
+/*
 	//bool is_forward() const;
 	//bool is_backward() const;
 	static size_t deserialize(DFS &result, char *buf, size_t bufsize);
 	static size_t serialize(DFS &result, char *buf, size_t bufsize);
 	static size_t get_serialized_dfs_code_size(DFS &result);
 	//static DFS parse_from_string(const char *str_dfs_code);
-	//std::string to_string(bool print_edge_type = true) const;
 	static DFS parse_from_string(const char *str_dfs_code) {
 		size_t len = strlen(str_dfs_code);
 		int from;
@@ -80,18 +104,6 @@ public:
 		if(r != 6) throw runtime_error("error: could not read dfs code from string");
 		return DFS(from, to, fromlabel, elabel, tolabel);
 	} // parse_from_string
-	std::string to_string(bool print_edge_type = true) const {
-		std::stringstream ss;
-		if(print_edge_type) {
-			if(is_forward()) ss << "F";
-			else ss << "B";
-		}
-		ss << "(" << from << " " << to << " " << fromlabel << " " << elabel << " " << tolabel << ")";
-		return ss.str();
-	}
-	bool is_forward() const { return from < to; }
-	bool is_backward() const { return from > to; }
-
 	//virtual size_t get_serialized_size() const;
 	//virtual size_t get_serialized_size(char *buffer, size_t buffer_size) const;
 	//virtual size_t serialize(char *buffer, size_t buffer_size) const;
@@ -130,6 +142,7 @@ public:
 	virtual size_t deserialize(std::istream &) {
 		throw method_unimplemented("DFS::serialize");
 	}
+//*/
 };
 
 struct DFS_less_then {
@@ -170,24 +183,19 @@ struct DFS_less_then {
 };
 
 struct DFS_less_then_fast {
-  bool operator()(const DFS &d1, const DFS &d2) const {
-    if(d1.from < d2.from) return true;
-    if(d1.from > d2.from) return false;
-
-    if(d1.to < d2.to) return true;
-    if(d1.to > d2.to) return false;
-
-    if(d1.fromlabel < d2.fromlabel) return true;
-    if(d1.fromlabel > d2.fromlabel) return false;
-
-    if(d1.elabel < d2.elabel) return true;
-    if(d1.elabel > d2.elabel) return false;
-
-    if(d1.tolabel < d2.tolabel) return true;
-    if(d1.tolabel > d2.tolabel) return false;
-
-    return false;
-  }
+	bool operator()(const DFS &d1, const DFS &d2) const {
+		if(d1.from < d2.from) return true;
+		if(d1.from > d2.from) return false;
+		if(d1.to < d2.to) return true;
+		if(d1.to > d2.to) return false;
+		if(d1.fromlabel < d2.fromlabel) return true;
+		if(d1.fromlabel > d2.fromlabel) return false;
+		if(d1.elabel < d2.elabel) return true;
+		if(d1.elabel > d2.elabel) return false;
+		if(d1.tolabel < d2.tolabel) return true;
+		if(d1.tolabel > d2.tolabel) return false;
+		return false;
+	}
 };
 
 /**
@@ -195,15 +203,15 @@ struct DFS_less_then_fast {
  * is functor.
  */
 struct DFS_std_equal {
-  bool operator()(const DFS &d1, const DFS &d2) const {
-    return d1 == d2;
-  }
+	bool operator()(const DFS &d1, const DFS &d2) const {
+		return d1 == d2;
+	}
 };
 
 struct DFS_std_not_equal {
-  bool operator()(const DFS &d1, const DFS &d2) const {
-    return d1 != d2;
-  }
+	bool operator()(const DFS &d1, const DFS &d2) const {
+		return d1 != d2;
+	}
 };
 
 /**
@@ -212,13 +220,13 @@ struct DFS_std_not_equal {
  * backward edge.
  */
 struct DFS_partial_equal {
-  bool operator()(const DFS &d1, const DFS &d2) const {
-    if(d1.from != d2.from || d1.to != d2.to) return false;
-    if(d1.fromlabel != -1 && d2.fromlabel != -1 && d1.fromlabel != d2.fromlabel) return false;
-    if(d1.tolabel != -1 && d2.tolabel != -1 && d1.tolabel != d2.tolabel) return false;
-    if(d1.elabel != d2.elabel) return false;
-    return true;
-  } // operator()
+	bool operator()(const DFS &d1, const DFS &d2) const {
+		if(d1.from != d2.from || d1.to != d2.to) return false;
+		if(d1.fromlabel != (LabelT)-1 && d2.fromlabel != (LabelT)-1 && d1.fromlabel != d2.fromlabel) return false;
+		if(d1.tolabel != (LabelT)-1 && d2.tolabel != (LabelT)-1 && d1.tolabel != d2.tolabel) return false;
+		if(d1.elabel != d2.elabel) return false;
+		return true;
+	} // operator()
 };
 
 /**
@@ -227,26 +235,26 @@ struct DFS_partial_equal {
  * backward edge. INTERNALLY USES DFS_equal.
  */
 struct DFS_partial_not_equal {
-  DFS_partial_equal eq;
-  bool operator()(const DFS &d1, const DFS &d2) const {
-    return !eq(d1, d2);
-  }
+	DFS_partial_equal eq;
+	bool operator()(const DFS &d1, const DFS &d2) const {
+		return !eq(d1, d2);
+	}
 };
 
 class DFSCode;
 std::ostream &operator<<(std::ostream &out, const DFSCode &code);
 
-struct DFSCode : public std::vector<DFS>, public serializable {
+//struct DFSCode : public std::vector<DFS>, public serializable {
+struct DFSCode : public std::vector<DFS> {
 private:
 	RMPath rmpath; // right-most path
 public:
 	const RMPath &get_rmpath() const { return rmpath; }
-
 	// RMPath is in the opposite order then the DFS code, i.e., the
 	// indexes into DFSCode go from higher numbers to lower numbers.
 	const RMPath &buildRMPath() {
 		rmpath.clear();
-		int old_from = -1;
+		VeridT old_from = (VeridT)-1;
 		for(int i = size() - 1; i >= 0; --i) {
 			if((*this)[i].from < (*this)[i].to &&  // forward
 					(rmpath.empty() || old_from == (*this)[i].to)) {
@@ -261,9 +269,9 @@ public:
 		g.clear();
 		for(DFSCode::const_iterator it = begin(); it != end(); ++it) {
 			g.resize(std::max(it->from, it->to) + 1);
-			if(it->fromlabel != -1)
+			if(it->fromlabel != (LabelT)-1)
 				g[it->from].label = it->fromlabel;
-			if(it->tolabel != -1)
+			if(it->tolabel != (LabelT)-1)
 				g[it->to].label = it->tolabel;
 			g[it->from].push(it->from, it->to, it->elabel);
 			if(g.directed == false)
@@ -272,12 +280,11 @@ public:
 		g.buildEdge();
 		return (true);
 	}
-
 	// Return number of nodes in the graph.
-	unsigned int nodeCount(void) {
-		unsigned int nodecount = 0;
+	unsigned nodeCount(void) {
+		unsigned nodecount = 0;
 		for(DFSCode::iterator it = begin(); it != end(); ++it)
-			nodecount = std::max(nodecount, (unsigned int)(std::max(it->from, it->to) + 1));
+			nodecount = std::max(nodecount, (unsigned)(std::max(it->from, it->to) + 1));
 		return (nodecount);
 	}
 	DFSCode &operator=(const DFSCode &other) {
@@ -287,32 +294,22 @@ public:
 		return *this;
 	}
 	friend bool operator==(const DFSCode &d1, const DFSCode &d2) {
-		if(d1.size() != d2.size())
-			return false;
-		for(int i = 0; i < d1.size(); i++) {
-			if(d1[i] != d2[i])
-				return false;
-		}
+		if(d1.size() != d2.size()) return false;
+		for(size_t i = 0; i < d1.size(); i++)
+			if(d1[i] != d2[i]) return false;
 		return true;
 	}
-
 	friend bool operator<(const DFSCode &d1, const DFSCode &d2) {
-		if(d1.size() < d2.size())
-			return true;
-		else if(d1.size() > d2.size())
-			return false;
-		for(int i = 0; i < d1.size(); i++) {
-			if(d1[i] < d2[i])
-				return true;
-			else if(d2[i] < d1[i])
-				return false;
+		if(d1.size() < d2.size()) return true;
+		else if(d1.size() > d2.size()) return false;
+		for(size_t i = 0; i < d1.size(); i++) {
+			if(d1[i] < d2[i]) return true;
+			else if(d2[i] < d1[i]) return false;
 		}
 		return false;         //equal
 	}
-
 	friend std::ostream &operator<<(std::ostream &out, const DFSCode &code);
-
-	void push(int from, int to, int fromlabel, int elabel, int tolabel) {
+	void push(VeridT from, VeridT to, LabelT fromlabel, LabelT elabel, LabelT tolabel) {
 		resize(size() + 1);
 		DFS &d = (*this)[size() - 1];
 		d.from = from;
@@ -321,12 +318,21 @@ public:
 		d.elabel = elabel;
 		d.tolabel = tolabel;
 	}
-
 	void pop() { resize(size() - 1); }
-	//std::ostream &write(std::ostream &) const;  // write
 	//std::string to_string(bool print_edge_type = true) const;
-	//bool dfs_code_is_min() const;
-	//static DFSCode read_from_str(const std::string &str);
+	std::string to_string(bool print_edge_type = true) const {
+		if (empty()) return "";
+		std::stringstream ss;
+		size_t i = 0;
+		ss << (*this)[i].to_string(print_edge_type);
+		i ++;
+		for (; i < size(); ++i) {
+			ss << ";" << (*this)[i].to_string(print_edge_type);
+		}
+		return ss.str();
+	}
+
+	//std::ostream &write(std::ostream &) const;  // write
 	std::ostream &write(std::ostream &os) const {
 		if(size() == 0) return os;
 		os << "(" << (*this)[0].fromlabel << ") " << (*this)[0].elabel << " (0f" << (*this)[0].tolabel << ");";
@@ -339,18 +345,9 @@ public:
 		}
 		return os;
 	}
-	std::string to_string(bool print_edge_type = true) const {
-		if(empty()) return "";
-		std::stringstream ss;
-		int i = 0;
-		ss << (*this)[i].to_string(print_edge_type);
-		i++;
-		for(; i < size(); ++i) {
-			ss << ";" << (*this)[i].to_string(print_edge_type);
-		}
-		return ss.str();
-	}
-	DFSCode read_from_str(const string &str) {
+/*
+	//static DFSCode read_from_str(const std::string &str);
+	DFSCode read_from_str(const std::string &str) {
 		std::vector<std::string> vec_str;
 		split(str, vec_str, ";");
 		DFSCode result;
@@ -360,6 +357,7 @@ public:
 		} // for i
 		return result;
 	}
+	//bool dfs_code_is_min() const;
 	//virtual size_t get_serialized_size() const;
 	//virtual size_t get_serialized_size(char *buffer, size_t buffer_size) const;
 	//virtual size_t serialize(char *buffer, size_t buffer_size) const;
@@ -367,7 +365,6 @@ public:
 	//virtual size_t serialize(std::ostream &) const;
 	//virtual size_t deserialize(std::istream &);
 	//void remove_negative_ones();
-
 	virtual size_t get_serialized_size() const {
 		if(empty()) return sizeof(int);
 		return size() * at(0).get_serialized_size() + sizeof(int);
@@ -417,10 +414,7 @@ public:
 			if(at(i).is_forward()) last_vid = at(i).to;
 		}
 	} // DFSCode::remove_negative_ones
-
-protected:
-  //static bool dfs_code_is_min_internal(Projected &projected, const DFSCode &dfs_code, DFSCode &min_dfs_code, Graph &graph_dfs_code);
-  //void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ");
+//*/
 };
 
 std::ostream &operator<<(std::ostream &out, const DFSCode &code) {

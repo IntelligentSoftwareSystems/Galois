@@ -4,31 +4,21 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include "../Lonestar/common_types.h"
 
-typedef int integer_t;
-typedef integer_t int_t;
-typedef unsigned int unsigned_integer_t;
-typedef unsigned_integer_t uint_t;
-typedef uint_t symbol_t;
-typedef double double_t;
-typedef char char_t;
-typedef char * charp_t;
-typedef float float_t;
-typedef long long_t;
-typedef unsigned long unsigned_long_t;
-typedef unsigned long ulong_t;
-typedef bool bool_t;
-typedef std::string string_t;
-typedef void * void_ptr_t;
-typedef std::vector<int> RMPath;
+typedef std::vector<VeridT> RMPath;
+//typedef int edge_label_t;
+//typedef int vertex_label_t;
+//typedef std::set<edge_label_t> edge_label_set_t;
+//typedef std::set<vertex_label_t> vertex_label_set_t;
 
 struct LabEdge {
-	int from;
-	int to;
-	int elabel;
+	VeridT from;
+	VeridT to;
+	LabelT elabel;
 	unsigned id;
 	LabEdge() : from(0), to(0), elabel(0), id(0) {}
-	LabEdge(int src, int dst, int el, unsigned eid) :
+	LabEdge(VeridT src, VeridT dst, LabelT el, unsigned eid) :
 		from(src), to(dst), elabel(el), id(eid) {}
 	std::string to_string() const {
 		std::stringstream ss;
@@ -42,18 +32,19 @@ class Vertex {
 public:
 	typedef std::vector<LabEdge>::iterator edge_iterator;
 	typedef std::vector<LabEdge>::const_iterator const_edge_iterator;
-	int label, global_vid, vertex_part_id, orig_part_id;
+	LabelT label;
+	VeridT global_vid, vertex_part_id, orig_part_id;
 	bool is_boundary_vertex;
 	std::vector<LabEdge> edge; //neighbor list
-	void push(int from, int to, int elabel) {
+	void push(VeridT from, VeridT to, LabelT elabel) {
 		edge.resize(edge.size() + 1);
 		edge[edge.size() - 1].from = from;
 		edge[edge.size() - 1].to = to;
 		edge[edge.size() - 1].elabel = elabel;
 		return;
 	}
-	bool find(int from, int to, LabEdge &result) const {
-		for(int i = 0; i < edge.size(); i++) {
+	bool find(VeridT from, VeridT to, LabEdge &result) const {
+		for(size_t i = 0; i < edge.size(); i++) {
 			if(edge[i].from == from && edge[i].to == to) {
 				result = edge[i];
 				return true;
@@ -61,6 +52,7 @@ public:
 		} // for i
 		return false;
 	} // find
+/*
 	static size_t get_serialized_size(const Vertex &vrtx) {
 		return sizeof(int) + 4 * vrtx.edge.size() * sizeof(int) + sizeof(int)     + sizeof(int);
 	}
@@ -80,7 +72,7 @@ public:
 		// store number of edges
 		*((int*)(buffer + pos)) = vrtx.edge.size();
 		pos += sizeof(int);
-		for(int i = 0; i < vrtx.edge.size(); i++) {
+		for(size_t i = 0; i < vrtx.edge.size(); i++) {
 			*((int*)(buffer + pos)) = vrtx.edge[i].from;
 			pos += sizeof(int);
 			*((int*)(buffer + pos)) = vrtx.edge[i].to;
@@ -119,21 +111,7 @@ public:
 		} // for i
 		return pos;
 	} // Vertex::deserialize
+//*/
 };
-
-inline void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ") {
-  // Skip delimiters at beginning.
-  std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
-  // Find first "non-delimiter".
-  std::string::size_type pos     = str.find_first_of(delimiters, lastPos);
-  while (std::string::npos != pos || std::string::npos != lastPos) {
-    // Found a token, add it to the vector.
-    tokens.push_back(str.substr(lastPos, pos - lastPos));
-    // Skip delimiters.  Note the "not_of"
-    lastPos = str.find_first_not_of(delimiters, pos);
-    // Find next "non-delimiter"
-    pos = str.find_first_of(delimiters, lastPos);
-  }
-}
 
 #endif
