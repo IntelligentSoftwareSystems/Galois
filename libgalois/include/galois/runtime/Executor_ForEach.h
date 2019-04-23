@@ -144,9 +144,7 @@ public:
 };
 
 template <typename FuncTy>
-struct ForEachFuncReference {
-  using FuncReferenceType = FuncTy const &;
-};
+struct ForEachFuncReference;
 
 template <typename FuncNoRef>
 struct ForEachFuncReference<FuncNoRef const> {
@@ -165,7 +163,7 @@ struct ForEachFuncReference<FuncNoRef &> {
 
 template <typename FuncNoRef>
 struct ForEachFuncReference<FuncNoRef &&> {
-  using FuncReferenceType = FuncNoRef const &;
+  using FuncReferenceType = FuncNoRef &;
 };
 
 // TODO(ddn): Implement wrapper to allow calling without UserContext
@@ -536,10 +534,12 @@ void for_each_impl(const RangeTy& range, FunctionTy&& fn,
       type ::template retype<value_type>
           WorkListTy;
   // typedef typename WorkListTy::value_type g;
-  typedef ForEachExecutor<WorkListTy, decltype(std::forward<FunctionTy>(fn)), ArgsTy> WorkTy;
+  using ReceivedFuncRefType = decltype(std::forward<FunctionTy>(fn));
+  typedef ForEachExecutor<WorkListTy, ReceivedFuncRefType, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
-  WorkTy W(std::forward<FunctionTy>(fn), args);
+  typename ForEachFuncReference<ReceivedFuncRefType>::FuncReferenceType fn_ref = fn;
+  WorkTy W(fn_ref, args);
   W.init(range);
   substrate::getThreadPool().run(activeThreads,
                                  [&W, &range]() { W.initThread(range); },
