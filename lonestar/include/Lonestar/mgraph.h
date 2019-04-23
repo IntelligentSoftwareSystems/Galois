@@ -6,16 +6,15 @@
 #include <fstream>
 #include <iostream>
 #include "core.h"
+#include "common_types.h"
 
-typedef int IndexT;
-typedef int ValueT;
 struct MEdge {
 	IndexT src;
 	IndexT dst;
 	ValueT elabel;
 	//IndexT id;
 	MEdge() : src(0), dst(0), elabel(0) {}
-	MEdge(int from, int to, int el) :
+	MEdge(IndexT from, IndexT to, ValueT el) :
 		src(from), dst(to), elabel(el) {}
 	std::string to_string() const {
 		std::stringstream ss;
@@ -30,13 +29,13 @@ public:
 	MEdgeList el;
 	MGraph() : need_relabel_edges(false), symmetrize_(false), directed_(false) {}
 	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), symmetrize_(false), directed_(false) {}
-	int * out_rowptr() const { return rowptr_; }
-	int * out_colidx() const { return colidx_; }
-	int * labels() { return labels_.data(); }
-	int get_label(int n) { return labels_[n]; }
-	int get_offset(int n) { return rowptr_[n]; }
-	int get_dest(int n) { return colidx_[n]; }
-	int get_weight(int n) { return weight_[n]; }
+	IndexT * out_rowptr() const { return rowptr_; }
+	IndexT * out_colidx() const { return colidx_; }
+	ValueT * labels() { return labels_.data(); }
+	ValueT get_label(int n) { return labels_[n]; }
+	IndexT get_offset(int n) { return rowptr_[n]; }
+	IndexT get_dest(int n) { return colidx_[n]; }
+	ValueT get_weight(int n) { return weight_[n]; }
 	int get_core() { return core; }
 	int out_degree(int n) const { return rowptr_[n+1] - rowptr_[n]; }
 	bool directed() const { return directed_; }
@@ -48,7 +47,7 @@ public:
 		is.open(filename, std::ios::in);
 		char line[1024];
 		std::vector<std::string> result;
-		std::set<std::pair<int,int> > edge_set;
+		std::set<std::pair<IndexT, IndexT> > edge_set;
 		//clear();
 		while(true) {
 			unsigned pos = is.tellg();
@@ -66,16 +65,16 @@ public:
 				labels_.resize(id + 1);
 				labels_[id] = atoi(result[2].c_str());
 			} else if(result[0] == "e" && result.size() >= 4) {
-				int src    = atoi(result[1].c_str());
-				int dst    = atoi(result[2].c_str());
-				int elabel = atoi(result[3].c_str());
+				IndexT src    = atoi(result[1].c_str());
+				IndexT dst    = atoi(result[2].c_str());
+				ValueT elabel = atoi(result[3].c_str());
 				assert(labels_.size() > src && labels_.size() > dst);
 				if (src == dst) continue; // remove self-loop
-				if (edge_set.find(std::pair<int, int>(src, dst)) == edge_set.end()) {
-					edge_set.insert(std::pair<int, int>(src, dst));
+				if (edge_set.find(std::pair<IndexT, IndexT>(src, dst)) == edge_set.end()) {
+					edge_set.insert(std::pair<IndexT, IndexT>(src, dst));
 					el.push_back(MEdge(src, dst, elabel));
 					if(symmetrize) {
-						edge_set.insert(std::pair<int, int>(dst, src));
+						edge_set.insert(std::pair<IndexT, IndexT>(dst, src));
 						el.push_back(MEdge(dst, src, elabel));
 					}
 				}
@@ -110,20 +109,20 @@ public:
 		while(is.getline(line, maxsize+1)) {
 			result.clear();
 			split(line, result);
-			int src = atoi(result[0].c_str());
+			IndexT src = atoi(result[0].c_str());
 			labels_.resize(src + 1);
 			labels_[src] = atoi(result[1].c_str());
-			int elabel = 0;
-			std::set<std::pair<int, int> > neighbors;
+			ValueT elabel = 0;
+			std::set<std::pair<IndexT, ValueT> > neighbors;
 			for(size_t i = 2; i < result.size(); i++) {
-				int dst = atoi(result[i].c_str());
+				IndexT dst = atoi(result[i].c_str());
 				if (src == dst) continue; // remove self-loop
 #ifdef USE_ELABEL
 				elabel = atoi(result[i].c_str());
 #endif
-				neighbors.insert(std::pair<int, int>(dst, elabel)); // remove redundant edge
+				neighbors.insert(std::pair<IndexT, ValueT>(dst, elabel)); // remove redundant edge
 			}
-			for (std::set<std::pair<int, int> >::iterator it = neighbors.begin(); it != neighbors.end(); ++it)
+			for (auto it = neighbors.begin(); it != neighbors.end(); ++it)
 				el.push_back(MEdge(src, it->first, it->second));
 		}
 		is.close();
@@ -211,11 +210,11 @@ public:
 		if (directed_) std::cout << "directed graph\n";
 		else std::cout << "undirected graph\n";
 		for (int n = 0; n < num_vertices_; n ++) {
-			int row_begin = rowptr_[n];
-			int row_end = rowptr_[n+1];
+			IndexT row_begin = rowptr_[n];
+			IndexT row_end = rowptr_[n+1];
 			std::cout << "vertex " << n << ": label = " << labels_[n] << " edgelist = [ ";
-			for (int offset = row_begin; offset < row_end; offset ++) {
-				int dst = colidx_[offset];
+			for (IndexT offset = row_begin; offset < row_end; offset ++) {
+				IndexT dst = colidx_[offset];
 				std::cout << dst << " ";
 			}
 			std::cout << "]" << std::endl;
@@ -228,14 +227,14 @@ private:
 	bool directed_;
 	int num_vertices_;
 	int num_edges_;
-	int *rowptr_;
-	int *colidx_;
-	int *weight_;
+	IndexT *rowptr_;
+	IndexT *colidx_;
+	ValueT *weight_;
 	int core;
 	//int *in_rowptr_;
 	//int *in_colidx_;
 	std::vector<int> rank;
-	std::vector<int> labels_;
+	std::vector<ValueT> labels_;
 	std::vector<std::vector<MEdge> > vertices;
 
 	std::vector<int> CountDegrees(const MEdgeList &el, bool transpose) {
@@ -254,9 +253,9 @@ private:
 		core = *(std::max_element(degrees.begin(), degrees.end()));
 		std::vector<int> offsets = PrefixSum(degrees);
 		num_edges_ = offsets[num_vertices_];
-		weight_ = new int[num_edges_];
-		colidx_ = new int[num_edges_];
-		rowptr_ = new int[num_vertices_+1]; 
+		weight_ = new ValueT[num_edges_];
+		colidx_ = new IndexT[num_edges_];
+		rowptr_ = new IndexT[num_vertices_+1]; 
 		for (int i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
 		for (auto it = el.begin(); it < el.end(); it++) {
 			MEdge e = *it;
@@ -325,9 +324,9 @@ private:
 		printf("core value (max truncated degree) = %u\n", core);
 		std::vector<int> offsets = PrefixSum(degrees);
 		assert(num_edges_ == offsets[num_vertices_]);
-		weight_ = new int[num_edges_];
-		colidx_ = new int[num_edges_];
-		rowptr_ = new int[num_vertices_+1]; 
+		weight_ = new ValueT[num_edges_];
+		colidx_ = new IndexT[num_edges_];
+		rowptr_ = new IndexT[num_vertices_+1]; 
 		for (int i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
 		for (int i = 0; i < num_vertices_; i ++) {
 			for (auto it = vertices[i].begin(); it < vertices[i].end(); it ++) {

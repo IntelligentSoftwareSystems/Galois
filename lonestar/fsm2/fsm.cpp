@@ -62,7 +62,7 @@ typedef Graph::GraphNode GNode;
 
 typedef galois::substrate::PerThreadStorage<LocalStatus> Status;
 
-void init(Graph& graph, Miner& miner, Projected_map3 &pattern_map, std::deque<DFS> &queue) {
+void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, std::deque<DFS> &queue) {
 	int single_edge_dfscodes = 0;
 	printf("\n=============================== Init ===============================\n\n");
 	for (auto src : graph) {
@@ -77,15 +77,15 @@ void init(Graph& graph, Miner& miner, Projected_map3 &pattern_map, std::deque<DF
 				if (pattern_map.count(src_label) == 0 || pattern_map[src_label].count(elabel) == 0 || pattern_map[src_label][elabel].count(dst_label) == 0)
 					single_edge_dfscodes++;
 				LabEdge *eptr = &(miner.edge_list[*e]);
-				pattern_map[src_label][elabel][dst_label].push(0, eptr, 0);
+				pattern_map[src_label][elabel][dst_label].push(2, eptr, 0); // single-edge embedding: (num_vertices, edge, pointer_to_parent_embedding)
 			}
 		}
 	}
 	int dfscodes_per_thread =  (int) ceil((single_edge_dfscodes * 1.0) / numThreads);
 	std::cout << "Single edge DFScodes " << single_edge_dfscodes << ", dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
-	for(Projected_iterator3 fromlabel = pattern_map.begin(); fromlabel != pattern_map.end(); ++fromlabel) {
-		for(Projected_iterator2 elabel = fromlabel->second.begin(); elabel != fromlabel->second.end(); ++elabel) {
-			for(Projected_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
+	for(EmbeddingList_iterator3 fromlabel = pattern_map.begin(); fromlabel != pattern_map.end(); ++fromlabel) {
+		for(EmbeddingList_iterator2 elabel = fromlabel->second.begin(); elabel != fromlabel->second.end(); ++elabel) {
+			for(EmbeddingList_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
 				DFS dfs(0, 1, fromlabel->first, elabel->first, tolabel->first);
 				queue.push_back(dfs);
 			} // for tolabel
@@ -99,9 +99,9 @@ void init(Graph& graph, Miner& miner, Projected_map3 &pattern_map, std::deque<DF
 void FsmSolver(Graph& graph, Miner& miner) {
 	Status status;
 	std::cout << "\n=============================== Start ===============================\n";
-	Projected_map3 pattern_map;
-	std::deque<DFS> task_queue;
-	init(graph, miner, pattern_map, task_queue);
+	PatternMap3D pattern_map; // mapping patterns to their embedding list
+	std::deque<DFS> task_queue; // task queue holding the DFScodes of patterns
+	init(graph, miner, pattern_map, task_queue); // insert single-edge patterns into the queue
 	//if(DEBUG) printout_embeddings(miner, queue);
 	for(size_t i = 0; i < status.size(); i++)
 		status.getLocal(i)->frequent_patterns_count = 0;
