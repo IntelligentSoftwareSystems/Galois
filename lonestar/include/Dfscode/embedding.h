@@ -28,7 +28,7 @@ struct LocalStatus {
 	std::vector<std::deque<DFS> > dfs_task_queue;
 	std::deque<DFSCode> dfscodes_to_process;
 };
-
+class EmbVector;
 // An embedding consists of an edge (pointer) 
 // and an embedding pointer to its parent embedding
 struct Embedding {
@@ -38,20 +38,23 @@ struct Embedding {
 	Embedding() : num_vertices(0), edge(0), prev(0) {};
 	std::string to_string() const {
 		std::stringstream ss;
-		ss << "[" << "," << edge->to_string() << "]";
+		ss << "[" << edge->to_string() << "]";
+		//ss << "[" << num_vertices << ", " << edge->to_string() << "]";
 		return ss.str();
 	}
-/*	void update_num_vertices() { num_vertices ++; }
-	void update_num_vertices(VeridT new_vertex) {
-		std::unordered_set<VeridT> vertex_set;
-		Embedding *em = prev;
-		while(em != NULL) {
-			vertex_set.insert(em->edge.src);
-			vertex_set.insert(em->edge.dst);
-			em = em->prev;
+	std::string to_string_all() {
+		std::vector<LabEdge> ev;
+		ev.push_back(*edge);
+		for(Embedding *p = prev; p; p = p->prev) {
+			ev.push_back(*(p->edge));
 		}
-		num_vertices = vertex_set.size();
-	}*/
+		std::reverse(ev.begin(), ev.end());
+		std::stringstream ss;
+		for(size_t i = 0; i < ev.size(); i++) {
+			ss << ev[i].to_string() << "; ";
+		}
+		return ss.str();
+	}
 };
 
 // embedding list

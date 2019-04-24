@@ -52,8 +52,10 @@ public:
 				for(auto e : graph->edges(id)) {
 					GNode dst = graph->getEdgeDst(e);
 					auto dst_label = 0, edge_label = 0;
-					if (label_flag) dst_label = graph->getData(dst);
-					//edge_label = graph->getEdgeData(e);
+					if (label_flag) {
+						dst_label = graph->getData(dst);
+						//edge_label = graph->getEdgeData(e); // TODO: enable this for FSM
+					}
 					auto num_vertices = vertices_set.size();
 					bool vertex_existed = true;
 					if(vertices_set.find(dst) == vertices_set.end()) {

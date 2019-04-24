@@ -70,7 +70,8 @@ public:
 	}
 
 	DFS() : from(0), to(0), fromlabel(0), elabel(0), tolabel(0) {}
-	DFS(VeridT from, VeridT to, LabelT fromlabel, LabelT elabel, LabelT tolabel) : from(from), to(to), fromlabel(fromlabel), elabel(elabel), tolabel(tolabel) {}
+	DFS(VeridT from, VeridT to, LabelT fromlabel, LabelT elabel, LabelT tolabel) :
+		from(from), to(to), fromlabel(fromlabel), elabel(elabel), tolabel(tolabel) {}
 	DFS(char *buffer, int size);
 	DFS(const DFS &d) : from(d.from), to(d.to), fromlabel(d.fromlabel), elabel(d.elabel), tolabel(d.tolabel) {}
 	//std::string to_string(bool print_edge_type = true) const;
@@ -144,7 +145,7 @@ public:
 	}
 //*/
 };
-
+/*
 struct DFS_less_then {
 	//bool bckwrd_bckwrd_less(const DFS &d1, const DFS &d2) const;
 	//bool frwrd_bckwrd_less(const DFS &d1, const DFS &d2) const;
@@ -198,10 +199,7 @@ struct DFS_less_then_fast {
 	}
 };
 
-/**
- * Standard equal, as defined in DFS. The only difference is that it
- * is functor.
- */
+// Standard equal, as defined in DFS. The only difference is that it is functor.
 struct DFS_std_equal {
 	bool operator()(const DFS &d1, const DFS &d2) const {
 		return d1 == d2;
@@ -214,11 +212,9 @@ struct DFS_std_not_equal {
 	}
 };
 
-/**
- * this is a special version of the == operator that compares the DFS
- * structure only partially, depending on whether it is forward or
- * backward edge.
- */
+// this is a special version of the == operator that compares the DFS
+// structure only partially, depending on whether it is forward or
+//backward edge.
 struct DFS_partial_equal {
 	bool operator()(const DFS &d1, const DFS &d2) const {
 		if(d1.from != d2.from || d1.to != d2.to) return false;
@@ -229,20 +225,16 @@ struct DFS_partial_equal {
 	} // operator()
 };
 
-/**
- * this is a special version of the == operator that compares the DFS
- * structure only partially, depending on whether it is forward or
- * backward edge. INTERNALLY USES DFS_equal.
- */
+// this is a special version of the == operator that compares the DFS
+// structure only partially, depending on whether it is forward or
+// backward edge. INTERNALLY USES DFS_equal.
 struct DFS_partial_not_equal {
 	DFS_partial_equal eq;
 	bool operator()(const DFS &d1, const DFS &d2) const {
 		return !eq(d1, d2);
 	}
 };
-
-class DFSCode;
-std::ostream &operator<<(std::ostream &out, const DFSCode &code);
+//*/
 
 //struct DFSCode : public std::vector<DFS>, public serializable {
 struct DFSCode : public std::vector<DFS> {
@@ -418,8 +410,8 @@ public:
 };
 
 std::ostream &operator<<(std::ostream &out, const DFSCode &code) {
-  out << code.to_string();
-  return out;
+	out << code.to_string();
+	return out;
 }
 
 #endif

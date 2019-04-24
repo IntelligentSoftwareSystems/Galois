@@ -27,11 +27,11 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <utility>
 #include <vector>
-#include <algorithm>
-#include <iostream>
 #include <fstream>
+#include <utility>
+#include <iostream>
+#include <algorithm>
 
 #define ENABLE_LABEL
 
@@ -51,14 +51,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::value
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
 	cll::init(Algo::nodeiterator));
-static cll::opt<unsigned> k("k",
-	cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
-static cll::opt<unsigned> minsup("minsup",
-	cll::desc("minimum suuport (default value 0)"), cll::init(0));
+static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
+static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
+static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 int total_num = 0;
-
+unsigned long merge_time = 0;
 //#define USE_DOMAIN
 #include "Mining/miner.h"
 #include "Lonestar/mgraph.h"
@@ -123,6 +122,8 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("QuickAggregation")
 	);
+	galois::StatTimer TmergeQP("MergeQuickPatterns");
+	TmergeQP.start();
 	//std::cout << "Merging quick patterns\n";
 	for (unsigned i = 0; i < qp_localmap.size(); i++) {
 		QpMap qp_lmap = *qp_localmap.getLocal(i);
@@ -140,6 +141,7 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 #endif
 		}
 	}
+	TmergeQP.stop();
 //*/
 	//std::cout << "Quick_aggregation: num_quick_patterns = " << qp_map.size() << "\n";
 
@@ -157,6 +159,8 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("CanonicalAggregation")
 	);
+	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
+	TmergeCG.start();
 	//std::cout << "Merging canonical patterns\n";
 	for (unsigned i = 0; i < cg_localmap.size(); i++) {
 		CgMap cg_lmap = *cg_localmap.getLocal(i);
@@ -174,6 +178,7 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 #endif
 		}
 	}
+	TmergeCG.stop();
 	int num_frequent_patterns = 0;
 	for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 #ifdef USE_DOMAIN
@@ -204,7 +209,6 @@ void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, C
 }
 
 #define DEBUG 0
-#define SHOW_OUTPUT 0
 void FsmSolver(Graph &graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueue queue, filtered_queue;
@@ -216,7 +220,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 	aggregator(miner, queue, cg_map);
 	//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 	//	<< std::distance(queue.begin(), queue.end()) << "\n";
-	if(SHOW_OUTPUT) miner.printout_agg(cg_map);
+	if(show) miner.printout_agg(cg_map);
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 	filter(miner, queue, filtered_queue, cg_map);
@@ -244,7 +248,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 		aggregator(miner, queue, cg_map);
 		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 		//	<< std::distance(queue.begin(), queue.end()) << "\n";
-		if(SHOW_OUTPUT) miner.printout_agg(cg_map);
+		if(show) miner.printout_agg(cg_map);
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
@@ -261,8 +265,8 @@ int main(int argc, char** argv) {
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
 	MGraph mgraph;
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
+	galois::StatTimer Tinit("GraphReading");
+	Tinit.start();
 	if (filetype == "txt") {
 		printf("Reading .lg file: %s\n", filename.c_str());
 		mgraph.read_txt(filename.c_str());
@@ -281,7 +285,7 @@ int main(int argc, char** argv) {
 			}
 		}
 	} else { printf("Unkown file format\n"); exit(1); }
-	Tinitial.stop();
+	Tinit.stop();
 	std::cout << "k = " << k << std::endl;
 	std::cout << "minsup = " << minsup << std::endl;
 	std::cout << "num_threads = " << numThreads << std::endl;
@@ -290,11 +294,12 @@ int main(int argc, char** argv) {
 	unsigned sizeof_emb = 2 * sizeof(ElementType);
 	Miner miner(true, sizeof_emb, &graph);
 	miner.set_threshold(minsup);
-	galois::reportPageAlloc("MeminfoPre");
-	galois::StatTimer T;
-	T.start();
+	//galois::reportPageAlloc("MeminfoPre");
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
 	FsmSolver(graph, miner);
-	T.stop();
-	galois::reportPageAlloc("MeminfoPost");
+	Tcomp.stop();
+	//galois::reportPageAlloc("MeminfoPost");
+	//std::cout << "merge_time = " << merge_time << std::endl;
 	return 0;
 }

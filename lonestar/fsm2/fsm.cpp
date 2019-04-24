@@ -37,23 +37,16 @@
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
 const char* url  = 0;
-
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
-
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<file type>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<file name>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
-	cll::init(Algo::nodeiterator));
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
+
+#define DEBUG 0
+#define SHOW_OUTPUT 1
 
 #include "Dfscode/miner.h"
 #include "Lonestar/mgraph.h"
@@ -61,10 +54,13 @@ typedef Graph::GraphNode GNode;
 #define CHUNK_SIZE 4
 
 typedef galois::substrate::PerThreadStorage<LocalStatus> Status;
+typedef galois::InsertBag<DFS> PatternQueue;
+typedef std::deque<DFS> DFSQueue;
 
-void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, std::deque<DFS> &queue) {
+void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &queue) {
 	int single_edge_dfscodes = 0;
 	printf("\n=============================== Init ===============================\n\n");
+	// classify each edge into its single-edge pattern accodding to its (src_label, edge_label, dst_label)
 	for (auto src : graph) {
 		auto& src_label = graph.getData(src);
 		Graph::edge_iterator first = graph.edge_begin(src);
@@ -73,7 +69,7 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, std::deque<DFS>
 			GNode dst = graph.getEdgeDst(e);
 			auto elabel = graph.getEdgeData(e);
 			auto& dst_label = graph.getData(dst);
-			if (src_label <= dst_label) {
+			if (src_label <= dst_label) { // TODO: has bug when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
 				if (pattern_map.count(src_label) == 0 || pattern_map[src_label].count(elabel) == 0 || pattern_map[src_label][elabel].count(dst_label) == 0)
 					single_edge_dfscodes++;
 				LabEdge *eptr = &(miner.edge_list[*e]);
@@ -83,6 +79,7 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, std::deque<DFS>
 	}
 	int dfscodes_per_thread =  (int) ceil((single_edge_dfscodes * 1.0) / numThreads);
 	std::cout << "Single edge DFScodes " << single_edge_dfscodes << ", dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
+	// for each single-edge pattern, generate a DFS code and push it into the task queue
 	for(EmbeddingList_iterator3 fromlabel = pattern_map.begin(); fromlabel != pattern_map.end(); ++fromlabel) {
 		for(EmbeddingList_iterator2 elabel = fromlabel->second.begin(); elabel != fromlabel->second.end(); ++elabel) {
 			for(EmbeddingList_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
@@ -93,18 +90,23 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, std::deque<DFS>
 	} // for fromlabel
 }
 
-#define DEBUG 0
-#define SHOW_OUTPUT 0
-
 void FsmSolver(Graph& graph, Miner& miner) {
 	Status status;
 	std::cout << "\n=============================== Start ===============================\n";
 	PatternMap3D pattern_map; // mapping patterns to their embedding list
-	std::deque<DFS> task_queue; // task queue holding the DFScodes of patterns
+	PatternQueue task_queue; // task queue holding the DFScodes of patterns
 	init(graph, miner, pattern_map, task_queue); // insert single-edge patterns into the queue
 	//if(DEBUG) printout_embeddings(miner, queue);
-	for(size_t i = 0; i < status.size(); i++)
+	std::cout << "numThreads = " << numThreads << " status.size() = " << status.size() << "\n";
+	for(size_t i = 0; i < status.size(); i++) {
 		status.getLocal(i)->frequent_patterns_count = 0;
+		status.getLocal(i)->thread_id = i;
+#ifdef ENABLE_LB
+		status.getLocal(i)->task_split_level = 0;
+		status.getLocal(i)->embeddings_regeneration_level = 0;
+		status.getLocal(i)->is_running = true;
+#endif
+	}
 
 	std::cout << "\n=============================== DFS ===============================\n";
 	size_t total = 0;
@@ -119,6 +121,15 @@ void FsmSolver(Graph& graph, Miner& miner) {
 			ls->DFS_CODE.push(0, 1, dfs.fromlabel, dfs.elabel, dfs.tolabel);
 			miner.grow(pattern_map[dfs.fromlabel][dfs.elabel][dfs.tolabel], 1, *ls);
 			ls->DFS_CODE.pop();
+#ifdef ENABLE_LB
+			if(ls->dfs_task_queue[0].size() == 0 && !miner.all_threads_idle()) {
+				bool succeed = miner.try_task_stealing(ls);
+				if (succeed) {
+					ls->embeddings_regeneration_level = 0;
+					miner.set_regen_level(ls->thread_id, 0);
+				}
+			}
+#endif
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),

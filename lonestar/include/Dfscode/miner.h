@@ -23,15 +23,22 @@ public:
 		minimal_support = minsup;
 		max_size = k;
 		label_flag = label_f;
-		use_threshold = enable_threshold;
 		nthreads = num_threads;
 		for(int i = 0; i < nthreads; i++) {
 			frequent_patterns_count.push_back(0);
 			std::vector<std::deque<DFS> > tmp;
 			dfs_task_queue.push_back(tmp);
-			dfs_task_queue_shared.push_back(tmp);
 		}
 		construct_edgelist();
+#ifdef ENABLE_LB
+		for(int i = 0; i < nthreads; i++) {
+			dfs_task_queue_shared.push_back(tmp);
+			thread_is_working.push_back(false);
+			embeddings_regeneration_level.push_back(0);
+		}
+		task_split_threshold = 2;
+		init_lb(0, nthreads);
+#endif
 	}
 	virtual ~Miner() {}
 	// returns the total number of frequent patterns
@@ -60,17 +67,55 @@ public:
 		}
 		assert(edge_list.size() == graph->sizeEdges());
 	}
+#ifdef ENABLE_LB
+	void set_regen_level(int tid, int val) {
+		embeddings_regeneration_level[tid] = val;
+	}
+	void try_task_stealing(LocalStatus &status) {
+		threads_load_balance(status);
+	}
+	void activate_thread(int tid) {
+		simple_lock.lock();
+		thread_is_working[tid] = true;
+		simple_lock.unlock();
+	}
+	void deactivate_thread(int tid) {
+		simple_lock.lock();
+		thread_is_working[tid] = false;
+		simple_lock.unlock();
+	}
+	bool all_threads_idle() {
+		bool all_idle = true;
+		simple_lock.lock();
+		for(int i = 0; i< num_threads; i++) {
+			if(thread_is_working[i] == true) {
+				all_idle = false;
+				break;
+			}
+		}
+		simple_lock.unlock();
+		return all_idle;
+	}
+	bool thread_working(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		bool th_is_working;
+		simple_lock.lock();
+		th_is_working = thread_is_working[thread_id];
+		simple_lock.unlock();
+		return th_is_working;
+	}
+#endif
 	// edge extension by DFS traversal: recursive call
 	void grow(EmbeddingList &emb_list, unsigned dfs_level, LocalStatus &status) {
-		if (use_threshold) {
-			unsigned sup = support(emb_list, status);
-			if (sup < minimal_support) return;
-		}
+		unsigned sup = support(emb_list, status);
+		if (sup < minimal_support) return;
 		if (is_min(status) == false) return; // check if this pattern is canonical: minimal DFSCode
-		if (use_threshold) {
-			status.frequent_patterns_count ++;
-			// list frequent patterns here!!!
-		} else std::cout << "motif_count = " << emb_list.size() << std::endl;
+		status.frequent_patterns_count ++;
+		// list frequent patterns here!!!
+		if(SHOW_OUTPUT) {
+			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
+			for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
+		}
 		const RMPath &rmpath = status.DFS_CODE.buildRMPath(); // build the right-most path of this pattern
 		LabelT minlabel = status.DFS_CODE[0].fromlabel; 
 		VeridT maxtoc = status.DFS_CODE[rmpath[0]].to; // right-most vertex
@@ -182,12 +227,15 @@ protected:
 	int nthreads;
 	unsigned minimal_support;
 	unsigned max_size;
-	bool use_threshold;
 	bool label_flag;
 	std::vector<int> frequent_patterns_count;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread
+#ifdef ENABLE_LB
+	int task_split_threshold;
+	std::vector<bool> thread_is_working;
+	std::vector<int> embeddings_regeneration_level;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue_shared;       //keep a separate queue for sharing work
-
+#endif
 	//support function for a single large graph, computes the minimum count of a node in the embeddings
 	virtual unsigned support(EmbeddingList &projected, LocalStatus &status) {
 		Map2D node_id_counts;

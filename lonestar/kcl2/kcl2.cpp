@@ -17,6 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+// This is a implementation of the WWW'18 paper:
+// Danisch et al., Listing k-cliques in Sparse Real-World Graphs, WWW 2018
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
@@ -163,7 +165,7 @@ void KclSolver(Graph& graph) {
 			mksub(graph, u, *sg, *new_id, *old_id, k);
 			kclique_thread(k-1, *sg, total_num);
 		},
-		galois::chunk_size<512>(), galois::steal(), galois::loopname("KclSolver")
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("KclSolver")
 	);
 	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
 }
