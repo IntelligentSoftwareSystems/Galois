@@ -97,43 +97,35 @@ fi
 pass=0
 fail=0
 failed_cases=""
-#for partition in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
-for partition in 11 12 13 14 15 16; do
-#for partition in 11; do
+#for partition in 1 2 3 4 5 6 7 8 9 10 11 12; do
+for partition in 1 2 3 4 5 6; do
+#for partition in 1; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
-    CUTTYPE+=" -partition=cvc"
+    CUTTYPE+=" -partition=oec"
   elif [ $partition -eq 2 ]; then
-    CUTTYPE+=" -partition=jcvc"
+    CUTTYPE+=" -partition=iec"
   elif [ $partition -eq 3 ]; then
-    CUTTYPE+=" -partition=jbvc"
+    CUTTYPE+=" -partition=cvc"
   elif [ $partition -eq 4 ]; then
-    CUTTYPE+=" -partition=2dvc -balanceMasters=nodes"
+    CUTTYPE+=" -partition=cvc-iec"
   elif [ $partition -eq 5 ]; then
     CUTTYPE+=" -partition=hovc"
   elif [ $partition -eq 6 ]; then
     CUTTYPE+=" -partition=hivc"
   elif [ $partition -eq 7 ]; then
-    CUTTYPE+=" -partition=oec"
-  elif [ $partition -eq 8 ]; then
-    CUTTYPE+=" -partition=iec"
-  elif [ $partition -eq 9 ]; then
-    CUTTYPE+=" -partition=od2vc"
-  elif [ $partition -eq 10 ]; then
-    CUTTYPE+=" -partition=od4vc"
-  elif [ $partition -eq 11 ]; then
-    CUTTYPE+=" -partition=gcvc"
-  elif [ $partition -eq 12 ]; then
-    CUTTYPE+=" -partition=goec"
-  elif [ $partition -eq 13 ]; then
-    CUTTYPE+=" -partition=ghovc"
-  elif [ $partition -eq 14 ]; then
-    CUTTYPE+=" -partition=ginger-o -stateRounds=100"
-  elif [ $partition -eq 15 ]; then
     CUTTYPE+=" -partition=fennel-o -stateRounds=100"
-  elif [ $partition -eq 16 ]; then
+  elif [ $partition -eq 8 ]; then
+    CUTTYPE+=" -partition=fennel-i -stateRounds=100"
+  elif [ $partition -eq 9 ]; then
+    CUTTYPE+=" -partition=ginger-o -stateRounds=100"
+  elif [ $partition -eq 10 ]; then
+    CUTTYPE+=" -partition=ginger-i -stateRounds=100"
+  elif [ $partition -eq 11 ]; then
     CUTTYPE+=" -partition=sugar-o -stateRounds=100"
+  elif [ $partition -eq 12 ]; then
+    CUTTYPE+=" -partition=sugar-i -stateRounds=100"
   fi
 
   for task in $SET; do
@@ -161,37 +153,29 @@ for partition in 11 12 13 14 15 16; do
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
       if [ $partition -eq 1 ]; then
-        failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 2 ]; then
-        failed_cases+="jagged cyclic vertex-cut $1 devices with $3 threads; "
+        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 3 ]; then
-        failed_cases+="jagged blocked vertex-cut $1 devices with $3 threads; "
+        failed_cases+="cartesian outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 4 ]; then
-        failed_cases+="2d checkerboard vertex-cut $1 devices with $3 threads; "
+        failed_cases+="cartesian incoming vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 5 ]; then
         failed_cases+="hybrid outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 6 ]; then
         failed_cases+="hybrid incoming vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 7 ]; then
-        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
+        failed_cases+="fennel outgoing edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 8 ]; then
-        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
+        failed_cases+="fennel incoming edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 9 ]; then
-        failed_cases+="over-decompose 2 cvc $1 devices with $3 threads; "
+        failed_cases+="ginger outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 10 ]; then
-        failed_cases+="over-decompose 4 cvc $1 devices with $3 threads; "
+        failed_cases+="ginger incoming vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 11 ]; then
-        failed_cases+="CuSP cvc $1 devices with $3 threads; "
+        failed_cases+="sugar outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 12 ]; then
-        failed_cases+="CuSP oec $1 devices with $3 threads; "
-      elif [ $partition -eq 13 ]; then
-        failed_cases+="CuSP hybrid outgoing $1 devices with $3 threads; "
-      elif [ $partition -eq 14 ]; then
-        failed_cases+="CuSP Ginger outgoing $1 devices with $3 threads; "
-      elif [ $partition -eq 15 ]; then
-        failed_cases+="CuSP FENNEL outgoing $1 devices with $3 threads; "
-      elif [ $partition -eq 16 ]; then
-        failed_cases+="CuSP Sugar outgoing $1 devices with $3 threads; "
+        failed_cases+="sugar outgoing vertex-cut $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
