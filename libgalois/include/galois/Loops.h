@@ -83,22 +83,8 @@ void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn,
  * @param args optional arguments to loop
  */
 template <typename FunctionTy, typename... Args>
-void on_each(const FunctionTy& fn, const Args&... args) {
-  runtime::on_each_gen(fn, std::make_tuple(args...));
-}
-
-/**
- * Low-level parallel loop. Operator is applied for each running thread.
- * Operator should confirm to <code>fn(tid, numThreads)</code> where tid is
- * the id of the current thread and numThreads is the total number of running
- * threads.
- *
- * @param fn operator, which is never copied
- * @param args optional arguments to loop
- */
-template <typename FunctionTy, typename... Args>
-void on_each(FunctionTy& fn, const Args&... args) {
-  runtime::on_each_gen(fn, std::make_tuple(args...));
+void on_each(FunctionTy&& fn, const Args&... args) {
+  runtime::on_each_gen(std::forward<FunctionTy>(fn), std::make_tuple(args...));
 }
 
 /**

@@ -28,9 +28,6 @@ void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn,
             const Args&... args);
 
 template <typename FunctionTy, typename... Args>
-void on_each(const FunctionTy& fn, const Args&... args);
-
-template <typename FunctionTy, typename... Args>
-void on_each(FunctionTy& fn, const Args&... args);
+void on_each(FunctionTy&& fn, const Args&... args);
 
 } // end namespace galois
