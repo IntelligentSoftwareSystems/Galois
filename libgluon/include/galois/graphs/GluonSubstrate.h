@@ -18,21 +18,20 @@
  */
 
 /**
- * @file DistributedGraph.h
+ * @file GluonSubstrate.h
  *
- * Contains the implementation for DistGraph. Command line argument definitions
+ * Contains the implementation for GluonSubstrate. Command line argument definitions
  * are found in DistributedGraph.cpp.
  */
 
-#ifndef _GALOIS_DIST_HGRAPH_H_
-#define _GALOIS_DIST_HGRAPH_H_
+#ifndef _GALOIS_GLUONSUB_H_
+#define _GALOIS_GLUONSUB_H_
 
 #include <unordered_map>
 #include <fstream>
 
 #include "galois/runtime/GlobalObj.h"
 #include "galois/graphs/BufferedGraph.h"
-#include "galois/graphs/B_LC_CSR_Graph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/SyncStructures.h"
@@ -50,57 +49,13 @@
 
 #include "llvm/Support/CommandLine.h"
 
-/*
- * Headers for boost serialization
- */
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/split_member.hpp>
-#include <boost/serialization/binary_object.hpp>
-#include <boost/serialization/serialization.hpp>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
 
 namespace cll = llvm::cl;
-
-/**
- * Enums specifying how masters are to be distributed among hosts.
- */
-enum MASTERS_DISTRIBUTION {
-  //! balance nodes
-  BALANCED_MASTERS,
-  //! balance edges
-  BALANCED_EDGES_OF_MASTERS,
-  //! balance nodes and edges
-  BALANCED_MASTERS_AND_EDGES
-};
 
 //! Specifies if synchronization should be partition agnostic
 extern cll::opt<bool> partitionAgnostic;
 //! Specifies what format to send metadata in
 extern cll::opt<DataCommMode> enforce_metadata;
-//! Specifies how to distribute masters among hosts
-extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> nodeWeightOfMaster;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> edgeWeightOfMaster;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> nodeAlphaRanges;
-//! Specifies number of threads doing I/O
-extern cll::opt<unsigned> numFileThreads;
-//! Specifies the size of the buffer used for
-extern cll::opt<unsigned> edgePartitionSendBufSize;
-//! Number of rounds to split master assignment phase in in CuSP
-//! @todo move this to CuSP source and not here
-extern cll::opt<uint32_t> stateRounds;
-//! If true, CuSP will use asynchronous synchronization for master assignment
-//! phase (phase0)
-//! @todo move this to CuSP source and not here
-extern cll::opt<bool> cuspAsync;
-//! If true, CuSP activates a barrier before the edge inspection sends.
-//! @todo move this to CuSP source and not here
-extern cll::opt<bool> inspectionBarrier;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -125,29 +80,22 @@ namespace galois {
 namespace graphs {
 
 /**
- * Base DistGraph class that all distributed graphs extend from.
+ * Base GluonSubstrate class that all distributed graphs extend from.
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-template <typename NodeTy, typename EdgeTy, bool WithInEdges = false>
-class DistGraph : public galois::runtime::GlobalObject {
+template <typename GraphType>
+class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
   //! Graph name used for printing things
-  constexpr static const char* const GRNAME = "dGraph";
+  constexpr static const char* const RNAME = "Gluon";
 
-  //! testing
-  using GraphTy = typename std::conditional<
-      WithInEdges, galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, true>,
-      galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>>::type;
-
-  //! Tracks current round number; has to be set manually by the user
-  bool round;
 
 protected:
-  //! The internal graph used by DistGraph to represent the graph
+  //! The internal graph used by GluonSubstrate to represent the graph
   GraphTy graph;
   //! Synchronization type
   enum SyncType {
@@ -159,13 +107,8 @@ protected:
   //! how to do synchronization
   bool transposed;
 
-  // global graph variables
-  uint64_t numGlobalNodes; //!< Total nodes in the global unpartitioned graph.
-  uint64_t numGlobalEdges; //!< Total edges in the global unpartitioned graph.
-
   const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
-  const uint32_t
-      numHosts; //!< Copy of net.Num, which is the total number of machines
+  const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
 
   // local graph
   // size() = Number of nodes created on this host (masters + mirrors)
@@ -183,10 +126,6 @@ protected:
   uint64_t last_nodeID_withEdges_bipartite; //!< used only for bipartite graphs
 
   // memoization optimization
-  //! Mirror nodes from different hosts. For reduce
-  std::vector<std::vector<size_t>> mirrorNodes;
-  //! Master nodes on different hosts. For broadcast
-  std::vector<std::vector<size_t>> masterNodes;
   //! Maximum size of master or mirror nodes on different hosts
   size_t maxSharedSize;
 
@@ -200,56 +139,13 @@ protected:
   BITVECTOR_STATUS* currentBVFlag;
 
 private:
-  // vector for determining range objects for master nodes + nodes
-  // with edges (which includes masters)
-  //! represents split of all nodes among threads to balance edges
-  std::vector<uint32_t> allNodesRanges;
-  //! represents split of master nodes among threads to balance edges
-  std::vector<uint32_t> masterRanges;
-  //! represents split of nodes with edges (includes masters) among threads to
-  //! balance edges
-  std::vector<uint32_t> withEdgeRanges;
-
-  //! represents split of all nodes among threads to balance in-edges
-  std::vector<uint32_t> allNodesRangesIn;
-  //! represents split of master nodes among threads to balance in-edges
-  std::vector<uint32_t> masterRangesIn;
-
-  using NodeRangeType =
-      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
-
-  //! Vector of ranges that stores the 3 different range objects that a user is
-  //! able to access
-  std::vector<NodeRangeType> specificRanges;
-  //! Like specificRanges, but for in edges
-  std::vector<NodeRangeType> specificRangesIn;
-
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
-
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
 protected:
-  //! Prints graph statistics.
-  void printStatistics() {
-    if (id == 0) {
-      galois::gPrint("Total nodes: ", numGlobalNodes, "\n");
-      galois::gPrint("Total edges: ", numGlobalEdges, "\n");
-    }
-    galois::gPrint("[", id, "] Master nodes: ", numOwned, "\n");
-    galois::gPrint("[", id, "] Mirror nodes: ", size() - numOwned, "\n");
-    galois::gPrint("[", id, "] Nodes with edges: ", numNodesWithEdges, "\n");
-    galois::gPrint("[", id, "] Edges: ", sizeEdges(), "\n");
-
-    // reports the number of nodes + edge as well
-    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-        "dGraph", "TotalNodes", numOwned);
-    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-        "dGraph", "TotalEdges", sizeEdges());
-  }
-
   //! Increments evilPhase, a phase counter used by communication.
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
@@ -260,32 +156,6 @@ protected:
   }
 
 public:
-  /****** VIRTUAL FUNCTIONS *********/
-  //! Converts a global node id to a local node id
-  //! @returns local id from passed in global id
-  virtual uint32_t G2L(uint64_t) const = 0;
-  //! Converts a local node id to a local node id
-  //! @returns global id from passed in local id
-  virtual uint64_t L2G(uint32_t) const = 0;
-  //! Returns vertex cut status
-  //! @returns True if the cut being used is a vertex cut
-  virtual bool is_vertex_cut() const = 0;
-  //! Determines which host has the master for a particular node
-  //! @returns Host id of node in question
-  virtual unsigned getHostID(uint64_t) const = 0;
-  //! Determine if a node has a master on this host.
-  //! @returns True if passed in global id has a master on this host
-  virtual bool isOwned(uint64_t) const = 0;
-  //! Determine if a node has a proxy on this host
-  //! @returns True if passed in global id has a proxy on this host
-  virtual bool isLocal(uint64_t) const = 0;
-  //! Serialize this graph
-  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
-                                        const unsigned int version = 0) const {}
-  //! Deserialize a graph
-  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
-                                          const unsigned int version = 0){};
-  //! Gets the mirror node ranges on this graph
   //! @returns Range of mirror nodes on this graph
   virtual std::vector<std::pair<uint32_t, uint32_t>>
   getMirrorRanges() const = 0;
@@ -346,257 +216,6 @@ private:
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
 
-  /**
-   * Given an OfflineGraph, compute the masters for each node by
-   * evenly (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host. Considers
-   * ONLY nodes and not edges.
-   *
-   * @param g The offline graph which has loaded the graph you want
-   * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  void computeMastersBlockedNodes(galois::graphs::OfflineGraph& g,
-                                  uint64_t numNodes_to_divide,
-                                  const std::vector<unsigned>& scalefactor,
-                                  unsigned DecomposeFactor = 1) {
-    if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
-      for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
-        gid2host.push_back(galois::block_range(0U, (unsigned)numNodes_to_divide,
-                                               i, numHosts * DecomposeFactor));
-    } else { // TODO: not compatible with DecomposeFactor.
-      assert(scalefactor.size() == numHosts);
-
-      unsigned numBlocks = 0;
-
-      for (unsigned i = 0; i < numHosts; ++i) {
-        numBlocks += scalefactor[i];
-      }
-
-      std::vector<std::pair<uint64_t, uint64_t>> blocks;
-      for (unsigned i = 0; i < numBlocks; ++i) {
-        blocks.push_back(galois::block_range(0U, (unsigned)numNodes_to_divide,
-                                             i, numBlocks));
-      }
-
-      std::vector<unsigned> prefixSums;
-      prefixSums.push_back(0);
-
-      for (unsigned i = 1; i < numHosts; ++i) {
-        prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-      }
-
-      for (unsigned i = 0; i < numHosts; ++i) {
-        unsigned firstBlock = prefixSums[i];
-        unsigned lastBlock  = prefixSums[i] + scalefactor[i] - 1;
-        gid2host.push_back(
-            std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
-      }
-    }
-  }
-
-  /**
-   * Given an OfflineGraph, compute the masters for each node by
-   * evenly (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host while taking
-   * into consideration the only edges of the node to get
-   * even blocks.
-   *
-   * @param g The offline graph which has loaded the graph you want
-   * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
-                                   uint64_t numNodes_to_divide,
-                                   const std::vector<unsigned>& scalefactor,
-                                   unsigned DecomposeFactor = 1) {
-    if (edgeWeightOfMaster == 0) {
-      edgeWeightOfMaster = 1;
-    }
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    gid2host.resize(numHosts * DecomposeFactor);
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d * numHosts),
-                              numHosts * DecomposeFactor, scalefactor);
-      gid2host[id + d * numHosts].first  = *(r.first.first);
-      gid2host[id + d * numHosts].second = *(r.first.second);
-    }
-
-    for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id)
-        continue;
-      galois::runtime::SendBuffer b;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
-      }
-      net.sendTagged(h, galois::runtime::evilPhase, b);
-    }
-    net.flush();
-    unsigned received = 1;
-    while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first != id);
-      auto& b = p->second;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gDeserialize(b, gid2host[p->first + d * numHosts]);
-      }
-      ++received;
-    }
-    increment_evilPhase();
-
-    #ifndef NDEBUG
-    for (unsigned h = 0; h < numHosts; h++) {
-      if (h == 0) {
-        assert(gid2host[h].first == 0);
-      } else if (h == numHosts - 1) {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == g.size());
-      } else {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == gid2host[h + 1].first);
-      }
-    }
-    #endif
-  }
-
-  /**
-   * Given an OfflineGraph, compute the masters for each node by
-   * evenly (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host while taking
-   * into consideration the edges of the node AND the node itself.
-   *
-   * @param g The offline graph which has loaded the graph you want
-   * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1. Ignored
-   * in this function currently.
-   *
-   * @todo make this function work with decompose factor
-   */
-  void computeMastersBalancedNodesAndEdges(
-      galois::graphs::OfflineGraph& g, uint64_t numNodes_to_divide,
-      const std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
-    if (nodeWeightOfMaster == 0) {
-      nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
-    }
-
-    if (edgeWeightOfMaster == 0) {
-      edgeWeightOfMaster = 1;
-    }
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    gid2host.resize(numHosts);
-    auto r = g.divideByNode(nodeWeightOfMaster, edgeWeightOfMaster, id,
-                            numHosts, scalefactor);
-    gid2host[id].first  = *r.first.first;
-    gid2host[id].second = *r.first.second;
-    for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id)
-        continue;
-      galois::runtime::SendBuffer b;
-      galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
-    }
-    net.flush();
-    unsigned received = 1;
-    while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first != id);
-      auto& b = p->second;
-      galois::runtime::gDeserialize(b, gid2host[p->first]);
-      ++received;
-    }
-    increment_evilPhase();
-  }
-
-protected:
-  /**
-   * Wrapper call that will call into more specific compute masters
-   * functions that compute masters based on nodes, edges, or both.
-   *
-   * @param g The offline graph which has loaded the graph you want
-   * to get the masters for
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param isBipartite Specifies if the graph is a bipartite graph
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  uint64_t computeMasters(galois::graphs::OfflineGraph& g,
-                          const std::vector<unsigned>& scalefactor,
-                          bool isBipartite         = false,
-                          unsigned DecomposeFactor = 1) {
-    galois::Timer timer;
-    timer.start();
-    g.reset_seek_counters();
-
-    uint64_t numNodes_to_divide = 0;
-
-    if (isBipartite) {
-      for (uint64_t n = 0; n < g.size(); ++n) {
-        if (std::distance(g.edge_begin(n), g.edge_end(n))) {
-          ++numNodes_to_divide;
-          last_nodeID_withEdges_bipartite = n;
-        }
-      }
-    } else {
-      numNodes_to_divide = g.size();
-    }
-
-    // compute masters for all nodes
-    switch (masters_distribution) {
-    case BALANCED_MASTERS:
-      computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor,
-                                 DecomposeFactor);
-      break;
-    case BALANCED_MASTERS_AND_EDGES:
-      computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor,
-                                          DecomposeFactor);
-      break;
-    case BALANCED_EDGES_OF_MASTERS:
-    default:
-      computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor,
-                                  DecomposeFactor);
-      break;
-    }
-
-    timer.stop();
-
-    galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
-        GRNAME, "MasterDistTime", timer.get());
-
-    galois::gPrint(
-        "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
-        " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
-        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)\n");
-    return numNodes_to_divide;
-  }
-
 private:
   /**
    * Initalize MPI related things. The MPI layer itself should have been
@@ -656,13 +275,13 @@ public:
   using edge_iterator = typename GraphTy::edge_iterator;
 
   /**
-   * Constructor for DistGraph. Initializes metadata fields.
+   * Constructor for GluonSubstrate. Initializes metadata fields.
    *
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    */
-  DistGraph(unsigned host, unsigned numHosts)
-      : galois::runtime::GlobalObject(this), round(false), transposed(false),
+  GluonSubstrate(unsigned host, unsigned numHosts)
+      : galois::runtime::GlobalObject(this), transposed(false),
         id(host), numHosts(numHosts) {
     enforce_data_mode = enforce_metadata;
 
@@ -676,7 +295,7 @@ public:
 
     // report edge buffer size
     if (host == 0) {
-      galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
+      galois::runtime::reportStat_Single(RNAME, "EdgePartitionBufferSize",
                                          (unsigned)edgePartitionSendBufSize);
     }
 
@@ -690,7 +309,7 @@ protected:
    */
   void setup_communication() {
     galois::CondStatTimer<MORE_DIST_STATS> Tcomm_setup("CommunicationSetupTime",
-                                                       GRNAME);
+                                                       RNAME);
 
     // barrier so that all hosts start the timer together
     galois::runtime::getHostBarrier().wait();
@@ -733,7 +352,7 @@ protected:
       std::string master_nodes_str =
           "MasterNodesFrom_" + std::to_string(id) + "_To_" + std::to_string(x);
       galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-          GRNAME, master_nodes_str, masterNodes[x].size());
+          RNAME, master_nodes_str, masterNodes[x].size());
       if (masterNodes[x].size() > maxSharedSize) {
         maxSharedSize = masterNodes[x].size();
       }
@@ -745,7 +364,7 @@ protected:
       std::string mirror_nodes_str =
           "MirrorNodesFrom_" + std::to_string(x) + "_To_" + std::to_string(id);
       galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-          GRNAME, mirror_nodes_str, mirrorNodes[x].size());
+          RNAME, mirror_nodes_str, mirrorNodes[x].size());
       if (mirrorNodes[x].size() > maxSharedSize) {
         maxSharedSize = mirrorNodes[x].size();
       }
@@ -756,417 +375,6 @@ protected:
     // do not track memory usage of partitioning
     auto& net = galois::runtime::getSystemNetworkInterface();
     net.resetMemUsage();
-  }
-
-public:
-  /**
-   * Do an in-memory transpose while keeping the original graph intact.
-   * Find thread ranges as well.
-   *
-   * Only does something if WithInEdges is enabled.
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  void constructIncomingEdges() {
-    graph.constructIncomingEdges();
-
-    determineThreadRangesIn();
-    determineThreadRangesMasterIn();
-    initializeSpecificRangesIn();
-  }
-
-  /**
-   * Does nothing (in other words WithInEdges is false).
-   */
-  template <bool T = WithInEdges, typename std::enable_if<!T>::type* = nullptr>
-  void constructIncomingEdges() {
-    // do nothing since the incoming edges template argument is false
-    return;
-  }
-
-  /**
-   * Get data of a node.
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A node data object
-   */
-  inline NodeTy&
-  getData(GraphNode N,
-          galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getData(N, mflag);
-    return r;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   *
-   * @param ni edge to get the data of
-   * @param mflag access flag for edge data
-   * @returns The edge data for the requested edge
-   */
-  inline typename GraphTy::edge_data_reference
-  getEdgeData(edge_iterator ni,
-              galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getEdgeData(ni, mflag);
-    return r;
-  }
-
-  /**
-   * Directly gets in-edge data.
-   *
-   * @param ni in-edge to get the data of
-   * @param mflag access flag for edge data
-   * @returns The edge data for the requested in-edge
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline typename GraphTy::edge_data_reference getInEdgeData(
-      edge_iterator ni,
-      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) const {
-    return graph.getInEdgeData(ni, mflag);
-  }
-
-  /**
-   * Gets edge destination of edge ni.
-   *
-   * @param ni edge id to get destination of
-   * @returns Local ID of destination of edge ni
-   */
-  GraphNode getEdgeDst(edge_iterator ni) { return graph.getEdgeDst(ni); }
-
-  /**
-   * Gets edge destination of in-edge ni.
-   *
-   * @param ni in-edge id to get destination of
-   * @returns Local ID of destination of in-edge ni
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  GraphNode getInEdgeDst(edge_iterator ni) const {
-    return graph.getInEdgeDst(ni);
-  }
-
-  /**
-   * Gets the first edge of some node.
-   *
-   * @param N node to get the edge of
-   * @returns iterator to first edge of N
-   */
-  inline edge_iterator edge_begin(GraphNode N) {
-    return graph.edge_begin(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  /**
-   * Gets the end edge boundary of some node.
-   *
-   * @param N node to get the edge of
-   * @returns iterator to the end of the edges of node N, i.e. the first edge
-   * of the next node (or an "end" iterator if there is no next node)
-   */
-  inline edge_iterator edge_end(GraphNode N) {
-    return graph.edge_end(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  /**
-   * Gets the first in-edge of some node.
-   *
-   * @param N node to get the edge of
-   * @returns iterator to first in-edge of N
-   */
-  // template<bool T = WithInEdges, typename std::enable_if<T == true>::type*>
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline edge_iterator in_edge_begin(GraphNode N) {
-    return graph.in_edge_begin(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  /**
-   * Gets the end in-edge boundary of some node.
-   *
-   * @param N node to get the edge of
-   * @returns iterator to the end of the in-edges of node N, i.e. the first
-   * in-edge of the next node (or an "end" iterator if there is no next node)
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline edge_iterator in_edge_end(GraphNode N) {
-    return graph.in_edge_end(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  /**
-   * Returns an iterable object over the edges of a particular node in the
-   * graph.
-   *
-   * @param N node to get edges iterator over
-   */
-  inline galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>>
-  edges(GraphNode N) {
-    return galois::graphs::internal::make_no_deref_range(edge_begin(N),
-                                                         edge_end(N));
-  }
-
-  /**
-   * Returns an iterable object over the in-edges of a particular node in the
-   * graph.
-   *
-   * @param N node to get edges iterator over
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>>
-  in_edges(GraphNode N) {
-    return galois::graphs::internal::make_no_deref_range(in_edge_begin(N),
-                                                         in_edge_end(N));
-  }
-
-  /**
-   * Gets number of nodes on this (local) graph.
-   *
-   * @returns number of nodes present in this (local) graph
-   */
-  inline size_t size() const { return graph.size(); }
-
-  /**
-   * Gets number of edges on this (local) graph.
-   *
-   * @returns number of edges present in this (local) graph
-   */
-  inline size_t sizeEdges() const { return graph.sizeEdges(); }
-
-  /**
-   * Gets number of nodes on the global unpartitioned graph.
-   *
-   * @returns number of nodes present in the global unpartitioned graph
-   */
-  inline size_t globalSize() const { return numGlobalNodes; }
-
-  /**
-   * Gets number of edges on the global unpartitioned graph.
-   *
-   * @returns number of edges present in the global unpartitioned graph
-   */
-  inline size_t globalSizeEdges() const { return numGlobalEdges; }
-
-  /**
-   * Returns a range object that encapsulates all nodes of the graph.
-   *
-   * @returns A range object that contains all the nodes in this graph
-   */
-  inline const NodeRangeType& allNodesRange() const {
-    assert(specificRanges.size() == 3);
-    return specificRanges[0];
-  }
-
-  /**
-   * Returns a range object that encapsulates only master nodes in this
-   * graph.
-   *
-   * @returns A range object that contains the master nodes in this graph
-   */
-  inline const NodeRangeType& masterNodesRange() const {
-    assert(specificRanges.size() == 3);
-    return specificRanges[1];
-  }
-
-  /**
-   * Returns a range object that encapsulates master nodes and nodes
-   * with edges in this graph.
-   *
-   * @returns A range object that contains the master nodes and the nodes
-   * with outgoing edges in this graph
-   */
-  inline const NodeRangeType& allNodesWithEdgesRange() const {
-    assert(specificRanges.size() == 3);
-    return specificRanges[2];
-  }
-
-  /**
-   * Returns a range object that encapsulates all nodes of the graph;
-   * specific range based on in-edge distribution.
-   *
-   * @returns A range object that contains all the nodes in this graph
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline const NodeRangeType& allNodesRangeIn() const {
-    return specificRangesIn[0];
-  }
-
-  /**
-   * Returns a range object that encapsulates only master nodes in this
-   * graph; specific range based on in-edge distribution.
-   *
-   * @returns A range object that contains the master nodes in this graph
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline const NodeRangeType& masterNodesRangeIn() const {
-    return specificRangesIn[1];
-  }
-
-  /**
-   * Returns a range object that encapsulates master nodes and nodes
-   * with in-edges in this graph; specific range based on in-edge distribution.
-   *
-   * @returns A range object that contains the master nodes and the nodes
-   * with incoming edges in this graph (i.e. all nodes)
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline const NodeRangeType& allNodesWithEdgesRangeIn() const {
-    return specificRangesIn[0];
-  }
-
-protected:
-  /**
-   * Uses a pre-computed prefix sum to determine division of nodes among
-   * threads.
-   *
-   * The call uses binary search to determine the ranges.
-   */
-  inline void determineThreadRanges() {
-    allNodesRanges = galois::graphs::determineUnitRangesFromPrefixSum(
-        galois::runtime::activeThreads, graph.getEdgePrefixSum());
-  }
-
-  /**
-   * Determines the thread ranges for master nodes only and saves them to
-   * the object.
-   *
-   * Only call after graph is constructed + only call once
-   */
-  inline void determineThreadRangesMaster() {
-    // make sure this hasn't been called before
-    assert(masterRanges.size() == 0);
-
-    // first check if we even need to do any work; if already calculated,
-    // use already calculated vector
-    if (beginMaster == 0 && (beginMaster + numOwned) == size()) {
-      masterRanges = allNodesRanges;
-    } else if (beginMaster == 0 &&
-               (beginMaster + numOwned) == numNodesWithEdges &&
-               withEdgeRanges.size() != 0) {
-      masterRanges = withEdgeRanges;
-    } else {
-      galois::gDebug("Manually det. master thread ranges");
-      masterRanges = galois::graphs::determineUnitRangesFromGraph(
-          graph, galois::runtime::activeThreads, beginMaster,
-          beginMaster + numOwned, nodeAlphaRanges);
-    }
-  }
-
-  /**
-   * Determines the thread ranges for nodes with edges only and saves them to
-   * the object.
-   *
-   * Only call after graph is constructed + only call once
-   */
-  inline void determineThreadRangesWithEdges() {
-    // make sure not called before
-    assert(withEdgeRanges.size() == 0);
-
-    // first check if we even need to do any work; if already calculated,
-    // use already calculated vector
-    if (numNodesWithEdges == size()) {
-      withEdgeRanges = allNodesRanges;
-    } else if (beginMaster == 0 &&
-               (beginMaster + numOwned) == numNodesWithEdges &&
-               masterRanges.size() != 0) {
-      withEdgeRanges = masterRanges;
-    } else {
-      galois::gDebug("Manually det. with edges thread ranges");
-      withEdgeRanges = galois::graphs::determineUnitRangesFromGraph(
-          graph, galois::runtime::activeThreads, 0, numNodesWithEdges,
-          nodeAlphaRanges);
-    }
-  }
-
-  /**
-   * Initializes the 3 range objects that a user can access to iterate
-   * over the graph in different ways.
-   */
-  void initializeSpecificRanges() {
-    assert(specificRanges.size() == 0);
-
-    // TODO/FIXME assertion likely not safe if a host gets no nodes
-    // make sure the thread ranges have already been calculated
-    // for the 3 ranges
-    assert(allNodesRanges.size() != 0);
-    assert(masterRanges.size() != 0);
-    assert(withEdgeRanges.size() != 0);
-
-    // 0 is all nodes
-    specificRanges.push_back(galois::runtime::makeSpecificRange(
-        boost::counting_iterator<size_t>(0),
-        boost::counting_iterator<size_t>(size()), allNodesRanges.data()));
-
-    // 1 is master nodes
-    specificRanges.push_back(galois::runtime::makeSpecificRange(
-        boost::counting_iterator<size_t>(beginMaster),
-        boost::counting_iterator<size_t>(beginMaster + numOwned),
-        masterRanges.data()));
-
-    // 2 is with edge nodes
-    specificRanges.push_back(galois::runtime::makeSpecificRange(
-        boost::counting_iterator<size_t>(0),
-        boost::counting_iterator<size_t>(numNodesWithEdges),
-        withEdgeRanges.data()));
-
-    assert(specificRanges.size() == 3);
-  }
-
-  /**
-   * Specific range editor: makes the range for edges equivalent to the range
-   * for masters.
-   */
-  void edgesEqualMasters() { specificRanges[2] = specificRanges[1]; }
-
-  /**
-   * Uses a pre-computed prefix sum to determine division of nodes among
-   * threads using in-edges.
-   *
-   * The call uses binary search to determine the ranges.
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline void determineThreadRangesIn() {
-    galois::gDebug("Determining thread ranges in");
-    allNodesRangesIn = galois::graphs::determineUnitRangesFromPrefixSum(
-        galois::runtime::activeThreads, graph.getInEdgePrefixSum());
-  }
-
-  /**
-   * Determine the thread ranges (splitting of nodes among threads) of master
-   * nodes using in-edges.
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  inline void determineThreadRangesMasterIn() {
-    assert(masterRangesIn.size() == 0);
-    galois::gDebug("Determining master thread ranges in");
-
-    // first check if we even need to do any work; if already calculated,
-    // use already calculated vector
-    if (beginMaster == 0 && (beginMaster + numOwned) == graph.size()) {
-      masterRangesIn = allNodesRangesIn;
-    } else {
-      galois::gDebug("Manually det. master thread in ranges");
-      masterRangesIn = galois::graphs::determineUnitRangesFromPrefixSum(
-          galois::runtime::activeThreads, graph.getInEdgePrefixSum(),
-          beginMaster, beginMaster + numOwned, nodeAlphaRanges);
-    }
-  }
-
-  /**
-   * Initialize the thread ranges for in-edges.
-   */
-  template <bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
-  void initializeSpecificRangesIn() {
-    assert(specificRangesIn.size() == 0);
-    galois::gDebug("Initialize specific ranges in");
-
-    // 0 is all nodes
-    specificRangesIn.push_back(galois::runtime::makeSpecificRange(
-        boost::counting_iterator<size_t>(0),
-        boost::counting_iterator<size_t>(size()), allNodesRangesIn.data()));
-
-    // 1 is master nodes
-    specificRangesIn.push_back(galois::runtime::makeSpecificRange(
-        boost::counting_iterator<size_t>(beginMaster),
-        boost::counting_iterator<size_t>(beginMaster + numOwned),
-        masterRangesIn.data()));
-
-    assert(specificRangesIn.size() == 2);
   }
 
 private:
@@ -1215,13 +423,13 @@ private:
     float replication_factor =
         (float)(global_total_mirror_nodes + numGlobalNodes) /
         (float)numGlobalNodes;
-    galois::runtime::reportStat_Single(GRNAME, "ReplicationFactor",
+    galois::runtime::reportStat_Single(RNAME, "ReplicationFactor",
                                        replication_factor);
 
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
-        GRNAME, "TotalNodes", numGlobalNodes);
+        RNAME, "TotalNodes", numGlobalNodes);
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
-        GRNAME, "TotalGlobalMirrorNodes", global_total_mirror_nodes);
+        RNAME, "TotalGlobalMirrorNodes", global_total_mirror_nodes);
   }
 
   /**
@@ -1294,7 +502,7 @@ private:
     std::string offsets_timer_str(syncTypeStr + "Offsets_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
 
     Toffsets.start();
 
@@ -2070,11 +1278,11 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
-        extract_batch_timer_str.c_str(), GRNAME);
+        extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
 
@@ -2118,7 +1326,7 @@ private:
     std::string metadata_str(syncTypeStr + "MetadataMode_" +
                              std::to_string(data_mode) + "_" +
                              get_run_identifier(loopName));
-    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME,
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(RNAME,
                                                             metadata_str, 1);
   }
 
@@ -2149,11 +1357,11 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
-        extract_batch_timer_str.c_str(), GRNAME);
+        extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
 
@@ -2202,7 +1410,7 @@ private:
     std::string metadata_str(syncTypeStr + "MetadataMode_" +
                              std::to_string(data_mode) + "_" +
                              get_run_identifier(loopName));
-    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME,
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(RNAME,
                                                             metadata_str, 1);
   }
 
@@ -2233,7 +1441,7 @@ private:
                                      get_run_identifier(loopName));
 
       galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-          GRNAME, statSavedBytes_str, (redundant_size - bit_set_size));
+          RNAME, statSavedBytes_str, (redundant_size - bit_set_size));
     }
   }
 
@@ -2264,7 +1472,7 @@ private:
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Tserialize(serialize_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
     if (data_mode == noData) {
       if (!async) {
         Tserialize.start();
@@ -2328,15 +1536,15 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
     std::string extract_alloc_timer_str(syncTypeStr + "ExtractAlloc_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textractalloc(
-        extract_alloc_timer_str.c_str(), GRNAME);
+        extract_alloc_timer_str.c_str(), RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
-        extract_batch_timer_str.c_str(), GRNAME);
+        extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
 
@@ -2462,7 +1670,7 @@ private:
     std::string metadata_str(syncTypeStr + "MetadataMode_" +
                              std::to_string(data_mode) + "_" +
                              get_run_identifier(loopName));
-    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME,
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(RNAME,
                                                             metadata_str, 1);
   }
 
@@ -2501,7 +1709,7 @@ private:
     std::string extract_timer_str(syncTypeStr + "ExtractVector_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
 
     Textract.start();
 
@@ -2563,7 +1771,7 @@ private:
     // std::string metadata_str(syncTypeStr + "_METADATA_MODE" +
     //                         std::to_string(data_mode) +
     //                         get_run_identifier(loopName));
-    // galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+    // galois::runtime::reportStat_Single(RNAME, metadata_str, 1);
   }
 
   /**
@@ -2597,7 +1805,7 @@ private:
                                   get_run_identifier(loopName));
 
     galois::runtime::reportStat_Tsum(
-        GRNAME, statSendBytes_str, b.size());
+        RNAME, statSendBytes_str, b.size());
   }
 
   template <
@@ -2614,7 +1822,7 @@ private:
                                   get_run_identifier(loopName));
 
     galois::runtime::reportStat_Tsum(
-        GRNAME, statSendBytes_str, b.size());
+        RNAME, statSendBytes_str, b.size());
   }
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -2747,7 +1955,7 @@ private:
     }
 
     galois::runtime::reportStat_Tsum(
-        GRNAME, statNumMessages_str, numMessages);
+        RNAME, statNumMessages_str, numMessages);
   }
 
   /**
@@ -2767,7 +1975,7 @@ private:
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
-        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TSendTime.start();
     sync_net_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
@@ -2810,7 +2018,7 @@ private:
     std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Tdeserialize(serialize_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
     Tdeserialize.start();
 
     // get other metadata associated with message if mode isn't OnlyData
@@ -2861,11 +2069,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string set_timer_str(syncTypeStr + "Set_" +
                               get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
     std::string set_batch_timer_str(syncTypeStr + "SetBatch_" +
                                     get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(
-        set_batch_timer_str.c_str(), GRNAME);
+        set_batch_timer_str.c_str(), RNAME);
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
@@ -2973,7 +2181,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string set_timer_str(syncTypeStr + "SetVector_" +
                               get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
@@ -3138,7 +2346,7 @@ private:
     std::string wait_timer_str("Wait_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Twait(wait_timer_str.c_str(),
-                                                    GRNAME);
+                                                    RNAME);
 
     if (async) {
       size_t syncTypePhase = 0;
@@ -3192,7 +2400,7 @@ private:
   void sync_recv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
-        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TRecvTime.start();
     sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
@@ -3210,9 +2418,9 @@ private:
                             bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
-        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
     galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
-        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<std::vector<uint8_t>> rb;
     static std::vector<MPI_Request> request;
@@ -3267,9 +2475,9 @@ private:
   void sync_onesided_mpi(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
-        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
     galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
-        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), GRNAME);
+        (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<MPI_Win> window;
     static MPI_Group mpi_access_group;
@@ -3365,7 +2573,7 @@ private:
   inline void reduce(std::string loopName) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> TsyncReduce(timer_str.c_str(),
-                                                       GRNAME);
+                                                       RNAME);
     TsyncReduce.start();
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -3409,7 +2617,7 @@ private:
   inline void broadcast(std::string loopName) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
-                                                          GRNAME);
+                                                          RNAME);
 
     TsyncBroadcast.start();
 
@@ -3466,14 +2674,6 @@ private:
 
     TsyncBroadcast.stop();
   }
-
-  // OEC - outgoing edge-cut : source of any edge is master
-  // IEC - incoming edge-cut : destination of any edge is master
-  // CVC - cartesian vertex-cut : if source of an edge is mirror,
-  //                              then destination is not, and vice-versa
-  // UVC - unconstrained vertex-cut
-  // Reduce - mirrors to master
-  // Broadcast - master to mirrors
 
   /**
    * Do sync necessary for write source, read source.
@@ -3675,7 +2875,7 @@ public:
             typename BitsetFnTy = galois::InvalidBitsetFnTy, bool async = false>
   inline void sync(std::string loopName) {
     std::string timer_str("Sync_" + loopName + "_" + get_run_identifier());
-    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    galois::StatTimer Tsync(timer_str.c_str(), RNAME);
 
     Tsync.start();
 
@@ -3746,7 +2946,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g,
+    static inline void call(GluonSubstrate* g,
                             galois::runtime::FieldFlags& fieldFlags,
                             std::string loopName,
                             const BITVECTOR_STATUS& bvFlag) {
@@ -3782,7 +2982,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g,
+    static inline void call(GluonSubstrate* g,
                             galois::runtime::FieldFlags& fieldFlags,
                             std::string loopName,
                             const BITVECTOR_STATUS& bvFlag) {
@@ -3817,7 +3017,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g,
+    static inline void call(GluonSubstrate* g,
                             galois::runtime::FieldFlags& fieldFlags,
                             std::string loopName,
                             const BITVECTOR_STATUS& bvFlag) {
@@ -3934,7 +3134,7 @@ public:
   inline void sync_on_demand(galois::runtime::FieldFlags& fieldFlags,
                              std::string loopName) {
     std::string timer_str("Sync_" + get_run_identifier(loopName));
-    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    galois::StatTimer Tsync(timer_str.c_str(), RNAME);
     Tsync.start();
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
@@ -3950,6 +3150,17 @@ public:
   }
 
 #ifdef __GALOIS_CHECKPOINT__
+/*
+ * Headers for boost serialization
+ */
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/serialization/split_member.hpp>
+#include <boost/serialization/binary_object.hpp>
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_map.hpp>
+
 public:
   /**
    * Checkpoint the complete structure on the node to disk
@@ -3957,7 +3168,7 @@ public:
   void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint") {
     using namespace boost::archive;
     galois::StatTimer TimerSaveCheckPoint(
-        get_run_identifier("TimerSaveCheckpoint").c_str(), GRNAME);
+        get_run_identifier("TimerSaveCheckpoint").c_str(), RNAME);
 
     TimerSaveCheckPoint.start();
     std::string checkpointFileName_local =
@@ -3992,7 +3203,7 @@ public:
   void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint") {
     using namespace boost::archive;
     galois::StatTimer TimerApplyCheckPoint(
-        get_run_identifier("TimerApplyCheckpoint").c_str(), GRNAME);
+        get_run_identifier("TimerApplyCheckpoint").c_str(), RNAME);
 
     TimerApplyCheckPoint.start();
     std::string checkpointFileName_local =
@@ -4015,23 +3226,6 @@ public:
     TimerApplyCheckPoint.stop();
   }
 #endif
-
-public:
-  /**
-   * Converts a local node id into a global node id
-   *
-   * @param nodeID local node id
-   * @returns global node id corresponding to the local one
-   */
-  inline uint64_t getGID(const uint32_t nodeID) const { return L2G(nodeID); }
-
-  /**
-   * Converts a global node id into a local node id
-   *
-   * @param nodeID global node id
-   * @returns local node id corresponding to the global one
-   */
-  inline uint32_t getLID(const uint64_t nodeID) const { return G2L(nodeID); }
 
 #ifdef __GALOIS_HET_CUDA__
 private:
@@ -4232,122 +3426,6 @@ public:
   }
 
   /**
-   * Write the local LC_CSR graph to the file on a disk.
-   *
-   * @param localGraphFileName file name to write local graph to.
-   */
-  void
-  save_local_graph_to_file(std::string localGraphFileName = "local_graph") {
-    using namespace boost::archive;
-    galois::StatTimer dGraphTimerSaveLocalGraph("TimerSaveLocalGraph", GRNAME);
-    dGraphTimerSaveLocalGraph.start();
-
-    std::string fileName = localGraphFileName + "_" + std::to_string(id);
-
-    galois::gDebug("[", id, "] inside save_local_graph_to_file \n");
-
-    std::ofstream outputStream(fileName, std::ios::binary);
-    if (!outputStream.is_open()) {
-      std::cerr << "ERROR: Could not open " << fileName
-                << " to save local graph!!!\n";
-    }
-
-    boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
-
-    // graph topology
-    ar << graph;
-    ar << numGlobalNodes;
-    ar << numGlobalEdges;
-
-    // bool
-    ar << transposed;
-
-    // Proxy information
-    // TODO: Find better way to serialize vector of vectors in boost
-    // serialization
-    for (uint32_t i = 0; i < numHosts; ++i) {
-      ar << masterNodes[i];
-      ar << mirrorNodes[i];
-    }
-
-    ar << numOwned;
-    ar << beginMaster;
-    ar << numNodesWithEdges;
-    ar << gid2host;
-
-    // Serialize partitioning scheme specific data structures.
-    boostSerializeLocalGraph(ar);
-
-    outputStream.close();
-    dGraphTimerSaveLocalGraph.stop();
-  }
-
-  /**
-   * Read the local LC_CSR graph from the file on a disk.
-   *
-   * @param localGraphFileName file name to read local graph from.
-   */
-  void
-  read_local_graph_from_file(std::string localGraphFileName = "local_graph") {
-    using namespace boost::archive;
-    galois::StatTimer dGraphTimerReadLocalGraph("TimerReadLocalGraph", GRNAME);
-    dGraphTimerReadLocalGraph.start();
-
-    std::string fileName = localGraphFileName + "_" + std::to_string(id);
-
-    std::ifstream inputStream(fileName, std::ios::binary);
-    if (!inputStream.is_open()) {
-      std::cerr << "ERROR: Could not open " << fileName
-                << " to read local graph!!!\n";
-    }
-
-    galois::gPrint("[", id, "] inside read_local_graph_from_file \n");
-
-    boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
-
-    // Graph topology
-    ar >> graph;
-    ar >> numGlobalNodes;
-    ar >> numGlobalEdges;
-
-    // bool
-    ar >> transposed;
-
-    // Proxy information
-    // TODO: Find better way to Deserialize vector of vectors in boost
-    // serialization
-    for (uint32_t i = 0; i < numHosts; ++i) {
-      ar >> masterNodes[i];
-      ar >> mirrorNodes[i];
-    }
-
-    ar >> numOwned;
-    ar >> beginMaster;
-    ar >> numNodesWithEdges;
-    ar >> gid2host;
-
-    // Serialize partitioning scheme specific data structures.
-    boostDeSerializeLocalGraph(ar);
-
-    allNodesRanges.clear();
-    masterRanges.clear();
-    withEdgeRanges.clear();
-    specificRanges.clear();
-
-    // find ranges again
-    determineThreadRanges();
-    determineThreadRangesMaster();
-    determineThreadRangesWithEdges();
-    initializeSpecificRanges();
-
-    // Exchange information among hosts
-    // send_info_to_host();
-
-    inputStream.close();
-    dGraphTimerReadLocalGraph.stop();
-  }
-
-  /**
    * Given a sync structure, reset the field specified by the structure
    * to the 0 of the reduction on mirrors.
    *
@@ -4382,10 +3460,10 @@ public:
   }
 };
 
-template <typename NodeTy, typename EdgeTy, bool WithInEdges>
+template <typename NodeTy, typename EdgeTy>
 constexpr const char* const
-    galois::graphs::DistGraph<NodeTy, EdgeTy, WithInEdges>::GRNAME;
+    galois::graphs::GluonSubstrate<NodeTy, EdgeTy>::RNAME;
 } // end namespace graphs
 } // end namespace galois
 
-#endif //_GALOIS_DIST_HGRAPH_H
+#endif // header guard
