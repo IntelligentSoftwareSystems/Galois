@@ -24,7 +24,7 @@ void for_each(const RangeFunc& rangeMaker, FunctionTy&& fn,
               const Args&... args);
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn,
+void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn,
             const Args&... args);
 
 template <typename FunctionTy, typename... Args>
