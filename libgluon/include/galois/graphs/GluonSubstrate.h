@@ -41,14 +41,9 @@
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/cuda/HostDecls.h"
 #endif
-#ifdef __GALOIS_HET_OPENCL__
-#include "galois/opencl/CL_Header.h"
-#endif
 
 #include "galois/runtime/BareMPI.h"
-
 #include "llvm/Support/CommandLine.h"
-
 
 namespace cll = llvm::cl;
 
@@ -87,7 +82,7 @@ namespace graphs {
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-template <typename GraphType>
+template <typename GraphTy>
 class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
   //! Graph name used for printing things
@@ -96,7 +91,7 @@ private:
 
 protected:
   //! The internal graph used by GluonSubstrate to represent the graph
-  GraphTy graph;
+  GraphTy& graph;
   //! Synchronization type
   enum SyncType {
     syncReduce,   //!< Reduction sync
@@ -267,10 +262,6 @@ private:
 public:
   //! Type representing a node in this graph
   using GraphNode = typename GraphTy::GraphNode;
-  //! iterator type over nodes
-  using iterator = typename GraphTy::iterator;
-  //! constant iterator type over nodes
-  using const_iterator = typename GraphTy::const_iterator;
   //! iterator type over edges
   using edge_iterator = typename GraphTy::edge_iterator;
 
@@ -3270,7 +3261,7 @@ public:
 
     galois::do_all(
         galois::iterate(graph),
-        [&](const typename GraphTy::GraphNode& nodeID) {
+        [&](const GraphNode& nodeID) {
           // initialize node_data with localID-to-globalID mapping
           m.node_data[nodeID] = getGID(nodeID);
           m.row_start[nodeID] = *edge_begin(nodeID);
@@ -3326,25 +3317,6 @@ public:
     }
 
     graph.deallocate();
-  }
-#endif
-
-#ifdef __GALOIS_HET_OPENCL__
-  typedef galois::opencl::Graphs::CL_LC_Graph<NodeTy, EdgeTy> CLGraphType;
-  typedef typename CLGraphType::NodeDataWrapper CLNodeDataWrapper;
-  typedef typename CLGraphType::NodeIterator CLNodeIterator;
-  CLGraphType clGraph;
-
-  const cl_mem& device_ptr() const { return clGraph.device_ptr(); }
-  CLNodeDataWrapper
-  getDataW(GraphNode N,
-           galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    return clGraph.getDataW(N);
-  }
-  const CLNodeDataWrapper
-  getDataR(GraphNode N,
-           galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    return clGraph.getDataR(N);
   }
 #endif
 
@@ -3446,12 +3418,7 @@ public:
         galois::do_all(
             galois::iterate(r.first, r.second),
             [&](uint32_t lid) {
-#ifdef __GALOIS_HET_OPENCL__
-              CLNodeDataWrapper d = clGraph.getDataW(lid);
-              FnTy::reset(lid, d);
-#else
               FnTy::reset(lid, getData(lid));
-#endif
             },
             galois::no_stats(),
             galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
