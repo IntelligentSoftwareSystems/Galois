@@ -31,6 +31,7 @@
 #include "galois/runtime/ForEachTraits.h"
 #include "galois/runtime/Range.h"
 #include "galois/runtime/LoopStatistics.h"
+#include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
@@ -143,29 +144,6 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
-template <typename FuncTy>
-struct ForEachFuncReference;
-
-template <typename FuncNoRef>
-struct ForEachFuncReference<FuncNoRef const> {
-  using FuncReferenceType = FuncNoRef const &;
-};
-
-template <typename FuncNoRef>
-struct ForEachFuncReference<FuncNoRef const &> {
-  using FuncReferenceType = FuncNoRef const &;
-};
-
-template <typename FuncNoRef>
-struct ForEachFuncReference<FuncNoRef &> {
-  using FuncReferenceType = FuncNoRef &;
-};
-
-template <typename FuncNoRef>
-struct ForEachFuncReference<FuncNoRef &&> {
-  using FuncReferenceType = FuncNoRef &;
-};
-
 // TODO(ddn): Implement wrapper to allow calling without UserContext
 // TODO(ddn): Check for operators that implement both with and without context
 template <class WorkListTy, class FunctionTy, typename ArgsTy>
@@ -189,10 +167,10 @@ protected:
   struct ThreadLocalBasics {
 
     UserContextAccess<value_type> facing;
-    typename ForEachFuncReference<FunctionTy>::FuncReferenceType function;
+    OperatorReferenceType<FunctionTy> function;
     SimpleRuntimeContext ctx;
 
-    explicit ThreadLocalBasics(typename ForEachFuncReference<FunctionTy>::FuncReferenceType fn)
+    explicit ThreadLocalBasics(OperatorReferenceType<FunctionTy> fn)
         : facing(), function(fn), ctx() {}
   };
 
@@ -200,7 +178,7 @@ protected:
 
   struct ThreadLocalData : public ThreadLocalBasics, public LoopStat {
 
-    ThreadLocalData(typename ForEachFuncReference<FunctionTy>::FuncReferenceType fn, const char* ln)
+    ThreadLocalData(OperatorReferenceType<FunctionTy> fn, const char* ln)
         : ThreadLocalBasics(fn), LoopStat(ln) {}
   };
 
@@ -212,7 +190,7 @@ protected:
   substrate::Barrier& barrier;
 
   WorkListTy wl;
-  typename ForEachFuncReference<FunctionTy>::FuncReferenceType origFunction;
+  OperatorReferenceType<FunctionTy> origFunction;
   const char* loopname;
   bool broke;
 
@@ -380,7 +358,7 @@ protected:
   struct T2 {};
 
   template <typename... WArgsTy>
-  ForEachExecutor(T2, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args, WArgsTy... wargs)
+  ForEachExecutor(T2, OperatorReferenceType<FunctionTy> f, const ArgsTy& args, WArgsTy... wargs)
       : term(substrate::getSystemTermination(activeThreads)),
         barrier(getBarrier(activeThreads)), wl(std::forward<WArgsTy>(wargs)...),
         origFunction(f), loopname(galois::internal::getLoopName(args)),
@@ -388,17 +366,17 @@ protected:
         execTime(loopname, "Execute") {}
 
   template <typename WArgsTy, int... Is>
-  ForEachExecutor(T1, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args,
+  ForEachExecutor(T1, OperatorReferenceType<FunctionTy> f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<Is...>)
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args,
+  ForEachExecutor(T1, OperatorReferenceType<FunctionTy> f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:
-  ForEachExecutor(typename ForEachFuncReference<FunctionTy>::FuncReferenceType f, const ArgsTy& args)
+  ForEachExecutor(OperatorReferenceType<FunctionTy> f, const ArgsTy& args)
       : ForEachExecutor(
             T1{}, f, args, get_by_supertype<wl_tag>(args).args,
             typename make_int_seq<std::tuple_size<decltype(
@@ -538,7 +516,7 @@ void for_each_impl(const RangeTy& range, FunctionTy&& fn,
   typedef ForEachExecutor<WorkListTy, ReceivedFuncRefType, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
-  typename ForEachFuncReference<ReceivedFuncRefType>::FuncReferenceType fn_ref = fn;
+  OperatorReferenceType<ReceivedFuncRefType> fn_ref = fn;
   WorkTy W(fn_ref, args);
   W.init(range);
   substrate::getThreadPool().run(activeThreads,
