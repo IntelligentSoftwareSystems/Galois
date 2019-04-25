@@ -108,7 +108,7 @@ struct sort_helper {
 
   template <class RandomAccessIterator, class Context>
   void operator()(std::pair<RandomAccessIterator, RandomAccessIterator> bounds,
-                  Context& ctx) const {
+                  Context& ctx) {
     if (std::distance(bounds.first, bounds.second) <= 1024) {
       std::sort(bounds.first, bounds.second, comp);
     } else {
