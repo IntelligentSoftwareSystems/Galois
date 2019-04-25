@@ -167,10 +167,10 @@ protected:
   struct ThreadLocalBasics {
 
     UserContextAccess<value_type> facing;
-    OperatorReferenceType<FunctionTy> function;
+    FunctionTy function;
     SimpleRuntimeContext ctx;
 
-    explicit ThreadLocalBasics(OperatorReferenceType<FunctionTy> fn)
+    explicit ThreadLocalBasics(FunctionTy fn)
         : facing(), function(fn), ctx() {}
   };
 
@@ -178,7 +178,7 @@ protected:
 
   struct ThreadLocalData : public ThreadLocalBasics, public LoopStat {
 
-    ThreadLocalData(OperatorReferenceType<FunctionTy> fn, const char* ln)
+    ThreadLocalData(FunctionTy fn, const char* ln)
         : ThreadLocalBasics(fn), LoopStat(ln) {}
   };
 
@@ -190,7 +190,7 @@ protected:
   substrate::Barrier& barrier;
 
   WorkListTy wl;
-  OperatorReferenceType<FunctionTy> origFunction;
+  FunctionTy origFunction;
   const char* loopname;
   bool broke;
 
@@ -358,7 +358,7 @@ protected:
   struct T2 {};
 
   template <typename... WArgsTy>
-  ForEachExecutor(T2, OperatorReferenceType<FunctionTy> f, const ArgsTy& args, WArgsTy... wargs)
+  ForEachExecutor(T2, FunctionTy f, const ArgsTy& args, WArgsTy... wargs)
       : term(substrate::getSystemTermination(activeThreads)),
         barrier(getBarrier(activeThreads)), wl(std::forward<WArgsTy>(wargs)...),
         origFunction(f), loopname(galois::internal::getLoopName(args)),
@@ -366,17 +366,17 @@ protected:
         execTime(loopname, "Execute") {}
 
   template <typename WArgsTy, int... Is>
-  ForEachExecutor(T1, OperatorReferenceType<FunctionTy> f, const ArgsTy& args,
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<Is...>)
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, OperatorReferenceType<FunctionTy> f, const ArgsTy& args,
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
                   const WArgsTy& wlargs, int_seq<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:
-  ForEachExecutor(OperatorReferenceType<FunctionTy> f, const ArgsTy& args)
+  ForEachExecutor(FunctionTy f, const ArgsTy& args)
       : ForEachExecutor(
             T1{}, f, args, get_by_supertype<wl_tag>(args).args,
             typename make_int_seq<std::tuple_size<decltype(
@@ -512,11 +512,11 @@ void for_each_impl(const RangeTy& range, FunctionTy&& fn,
       type ::template retype<value_type>
           WorkListTy;
   // typedef typename WorkListTy::value_type g;
-  using ReceivedFuncRefType = decltype(std::forward<FunctionTy>(fn));
-  typedef ForEachExecutor<WorkListTy, ReceivedFuncRefType, ArgsTy> WorkTy;
+  using FuncRefType = OperatorReferenceType<decltype(std::forward<FunctionTy>(fn))>;
+  typedef ForEachExecutor<WorkListTy, FuncRefType, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
-  OperatorReferenceType<ReceivedFuncRefType> fn_ref = fn;
+  FuncRefType fn_ref = fn;
   WorkTy W(fn_ref, args);
   W.init(range);
   substrate::getThreadPool().run(activeThreads,

@@ -455,7 +455,7 @@ struct FIFO {
 template <typename T, typename FunctionTy, typename ArgsTy>
 struct OptionsCommon {
   typedef T value_type;
-  typedef OperatorReferenceType<FunctionTy> function2_type;
+  typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
   static const bool needStats = galois::internal::NeedStats<ArgsTy>::value;
@@ -496,7 +496,7 @@ struct OptionsCommon {
 template <typename T, typename FunctionTy, typename ArgsTy, bool Enable>
 struct OptionsBase : public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
-  typedef OperatorReferenceType<FunctionTy> function1_type;
+  typedef FunctionTy function1_type;
 
   function1_type fn1;
 
@@ -512,7 +512,7 @@ struct OptionsBase<T, FunctionTy, ArgsTy, true>
 
   function1_type fn1;
 
-  OptionsBase(OperatorReferenceType<FunctionTy> f, ArgsTy a)
+  OptionsBase(FunctionTy f, ArgsTy a)
       : SuperTy(f, a),
         fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) {}
 };
@@ -1686,7 +1686,7 @@ struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>
     : public internal::Executor<internal::Options<T, FunctionTy, ArgsTy>> {
   typedef internal::Options<T, FunctionTy, ArgsTy> OptionsTy;
   typedef internal::Executor<OptionsTy> SuperTy;
-  ForEachExecutor(OperatorReferenceType<FunctionTy> f, const ArgsTy& args)
+  ForEachExecutor(FunctionTy f, const ArgsTy& args)
       : SuperTy(OptionsTy(f, args)) {}
 };
 
