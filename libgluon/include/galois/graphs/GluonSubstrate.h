@@ -1466,6 +1466,7 @@ private:
   }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Sends
 ////////////////////////////////////////////////////////////////////////////////
   /**
    * Non-bitset extract that uses serializelazy to copy data over to the
@@ -2059,6 +2060,9 @@ private:
     TSendTime.stop();
   }
 
+////////////////////////////////////////////////////////////////////////////////
+// Receives
+////////////////////////////////////////////////////////////////////////////////
 
   /**
    * Deserializes messages from other hosts and applies them to update local
@@ -2355,7 +2359,7 @@ private:
   template <WriteLocation writeLocation, ReadLocation readLocation,
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
             bool async>
-  void sync_net_recv(std::string loopName) {
+  void syncNetRecv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string wait_timer_str("Wait_" +
                                   get_run_identifier(loopName));
@@ -2417,11 +2421,14 @@ private:
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TRecvTime.start();
-    sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
+    syncNetRecv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
         loopName);
     TRecvTime.stop();
   }
 
+////////////////////////////////////////////////////////////////////////////////
+// MPI sync variants
+////////////////////////////////////////////////////////////////////////////////
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
    * Nonblocking MPI sync
@@ -2571,6 +2578,10 @@ private:
     TRecvTime.stop();
   }
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+// Higher Level Sync Calls (broadcast/reduce, etc)
+////////////////////////////////////////////////////////////////////////////////
 
   /**
    * Does a reduction of data from mirror nodes to master nodes.
@@ -2871,6 +2882,10 @@ private:
     broadcast<writeAny, readAny, SyncFnTy, BitsetFnTy, async>(loopName);
   }
 
+////////////////////////////////////////////////////////////////////////////////
+// Public iterface: sync
+////////////////////////////////////////////////////////////////////////////////
+
 public:
   /**
    * Main sync call exposed to the user that calls the correct sync function
@@ -3164,6 +3179,86 @@ public:
   }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Metadata settings/getters
+////////////////////////////////////////////////////////////////////////////////
+  /**
+   * Set the run number.
+   *
+   * @param runNum Number to set the run to
+   */
+  inline void set_num_run(const uint32_t runNum) { num_run = runNum; }
+
+  /**
+   * Get the set run number.
+   *
+   * @returns The set run number saved in the graph
+   */
+  inline uint32_t get_run_num() const { return num_run; }
+
+  /**
+   * Set the round number for use in the run identifier.
+   *
+   * @param round round number to set to
+   */
+  inline void set_num_round(const uint32_t round) { num_round = round; }
+
+  /**
+   * Get a run identifier using the set run and set round.
+   *
+   * @returns a string run identifier
+   * @deprecated We want to move away from calling this by itself; use ones
+   * that take an argument; will be removed once we eliminate all instances
+   * of its use from code
+   */
+  inline std::string get_run_identifier() const {
+#if DIST_PER_ROUND_TIMER
+    return std::string(std::to_string(num_run) + "_" +
+                       std::to_string(num_round));
+#else
+    return std::string(std::to_string(num_run));
+#endif
+  }
+
+  /**
+   * Get a run identifier using the set run and set round and
+   * append to the passed in string.
+   *
+   * @param loop_name String to append the run identifier
+   * @returns String with run identifier appended to passed in loop name
+   */
+  inline std::string get_run_identifier(std::string loop_name) const {
+#if DIST_PER_ROUND_TIMER
+    return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
+                       "_" + std::to_string(num_round));
+#else
+    return std::string(std::string(loop_name) + "_" + std::to_string(num_run));
+#endif
+  }
+
+  /**
+   * Get a run identifier using the set run and set round and
+   * append to the passed in string in addition to the number identifier passed
+   * in.
+   *
+   * @param loop_name String to append the run identifier
+   * @param alterID another ID with which to add to the timer name.
+   *
+   * @returns String with run identifier appended to passed in loop name +
+   * alterID
+   */
+  inline std::string get_run_identifier(std::string loop_name,
+                                        unsigned alterID) const {
+#if DIST_PER_ROUND_TIMER
+    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
+                       "_" + std::to_string(num_run) + "_" +
+                       std::to_string(num_round));
+#else
+    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
+                       "_" + std::to_string(num_run));
+#endif
+  }
+
+////////////////////////////////////////////////////////////////////////////////
 // Checkpointing code for graph
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3247,86 +3342,6 @@ public:
 //    TimerApplyCheckPoint.stop();
 //  }
 #endif
-
-////////////////////////////////////////////////////////////////////////////////
-// Metadata settings/getters
-////////////////////////////////////////////////////////////////////////////////
-  /**
-   * Set the run number.
-   *
-   * @param runNum Number to set the run to
-   */
-  inline void set_num_run(const uint32_t runNum) { num_run = runNum; }
-
-  /**
-   * Get the set run number.
-   *
-   * @returns The set run number saved in the graph
-   */
-  inline uint32_t get_run_num() const { return num_run; }
-
-  /**
-   * Set the round number for use in the run identifier.
-   *
-   * @param round round number to set to
-   */
-  inline void set_num_round(const uint32_t round) { num_round = round; }
-
-  /**
-   * Get a run identifier using the set run and set round.
-   *
-   * @returns a string run identifier
-   * @deprecated We want to move away from calling this by itself; use ones
-   * that take an argument; will be removed once we eliminate all instances
-   * of its use from code
-   */
-  inline std::string get_run_identifier() const {
-#if DIST_PER_ROUND_TIMER
-    return std::string(std::to_string(num_run) + "_" +
-                       std::to_string(num_round));
-#else
-    return std::string(std::to_string(num_run));
-#endif
-  }
-
-  /**
-   * Get a run identifier using the set run and set round and
-   * append to the passed in string.
-   *
-   * @param loop_name String to append the run identifier
-   * @returns String with run identifier appended to passed in loop name
-   */
-  inline std::string get_run_identifier(std::string loop_name) const {
-#if DIST_PER_ROUND_TIMER
-    return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
-                       "_" + std::to_string(num_round));
-#else
-    return std::string(std::string(loop_name) + "_" + std::to_string(num_run));
-#endif
-  }
-
-  /**
-   * Get a run identifier using the set run and set round and
-   * append to the passed in string in addition to the number identifier passed
-   * in.
-   *
-   * @param loop_name String to append the run identifier
-   * @param alterID another ID with which to add to the timer name.
-   *
-   * @returns String with run identifier appended to passed in loop name +
-   * alterID
-   */
-  inline std::string get_run_identifier(std::string loop_name,
-                                        unsigned alterID) const {
-#if DIST_PER_ROUND_TIMER
-    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
-                       "_" + std::to_string(num_run) + "_" +
-                       std::to_string(num_round));
-#else
-    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
-                       "_" + std::to_string(num_run));
-#endif
-  }
 };
 
 template <typename GraphTy>
