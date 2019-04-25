@@ -63,7 +63,7 @@ typedef Graph::GraphNode GNode;
 
 // insert edges into the worklist (task queue)
 void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
-	printf("\n=============================== Init ===============================\n");
+	//printf("\n=============================== Init ===============================\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
@@ -82,14 +82,14 @@ void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
 }
 
 void KclSolver(Graph& graph, Miner &miner) {
-	std::cout << "=============================== Start ===============================\n";
+	//std::cout << "=============================== Start ===============================\n";
 	BaseEmbeddingQueue queue, queue2;
 	initialization(graph, queue);
-	printout_embeddings(0, miner, queue, DEBUG);
+	//printout_embeddings(0, miner, queue, DEBUG);
 	unsigned level = 1;
 	while (level < k-1) {
-		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
+		//std::cout << "\n============================== Level " << level << " ==============================\n";
+		//std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
 		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
@@ -101,9 +101,9 @@ void KclSolver(Graph& graph, Miner &miner) {
 			galois::loopname("ExtendVertex")
 		);
 		miner.update_base_embedding_size(); // increase the embedding size since one more edge added
-		printout_embeddings(level, miner, queue2, DEBUG);
+		//printout_embeddings(level, miner, queue2, DEBUG);
 
-		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
+		//std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		queue.clear();
 #if 1
 		miner.aggregate_clique(queue2, queue); // sequential implementaion
@@ -146,11 +146,12 @@ void KclSolver(Graph& graph, Miner &miner) {
 			}
 		}
 #endif
-		printout_embeddings(level, miner, queue, DEBUG);
+		//printout_embeddings(level, miner, queue, DEBUG);
 		level ++;
 		//std::cout << "Number of " << level+1 << "-cliques is: " << std::distance(queue.begin(), queue.end()) << "\n";
 	}
-	std::cout << "\n=============================== Done ===============================\n\n";
+	//std::cout << "\n=============================== Done ===============================\n\n";
+	galois::gPrint("\n\ttotal_num_cliques = ", std::distance(queue.begin(), queue.end()), "\n\n");
 }
 
 int main(int argc, char** argv) {
@@ -182,9 +183,8 @@ int main(int argc, char** argv) {
 	Miner miner(false, sizeof_embedding, &graph);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	galois::reportPageAlloc("MeminfoPre");
-	galois::StatTimer T;
-	T.start();
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
 	switch (algo) {
 		case nodeiterator:
 			KclSolver(graph, miner);
@@ -194,7 +194,6 @@ int main(int argc, char** argv) {
 		default:
 			std::cerr << "Unknown algo: " << algo << "\n";
 	}
-	T.stop();
-	galois::reportPageAlloc("MeminfoPost");
+	Tcomp.stop();
 	return 0;
 }

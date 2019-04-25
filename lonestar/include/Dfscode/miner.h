@@ -1,29 +1,20 @@
 // Copyright 2019, University of Texas at Austin
 // Authors: Xuhao Chen <cxh@utexas.edu>
-
-#include <map>
-#include <set>
-#include <omp.h>
 #include <deque>
-#include <vector>
 #include <math.h>
-#include <cstdio>
 #include <unistd.h>
 #include <stdlib.h>
-#include <iostream>
-#include <iterator>
-#include <algorithm>
 #include "embedding.h"
 
 class Miner {
 public:
 	std::vector<LabEdge> edge_list;
-	Miner(Graph *g, unsigned k, unsigned minsup, int num_threads, bool label_f = true, bool enable_threshold = true) {
+	Miner(Graph *g, unsigned k, unsigned minsup, int num_threads, bool show = false) {
 		this->graph = g;
 		minimal_support = minsup;
 		max_size = k;
-		label_flag = label_f;
 		nthreads = num_threads;
+		show_output = show;
 		for(int i = 0; i < nthreads; i++) {
 			frequent_patterns_count.push_back(0);
 			std::vector<std::deque<DFS> > tmp;
@@ -112,7 +103,7 @@ public:
 		if (is_min(status) == false) return; // check if this pattern is canonical: minimal DFSCode
 		status.frequent_patterns_count ++;
 		// list frequent patterns here!!!
-		if(SHOW_OUTPUT) {
+		if(show_output) {
 			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
 			for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
@@ -227,7 +218,7 @@ protected:
 	int nthreads;
 	unsigned minimal_support;
 	unsigned max_size;
-	bool label_flag;
+	bool show_output;
 	std::vector<int> frequent_patterns_count;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread
 #ifdef ENABLE_LB
@@ -270,12 +261,11 @@ protected:
 		EdgeList edges;
 		for(size_t from = 0; from < status.GRAPH_IS_MIN.size(); ++from) {
 			if(get_forward_root(status.GRAPH_IS_MIN, status.GRAPH_IS_MIN[from], edges)) {
-			//if(get_forward_root(status.GRAPH_IS_MIN, from, edges)) {
 				for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
 					root[status.GRAPH_IS_MIN[from].label][(*it)->elabel][status.GRAPH_IS_MIN[(*it)->to].label].push(0, *it, 0);
-				} // for it
-			} // if get_forward_root
-		} // for from
+				}
+			}
+		}
 		EmbeddingList_iterator3 fromlabel = root.begin();
 		EmbeddingList_iterator2 elabel = fromlabel->second.begin();
 		EmbeddingList_iterator1 tolabel = elabel->second.begin();

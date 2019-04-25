@@ -38,7 +38,7 @@
 #define DEBUG 0
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph";
+const char* desc = "Counts the K-Cliques in a graph using DFS traversal";
 const char* url  = 0;
 
 enum Algo {
@@ -51,10 +51,8 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
-	cll::init(Algo::nodeiterator));
-static cll::opt<unsigned> k("k",
-	cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
+	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
+static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -68,6 +66,7 @@ typedef std::vector<unsigned> UintVec;
 typedef galois::substrate::PerThreadStorage<Subgraph> LocalSubgraph;
 typedef galois::substrate::PerThreadStorage<UintVec> LocalVector;
 
+// construct subgraph
 void mksub(Graph &g, GNode u, Subgraph &sg, UintVec &new_id, UintVec &old_id, unsigned k) {
 	if (old_id.empty()) {
 		new_id.resize(g.size());
@@ -101,6 +100,7 @@ void mksub(Graph &g, GNode u, Subgraph &sg, UintVec &new_id, UintVec &old_id, un
 	}
 }
 
+// each task extends from a vertex, l is the level starting from k-1 and decreases until l=2
 void kclique_thread(unsigned l, Subgraph &sg, galois::GAccumulator<long long> &num) {
 	if (l == 2) {
 		for(unsigned i = 0; i < sg.n[2]; i++) { //list all edges
@@ -112,13 +112,12 @@ void kclique_thread(unsigned l, Subgraph &sg, galois::GAccumulator<long long> &n
 		}
 		return;
 	}
-	printf("TODO\n");
 	for(unsigned i = 0; i < sg.n[l]; i ++) {
 		unsigned u = sg.vertices[l][i];
-		//printf("%u %u\n",i,u);
 		sg.n[l-1] = 0;
-		unsigned end = u*sg.core+sg.d[l][u];
-		for (unsigned j = u*sg.core; j < end; j ++) {//relabeling vertices and forming U'.
+		unsigned begin = u * sg.core;
+		unsigned end = begin + sg.d[l][u];
+		for (unsigned j = begin; j < end; j ++) {//relabeling vertices and forming U'.
 			unsigned v = sg.adj[j];
 			if (sg.lab[v] == l) {
 				sg.lab[v] = l-1;

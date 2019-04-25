@@ -34,6 +34,9 @@
 #include <algorithm>
 #include "Lonestar/common_types.h"
 
+#define ENABLE_LABEL
+#define DEBUG 0
+
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
 const char* url  = 0;
@@ -42,11 +45,9 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<file type>"),
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<file name>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
+static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
-
-#define DEBUG 0
-#define SHOW_OUTPUT 1
 
 #include "Dfscode/miner.h"
 #include "Lonestar/mgraph.h"
@@ -69,7 +70,8 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &q
 			GNode dst = graph.getEdgeDst(e);
 			auto elabel = graph.getEdgeData(e);
 			auto& dst_label = graph.getData(dst);
-			if (src_label <= dst_label) { // TODO: has bug when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
+			if (src_label <= dst_label) { // when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
+			//if (src_label < dst_label || (src_label == dst_label && src < dst)) {
 				if (pattern_map.count(src_label) == 0 || pattern_map[src_label].count(elabel) == 0 || pattern_map[src_label][elabel].count(dst_label) == 0)
 					single_edge_dfscodes++;
 				LabEdge *eptr = &(miner.edge_list[*e]);
@@ -97,7 +99,7 @@ void FsmSolver(Graph& graph, Miner& miner) {
 	PatternQueue task_queue; // task queue holding the DFScodes of patterns
 	init(graph, miner, pattern_map, task_queue); // insert single-edge patterns into the queue
 	//if(DEBUG) printout_embeddings(miner, queue);
-	std::cout << "numThreads = " << numThreads << " status.size() = " << status.size() << "\n";
+	//std::cout << "numThreads = " << numThreads << " status.size() = " << status.size() << "\n";
 	for(size_t i = 0; i < status.size(); i++) {
 		status.getLocal(i)->frequent_patterns_count = 0;
 		status.getLocal(i)->thread_id = i;
@@ -166,7 +168,7 @@ int main(int argc, char** argv) {
 			}
 		}
 	} else { printf("Unkown file format\n"); exit(1); }
-	Miner miner(&graph, k, minsup, numThreads, true);
+	Miner miner(&graph, k, minsup, numThreads, show);
 	Tinit.stop();
 
 	std::cout << "k = " << k << std::endl;

@@ -1,15 +1,5 @@
 #ifndef __GRAPH_HPP__
 #define __GRAPH_HPP__
-#include <set>
-#include <map>
-#include <string>
-#include <cstring>
-#include <cassert>
-#include <sstream>
-#include <iterator>
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
 #include "types.hpp"
 
 inline void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ") {
@@ -27,7 +17,9 @@ inline void split(const std::string& str, std::vector<std::string>& tokens, cons
 	}
 }
 
-// canonical graph
+// Canonical graph used for canonical check.
+// A pattern (DFSCode) is converted to a canonical graph
+// to perform a canonical check (minimal DFSCode)
 class CGraph : public std::vector<Vertex> {
 private:
 	unsigned edge_size_;
@@ -64,6 +56,7 @@ public:
 		}
 		edge_size_ = id;
 	}
+/*
 	std::istream & read_txt(std::istream &is) {
 		char line[1024];
 		std::vector<std::string> result;
@@ -143,7 +136,6 @@ public:
 		buildEdge();
 		return is;
 	}
-/*
 	std::istream &read_partition_info(std::istream &, int part_id);  // read
 	std::istream &read_partition_info_non_locals(std::istream &);  // read
 	std::istream &read_adj_par(std::istream &);  // read

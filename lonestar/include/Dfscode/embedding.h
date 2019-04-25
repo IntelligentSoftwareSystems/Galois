@@ -1,16 +1,5 @@
 #ifndef __GRAPH_TYPES_HPP__
 #define __GRAPH_TYPES_HPP__
-
-#include <set>
-#include <map>
-#include <string>
-#include <cstring>
-#include <cassert>
-#include <sstream>
-#include <iterator>
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
 #include "types.hpp"
 #include "cgraph.hpp"
 #include "dfs_code.hpp"
@@ -29,6 +18,7 @@ struct LocalStatus {
 	std::deque<DFSCode> dfscodes_to_process;
 };
 class EmbVector;
+
 // An embedding consists of an edge (pointer) 
 // and an embedding pointer to its parent embedding
 struct Embedding {
@@ -57,7 +47,7 @@ struct Embedding {
 	}
 };
 
-// embedding list
+// Embedding list
 class EmbeddingList : public std::vector<Embedding> {
 public:
 	void push(int n, LabEdge *edge, Embedding *prev) {
@@ -174,7 +164,7 @@ bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e,
 	}
 	return (!result.empty());
 }
-
+/*
 bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const VeridT src, EdgeList &result) {
 	result.clear();
 	auto& src_label = graph.getData(src);
@@ -195,18 +185,15 @@ bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const Verid
 	//std::cout << "\n";
 	return (!result.empty());
 }
+//*/
 
-/* Original comment:
- *  get_backward (graph, e1, e2, history);
- *  e1 (from1, elabel1, to1)
- *  e2 (from2, elabel2, to2)
- *  to2 -> from1
- *
- *  (elabel1 < elabel2 || (elabel == elabel2 && tolabel1 < tolabel2) . (elabel1, to1)
- *
- * RK comment: gets backward edge that starts and ends at the right most path
- * e1 is the forward edge and the backward edge goes to e1->from
- */
+// get_backward (graph, e1, e2, history);
+//   e1 (from1, elabel1, to1)
+//   e2 (from2, elabel2, to2)
+//   to2 -> from1
+//   (elabel1 < elabel2 || (elabel == elabel2 && tolabel1 < tolabel2) . (elabel1, to1)
+// RK comment: gets backward edge that starts and ends at the right most path
+// e1 is the forward edge and the backward edge goes to e1->from
 LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1, LabEdge* e2, History& history) {
 	if(e1 == e2) return 0;
 	assert(e1->from >= 0 && e1->from < graph.size());
@@ -228,6 +215,9 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1
 	return 0;
 }
 
+////////////////////////////////////////////////
+// Funstions used for regenerating embeddings //
+////////////////////////////////////////////////
 bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &DFS_CODE, History& history, EdgeList &result) {
 	result.clear();
 	//forward extenstion from dfs_from <=> from
@@ -274,6 +264,9 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCo
 	return 0;
 }
 
+/////////////////////////////////////////////////
+// Canonical check (minimal DFSCode) functions //
+/////////////////////////////////////////////////
 bool get_forward_rmpath(CGraph &graph, LabEdge *e, LabelT minlabel, History& history, EdgeList &result) {
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());

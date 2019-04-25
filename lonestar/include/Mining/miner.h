@@ -29,6 +29,7 @@ class Miner {
 public:
 	Miner(bool label_f, unsigned emb_size, Graph *g) : label_flag(label_f), embedding_size(emb_size) {
 		graph = g;
+		num_cliques = 0;
 		//construct_edgelist();
 		//edge_hashmap.resize(g->size());
 		//build_edge_hashmap(g->sizeEdges(), 0, edge_list);
@@ -190,6 +191,7 @@ public:
 			}
 			else simple_agg[emb] = 1;
 		}
+		//num_cliques += std::distance(out_queue.begin(), out_queue.end());
 	}
 	// check each embedding to find the cliques
 	void aggregate_clique_each(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
@@ -275,6 +277,7 @@ public:
 	void update_embedding_size() { embedding_size += sizeof(ElementType); }
 	void update_base_embedding_size() { embedding_size += sizeof(SimpleElement); }
 	inline unsigned get_embedding_size() { return embedding_size; }
+	unsigned get_total_num_cliques() { return num_cliques; }
 	void printout_embedding(int level, Embedding emb) {
 		if(emb.size() == 0) {
 			std::cout << "(empty)";
@@ -330,6 +333,7 @@ private:
 	unsigned embedding_size;
 	unsigned threshold;
 	Graph *graph;
+	unsigned num_cliques;
 #if 0
 	std::vector<LabeledEdge> edge_list;
 	void construct_edgelist() {

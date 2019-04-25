@@ -1,9 +1,18 @@
 #ifndef __TYPES_HPP__
 #define __TYPES_HPP__
 
-#include <string>
+#include <set>
+#include <map>
 #include <vector>
+#include <string>
+#include <cstdio>
+#include <cstring>
+#include <cassert>
 #include <sstream>
+#include <iterator>
+#include <iostream>
+#include <stdexcept>
+#include <algorithm>
 #include "../Lonestar/common_types.h"
 
 typedef std::vector<VeridT> RMPath;
@@ -12,6 +21,7 @@ typedef std::vector<VeridT> RMPath;
 //typedef std::set<edge_label_t> edge_label_set_t;
 //typedef std::set<vertex_label_t> vertex_label_set_t;
 
+// Labelled Edge
 struct LabEdge {
 	VeridT from;
 	VeridT to;
@@ -28,6 +38,7 @@ struct LabEdge {
 };
 typedef std::vector<LabEdge *> EdgeList;
 
+// Used for construct canonical graph
 class Vertex {
 public:
 	typedef std::vector<LabEdge>::iterator edge_iterator;

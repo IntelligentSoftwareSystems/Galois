@@ -1,12 +1,5 @@
 #ifndef __DFS_CODE_HPP__
 #define __DFS_CODE_HPP__
-#include <string>
-#include <vector>
-#include <cstdio>
-#include <sstream>
-#include <string.h>
-#include <iostream>
-#include <stdexcept>
 #include "types.hpp"
 
 /*
@@ -37,13 +30,15 @@ public:
   }
 };
 //*/
+
+// A 5-tuple element in a DFSCode
 class DFS {
 public:
-	VeridT from;
-	VeridT to;
-	LabelT fromlabel;
-	LabelT elabel;
-	LabelT tolabel;
+	VeridT from; // source vertex
+	VeridT to;   // target vertex
+	LabelT fromlabel; // source vertex label
+	LabelT elabel;    // edge label
+	LabelT tolabel;   // target vertex label
 	friend bool operator==(const DFS &d1, const DFS &d2) {
 		return (d1.from == d2.from && d1.to == d2.to && d1.fromlabel == d2.fromlabel
 				&& d1.elabel == d2.elabel && d1.tolabel == d2.tolabel);
@@ -236,13 +231,13 @@ struct DFS_partial_not_equal {
 };
 //*/
 
-//struct DFSCode : public std::vector<DFS>, public serializable {
+// DFSCode (pattern) is a sequence of 5-tuples
 struct DFSCode : public std::vector<DFS> {
 private:
 	RMPath rmpath; // right-most path
 public:
 	const RMPath &get_rmpath() const { return rmpath; }
-	// RMPath is in the opposite order then the DFS code, i.e., the
+	// RMPath is in the opposite order than the DFS code, i.e., the
 	// indexes into DFSCode go from higher numbers to lower numbers.
 	const RMPath &buildRMPath() {
 		rmpath.clear();
@@ -256,7 +251,7 @@ public:
 		}
 		return rmpath;
 	}
-	// Convert current DFS code into a graph.
+	// Convert current DFS code into a canonical graph.
 	bool toGraph(CGraph &g) const {
 		g.clear();
 		for(DFSCode::const_iterator it = begin(); it != end(); ++it) {
@@ -311,7 +306,6 @@ public:
 		d.tolabel = tolabel;
 	}
 	void pop() { resize(size() - 1); }
-	//std::string to_string(bool print_edge_type = true) const;
 	std::string to_string(bool print_edge_type = true) const {
 		if (empty()) return "";
 		std::stringstream ss;
@@ -323,8 +317,7 @@ public:
 		}
 		return ss.str();
 	}
-
-	//std::ostream &write(std::ostream &) const;  // write
+/*
 	std::ostream &write(std::ostream &os) const {
 		if(size() == 0) return os;
 		os << "(" << (*this)[0].fromlabel << ") " << (*this)[0].elabel << " (0f" << (*this)[0].tolabel << ");";
@@ -337,7 +330,6 @@ public:
 		}
 		return os;
 	}
-/*
 	//static DFSCode read_from_str(const std::string &str);
 	DFSCode read_from_str(const std::string &str) {
 		std::vector<std::string> vec_str;
