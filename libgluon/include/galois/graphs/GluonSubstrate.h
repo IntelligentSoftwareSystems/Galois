@@ -3,7 +3,7 @@
  * The code is being released under the terms of the 3-Clause BSD License (a
  * copy is located in LICENSE.txt at the top-level directory).
  *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,8 +20,7 @@
 /**
  * @file GluonSubstrate.h
  *
- * Contains the implementation for GluonSubstrate. Command line argument definitions
- * are found in DistributedGraph.cpp.
+ * Contains the implementation for GluonSubstrate.
  */
 
 #ifndef _GALOIS_GLUONSUB_H_
@@ -85,20 +84,33 @@ namespace graphs {
 template <typename GraphTy>
 class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
-  //! Graph name used for printing things
-  constexpr static const char* const RNAME = "Gluon";
-
-  //! The graph to handle communication for
-  GraphTy& userGraph;
-
   //! Synchronization type
   enum SyncType {
     syncReduce,   //!< Reduction sync
     syncBroadcast //!< Broadcast sync
   };
 
+  //! Graph name used for printing things
+  constexpr static const char* const RNAME = "Gluon";
+
+  //! The graph to handle communication for
+  GraphTy& userGraph;
   const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
   const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
+  bool transposed;  //!< Marks if passed in graph is transposed or not.
+  bool isVertexCut;  //!< Marks if passed in graph's partitioning is vertex cut.
+  uint32_t num_run;   //!< Keep track of number of runs.
+  uint32_t num_round; //!< Keep track of number of rounds.
+
+  // bitvector status hasn't been maintained
+  //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be
+  //! written
+  using BITVECTOR_STATUS = galois::runtime::BITVECTOR_STATUS;
+  //! A pointer set during syncOnDemand calls that points to the status
+  //! of a bitvector with regard to where data has been synchronized
+  //! @todo pass the flag as function paramater instead
+  BITVECTOR_STATUS* currentBVFlag;
+
 
   // memoization optimization
   //! Master nodes on different hosts. For broadcast;
@@ -109,71 +121,15 @@ private:
   //! Maximum size of master or mirror nodes on different hosts
   size_t maxSharedSize;
 
-  // hasn't been maintained
-  //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be
-  //! written
-  using BITVECTOR_STATUS = galois::runtime::BITVECTOR_STATUS;
-  //! A pointer set during syncOnDemand calls that points to the status
-  //! of a bitvector with regard to where data has been synchronized
-  //! @todo pass the flag as function paramater instead
-  BITVECTOR_STATUS* currentBVFlag;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
+  // Used for efficient comms
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
-  //! Increments evilPhase, a phase counter used by communication.
-  void inline incrementEvilPhase() {
-    ++galois::runtime::evilPhase;
-    // limit defined by MPI or LCI
-    if (galois::runtime::evilPhase >= std::numeric_limits<int16_t>::max()) {
-      galois::runtime::evilPhase = 1;
-    }
-  }
 
-  // TODO problem for cartesian cut
-  // Requirement: For all X and Y,
-  // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
-  /**
-   * Determine if we have anything that we need to send to a particular host
-   *
-   * @param host Host number that we may or may not send to
-   * @param syncType Synchronization type to determine which nodes on a
-   * host need to be considered
-   * @param writeLocation If data is being written to on source or
-   * destination (or both)
-   * @param readLocation If data is being read from on source or
-   * destination (or both)
-   * @returns true if there is nothing to send to a host, false otherwise
-   */
-  bool nothingToSend(unsigned host, SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
-    return (sharedNodes[host].size() == 0);
-  }
-
-  /**
-   * Determine if we have anything that we need to receive from a particular
-   * host
-   *
-   * @param host Host number that we may or may not receive from
-   * @param syncType Synchronization type to determine which nodes on a
-   * host need to be considered
-   * @param writeLocation If data is being written to on source or
-   * destination (or both)
-   * @param readLocation If data is being read from on source or
-   * destination (or both)
-   * @returns true if there is nothing to receive from a host, false otherwise
-   */
-  bool nothingToRecv(unsigned host, SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    return (sharedNodes[host].size() == 0);
-  }
 
   /**
    * Reset a provided bitset given the type of synchronization performed
@@ -225,7 +181,7 @@ private:
         galois::do_all(
             galois::iterate(r.first, r.second),
             [&](uint32_t lid) {
-              FnTy::reset(lid, getData(lid));
+              FnTy::reset(lid, userGraph.getData(lid));
             },
             galois::no_stats(),
             galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
@@ -233,8 +189,16 @@ private:
     }
   }
 
-  uint32_t num_run;   //!< Keep track of number of runs.
-  uint32_t num_round; //!< Keep track of number of rounds.
+  //! Increments evilPhase, a phase counter used by communication.
+  void inline incrementEvilPhase() {
+    ++galois::runtime::evilPhase;
+    // limit defined by MPI or LCI
+    if (galois::runtime::evilPhase >= std::numeric_limits<int16_t>::max()) {
+      galois::runtime::evilPhase = 1;
+    }
+  }
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Proxy communication setup
@@ -337,7 +301,9 @@ private:
     for (uint32_t h = 0; h < masterNodes.size(); ++h) {
       galois::do_all(
           galois::iterate(0ul, masterNodes[h].size()),
-          [&](uint32_t n) { masterNodes[h][n] = getLID(masterNodes[h][n]); },
+          [&](uint32_t n) {
+            masterNodes[h][n] = userGraph.getLID(masterNodes[h][n]);
+          },
 #if MORE_COMM_STATS
           galois::loopname(get_run_identifier("MasterNodes").c_str()),
 #endif
@@ -347,7 +313,9 @@ private:
     for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
       galois::do_all(
           galois::iterate(0ul, mirrorNodes[h].size()),
-          [&](uint32_t n) { mirrorNodes[h][n] = getLID(mirrorNodes[h][n]); },
+          [&](uint32_t n) {
+            mirrorNodes[h][n] = userGraph.getLID(mirrorNodes[h][n]);
+          },
 #if MORE_COMM_STATS
           galois::loopname(get_run_identifier("MirrorNodes").c_str()),
 #endif
@@ -386,7 +354,6 @@ private:
     auto& net = galois::runtime::getSystemNetworkInterface();
     net.resetMemUsage();
   }
-
 
   /**
    * Reports master/mirror stats.
@@ -465,31 +432,32 @@ public:
   using edge_iterator = typename GraphTy::edge_iterator;
 
   /**
+   * Delete default constructor: this class NEEDS to have a graph passed into
+   * it.
+   */
+  GluonSubstrate() = delete;
+
+  /**
    * Constructor for GluonSubstrate. Initializes metadata fields.
    *
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    */
-  // TODO handle passed in graph, initialize mirrors and masters
-  GluonSubstrate(unsigned host, unsigned numHosts, GraphTy& userGraph)
-      : galois::runtime::GlobalObject(this), transposed(false),
-        id(host), numHosts(numHosts) {
+  GluonSubstrate(GraphTy& _userGraph, unsigned host, unsigned numHosts,
+                 bool _transposed, bool _isVertexCut)
+      : galois::runtime::GlobalObject(this), userGraph(_userGraph),
+        id(host), transposed(_transposed), isVertexCut(_isVertexCut),
+        numHosts(numHosts), num_run(0), num_round(0), currentBVFlag(nullptr) {
     enforce_data_mode = enforce_metadata;
-
-    masterNodes.resize(numHosts);
-    mirrorNodes.resize(numHosts);
-
-    num_run        = 0;
-    num_round      = 0;
-    numGlobalEdges = 0;
-    currentBVFlag  = nullptr;
-
     initBareMPI();
+    // get mirrors from passed in graph (should have it)
+    mirrorNodes = userGraph.getMirrorNodes();
 
+    // master setup from mirrors done by setupCommunication call
+    masterNodes.resize(numHosts);
     // setup proxy communication
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
         "GraphCommSetupTime", GRNAME);
-
     Tgraph_construct_comm.start();
     setupCommunication();
     Tgraph_construct_comm.stop();
@@ -680,7 +648,9 @@ private:
     galois::do_all(galois::iterate(0ul, offsets.size()),
                    [&](unsigned int n) {
                      offsets[n] =
-                         static_cast<uint32_t>(getGID(indices[offsets[n]]));
+                         static_cast<uint32_t>(
+                           userGraph.getGID(indices[offsets[n]])
+                         );
                    },
 #if MORE_COMM_STATS
                    galois::loopname(get_run_identifier(doall_str).c_str()),
@@ -704,7 +674,9 @@ private:
                           get_run_identifier(loopName));
 
     galois::do_all(galois::iterate(0ul, offsets.size()),
-                   [&](unsigned int n) { offsets[n] = getLID(offsets[n]); },
+                   [&](unsigned int n) {
+                     offsets[n] = userGraph.getLID(offsets[n]);
+                   },
 #if MORE_COMM_STATS
                    galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
@@ -888,6 +860,49 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Other helper functions
 ////////////////////////////////////////////////////////////////////////////////
+  // TODO problem for cartesian cut, need to somehow make it work
+
+  // Requirement: For all X and Y,
+  // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
+  /**
+   * Determine if we have anything that we need to send to a particular host
+   *
+   * @param host Host number that we may or may not send to
+   * @param syncType Synchronization type to determine which nodes on a
+   * host need to be considered
+   * @param writeLocation If data is being written to on source or
+   * destination (or both)
+   * @param readLocation If data is being read from on source or
+   * destination (or both)
+   * @returns true if there is nothing to send to a host, false otherwise
+   */
+  bool nothingToSend(unsigned host, SyncType syncType,
+                             WriteLocation writeLocation,
+                             ReadLocation readLocation) {
+    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
+    return (sharedNodes[host].size() == 0);
+  }
+
+  /**
+   * Determine if we have anything that we need to receive from a particular
+   * host
+   *
+   * @param host Host number that we may or may not receive from
+   * @param syncType Synchronization type to determine which nodes on a
+   * host need to be considered
+   * @param writeLocation If data is being written to on source or
+   * destination (or both)
+   * @param readLocation If data is being read from on source or
+   * destination (or both)
+   * @returns true if there is nothing to receive from a host, false otherwise
+   */
+  bool nothingToRecv(unsigned host, SyncType syncType,
+                             WriteLocation writeLocation,
+                             ReadLocation readLocation) {
+    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+    return (sharedNodes[host].size() == 0);
+  }
+
   /**
    * Reports bytes saved by using the bitset to only selectively load data
    * to send.
@@ -922,7 +937,6 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Extract data from nodes (for reduce and broadcast)
 ////////////////////////////////////////////////////////////////////////////////
-
   /**
    * Extracts data at provided lid.
    *
@@ -939,11 +953,11 @@ private:
   template <typename FnTy, SyncType syncType>
   inline typename FnTy::ValTy extractWrapper(size_t lid) {
     if (syncType == syncReduce) {
-      auto val = FnTy::extract(lid, getData(lid));
-      FnTy::reset(lid, getData(lid));
+      auto val = FnTy::extract(lid, userGraph.getData(lid));
+      FnTy::reset(lid, userGraph.getData(lid));
       return val;
     } else {
-      return FnTy::extract(lid, getData(lid));
+      return FnTy::extract(lid, userGraph.getData(lid));
     }
   }
 
@@ -965,11 +979,11 @@ private:
   template <typename FnTy, SyncType syncType>
   inline typename FnTy::ValTy extractWrapper(size_t lid, unsigned vecIndex) {
     if (syncType == syncReduce) {
-      auto val = FnTy::extract(lid, getData(lid), vecIndex);
-      FnTy::reset(lid, getData(lid), vecIndex);
+      auto val = FnTy::extract(lid, userGraph.getData(lid), vecIndex);
+      FnTy::reset(lid, userGraph.getData(lid), vecIndex);
       return val;
     } else {
-      return FnTy::extract(lid, getData(lid), vecIndex);
+      return FnTy::extract(lid, userGraph.getData(lid), vecIndex);
     }
   }
 
@@ -1225,12 +1239,12 @@ private:
   inline void setWrapper(size_t lid, typename FnTy::ValTy val,
                          galois::DynamicBitSet& bit_set_compute) {
     if (syncType == syncReduce) {
-      if (FnTy::reduce(lid, getData(lid), val)) {
+      if (FnTy::reduce(lid, userGraph.getData(lid), val)) {
         if (bit_set_compute.size() != 0) bit_set_compute.set(lid);
       }
     } else {
-      if (async) FnTy::reduce(lid, getData(lid), val);
-      else FnTy::setVal(lid, getData(lid), val);
+      if (async) FnTy::reduce(lid, userGraph.getData(lid), val);
+      else FnTy::setVal(lid, userGraph.getData(lid), val);
     }
   }
 
@@ -1255,13 +1269,13 @@ private:
                          galois::DynamicBitSet& bit_set_compute,
                          unsigned vecIndex) {
     if (syncType == syncReduce) {
-      if (FnTy::reduce(lid, getData(lid), val, vecIndex)) {
+      if (FnTy::reduce(lid, userGraph.getData(lid), val, vecIndex)) {
         if (bit_set_compute.size() != 0)
           bit_set_compute.set(lid);
       }
     } else {
-      if (async) FnTy::reduce(lid, getData(lid), val, vecIndex);
-      else FnTy::setVal(lid, getData(lid), val, vecIndex);
+      if (async) FnTy::reduce(lid, userGraph.getData(lid), val, vecIndex);
+      else FnTy::setVal(lid, userGraph.getData(lid), val, vecIndex);
     }
   }
 
@@ -1442,9 +1456,11 @@ private:
       return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset(), data_mode);
     } else {
       if (async) {
-        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset(),
+                                         data_mode);
       } else {
-        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(),
+                                  data_mode);
       }
     }
   }
@@ -2685,7 +2701,7 @@ private:
   inline void sync_src_to_src(std::string loopName) {
     // do nothing for OEC
     // reduce and broadcast for IEC, CVC, UVC
-    if (transposed || is_vertex_cut()) {
+    if (transposed || isVertexCut) {
       reduce<writeSource, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
       broadcast<writeSource, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
     }
@@ -2706,12 +2722,12 @@ private:
     // reduce and broadcast for CVC, UVC
     if (transposed) {
       reduce<writeSource, readDestination, SyncFnTy, BitsetFnTy, async>(loopName);
-      if (is_vertex_cut()) {
+      if (isVertexCut) {
         broadcast<writeSource, readDestination, SyncFnTy, BitsetFnTy, async>(
             loopName);
       }
     } else {
-      if (is_vertex_cut()) {
+      if (isVertexCut) {
         reduce<writeSource, readDestination, SyncFnTy, BitsetFnTy, async>(loopName);
       }
       broadcast<writeSource, readDestination, SyncFnTy, BitsetFnTy, async>(
@@ -2731,7 +2747,7 @@ private:
   inline void sync_src_to_any(std::string loopName) {
     // only broadcast for OEC
     // reduce and broadcast for IEC, CVC, UVC
-    if (transposed || is_vertex_cut()) {
+    if (transposed || isVertexCut) {
       reduce<writeSource, readAny, SyncFnTy, BitsetFnTy, async>(loopName);
     }
     broadcast<writeSource, readAny, SyncFnTy, BitsetFnTy, async>(loopName);
@@ -2751,14 +2767,14 @@ private:
     // only broadcast for IEC
     // reduce and broadcast for CVC, UVC
     if (transposed) {
-      if (is_vertex_cut()) {
+      if (isVertexCut) {
         reduce<writeDestination, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
       }
       broadcast<writeDestination, readSource, SyncFnTy, BitsetFnTy, async>(
           loopName);
     } else {
       reduce<writeDestination, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
-      if (is_vertex_cut()) {
+      if (isVertexCut) {
         broadcast<writeDestination, readSource, SyncFnTy, BitsetFnTy, async>(
             loopName);
       }
@@ -2777,7 +2793,7 @@ private:
   inline void sync_dst_to_dst(std::string loopName) {
     // do nothing for IEC
     // reduce and broadcast for OEC, CVC, UVC
-    if (!transposed || is_vertex_cut()) {
+    if (!transposed || isVertexCut) {
       reduce<writeDestination, readDestination, SyncFnTy, BitsetFnTy, async>(
           loopName);
       broadcast<writeDestination, readDestination, SyncFnTy, BitsetFnTy, async>(
@@ -2797,7 +2813,7 @@ private:
   inline void sync_dst_to_any(std::string loopName) {
     // only broadcast for IEC
     // reduce and broadcast for OEC, CVC, UVC
-    if (!transposed || is_vertex_cut()) {
+    if (!transposed || isVertexCut) {
       reduce<writeDestination, readAny, SyncFnTy, BitsetFnTy, async>(loopName);
     }
     broadcast<writeDestination, readAny, SyncFnTy, BitsetFnTy, async>(loopName);
@@ -2816,7 +2832,7 @@ private:
     // only reduce for OEC
     // reduce and broadcast for IEC, CVC, UVC
     reduce<writeAny, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
-    if (transposed || is_vertex_cut()) {
+    if (transposed || isVertexCut) {
       broadcast<writeAny, readSource, SyncFnTy, BitsetFnTy, async>(loopName);
     }
   }
@@ -2835,7 +2851,7 @@ private:
     // reduce and broadcast for OEC, CVC, UVC
     reduce<writeAny, readDestination, SyncFnTy, BitsetFnTy, async>(loopName);
 
-    if (!transposed || is_vertex_cut()) {
+    if (!transposed || isVertexCut) {
       broadcast<writeAny, readDestination, SyncFnTy, BitsetFnTy, async>(loopName);
     }
   }
@@ -3148,197 +3164,88 @@ public:
   }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Checkpointing code
+// Checkpointing code for graph
 ////////////////////////////////////////////////////////////////////////////////
 
+// @todo Checkpointing code needs updates to make it work.
 #ifdef __GALOIS_CHECKPOINT__
-/*
- * Headers for boost serialization
- */
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/split_member.hpp>
-#include <boost/serialization/binary_object.hpp>
-#include <boost/serialization/serialization.hpp>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/unordered_map.hpp>
-
-public:
-  /**
-   * Checkpoint the complete structure on the node to disk
-   */
-  void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint") {
-    using namespace boost::archive;
-    galois::StatTimer TimerSaveCheckPoint(
-        get_run_identifier("TimerSaveCheckpoint").c_str(), RNAME);
-
-    TimerSaveCheckPoint.start();
-    std::string checkpointFileName_local =
-        checkpointFileName + "_" + std::to_string(id);
-
-    std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
-    if (!outputStream.is_open()) {
-      galois::gPrint("ERROR: Could not open ", checkpointFileName_local,
-                     " to save checkpoint!!!\n");
-    }
-    galois::gPrint("[", id,
-                   "] Saving local checkpoint to :", checkpointFileName_local,
-                   "\n");
-
-    boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
-
-    // TODO handle this with CuSP
-    userGraph.serializeNodeData(ar);
-
-    std::string statSendBytes_str("CheckpointBytesTotal");
-    constexpr static const char* const RREGION = "RECOVERY";
-    size_t cp_size                             = outputStream.tellp();
-    galois::runtime::reportStat_Tsum(RREGION, statSendBytes_str, cp_size);
-
-    outputStream.flush();
-    outputStream.close();
-    TimerSaveCheckPoint.stop();
-  }
-
-  /**
-   * Load checkpointed data from disk.
-   */
-  void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint") {
-    using namespace boost::archive;
-    galois::StatTimer TimerApplyCheckPoint(
-        get_run_identifier("TimerApplyCheckpoint").c_str(), RNAME);
-
-    TimerApplyCheckPoint.start();
-    std::string checkpointFileName_local =
-        checkpointFileName + "_" + std::to_string(id);
-
-    std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
-
-    if (!inputStream.is_open()) {
-      galois::gPrint("ERROR: Could not open ", checkpointFileName_local,
-                     " to read checkpoint!!!\n");
-    }
-    galois::gPrint("[", id, "] reading local checkpoint from: ",
-                   checkpointFileName_local, "\n");
-
-    boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
-
-    // TODO handle this with CuSP
-    userGraph.deSerializeNodeData(ar);
-
-    inputStream.close();
-    TimerApplyCheckPoint.stop();
-  }
-#endif
-
-////////////////////////////////////////////////////////////////////////////////
-// GPU marshaling
-////////////////////////////////////////////////////////////////////////////////
-
-// TODO figure out how to cleanly separate this from graph
-#ifdef __GALOIS_HET_CUDA__
-private:
-  // Code that handles getting the graph onto the GPU
-  template <bool isVoidType,
-            typename std::enable_if<isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
-                             const edge_iterator& e) {
-    // do nothing
-  }
-
-  template <bool isVoidType,
-            typename std::enable_if<!isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
-                             const edge_iterator& e) {
-    m.edge_data[index] = getEdgeData(e);
-  }
-
-public:
-  void getMarshalGraph(MarshalGraph& m) {
-    m.nnodes = size();
-    m.nedges = sizeEdges();
-    assert(numOwned > 0);
-    m.numOwned          = numOwned;
-    m.beginMaster       = beginMaster;
-    m.numNodesWithEdges = numNodesWithEdges;
-    m.id                = id;
-    m.numHosts          = masterNodes.size();
-    m.row_start         = (index_type*)calloc(m.nnodes + 1, sizeof(index_type));
-    m.edge_dst          = (index_type*)calloc(m.nedges, sizeof(index_type));
-    m.node_data         = (index_type*)calloc(m.nnodes, sizeof(node_data_type));
-
-    // TODO deal with edgetype
-    if (std::is_void<EdgeTy>::value) {
-      m.edge_data = NULL;
-    } else {
-      if (!std::is_same<EdgeTy, edge_data_type>::value) {
-        galois::gWarn("Edge data type mismatch between CPU and GPU\n");
-      }
-
-      m.edge_data = (edge_data_type*)calloc(m.nedges, sizeof(edge_data_type));
-    }
-
-    galois::do_all(
-        // TODO user must provide an iterator
-        galois::iterate(userGraph),
-        [&](const GraphNode& nodeID) {
-          // initialize node_data with localID-to-globalID mapping
-          m.node_data[nodeID] = getGID(nodeID);
-          m.row_start[nodeID] = *edge_begin(nodeID);
-          for (auto e = edge_begin(nodeID); e != edge_end(nodeID); e++) {
-            auto edgeID = *e;
-            setMarshalEdge<std::is_void<EdgeTy>::value>(m, edgeID, e);
-            m.edge_dst[edgeID] = getEdgeDst(e);
-          }
-        },
-        galois::steal());
-    m.row_start[m.nnodes] = m.nedges;
-
-    // copy memoization meta-data
-    m.num_master_nodes =
-        (unsigned int*)calloc(masterNodes.size(), sizeof(unsigned int));
-    ;
-    m.master_nodes =
-        (unsigned int**)calloc(masterNodes.size(), sizeof(unsigned int*));
-    ;
-
-    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
-      m.num_master_nodes[h] = masterNodes[h].size();
-
-      if (masterNodes[h].size() > 0) {
-        m.master_nodes[h] =
-            (unsigned int*)calloc(masterNodes[h].size(), sizeof(unsigned int));
-        ;
-        std::copy(masterNodes[h].begin(), masterNodes[h].end(),
-                  m.master_nodes[h]);
-      } else {
-        m.master_nodes[h] = NULL;
-      }
-    }
-
-    m.num_mirror_nodes =
-        (unsigned int*)calloc(mirrorNodes.size(), sizeof(unsigned int));
-    ;
-    m.mirror_nodes =
-        (unsigned int**)calloc(mirrorNodes.size(), sizeof(unsigned int*));
-    ;
-    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
-      m.num_mirror_nodes[h] = mirrorNodes[h].size();
-
-      if (mirrorNodes[h].size() > 0) {
-        m.mirror_nodes[h] =
-            (unsigned int*)calloc(mirrorNodes[h].size(), sizeof(unsigned int));
-        ;
-        std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(),
-                  m.mirror_nodes[h]);
-      } else {
-        m.mirror_nodes[h] = NULL;
-      }
-    }
-
-    // TODO user needs to provide method of freeing up graph?
-    userGraph.deallocate();
-  }
+///*
+// * Headers for boost serialization
+// */
+//#include <boost/archive/binary_oarchive.hpp>
+//#include <boost/archive/binary_iarchive.hpp>
+//#include <boost/serialization/split_member.hpp>
+//#include <boost/serialization/binary_object.hpp>
+//#include <boost/serialization/serialization.hpp>
+//#include <boost/serialization/vector.hpp>
+//#include <boost/serialization/unordered_map.hpp>
+//
+//public:
+//  /**
+//   * Checkpoint the complete structure on the node to disk
+//   */
+//  void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint") {
+//    using namespace boost::archive;
+//    galois::StatTimer TimerSaveCheckPoint(
+//        get_run_identifier("TimerSaveCheckpoint").c_str(), RNAME);
+//
+//    TimerSaveCheckPoint.start();
+//    std::string checkpointFileName_local =
+//        checkpointFileName + "_" + std::to_string(id);
+//
+//    std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
+//    if (!outputStream.is_open()) {
+//      galois::gPrint("ERROR: Could not open ", checkpointFileName_local,
+//                     " to save checkpoint!!!\n");
+//    }
+//    galois::gPrint("[", id,
+//                   "] Saving local checkpoint to :", checkpointFileName_local,
+//                   "\n");
+//
+//    boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
+//
+//    // TODO handle this with CuSP
+//    userGraph.serializeNodeData(ar);
+//
+//    std::string statSendBytes_str("CheckpointBytesTotal");
+//    constexpr static const char* const RREGION = "RECOVERY";
+//    size_t cp_size                             = outputStream.tellp();
+//    galois::runtime::reportStat_Tsum(RREGION, statSendBytes_str, cp_size);
+//
+//    outputStream.flush();
+//    outputStream.close();
+//    TimerSaveCheckPoint.stop();
+//  }
+//
+//  /**
+//   * Load checkpointed data from disk.
+//   */
+//  void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint") {
+//    using namespace boost::archive;
+//    galois::StatTimer TimerApplyCheckPoint(
+//        get_run_identifier("TimerApplyCheckpoint").c_str(), RNAME);
+//
+//    TimerApplyCheckPoint.start();
+//    std::string checkpointFileName_local =
+//        checkpointFileName + "_" + std::to_string(id);
+//
+//    std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
+//
+//    if (!inputStream.is_open()) {
+//      galois::gPrint("ERROR: Could not open ", checkpointFileName_local,
+//                     " to read checkpoint!!!\n");
+//    }
+//    galois::gPrint("[", id, "] reading local checkpoint from: ",
+//                   checkpointFileName_local, "\n");
+//
+//    boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
+//
+//    // TODO handle this with CuSP
+//    userGraph.deSerializeNodeData(ar);
+//
+//    inputStream.close();
+//    TimerApplyCheckPoint.stop();
+//  }
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3420,7 +3327,6 @@ public:
                        "_" + std::to_string(num_run));
 #endif
   }
-
 };
 
 template <typename GraphTy>
