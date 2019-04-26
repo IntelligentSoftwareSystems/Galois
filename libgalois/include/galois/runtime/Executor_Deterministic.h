@@ -490,7 +490,7 @@ struct OptionsCommon {
   function2_type fn2;
   args_type args;
 
-  OptionsCommon(const FunctionTy& f, ArgsTy a) : fn2(f), args(a) {}
+  OptionsCommon(function2_type f, ArgsTy a) : fn2(f), args(a) {}
 };
 
 template <typename T, typename FunctionTy, typename ArgsTy, bool Enable>
@@ -500,7 +500,7 @@ struct OptionsBase : public OptionsCommon<T, FunctionTy, ArgsTy> {
 
   function1_type fn1;
 
-  OptionsBase(const FunctionTy& f, ArgsTy a) : SuperTy(f, a), fn1(f) {}
+  OptionsBase(function1_type f, ArgsTy a) : SuperTy(f, a), fn1(f) {}
 };
 
 template <typename T, typename FunctionTy, typename ArgsTy>
@@ -512,7 +512,7 @@ struct OptionsBase<T, FunctionTy, ArgsTy, true>
 
   function1_type fn1;
 
-  OptionsBase(const FunctionTy& f, ArgsTy a)
+  OptionsBase(FunctionTy f, ArgsTy a)
       : SuperTy(f, a),
         fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) {}
 };
@@ -1686,7 +1686,7 @@ struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>
     : public internal::Executor<internal::Options<T, FunctionTy, ArgsTy>> {
   typedef internal::Options<T, FunctionTy, ArgsTy> OptionsTy;
   typedef internal::Executor<OptionsTy> SuperTy;
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args)
+  ForEachExecutor(FunctionTy f, const ArgsTy& args)
       : SuperTy(OptionsTy(f, args)) {}
 };
 
