@@ -868,45 +868,40 @@ public:
              << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second
              << " v);\n";
       header << "void batch_get_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-             << var.second << " *v);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v);\n";
       header << "void batch_get_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second
-             << " *v, size_t *v_size, DataCommMode *data_mode);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, size_t* v_size, DataCommMode* data_mode);\n";
+      header << "void batch_get_mirror_node_" << var.first
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v);\n";
       header << "void batch_get_mirror_node_" << var.first
              << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-             << var.second << " *v);\n";
-      header << "void batch_get_mirror_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second
-             << " *v, size_t *v_size, DataCommMode *data_mode);\n";
+             << "uint8_t* v, size_t* v_size, DataCommMode* data_mode);\n";
       header << "void batch_get_reset_node_" << var.first
              << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-             << var.second << " *v, " << var.second << " i);\n";
+             << "uint8_t* v, " << var.second << " i);\n";
       header << "void batch_get_reset_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second << " *v, size_t *v_size, DataCommMode *data_mode, "
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, size_t* v_size, DataCommMode* data_mode, "
              << var.second << " i);\n";
       header << "void batch_set_mirror_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t *v, DataCommMode data_mode);\n";
       header << "void batch_set_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, DataCommMode data_mode);\n";
+      header << "void batch_add_mirror_node_" << var.first
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, DataCommMode data_mode);\n";
       header << "void batch_add_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, DataCommMode data_mode);\n";
+      header << "void batch_min_mirror_node_" << var.first
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, DataCommMode data_mode);\n";
       header << "void batch_min_node_" << var.first
-             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                "*bitset_comm, unsigned int *offsets, "
-             << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+             << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+             << "uint8_t* v, DataCommMode data_mode);\n";
       header << "void batch_reset_node_" << var.first
              << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, "
              << var.second << " v);\n\n";
@@ -1040,88 +1035,89 @@ public:
       cuheader << "}\n\n";
       cuheader << "void batch_get_node_" << var.first
                << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-               << var.second << " *v) {\n";
+               << "uint8_t* v) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second
                << ", sharedMaster, false>(ctx, &ctx->" << var.first
                << ", from_id, v);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, size_t* v_size, DataCommMode* data_mode) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second
                << ", sharedMaster, false>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_mirror_node_" << var.first
                << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-               << var.second << " *v) {\n";
+               << "uint8_t* v) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second
                << ", sharedMirror, false>(ctx, &ctx->" << var.first
                << ", from_id, v);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_mirror_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, size_t* v_size, DataCommMode* data_mode) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second
                << ", sharedMirror, false>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_reset_node_" << var.first
                << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
-               << var.second << " *v, " << var.second << " i) {\n";
+               << "uint8_t* v, " << var.second << " i) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second
                << ", sharedMirror, true>(ctx, &ctx->" << var.first
                << ", from_id, v, i);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_reset_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second << " *v, size_t *v_size, DataCommMode *data_mode, "
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, size_t* v_size, DataCommMode* data_mode, "
                << var.second << " i) {\n";
       cuheader
           << "\tbatch_get_shared_field<" << var.second
           << ", sharedMirror, true>(ctx, &ctx->" << var.first
-          << ", from_id, bitset_comm, offsets, v, v_size, data_mode, i);\n";
+          << ", from_id, v, v_size, data_mode, i);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_set_mirror_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t v_size, DataCommMode data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second
                << ", sharedMirror, setOp>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_set_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t v_size, DataCommMode data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second
                << ", sharedMaster, setOp>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, data_mode);\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_add_mirror_node_" << var.first
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
+      cuheader << "\tbatch_set_shared_field<" << var.second
+               << ", sharedMirror, addOp>(ctx, &ctx->" << var.first
+               << ", from_id, v, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_add_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t v_size, DataCommMode data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second
                << ", sharedMaster, addOp>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, data_mode);\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_min_mirror_node_" << var.first
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
+      cuheader << "\tbatch_set_shared_field<" << var.second
+               << ", sharedMirror, minOp>(ctx, &ctx->" << var.first
+               << ", from_id, v, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_min_node_" << var.first
-               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t "
-                  "*bitset_comm, unsigned int *offsets, "
-               << var.second
-               << " *v, size_t v_size, DataCommMode data_mode) {\n";
+               << "_cuda(struct CUDA_Context* ctx, unsigned from_id, "
+               << "uint8_t* v, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second
                << ", sharedMaster, minOp>(ctx, &ctx->" << var.first
-               << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+               << ", from_id, v, data_mode);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_reset_node_" << var.first
                << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, "
