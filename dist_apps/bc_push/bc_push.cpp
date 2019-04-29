@@ -313,10 +313,10 @@ struct FirstIterationSSSP {
 /* Sub struct for running SSSP (beyond 1st iteration) */
 struct SSSP {
   Graph* graph;
-  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& active_vertices;
 
   SSSP(Graph* _graph, galois::DGAccumulator<uint32_t>& dga)
-      : graph(_graph), DGAccumulator_accum(dga) {}
+      : graph(_graph), active_vertices(dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     FirstIterationSSSP::go(_graph);
@@ -405,7 +405,7 @@ struct SSSP {
 
         if (old > new_dist) {
           bitset_current_length.set(dst);
-          DGAccumulator_accum += 1;
+          active_vertices += 1;
         }
       }
     }
@@ -474,8 +474,7 @@ struct PredAndSucc {
         edge_weight += graph->getEdgeData(current_edge);
 #endif
 
-        if ((src_data.current_length + edge_weight) ==
-            dst_data.current_length) {
+        if ((src_data.current_length + edge_weight) == dst_data.current_length) {
           // dest on shortest path with this node as predecessor
           galois::add(src_data.num_successors, (unsigned int)1);
           galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
@@ -577,14 +576,14 @@ struct NumShortestPaths {
   const uint64_t local_current_src_node;
 
   Graph* graph;
-  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& active_vertices;
 
   NumShortestPaths(const uint32_t& _local_infinity,
                    const uint64_t& _local_current_src_node, Graph* _graph,
                    galois::DGAccumulator<uint32_t>& dga)
       : local_infinity(_local_infinity),
         local_current_src_node(_local_current_src_node), graph(_graph),
-        DGAccumulator_accum(dga) {}
+        active_vertices(dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
@@ -690,8 +689,7 @@ struct NumShortestPaths {
           GALOIS_ASSERT(paths_to_add >= 1);
 #endif
 
-          if ((src_data.current_length + edge_weight) ==
-              dst_data.current_length) {
+          if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
             galois::atomicAdd(dst_data.to_add, paths_to_add);
             // increment dst trim so it can decrement predecessor
@@ -700,7 +698,7 @@ struct NumShortestPaths {
             bitset_to_add.set(dst);
             bitset_trim.set(dst);
 
-            DGAccumulator_accum += 1;
+            active_vertices += 1;
           }
         }
       }
@@ -819,7 +817,7 @@ struct DependencyPropChanges {
         bitset_dependency.set(src);
       }
 
-      if (src_data.num_successors == 0 && src_data.propagation_flag) {
+      if ((src_data.num_successors == 0) && src_data.propagation_flag) {
 // has had dependency back-propagated; reset the flag
 #ifdef BCDEBUG
         GALOIS_ASSERT(src_data.trim == 0);
@@ -857,14 +855,14 @@ struct DependencyPropagation {
   const uint32_t& local_infinity;
   const uint64_t& local_current_src_node;
   Graph* graph;
-  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& active_vertices;
 
   DependencyPropagation(const uint32_t& _local_infinity,
                         const uint64_t& _local_current_src_node, Graph* _graph,
                         galois::DGAccumulator<uint32_t>& dga)
       : local_infinity(_local_infinity),
         local_current_src_node(_local_current_src_node), graph(_graph),
-        DGAccumulator_accum(dga) {}
+        active_vertices(dga) {}
 
   /* Look at all nodes to do propagation until no more work is done */
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
@@ -960,8 +958,7 @@ struct DependencyPropagation {
             // dependency to take)
             if (dst_data.propagation_flag) {
               // dest on shortest path with this node as predecessor
-              if ((src_data.current_length + edge_weight) ==
-                  dst_data.current_length) {
+              if ((src_data.current_length + edge_weight) == dst_data.current_length) {
                 // increment my trim for later use to decrement successor
                 galois::atomicAdd(src_data.trim, (unsigned int)1);
 
@@ -982,7 +979,7 @@ struct DependencyPropagation {
                 bitset_trim.set(src);
                 bitset_to_add_float.set(src);
 
-                DGAccumulator_accum += 1;
+                active_vertices += 1;
               }
             }
           }

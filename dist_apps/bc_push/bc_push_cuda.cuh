@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 #pragma once
 #include <cuda.h>
 #include <stdio.h>
@@ -30,11 +11,11 @@ struct CUDA_Context : public CUDA_Context_Common {
 	struct CUDA_Context_Field<uint32_t> current_length;
 	struct CUDA_Context_Field<float> dependency;
 	struct CUDA_Context_Field<uint32_t> num_predecessors;
-	struct CUDA_Context_Field<uint64_t> num_shortest_paths;
+	struct CUDA_Context_Field<ShortPathType> num_shortest_paths;
 	struct CUDA_Context_Field<uint32_t> num_successors;
 	struct CUDA_Context_Field<uint32_t> old_length;
 	struct CUDA_Context_Field<uint8_t> propagation_flag;
-	struct CUDA_Context_Field<uint64_t> to_add;
+	struct CUDA_Context_Field<ShortPathType> to_add;
 	struct CUDA_Context_Field<float> to_add_float;
 	struct CUDA_Context_Field<uint32_t> trim;
 };
@@ -129,43 +110,51 @@ bool min_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned LID,
 	return false;
 }
 
-void batch_get_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->betweeness_centrality, from_id, v);
 }
 
-void batch_get_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->betweeness_centrality, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->betweeness_centrality, from_id, v);
 }
 
-void batch_get_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->betweeness_centrality, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, float i) {
+void batch_get_reset_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->betweeness_centrality, from_id, v, i);
 }
 
-void batch_get_reset_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, float i) {
+void batch_get_reset_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->betweeness_centrality, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
 }
 
-void batch_set_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
 }
 
-void batch_add_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, addOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
+}
+
+void batch_add_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
 }
 
-void batch_min_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, minOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
+}
+
+void batch_min_node_betweeness_centrality_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->betweeness_centrality, from_id, v, data_mode);
 }
 
@@ -209,43 +198,51 @@ bool min_node_current_length_cuda(struct CUDA_Context* ctx, unsigned LID, uint32
 	return false;
 }
 
-void batch_get_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->current_length, from_id, v);
 }
 
-void batch_get_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->current_length, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->current_length, from_id, v);
 }
 
-void batch_get_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->current_length, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->current_length, from_id, v, i);
 }
 
-void batch_get_reset_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->current_length, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->current_length, from_id, v, data_mode);
 }
 
-void batch_set_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->current_length, from_id, v, data_mode);
 }
 
-void batch_add_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->current_length, from_id, v, data_mode);
+}
+
+void batch_add_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->current_length, from_id, v, data_mode);
 }
 
-void batch_min_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->current_length, from_id, v, data_mode);
+}
+
+void batch_min_node_current_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->current_length, from_id, v, data_mode);
 }
 
@@ -289,43 +286,51 @@ bool min_node_dependency_cuda(struct CUDA_Context* ctx, unsigned LID, float v) {
 	return false;
 }
 
-void batch_get_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->dependency, from_id, v);
 }
 
-void batch_get_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->dependency, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->dependency, from_id, v);
 }
 
-void batch_get_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->dependency, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, float i) {
+void batch_get_reset_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->dependency, from_id, v, i);
 }
 
-void batch_get_reset_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, float i) {
+void batch_get_reset_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->dependency, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->dependency, from_id, v, data_mode);
 }
 
-void batch_set_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->dependency, from_id, v, data_mode);
 }
 
-void batch_add_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, addOp>(ctx, &ctx->dependency, from_id, v, data_mode);
+}
+
+void batch_add_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->dependency, from_id, v, data_mode);
 }
 
-void batch_min_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, minOp>(ctx, &ctx->dependency, from_id, v, data_mode);
+}
+
+void batch_min_node_dependency_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->dependency, from_id, v, data_mode);
 }
 
@@ -369,43 +374,51 @@ bool min_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned LID, uint
 	return false;
 }
 
-void batch_get_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->num_predecessors, from_id, v);
 }
 
-void batch_get_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->num_predecessors, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->num_predecessors, from_id, v);
 }
 
-void batch_get_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->num_predecessors, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->num_predecessors, from_id, v, i);
 }
 
-void batch_get_reset_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->num_predecessors, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
 }
 
-void batch_set_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
 }
 
-void batch_add_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
+}
+
+void batch_add_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
 }
 
-void batch_min_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
+}
+
+void batch_min_node_num_predecessors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->num_predecessors, from_id, v, data_mode);
 }
 
@@ -425,23 +438,23 @@ void bitset_num_shortest_paths_reset_cuda(struct CUDA_Context* ctx, size_t begin
 	reset_bitset_field(&ctx->num_shortest_paths, begin, end);
 }
 
-uint64_t get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID) {
-	uint64_t *num_shortest_paths = ctx->num_shortest_paths.data.cpu_rd_ptr();
+ShortPathType get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID) {
+	ShortPathType *num_shortest_paths = ctx->num_shortest_paths.data.cpu_rd_ptr();
 	return num_shortest_paths[LID];
 }
 
-void set_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
+void set_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
 	num_shortest_paths[LID] = v;
 }
 
-void add_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
+void add_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
 	num_shortest_paths[LID] += v;
 }
 
-bool min_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
+bool min_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *num_shortest_paths = ctx->num_shortest_paths.data.cpu_wr_ptr();
 	if (num_shortest_paths[LID] > v){
 		num_shortest_paths[LID] = v;
 		return true;
@@ -449,48 +462,56 @@ bool min_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned LID, ui
 	return false;
 }
 
-void batch_get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v) {
-	batch_get_shared_field<uint64_t, sharedMaster, false>(ctx, &ctx->num_shortest_paths, from_id, v);
+void batch_get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
+	batch_get_shared_field<ShortPathType, sharedMaster, false>(ctx, &ctx->num_shortest_paths, from_id, v);
 }
 
-void batch_get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<uint64_t, sharedMaster, false>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode);
+void batch_get_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
+	batch_get_shared_field<ShortPathType, sharedMaster, false>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v) {
-	batch_get_shared_field<uint64_t, sharedMirror, false>(ctx, &ctx->num_shortest_paths, from_id, v);
+void batch_get_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
+	batch_get_shared_field<ShortPathType, sharedMirror, false>(ctx, &ctx->num_shortest_paths, from_id, v);
 }
 
-void batch_get_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<uint64_t, sharedMirror, false>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode);
+void batch_get_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
+	batch_get_shared_field<ShortPathType, sharedMirror, false>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v, uint64_t i) {
-	batch_get_shared_field<uint64_t, sharedMirror, true>(ctx, &ctx->num_shortest_paths, from_id, v, i);
+void batch_get_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, ShortPathType i) {
+	batch_get_shared_field<ShortPathType, sharedMirror, true>(ctx, &ctx->num_shortest_paths, from_id, v, i);
 }
 
-void batch_get_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint64_t i) {
-	batch_get_shared_field<uint64_t, sharedMirror, true>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode, i);
+void batch_get_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, ShortPathType i) {
+	batch_get_shared_field<ShortPathType, sharedMirror, true>(ctx, &ctx->num_shortest_paths, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMirror, setOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+void batch_set_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, setOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
 }
 
-void batch_set_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, setOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+void batch_set_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, setOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
 }
 
-void batch_add_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, addOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+void batch_add_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, addOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
 }
 
-void batch_min_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, minOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+void batch_add_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, addOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
 }
 
-void batch_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint64_t v) {
-	reset_data_field<uint64_t>(&ctx->num_shortest_paths, begin, end, v);
+void batch_min_mirror_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, minOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+}
+
+void batch_min_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, minOp>(ctx, &ctx->num_shortest_paths, from_id, v, data_mode);
+}
+
+void batch_reset_node_num_shortest_paths_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, ShortPathType v) {
+	reset_data_field<ShortPathType>(&ctx->num_shortest_paths, begin, end, v);
 }
 
 void get_bitset_num_successors_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
@@ -529,43 +550,51 @@ bool min_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned LID, uint32
 	return false;
 }
 
-void batch_get_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->num_successors, from_id, v);
 }
 
-void batch_get_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->num_successors, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->num_successors, from_id, v);
 }
 
-void batch_get_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->num_successors, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->num_successors, from_id, v, i);
 }
 
-void batch_get_reset_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->num_successors, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
 }
 
-void batch_set_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
 }
 
-void batch_add_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
+}
+
+void batch_add_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
 }
 
-void batch_min_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
+}
+
+void batch_min_node_num_successors_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->num_successors, from_id, v, data_mode);
 }
 
@@ -609,43 +638,51 @@ bool min_node_old_length_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v
 	return false;
 }
 
-void batch_get_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->old_length, from_id, v);
 }
 
-void batch_get_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->old_length, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->old_length, from_id, v);
 }
 
-void batch_get_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->old_length, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->old_length, from_id, v, i);
 }
 
-void batch_get_reset_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->old_length, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->old_length, from_id, v, data_mode);
 }
 
-void batch_set_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->old_length, from_id, v, data_mode);
 }
 
-void batch_add_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->old_length, from_id, v, data_mode);
+}
+
+void batch_add_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->old_length, from_id, v, data_mode);
 }
 
-void batch_min_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->old_length, from_id, v, data_mode);
+}
+
+void batch_min_node_old_length_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->old_length, from_id, v, data_mode);
 }
 
@@ -689,43 +726,51 @@ bool min_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned LID, uint
 	return false;
 }
 
-void batch_get_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint8_t, sharedMaster, false>(ctx, &ctx->propagation_flag, from_id, v);
 }
 
-void batch_get_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint8_t, sharedMaster, false>(ctx, &ctx->propagation_flag, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint8_t, sharedMirror, false>(ctx, &ctx->propagation_flag, from_id, v);
 }
 
-void batch_get_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint8_t, sharedMirror, false>(ctx, &ctx->propagation_flag, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint8_t i) {
+void batch_get_reset_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint8_t i) {
 	batch_get_shared_field<uint8_t, sharedMirror, true>(ctx, &ctx->propagation_flag, from_id, v, i);
 }
 
-void batch_get_reset_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint8_t i) {
+void batch_get_reset_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint8_t i) {
 	batch_get_shared_field<uint8_t, sharedMirror, true>(ctx, &ctx->propagation_flag, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint8_t, sharedMirror, setOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
 }
 
-void batch_set_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint8_t, sharedMaster, setOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
 }
 
-void batch_add_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint8_t, sharedMirror, addOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
+}
+
+void batch_add_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint8_t, sharedMaster, addOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
 }
 
-void batch_min_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint8_t, sharedMirror, minOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
+}
+
+void batch_min_node_propagation_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint8_t, sharedMaster, minOp>(ctx, &ctx->propagation_flag, from_id, v, data_mode);
 }
 
@@ -745,23 +790,23 @@ void bitset_to_add_reset_cuda(struct CUDA_Context* ctx, size_t begin, size_t end
 	reset_bitset_field(&ctx->to_add, begin, end);
 }
 
-uint64_t get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID) {
-	uint64_t *to_add = ctx->to_add.data.cpu_rd_ptr();
+ShortPathType get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID) {
+	ShortPathType *to_add = ctx->to_add.data.cpu_rd_ptr();
 	return to_add[LID];
 }
 
-void set_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *to_add = ctx->to_add.data.cpu_wr_ptr();
+void set_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *to_add = ctx->to_add.data.cpu_wr_ptr();
 	to_add[LID] = v;
 }
 
-void add_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *to_add = ctx->to_add.data.cpu_wr_ptr();
+void add_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *to_add = ctx->to_add.data.cpu_wr_ptr();
 	to_add[LID] += v;
 }
 
-bool min_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
-	uint64_t *to_add = ctx->to_add.data.cpu_wr_ptr();
+bool min_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, ShortPathType v) {
+	ShortPathType *to_add = ctx->to_add.data.cpu_wr_ptr();
 	if (to_add[LID] > v){
 		to_add[LID] = v;
 		return true;
@@ -769,48 +814,56 @@ bool min_node_to_add_cuda(struct CUDA_Context* ctx, unsigned LID, uint64_t v) {
 	return false;
 }
 
-void batch_get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v) {
-	batch_get_shared_field<uint64_t, sharedMaster, false>(ctx, &ctx->to_add, from_id, v);
+void batch_get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
+	batch_get_shared_field<ShortPathType, sharedMaster, false>(ctx, &ctx->to_add, from_id, v);
 }
 
-void batch_get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<uint64_t, sharedMaster, false>(ctx, &ctx->to_add, from_id, v, v_size, data_mode);
+void batch_get_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
+	batch_get_shared_field<ShortPathType, sharedMaster, false>(ctx, &ctx->to_add, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v) {
-	batch_get_shared_field<uint64_t, sharedMirror, false>(ctx, &ctx->to_add, from_id, v);
+void batch_get_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
+	batch_get_shared_field<ShortPathType, sharedMirror, false>(ctx, &ctx->to_add, from_id, v);
 }
 
-void batch_get_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<uint64_t, sharedMirror, false>(ctx, &ctx->to_add, from_id, v, v_size, data_mode);
+void batch_get_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
+	batch_get_shared_field<ShortPathType, sharedMirror, false>(ctx, &ctx->to_add, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *v, uint64_t i) {
-	batch_get_shared_field<uint64_t, sharedMirror, true>(ctx, &ctx->to_add, from_id, v, i);
+void batch_get_reset_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, ShortPathType i) {
+	batch_get_shared_field<ShortPathType, sharedMirror, true>(ctx, &ctx->to_add, from_id, v, i);
 }
 
-void batch_get_reset_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint64_t i) {
-	batch_get_shared_field<uint64_t, sharedMirror, true>(ctx, &ctx->to_add, from_id, v, v_size, data_mode, i);
+void batch_get_reset_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, ShortPathType i) {
+	batch_get_shared_field<ShortPathType, sharedMirror, true>(ctx, &ctx->to_add, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMirror, setOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+void batch_set_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, setOp>(ctx, &ctx->to_add, from_id, v, data_mode);
 }
 
-void batch_set_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, setOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+void batch_set_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, setOp>(ctx, &ctx->to_add, from_id, v, data_mode);
 }
 
-void batch_add_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, addOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+void batch_add_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, addOp>(ctx, &ctx->to_add, from_id, v, data_mode);
 }
 
-void batch_min_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
-	batch_set_shared_field<uint64_t, sharedMaster, minOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+void batch_add_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, addOp>(ctx, &ctx->to_add, from_id, v, data_mode);
 }
 
-void batch_reset_node_to_add_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint64_t v) {
-	reset_data_field<uint64_t>(&ctx->to_add, begin, end, v);
+void batch_min_mirror_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMirror, minOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+}
+
+void batch_min_node_to_add_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<ShortPathType, sharedMaster, minOp>(ctx, &ctx->to_add, from_id, v, data_mode);
+}
+
+void batch_reset_node_to_add_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, ShortPathType v) {
+	reset_data_field<ShortPathType>(&ctx->to_add, begin, end, v);
 }
 
 void get_bitset_to_add_float_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
@@ -849,43 +902,51 @@ bool min_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned LID, float v)
 	return false;
 }
 
-void batch_get_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->to_add_float, from_id, v);
 }
 
-void batch_get_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->to_add_float, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->to_add_float, from_id, v);
 }
 
-void batch_get_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<float, sharedMirror, false>(ctx, &ctx->to_add_float, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, float i) {
+void batch_get_reset_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->to_add_float, from_id, v, i);
 }
 
-void batch_get_reset_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, float i) {
+void batch_get_reset_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, float i) {
 	batch_get_shared_field<float, sharedMirror, true>(ctx, &ctx->to_add_float, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
 }
 
-void batch_set_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
 }
 
-void batch_add_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, addOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
+}
+
+void batch_add_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
 }
 
-void batch_min_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMirror, minOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
+}
+
+void batch_min_node_to_add_float_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->to_add_float, from_id, v, data_mode);
 }
 
@@ -929,43 +990,51 @@ bool min_node_trim_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v) {
 	return false;
 }
 
-void batch_get_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->trim, from_id, v);
 }
 
-void batch_get_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->trim, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->trim, from_id, v);
 }
 
-void batch_get_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->trim, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->trim, from_id, v, i);
 }
 
-void batch_get_reset_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->trim, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->trim, from_id, v, data_mode);
 }
 
-void batch_set_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->trim, from_id, v, data_mode);
 }
 
-void batch_add_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->trim, from_id, v, data_mode);
+}
+
+void batch_add_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->trim, from_id, v, data_mode);
 }
 
-void batch_min_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->trim, from_id, v, data_mode);
+}
+
+void batch_min_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->trim, from_id, v, data_mode);
 }
 

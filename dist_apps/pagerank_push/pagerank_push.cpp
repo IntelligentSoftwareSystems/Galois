@@ -149,8 +149,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.residual  = local_alpha;
-    uint32_t num_edges =
-        std::distance(graph->edge_begin(src), graph->edge_end(src));
+    uint32_t num_edges = std::distance(graph->edge_begin(src), graph->edge_end(src));
     galois::atomicAdd(sdata.nout, num_edges);
     bitset_nout.set(src);
   }
@@ -211,10 +210,10 @@ struct PageRank {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   PageRank(Graph* _g, DGAccumulatorTy& _dga)
-      : graph(_g), DGAccumulator_accum(_dga) {}
+      : graph(_g), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned _num_iterations   = 0;
@@ -277,8 +276,7 @@ struct PageRank {
       float _delta = sdata.delta;
       sdata.delta  = 0;
 
-      DGAccumulator_accum +=
-          1; // this should be moved to Pagerank_delta operator
+      active_vertices += 1; // this should be moved to Pagerank_delta operator
 
       for (auto nbr : graph->edges(src)) {
         GNode dst       = graph->getEdgeDst(nbr);

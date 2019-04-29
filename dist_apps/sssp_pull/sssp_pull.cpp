@@ -100,8 +100,7 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current =
-        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
@@ -113,10 +112,10 @@ struct SSSP {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   SSSP(Graph* _graph, DGAccumulatorTy& _dga)
-      : graph(_graph), DGAccumulator_accum(_dga) {}
+      : graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned _num_iterations   = 0;
@@ -179,7 +178,7 @@ struct SSSP {
       uint32_t old_dist = galois::min(snode.dist_current, new_dist);
       if (old_dist > new_dist) {
         bitset_dist_current.set(src);
-        DGAccumulator_accum += 1;
+        active_vertices += 1;
       }
     }
   }
@@ -214,11 +213,12 @@ struct SSSPSanityCheck {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint64_t sum;
+      uint64_t sum, avg;
       uint32_t max;
-      SSSPSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
+      SSSPSanityCheck_masterNodes_cuda(sum, avg, max, infinity, cuda_ctx);
       dgas += sum;
       dgm.update(max);
+      dgag += avg;
     } else
 #endif
     {
@@ -295,9 +295,9 @@ int main(int argc, char** argv) {
 
   // accumulators for use in operators
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint64_t> dg_avge;
@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    SSSP::go(*hg, DGAccumulator_accum);
+    SSSP::go(*hg, active_vertices);
     StatTimer_main.stop();
 
     // sanity check

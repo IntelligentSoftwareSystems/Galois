@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
@@ -41,10 +22,10 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __begin, unsigned int __
     bool pop  = src < __end;
     if (pop)
     {
-      p_value[src] = 0;
-      p_nout[src] = 0;
-      p_residual[src] = 0;
-      p_delta[src] = 0;
+      p_value[src]     = 0;
+      p_nout[src]      = 0;
+      p_residual[src]  = 0;
+      p_delta[src]     = 0;
     }
   }
   // FP: "10 -> 11;
@@ -65,7 +46,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
     bool pop  = src < __end;
     if (pop)
     {
-      p_residual[src] = local_alpha;
+      p_residual[src]  = local_alpha;
       num_edges = graph.getOutDegree(src);
       atomicTestAdd(&p_nout[src], num_edges);
       bitset_nout.set(src);
@@ -92,7 +73,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
       if (p_residual[src] > 0)
       {
         residual_old = p_residual[src];
-        p_residual[src] = 0;
+        p_residual[src]     = 0;
         p_value[src] += residual_old;
         if (residual_old > local_tolerance)
         {
@@ -104,16 +85,16 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
       }
     }
   }
-  // FP: "15 -> 16;
+  // FP: "17 -> 18;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, HGAccumulator<unsigned int> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_PageRank;
   float _delta;
-  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -132,7 +113,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   // FP: "7 -> 8;
-  DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "8 -> 9;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -148,8 +129,8 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
       if (p_delta[src] > 0)
       {
         _delta = p_delta[src];
-        p_delta[src] = 0;
-        DGAccumulator_accum.reduce( 1);
+        p_delta[src]  = 0;
+        active_vertices.reduce( 1);
       }
       else
       {
@@ -320,7 +301,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     _delta = _np_closure[threadIdx.x]._delta;
   }
   // FP: "106 -> 107;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "107 -> 108;
 }
 __global__ void PageRankSanity(CSRGraph graph, unsigned int __begin, unsigned int __end, float local_tolerance, float * p_residual, float * p_value, HGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance, HGAccumulator<float> DGAccumulator_sum, HGAccumulator<float> DGAccumulator_sum_residual, HGReduceMax<float> max_residual, HGReduceMax<float> max_value, HGReduceMin<float> min_residual, HGReduceMin<float> min_value)
@@ -489,46 +470,46 @@ void PageRank_delta_nodesWithEdges_cuda(const float & local_alpha, float local_t
   PageRank_delta_cuda(0, ctx->numNodesWithEdges, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void PageRank_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
+  Shared<unsigned int> active_verticesval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void PageRank_allNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void PageRank_allNodes_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  PageRank_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_masterNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void PageRank_masterNodes_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  PageRank_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void PageRank_nodesWithEdges_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  PageRank_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_residual_over_tolerance, float & DGAccumulator_sum, float & DGAccumulator_sum_residual, float & max_residual, float & max_value, float & min_residual, float & min_value, float local_tolerance, struct CUDA_Context*  ctx)

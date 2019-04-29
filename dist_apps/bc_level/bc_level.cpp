@@ -182,11 +182,11 @@ struct InitializeIteration {
 struct ForwardPass {
   Graph* graph;
   galois::DGAccumulator<uint32_t>& dga;
-  uint32_t r;
+  uint32_t local_r;
 
   ForwardPass(Graph* _graph, galois::DGAccumulator<uint32_t>& _dga, 
               uint32_t roundNum)
-    : graph(_graph), dga(_dga), r(roundNum) {}
+    : graph(_graph), dga(_dga), local_r(roundNum) {}
 
   /**
    * Level by level BFS while also finding number of shortest paths to a
@@ -230,7 +230,7 @@ struct ForwardPass {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (src_data.current_length == r) {
+    if (src_data.current_length == local_r) {
       for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
@@ -242,8 +242,8 @@ struct ForwardPass {
           //assert(src_data.num_shortest_paths > 0);
 
           bitset_current_length.set(dst);
-          galois::atomicAdd(dst_data.num_shortest_paths, 
-                            src_data.num_shortest_paths.load());
+          double nsp = src_data.num_shortest_paths;
+          galois::atomicAdd(dst_data.num_shortest_paths, nsp);
           bitset_num_shortest_paths.set(dst);
 
           dga += 1;
@@ -251,8 +251,8 @@ struct ForwardPass {
           //assert(src_data.num_shortest_paths > 0);
           //assert(dst_data.current_length == r + 1);
 
-          galois::atomicAdd(dst_data.num_shortest_paths, 
-                            src_data.num_shortest_paths.load());
+          double nsp = src_data.num_shortest_paths;
+          galois::atomicAdd(dst_data.num_shortest_paths, nsp);
           bitset_num_shortest_paths.set(dst);
 
           dga += 1;
@@ -308,9 +308,9 @@ struct MiddleSync {
  */
 struct BackwardPass {
   Graph* graph;
-  uint32_t r;
+  uint32_t local_r;
 
-  BackwardPass(Graph* _graph, uint32_t roundNum) : graph(_graph), r(roundNum) {}
+  BackwardPass(Graph* _graph, uint32_t roundNum) : graph(_graph), local_r(roundNum) {}
 
   void static go(Graph& _graph, uint32_t roundNumber) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -341,15 +341,14 @@ struct BackwardPass {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (src_data.current_length == r) {
+    if (src_data.current_length == local_r) {
       uint32_t dest_to_find = src_data.current_length + 1;
       for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
-        if (dest_to_find == dst_data.current_length.load()) {
-          float contrib = ((float)1 + dst_data.dependency) /
-                          dst_data.num_shortest_paths;
+        if (dest_to_find == dst_data.current_length) {
+          float contrib = ((float)1 + dst_data.dependency) / dst_data.num_shortest_paths;
           src_data.dependency = src_data.dependency + contrib;
           bitset_dependency.set(src);
         }

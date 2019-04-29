@@ -88,7 +88,7 @@ function(distAppNoGPU name)
 endfunction()
 
 distAppNoGPU(bc_level)
-distAppNoGPU(weighted_bc)
+distApp(weighted_bc)
 
 distApp(bfs_pull)
 distApp(bfs_push)

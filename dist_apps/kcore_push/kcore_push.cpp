@@ -210,11 +210,11 @@ struct KCoreStep1 {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph,
              DGAccumulatorTy& _dga)
-      : local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
+      : local_k_core_num(_kcore), graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned iterations = 0;
@@ -279,7 +279,7 @@ struct KCoreStep1 {
         // set flag to 0 (false) and increment trim on outgoing neighbors
         // (if they exist)
         src_data.flag = false;
-        DGAccumulator_accum += 1; // can be optimized: node may not have edges
+        active_vertices += 1; // can be optimized: node may not have edges
 
         for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
@@ -301,11 +301,11 @@ struct KCoreStep1 {
 /* Gets the total number of nodes that are still alive */
 struct KCoreSanityCheck {
   Graph* graph;
-  galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t>& active_vertices;
 
   KCoreSanityCheck(Graph* _graph,
-                   galois::DGAccumulator<uint64_t>& _DGAccumulator_accum)
-      : graph(_graph), DGAccumulator_accum(_DGAccumulator_accum) {}
+                   galois::DGAccumulator<uint64_t>& _active_vertices)
+      : graph(_graph), active_vertices(_active_vertices) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
     dga.reset();
@@ -336,7 +336,7 @@ struct KCoreSanityCheck {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.flag) {
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
     }
   }
 };
@@ -378,9 +378,9 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
   galois::DGAccumulator<uint64_t> dga;
 
@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    KCoreStep1::go(*h_graph, DGAccumulator_accum);
+    KCoreStep1::go(*h_graph, active_vertices);
     StatTimer_main.stop();
 
     // sanity check

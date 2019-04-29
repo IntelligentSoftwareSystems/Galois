@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
@@ -61,25 +42,25 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
     bool pop  = src < __end;
     if (pop)
     {
-      p_flag[src] = true;
-      p_trim[src] = 0;
+      p_flag[src]           = true;
+      p_trim[src]           = 0;
       p_current_degree[src] = 0;
-      p_pull_flag[src] = false;
+      p_pull_flag[src]      = false;
     }
   }
   // FP: "10 -> 11;
 }
-__global__ void LiveUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void LiveUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, HGAccumulator<unsigned int> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = TB_SIZE;
-  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
-  DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "3 -> 4;
   src_end = __end;
   for (index_type src = __begin + tid; src < src_end; src += nthreads)
@@ -96,7 +77,7 @@ __global__ void LiveUpdate(CSRGraph graph, unsigned int __begin, unsigned int __
         if (p_current_degree[src] < local_k_core_num)
         {
           p_flag[src] = false;
-          DGAccumulator_accum.reduce( 1);
+          active_vertices.reduce( 1);
           p_pull_flag[src] = true;
         }
       }
@@ -111,7 +92,7 @@ __global__ void LiveUpdate(CSRGraph graph, unsigned int __begin, unsigned int __
     }
   }
   // FP: "22 -> 23;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "23 -> 24;
 }
 __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, DynamicBitset& bitset_trim)
@@ -329,17 +310,17 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
   }
   // FP: "106 -> 107;
 }
-__global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, HGAccumulator<uint64_t> DGAccumulator_accum)
+__global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, HGAccumulator<uint64_t> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = TB_SIZE;
-  __shared__ cub::BlockReduce<uint64_t, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<uint64_t, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
-  DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "3 -> 4;
   src_end = __end;
   for (index_type src = __begin + tid; src < src_end; src += nthreads)
@@ -349,12 +330,12 @@ __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned 
     {
       if (p_flag[src])
       {
-        DGAccumulator_accum.reduce( 1);
+        active_vertices.reduce( 1);
       }
     }
   }
   // FP: "11 -> 12;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(active_vertices_ts);
   // FP: "12 -> 13;
 }
 void DegreeCounting_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
@@ -421,46 +402,46 @@ void InitializeGraph_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void LiveUpdate_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
+void LiveUpdate_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active_vertices, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
+  Shared<unsigned int> active_verticesval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  LiveUpdate <<<blocks, threads>>>(ctx->gg, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  LiveUpdate <<<blocks, threads>>>(ctx->gg, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void LiveUpdate_allNodes_cuda(unsigned int & DGAccumulator_accum, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
+void LiveUpdate_allNodes_cuda(unsigned int & active_vertices, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  LiveUpdate_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, local_k_core_num, ctx);
+  LiveUpdate_cuda(0, ctx->gg.nnodes, active_vertices, local_k_core_num, ctx);
   // FP: "2 -> 3;
 }
-void LiveUpdate_masterNodes_cuda(unsigned int & DGAccumulator_accum, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
+void LiveUpdate_masterNodes_cuda(unsigned int & active_vertices, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  LiveUpdate_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, local_k_core_num, ctx);
+  LiveUpdate_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, local_k_core_num, ctx);
   // FP: "2 -> 3;
 }
-void LiveUpdate_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
+void LiveUpdate_nodesWithEdges_cuda(unsigned int & active_vertices, uint32_t local_k_core_num, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  LiveUpdate_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, local_k_core_num, ctx);
+  LiveUpdate_cuda(0, ctx->numNodesWithEdges, active_vertices, local_k_core_num, ctx);
   // FP: "2 -> 3;
 }
 void KCore_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
@@ -495,45 +476,45 @@ void KCore_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   KCore_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void KCoreSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void KCoreSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<uint64_t> _DGAccumulator_accum;
+  HGAccumulator<uint64_t> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<uint64_t> DGAccumulator_accumval  = Shared<uint64_t>(1);
+  Shared<uint64_t> active_verticesval  = Shared<uint64_t>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  KCoreSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  KCoreSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void KCoreSanityCheck_allNodes_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void KCoreSanityCheck_allNodes_cuda(uint64_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  KCoreSanityCheck_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  KCoreSanityCheck_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void KCoreSanityCheck_masterNodes_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void KCoreSanityCheck_masterNodes_cuda(uint64_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  KCoreSanityCheck_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  KCoreSanityCheck_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void KCoreSanityCheck_nodesWithEdges_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void KCoreSanityCheck_nodesWithEdges_cuda(uint64_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  KCoreSanityCheck_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  KCoreSanityCheck_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }

@@ -114,13 +114,13 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current =
-        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    sdata.dist_old =
-        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
+#ifdef __GALOIS_HET_CUDA__
+#if DIST_PER_ROUND_TIMER
 void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
 
 	std::string str = get_thread_block_work_into_string(cuda_ctx);
@@ -132,6 +132,8 @@ void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, s
 		galois::runtime::reportParam(regionname, tb_identifer, num_thread_blocks);
 	}
 }
+#endif
+#endif
 
 struct FirstItr_BFS {
   Graph* graph;
@@ -153,8 +155,12 @@ struct FirstItr_BFS {
       std::string impl_str(_graph.get_run_identifier("BFS"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
+#if DIST_PER_ROUND_TIMER
       unsigned int active_vertices = 0;
       FirstItr_BFS_cuda(__begin, __end, active_vertices, cuda_ctx);
+#else
+      FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
+#endif
       StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
       std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
@@ -205,13 +211,13 @@ struct BFS {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
-  galois::GAccumulator<uint32_t>& work_items;
+  DGAccumulatorTy& active_vertices;
+  DGAccumulatorTy& work_edges;
 
   BFS(uint32_t _local_priority, Graph* _graph, 
-      DGAccumulatorTy& _dga, galois::GAccumulator<uint32_t>& _work_items)
+      DGAccumulatorTy& _dga, DGAccumulatorTy& _work_edges)
       : local_priority(_local_priority), graph(_graph), 
-      DGAccumulator_accum(_dga), work_items(_work_items) {}
+      active_vertices(_dga), work_edges(_work_edges) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     FirstItr_BFS::go(_graph);
@@ -223,16 +229,16 @@ struct BFS {
     uint32_t priority;
     if (delta == 0) priority = std::numeric_limits<uint32_t>::max();
     else priority = 0;
-    galois::GAccumulator<uint32_t> work_items;
+    DGAccumulatorTy work_edges;
 
     do {
 
-      //if (work_items.reduce() == 0) 
+      //if (work_edges.reduce() == 0) 
       priority += delta;
 
       _graph.set_num_round(_num_iterations);
       dga.reset();
-      work_items.reset();
+      work_edges.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
 
@@ -241,10 +247,14 @@ struct BFS {
         StatTimer_cuda.start();
         unsigned int __retval = 0;
         unsigned int __retval2 = 0;
+#if DIST_PER_ROUND_TIMER
         unsigned int active_vertices = 0;
         BFS_nodesWithEdges_cuda(__retval, __retval2, active_vertices, priority, cuda_ctx);
+#else
+        BFS_nodesWithEdges_cuda(__retval, __retval2, priority, cuda_ctx);
+#endif
         dga += __retval;
-        work_items += __retval2;
+        work_edges += __retval2;
         StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
         std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
@@ -258,7 +268,7 @@ struct BFS {
 #endif
       {
         galois::do_all(
-            galois::iterate(nodesWithEdges), BFS(priority, &_graph, dga, work_items), galois::steal(),
+            galois::iterate(nodesWithEdges), BFS(priority, &_graph, dga, work_edges), galois::steal(),
             galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("BFS").c_str()));
       }
@@ -272,7 +282,7 @@ struct BFS {
 
       galois::runtime::reportStat_Tsum(
           regionname, _graph.get_run_identifier("NumWorkItems"),
-          (unsigned long)work_items.reduce());
+          (unsigned long)work_edges.read_local());
 
       ++_num_iterations;
     } while (
@@ -290,13 +300,13 @@ struct BFS {
     NodeData& snode = graph->getData(src);
 
     if (snode.dist_old > snode.dist_current) {
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
 
       if (local_priority > snode.dist_current) {
         snode.dist_old = snode.dist_current;
 
         for (auto jj : graph->edges(src)) {
-          work_items += 1;
+          work_edges += 1;
 
           GNode dst         = graph->getEdgeDst(jj);
           auto& dnode       = graph->getData(dst);
@@ -412,9 +422,9 @@ int main(int argc, char** argv) {
 
   // accumulators for use in operators
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGReduceMax<uint32_t> m;
@@ -425,7 +435,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
-    BFS::go(*hg, DGAccumulator_accum);
+    BFS::go(*hg, active_vertices);
     StatTimer_main.stop();
 
     // sanity check

@@ -151,10 +151,10 @@ struct ConnectedComp {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   ConnectedComp(Graph* _graph, DGAccumulatorTy& _dga)
-      : graph(_graph), DGAccumulator_accum(_dga) {}
+      : graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     using namespace galois::worklists;
@@ -216,7 +216,7 @@ struct ConnectedComp {
     if (snode.comp_old > snode.comp_current) {
       snode.comp_old = snode.comp_current;
 
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
 
       for (auto jj : graph->edges(src)) {
         GNode dst         = graph->getEdgeDst(jj);
@@ -238,10 +238,10 @@ struct ConnectedComp {
 struct ConnectedCompSanityCheck {
   Graph* graph;
 
-  galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t>& active_vertices;
 
   ConnectedCompSanityCheck(Graph* _graph, galois::DGAccumulator<uint64_t>& _dga)
-      : graph(_graph), DGAccumulator_accum(_dga) {}
+      : graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
     dga.reset();
@@ -272,7 +272,7 @@ struct ConnectedCompSanityCheck {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.comp_current == graph->getGID(src)) {
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
     }
   }
 };
@@ -316,11 +316,11 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
-  galois::DGAccumulator<uint64_t> DGAccumulator_accum64;
+  galois::DGAccumulator<uint64_t> active_vertices64;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] ConnectedComp::go run ", run, " called\n");
@@ -328,10 +328,10 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    ConnectedComp::go(*hg, DGAccumulator_accum);
+    ConnectedComp::go(*hg, active_vertices);
     StatTimer_main.stop();
 
-    ConnectedCompSanityCheck::go(*hg, DGAccumulator_accum64);
+    ConnectedCompSanityCheck::go(*hg, active_vertices64);
 
     if ((run + 1) != numRuns) {
 #ifdef __GALOIS_HET_CUDA__

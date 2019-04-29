@@ -109,13 +109,13 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current =
-        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    sdata.dist_old =
-        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
+#ifdef __GALOIS_HET_CUDA__
+#if DIST_PER_ROUND_TIMER
 void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
 
 	std::string str = get_thread_block_work_into_string(cuda_ctx);
@@ -127,6 +127,8 @@ void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, s
 		galois::runtime::reportParam(REGION_NAME, tb_identifer, num_thread_blocks);
 	}
 }
+#endif
+#endif
 
 struct FirstItr_SSSP {
   Graph* graph;
@@ -147,8 +149,12 @@ struct FirstItr_SSSP {
       std::string impl_str("SSSP_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
+#if DIST_PER_ROUND_TIMER
       unsigned int active_vertices = 0;	
       FirstItr_SSSP_cuda(__begin, __end, active_vertices, cuda_ctx);
+#else
+      FirstItr_SSSP_cuda(__begin, __end, cuda_ctx);
+#endif
       StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
       std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
@@ -200,13 +206,13 @@ struct SSSP {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
-  galois::GAccumulator<uint32_t>& work_items;
+  DGAccumulatorTy& active_vertices;
+  DGAccumulatorTy& work_edges;
 
   SSSP(uint32_t _local_priority, Graph* _graph, 
-      DGAccumulatorTy& _dga, galois::GAccumulator<uint32_t>& _work_items)
+      DGAccumulatorTy& _dga, DGAccumulatorTy& _work_edges)
       : local_priority(_local_priority), graph(_graph), 
-      DGAccumulator_accum(_dga), work_items(_work_items) {}
+      active_vertices(_dga), work_edges(_work_edges) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     using namespace galois::worklists;
@@ -220,16 +226,16 @@ struct SSSP {
     uint32_t priority;
     if (delta == 0) priority = std::numeric_limits<uint32_t>::max();
     else priority = 0;
-    galois::GAccumulator<uint32_t> work_items;
+    DGAccumulatorTy work_edges;
 
     do {
 
-      //if (work_items.reduce() == 0) 
+      //if (work_edges.reduce() == 0) 
       priority += delta;
 
       _graph.set_num_round(_num_iterations);
       dga.reset();
-      work_items.reset();
+      work_edges.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("SSSP_" + (_graph.get_run_identifier()));
@@ -237,10 +243,14 @@ struct SSSP {
         StatTimer_cuda.start();
         unsigned int __retval = 0;
         unsigned int __retval2 = 0;
-	unsigned int active_vertices = 0;
+#if DIST_PER_ROUND_TIMER
+        unsigned int active_vertices = 0;
         SSSP_nodesWithEdges_cuda(__retval, __retval2, active_vertices, priority, cuda_ctx);
+#else
+        SSSP_nodesWithEdges_cuda(__retval, __retval2, priority, cuda_ctx);
+#endif
         dga += __retval;
-        work_items += __retval2;
+        work_edges += __retval2;
         StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
         std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
@@ -254,7 +264,7 @@ struct SSSP {
 #endif
       {
         galois::do_all(
-            galois::iterate(nodesWithEdges), SSSP{priority, &_graph, dga, work_items},
+            galois::iterate(nodesWithEdges), SSSP{priority, &_graph, dga, work_edges},
             galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
             galois::steal());
@@ -270,7 +280,7 @@ struct SSSP {
 
       galois::runtime::reportStat_Tsum(
           "SSSP", "NumWorkItems_" + (_graph.get_run_identifier()),
-          (unsigned long)work_items.reduce());
+          (unsigned long)work_edges.reduce());
       ++_num_iterations;
     } while (
 #ifndef __GALOIS_HET_ASYNC__
@@ -287,13 +297,13 @@ struct SSSP {
     NodeData& snode = graph->getData(src);
 
     if (snode.dist_old > snode.dist_current) {
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
 
       if (local_priority > snode.dist_current) {
         snode.dist_old = snode.dist_current;
 
         for (auto jj : graph->edges(src)) {
-          work_items += 1;
+          work_edges += 1;
 
           GNode dst         = graph->getEdgeDst(jj);
           auto& dnode       = graph->getData(dst);
@@ -336,11 +346,12 @@ struct SSSPSanityCheck {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint64_t sum;
+      uint64_t sum, avg;
       uint32_t max;
-      SSSPSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
+      SSSPSanityCheck_masterNodes_cuda(sum, avg, max, infinity, cuda_ctx);
       dgas += sum;
       dgm.update(max);
+      dgag += avg;
     } else
 #endif
     {
@@ -419,9 +430,9 @@ int main(int argc, char** argv) {
 
   // accumulators for use in operators
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint64_t> dg_avge;
@@ -433,7 +444,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    SSSP::go(*hg, DGAccumulator_accum);
+    SSSP::go(*hg, active_vertices);
     StatTimer_main.stop();
 
     SSSPSanityCheck::go(*hg, DGAccumulator_sum, m, dg_avge);

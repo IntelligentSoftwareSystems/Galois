@@ -112,8 +112,7 @@ struct DegreeCounting {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    src_data.current_degree =
-        std::distance(graph->edge_begin(src), graph->edge_end(src));
+    src_data.current_degree = std::distance(graph->edge_begin(src), graph->edge_end(src));
     bitset_current_degree.set(src);
 
     //// technically can use std::dist above, but this is more easily
@@ -174,11 +173,11 @@ struct LiveUpdate {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   LiveUpdate(cll::opt<uint32_t>& _kcore, Graph* _graph,
              DGAccumulatorTy& _dga)
-      : local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
+      : local_k_core_num(_kcore), graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     const auto& allNodes = _graph.allNodesRange();
@@ -220,7 +219,7 @@ struct LiveUpdate {
 
       if (sdata.current_degree < local_k_core_num) {
         sdata.flag = false;
-        DGAccumulator_accum += 1;
+        active_vertices += 1;
 
         // let neighbors pull from me next round
         // assert(sdata.pull_flag == false);
@@ -326,11 +325,11 @@ struct KCore {
 /* Gets the total number of nodes that are still alive */
 struct KCoreSanityCheck {
   Graph* graph;
-  galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t>& active_vertices;
 
   KCoreSanityCheck(Graph* _graph,
-                   galois::DGAccumulator<uint64_t>& _DGAccumulator_accum)
-      : graph(_graph), DGAccumulator_accum(_DGAccumulator_accum) {}
+                   galois::DGAccumulator<uint64_t>& _active_vertices)
+      : graph(_graph), active_vertices(_active_vertices) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
     dga.reset();
@@ -361,7 +360,7 @@ struct KCoreSanityCheck {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.flag) {
-      DGAccumulator_accum += 1;
+      active_vertices += 1;
     }
   }
 };
@@ -404,9 +403,9 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
 #ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+  galois::DGTerminator<unsigned int> active_vertices;
 #else
-  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int> active_vertices;
 #endif
   galois::DGAccumulator<uint64_t> dga;
 
@@ -416,7 +415,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    KCore::go(*h_graph, DGAccumulator_accum);
+    KCore::go(*h_graph, active_vertices);
     StatTimer_main.stop();
 
     // sanity check

@@ -111,6 +111,8 @@ struct ResetGraph {
   }
 };
 
+#ifdef __GALOIS_HET_CUDA__
+#if DIST_PER_ROUND_TIMER
 void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
 
 	std::string str = get_thread_block_work_into_string(cuda_ctx);
@@ -122,6 +124,9 @@ void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, s
 		galois::runtime::reportParam(REGION_NAME, tb_identifer, num_thread_blocks);
 	}
 }
+#endif
+#endif
+
 struct InitializeGraph {
   Graph* graph;
 
@@ -175,12 +180,12 @@ struct PageRank_delta {
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
 #endif
 
-  DGAccumulatorTy& DGAccumulator_accum;
+  DGAccumulatorTy& active_vertices;
 
   PageRank_delta(const float& _local_alpha, cll::opt<float>& _local_tolerance,
                  Graph* _graph, DGAccumulatorTy& _dga)
       : local_alpha(_local_alpha), local_tolerance(_local_tolerance),
-        graph(_graph), DGAccumulator_accum(_dga) {}
+        graph(_graph), active_vertices(_dga) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     const auto& allNodes = _graph.allNodesRange();
@@ -212,7 +217,7 @@ struct PageRank_delta {
       if (sdata.residual > this->local_tolerance) {
         if (sdata.nout > 0) {
           sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
-          DGAccumulator_accum += 1;
+          active_vertices += 1;
         }
       }
       sdata.residual = 0;

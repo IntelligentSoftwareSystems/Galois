@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
@@ -25,13 +6,11 @@ void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 #include "kernels/reduce.cuh"
-#include "bc_push_cuda.cuh"
-static const int __tb_NumShortestPaths = TB_SIZE;
+#include "weighted_bc_cuda.cuh"
 static const int __tb_FirstIterationSSSP = TB_SIZE;
 static const int __tb_SSSP = TB_SIZE;
-static const int __tb_DependencyPropagation = TB_SIZE;
 static const int __tb_PredAndSucc = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_betweeness_centrality, float * p_dependency, uint32_t * p_num_predecessors, uint64_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, uint64_t * p_to_add, float * p_to_add_float, uint32_t * p_trim)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_betweeness_centrality, float * p_dependency, uint32_t * p_num_predecessors, ShortPathType * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, ShortPathType * p_to_add, float * p_to_add_float, uint32_t * p_trim)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -46,19 +25,19 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
     if (pop)
     {
       p_betweeness_centrality[src] = 0;
-      p_num_shortest_paths[src] = 0;
-      p_num_successors[src] = 0;
-      p_num_predecessors[src] = 0;
-      p_trim[src] = 0;
-      p_to_add[src] = 0;
-      p_to_add_float[src] = 0;
-      p_dependency[src] = 0;
-      p_propagation_flag[src] = false;
+      p_num_shortest_paths[src]    = 0;
+      p_num_successors[src]        = 0;
+      p_num_predecessors[src]      = 0;
+      p_trim[src]                  = 0;
+      p_to_add[src]                = 0;
+      p_to_add_float[src]          = 0;
+      p_dependency[src]            = 0;
+      p_propagation_flag[src]      = false;
     }
   }
   // FP: "15 -> 16;
 }
-__global__ void InitializeIteration(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_predecessors, uint64_t * p_num_shortest_paths, uint32_t * p_num_successors, uint32_t * p_old_length, uint8_t * p_propagation_flag)
+__global__ void InitializeIteration(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_predecessors, ShortPathType * p_num_shortest_paths, uint32_t * p_num_successors, uint32_t * p_old_length, uint8_t * p_propagation_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -77,21 +56,21 @@ __global__ void InitializeIteration(CSRGraph graph, unsigned int __begin, unsign
       is_source = graph.node_data[src] == local_current_src_node;
       if (!is_source)
       {
-        p_current_length[src] = local_infinity;
-        p_old_length[src] = local_infinity;
+        p_current_length[src]     = local_infinity;
+        p_old_length[src]         = local_infinity;
         p_num_shortest_paths[src] = 0;
-        p_propagation_flag[src] = false;
+        p_propagation_flag[src]   = false;
       }
       else
       {
-        p_current_length[src] = 0;
-        p_old_length[src] = 0;
+        p_current_length[src]     = 0;
+        p_old_length[src]         = 0;
         p_num_shortest_paths[src] = 1;
-        p_propagation_flag[src] = true;
+        p_propagation_flag[src]   = true;
       }
       p_num_predecessors[src] = 0;
-      p_num_successors[src] = 0;
-      p_dependency[src] = 0;
+      p_num_successors[src]   = 0;
+      p_dependency[src]       = 0;
     }
   }
   // FP: "21 -> 22;
@@ -316,13 +295,13 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
   }
   // FP: "112 -> 113;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, DynamicBitset& bitset_current_length, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, DynamicBitset& bitset_current_length, HGAccumulator<uint32_t> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_SSSP;
-  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -340,7 +319,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -448,7 +427,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           if (old > new_dist)
           {
             bitset_current_length.set(dst);
-            DGAccumulator_accum.reduce( 1);
+            active_vertices.reduce( 1);
           }
         }
       }
@@ -500,7 +479,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
             if (old > new_dist)
             {
               bitset_current_length.set(dst);
-              DGAccumulator_accum.reduce( 1);
+              active_vertices.reduce( 1);
             }
           }
         }
@@ -548,7 +527,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           if (old > new_dist)
           {
             bitset_current_length.set(dst);
-            DGAccumulator_accum.reduce( 1);
+            active_vertices.reduce( 1);
           }
         }
       }
@@ -562,7 +541,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "130 -> 131;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(active_vertices_ts);
   // FP: "131 -> 132;
 }
 __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors, DynamicBitset& bitset_num_predecessors, DynamicBitset& bitset_num_successors)
@@ -801,7 +780,7 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
   }
   // FP: "121 -> 122;
 }
-__global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_num_shortest_paths)
+__global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, ShortPathType * p_num_shortest_paths, uint8_t * p_propagation_flag, ShortPathType * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_num_shortest_paths)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -820,7 +799,7 @@ __global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, un
         if (p_trim[src] > 0)
         {
           p_num_predecessors[src] = p_num_predecessors[src] - p_trim[src];
-          p_trim[src] = 0;
+          p_trim[src]             = 0;
           if (p_num_predecessors[src] == 0)
           {
             p_propagation_flag[src] = true;
@@ -837,41 +816,23 @@ __global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, un
   }
   // FP: "20 -> 21;
 }
-__global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_to_add, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, ShortPathType * p_num_shortest_paths, uint8_t * p_propagation_flag, ShortPathType * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_to_add, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_NumShortestPaths;
-  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
-  index_type src_rup;
   // FP: "1 -> 2;
-  const int _NP_CROSSOVER_WP = 32;
-  const int _NP_CROSSOVER_TB = __kernel_tb_size;
   // FP: "2 -> 3;
-  const int BLKSIZE = __kernel_tb_size;
-  const int ITSIZE = BLKSIZE * 8;
+  active_vertices.thread_entry();
   // FP: "3 -> 4;
-
-  typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
-  typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
-
-  // FP: "4 -> 5;
-  __shared__ npsTy nps ;
-  // FP: "5 -> 6;
-  // FP: "6 -> 7;
-  DGAccumulator_accum.thread_entry();
-  // FP: "7 -> 8;
   src_end = __end;
-  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
-  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    multiple_sum<2, index_type> _np_mps;
-    multiple_sum<2, index_type> _np_mps_total;
-    // FP: "8 -> 9;
+    index_type current_edge_end;
     bool pop  = src < __end;
-    // FP: "9 -> 10;
     if (pop)
     {
       if (p_current_length[src] != local_infinity)
@@ -890,211 +851,35 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
         pop = false;
       }
     }
-    // FP: "16 -> 17;
-    // FP: "19 -> 20;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "20 -> 21;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "21 -> 22;
-    _np_closure[threadIdx.x].src = src;
-    // FP: "22 -> 23;
-    if (pop)
+    if (!pop)
     {
-      _np.size = (graph).getOutDegree(src);
-      _np.start = (graph).getFirstEdge(src);
+      continue;
     }
-    // FP: "25 -> 26;
-    // FP: "26 -> 27;
-    _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
-    _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "27 -> 28;
-    BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "28 -> 29;
-    if (threadIdx.x == 0)
+    current_edge_end = (graph).getFirstEdge((src) + 1);
+    for (index_type current_edge = (graph).getFirstEdge(src) + 0; current_edge < current_edge_end; current_edge += 1)
     {
-      nps.tb.owner = MAX_TB_SIZE + 1;
-    }
-    // FP: "31 -> 32;
-    __syncthreads();
-    // FP: "32 -> 33;
-    while (true)
-    {
-      // FP: "33 -> 34;
-      if (_np.size >= _NP_CROSSOVER_TB)
-      {
-        nps.tb.owner = threadIdx.x;
-      }
-      // FP: "36 -> 37;
-      __syncthreads();
-      // FP: "37 -> 38;
-      if (nps.tb.owner == MAX_TB_SIZE + 1)
-      {
-        // FP: "38 -> 39;
-        __syncthreads();
-        // FP: "39 -> 40;
-        break;
-      }
-      // FP: "41 -> 42;
-      if (nps.tb.owner == threadIdx.x)
-      {
-        nps.tb.start = _np.start;
-        nps.tb.size = _np.size;
-        nps.tb.src = threadIdx.x;
-        _np.start = 0;
-        _np.size = 0;
-      }
-      // FP: "44 -> 45;
-      __syncthreads();
-      // FP: "45 -> 46;
-      int ns = nps.tb.start;
-      int ne = nps.tb.size;
-      // FP: "46 -> 47;
-      if (nps.tb.src == threadIdx.x)
-      {
-        nps.tb.owner = MAX_TB_SIZE + 1;
-      }
-      // FP: "49 -> 50;
-      assert(nps.tb.src < __kernel_tb_size);
-      src = _np_closure[nps.tb.src].src;
-      // FP: "50 -> 51;
-      for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
-      {
-        index_type current_edge;
-        current_edge = ns +_np_j;
-        {
-          index_type dst;
-          int edge_weight;
-          uint64_t paths_to_add;
-          dst = graph.getAbsDestination(current_edge);
-          edge_weight = 1;
+      index_type dst;
+      int edge_weight;
+      ShortPathType paths_to_add;
+      dst = graph.getAbsDestination(current_edge);
+      edge_weight = 1;
 #ifndef __USE_BFS__
-          edge_weight += graph.getAbsWeight(current_edge);
+      edge_weight += graph.getAbsWeight(current_edge);
 #endif
-          paths_to_add = p_num_shortest_paths[src];
-          if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-          {
-            atomicTestAdd(&p_to_add[dst], paths_to_add);
-            atomicTestAdd(&p_trim[dst], (unsigned int)1);
-            bitset_to_add.set(dst);
-            bitset_trim.set(dst);
-            DGAccumulator_accum.reduce( 1);
-          }
-        }
-      }
-      // FP: "68 -> 69;
-      __syncthreads();
-    }
-    // FP: "70 -> 71;
-
-    // FP: "71 -> 72;
-    {
-      const int warpid = threadIdx.x / 32;
-      // FP: "72 -> 73;
-      const int _np_laneid = cub::LaneId();
-      // FP: "73 -> 74;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      paths_to_add = p_num_shortest_paths[src];
+      if ((p_current_length[src] + edge_weight) == p_current_length[dst])
       {
-        if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
-        {
-          nps.warp.owner[warpid] = _np_laneid;
-        }
-        if (nps.warp.owner[warpid] == _np_laneid)
-        {
-          nps.warp.start[warpid] = _np.start;
-          nps.warp.size[warpid] = _np.size;
-          nps.warp.src[warpid] = threadIdx.x;
-          _np.start = 0;
-          _np.size = 0;
-        }
-        index_type _np_w_start = nps.warp.start[warpid];
-        index_type _np_w_size = nps.warp.size[warpid];
-        assert(nps.warp.src[warpid] < __kernel_tb_size);
-        src = _np_closure[nps.warp.src[warpid]].src;
-        for (int _np_ii = _np_laneid; _np_ii < _np_w_size; _np_ii += 32)
-        {
-          index_type current_edge;
-          current_edge = _np_w_start +_np_ii;
-          {
-            index_type dst;
-            int edge_weight;
-            uint64_t paths_to_add;
-            dst = graph.getAbsDestination(current_edge);
-            edge_weight = 1;
-#ifndef __USE_BFS__
-            edge_weight += graph.getAbsWeight(current_edge);
-#endif
-            paths_to_add = p_num_shortest_paths[src];
-            if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-            {
-              atomicTestAdd(&p_to_add[dst], paths_to_add);
-              atomicTestAdd(&p_trim[dst], (unsigned int)1);
-              bitset_to_add.set(dst);
-              bitset_trim.set(dst);
-              DGAccumulator_accum.reduce( 1);
-            }
-          }
-        }
+        atomicTestAdd(&p_to_add[dst], paths_to_add);
+        atomicTestAdd(&p_trim[dst], (unsigned int)1);
+        bitset_to_add.set(dst);
+        bitset_trim.set(dst);
+        active_vertices.reduce( 1);
       }
-      // FP: "101 -> 102;
-      __syncthreads();
-      // FP: "102 -> 103;
     }
-
-    // FP: "103 -> 104;
-    __syncthreads();
-    // FP: "104 -> 105;
-    _np.total = _np_mps_total.el[1];
-    _np.offset = _np_mps.el[1];
-    // FP: "105 -> 106;
-    while (_np.work())
-    {
-      // FP: "106 -> 107;
-      int _np_i =0;
-      // FP: "107 -> 108;
-      _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "108 -> 109;
-      __syncthreads();
-      // FP: "109 -> 110;
-
-      // FP: "110 -> 111;
-      for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
-      {
-        index_type current_edge;
-        assert(nps.fg.src[_np_i] < __kernel_tb_size);
-        src = _np_closure[nps.fg.src[_np_i]].src;
-        current_edge= nps.fg.itvalue[_np_i];
-        {
-          index_type dst;
-          int edge_weight;
-          uint64_t paths_to_add;
-          dst = graph.getAbsDestination(current_edge);
-          edge_weight = 1;
-#ifndef __USE_BFS__
-          edge_weight += graph.getAbsWeight(current_edge);
-#endif
-          paths_to_add = p_num_shortest_paths[src];
-          if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-          {
-            atomicTestAdd(&p_to_add[dst], paths_to_add);
-            atomicTestAdd(&p_trim[dst], (unsigned int)1);
-            bitset_to_add.set(dst);
-            bitset_trim.set(dst);
-            DGAccumulator_accum.reduce( 1);
-          }
-        }
-      }
-      // FP: "129 -> 130;
-      _np.execute_round_done(ITSIZE);
-      // FP: "130 -> 131;
-      __syncthreads();
-    }
-    // FP: "132 -> 133;
-    assert(threadIdx.x < __kernel_tb_size);
-    src = _np_closure[threadIdx.x].src;
   }
-  // FP: "136 -> 137;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
-  // FP: "137 -> 138;
+  // FP: "34 -> 35;
+  active_vertices.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(active_vertices_ts);
+  // FP: "35 -> 36;
 }
 __global__ void PropagationFlagUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_successors, uint8_t * p_propagation_flag, DynamicBitset& bitset_propagation_flag)
 {
@@ -1144,7 +929,7 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
           p_to_add_float[src] = 0.0;
           bitset_dependency.set(src);
         }
-        if (p_num_successors[src] == 0 && p_propagation_flag[src])
+        if ((p_num_successors[src] == 0) && p_propagation_flag[src])
         {
           p_propagation_flag[src] = false;
           bitset_propagation_flag.set(src);
@@ -1154,7 +939,7 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
           if (p_trim[src] > 0)
           {
             p_num_successors[src] = p_num_successors[src] - p_trim[src];
-            p_trim[src] = 0;
+            p_trim[src]           = 0;
             if (p_num_successors[src] == 0)
             {
               p_propagation_flag[src] = true;
@@ -1167,41 +952,23 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
   }
   // FP: "25 -> 26;
 }
-__global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint64_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim, DynamicBitset& bitset_to_add_float, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, ShortPathType * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim, DynamicBitset& bitset_to_add_float, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_DependencyPropagation;
-  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
-  index_type src_rup;
   // FP: "1 -> 2;
-  const int _NP_CROSSOVER_WP = 32;
-  const int _NP_CROSSOVER_TB = __kernel_tb_size;
   // FP: "2 -> 3;
-  const int BLKSIZE = __kernel_tb_size;
-  const int ITSIZE = BLKSIZE * 8;
+  active_vertices.thread_entry();
   // FP: "3 -> 4;
-
-  typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
-  typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
-
-  // FP: "4 -> 5;
-  __shared__ npsTy nps ;
-  // FP: "5 -> 6;
-  // FP: "6 -> 7;
-  DGAccumulator_accum.thread_entry();
-  // FP: "7 -> 8;
   src_end = __end;
-  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
-  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    multiple_sum<2, index_type> _np_mps;
-    multiple_sum<2, index_type> _np_mps_total;
-    // FP: "8 -> 9;
+    index_type current_edge_end;
     bool pop  = src < __end;
-    // FP: "9 -> 10;
     if (pop)
     {
       if (p_current_length[src] != local_infinity)
@@ -1230,226 +997,40 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
         pop = false;
       }
     }
-    // FP: "21 -> 22;
-    // FP: "24 -> 25;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "25 -> 26;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "26 -> 27;
-    _np_closure[threadIdx.x].src = src;
-    // FP: "27 -> 28;
-    if (pop)
+    if (!pop)
     {
-      _np.size = (graph).getOutDegree(src);
-      _np.start = (graph).getFirstEdge(src);
+      continue;
     }
-    // FP: "30 -> 31;
-    // FP: "31 -> 32;
-    _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
-    _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "32 -> 33;
-    BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "33 -> 34;
-    if (threadIdx.x == 0)
+    current_edge_end = (graph).getFirstEdge((src) + 1);
+    for (index_type current_edge = (graph).getFirstEdge(src) + 0; current_edge < current_edge_end; current_edge += 1)
     {
-      nps.tb.owner = MAX_TB_SIZE + 1;
-    }
-    // FP: "36 -> 37;
-    __syncthreads();
-    // FP: "37 -> 38;
-    while (true)
-    {
-      // FP: "38 -> 39;
-      if (_np.size >= _NP_CROSSOVER_TB)
-      {
-        nps.tb.owner = threadIdx.x;
-      }
-      // FP: "41 -> 42;
-      __syncthreads();
-      // FP: "42 -> 43;
-      if (nps.tb.owner == MAX_TB_SIZE + 1)
-      {
-        // FP: "43 -> 44;
-        __syncthreads();
-        // FP: "44 -> 45;
-        break;
-      }
-      // FP: "46 -> 47;
-      if (nps.tb.owner == threadIdx.x)
-      {
-        nps.tb.start = _np.start;
-        nps.tb.size = _np.size;
-        nps.tb.src = threadIdx.x;
-        _np.start = 0;
-        _np.size = 0;
-      }
-      // FP: "49 -> 50;
-      __syncthreads();
-      // FP: "50 -> 51;
-      int ns = nps.tb.start;
-      int ne = nps.tb.size;
-      // FP: "51 -> 52;
-      if (nps.tb.src == threadIdx.x)
-      {
-        nps.tb.owner = MAX_TB_SIZE + 1;
-      }
-      // FP: "54 -> 55;
-      assert(nps.tb.src < __kernel_tb_size);
-      src = _np_closure[nps.tb.src].src;
-      // FP: "55 -> 56;
-      for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
-      {
-        index_type current_edge;
-        current_edge = ns +_np_j;
-        {
-          index_type dst;
-          int edge_weight;
-          dst = graph.getAbsDestination(current_edge);
-          edge_weight = 1;
+      index_type dst;
+      int edge_weight;
+      dst = graph.getAbsDestination(current_edge);
+      edge_weight = 1;
 #ifndef __USE_BFS__
-          edge_weight += graph.getAbsWeight(current_edge);
+      edge_weight += graph.getAbsWeight(current_edge);
 #endif
-          if (p_propagation_flag[dst])
-          {
-            if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-            {
-              float contrib;
-              atomicTestAdd(&p_trim[src], (unsigned int)1);
-              contrib = p_num_shortest_paths[src];
-              contrib /= p_num_shortest_paths[dst];
-              contrib *= (1.0 + p_dependency[dst]);
-              atomicTestAdd(&p_to_add_float[src], contrib);
-              bitset_trim.set(src);
-              bitset_to_add_float.set(src);
-              DGAccumulator_accum.reduce( 1);
-            }
-          }
-        }
-      }
-      // FP: "77 -> 78;
-      __syncthreads();
-    }
-    // FP: "79 -> 80;
-
-    // FP: "80 -> 81;
-    {
-      const int warpid = threadIdx.x / 32;
-      // FP: "81 -> 82;
-      const int _np_laneid = cub::LaneId();
-      // FP: "82 -> 83;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      if (p_propagation_flag[dst])
       {
-        if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
+        if ((p_current_length[src] + edge_weight) == p_current_length[dst])
         {
-          nps.warp.owner[warpid] = _np_laneid;
-        }
-        if (nps.warp.owner[warpid] == _np_laneid)
-        {
-          nps.warp.start[warpid] = _np.start;
-          nps.warp.size[warpid] = _np.size;
-          nps.warp.src[warpid] = threadIdx.x;
-          _np.start = 0;
-          _np.size = 0;
-        }
-        index_type _np_w_start = nps.warp.start[warpid];
-        index_type _np_w_size = nps.warp.size[warpid];
-        assert(nps.warp.src[warpid] < __kernel_tb_size);
-        src = _np_closure[nps.warp.src[warpid]].src;
-        for (int _np_ii = _np_laneid; _np_ii < _np_w_size; _np_ii += 32)
-        {
-          index_type current_edge;
-          current_edge = _np_w_start +_np_ii;
-          {
-            index_type dst;
-            int edge_weight;
-            dst = graph.getAbsDestination(current_edge);
-            edge_weight = 1;
-#ifndef __USE_BFS__
-            edge_weight += graph.getAbsWeight(current_edge);
-#endif
-            if (p_propagation_flag[dst])
-            {
-              if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-              {
-                float contrib;
-                atomicTestAdd(&p_trim[src], (unsigned int)1);
-                contrib = p_num_shortest_paths[src];
-                contrib /= p_num_shortest_paths[dst];
-                contrib *= (1.0 + p_dependency[dst]);
-                atomicTestAdd(&p_to_add_float[src], contrib);
-                bitset_trim.set(src);
-                bitset_to_add_float.set(src);
-                DGAccumulator_accum.reduce( 1);
-              }
-            }
-          }
+          float contrib;
+          atomicTestAdd(&p_trim[src], (unsigned int)1);
+          contrib = p_num_shortest_paths[src];
+          contrib /= p_num_shortest_paths[dst];
+          contrib *= (1.0 + p_dependency[dst]);
+          atomicTestAdd(&p_to_add_float[src], contrib);
+          bitset_trim.set(src);
+          bitset_to_add_float.set(src);
+          active_vertices.reduce( 1);
         }
       }
-      // FP: "114 -> 115;
-      __syncthreads();
-      // FP: "115 -> 116;
     }
-
-    // FP: "116 -> 117;
-    __syncthreads();
-    // FP: "117 -> 118;
-    _np.total = _np_mps_total.el[1];
-    _np.offset = _np_mps.el[1];
-    // FP: "118 -> 119;
-    while (_np.work())
-    {
-      // FP: "119 -> 120;
-      int _np_i =0;
-      // FP: "120 -> 121;
-      _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "121 -> 122;
-      __syncthreads();
-      // FP: "122 -> 123;
-
-      // FP: "123 -> 124;
-      for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
-      {
-        index_type current_edge;
-        assert(nps.fg.src[_np_i] < __kernel_tb_size);
-        src = _np_closure[nps.fg.src[_np_i]].src;
-        current_edge= nps.fg.itvalue[_np_i];
-        {
-          index_type dst;
-          int edge_weight;
-          dst = graph.getAbsDestination(current_edge);
-          edge_weight = 1;
-#ifndef __USE_BFS__
-          edge_weight += graph.getAbsWeight(current_edge);
-#endif
-          if (p_propagation_flag[dst])
-          {
-            if ((p_current_length[src] + edge_weight) == p_current_length[dst])
-            {
-              float contrib;
-              atomicTestAdd(&p_trim[src], (unsigned int)1);
-              contrib = p_num_shortest_paths[src];
-              contrib /= p_num_shortest_paths[dst];
-              contrib *= (1.0 + p_dependency[dst]);
-              atomicTestAdd(&p_to_add_float[src], contrib);
-              bitset_trim.set(src);
-              bitset_to_add_float.set(src);
-              DGAccumulator_accum.reduce( 1);
-            }
-          }
-        }
-      }
-      // FP: "146 -> 147;
-      _np.execute_round_done(ITSIZE);
-      // FP: "147 -> 148;
-      __syncthreads();
-    }
-    // FP: "149 -> 150;
-    assert(threadIdx.x < __kernel_tb_size);
-    src = _np_closure[threadIdx.x].src;
   }
-  // FP: "153 -> 154;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
-  // FP: "154 -> 155;
+  // FP: "43 -> 44;
+  active_vertices.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(active_vertices_ts);
+  // FP: "44 -> 45;
 }
 __global__ void BC(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_betweeness_centrality, float * p_dependency)
 {
@@ -1608,46 +1189,46 @@ void FirstIterationSSSP_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   FirstIterationSSSP_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<uint32_t> _DGAccumulator_accum;
+  HGAccumulator<uint32_t> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<uint32_t> DGAccumulator_accumval  = Shared<uint32_t>(1);
+  Shared<uint32_t> active_verticesval  = Shared<uint32_t>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void SSSP_allNodes_cuda(uint32_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_allNodes_cuda(uint32_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_masterNodes_cuda(uint32_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_masterNodes_cuda(uint32_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_nodesWithEdges_cuda(uint32_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_nodesWithEdges_cuda(uint32_t & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
@@ -1714,46 +1295,46 @@ void NumShortestPathsChanges_nodesWithEdges_cuda(const uint32_t & local_infinity
   NumShortestPathsChanges_cuda(0, ctx->numNodesWithEdges, local_infinity, ctx);
   // FP: "2 -> 3;
 }
-void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
+void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<uint32_t> _DGAccumulator_accum;
+  HGAccumulator<uint32_t> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<uint32_t> DGAccumulator_accumval  = Shared<uint32_t>(1);
+  Shared<uint32_t> active_verticesval  = Shared<uint32_t>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  NumShortestPaths <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void NumShortestPaths_allNodes_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
+void NumShortestPaths_allNodes_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  NumShortestPaths_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  NumShortestPaths_cuda(0, ctx->gg.nnodes, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
-void NumShortestPaths_masterNodes_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
+void NumShortestPaths_masterNodes_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  NumShortestPaths_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  NumShortestPaths_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
-void NumShortestPaths_nodesWithEdges_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
+void NumShortestPaths_nodesWithEdges_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  NumShortestPaths_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  NumShortestPaths_cuda(0, ctx->numNodesWithEdges, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
 void PropagationFlagUpdate_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
@@ -1820,46 +1401,46 @@ void DependencyPropChanges_nodesWithEdges_cuda(const uint32_t & local_infinity, 
   DependencyPropChanges_cuda(0, ctx->numNodesWithEdges, local_infinity, ctx);
   // FP: "2 -> 3;
 }
-void DependencyPropagation_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
+void DependencyPropagation_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<uint32_t> _DGAccumulator_accum;
+  HGAccumulator<uint32_t> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<uint32_t> DGAccumulator_accumval  = Shared<uint32_t>(1);
+  Shared<uint32_t> active_verticesval  = Shared<uint32_t>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  DependencyPropagation <<<blocks, __tb_DependencyPropagation>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add_float.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  DependencyPropagation <<<blocks, threads>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add_float.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void DependencyPropagation_allNodes_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
+void DependencyPropagation_allNodes_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  DependencyPropagation_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  DependencyPropagation_cuda(0, ctx->gg.nnodes, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
-void DependencyPropagation_masterNodes_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
+void DependencyPropagation_masterNodes_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  DependencyPropagation_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  DependencyPropagation_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
-void DependencyPropagation_nodesWithEdges_cuda(uint32_t & DGAccumulator_accum, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
+void DependencyPropagation_nodesWithEdges_cuda(uint32_t & active_vertices, const uint32_t & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  DependencyPropagation_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, local_infinity, local_current_src_node, ctx);
+  DependencyPropagation_cuda(0, ctx->numNodesWithEdges, active_vertices, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
 void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)

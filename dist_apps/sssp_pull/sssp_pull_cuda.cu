@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
@@ -46,13 +27,13 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   }
   // FP: "7 -> 8;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_SSSP;
-  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -70,7 +51,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -165,7 +146,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           if (old_dist > new_dist)
           {
             bitset_dist_current.set(src);
-            DGAccumulator_accum.reduce( 1);
+            active_vertices.reduce( 1);
           }
         }
       }
@@ -212,7 +193,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
             if (old_dist > new_dist)
             {
               bitset_dist_current.set(src);
-              DGAccumulator_accum.reduce( 1);
+              active_vertices.reduce( 1);
             }
           }
         }
@@ -255,7 +236,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           if (old_dist > new_dist)
           {
             bitset_dist_current.set(src);
-            DGAccumulator_accum.reduce( 1);
+            active_vertices.reduce( 1);
           }
         }
       }
@@ -269,16 +250,17 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "117 -> 118;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "118 -> 119;
 }
-__global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGReduceMax<uint32_t> DGMax)
+__global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGAccumulator<uint64_t> dg_avg, HGReduceMax<uint32_t> DGMax)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = TB_SIZE;
   __shared__ cub::BlockReduce<uint64_t, TB_SIZE>::TempStorage DGAccumulator_sum_ts;
+  __shared__ cub::BlockReduce<uint64_t, TB_SIZE>::TempStorage dg_avg_ts;
   __shared__ cub::BlockReduce<uint32_t, TB_SIZE>::TempStorage DGMax_ts;
   index_type src_end;
   // FP: "1 -> 2;
@@ -286,8 +268,11 @@ __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned i
   DGAccumulator_sum.thread_entry();
   // FP: "3 -> 4;
   // FP: "4 -> 5;
-  DGMax.thread_entry();
+  dg_avg.thread_entry();
   // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  DGMax.thread_entry();
+  // FP: "7 -> 8;
   src_end = __end;
   for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
@@ -298,14 +283,17 @@ __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned i
       {
         DGAccumulator_sum.reduce( 1);
         DGMax.reduce(p_dist_current[src]);
+        dg_avg.reduce( p_dist_current[src]);
       }
     }
   }
-  // FP: "14 -> 15;
+  // FP: "17 -> 18;
   DGAccumulator_sum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_sum_ts);
-  // FP: "15 -> 16;
+  // FP: "18 -> 19;
+  dg_avg.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(dg_avg_ts);
+  // FP: "19 -> 20;
   DGMax.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGMax_ts);
-  // FP: "16 -> 17;
+  // FP: "20 -> 21;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)
 {
@@ -339,53 +327,54 @@ void InitializeGraph_nodesWithEdges_cuda(const uint32_t & local_infinity, unsign
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
-  HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
+  Shared<unsigned int> active_verticesval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  *(active_verticesval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
-  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
-  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  active_vertices = *(active_verticesval.cpu_rd_ptr());
   // FP: "11 -> 12;
 }
-void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_allNodes_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_masterNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_masterNodes_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_nodesWithEdges_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSPSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
+void SSSPSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_sum, uint64_t & dg_avg, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
   HGAccumulator<uint64_t> _DGAccumulator_sum;
+  HGAccumulator<uint64_t> _dg_avg;
   HGReduceMax<uint32_t> _DGMax;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
@@ -399,37 +388,46 @@ void SSSPSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t &
   // FP: "7 -> 8;
   _DGAccumulator_sum.rv = DGAccumulator_sumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  Shared<uint32_t> DGMaxval  = Shared<uint32_t>(1);
+  Shared<uint64_t> dg_avgval  = Shared<uint64_t>(1);
   // FP: "9 -> 10;
   // FP: "10 -> 11;
-  *(DGMaxval.cpu_wr_ptr()) = 0;
+  *(dg_avgval.cpu_wr_ptr()) = 0;
   // FP: "11 -> 12;
-  _DGMax.rv = DGMaxval.gpu_wr_ptr();
+  _dg_avg.rv = dg_avgval.gpu_wr_ptr();
   // FP: "12 -> 13;
-  SSSPSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->dist_current.data.gpu_wr_ptr(), _DGAccumulator_sum, _DGMax);
+  Shared<uint32_t> DGMaxval  = Shared<uint32_t>(1);
   // FP: "13 -> 14;
-  check_cuda_kernel;
   // FP: "14 -> 15;
-  DGAccumulator_sum = *(DGAccumulator_sumval.cpu_rd_ptr());
+  *(DGMaxval.cpu_wr_ptr()) = 0;
   // FP: "15 -> 16;
-  DGMax = *(DGMaxval.cpu_rd_ptr());
+  _DGMax.rv = DGMaxval.gpu_wr_ptr();
   // FP: "16 -> 17;
+  SSSPSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->dist_current.data.gpu_wr_ptr(), _DGAccumulator_sum, _dg_avg, _DGMax);
+  // FP: "17 -> 18;
+  check_cuda_kernel;
+  // FP: "18 -> 19;
+  DGAccumulator_sum = *(DGAccumulator_sumval.cpu_rd_ptr());
+  // FP: "19 -> 20;
+  dg_avg = *(dg_avgval.cpu_rd_ptr());
+  // FP: "20 -> 21;
+  DGMax = *(DGMaxval.cpu_rd_ptr());
+  // FP: "21 -> 22;
 }
-void SSSPSanityCheck_allNodes_cuda(uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
+void SSSPSanityCheck_allNodes_cuda(uint64_t & DGAccumulator_sum, uint64_t & dg_avg, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSPSanityCheck_cuda(0, ctx->gg.nnodes, DGAccumulator_sum, DGMax, local_infinity, ctx);
+  SSSPSanityCheck_cuda(0, ctx->gg.nnodes, DGAccumulator_sum, dg_avg, DGMax, local_infinity, ctx);
   // FP: "2 -> 3;
 }
-void SSSPSanityCheck_masterNodes_cuda(uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
+void SSSPSanityCheck_masterNodes_cuda(uint64_t & DGAccumulator_sum, uint64_t & dg_avg, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSPSanityCheck_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_sum, DGMax, local_infinity, ctx);
+  SSSPSanityCheck_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_sum, dg_avg, DGMax, local_infinity, ctx);
   // FP: "2 -> 3;
 }
-void SSSPSanityCheck_nodesWithEdges_cuda(uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
+void SSSPSanityCheck_nodesWithEdges_cuda(uint64_t & DGAccumulator_sum, uint64_t & dg_avg, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSPSanityCheck_cuda(0, ctx->numNodesWithEdges, DGAccumulator_sum, DGMax, local_infinity, ctx);
+  SSSPSanityCheck_cuda(0, ctx->numNodesWithEdges, DGAccumulator_sum, dg_avg, DGMax, local_infinity, ctx);
   // FP: "2 -> 3;
 }

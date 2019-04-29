@@ -1,22 +1,3 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
-
 #pragma once
 #include <cuda.h>
 #include <stdio.h>
@@ -89,51 +70,51 @@ bool min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t
 	return false;
 }
 
-void batch_get_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->comp_current, from_id, v);
 }
 
-void batch_get_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->comp_current, from_id, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v) {
+void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->comp_current, from_id, v);
 }
 
-void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode) {
+void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode) {
 	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->comp_current, from_id, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, uint32_t i) {
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->comp_current, from_id, v, i);
 }
 
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, size_t* v_size, DataCommMode* data_mode, uint32_t i) {
 	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->comp_current, from_id, v, v_size, data_mode, i);
 }
 
-void batch_set_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
-void batch_set_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_set_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
-void batch_add_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
-void batch_add_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_add_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
-void batch_min_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
-void batch_min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+void batch_min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t* v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
