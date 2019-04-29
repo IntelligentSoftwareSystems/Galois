@@ -1,6 +1,5 @@
 set(sources
-		src/graph.cc
-		src/orbit.cc
+		src/abgraph.cc
 		src/partition.cc
 )
 

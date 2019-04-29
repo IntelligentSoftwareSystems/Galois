@@ -30,7 +30,7 @@
 #define CHUNK_SIZE 256
 
 const char* name = "TC";
-const char* desc = "Counts the triangles in a graph (only works for undirected neighbor-sorted graphs)";
+const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
 const char* url  = 0;
 
 enum Algo {
@@ -40,7 +40,7 @@ enum Algo {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
@@ -51,26 +51,21 @@ typedef Graph::GraphNode GNode;
 #include "Mining/util.h"
 
 void TcSolver(Graph& graph) {
-	galois::GAccumulator<unsigned int> total_num;
+	galois::GAccumulator<unsigned> total_num;
 	total_num.reset();
-	//galois::do_all(
 	galois::for_each(
 		galois::iterate(graph.begin(), graph.end()),
-		//[&](const GNode& src) {
 		[&](const GNode& src, auto& ctx) {
 			for (auto e1 : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e1);
-				if (dst > src) break;
 				for (auto e2 : graph.edges(dst)) {
 					GNode dst_dst = graph.getEdgeDst(e2);
-					if (dst_dst > dst) break;
 					for (auto e3 : graph.edges(src)) {
 						GNode dst2 = graph.getEdgeDst(e3);
 						if (dst_dst == dst2) {
 							total_num += 1;
 							break;
 						}
-						if (dst2 > dst_dst) break;
 					}
 				}
 			}
@@ -85,7 +80,7 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
+	MGraph mgraph(true);
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
 	if (filetype == "txt") {
@@ -102,10 +97,15 @@ int main(int argc, char** argv) {
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
 		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) graph.getData(n) = 1;
+		Graph g_temp;
+		galois::graphs::readGraph(g_temp, filename);
+		for (GNode n : g_temp) g_temp.getData(n) = 1;
+		mgraph.read_gr(g_temp); //symmetrize
+		genGraph(mgraph, graph);
 	} else { galois::gPrint("Unkown file format\n"); exit(1); }
+	//print_graph(graph);
 	Tinitial.stop();
+
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();

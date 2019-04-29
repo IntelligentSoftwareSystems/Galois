@@ -31,7 +31,7 @@ namespace bliss {
 #include "kqueue.hh"
 #include "heap.hh"
 #include "orbit.hh"
-#include "graph.hh"
+#include "abgraph.hh"
 
 
 namespace bliss {

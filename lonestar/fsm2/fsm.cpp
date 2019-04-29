@@ -60,6 +60,7 @@ typedef std::deque<DFS> DFSQueue;
 
 void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &queue) {
 	int single_edge_dfscodes = 0;
+	int num_embeddings = 0;
 	printf("\n=============================== Init ===============================\n\n");
 	// classify each edge into its single-edge pattern accodding to its (src_label, edge_label, dst_label)
 	for (auto src : graph) {
@@ -70,17 +71,19 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &q
 			GNode dst = graph.getEdgeDst(e);
 			auto elabel = graph.getEdgeData(e);
 			auto& dst_label = graph.getData(dst);
-			if (src_label <= dst_label) { // when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
-			//if (src_label < dst_label || (src_label == dst_label && src < dst)) {
+			//if (src_label <= dst_label) { // when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
+			if (src_label < dst_label || (src_label == dst_label && src < dst)) {
 				if (pattern_map.count(src_label) == 0 || pattern_map[src_label].count(elabel) == 0 || pattern_map[src_label][elabel].count(dst_label) == 0)
 					single_edge_dfscodes++;
 				LabEdge *eptr = &(miner.edge_list[*e]);
 				pattern_map[src_label][elabel][dst_label].push(2, eptr, 0); // single-edge embedding: (num_vertices, edge, pointer_to_parent_embedding)
+				num_embeddings ++;
 			}
 		}
 	}
 	int dfscodes_per_thread =  (int) ceil((single_edge_dfscodes * 1.0) / numThreads);
-	std::cout << "Single edge DFScodes " << single_edge_dfscodes << ", dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
+	std::cout << "num_single_edge_patterns = " << single_edge_dfscodes << ", dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
+	std::cout << "num_embeddings = " << num_embeddings << std::endl; 
 	// for each single-edge pattern, generate a DFS code and push it into the task queue
 	for(EmbeddingList_iterator3 fromlabel = pattern_map.begin(); fromlabel != pattern_map.end(); ++fromlabel) {
 		for(EmbeddingList_iterator2 elabel = fromlabel->second.begin(); elabel != fromlabel->second.end(); ++elabel) {

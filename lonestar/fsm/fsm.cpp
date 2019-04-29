@@ -27,16 +27,12 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <vector>
-#include <fstream>
-#include <utility>
-#include <iostream>
-#include <algorithm>
 
 #define ENABLE_LABEL
+//#define USE_DOMAIN
 
 const char* name = "FSM";
-const char* desc = "Frequent subgraph mining";
+const char* desc = "Frequent subgraph mining using BFS traversal";
 const char* url  = 0;
 
 enum Algo {
@@ -49,8 +45,7 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
-	cll::init(Algo::nodeiterator));
+	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
 static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
@@ -58,7 +53,7 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>:
 typedef Graph::GraphNode GNode;
 int total_num = 0;
 unsigned long merge_time = 0;
-//#define USE_DOMAIN
+
 #include "Mining/miner.h"
 #include "Lonestar/mgraph.h"
 #include "Mining/util.h"

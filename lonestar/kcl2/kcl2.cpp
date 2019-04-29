@@ -29,16 +29,10 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <utility>
-#include <vector>
-#include <algorithm>
-#include <iostream>
-#include <fstream>
-#define USE_SIMPLE
-#define DEBUG 0
+#define CHUNK_SIZE 256
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph using DFS traversal";
+const char* desc = "Counts the K-Cliques in a graph using DFS traversal (inputs do NOT need to be symmetrized)";
 const char* url  = 0;
 
 enum Algo {
@@ -56,17 +50,15 @@ static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#include "Mining/miner.h"
 #include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #include "Lonestar/subgraph.h"
-#define CHUNK_SIZE 256
 int core;
 typedef std::vector<unsigned> UintVec;
 typedef galois::substrate::PerThreadStorage<Subgraph> LocalSubgraph;
 typedef galois::substrate::PerThreadStorage<UintVec> LocalVector;
 
-// construct subgraph
+// construct the subgraph induced by vertex u's neighbors
 void mksub(Graph &g, GNode u, Subgraph &sg, UintVec &new_id, UintVec &old_id, unsigned k) {
 	if (old_id.empty()) {
 		new_id.resize(g.size());
@@ -84,13 +76,14 @@ void mksub(Graph &g, GNode u, Subgraph &sg, UintVec &new_id, UintVec &old_id, un
 		sg.d[k-1][j] = 0;//new degrees
 		j ++;
 	}
-	sg.n[k-1] = j;
-	for (unsigned i = 0; i < sg.n[k-1]; i ++) {//reodering adjacency list and computing new degrees
-		unsigned v = old_id[i];
+	sg.n[k-1] = j; // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
+	//reodering adjacency list and computing new degrees
+	for (unsigned i = 0; i < sg.n[k-1]; i ++) {
+		unsigned v = old_id[i]; // for each neighbor v of u
 		for (auto e : g.edges(v)) {
-			GNode w = g.getEdgeDst(e);
+			GNode w = g.getEdgeDst(e); // w is the neighbor's neighbor
 			j = new_id[w];
-			if (j != (unsigned)-1)
+			if (j != (unsigned)-1) // if w is also a neighbor of u
 				sg.adj[sg.core * i + sg.d[k-1][i]++] = j;
 		}
 	}
@@ -105,30 +98,49 @@ void kclique_thread(unsigned l, Subgraph &sg, galois::GAccumulator<long long> &n
 	if (l == 2) {
 		for(unsigned i = 0; i < sg.n[2]; i++) { //list all edges
 			unsigned u = sg.vertices[2][i];
-			unsigned end = u * sg.core + sg.d[2][u];
-			for (unsigned j = u * sg.core; j < end; j ++) {
+			unsigned begin = u * sg.core;
+			unsigned end = begin + sg.d[2][u];
+			for (unsigned j = begin; j < end; j ++) {
 				num += 1; //listing here!!!
 			}
 		}
 		return;
 	}
+	// compute the subgraphs induced on the neighbors of each node in current level,
+	// and then recurse on such a subgraph
 	for(unsigned i = 0; i < sg.n[l]; i ++) {
+		// for each vertex u in level l
+		// a new induced subgraph G[∆G(u)] is built
 		unsigned u = sg.vertices[l][i];
 		sg.n[l-1] = 0;
 		unsigned begin = u * sg.core;
 		unsigned end = begin + sg.d[l][u];
-		for (unsigned j = begin; j < end; j ++) {//relabeling vertices and forming U'.
+		// extend one vertex v which is a neighbor of u
+		for (unsigned j = begin; j < end; j ++) {
+			// for each out-neighbor v of node u in G, set its label to l − 1
+			// if the label was equal to l. We thus have that if a label of a
+			// node v is equal to l − 1 it means that node v is in the new subgraph
 			unsigned v = sg.adj[j];
+			// update info of v
+			// relabeling vertices and forming U'.
 			if (sg.lab[v] == l) {
 				sg.lab[v] = l-1;
 				sg.vertices[l-1][sg.n[l-1]++] = v;
 				sg.d[l-1][v] = 0;//new degrees
 			}
 		}
-		for (unsigned j = 0; j < sg.n[l-1]; j ++) {//reodering adjacency list and computing new degrees
+		// for each out-neighbor v of u
+		// reodering adjacency list and computing new degrees
+		for (unsigned j = 0; j < sg.n[l-1]; j ++) {
 			unsigned v = sg.vertices[l-1][j];
-			end = sg.core * v + sg.d[l][v];
-			for (unsigned k = sg.core * v; k < end; k ++) {
+			begin = v * sg.core;
+			end = begin + sg.d[l][v];
+			// move all the out-neighbors of v with label equal to l − 1 
+			// in the first part of ∆(v) (by swapping nodes),
+			// and compute the out-degree of node v in the new subgraph
+			// updating d(v). The first d(v) nodes in ∆(v) are
+			// thus the out-neighbors of v in the new subgraph.
+			for (unsigned k = begin; k < end; k ++) {
 				unsigned w = sg.adj[k];
 				if (sg.lab[w] == l-1) {
 					sg.d[l-1][v] ++;
@@ -189,16 +201,18 @@ int main(int argc, char** argv) {
 		mgraph.read_mtx(filename.c_str(), true); //symmetrize
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
-		printf("Currently .gr file not supported\n");
-		exit(1);
 		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) graph.getData(n) = 1;
-	} else { printf("Unkown file format\n"); exit(1); }
+		Graph g_temp;
+		galois::graphs::readGraph(g_temp, filename);
+		for (GNode n : g_temp) g_temp.getData(n) = 1;
+		mgraph.read_gr(g_temp); //symmetrize
+		genGraph(mgraph, graph);
+	} else { galois::gPrint("Unkown file format\n"); exit(1); }
 	core = mgraph.get_core();
-	//print_graph(graph);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+	//print_graph(graph);
+
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	switch (algo) {

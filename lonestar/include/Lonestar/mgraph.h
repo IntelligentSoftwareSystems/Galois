@@ -206,6 +206,21 @@ public:
 		num_edges_ = el.size();
 		MakeGraphFromEL();
 	}
+	void read_gr(Graph& g) {
+		for (auto it = g.begin(); it != g.end(); it ++) {
+			GNode src = *it;
+			for (auto e : g.edges(src)) {
+				GNode dst = g.getEdgeDst(e);
+				el.push_back(MEdge(src, dst, 1));
+			}
+		}
+		assert(el.size() == g.sizeEdge());
+		num_vertices_ = g.size();
+		num_edges_ = el.size();
+		labels_.resize(num_vertices_);
+		for (int i = 0; i < num_vertices_; i ++) { labels_[i] = g.getData(i); }
+		MakeGraphFromEL();
+	}
 	void print_graph() {
 		if (directed_) std::cout << "directed graph\n";
 		else std::cout << "undirected graph\n";
@@ -304,6 +319,8 @@ private:
 	}
 	void RelabelEdges() {
 		ord_core();
+		//for (int i = 0; i < num_vertices_; i ++)
+		//	std::cout << i << " --> " << rank[i] << "\n";
 		for (int i = 0; i < num_edges_; i ++) {
 			int source = rank[el[i].src];
 			int target = rank[el[i].dst];
@@ -315,6 +332,11 @@ private:
 			el[i].src = source;
 			el[i].dst = target;
 		}
+		std::vector<ValueT> new_labels(num_vertices_);
+		for (int i = 0; i < num_vertices_; i ++)
+			new_labels[rank[i]] = labels_[i];
+		for (int i = 0; i < num_vertices_; i ++)
+			labels_[i] = new_labels[i];
 	}
 	void MakeCSR(bool transpose) {
 		std::vector<int> degrees(num_vertices_);

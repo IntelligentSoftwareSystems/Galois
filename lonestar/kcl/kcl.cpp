@@ -49,10 +49,8 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
-	cll::init(Algo::nodeiterator));
-static cll::opt<unsigned> k("k",
-	cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
+	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
+static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
