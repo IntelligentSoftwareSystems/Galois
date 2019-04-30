@@ -38,7 +38,7 @@ makeTest(ADD_TARGET worklists-compile DISTSAFE)
 makeTest(ADD_TARGET floatingPointErrors)
 makeTest(ADD_TARGET hwtopo DISTSAFE)
 makeTest(ADD_TARGET morphgraph)
-makeTest(ADD_TARGET papi)
+makeTest(ADD_TARGET papi 2)
 
 #makeTest(TARGET lonestar/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz")
 #makeTest(TARGET lonestar/clustering/clustering -numPoints 1000)
