@@ -18,7 +18,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -34,7 +34,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++ wget
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ wget
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -50,7 +50,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev wget
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ zlib1g-dev wget
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -86,7 +86,7 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -119,7 +119,7 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -154,7 +154,7 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -180,7 +180,7 @@ jobs:
           source activate
           # The latest conda-forge libcxx package appears to have some issues with CentOS 6.
           # Work around that by pinning the llvm/clang/libcxx version to 6.
-          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib
+          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib eigen
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -196,7 +196,7 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost
+          pacman -q -S --noconfirm gcc make cmake boost eigen
           mkdir build
           cd build
           curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
@@ -211,7 +211,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress make cmake boost-dev zlib-dev
+          apk add --no-cache --no-progress make cmake boost-dev zlib-dev eigen
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -226,7 +226,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip eigen3
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
@@ -241,7 +241,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel boost-devel make cmake gcc-c++
+          yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel
           mkdir build
           cd build
           curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
@@ -259,7 +259,7 @@ jobs:
           # Install llvm-devel, not because it is required, but because it may
           # conflict with the llvm headers that are vendored for use when building
           # command line programs. That configuration needs to be tested.
-          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel
+          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel
           mkdir build
           cd build
           curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
