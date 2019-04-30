@@ -1299,7 +1299,7 @@ int main(int argc, char** argv) {
         bitset_old_length_reset_cuda(cuda_ctx);
         bitset_propagation_flag_reset_cuda(cuda_ctx);
         bitset_dependency_reset_cuda(cuda_ctx);
-      } else
+      } else if (personality == CPU)
 #endif
       {
         bitset_to_add.reset();

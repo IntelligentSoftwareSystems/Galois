@@ -87,8 +87,9 @@ function(distAppNoGPU name)
   endif()
 endfunction()
 
-distAppNoGPU(bc_level)
+distApp(bc_level)
 distApp(weighted_bc)
+distAppNoGPU(bc_mr)
 
 distApp(bfs_pull)
 distApp(bfs_push)
@@ -111,5 +112,3 @@ distApp(sssp_push)
 distApp(sssp_push_lb)
 
 distAppNoGPU(partition)
-
-distAppNoGPU(bc_mr)
