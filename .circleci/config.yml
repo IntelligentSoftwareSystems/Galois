@@ -226,7 +226,9 @@ jobs:
     steps:
       - checkout
       - run: |
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip eigen3
+          # Note: Eigen is deliberately excluded here since the tests should still run properly without it installed.
+          # It's also excluded here because, as of this writing, it doesn't have a stable package in the latest OpenSUSE release.
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
