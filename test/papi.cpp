@@ -71,7 +71,15 @@ int main(int argc, char* argv[]) {
 
   galois::SharedMemSys G;
 
-  auto numThreads = galois::setActiveThreads(std::stoul(argv[1]));
+  unsigned long long numThreads;
+  if (argc == 1) {
+    numThreads = 1;
+  } else if (argc == 2) {
+    numThreads = galois::setActiveThreads(std::stoull(argv[1]));
+  } else {
+    throw std::invalid_argument("Test received too many command line arguments");
+  }
+
   galois::runtime::reportParam("NULL", "Threads", numThreads);
 
   size_t vecSz = 1024 * 1024;
