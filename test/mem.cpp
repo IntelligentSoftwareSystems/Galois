@@ -17,8 +17,9 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/runtime/Mem.h"
+#include "galois/Galois.h"
 #include "galois/gIO.h"
+#include "galois/runtime/Mem.h"
 
 using namespace galois::runtime;
 using namespace galois::substrate;
@@ -30,6 +31,7 @@ struct element {
 };
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   unsigned baseAllocSize = SystemHeap::AllocSize;
 
   FixedSizeAllocator<element> falloc;

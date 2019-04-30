@@ -17,6 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "galois/Galois.h"
 #include "galois/runtime/Range.h"
 
 #include <cstdlib>
@@ -59,6 +60,7 @@ struct checker {
 #include "galois/worklists/WorkList.h"
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   if (argc > 1)
     run = atoi(argv[1]);
 

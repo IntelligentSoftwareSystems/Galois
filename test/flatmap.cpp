@@ -161,6 +161,7 @@ void timeTests(std::string prefix, const std::vector<int>& keys) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   testMap<std::map<int, element>>();
   testMap<galois::flat_map<int, element>>();
 #ifdef GALOIS_USE_EXP

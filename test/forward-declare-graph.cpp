@@ -56,6 +56,7 @@ struct Node5 {
 };
 
 int main() {
+  galois::SharedMemSys Galois_runtime;
   Graph1 g1;
   Graph2 g2;
   Graph3 g3;
