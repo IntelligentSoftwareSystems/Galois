@@ -26,9 +26,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
-#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
-#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -57,6 +55,15 @@ static cll::opt<uint32_t>
     delta("delta",
              cll::desc("Shift value for the delta step (default value 0)"),
              cll::init(0));
+
+enum Exec { Sync, Async };
+
+static cll::opt<Exec> execution(
+    "exec",
+    cll::desc("Distributed Execution Model (default value Async):"),
+    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -202,24 +209,24 @@ struct FirstItr_BFS {
   }
 };
 
+template <bool async>
 struct BFS {
   uint32_t local_priority;
   Graph* graph;
-#ifdef __GALOIS_HET_ASYNC__
-  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
-#else
+  using DGTerminatorDetector = typename std::conditional<async, 
+          galois::DGTerminator<unsigned int>,
+          galois::DGAccumulator<unsigned int>>::type;
   using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
-#endif
 
-  DGAccumulatorTy& active_vertices;
+  DGTerminatorDetector& active_vertices;
   DGAccumulatorTy& work_edges;
 
   BFS(uint32_t _local_priority, Graph* _graph, 
-      DGAccumulatorTy& _dga, DGAccumulatorTy& _work_edges)
+      DGTerminatorDetector& _dga, DGAccumulatorTy& _work_edges)
       : local_priority(_local_priority), graph(_graph), 
       active_vertices(_dga), work_edges(_work_edges) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga) {
+  void static go(Graph& _graph) {
     FirstItr_BFS::go(_graph);
 
     unsigned _num_iterations = 1;
@@ -229,6 +236,7 @@ struct BFS {
     uint32_t priority;
     if (delta == 0) priority = std::numeric_limits<uint32_t>::max();
     else priority = 0;
+    DGTerminatorDetector dga;
     DGAccumulatorTy work_edges;
 
     do {
@@ -272,13 +280,8 @@ struct BFS {
             galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("BFS").c_str()));
       }
-#ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Bitset_dist_current, true>("BFS");
-#else
-      _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Bitset_dist_current>("BFS");
-#endif
+                  Bitset_dist_current, async>("BFS");
 
       galois::runtime::reportStat_Tsum(
           regionname, _graph.get_run_identifier("NumWorkItems"),
@@ -286,9 +289,7 @@ struct BFS {
 
       ++_num_iterations;
     } while (
-#ifndef __GALOIS_HET_ASYNC__
-             (_num_iterations < maxIterations) &&
-#endif
+             (async || (_num_iterations < maxIterations)) &&
              dga.reduce(_graph.get_run_identifier()));
 
     galois::runtime::reportStat_Tmax(
@@ -421,11 +422,6 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   // accumulators for use in operators
-#ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> active_vertices;
-#else
-  galois::DGAccumulator<unsigned int> active_vertices;
-#endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGReduceMax<uint32_t> m;
 
@@ -435,7 +431,11 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
-    BFS::go(*hg, active_vertices);
+    if (execution == Async) {
+      BFS<true>::go(*hg);
+    } else {
+      BFS<false>::go(*hg);
+    }
     StatTimer_main.stop();
 
     // sanity check

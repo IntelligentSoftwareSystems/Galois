@@ -21,9 +21,7 @@
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 #include "galois/DReducible.h"
-#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
-#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -50,6 +48,15 @@ static cll::opt<unsigned int>
     maxIterations("maxIterations",
                   cll::desc("Maximum iterations: Default 1000"),
                   cll::init(1000));
+
+enum Exec { Sync, Async };
+
+static cll::opt<Exec> execution(
+    "exec",
+    cll::desc("Distributed Execution Model (default value Async):"),
+    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -202,22 +209,22 @@ struct PageRank_delta {
   }
 };
 
+template <bool async>
 struct PageRank {
   Graph* graph;
-#ifdef __GALOIS_HET_ASYNC__
-  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
-#else
-  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
-#endif
+  using DGTerminatorDetector = typename std::conditional<async, 
+          galois::DGTerminator<unsigned int>,
+          galois::DGAccumulator<unsigned int>>::type;
 
-  DGAccumulatorTy& active_vertices;
+  DGTerminatorDetector& active_vertices;
 
-  PageRank(Graph* _g, DGAccumulatorTy& _dga)
+  PageRank(Graph* _g, DGTerminatorDetector& _dga)
       : graph(_g), active_vertices(_dga) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga) {
+  void static go(Graph& _graph) {
     unsigned _num_iterations   = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    DGTerminatorDetector dga;
 
     do {
       _graph.set_num_round(_num_iterations);
@@ -244,13 +251,8 @@ struct PageRank {
             galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
       }
 
-#ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeDestination, readSource, Reduce_add_residual,
-                  Bitset_residual, true>("PageRank");
-#else
-      _graph.sync<writeDestination, readSource, Reduce_add_residual,
-                  Bitset_residual>("PageRank");
-#endif
+                  Bitset_residual, async>("PageRank");
 
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
@@ -258,9 +260,7 @@ struct PageRank {
 
       ++_num_iterations;
     } while (
-#ifndef __GALOIS_HET_ASYNC__
-             (_num_iterations < maxIterations) &&
-#endif
+             (async || (_num_iterations < maxIterations)) &&
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -452,12 +452,6 @@ int main(int argc, char** argv) {
   InitializeGraph::go((*hg));
   galois::runtime::getHostBarrier().wait();
 
-#ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> PageRank_accum;
-#else
-  galois::DGAccumulator<unsigned int> PageRank_accum;
-#endif
-
   galois::DGAccumulator<float> DGA_sum;
   galois::DGAccumulator<float> DGA_sum_residual;
   galois::DGAccumulator<uint64_t> DGA_residual_over_tolerance;
@@ -472,7 +466,11 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    PageRank::go(*hg, PageRank_accum);
+    if (execution == Async) {
+      PageRank<true>::go(*hg);
+    } else {
+      PageRank<false>::go(*hg);
+    }
     StatTimer_main.stop();
 
     // sanity check

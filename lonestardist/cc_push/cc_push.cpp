@@ -23,9 +23,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
-#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
-#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -44,6 +42,15 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"),
                                             cll::init(1000));
+
+enum Exec { Sync, Async };
+
+static cll::opt<Exec> execution(
+    "exec",
+    cll::desc("Distributed Execution Model (default value Async):"),
+    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -174,25 +181,25 @@ struct FirstItr_ConnectedComp {
   }
 };
 
+template <bool async>
 struct ConnectedComp {
   Graph* graph;
-#ifdef __GALOIS_HET_ASYNC__
-  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
-#else
-  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
-#endif
+  using DGTerminatorDetector = typename std::conditional<async, 
+          galois::DGTerminator<unsigned int>,
+          galois::DGAccumulator<unsigned int>>::type;
 
-  DGAccumulatorTy& active_vertices;
+  DGTerminatorDetector& active_vertices;
 
-  ConnectedComp(Graph* _graph, DGAccumulatorTy& _dga)
+  ConnectedComp(Graph* _graph, DGTerminatorDetector& _dga)
       : graph(_graph), active_vertices(_dga) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga) {
+  void static go(Graph& _graph) {
     using namespace galois::worklists;
 
     FirstItr_ConnectedComp::go(_graph);
 
     unsigned _num_iterations = 1;
+    DGTerminatorDetector dga;
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -231,22 +238,15 @@ struct ConnectedComp {
                            _graph.get_run_identifier("ConnectedComp").c_str()));
       }
 
-#ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current,
-                  Bitset_comp_current, true>("ConnectedComp");
-#else
-      _graph.sync<writeDestination, readSource, Reduce_min_comp_current,
-                  Bitset_comp_current>("ConnectedComp");
-#endif
+                  Bitset_comp_current, async>("ConnectedComp");
 
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
           (unsigned long)dga.read_local());
       ++_num_iterations;
     } while (
-#ifndef __GALOIS_HET_ASYNC__
-             (_num_iterations < maxIterations) &&
-#endif
+             (async || (_num_iterations < maxIterations)) &&
              dga.reduce(_graph.get_run_identifier()));
 
     galois::runtime::reportStat_Tmax(
@@ -359,11 +359,6 @@ int main(int argc, char** argv) {
   InitializeGraph::go((*hg));
   galois::runtime::getHostBarrier().wait();
 
-#ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> active_vertices;
-#else
-  galois::DGAccumulator<unsigned int> active_vertices;
-#endif
   galois::DGAccumulator<uint64_t> active_vertices64;
 
   for (auto run = 0; run < numRuns; ++run) {
@@ -372,7 +367,11 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    ConnectedComp::go(*hg, active_vertices);
+    if (execution == Async) {
+      ConnectedComp<true>::go(*hg);
+    } else {
+      ConnectedComp<false>::go(*hg);
+    }
     StatTimer_main.stop();
 
     ConnectedCompSanityCheck::go(*hg, active_vertices64);

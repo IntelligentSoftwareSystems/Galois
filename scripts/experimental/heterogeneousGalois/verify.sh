@@ -13,6 +13,8 @@ inputdirname=/net/ohm/export/iss/dist-inputs
 inputname=$2
 extension=gr
 
+option=$3
+
 outputdirname=/net/ohm/export/iss/dist-outputs
 #outputdirname=/workspace/dist-outputs
 
@@ -143,8 +145,8 @@ for partition in 1 2 3 4 5 6; do
     fi
     rm -f output_*.log
 
-    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG
-    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
+    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${option} ${PFLAGS} ${CUTTYPE} -verify" >>$LOG
+    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${option} ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
 
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
     eval "python $checker -t=0.01 $OUTPUT output_${hostname}_0.log &> .output_diff"
@@ -190,6 +192,7 @@ rm -f output_*.log
 echo "---------------------------------------------------------------------------------------"
 echo "Algorithm: " $execname
 echo "Input: " $inputname
+echo "Runtime option: " $option
 echo $pass "passed test cases"
 if [[ $fail == 0 ]] ; then
   echo "Status: SUCCESS"

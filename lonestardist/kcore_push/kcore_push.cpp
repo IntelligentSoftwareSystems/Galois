@@ -27,9 +27,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
-#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
-#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -50,6 +48,15 @@ static cll::opt<unsigned int>
 // required k specification for k-core
 static cll::opt<unsigned int> k_core_num("kcore", cll::desc("KCore value"),
                                          cll::Required);
+
+enum Exec { Sync, Async };
+
+static cll::opt<Exec> execution(
+    "exec",
+    cll::desc("Distributed Execution Model (default value Async):"),
+    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other inits */
@@ -200,24 +207,24 @@ struct KCoreStep2 {
 
 /* Step that determines if a node is dead and updates its neighbors' trim
  * if it is */
+template <bool async>
 struct KCoreStep1 {
   cll::opt<uint32_t>& local_k_core_num;
   Graph* graph;
 
-#ifdef __GALOIS_HET_ASYNC__
-  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
-#else
-  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
-#endif
+  using DGTerminatorDetector = typename std::conditional<async, 
+          galois::DGTerminator<unsigned int>,
+          galois::DGAccumulator<unsigned int>>::type;
 
-  DGAccumulatorTy& active_vertices;
+  DGTerminatorDetector& active_vertices;
 
   KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph,
-             DGAccumulatorTy& _dga)
+             DGTerminatorDetector& _dga)
       : local_k_core_num(_kcore), graph(_graph), active_vertices(_dga) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga) {
+  void static go(Graph& _graph) {
     unsigned iterations = 0;
+    DGTerminatorDetector dga;
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -245,22 +252,15 @@ struct KCoreStep1 {
       // source=destination; not a readAny because any will grab non
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
-#ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeDestination, readSource, Reduce_add_trim,
-                  Bitset_trim, true>("KCore");
-#else
-      _graph.sync<writeDestination, readSource, Reduce_add_trim,
-                  Bitset_trim>("KCore");
-#endif
+                  Bitset_trim, async>("KCore");
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);
 
       iterations++;
     } while (
-#ifndef __GALOIS_HET_ASYNC__
-             (iterations < maxIterations) &&
-#endif
+             (async || (iterations < maxIterations)) &&
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -377,11 +377,6 @@ int main(int argc, char** argv) {
   InitializeGraph1::go((*h_graph));
   galois::runtime::getHostBarrier().wait();
 
-#ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> active_vertices;
-#else
-  galois::DGAccumulator<unsigned int> active_vertices;
-#endif
   galois::DGAccumulator<uint64_t> dga;
 
   for (auto run = 0; run < numRuns; ++run) {
@@ -390,7 +385,11 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    KCoreStep1::go(*h_graph, active_vertices);
+    if (execution == Async) {
+      KCoreStep1<true>::go(*h_graph);
+    } else {
+      KCoreStep1<false>::go(*h_graph);
+    }
     StatTimer_main.stop();
 
     // sanity check

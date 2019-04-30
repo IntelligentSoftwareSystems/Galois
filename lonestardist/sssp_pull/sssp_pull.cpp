@@ -23,9 +23,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
-#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
-#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -47,6 +45,15 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<unsigned long long>
     src_node("startNode", // not uint64_t due to a bug in llvm cl
              cll::desc("ID of the source node"), cll::init(0));
+
+enum Exec { Sync, Async };
+
+static cll::opt<Exec> execution(
+    "exec",
+    cll::desc("Distributed Execution Model (default value Async):"),
+    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -104,22 +111,22 @@ struct InitializeGraph {
   }
 };
 
+template <bool async>
 struct SSSP {
   Graph* graph;
-#ifdef __GALOIS_HET_ASYNC__
-  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
-#else
-  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
-#endif
+  using DGTerminatorDetector = typename std::conditional<async, 
+          galois::DGTerminator<unsigned int>,
+          galois::DGAccumulator<unsigned int>>::type;
 
-  DGAccumulatorTy& active_vertices;
+  DGTerminatorDetector& active_vertices;
 
-  SSSP(Graph* _graph, DGAccumulatorTy& _dga)
+  SSSP(Graph* _graph, DGTerminatorDetector& _dga)
       : graph(_graph), active_vertices(_dga) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga) {
+  void static go(Graph& _graph) {
     unsigned _num_iterations   = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    DGTerminatorDetector dga;
 
     do {
       _graph.set_num_round(_num_iterations);
@@ -142,13 +149,8 @@ struct SSSP {
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
       }
 
-#ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Bitset_dist_current, true>("SSSP");
-#else
-      _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Bitset_dist_current>("SSSP");
-#endif
+                  Bitset_dist_current, async>("SSSP");
 
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
@@ -156,9 +158,7 @@ struct SSSP {
 
       ++_num_iterations;
     } while (
-#ifndef __GALOIS_HET_ASYNC__
-             (_num_iterations < maxIterations) &&
-#endif
+             (async || (_num_iterations < maxIterations)) &&
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -294,11 +294,6 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   // accumulators for use in operators
-#ifdef __GALOIS_HET_ASYNC__
-  galois::DGTerminator<unsigned int> active_vertices;
-#else
-  galois::DGAccumulator<unsigned int> active_vertices;
-#endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint64_t> dg_avge;
   galois::DGReduceMax<uint32_t> m;
@@ -309,7 +304,11 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    SSSP::go(*hg, active_vertices);
+    if (execution == Async) {
+      SSSP<true>::go(*hg);
+    } else {
+      SSSP<false>::go(*hg);
+    }
     StatTimer_main.stop();
 
     // sanity check
