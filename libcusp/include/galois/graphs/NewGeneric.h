@@ -121,59 +121,59 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
   // TODO : user should not need to know about write and read locations,
   // so move this out or hide somehow....
-  virtual bool nothingToSend(unsigned host,
-                             typename base_DistGraph::SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
-                        base_DistGraph::mirrorNodes :
-                        base_DistGraph::masterNodes;
+  //virtual bool nothingToSend(unsigned host,
+  //                           typename base_DistGraph::SyncType syncType,
+  //                           WriteLocation writeLocation,
+  //                           ReadLocation readLocation) {
+  //  auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
+  //                      base_DistGraph::mirrorNodes :
+  //                      base_DistGraph::masterNodes;
 
-    unsigned map = 2;
-    if (syncType == base_DistGraph::syncReduce) {
-      map = 0;
-    } else {
-      map = 1;
-    }
+  //  unsigned map = 2;
+  //  if (syncType == base_DistGraph::syncReduce) {
+  //    map = 0;
+  //  } else {
+  //    map = 1;
+  //  }
 
-    if (graphPartitioner->isCartCut()) {
-      if (sharedNodes[host].size() > 0) {
-        return graphPartitioner->isNotCommunicationPartner(host, map,
-                                 writeLocation, readLocation,
-                                 base_DistGraph::transposed);
-      }
-    } else {
-      return (sharedNodes[host].size() == 0);
-    }
-    return true;
-  }
+  //  if (graphPartitioner->isCartCut()) {
+  //    if (sharedNodes[host].size() > 0) {
+  //      return graphPartitioner->isNotCommunicationPartner(host, map,
+  //                               writeLocation, readLocation,
+  //                               base_DistGraph::transposed);
+  //    }
+  //  } else {
+  //    return (sharedNodes[host].size() == 0);
+  //  }
+  //  return true;
+  //}
 
-  virtual bool nothingToRecv(unsigned host,
-                             typename base_DistGraph::SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
-                        base_DistGraph::masterNodes :
-                        base_DistGraph::mirrorNodes;
+  //virtual bool nothingToRecv(unsigned host,
+  //                           typename base_DistGraph::SyncType syncType,
+  //                           WriteLocation writeLocation,
+  //                           ReadLocation readLocation) {
+  //  auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
+  //                      base_DistGraph::masterNodes :
+  //                      base_DistGraph::mirrorNodes;
 
-    unsigned map = 2;
-    if (syncType == base_DistGraph::syncReduce) {
-      map = 0;
-    } else {
-      map = 1;
-    }
+  //  unsigned map = 2;
+  //  if (syncType == base_DistGraph::syncReduce) {
+  //    map = 0;
+  //  } else {
+  //    map = 1;
+  //  }
 
-    if (graphPartitioner->isCartCut()) {
-      if (sharedNodes[host].size() > 0) {
-        return graphPartitioner->isNotCommunicationPartner(host, map,
-                                 writeLocation, readLocation,
-                                 base_DistGraph::transposed);
-      }
-    } else {
-      return (sharedNodes[host].size() == 0);
-    }
-    return true;
-  }
+  //  if (graphPartitioner->isCartCut()) {
+  //    if (sharedNodes[host].size() > 0) {
+  //      return graphPartitioner->isNotCommunicationPartner(host, map,
+  //                               writeLocation, readLocation,
+  //                               base_DistGraph::transposed);
+  //    }
+  //  } else {
+  //    return (sharedNodes[host].size() == 0);
+  //  }
+  //  return true;
+  //}
 
   /**
    * Constructor
@@ -673,7 +673,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         // note the +1 on evil phase; load messages send using a different
         // phase to avoid conflicts
-        net.sendTagged(h, galois::runtime::evilPhase + 1, b);
+        net.sendTagged(h, base_DistGraph::evilPhasePlus1(), b);
       }
     }
     sendTimer.stop();
@@ -693,13 +693,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                      std::vector<uint64_t>& edgeLoads,
                      galois::DynamicBitSet& loadsClear) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-    decltype(net.recieveTagged(galois::runtime::evilPhase + 1, nullptr)) p;
+    decltype(net.recieveTagged(base_DistGraph::evilPhasePlus1(), nullptr)) p;
 
     galois::StatTimer recvTimer("Phase0AsyncRecvLoadTime", GRNAME);
     recvTimer.start();
     do {
       // note the +1
-      p = net.recieveTagged(galois::runtime::evilPhase + 1, nullptr);
+      p = net.recieveTagged(base_DistGraph::evilPhasePlus1(), nullptr);
 
       if (p) {
         unsigned messageType = (unsigned)-1;
@@ -976,7 +976,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::SendBuffer b;
         galois::runtime::gSerialize(b, 3u);
         bytesSent += b.size();
-        net.sendTagged(h, galois::runtime::evilPhase + phase, b);
+        // assumes phase is 0 or 1
+        if (phase == 1) {
+          net.sendTagged(h, base_DistGraph::evilPhasePlus1(), b);
+        } else if (phase == 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, b);
+        } else {
+          GALOIS_DIE("phase in send all clears should be 0 or 1");
+        }
       }
     }
     allClearTimer.stop();
@@ -2997,29 +3004,30 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   /**
    * Reset bitset
    */
-  void reset_bitset(typename base_DistGraph::SyncType syncType,
-                    void (*bitset_reset_range)(size_t, size_t)) const {
-    // layout: masters.... outgoing mirrors.... incoming mirrors
-    // note the range for bitset reset range is inclusive
-    if (base_DistGraph::numOwned > 0) {
-      if (syncType == base_DistGraph::syncBroadcast) { // reset masters
-        bitset_reset_range(0, base_DistGraph::numOwned - 1);
-      } else {
-        assert(syncType == base_DistGraph::syncReduce);
-        // mirrors occur after masters
-        if (base_DistGraph::numOwned < numNodes) {
-          bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
-        }
-      }
-    } else { // all things are mirrors
-      // only need to reset if reduce
-      if (syncType == base_DistGraph::syncReduce) {
-        if (numNodes > 0) {
-          bitset_reset_range(0, numNodes - 1);
-        }
-      }
-    }
-  }
+  // TODO
+  //void reset_bitset(typename base_DistGraph::SyncType syncType,
+  //                  void (*bitset_reset_range)(size_t, size_t)) const {
+  //  // layout: masters.... outgoing mirrors.... incoming mirrors
+  //  // note the range for bitset reset range is inclusive
+  //  if (base_DistGraph::numOwned > 0) {
+  //    if (syncType == base_DistGraph::syncBroadcast) { // reset masters
+  //      bitset_reset_range(0, base_DistGraph::numOwned - 1);
+  //    } else {
+  //      assert(syncType == base_DistGraph::syncReduce);
+  //      // mirrors occur after masters
+  //      if (base_DistGraph::numOwned < numNodes) {
+  //        bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
+  //      }
+  //    }
+  //  } else { // all things are mirrors
+  //    // only need to reset if reduce
+  //    if (syncType == base_DistGraph::syncReduce) {
+  //      if (numNodes > 0) {
+  //        bitset_reset_range(0, numNodes - 1);
+  //      }
+  //    }
+  //  }
+  //}
 
   std::vector<std::pair<uint32_t, uint32_t>> getMirrorRanges() const {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;

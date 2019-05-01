@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <fstream>
 
+#include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
@@ -178,6 +179,18 @@ protected:
     if (galois::runtime::evilPhase >=
         std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
+    }
+  }
+
+  //! Returns evilPhase + 1, handling loop around as necessary
+  unsigned inline evilPhasePlus1() {
+    unsigned result = galois::runtime::evilPhase + 1;
+
+    // limit defined by MPI or LCI
+    if (result >= std::numeric_limits<int16_t>::max()) {
+      return 1;
+    } else {
+      return result;
     }
   }
 
@@ -441,7 +454,7 @@ public:
    * @param numHosts total number of hosts in the currently executing program
    */
   DistGraph(unsigned host, unsigned numHosts)
-      : round(false), transposed(false), id(host), numHosts(numHosts) {
+      : transposed(false), id(host), numHosts(numHosts) {
     mirrorNodes.resize(numHosts);
     numGlobalNodes = 0;
     numGlobalEdges = 0;
