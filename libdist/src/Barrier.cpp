@@ -52,6 +52,11 @@ public:
   virtual void wait() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
+    if (galois::runtime::evilPhase == 0) {
+      galois::gWarn("evilPhase is 0, implying loop-around or no use: fence "
+                    "may not work correctly!");
+    }
+
     for (unsigned h = 0; h < net.Num; ++h) {
       if (h == net.ID)
         continue;
