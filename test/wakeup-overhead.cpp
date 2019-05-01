@@ -89,6 +89,7 @@ std::atomic<int> EXIT;
 #include <chrono>
 
 int main(int argc, char* argv[]) {
+  galois::SharedMemSys Galois_runtime;
   LonestarStart(argc, argv, 0, 0, 0);
   galois::setActiveThreads(std::max(galois::getActiveThreads(), 2U));
 

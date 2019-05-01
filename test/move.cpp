@@ -88,6 +88,7 @@ void testContainerC(T&& x, U&& y) {
 }
 
 int main() {
+  galois::SharedMemSys Galois_runtime;
   // test(galois::FixedSizeBag<MoveOnly>());
   // test(galois::ConcurrentFixedSizeBag<MoveOnly>());
   // test(galois::FixedSizeRing<MoveOnly>());
