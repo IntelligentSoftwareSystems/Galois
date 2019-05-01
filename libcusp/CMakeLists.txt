@@ -1,8 +1,11 @@
-add_library(galois_cusp SHARED
+set(sources
+  src/DistributedGraph.cpp
   $<TARGET_OBJECTS:galois_shmem_obj>
   $<TARGET_OBJECTS:galois_dist_obj>
   $<TARGET_OBJECTS:gllvm_obj>
 )
+
+add_library(galois_cusp STATIC ${sources})
 
 target_link_libraries(galois_cusp galois_shmem galois_dist gllvm)
 target_link_libraries(galois_cusp ${MPI_CXX_LIBRARIES})
