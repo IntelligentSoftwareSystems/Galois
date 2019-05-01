@@ -1,5 +1,4 @@
 set(sources
-  src/DistributedGraph.cpp
   $<TARGET_OBJECTS:galois_shmem_obj>
   $<TARGET_OBJECTS:galois_dist_obj>
   $<TARGET_OBJECTS:gllvm_obj>

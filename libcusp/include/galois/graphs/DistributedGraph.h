@@ -48,8 +48,8 @@
 //#include <boost/serialization/vector.hpp>
 //#include <boost/serialization/unordered_map.hpp>
 
-namespace cll = llvm::cl;
-
+namespace galois {
+namespace graphs {
 /**
  * Enums specifying how masters are to be distributed among hosts.
  */
@@ -61,31 +61,6 @@ enum MASTERS_DISTRIBUTION {
   //! balance nodes and edges
   BALANCED_MASTERS_AND_EDGES
 };
-
-//! Specifies how to distribute masters among hosts
-extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> nodeWeightOfMaster;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> edgeWeightOfMaster;
-//! Specifies how much weight to give to a node when
-extern cll::opt<uint32_t> nodeAlphaRanges;
-//! Specifies number of threads doing I/O
-extern cll::opt<unsigned> numFileThreads;
-//! Specifies the size of the buffer used for
-extern cll::opt<unsigned> edgePartitionSendBufSize;
-//! Number of rounds to split master assignment phase in in CuSP
-//! @todo move this to CuSP source and not here
-extern cll::opt<uint32_t> stateRounds;
-//! If true, CuSP will use asynchronous synchronization for master assignment
-//! phase (phase0)
-extern cll::opt<bool> cuspAsync;
-//! If true, CuSP activates a barrier before the edge inspection sends.
-//! @todo move this to CuSP source and not here
-extern cll::opt<bool> inspectionBarrier;
-
-namespace galois {
-namespace graphs {
 
 /**
  * Base DistGraph class that all distributed graphs extend from.
@@ -270,16 +245,17 @@ private:
   void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
                                    uint64_t numNodes_to_divide,
                                    const std::vector<unsigned>& scalefactor,
+                                   uint32_t edgeWeight,
                                    unsigned DecomposeFactor = 1) {
-    if (edgeWeightOfMaster == 0) {
-      edgeWeightOfMaster = 1;
+    if (edgeWeight == 0) {
+      edgeWeight = 1;
     }
 
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     gid2host.resize(numHosts * DecomposeFactor);
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d * numHosts),
+      auto r = g.divideByNode(0, edgeWeight, (id + d * numHosts),
                               numHosts * DecomposeFactor, scalefactor);
       gid2host[id + d * numHosts].first  = *(r.first.first);
       gid2host[id + d * numHosts].second = *(r.first.second);
@@ -346,17 +322,18 @@ private:
    */
   void computeMastersBalancedNodesAndEdges(
       galois::graphs::OfflineGraph& g, uint64_t numNodes_to_divide,
-      const std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
-    if (nodeWeightOfMaster == 0) {
-      nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
+      const std::vector<unsigned>& scalefactor, uint32_t nodeWeight,
+      uint32_t edgeWeight, unsigned DecomposeFactor = 1) {
+    if (nodeWeight == 0) {
+      nodeWeight = g.sizeEdges() / g.size(); // average degree
+    }
+    if (edgeWeight == 0) {
+      edgeWeight = 1;
     }
 
-    if (edgeWeightOfMaster == 0) {
-      edgeWeightOfMaster = 1;
-    }
     auto& net = galois::runtime::getSystemNetworkInterface();
     gid2host.resize(numHosts);
-    auto r = g.divideByNode(nodeWeightOfMaster, edgeWeightOfMaster, id,
+    auto r = g.divideByNode(nodeWeight, edgeWeight, id,
                             numHosts, scalefactor);
     gid2host[id].first  = *r.first.first;
     gid2host[id].second = *r.first.second;
@@ -391,14 +368,14 @@ protected:
    * to get the masters for
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
-   * @param isBipartite Specifies if the graph is a bipartite graph
    * @param DecomposeFactor Specifies how decomposed the blocking
    * of nodes should be. For example, a factor of 2 will make 2 blocks
    * out of 1 block had the decompose factor been set to 1.
    */
-  uint64_t computeMasters(galois::graphs::OfflineGraph& g,
+  uint64_t computeMasters(MASTERS_DISTRIBUTION masters_distribution,
+                          galois::graphs::OfflineGraph& g,
                           const std::vector<unsigned>& scalefactor,
-                          bool isBipartite         = false,
+                          uint32_t nodeWeight=0, uint32_t edgeWeight=0,
                           unsigned DecomposeFactor = 1) {
     galois::Timer timer;
     timer.start();
@@ -416,12 +393,13 @@ protected:
       break;
     case BALANCED_MASTERS_AND_EDGES:
       computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor,
+                                          nodeWeight, edgeWeight,
                                           DecomposeFactor);
       break;
     case BALANCED_EDGES_OF_MASTERS:
     default:
       computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor,
-                                  DecomposeFactor);
+                                  edgeWeight, DecomposeFactor);
       break;
     }
 
@@ -458,11 +436,12 @@ public:
     mirrorNodes.resize(numHosts);
     numGlobalNodes = 0;
     numGlobalEdges = 0;
+
     // report edge buffer size
-    if (host == 0) {
-      galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
-                                         (unsigned)edgePartitionSendBufSize);
-    }
+    //if (host == 0) {
+    //  galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
+    //                                     (unsigned)edgePartitionSendBufSize);
+    //}
   }
 
 protected:
@@ -631,7 +610,7 @@ protected:
       galois::gDebug("Manually det. master thread ranges");
       masterRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, beginMaster,
-          beginMaster + numOwned, nodeAlphaRanges);
+          beginMaster + numOwned, 0);
     }
   }
 
@@ -657,7 +636,7 @@ protected:
       galois::gDebug("Manually det. with edges thread ranges");
       withEdgeRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, 0, numNodesWithEdges,
-          nodeAlphaRanges);
+          0);
     }
   }
 

@@ -3,9 +3,7 @@
 
 #include "galois/DistGalois.h"
 #include "galois/graphs/DistributedGraph.h"
-#include "galois/graphs/DistributedGraph.h"
 #include "galois/graphs/NewGeneric.h"
-#include "galois/graphs/Generic.h"
 #include "galois/graphs/GenericPartitioners.h"
 
 namespace galois {
@@ -21,10 +19,15 @@ namespace galois {
    * TODO @todo look into making void node data work in LargeArray for D-Galois;
    * void specialization. For now, use char as default
    */
-  template<typename PartitionPolicy, typename NodeData=char, typename EdgeData=void>
+  template<typename PartitionPolicy, typename NodeData=char,
+           typename EdgeData=void>
   galois::graphs::DistGraph<NodeData, EdgeData>* cuspPartitionGraph(
-        std::string graphFile, CUSP_GRAPH_TYPE inputType, CUSP_GRAPH_TYPE outputType,
-        bool symmetricGraph=false, std::string transposeGraphFile=""
+        std::string graphFile, CUSP_GRAPH_TYPE inputType,
+        CUSP_GRAPH_TYPE outputType, bool symmetricGraph=false,
+        std::string transposeGraphFile="",
+        bool cuspAsync=true, uint32_t cuspStateRounds=100,
+        galois::graphs::MASTERS_DISTRIBUTION readPolicy=galois::graphs::BALANCED_EDGES_OF_MASTERS,
+        uint32_t nodeWeight=0, uint32_t edgeWeight=0
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     using DistGraphConstructor = galois::graphs::NewDistGraphGeneric<NodeData,
@@ -62,13 +65,15 @@ namespace galois {
         GALOIS_DIE("Invalid input graph type specified in CuSP partitioner");
       }
 
-      return new DistGraphConstructor(inputToUse, net.ID, net.Num, useTranspose,
-                                      false, localGraphName);
+      return new DistGraphConstructor(inputToUse, net.ID, net.Num, cuspAsync,
+                                      cuspStateRounds, useTranspose, readPolicy,
+                                      nodeWeight, edgeWeight);
     } else {
       // symmetric graph path: assume the passed in graphFile is a symmetric
       // graph; output is also symmetric
-      return new DistGraphConstructor(graphFile, net.ID, net.Num, false, false,
-                                      localGraphName);
+      return new DistGraphConstructor(graphFile, net.ID, net.Num, cuspAsync,
+                                      cuspStateRounds, false, readPolicy,
+                                      nodeWeight, edgeWeight);
     }
   }
 } // end namespace galois

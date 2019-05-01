@@ -43,6 +43,8 @@ namespace graphs {
  */
 template <typename NodeTy, typename EdgeTy, typename Partitioner>
 class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
+  //! size used to buffer edge sends during partitioning
+  constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME = "dGraph_Generic";
   Partitioner* graphPartitioner;
 
@@ -179,9 +181,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * Constructor
    */
   NewDistGraphGeneric(const std::string& filename, unsigned host,
-                   unsigned _numHosts, bool transpose = false,
-                   bool readFromFile = false,
-                   std::string localGraphFileName = "local_graph")
+             unsigned _numHosts, bool cuspAsync=true,
+             uint32_t stateRounds=100, bool transpose=false,
+             galois::graphs::MASTERS_DISTRIBUTION md=BALANCED_EDGES_OF_MASTERS,
+             uint32_t nodeWeight=0, uint32_t edgeWeight=0,
+             bool readFromFile=false,
+             std::string localGraphFileName="local_graph")
       : base_DistGraph(host, _numHosts) {
     galois::runtime::reportParam("dGraph", "GenericPartitioner", "0");
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
@@ -202,7 +207,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::numGlobalEdges = g.sizeEdges();
     std::vector<unsigned> dummy;
     // not actually getting masters, but getting assigned readers for nodes
-    base_DistGraph::computeMasters(g, dummy);
+    base_DistGraph::computeMasters(md, g, dummy, nodeWeight, edgeWeight);
 
     graphPartitioner = new Partitioner(host, _numHosts,
                                        base_DistGraph::numGlobalNodes,
@@ -247,7 +252,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::StatTimer phase0Timer("Phase0", GRNAME);
       galois::gPrint("[", base_DistGraph::id, "] Starting master assignment.\n");
       phase0Timer.start();
-      phase0(bufGraph, cuspAsync);
+      phase0(bufGraph, cuspAsync, stateRounds);
       phase0Timer.stop();
       galois::gPrint("[", base_DistGraph::id, "] Master assignment complete.\n");
     }
@@ -1287,7 +1292,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * assignments BSP style or asynchronous style. Note regardless of which
    * is chosen there is a barrier at the end of master assignment.
    */
-  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph, bool async) {
+  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph, bool async,
+              const uint32_t stateRounds) {
     galois::DynamicBitSet ghosts;
     galois::gstl::Vector<galois::gstl::Vector<uint32_t>> syncNodes; // masterNodes
     syncNodes.resize(base_DistGraph::numHosts);
@@ -1767,9 +1773,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         " seconds to read ", allBytesRead, " bytes (",
         allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
 
-    if (inspectionBarrier) {
-      galois::runtime::getHostBarrier().wait();
-    }
+    // old inspection barrier
+    //galois::runtime::getHostBarrier().wait();
+
     sendInspectionData(numOutgoingEdges, hasIncomingEdge, hostHasOutgoing);
 
     // setup a single hasIncomingEdge bitvector
@@ -3001,34 +3007,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
  public:
-  /**
-   * Reset bitset
-   */
-  // TODO
-  //void reset_bitset(typename base_DistGraph::SyncType syncType,
-  //                  void (*bitset_reset_range)(size_t, size_t)) const {
-  //  // layout: masters.... outgoing mirrors.... incoming mirrors
-  //  // note the range for bitset reset range is inclusive
-  //  if (base_DistGraph::numOwned > 0) {
-  //    if (syncType == base_DistGraph::syncBroadcast) { // reset masters
-  //      bitset_reset_range(0, base_DistGraph::numOwned - 1);
-  //    } else {
-  //      assert(syncType == base_DistGraph::syncReduce);
-  //      // mirrors occur after masters
-  //      if (base_DistGraph::numOwned < numNodes) {
-  //        bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
-  //      }
-  //    }
-  //  } else { // all things are mirrors
-  //    // only need to reset if reduce
-  //    if (syncType == base_DistGraph::syncReduce) {
-  //      if (numNodes > 0) {
-  //        bitset_reset_range(0, numNodes - 1);
-  //      }
-  //    }
-  //  }
-  //}
-
   std::vector<std::pair<uint32_t, uint32_t>> getMirrorRanges() const {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;
     // order of nodes locally is masters, outgoing mirrors, incoming mirrors,
