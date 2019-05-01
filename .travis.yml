@@ -167,6 +167,21 @@ matrix:
             - boost1.67
             - libeigen3-dev
     - env:
+        - CLANG_VER=8
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-8
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-8
+            - gcc-8
+            - g++-8
+            - cmake3
+            - boost1.67
+            - libeigen3-dev
+    - env:
         - CLANG_VER=7
         - BUILD_TYPE=Debug
       addons:
