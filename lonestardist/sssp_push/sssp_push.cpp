@@ -222,8 +222,6 @@ struct SSSP {
       active_vertices(_dga), work_edges(_work_edges) {}
 
   void static go(Graph& _graph) {
-    using namespace galois::worklists;
-
     FirstItr_SSSP::go(_graph);
 
     unsigned _num_iterations = 1;
@@ -283,7 +281,7 @@ struct SSSP {
 
       galois::runtime::reportStat_Tsum(
           "SSSP", "NumWorkItems_" + (_graph.get_run_identifier()),
-          (unsigned long)work_edges.reduce());
+          (unsigned long)work_edges.read_local());
       ++_num_iterations;
     } while (
              (async || (_num_iterations < maxIterations)) &&
