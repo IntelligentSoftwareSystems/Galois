@@ -30,9 +30,7 @@
 #include <fstream>
 
 #include "galois/runtime/GlobalObj.h"
-#include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
-#include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/SyncStructures.h"
 #include "galois/runtime/DataCommMode.h"
 #include "galois/DynamicBitset.h"
