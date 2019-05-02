@@ -2,8 +2,7 @@ set(sources
         src/cuda_device.cpp
         src/SyncStructures.cpp
         src/GlobalObj.cpp
-        src/DistributedGraph.cpp
-        src/DistributedGraphLoader.cpp
+        src/GluonSubstrate.cpp
 )
 add_library(galois_gluon STATIC ${sources})
 add_library(galois_gluon_async STATIC ${sources})
