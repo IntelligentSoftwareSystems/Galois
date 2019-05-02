@@ -11,9 +11,11 @@ include_directories(BEFORE
 add_library(lonestar STATIC src/BoilerPlate.cpp)
 target_include_directories(lonestar PUBLIC 
   ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libgalois/experimental/include
+  ${CMAKE_SOURCE_DIR}/bliss/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(lonestar galois_shmem gllvm)
+target_link_libraries(lonestar galois_shmem gllvm bliss)
 
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality) 
@@ -35,3 +37,10 @@ add_subdirectory(surveypropagation)
 add_subdirectory(triangles)
 add_subdirectory(motifcounting)
 add_subdirectory(tutorial_examples)
+add_subdirectory(fsm)
+add_subdirectory(fsm2)
+add_subdirectory(motif)
+add_subdirectory(kcl)
+add_subdirectory(kcl2)
+add_subdirectory(tc)
+add_subdirectory(tc2)

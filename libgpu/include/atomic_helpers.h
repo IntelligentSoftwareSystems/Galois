@@ -1,5 +1,24 @@
 #pragma once
 
+// TODO: re-implement all these using atomicCAS()
+
+__device__ static double atomicTestAdd(double* address, double val) {
+#if __CUDA_ARCH__ >= 600
+  return (val == 0.0) ? *address : atomicAdd(address, val);
+#else
+  unsigned long long int* address_ull = (unsigned long long int*)address;
+  unsigned long long int old = *address_ull;
+  unsigned long long int assumed;
+  do {
+    assumed = old;
+    double value = val + __longlong_as_double(assumed);
+    unsigned long long int value_ull = __double_as_longlong(value);
+    old = atomicCAS(address_ull, assumed, value_ull);
+  } while (assumed != old);
+  return __longlong_as_double(assumed);
+#endif
+}
+
 __device__ static float atomicMax(float* address, float val) {
   int* address_as_i = (int*)address;
   int val_as_i      = __float_as_int(val);

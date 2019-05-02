@@ -162,7 +162,7 @@ Please refer to the manual for details on stats.
 Running Distributed Galois
 ---------
 
-Please refer to `dist_apps/README.md` for more details on
+Please refer to `lonestardist/README.md` for more details on
 running distributed benchmarks.
 
 Documentation
@@ -189,8 +189,8 @@ Source-Tree Organization
 - `libgalois` contains the source code for the shared-memory Galois library, e.g., runtime, graphs, worklists, etc. 
 - `lonestar` contains the Lonestar benchmark applications and tutorial examples for Galois
 - `libdist` contains the source code for the distributed-memory and heterogeneous Galois library
-- `dist_apps` contains the source code for the distributed-memory and heterogeneous
-  benchmark applications. Please refer to `dist_apps/README.md` for instructions on
+- `lonestardist` contains the source code for the distributed-memory and heterogeneous
+  benchmark applications. Please refer to `lonestardist/README.md` for instructions on
   building and running these apps. 
 - `tools` contains various helper programs such as graph-converter to convert
   between graph file formats and graph-stats to print graph properties

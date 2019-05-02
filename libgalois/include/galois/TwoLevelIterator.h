@@ -534,9 +534,11 @@ typename ChooseTwoLevelIterator<Outer, typename InnerBegFn::result_type,
                                 InnerBegFn, InnerEndFn>::type
 make_two_level_begin(Outer beg, Outer end, InnerBegFn innerBegFn,
                      InnerEndFn innerEndFn) {
+#ifndef NDEBUG
   const bool V = std::is_same<typename InnerBegFn::result_type,
                               typename InnerEndFn::result_type>::value;
   assert(V);
+#endif
 
   typedef typename InnerBegFn::result_type Inner;
   typedef typename ChooseTwoLevelIterator<Outer, Inner, InnerBegFn,

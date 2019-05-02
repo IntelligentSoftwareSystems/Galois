@@ -1,0 +1,1 @@
+app(tc tc.cpp)

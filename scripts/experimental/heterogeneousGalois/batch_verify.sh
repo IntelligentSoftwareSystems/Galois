@@ -8,6 +8,7 @@ EXECS=( "bfs_push" "kcore_push" "cc_push" "sssp_push" "pagerank_pull" )
 
 INPUTS=( "rmat25" "twitter-WWW10-component" )
 INPUTS=( "rmat15" "rmat20" "rmat24" "road-USA" )
+INPUTS=( "rmat15" "rmat20" )
 INPUTS=( "rmat20" )
 INPUTS=( "rmat15" )
 
@@ -18,7 +19,9 @@ for input in "${INPUTS[@]}"
 do
   for EXEC in "${EXECS[@]}"
   do
-    $current_dir/verify.sh ${EXEC} ${input}
+    $current_dir/verify.sh ${EXEC} ${input} "--exec=Sync"
+    $current_dir/verify.sh ${EXEC} ${input} "--exec=Async"
+    rm -f $LOG
   done
 done
 
