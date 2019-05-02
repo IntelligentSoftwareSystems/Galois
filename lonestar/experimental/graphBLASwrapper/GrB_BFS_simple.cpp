@@ -1,5 +1,7 @@
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
+#include "galois/LargeArray.h"
+#include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -8,8 +10,9 @@
 
 namespace cll = llvm::cl;
 
+// TODO it should be sparse vector.
 template <typename T>
-using GrB_Vector = galois::gstl::Vector<T>;
+using GrB_Vector = galois::LargeArray<T>;
 
 using GrB_Matrix =
     galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_no_lockable<true>::type;
@@ -66,7 +69,7 @@ template <typename T, typename K>
 void GrB_reduce (T *c,
         const void *accum,
         const void *monoid, // assume LOR
-        const GrB_Vector<K> u,
+        const GrB_Vector<K> &u,
         const void *desc) {
     galois::do_all(galois::iterate(0ul, u.size()),
             [&] (uint64_t idx) {
@@ -90,18 +93,21 @@ void GrB_reduce (T *c,
  */
 template <typename T, typename K>
 void GrB_vxm (GrB_Vector<T> &w,
-        const GrB_Vector<K> &mask,
+        GrB_Vector<K> &mask,
         const void *accum, // assume NULL
         const void *semiring, // assume LOR_LAND_BOOL
-        const GrB_Vector<T> u,
+        const GrB_Vector<T> &u,
         GrB_Matrix &A,
         const void *desc) { // assume original, original, complemented v, replace
+    GrB_Vector<T> tmpV;
+    tmpV.allocateInterleaved(u.size());
+    std::copy(u.begin(), u.end(), tmpV.begin());
     galois::do_all(galois::iterate(0ul, w.size()),
             [&] (uint32_t idx) {
                 if (!mask[idx]) {
                     for (auto e : A.edges(idx)) {
                         auto jdx = A.getEdgeDst(e);
-                        w[idx] = (w[idx] || (u[jdx] && 1));
+                        w[idx] = (w[idx] || (tmpV[jdx] && 1));
                     }
                 } else {
                     w[idx] = 0;
@@ -114,8 +120,7 @@ void GrB_vxm (GrB_Vector<T> &w,
 template <typename T>
 void GrB_Vector_new (GrB_Vector<T> *v,
                     int type, uint64_t size) {
-    v->clear();
-    v->resize(size);
+    v->allocateInterleaved(size);
 }
 
 template <typename T>
@@ -142,6 +147,9 @@ int main(int argc, char** argv) {
     std::cout << " Input graph is : " << filename << "\n";
     std::cout << " The number of active threads is : " << numThreads << "\n";
 
+    galois::StatTimer bfsTimer("BFStimer");
+    bfsTimer.start();
+
     GrB_Vector_new(&v, 0, graph.size());
     GrB_Vector_new(&q, 0, graph.size());
 
@@ -150,9 +158,7 @@ int main(int argc, char** argv) {
 
     // Start Node
     q[startNode] = true;
-
     uint64_t level = 1;
-
     for (int64_t level = 1; level <= graph.size(); level ++) {
         // v<q> = level
         GrB_assign<uint64_t>(v, q, -1, level, (uint64_t *) NULL, graph.size(), -1);
@@ -166,6 +172,8 @@ int main(int argc, char** argv) {
         // q`[!v] = `q or.and A
         GrB_vxm (q, v, NULL, NULL, q, graph, NULL);
     }
+
+    bfsTimer.stop();
 
     GrB_Dump_Vector(v);
 
