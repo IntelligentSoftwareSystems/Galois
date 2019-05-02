@@ -19,7 +19,8 @@ void genGraph(MGraph &mg, Graph &g) {
 		g.fixEndEdge(i, row_end);
 		for (int offset = row_begin; offset < row_end; offset ++) {
 			#ifdef ENABLE_LABEL
-				g.constructEdge(offset, mg.get_dest(offset), mg.get_weight(offset));
+				//g.constructEdge(offset, mg.get_dest(offset), mg.get_weight(offset));
+				g.constructEdge(offset, mg.get_dest(offset), 1); // do not consider edge labels currently
 			#else
 				g.constructEdge(offset, mg.get_dest(offset), 0);
 			#endif

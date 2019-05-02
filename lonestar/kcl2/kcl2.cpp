@@ -41,8 +41,8 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));

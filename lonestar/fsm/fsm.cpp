@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #define ENABLE_LABEL
-//#define USE_DOMAIN
+#define USE_DOMAIN
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using BFS traversal";
@@ -41,8 +41,8 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
@@ -99,7 +99,7 @@ typedef LocalQpMapFreq LocalQpMap;
 typedef LocalCgMapFreq LocalCgMap;
 #endif
 
-void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
+int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
@@ -145,8 +145,8 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	LocalCgMap cg_localmap; // canonical pattern local map for each thread
 	galois::do_all(
 		galois::iterate(qp_map),
-		[&](std::pair<Quick_Pattern, SupportType> qp) {
-			Quick_Pattern subgraph = qp.first;
+		[&](std::pair<QuickPattern, SupportType> qp) {
+			QuickPattern subgraph = qp.first;
 			SupportType support = qp.second;
 			miner.canonical_aggregate_each(subgraph, support, *(cg_localmap.getLocal()));
 		},
@@ -184,6 +184,7 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	total_num += num_frequent_patterns;
 	std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
 		<< " frequent patterns: " << num_frequent_patterns << "\n";
+	return num_frequent_patterns;
 }
 
 void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
@@ -212,7 +213,11 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 	CgMap cg_map; // canonical graph map
-	aggregator(miner, queue, cg_map);
+	int num_freq_patterns = aggregator(miner, queue, cg_map);
+	if(num_freq_patterns == 0) {
+		std::cout << "No frequent pattern found\n";
+		return;
+	}
 	//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 	//	<< std::distance(queue.begin(), queue.end()) << "\n";
 	if(show) miner.printout_agg(cg_map);
@@ -240,10 +245,11 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
-		aggregator(miner, queue, cg_map);
+		num_freq_patterns = aggregator(miner, queue, cg_map);
 		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 		if(show) miner.printout_agg(cg_map);
+		if(num_freq_patterns == 0) break;
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
@@ -287,7 +293,7 @@ int main(int argc, char** argv) {
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 	//print_graph(graph);
 	unsigned sizeof_emb = 2 * sizeof(ElementType);
-	Miner miner(true, sizeof_emb, &graph);
+	Miner miner(&graph, sizeof_emb);
 	miner.set_threshold(minsup);
 	//galois::reportPageAlloc("MeminfoPre");
 	galois::StatTimer Tcomp("Compute");

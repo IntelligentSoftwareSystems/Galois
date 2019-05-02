@@ -71,8 +71,8 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &q
 			GNode dst = graph.getEdgeDst(e);
 			auto elabel = graph.getEdgeData(e);
 			auto& dst_label = graph.getData(dst);
-			//if (src_label <= dst_label) { // when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
-			if (src_label < dst_label || (src_label == dst_label && src < dst)) {
+			if (src_label <= dst_label) { // when src_label == dst_label (the edge will be added twice since the input graph is symmetrized)
+			//if (src_label < dst_label || (src_label == dst_label && src < dst)) {
 				if (pattern_map.count(src_label) == 0 || pattern_map[src_label].count(elabel) == 0 || pattern_map[src_label][elabel].count(dst_label) == 0)
 					single_edge_dfscodes++;
 				LabEdge *eptr = &(miner.edge_list[*e]);

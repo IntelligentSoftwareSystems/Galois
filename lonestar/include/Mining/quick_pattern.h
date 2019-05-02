@@ -10,17 +10,17 @@
 
 #include "type.h"
 
-class Quick_Pattern {
-friend std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern);
+class QuickPattern {
+friend std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern);
 public:
-	Quick_Pattern() { }
-	Quick_Pattern(unsigned subgraph_size) {
+	QuickPattern() { }
+	QuickPattern(unsigned subgraph_size) {
 		size = subgraph_size/ sizeof(ElementType);
 		elements = new ElementType[size];
 	}
-	~Quick_Pattern() {}
+	~QuickPattern() {}
 	//operator for map
-	bool operator==(const Quick_Pattern& other) const {
+	bool operator==(const QuickPattern& other) const {
 		//compare edges
 		assert(size == other.size);
 		for (unsigned i = 0; i < size; ++i) {
@@ -68,7 +68,7 @@ private:
 	ElementType* elements;
 };
 
-std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern) {
+std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern) {
 	if(quick_pattern.get_size() == 0) {
 		strm << "(empty)";
 		return strm;
@@ -83,8 +83,8 @@ std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_patter
 
 namespace std {
 	template<>
-	struct hash<Quick_Pattern> {
-		std::size_t operator()(const Quick_Pattern& qp) const {
+	struct hash<QuickPattern> {
+		std::size_t operator()(const QuickPattern& qp) const {
 			return std::hash<int>()(qp.get_hash());
 		}
 	};

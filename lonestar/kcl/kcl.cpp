@@ -45,8 +45,8 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
 	} else { printf("Unkown file format\n"); exit(1); }
 	//print_graph(graph);
 	unsigned sizeof_embedding = 2 * sizeof(SimpleElement);
-	Miner miner(false, sizeof_embedding, &graph);
+	Miner miner(&graph, sizeof_embedding);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 	galois::StatTimer Tcomp("Compute");

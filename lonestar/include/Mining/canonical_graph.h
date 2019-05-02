@@ -7,15 +7,15 @@
 #define CORE_CANONICAL_GRAPH_HPP_
 #include "type.h"
 
-class Canonical_Graph {
-	friend std::ostream & operator<<(std::ostream & strm, const Canonical_Graph& cg);
+class CanonicalGraph {
+	friend std::ostream & operator<<(std::ostream & strm, const CanonicalGraph& cg);
 public:
-	Canonical_Graph() : number_of_vertices(0), hash_value(0) {}
-	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed) {
+	CanonicalGraph() : number_of_vertices(0), hash_value(0) {}
+	CanonicalGraph(bliss::AbstractGraph* ag, bool is_directed) {
 		construct_cg(ag, is_directed);
 	}
-	~Canonical_Graph() {}
-	int cmp(const Canonical_Graph& other_cg) const {
+	~CanonicalGraph() {}
+	int cmp(const CanonicalGraph& other_cg) const {
 		//compare the numbers of vertices
 		if(get_number_vertices() < other_cg.get_number_vertices()) return -1;
 		if(get_number_vertices() > other_cg.get_number_vertices()) return 1;
@@ -35,7 +35,7 @@ public:
 	inline unsigned int get_hash() const { return hash_value; }
 	inline int get_number_vertices() const { return number_of_vertices; }
 	//operator for map
-	inline bool operator==(const Canonical_Graph& other) const { return cmp(other) == 0; }
+	inline bool operator==(const CanonicalGraph& other) const { return cmp(other) == 0; }
 	inline Embedding& get_embedding() { return embedding; }
 	inline Embedding get_embedding_const() const { return embedding; }
 	inline void set_number_vertices(int num_vertices) { number_of_vertices = num_vertices; }
@@ -156,15 +156,15 @@ private:
 	}
 };
 
-std::ostream & operator<<(std::ostream & strm, const Canonical_Graph& cg) {
+std::ostream & operator<<(std::ostream & strm, const CanonicalGraph& cg) {
 	strm << "{" << cg.get_embedding_const() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
 	return strm;
 }
 
 namespace std {
 template<>
-struct hash<Canonical_Graph> {
-	std::size_t operator()(const Canonical_Graph& cg) const {
+struct hash<CanonicalGraph> {
+	std::size_t operator()(const CanonicalGraph& cg) const {
 		//simple hash
 		return std::hash<int>()(cg.get_hash());
 	}

@@ -27,26 +27,14 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <utility>
-#include <vector>
-#include <algorithm>
-#include <iostream>
-#include <fstream>
 #define DEBUG 0
 
-const char* name = "Motif";
-const char* desc = "Counts the motifs in a graph";
+const char* name = "Motif Counting";
+const char* desc = "Counts the motifs in a graph using BFS traversal";
 const char* url  = 0;
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif(default value 0)"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -55,22 +43,21 @@ typedef Graph::GraphNode GNode;
 #include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
+
 // insert edges into the worklist (task queue)
 void initialization(Graph& graph, EmbeddingQueue &queue) {
 	printf("\n=============================== Init ===============================\n\n");
 	galois::do_all(
+		// for each vertex
 		//galois::iterate(graph),
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
-			// for each vertex
-			//auto& src_label = graph.getData(src);
 			//Graph::edge_iterator first = graph.edge_begin(src);
 			//Graph::edge_iterator last = graph.edge_end(src);
-			// for each edge of this vertex
 			//for (auto e = first; e != last; ++ e) {
+			// for each edge of this vertex
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
-				//auto& dst_label = graph.getData(dst);
 				if(src < dst) {
 					// create a new embedding
 					Embedding new_emb;
@@ -149,7 +136,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		/*
 		// sequential implementation
 		for (auto qp = qp_map.begin(); qp != qp_map.end(); ++ qp) {
-			Quick_Pattern subgraph = qp->first;
+			QuickPattern subgraph = qp->first;
 			int count = qp->second;
 			miner.canonical_aggregate_each(subgraph, count, cg_map);
 		}
@@ -159,8 +146,8 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(
 			galois::iterate(qp_map),
-			[&](std::pair<Quick_Pattern, int> qp) {
-				Quick_Pattern subgraph = qp.first;
+			[&](std::pair<QuickPattern, int> qp) {
+				QuickPattern subgraph = qp.first;
 				int count = qp.second;
 				miner.canonical_aggregate_each(subgraph, count, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},
@@ -191,8 +178,8 @@ int main(int argc, char** argv) {
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
 	MGraph mgraph;
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
+	galois::StatTimer Tinit("GraphReadingTime");
+	Tinit.start();
 	if (filetype == "txt") {
 		printf("Reading .lg file: %s\n", filename.c_str());
 		mgraph.read_txt(filename.c_str());
@@ -211,22 +198,12 @@ int main(int argc, char** argv) {
 	unsigned sizeof_embedding = 2 * sizeof(ElementType);
 	galois::gPrint("Embedding Element size: ", sizeof(ElementType), "\n");
 	// a miner defines the operators (join and aggregation)
-	Miner miner(false, sizeof_embedding, &graph);
-	Tinitial.stop();
+	Miner miner(&graph, sizeof_embedding);
+	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	galois::reportPageAlloc("MeminfoPre");
-	galois::StatTimer T;
-	T.start();
-	switch (algo) {
-		case nodeiterator:
-			MotifSolver(graph, miner);
-			break;
-		case edgeiterator:
-			break;
-		default:
-			std::cerr << "Unknown algo: " << algo << "\n";
-	}
-	T.stop();
-	galois::reportPageAlloc("MeminfoPost");
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
+	MotifSolver(graph, miner);
+	Tcomp.stop();
 	return 0;
 }
