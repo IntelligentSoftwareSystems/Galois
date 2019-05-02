@@ -15,6 +15,7 @@ friend std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_
 public:
 	QuickPattern() { }
 	QuickPattern(unsigned subgraph_size) {
+		id = -1;
 		size = subgraph_size/ sizeof(ElementType);
 		elements = new ElementType[size];
 	}
@@ -62,10 +63,13 @@ public:
 	inline unsigned get_size() const { return size; }
 	inline ElementType* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
+	inline int get_id() const { return id; }
+	void set_id(int i) { id = i; }
 
 private:
 	unsigned size;
 	ElementType* elements;
+	int id; // quick pattern ID
 };
 
 std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern) {

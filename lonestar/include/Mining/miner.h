@@ -23,7 +23,14 @@ typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
 typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
 typedef galois::substrate::PerThreadStorage<SimpleMap> LocalSimpleMap;
 typedef galois::InsertBag<Embedding> EmbeddingQueue;
+typedef galois::InsertBag<int> IntQueue;
 typedef galois::InsertBag<BaseEmbedding> BaseEmbeddingQueue;
+//typedef std::vector<Embedding> EmbeddingVec;
+//typedef std::vector<EmbeddingVec> EmbeddingLists;
+typedef galois::gstl::Vector<Embedding> EmbeddingVec;
+typedef galois::gstl::Vector<EmbeddingVec> EmbeddingLists;
+typedef galois::gstl::Vector<int> IntVec; // quick pattern ID list, used for each canonical pattern
+typedef galois::gstl::Vector<IntVec> QpLists;
 
 class Miner {
 public:
@@ -163,13 +170,25 @@ public:
 		// otherwise add this quick pattern into the map, and set the count as one
 		} else qp_map[qp] = 1;
 	}
-	void quick_aggregate_each(const Embedding& emb, QpMapDomain& qp_map) {
+	void quick_aggregate_each(const Embedding& emb, QpMapDomain& qp_map, EmbeddingLists& emb_lists) {
 		QuickPattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp);
 		bool qp_existed = false;
-		if (qp_map.find(qp) == qp_map.end())
+		int num_qp = qp_map.size();
+		auto it = qp_map.find(qp);
+		if (it == qp_map.end()) {
+			qp.set_id(num_qp);
+			emb_lists.resize(num_qp+1);
+			emb_lists[num_qp].emplace_back(emb);
 			qp_map[qp].resize(emb.size());
-		else qp_existed = true;
+		} else {
+			qp_existed = true;
+			int qp_id = it->first.get_id();
+			assert(qp_id >= 0 && qp_id < emb_lists.size());
+			int list_size = emb_lists[qp_id].size();
+			emb_lists[qp_id].resize(list_size+1);
+			emb_lists[qp_id].emplace_back(emb);
+		}
 		for (unsigned i = 0; i < emb.size(); i ++)
 			qp_map[qp][i].insert(emb[i].vertex_id);
 		if (qp_existed) qp.clean();
@@ -186,7 +205,7 @@ public:
 		}
 	}
 	// aggregate quick patterns into canonical patterns
-	void canonical_aggregate_each(QuickPattern qp, Frequency freq, CgMapFreq& cg_map) {
+	void canonical_aggregate_each(QuickPattern qp, Frequency freq, CgMapFreq &cg_map) {
 		// turn the quick pattern into its canonical pattern
 		CanonicalGraph* cg = turn_canonical_graph(qp, false);
 		qp.clean();
@@ -196,14 +215,26 @@ public:
 		else cg_map[*cg] = freq;
 		delete cg;
 	}
-	void canonical_aggregate_each(QuickPattern qp, DomainSupport domainSets, CgMapDomain& cg_map) {
+	void canonical_aggregate_each(QuickPattern qp, DomainSupport domainSets, CgMapDomain& cg_map, QpLists& qp_lists) {
 		assert(qp.get_size() == domainSets.size());
 		unsigned numDomains = qp.get_size();
 		// turn the quick pattern into its canonical pattern
 		CanonicalGraph* cg = turn_canonical_graph(qp, false);
-		qp.clean();
-		if (cg_map.find(*cg) == cg_map.end())
+		int num_cg = cg_map.size();
+		auto it = cg_map.find(*cg);
+		if (it == cg_map.end()) {
+			cg->set_id(num_cg);
+			qp_lists.resize(num_cg+1);
+			qp_lists[num_cg].emplace_back(qp.get_id());
 			cg_map[*cg].resize(numDomains);
+		} else {
+			int cg_id = it->first.get_id();
+			assert(cg_id >= 0 && cg_id < emb_lists.size());
+			//int list_size = qp_lists[qp_id].size();
+			//qp_lists[qp_id].resize(list_size+1);
+			qp_lists[cg_id].emplace_back(qp.get_id());
+		}
+		qp.clean();
 		for (unsigned i = 0; i < numDomains; i ++) {
 			unsigned qp_idx = cg->get_quick_pattern_index(i);
 			assert(qp_idx >= 0 && qp_idx < numDomains);
@@ -266,9 +297,7 @@ public:
 			CanonicalGraph* cf = turn_canonical_graph(qp, false);
 			qp.clean();
 			assert(cg_map.find(*cf) != cg_map.end());
-			if(cg_map[*cf] >= threshold) {
-				out_queue.push_back(emb);
-			}
+			if(cg_map[*cf] >= threshold) out_queue.push_back(emb);
 			delete cf;
 		}
 	}
@@ -289,7 +318,26 @@ public:
 			out_queue.push_back(emb);
 		delete cf;
 	}
-	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMapDomain &cg_map) {
+	void filter(CgMapDomain &cg_map, EmbeddingQueue &in_queue, EmbeddingQueue &out_queue) {
+		for (auto emb : in_queue) {
+			QuickPattern qp(embedding_size);
+			turn_quick_pattern_pure(emb, qp);
+			CanonicalGraph* cf = turn_canonical_graph(qp, false);
+			qp.clean();
+			assert(cg_map.find(*cf) != cg_map.end());
+			bool is_frequent = true;
+			unsigned numOfDomains = cg_map[*cf].size();
+			for (unsigned i = 0; i < numOfDomains; i ++) {
+				if (cg_map[*cf][i].size() < threshold) {
+					is_frequent = false;
+					break;
+				}
+			}
+			if (is_frequent) out_queue.push_back(emb);
+			delete cf;
+		}
+	}
+	void filter_each(Embedding &emb, CgMapDomain &cg_map, EmbeddingQueue &out_queue) {
 		QuickPattern qp(embedding_size);
 		turn_quick_pattern_pure(emb, qp);
 		CanonicalGraph* cf = turn_canonical_graph(qp, false);
@@ -305,6 +353,41 @@ public:
 		}
 		if (is_frequent) out_queue.push_back(emb);
 		delete cf;
+	}
+	void filter(CgMapDomain& cg_map, QpLists& qp_lists, EmbeddingLists& emb_lists, EmbeddingQueue& out_queue) {
+		for (auto cg : cg_map) {
+			bool is_frequent = true;
+			unsigned numOfDomains = cg.second.size();
+			for (unsigned i = 0; i < numOfDomains; i ++) {
+				if (cg.second[i].size() < threshold) {
+					is_frequent = false;
+					break;
+				}
+			}
+			if (is_frequent) {
+				int cg_id = cg.first.get_id();
+				//std::cout << "cxh debug: cg " << cg_id << " is frequent with " << qp_lists[cg_id].size() << " quick_patterns\n";
+				for (auto qp_id : qp_lists[cg_id])
+					for (auto emb : emb_lists[qp_id])
+						out_queue.push_back(emb);
+			}
+		}
+	}
+	void filter_each(CanonicalGraph cg, DomainSupport ds, QpLists& qp_lists, EmbeddingLists& emb_lists, EmbeddingQueue& out_queue) {
+		bool is_frequent = true;
+		unsigned numOfDomains = ds.size();
+		for (unsigned i = 0; i < numOfDomains; i ++) {
+			if (ds[i].size() < threshold) {
+				is_frequent = false;
+				break;
+			}
+		}
+		if (is_frequent) {
+			int cg_id = cg.get_id();
+			for (auto qp_id : qp_lists[cg_id])
+				for (auto emb : emb_lists[qp_id])
+					out_queue.push_back(emb);
+		}
 	}
 	void set_threshold(unsigned minsup) { threshold = minsup; }
 	void update_embedding_size() { embedding_size += sizeof(ElementType); }

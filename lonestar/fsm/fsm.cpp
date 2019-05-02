@@ -99,7 +99,7 @@ typedef LocalQpMapFreq LocalQpMap;
 typedef LocalCgMapFreq LocalCgMap;
 #endif
 
-int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
+int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, EmbeddingLists& emb_lists, QpLists& qp_lists) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
@@ -111,7 +111,7 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	galois::for_each(
 		galois::iterate(queue),
 		[&](const Embedding& emb, auto& ctx) {
-			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
+			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()), emb_lists);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -148,7 +148,7 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 		[&](std::pair<QuickPattern, SupportType> qp) {
 			QuickPattern subgraph = qp.first;
 			SupportType support = qp.second;
-			miner.canonical_aggregate_each(subgraph, support, *(cg_localmap.getLocal()));
+			miner.canonical_aggregate_each(subgraph, support, *(cg_localmap.getLocal()), qp_lists);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -187,15 +187,26 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	return num_frequent_patterns;
 }
 
-void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
-	//std::cout << "Filtering: num_patterns = " << cg_map.size() << " num_embeddings = " 
-	//	<< std::distance(in_queue.begin(), in_queue.end()) << "\n";
-	//miner.filter(in_queue, out_queue, cg_map);
+void filter(Miner& miner, CgMap& cg_map, QpLists& qp_lists, EmbeddingLists& emb_lists, EmbeddingQueue& out_queue) {
+	//miner.filter(cg_map, qp_lists, emb_lists, out_queue);
+	galois::do_all(
+		galois::iterate(cg_map),
+		[&](std::pair<CanonicalGraph, SupportType> cg_pair) {
+			miner.filter_each(cg_pair.first, cg_pair.second, qp_lists, emb_lists, out_queue);
+		},
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::loopname("Filter")
+	);
+}
+
+void filter_old(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
+	//miner.filter(cg_map, in_queue, out_queue);
 	///*
 	galois::for_each(
 		galois::iterate(in_queue),
 		[&](Embedding& emb, auto& ctx) {
-			miner.filter_each(emb, out_queue, cg_map);
+			miner.filter_each(emb, cg_map, out_queue);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -213,7 +224,9 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 	CgMap cg_map; // canonical graph map
-	int num_freq_patterns = aggregator(miner, queue, cg_map);
+	EmbeddingLists emb_lists;
+	QpLists qp_lists;
+	int num_freq_patterns = aggregator(miner, queue, cg_map, emb_lists, qp_lists);
 	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n";
 		return;
@@ -223,7 +236,8 @@ void FsmSolver(Graph &graph, Miner &miner) {
 	if(show) miner.printout_agg(cg_map);
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
-	filter(miner, queue, filtered_queue, cg_map);
+	filter(miner, cg_map, qp_lists, emb_lists, filtered_queue);
+	//filter(miner, queue, filtered_queue, cg_map);
 	printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
@@ -245,7 +259,11 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
-		num_freq_patterns = aggregator(miner, queue, cg_map);
+		for (auto list : emb_lists) list.clear();
+		for (auto list : qp_lists) list.clear();
+		emb_lists.clear();
+		qp_lists.clear();
+		num_freq_patterns = aggregator(miner, queue, cg_map, emb_lists, qp_lists);
 		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 		if(show) miner.printout_agg(cg_map);
@@ -253,7 +271,8 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
-		filter(miner, queue, filtered_queue, cg_map);
+		filter(miner, cg_map, qp_lists, emb_lists, filtered_queue);
+		//filter(miner, queue, filtered_queue, cg_map);
 		printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
