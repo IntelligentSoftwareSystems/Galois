@@ -47,7 +47,8 @@ void GrB_assign (GrB_Vector<T>& w,
                 if (mask[idx]) {
                     w[idx] = x;
                 }
-            });
+            }, galois::loopname("VectorAssignment"),
+               galois::steal() );
 }
 
 template <typename T>
@@ -57,7 +58,8 @@ void GrB_Vector_setElement (GrB_Vector<T>& w,
     galois::do_all(galois::iterate(0ul, n),
             [&] (uint64_t idx) {
                 w[idx] = x;
-            });
+            }, galois::loopname("SetElement"),
+               galois::steal() );
 }
 
 template <typename T, typename K>
@@ -69,7 +71,8 @@ void GrB_reduce (T *c,
     galois::do_all(galois::iterate(0ul, u.size()),
             [&] (uint64_t idx) {
                *c = u[idx] || c;
-            });
+            }, galois::loopname("Reduce"),
+               galois::steal() );
 }
 
 /** 
@@ -103,7 +106,9 @@ void GrB_vxm (GrB_Vector<T> &w,
                 } else {
                     w[idx] = 0;
                 }
-            } );
+            },
+            galois::loopname("DVxSPM") );
+            //galois::steal() ); // make results inconsistent..
 }
 
 template <typename T>
