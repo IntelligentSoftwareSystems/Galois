@@ -461,8 +461,6 @@ public:
     //}
   }
 
-
-public:
   /**
    * Return a vector of pairs denoting mirror node ranges.
    *
@@ -479,6 +477,11 @@ public:
     }
     return mirrorRangesVector;
   }
+
+  std::vector<std::vector<size_t>>& getMirrorNodes() {
+    return mirrorNodes;
+  }
+
 
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
@@ -594,6 +597,13 @@ public:
    * @returns number of edges present in this (local) graph
    */
   inline size_t sizeEdges() const { return graph.sizeEdges(); }
+
+  /**
+   * Gets number of nodes on this (local) graph.
+   *
+   * @returns number of nodes present in this (local) graph
+   */
+  inline size_t numMasters() const { return numOwned; }
 
   /**
    * Gets number of nodes on the global unpartitioned graph.
