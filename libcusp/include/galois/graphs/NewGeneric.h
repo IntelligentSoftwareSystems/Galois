@@ -48,18 +48,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_Generic";
   Partitioner* graphPartitioner;
 
- public:
-  //! typedef for base DistGraph class
-  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
+  uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
+    assert(isLocal(gid));
+    // optimized for edge cuts
+    if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
+      return gid - globalOffset;
 
-  //! GID = localToGlobalVector[LID]
-  std::vector<uint64_t> localToGlobalVector;
-  //! LID = globalToLocalMap[GID]
-  std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
-
-  uint32_t numNodes;
-  uint64_t numEdges;
-  uint32_t nodesToReceive;
+    return base_DistGraph::globalToLocalMap.at(gid);
+  }
 
   /**
    * Free memory of a vector by swapping an empty vector with it
@@ -70,55 +66,34 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     vectorToKill.swap(dummyVector);
   }
 
-#if 0 // avoid using this
-  /**
-   * get reader of a particular node
-   */
-  unsigned getHostReader(uint64_t gid) const {
-    for (auto i = 0U; i < base_DistGraph::numHosts; ++i) {
-      uint64_t start, end;
-      std::tie(start, end) = base_DistGraph::gid2host[i];
-      if (gid >= start && gid < end) {
-        return i;
-      }
-    }
+  uint32_t nodesToReceive;
 
-    return -1;
-  }
-#endif
+ public:
+  //! typedef for base DistGraph class
+  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
-  unsigned getHostID(uint64_t gid) const {
+  virtual unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->getMaster(gid);
   }
 
-  bool isOwned(uint64_t gid) const {
+  virtual bool isOwned(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (graphPartitioner->getMaster(gid) == base_DistGraph::id);
   }
 
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    return (globalToLocalMap.find(gid) != globalToLocalMap.end());
+    return (base_DistGraph::globalToLocalMap.find(gid) !=
+            base_DistGraph::globalToLocalMap.end());
   }
 
-  virtual uint32_t G2L(uint64_t gid) const {
-    assert(isLocal(gid));
-    return globalToLocalMap.at(gid);
-  }
-
-  uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
-    // optimized for edge cuts
-    if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
-      return gid - globalOffset;
-
-    return globalToLocalMap.at(gid);
-  }
-
-
-  virtual uint64_t L2G(uint32_t lid) const {
-    return localToGlobalVector[lid];
+  // TODO current uses graph partitioner
+  // TODO make it so user doens't have to specify; can be done by tracking
+  // if an outgoing mirror is marked as having an incoming edge on any
+  // host
+  virtual bool is_vertex_cut() const {
+    return graphPartitioner->isVertexCut();
   }
 
   // TODO : user should not need to know about write and read locations,
@@ -301,13 +276,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     base_DistGraph::beginMaster = 0;
     // Allocate and construct the graph
-    base_DistGraph::graph.allocateFrom(numNodes, numEdges);
+    base_DistGraph::graph.allocateFrom(base_DistGraph::numNodes, base_DistGraph::numEdges);
     base_DistGraph::graph.constructNodes();
 
     // edge end fixing
     auto& base_graph = base_DistGraph::graph;
     galois::do_all(
-      galois::iterate((uint32_t)0, numNodes),
+      galois::iterate((uint32_t)0, base_DistGraph::numNodes),
       [&](auto n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
 #if MORE_DIST_STATS
       galois::loopname("FixEndEdgeLoop"),
@@ -338,13 +313,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // TODO this is a hack; fix it somehow
     if (graphPartitioner->isVertexCut() && !graphPartitioner->isCartCut()) {
-      base_DistGraph::numNodesWithEdges = numNodes;
+      base_DistGraph::numNodesWithEdges = base_DistGraph::numNodes;
     }
 
     if (transpose) {
       base_DistGraph::transposed = true;
-      base_DistGraph::numNodesWithEdges = numNodes;
-      if (numNodes > 0) {
+      base_DistGraph::numNodesWithEdges = base_DistGraph::numNodes;
+      if (base_DistGraph::numNodes > 0) {
         // consider all nodes to have outgoing edges (TODO better way to do this?)
         // for now it's fine I guess
         base_DistGraph::graph.transpose(GRNAME);
@@ -1516,7 +1491,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
     // already set before this is called
-    localToGlobalVector.resize(base_DistGraph::numOwned);
+    base_DistGraph::localToGlobalVector.resize(base_DistGraph::numOwned);
     prefixSumOfEdges.resize(base_DistGraph::numOwned);
 
     galois::do_all(
@@ -1532,7 +1507,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           }
         }
         prefixSumOfEdges[n - globalOffset] = (*ee) - edgeOffset;
-        localToGlobalVector[n - globalOffset] = n;
+        base_DistGraph::localToGlobalVector[n - globalOffset] = n;
       },
       #if MORE_DIST_STATS
       galois::loopname("EdgeInspectionLoop"),
@@ -1551,8 +1526,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // get incoming mirrors ready for creation
     uint32_t additionalMirrorCount = incomingMirrors.count();
-    localToGlobalVector.resize(localToGlobalVector.size() +
-                               additionalMirrorCount);
+    base_DistGraph::localToGlobalVector.resize(
+      base_DistGraph::localToGlobalVector.size() + additionalMirrorCount
+    );
     if (base_DistGraph::numOwned > 0) {
       // fill prefix sum with last number (incomings have no edges)
       prefixSumOfEdges.resize(prefixSumOfEdges.size() + additionalMirrorCount,
@@ -1602,8 +1578,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           uint32_t handledNodes = 0;
           for (size_t i = beginNode; i < endNode; i++) {
             if (incomingMirrors.test(i)) {
-              localToGlobalVector[startingNodeIndex + threadStartLocation +
-                                  handledNodes] = i;
+              base_DistGraph::localToGlobalVector[startingNodeIndex +
+                threadStartLocation + handledNodes] = i;
               handledNodes++;
             }
           }
@@ -1611,22 +1587,23 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       );
     }
 
-    numNodes = base_DistGraph::numOwned + additionalMirrorCount;
+    base_DistGraph::numNodes = base_DistGraph::numOwned + additionalMirrorCount;
     if (prefixSumOfEdges.size() != 0) {
-      numEdges = prefixSumOfEdges.back();
+      base_DistGraph::numEdges = prefixSumOfEdges.back();
     } else {
-      numEdges = 0;
+      base_DistGraph::numEdges = 0;
     }
-    assert(localToGlobalVector.size() == numNodes);
-    assert(prefixSumOfEdges.size() == numNodes);
+    assert(base_DistGraph::localToGlobalVector.size() ==
+           base_DistGraph::numNodes);
+    assert(prefixSumOfEdges.size() == base_DistGraph::numNodes);
 
     // g2l mapping
-    globalToLocalMap.reserve(numNodes);
-    for (unsigned i = 0; i < numNodes; i++) {
+    base_DistGraph::globalToLocalMap.reserve(base_DistGraph::numNodes);
+    for (unsigned i = 0; i < base_DistGraph::numNodes; i++) {
       // global to local map construction
-      globalToLocalMap[localToGlobalVector[i]] = i;
+      base_DistGraph::globalToLocalMap[base_DistGraph::localToGlobalVector[i]] = i;
     }
-    assert(globalToLocalMap.size() == numNodes);
+    assert(base_DistGraph::globalToLocalMap.size() == base_DistGraph::numNodes);
 
     base_DistGraph::numNodesWithEdges = base_DistGraph::numOwned;
   }
@@ -2237,14 +2214,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::DynamicBitSet& hasIncomingEdge,
     galois::gstl::Vector<uint64_t>& prefixSumOfEdges
   ) {
-    numNodes = 0;
-    numEdges = 0;
+    base_DistGraph::numNodes = 0;
+    base_DistGraph::numEdges = 0;
     nodesToReceive = 0;
 
     // reserve overestimation of nodes
     prefixSumOfEdges.reserve(base_DistGraph::numGlobalNodes /
                              base_DistGraph::numHosts * 1.15);
-    localToGlobalVector.reserve(base_DistGraph::numGlobalNodes /
+    base_DistGraph::localToGlobalVector.reserve(base_DistGraph::numGlobalNodes /
                                 base_DistGraph::numHosts * 1.15);
 
     inspectMasterNodes(numOutgoingEdges, prefixSumOfEdges);
@@ -2311,16 +2288,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         threadPrefixSums[i] += threadPrefixSums[i - 1];
       }
 
-      assert(prefixSumOfEdges.size() == numNodes);
-      assert(localToGlobalVector.size() == numNodes);
+      assert(prefixSumOfEdges.size() == base_DistGraph::numNodes);
+      assert(base_DistGraph::localToGlobalVector.size() ==
+             base_DistGraph::numNodes);
 
       uint32_t newMasterNodes = threadPrefixSums[activeThreads - 1];
       galois::gDebug("[", base_DistGraph::id, "] This many masters from host ",
                      h, ": ", newMasterNodes);
-      uint32_t startingNodeIndex = numNodes;
+      uint32_t startingNodeIndex = base_DistGraph::numNodes;
       // increase size of prefix sum + mapping vector
-      prefixSumOfEdges.resize(numNodes + newMasterNodes);
-      localToGlobalVector.resize(numNodes + newMasterNodes);
+      prefixSumOfEdges.resize(base_DistGraph::numNodes + newMasterNodes);
+      base_DistGraph::localToGlobalVector.resize(base_DistGraph::numNodes +
+                                                 newMasterNodes);
 
       if (newMasterNodes > 0) {
         // do actual work, second on_each
@@ -2357,20 +2336,20 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                    handledNodes] = 0;
                 }
 
-                localToGlobalVector[startingNodeIndex + threadStartLocation +
-                                    handledNodes] = globalID;
+                base_DistGraph::localToGlobalVector[startingNodeIndex +
+                        threadStartLocation + handledNodes] = globalID;
                 handledNodes++;
               }
             }
           }
         );
-        numNodes += newMasterNodes;
+        base_DistGraph::numNodes += newMasterNodes;
       }
     }
 
     nodesToReceive += toReceive.reduce();
     // masters have been handled
-    base_DistGraph::numOwned = numNodes;
+    base_DistGraph::numOwned = base_DistGraph::numNodes;
   }
 
   /**
@@ -2419,16 +2398,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         threadPrefixSums[i] += threadPrefixSums[i - 1];
       }
 
-      assert(prefixSumOfEdges.size() == numNodes);
-      assert(localToGlobalVector.size() == numNodes);
+      assert(prefixSumOfEdges.size() == base_DistGraph::numNodes);
+      assert(base_DistGraph::localToGlobalVector.size() ==
+             base_DistGraph::numNodes);
 
       uint32_t newOutgoingNodes = threadPrefixSums[activeThreads - 1];
       // increase size of prefix sum + mapping vector
-      prefixSumOfEdges.resize(numNodes + newOutgoingNodes);
-      localToGlobalVector.resize(numNodes + newOutgoingNodes);
+      prefixSumOfEdges.resize(base_DistGraph::numNodes + newOutgoingNodes);
+      base_DistGraph::localToGlobalVector.resize(base_DistGraph::numNodes +
+                                                 newOutgoingNodes);
 
       uint64_t startNode = base_DistGraph::gid2host[h].first;
-      uint32_t startingNodeIndex = numNodes;
+      uint32_t startingNodeIndex = base_DistGraph::numNodes;
 
 
       if (newOutgoingNodes > 0) {
@@ -2453,8 +2434,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
               if (myEdges > 0) {
                 prefixSumOfEdges[startingNodeIndex + threadStartLocation +
                                  handledNodes] = myEdges;
-                localToGlobalVector[startingNodeIndex + threadStartLocation +
-                                    handledNodes] = startNode + i;
+                base_DistGraph::localToGlobalVector[startingNodeIndex +
+                                                    threadStartLocation +
+                                                    handledNodes] = startNode + i;
                 handledNodes++;
 
                 if (myEdges > 0 && h != myHID) {
@@ -2464,14 +2446,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             }
           }
         );
-        numNodes += newOutgoingNodes;
+        base_DistGraph::numNodes += newOutgoingNodes;
       }
       // don't need anymore after this point; get memory back
       numOutgoingEdges[h].clear();
     }
 
     nodesToReceive += toReceive.reduce();
-    base_DistGraph::numNodesWithEdges = numNodes;
+    base_DistGraph::numNodesWithEdges = base_DistGraph::numNodes;
   }
 
   /**
@@ -2485,15 +2467,16 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gstl::Vector<uint64_t>& prefixSumOfEdges,
     const uint64_t incomingEstimate
   ) {
-    if (numNodes == 0) {
+    if (base_DistGraph::numNodes == 0) {
       return;
     }
-    globalToLocalMap.reserve(base_DistGraph::numNodesWithEdges + incomingEstimate);
-    globalToLocalMap[localToGlobalVector[0]] = 0;
+    base_DistGraph::globalToLocalMap.reserve(base_DistGraph::numNodesWithEdges +
+                                             incomingEstimate);
+    base_DistGraph::globalToLocalMap[base_DistGraph::localToGlobalVector[0]] = 0;
     // global to local map construction using num nodes with edges
     for (unsigned i = 1; i < base_DistGraph::numNodesWithEdges; i++) {
       prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
-      globalToLocalMap[localToGlobalVector[i]] = i;
+      base_DistGraph::globalToLocalMap[base_DistGraph::localToGlobalVector[i]] = i;
     }
   }
 
@@ -2518,7 +2501,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         for (size_t i = beginNode; i < endNode; i++) {
           // only count if doesn't exist in global/local map + is incoming
           // edge
-          if (hasIncomingEdge.test(i) && !globalToLocalMap.count(i)) ++count;
+          if (hasIncomingEdge.test(i) &&
+              !base_DistGraph::globalToLocalMap.count(i)) ++count;
         }
         threadPrefixSums[tid] = count;
       }
@@ -2528,15 +2512,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       threadPrefixSums[i] += threadPrefixSums[i - 1];
     }
 
-    assert(prefixSumOfEdges.size() == numNodes);
-    assert(localToGlobalVector.size() == numNodes);
+    assert(prefixSumOfEdges.size() == base_DistGraph::numNodes);
+    assert(base_DistGraph::localToGlobalVector.size() ==
+           base_DistGraph::numNodes);
 
     uint32_t newIncomingNodes = threadPrefixSums[activeThreads - 1];
     // increase size of prefix sum + mapping vector
-    prefixSumOfEdges.resize(numNodes + newIncomingNodes);
-    localToGlobalVector.resize(numNodes + newIncomingNodes);
+    prefixSumOfEdges.resize(base_DistGraph::numNodes + newIncomingNodes);
+    base_DistGraph::localToGlobalVector.resize(base_DistGraph::numNodes +
+                                               newIncomingNodes);
 
-    uint32_t startingNodeIndex = numNodes;
+    uint32_t startingNodeIndex = base_DistGraph::numNodes;
 
     if (newIncomingNodes > 0) {
       // do actual work, second on_each
@@ -2556,17 +2542,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           uint32_t handledNodes = 0;
 
           for (size_t i = beginNode; i < endNode; i++) {
-            if (hasIncomingEdge.test(i) && !globalToLocalMap.count(i)) {
+            if (hasIncomingEdge.test(i) && !base_DistGraph::globalToLocalMap.count(i)) {
               prefixSumOfEdges[startingNodeIndex + threadStartLocation +
                                handledNodes] = 0;
-              localToGlobalVector[startingNodeIndex + threadStartLocation +
-                                  handledNodes] = i;
+              base_DistGraph::localToGlobalVector[startingNodeIndex +
+                                                  threadStartLocation +
+                                                  handledNodes] = i;
               handledNodes++;
             }
           }
         }
       );
-      numNodes += newIncomingNodes;
+      base_DistGraph::numNodes += newIncomingNodes;
     }
   }
 
@@ -2575,17 +2562,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void finalizeInspection(galois::gstl::Vector<uint64_t>& prefixSumOfEdges) {
     // reserve rest of memory needed
-    globalToLocalMap.reserve(numNodes);
-    for (unsigned i = base_DistGraph::numNodesWithEdges; i < numNodes; i++) {
+    base_DistGraph::globalToLocalMap.reserve(base_DistGraph::numNodes);
+    for (unsigned i = base_DistGraph::numNodesWithEdges; i < base_DistGraph::numNodes; i++) {
       // finalize prefix sum
       prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
       // global to local map construction
-      globalToLocalMap[localToGlobalVector[i]] = i;
+      base_DistGraph::globalToLocalMap[base_DistGraph::localToGlobalVector[i]] = i;
     }
     if (prefixSumOfEdges.size() != 0) {
-      numEdges = prefixSumOfEdges.back();
+      base_DistGraph::numEdges = prefixSumOfEdges.back();
     } else {
-      numEdges = 0;
+      base_DistGraph::numEdges = 0;
     }
   }
 
@@ -2596,9 +2583,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * TODO make parallel?
    */
   void fillMirrors() {
-    base_DistGraph::mirrorNodes.reserve(numNodes - base_DistGraph::numOwned);
-    for (uint32_t i = base_DistGraph::numOwned; i < numNodes; i++) {
-      uint32_t globalID = localToGlobalVector[i];
+    base_DistGraph::mirrorNodes.reserve(base_DistGraph::numNodes - base_DistGraph::numOwned);
+    for (uint32_t i = base_DistGraph::numOwned; i < base_DistGraph::numNodes; i++) {
+      uint32_t globalID = base_DistGraph::localToGlobalVector[i];
       base_DistGraph::mirrorNodes[graphPartitioner->getMaster(globalID)].
               push_back(globalID);
     }
@@ -2830,18 +2817,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         auto ee     = bufGraph.edgeBegin(src);
         auto ee_end = bufGraph.edgeEnd(src);
-        uint64_t numEdges = std::distance(ee, ee_end);
+        uint64_t numEdgesL = std::distance(ee, ee_end);
         auto& gdst_vec  = *gdst_vecs.getLocal();
 
         for (unsigned i = 0; i < numHosts; ++i) {
           gdst_vec[i].clear();
-          //gdst_vec[i].reserve(numEdges);
+          //gdst_vec[i].reserve(numEdgesL);
         }
 
         for (; ee != ee_end; ++ee) {
           uint32_t gdst = bufGraph.edgeDestination(*ee);
           uint32_t hostBelongs =
-            graphPartitioner->getEdgeOwner(src, gdst, numEdges);
+            graphPartitioner->getEdgeOwner(src, gdst, numEdgesL);
 
           if (hostBelongs == id) {
             // edge belongs here, construct on self
@@ -2945,7 +2932,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
         assert(isLocal(n));
-        uint32_t lsrc = G2L(n);
+        uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
         assert((cur_end - cur) == gdst_vec.size());
@@ -2983,7 +2970,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     while (cur < cur_end) {
       auto gdata    = gdata_vec[i];
       uint64_t gdst = gdst_vec[i++];
-      uint32_t ldst = G2L(gdst);
+      uint32_t ldst = this->G2L(gdst);
       graph.constructEdge(cur++, ldst, gdata);
       // TODO
       // if ldst is an outgoing mirror, this is vertex cut
@@ -2999,45 +2986,25 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     uint64_t i = 0;
     while (cur < cur_end) {
       uint64_t gdst = gdst_vec[i++];
-      uint32_t ldst = G2L(gdst);
+      uint32_t ldst = this->G2L(gdst);
       graph.constructEdge(cur++, ldst);
       // TODO
       // if ldst is an outgoing mirror, this is vertex cut
     }
   }
 
- public:
-  std::vector<std::pair<uint32_t, uint32_t>> getMirrorRanges() const {
-    std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;
-    // order of nodes locally is masters, outgoing mirrors, incoming mirrors,
-    // so just get from numOwned to end
-    if (base_DistGraph::numOwned != numNodes) {
-      assert(base_DistGraph::numOwned < numNodes);
-      mirrorRangesVector.push_back(std::make_pair(base_DistGraph::numOwned,
-                                                  numNodes));
-    }
-    return mirrorRangesVector;
-  }
-
-  // TODO current uses graph partitioner
-  // TODO make it so user doens't have to specify; can be done by tracking
-  // if an outgoing mirror is marked as having an incoming edge on any
-  // host
-  bool is_vertex_cut() const {
-    return graphPartitioner->isVertexCut();
-  }
-
+ //public:
   //virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
   //                                      const unsigned int version = 0) const {
   //  // unsigned ints
-  //  ar << numNodes;
+  //  ar << base_DistGraph::numNodes;
 
   //  // partition specific
   //  graphPartitioner->serializePartition(ar);
 
   //  // maps and vectors
-  //  ar << localToGlobalVector;
-  //  ar << globalToLocalMap;
+  //  ar << base_DistGraph::localToGlobalVector;
+  //  ar << base_DistGraph::globalToLocalMap;
   //}
 
   //virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
@@ -3049,32 +3016,15 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   //  graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
   //  // unsigned ints
-  //  ar >> numNodes;
+  //  ar >> base_DistGraph::numNodes;
 
   //  // partition specific
   //  graphPartitioner->deserializePartition(ar);
 
   //  // maps and vectors
-  //  ar >> localToGlobalVector;
-  //  ar >> globalToLocalMap;
+  //  ar >> base_DistGraph::localToGlobalVector;
+  //  ar >> base_DistGraph::globalToLocalMap;
   //}
-
-  /**
-   * Converts a local node id into a global node id
-   *
-   * @param nodeID local node id
-   * @returns global node id corresponding to the local one
-   */
-  inline uint64_t getGID(const uint32_t nodeID) const { return L2G(nodeID); }
-
-  /**
-   * Converts a global node id into a local node id
-   *
-   * @param nodeID global node id
-   * @returns local node id corresponding to the global one
-   */
-  inline uint32_t getLID(const uint64_t nodeID) const { return G2L(nodeID); }
-
 };
 
 // make GRNAME visible to public

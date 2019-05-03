@@ -86,6 +86,8 @@ protected:
   // global graph variables
   uint64_t numGlobalNodes; //!< Total nodes in the global unpartitioned graph.
   uint64_t numGlobalEdges; //!< Total edges in the global unpartitioned graph.
+  uint32_t numNodes; //!< Num nodes in this graph in total
+  uint64_t numEdges; //!< Num edges in this graph in total
 
   const unsigned id; //!< ID of the machine.
   const uint32_t numHosts; //!< Total number of machines
@@ -104,6 +106,12 @@ protected:
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
   //! Mirror nodes from different hosts. For reduce
   std::vector<std::vector<size_t>> mirrorNodes;
+
+  //! GID = localToGlobalVector[LID]
+  std::vector<uint64_t> localToGlobalVector;
+  //! LID = globalToLocalMap[GID]
+  std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
+
 
 private:
   // vector for determining range objects for master nodes + nodes
@@ -415,6 +423,15 @@ protected:
     return numNodes_to_divide;
   }
 
+  uint32_t G2L(uint64_t gid) const {
+    assert(isLocal(gid));
+    return globalToLocalMap.at(gid);
+  }
+
+  uint64_t L2G(uint32_t lid) const {
+    return localToGlobalVector[lid];
+  }
+
 public:
   //! Type representing a node in this graph
   using GraphNode = typename GraphTy::GraphNode;
@@ -444,8 +461,57 @@ public:
     //}
   }
 
-protected:
+
 public:
+  /**
+   * Return a vector of pairs denoting mirror node ranges.
+   *
+   * Assumes all mirror nodes occur after the masters: this invariant should be
+   * held by CuSP.
+   */
+  std::vector<std::pair<uint32_t, uint32_t>> getMirrorRanges() const {
+    std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;
+    // order of nodes locally is masters, outgoing mirrors, incoming mirrors,
+    // so just get from numOwned to end
+    if (numOwned != numNodes) {
+      assert(numOwned < numNodes);
+      mirrorRangesVector.push_back(std::make_pair(numOwned, numNodes));
+    }
+    return mirrorRangesVector;
+  }
+
+  //! Determines which host has the master for a particular node
+  //! @returns Host id of node in question
+  virtual unsigned getHostID(uint64_t) const = 0;
+  //! Determine if a node has a master on this host.
+  //! @returns True if passed in global id has a master on this host
+  virtual bool isOwned(uint64_t) const = 0;
+  //! Determine if a node has a proxy on this host
+  //! @returns True if passed in global id has a proxy on this host
+  virtual bool isLocal(uint64_t) const = 0;
+  /**
+   * Returns true if current partition is a vertex cut
+   * @returns true if partition being stored in this graph is a vertex cut
+   */
+  virtual bool is_vertex_cut() const = 0;
+  bool isTransposed() { return transposed; }
+
+  /**
+   * Converts a local node id into a global node id
+   *
+   * @param nodeID local node id
+   * @returns global node id corresponding to the local one
+   */
+  inline uint64_t getGID(const uint32_t nodeID) const { return L2G(nodeID); }
+
+  /**
+   * Converts a global node id into a local node id
+   *
+   * @param nodeID global node id
+   * @returns local node id corresponding to the global one
+   */
+  inline uint32_t getLID(const uint64_t nodeID) const { return G2L(nodeID); }
+
   /**
    * Get data of a node.
    *
@@ -688,6 +754,7 @@ public:
    * @param localGraphFileName file name to write local graph to.
    */
   void save_local_graph_to_file(std::string localGraphFileName = "local_graph") {
+    galois::gWarn("Currently not implemented. TODO");
     //using namespace boost::archive;
     //galois::StatTimer dGraphTimerSaveLocalGraph("TimerSaveLocalGraph", GRNAME);
     //dGraphTimerSaveLocalGraph.start();
@@ -739,6 +806,7 @@ public:
    */
   void
   read_local_graph_from_file(std::string localGraphFileName = "local_graph") {
+    galois::gWarn("Currently not implemented. TODO");
     //using namespace boost::archive;
     //galois::StatTimer dGraphTimerReadLocalGraph("TimerReadLocalGraph", GRNAME);
     //dGraphTimerReadLocalGraph.start();
@@ -796,6 +864,7 @@ public:
     //inputStream.close();
     //dGraphTimerReadLocalGraph.stop();
   }
+
 };
 
 template <typename NodeTy, typename EdgeTy>
