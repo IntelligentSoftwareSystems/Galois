@@ -44,7 +44,7 @@ void GrB_print_Vector (GrB_Vector<T> &v) {
 // in this version, it only supports w<mask>(I) = accum (w(I), x).
 template <typename T, typename K=bool>
 void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
-        GrB_Vector<K>* mask, // optional mask for w, unused if NULL
+        GrB_Vector<K>& mask, // optional mask for w, unused if NULL
         const int accum, // incomplete type.
         const T x, // scalar to assign to w(I)
         const GrB_Index *I, // row indices
@@ -53,7 +53,9 @@ void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
         ) {
     galois::do_all(galois::iterate((GrB_Index) 0, ni),
             [&] (GrB_Index idx) {
-            if ((*mask)[idx]) w[idx] = x;
+                if (mask[idx]) {
+                    w[idx] = x;
+                }
             },
             galois::loopname("VectorAssignment"),
             galois::steal() );
@@ -70,8 +72,6 @@ void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
         const GrB_Index ni, // # of row indices
         const int desc // incompelete type.
         ) {
-    std::cout << "GrB assign with NULL\n";
-
     galois::do_all(galois::iterate((GrB_Index) 0, ni),
             [&] (GrB_Index idx) { w[idx] = x; },
             galois::loopname("VectorAssignment"),
@@ -95,9 +95,12 @@ void GrB_reduce (T *c,
         const void *monoid, // assume LOR
         const GrB_Vector<K> &u,
         const void *desc) {
+    T& cr = *c;
     galois::do_all(galois::iterate(0ul, u.size()),
             [&] (uint64_t idx) {
-               *c = u[idx] || c;
+               if (!cr && u[idx]) {
+                   cr = u[idx] || cr;
+               }
             }, galois::loopname("Reduce"),
                galois::steal() );
 }
@@ -202,9 +205,10 @@ int main(int argc, char** argv) {
 
     std::cout << " Input graph is : " << filename << "\n";
     std::cout << " The number of active threads is : " << numThreads << "\n";
+    std::cout << " The number of nodes is : " << A.size() << "\n";
 
-    galois::StatTimer bfsTimer("BFStimer");
-    bfsTimer.start();
+    galois::StatTimer mainTimer("MainTimer");
+    mainTimer.start();
 
     // create an empty vector v, and make it dense.
     // v maintains labels for each node.
@@ -216,25 +220,28 @@ int main(int argc, char** argv) {
     GrB_Vector_new(&q, 0, n);
     GrB_Vector_setElement(q, true, startNode);
 
+    galois::StatTimer bfsTimer("BFStimer");
+    bfsTimer.start();
     // BFS traversal and label the nodes.
-    for (uint32_t level = 1; level <= n; level ++) {
+    uint32_t level = 1;
+    for (; level <= n; level ++) {
         // v<q> = level
-        GrB_assign (v, &q, -1, level, NULL, n, -1);
+        GrB_assign (v, q, -1, level, NULL, n, -1);
 
         // successor = ||(q)
         bool anyq = false;
         GrB_reduce (&anyq, NULL, NULL, q, NULL);
-        if (!anyq) break;
+        if (!anyq) { printf("break\n"); break; }
 
         // q`[!v] = `q or.and A
         GrB_vxm (q, v, NULL, NULL, q, A, NULL);
         //GrB_print_Vector(q);
     }
-
-    //GrB_assign (v, &v, -1, v, NULL, n, -1);
+    bfsTimer.stop();
+    mainTimer.stop();
+    //GrB_assign (v, v, -1, v, NULL, n, -1);
     GrB_Vector_nvals (&nvals, v);
 
-    bfsTimer.stop();
 
     GrB_Dump_Vector(v);
 
