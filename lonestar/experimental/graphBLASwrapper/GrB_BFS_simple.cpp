@@ -51,19 +51,31 @@ void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
         const GrB_Index ni, // # of row indices
         const int desc // incompelete type.
         ) {
-    if (mask == NULL) {
-        galois::do_all(galois::iterate((GrB_Index) 0, ni),
-                [&] (GrB_Index idx) { w[idx] = x; },
-                galois::loopname("VectorAssignment"),
-                galois::steal() );
-    } else {
-            galois::do_all(galois::iterate((GrB_Index) 0, ni),
-                [&] (GrB_Index idx) {
-                    if ((*mask)[idx]) w[idx] = x;
-                },
-                galois::loopname("VectorAssignment"),
-                galois::steal() );
-    }
+    galois::do_all(galois::iterate((GrB_Index) 0, ni),
+            [&] (GrB_Index idx) {
+            if ((*mask)[idx]) w[idx] = x;
+            },
+            galois::loopname("VectorAssignment"),
+            galois::steal() );
+}
+
+// assign a scalar to subvector.
+// in this version, it only supports w<mask>(I) = accum (w(I), x).
+template <typename T>
+void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
+        void* mask,
+        const int accum, // incomplete type.
+        const T x, // scalar to assign to w(I)
+        const GrB_Index *I, // row indices
+        const GrB_Index ni, // # of row indices
+        const int desc // incompelete type.
+        ) {
+    std::cout << "GrB assign with NULL\n";
+
+    galois::do_all(galois::iterate((GrB_Index) 0, ni),
+            [&] (GrB_Index idx) { w[idx] = x; },
+            galois::loopname("VectorAssignment"),
+            galois::steal() );
 }
 
 // add a single entry to a vector.
@@ -197,7 +209,7 @@ int main(int argc, char** argv) {
     // create an empty vector v, and make it dense.
     // v maintains labels for each node.
     GrB_Vector_new(&v, 0, n);
-    GrB_assign(v, (GrB_Vector<bool> *)NULL, -1, 0u, NULL, n, -1);
+    GrB_assign(v, NULL, -1, 0u, NULL, n, -1);
     GrB_Vector_nvals(&n, v);
 
     // create a boolean vector q, and set q(s) to true.
