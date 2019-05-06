@@ -10,7 +10,7 @@
 class CanonicalGraph {
 	friend std::ostream & operator<<(std::ostream & strm, const CanonicalGraph& cg);
 public:
-	CanonicalGraph() : number_of_vertices(0), hash_value(0), id(-1) {}
+	CanonicalGraph() : number_of_vertices(0), hash_value(0) {}
 	CanonicalGraph(bliss::AbstractGraph* ag, bool is_directed) {
 		construct_cg(ag, is_directed);
 	}
@@ -32,7 +32,7 @@ public:
 		}
 		return 0;
 	}
-	inline unsigned int get_hash() const { return hash_value; }
+	inline unsigned get_hash() const { return hash_value; }
 	inline int get_number_vertices() const { return number_of_vertices; }
 	//operator for map
 	inline bool operator==(const CanonicalGraph& other) const { return cmp(other) == 0; }
@@ -41,15 +41,14 @@ public:
 	inline void set_number_vertices(int num_vertices) { number_of_vertices = num_vertices; }
 	inline void set_hash_value(unsigned int hash) { hash_value = hash; }
 	inline unsigned get_quick_pattern_index(unsigned i) { return qp_idx[i]; }
-	inline int get_id() const { return id; }
-	void set_id(int i) { id = i; }
+	inline unsigned get_id() const { return hash_value; }
 
 private:
 	Embedding embedding;
 	std::vector<int> qp_idx;
 	int number_of_vertices;
-	unsigned int hash_value;
-	int id; // canonical graph ID
+	unsigned hash_value;
+	unsigned support;
 	void construct_cg(bliss::AbstractGraph* ag, bool is_directed) {
 		assert(!is_directed);
 		if(!is_directed) {

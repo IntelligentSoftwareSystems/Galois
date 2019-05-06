@@ -29,7 +29,8 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #define ENABLE_LABEL
-#define USE_DOMAIN
+//#define USE_DOMAIN
+#define DEBUG 0
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using BFS traversal";
@@ -59,16 +60,13 @@ unsigned long merge_time = 0;
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
 
+// insert single-edge embeddings into the embedding queue
 void init(Graph& graph, EmbeddingQueue &queue) {
-	//print_graph(graph);
 	printf("\n=============================== Init ===============================\n\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
 			auto& src_label = graph.getData(src);
-			//Graph::edge_iterator first = graph.edge_begin(src);
-			//Graph::edge_iterator last = graph.edge_end(src);
-			//for (auto e = first; e != last; ++ e) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
 				if (src < dst) {
@@ -83,8 +81,8 @@ void init(Graph& graph, EmbeddingQueue &queue) {
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 		galois::loopname("Initialization")
 	);
-	//}
 }
+
 #ifdef USE_DOMAIN
 typedef DomainSupport SupportType;
 typedef QpMapDomain QpMap;
@@ -99,7 +97,7 @@ typedef LocalQpMapFreq LocalQpMap;
 typedef LocalCgMapFreq LocalCgMap;
 #endif
 
-int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, EmbeddingLists& emb_lists, QpLists& qp_lists) {
+int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, UintMap& id_map, UintMap& support_map) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
@@ -108,15 +106,18 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, EmbeddingList
 ///*
 	// Parallel quick aggregation
 	LocalQpMap qp_localmap; // quick pattern local map for each thread
-	galois::for_each(
+	galois::do_all(
+	//galois::for_each(
 		galois::iterate(queue),
-		[&](const Embedding& emb, auto& ctx) {
-			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()), emb_lists);
+		//[&](Embedding &emb, auto& ctx) {
+		[&](Embedding &emb) {
+			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("QuickAggregation")
 	);
+	
 	galois::StatTimer TmergeQP("MergeQuickPatterns");
 	TmergeQP.start();
 	//std::cout << "Merging quick patterns\n";
@@ -139,19 +140,17 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, EmbeddingList
 	TmergeQP.stop();
 //*/
 	//std::cout << "Quick_aggregation: num_quick_patterns = " << qp_map.size() << "\n";
-
 	// Parallel canonical aggregation
 	//std::cout << "Aggregating canonical patterns\n";
 	LocalCgMap cg_localmap; // canonical pattern local map for each thread
 	galois::do_all(
 		galois::iterate(qp_map),
 		[&](std::pair<QuickPattern, SupportType> qp) {
-			QuickPattern subgraph = qp.first;
-			SupportType support = qp.second;
-			miner.canonical_aggregate_each(subgraph, support, *(cg_localmap.getLocal()), qp_lists);
+			miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()), id_map);
+			//miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()));
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("CanonicalAggregation")
 	);
 	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
@@ -175,47 +174,37 @@ int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, EmbeddingList
 	}
 	TmergeCG.stop();
 	int num_frequent_patterns = 0;
-	for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
-#ifdef USE_DOMAIN
-		if (miner.support_count(it->second) >= minsup) num_frequent_patterns ++;
-#else
-		if (it->second >= minsup) num_frequent_patterns ++;
-#endif
+	num_frequent_patterns = miner.support_count(cg_map, support_map);
 	total_num += num_frequent_patterns;
 	std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
 		<< " frequent patterns: " << num_frequent_patterns << "\n";
 	return num_frequent_patterns;
 }
 
-void filter(Miner& miner, CgMap& cg_map, QpLists& qp_lists, EmbeddingLists& emb_lists, EmbeddingQueue& out_queue) {
-	//miner.filter(cg_map, qp_lists, emb_lists, out_queue);
+void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap& cg_map, const UintMap id_map, const UintMap support_map) {
+	//miner.filter(in_queue, cg_map, out_queue);
+	galois::StatTimer Tfilter("Filter");
+	Tfilter.start();
+	miner.filter(in_queue, id_map, support_map, out_queue);
+	Tfilter.stop();
+	/*
+	std::cout << "id_map size: " << id_map.size() << ", support_map size: " << support_map.size() << "\n";
 	galois::do_all(
-		galois::iterate(cg_map),
-		[&](std::pair<CanonicalGraph, SupportType> cg_pair) {
-			miner.filter_each(cg_pair.first, cg_pair.second, qp_lists, emb_lists, out_queue);
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("Filter")
-	);
-}
-
-void filter_old(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
-	//miner.filter(cg_map, in_queue, out_queue);
-	///*
-	galois::for_each(
+	//galois::for_each(
 		galois::iterate(in_queue),
-		[&](Embedding& emb, auto& ctx) {
+		//[&](Embedding &emb, auto& ctx) {
+		[&](Embedding &emb) {
+			//miner.filter_each(emb, id_map, support_map, out_queue);
 			miner.filter_each(emb, cg_map, out_queue);
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("Filter")
 	);
+	std::cout << "Done filtering\n";
 	//*/
 }
 
-#define DEBUG 0
 void FsmSolver(Graph &graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueue queue, filtered_queue;
@@ -224,9 +213,11 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 	CgMap cg_map; // canonical graph map
-	EmbeddingLists emb_lists;
-	QpLists qp_lists;
-	int num_freq_patterns = aggregator(miner, queue, cg_map, emb_lists, qp_lists);
+	UintMap id_map, support_map;
+	cg_map.clear();
+	id_map.clear();
+	//EmbeddingLists emb_lists;
+	int num_freq_patterns = aggregator(miner, queue, cg_map, id_map, support_map);
 	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n";
 		return;
@@ -236,8 +227,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 	if(show) miner.printout_agg(cg_map);
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
-	filter(miner, cg_map, qp_lists, emb_lists, filtered_queue);
-	//filter(miner, queue, filtered_queue, cg_map);
+	filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 	printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
@@ -247,23 +237,20 @@ void FsmSolver(Graph &graph, Miner &miner) {
 		queue.clear();
 		galois::for_each(
 			galois::iterate(filtered_queue),
-			[&](const Embedding& embedding, auto& ctx) {
-				miner.extend_edge(k, embedding, queue);
+			[&](const Embedding& emb, auto& ctx) {
+				miner.extend_edge(k, emb, queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Join")
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Join")
 		);
 		miner.update_embedding_size();
 		printout_embeddings(level, miner, queue);
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
-		for (auto list : emb_lists) list.clear();
-		for (auto list : qp_lists) list.clear();
-		emb_lists.clear();
-		qp_lists.clear();
-		num_freq_patterns = aggregator(miner, queue, cg_map, emb_lists, qp_lists);
+		id_map.clear();
+		support_map.clear();
+		num_freq_patterns = aggregator(miner, queue, cg_map, id_map, support_map);
 		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 		if(show) miner.printout_agg(cg_map);
@@ -271,8 +258,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
-		filter(miner, cg_map, qp_lists, emb_lists, filtered_queue);
-		//filter(miner, queue, filtered_queue, cg_map);
+		filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 		printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
@@ -314,12 +300,9 @@ int main(int argc, char** argv) {
 	unsigned sizeof_emb = 2 * sizeof(ElementType);
 	Miner miner(&graph, sizeof_emb);
 	miner.set_threshold(minsup);
-	//galois::reportPageAlloc("MeminfoPre");
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	FsmSolver(graph, miner);
 	Tcomp.stop();
-	//galois::reportPageAlloc("MeminfoPost");
-	//std::cout << "merge_time = " << merge_time << std::endl;
 	return 0;
 }

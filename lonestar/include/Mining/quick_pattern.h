@@ -15,9 +15,29 @@ friend std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_
 public:
 	QuickPattern() { }
 	QuickPattern(unsigned subgraph_size) {
-		id = -1;
-		size = subgraph_size/ sizeof(ElementType);
+		hash_value = 0;
+		cg_id = 0;
+		size = subgraph_size / sizeof(ElementType);
 		elements = new ElementType[size];
+	}
+	QuickPattern(const Embedding & emb) {
+		cg_id = 0;
+		size = emb.size();
+		unsigned bytes = size * sizeof(ElementType);
+		elements = new ElementType[size];
+		std::memcpy(elements, emb.data(), bytes);
+		std::unordered_map<VertexId, VertexId> map;
+		VertexId new_id = 1;
+		for(unsigned i = 0; i < size; i++) {
+			auto& element = elements[i];
+			VertexId old_id = element.vertex_id;
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				element.set_vertex_id(new_id);
+				map[old_id] = new_id++;
+			} else element.set_vertex_id(iterator->second);
+		}
+		set_hash();
 	}
 	~QuickPattern() {}
 	//operator for map
@@ -42,8 +62,8 @@ public:
 		}
 		return a; 
 	}
-	unsigned get_hash() const {
-		//TODO
+	inline unsigned get_hash() const { return hash_value; }
+	inline void set_hash() {
 		bliss::UintSeqHash h;
 		h.update(size);
 		//hash vertex labels and edges
@@ -55,21 +75,22 @@ public:
 #endif
 			h.update(element.history_info);
 		}
-		return h.get_value();
+		hash_value = h.get_value();
+		//return h.get_value();
 	}
-	ElementType& at(unsigned index) const {
-		return elements[index];
-	}
+	ElementType& at(unsigned index) const { return elements[index]; }
 	inline unsigned get_size() const { return size; }
 	inline ElementType* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
-	inline int get_id() const { return id; }
-	void set_id(int i) { id = i; }
+	inline unsigned get_id() const { return hash_value; }
+	inline unsigned get_cgid() const { return cg_id; }
+	void set_cgid(unsigned i) { cg_id = i; }
 
 private:
 	unsigned size;
 	ElementType* elements;
-	int id; // quick pattern ID
+	unsigned hash_value; // quick pattern ID
+	unsigned cg_id; // ID of the canonical pattern that this quick pattern belongs to
 };
 
 std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern) {

@@ -49,12 +49,8 @@ void initialization(Graph& graph, EmbeddingQueue &queue) {
 	printf("\n=============================== Init ===============================\n\n");
 	galois::do_all(
 		// for each vertex
-		//galois::iterate(graph),
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
-			//Graph::edge_iterator first = graph.edge_begin(src);
-			//Graph::edge_iterator last = graph.edge_end(src);
-			//for (auto e = first; e != last; ++ e) {
 			// for each edge of this vertex
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
@@ -107,12 +103,11 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
 		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		//miner.quick_aggregate(queue, qp_map); // sequential implementaion
-
 		// Parallel quick pattern aggregation
 		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
 		galois::for_each(
 			galois::iterate(queue),
-			[&](const Embedding& emb, auto& ctx) {
+			[&](Embedding& emb, auto& ctx) {
 				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -133,15 +128,6 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
 		CgMapFreq cg_map; // canonical graph map for couting the frequency
 		//miner.canonical_aggregate(qp_map, cg_map);
-		/*
-		// sequential implementation
-		for (auto qp = qp_map.begin(); qp != qp_map.end(); ++ qp) {
-			QuickPattern subgraph = qp->first;
-			int count = qp->second;
-			miner.canonical_aggregate_each(subgraph, count, cg_map);
-		}
-		//*/
-
 		// Parallel canonical pattern aggregation
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(
