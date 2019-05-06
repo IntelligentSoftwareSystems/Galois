@@ -132,13 +132,11 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(
 			galois::iterate(qp_map),
-			[&](std::pair<QuickPattern, int> qp) {
-				QuickPattern subgraph = qp.first;
-				int count = qp.second;
-				miner.canonical_aggregate_each(subgraph, count, *(cg_localmap.getLocal())); // canonical pattern aggregation
+			[&](std::pair<QuickPattern, Frequency> qp) {
+				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalAggregation")
 		);
 		// merging results sequentially

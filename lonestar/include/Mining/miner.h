@@ -181,12 +181,12 @@ public:
 			// if this quick pattern already exists, increase its count
 			qp_map[qp] += 1;
 			emb.set_qpid(qp.get_id());
+			qp.clean();
 		// otherwise add this quick pattern into the map, and set the count as one
 		} else {
 			qp_map[qp] = 1;
 			emb.set_qpid(qp.get_id());
 		}
-		qp.clean();
 	}
 	inline void quick_aggregate_each(Embedding& emb, QpMapDomain& qp_map) {
 		QuickPattern qp(emb);
@@ -215,7 +215,7 @@ public:
 		}
 	}
 	// aggregate quick patterns into canonical patterns.
-	void canonical_aggregate_each(QuickPattern qp, Frequency freq, CgMapFreq &cg_map) {
+	inline void canonical_aggregate_each(QuickPattern qp, Frequency freq, CgMapFreq &cg_map) {
 		// turn the quick pattern into its canonical pattern
 		CanonicalGraph* cg = turn_canonical_graph(qp, false);
 		qp.clean();
