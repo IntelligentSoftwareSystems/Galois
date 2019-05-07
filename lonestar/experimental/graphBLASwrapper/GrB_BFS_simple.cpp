@@ -1,3 +1,9 @@
+/*
+(*
+(* This code does not support accumulate/semiring/types yet..
+(* It is designed only for BFS_simple; all the types and operations are limited.
+(*
+*/
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/LargeArray.h"
@@ -10,10 +16,9 @@
 
 namespace cll = llvm::cl;
 
-// TODO it should be sparse vector.
 template <typename T>
 using GrB_Vector = galois::LargeArray<T>;
-
+using GrB_Index  = uint64_t;
 using GrB_Matrix =
     galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_no_lockable<true>::type;
 using GNode = GrB_Matrix::GraphNode;
@@ -28,7 +33,6 @@ static cll::opt<int>
 static cll::opt<uint32_t>
     startNode("startNode", cll::desc("Start node (default value 0)"),
             cll::init(0));
-
 template <typename T>
 void GrB_print_Vector (GrB_Vector<T> &v) {
     std::cout << "***********" << std::endl;
@@ -36,44 +40,67 @@ void GrB_print_Vector (GrB_Vector<T> &v) {
         std::cout << i << ":" << v[i] << std::endl;
 }
 
-template <typename T, typename K = bool, typename I=uint64_t>
-void GrB_assign (GrB_Vector<T>& w,
-        const GrB_Vector<K>& mask,
+// assign a scalar to subvector.
+// in this version, it only supports w<mask>(I) = accum (w(I), x).
+template <typename T, typename K=bool>
+void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
+        GrB_Vector<K>& mask, // optional mask for w, unused if NULL
         const int accum, // incomplete type.
-        const T x,
-        const I *ri,
-        const I ni,
+        const T x, // scalar to assign to w(I)
+        const GrB_Index *I, // row indices
+        const GrB_Index ni, // # of row indices
         const int desc // incompelete type.
         ) {
-    galois::do_all(galois::iterate(0ul, w.size()),
-            [&] (uint64_t idx) {
+    galois::do_all(galois::iterate((GrB_Index) 0, ni),
+            [&] (GrB_Index idx) {
                 if (mask[idx]) {
                     w[idx] = x;
                 }
-            }, galois::loopname("VectorAssignment"),
-               galois::steal() );
+            },
+            galois::loopname("VectorAssignment"),
+            galois::steal() );
 }
 
+// assign a scalar to subvector.
+// in this version, it only supports w<mask>(I) = accum (w(I), x).
+template <typename T>
+void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
+        void* mask,
+        const int accum, // incomplete type.
+        const T x, // scalar to assign to w(I)
+        const GrB_Index *I, // row indices
+        const GrB_Index ni, // # of row indices
+        const int desc // incompelete type.
+        ) {
+    galois::do_all(galois::iterate((GrB_Index) 0, ni),
+            [&] (GrB_Index idx) { w[idx] = x; },
+            galois::loopname("VectorAssignment"),
+            galois::steal() );
+}
+
+// add a single entry to a vector.
+// In our context, just set `x` to w[i].
 template <typename T>
 void GrB_Vector_setElement (GrB_Vector<T>& w,
         const T x,
-        uint64_t n) {
-    galois::do_all(galois::iterate(0ul, n),
-            [&] (uint64_t idx) {
-                w[idx] = x;
-            }, galois::loopname("SetElement"),
-               galois::steal() );
+        const GrB_Index i) {
+    w[i] = x;
 }
 
+// reduce a vector to scalar.
+// NOTE: there is another version for matrix: not yet implemented.
 template <typename T, typename K>
 void GrB_reduce (T *c,
         const void *accum,
         const void *monoid, // assume LOR
         const GrB_Vector<K> &u,
         const void *desc) {
+    T& cr = *c;
     galois::do_all(galois::iterate(0ul, u.size()),
             [&] (uint64_t idx) {
-               *c = u[idx] || c;
+               if (!cr && u[idx]) {
+                   cr = u[idx] || cr;
+               }
             }, galois::loopname("Reduce"),
                galois::steal() );
 }
@@ -96,39 +123,70 @@ void GrB_vxm (GrB_Vector<T> &w,
         GrB_Vector<K> &mask,
         const void *accum, // assume NULL
         const void *semiring, // assume LOR_LAND_BOOL
-        const GrB_Vector<T> &u,
+        GrB_Vector<T> &u,
         GrB_Matrix &A,
         const void *desc) { // assume original, original, complemented v, replace
+    // copy operand vector to temporary larray.
+    // we use initial `u` array to compute below multiplication.
+    // however, if w and u are the same objects, it does not work correctly.
+    // also, larray does not support const copy operation.
+
     GrB_Vector<T> tmpV;
     tmpV.allocateInterleaved(u.size());
     std::copy(u.begin(), u.end(), tmpV.begin());
-    galois::do_all(galois::iterate(0ul, w.size()),
-            [&] (uint32_t idx) {
-                if (!mask[idx]) {
+
+    uint64_t size = A.size();
+    // if replacable, w is initialized.
+    galois::do_all(galois::iterate(0ul, size),
+            [&] (uint64_t idx) {
+                w[idx] = 0;
+            }, galois::loopname("InitializeW"), galois::steal() );
+
+    galois::do_all(galois::iterate(0ul, size),
+            [&] (uint64_t idx) {
+                if (tmpV[idx]) {
                     for (auto e : A.edges(idx)) {
                         auto jdx = A.getEdgeDst(e);
-                        w[idx] = (w[idx] || (tmpV[jdx] && 1));
+                        if (!mask[jdx]) {
+                            w[jdx] = (w[jdx] || 1);
+                        }
                     }
-                } else {
-                    w[idx] = 0;
                 }
             },
-            galois::loopname("DVxSPM") );
-            //galois::steal() ); // make results inconsistent..
+            galois::loopname("DVxSPM"),
+            galois::steal() );
+
+    tmpV.destroy();
+    tmpV.deallocate();
 }
 
+// create a vector.
 template <typename T>
 void GrB_Vector_new (GrB_Vector<T> *v,
                     int type, uint64_t size) {
     v->allocateInterleaved(size);
 }
 
+// print out the results.
 template <typename T>
 void GrB_Dump_Vector (GrB_Vector<T> &v) {
     std::ofstream dmpfp("label.out");
-    for (int i = 0; i < v.size(); i++)
+    for (uint64_t i = 0; i < v.size(); i++)
         dmpfp << i << "," << v[i] << "\n";
     dmpfp.close();
+}
+
+// return the number of entries in a vector.
+template <typename T>
+void GrB_Vector_nvals (GrB_Index *nvals,
+                       const GrB_Vector<T> &v) {
+    *nvals = v.size();
+}
+
+// return the number of rows of a matrix.
+void GrB_Matrix_nrows (GrB_Index *nrows,
+                       const GrB_Matrix &A) {
+    *nrows = A.size();
 }
 
 int main(int argc, char** argv) {
@@ -137,43 +195,53 @@ int main(int argc, char** argv) {
 
     numThreads = galois::setActiveThreads(numThreads);
 
-    GrB_Vector<uint64_t> v;
+    GrB_Vector<uint32_t> v;
     GrB_Vector<bool> q;
+    GrB_Matrix A;
+    GrB_Index n, nvals;
 
-    GrB_Matrix graph;
-    // CSC format.
-    galois::graphs::readGraph(graph, filename);
+    galois::graphs::readGraph(A, filename);
+    GrB_Matrix_nrows (&n, A);
 
     std::cout << " Input graph is : " << filename << "\n";
     std::cout << " The number of active threads is : " << numThreads << "\n";
+    std::cout << " The number of nodes is : " << A.size() << "\n";
+
+    galois::StatTimer mainTimer("MainTimer");
+    mainTimer.start();
+
+    // create an empty vector v, and make it dense.
+    // v maintains labels for each node.
+    GrB_Vector_new(&v, 0, n);
+    GrB_assign(v, NULL, -1, 0u, NULL, n, -1);
+    GrB_Vector_nvals(&n, v);
+
+    // create a boolean vector q, and set q(s) to true.
+    GrB_Vector_new(&q, 0, n);
+    GrB_Vector_setElement(q, true, startNode);
 
     galois::StatTimer bfsTimer("BFStimer");
     bfsTimer.start();
-
-    GrB_Vector_new(&v, 0, graph.size());
-    GrB_Vector_new(&q, 0, graph.size());
-
-    GrB_Vector_setElement(v, 0ul, graph.size());
-    GrB_Vector_setElement(q, false, graph.size());
-
-    // Start Node
-    q[startNode] = true;
-    uint64_t level = 1;
-    for (int64_t level = 1; level <= graph.size(); level ++) {
+    // BFS traversal and label the nodes.
+    uint32_t level = 1;
+    for (; level <= n; level ++) {
         // v<q> = level
-        GrB_assign<uint64_t>(v, q, -1, level, (uint64_t *) NULL, graph.size(), -1);
+        GrB_assign (v, q, -1, level, NULL, n, -1);
 
         // successor = ||(q)
         bool anyq = false;
-        GrB_reduce(&anyq, NULL, NULL, q, NULL);
-        //GrB_print_Vector(q);
-        if (!anyq) break;
+        GrB_reduce (&anyq, NULL, NULL, q, NULL);
+        if (!anyq) { printf("break\n"); break; }
 
         // q`[!v] = `q or.and A
-        GrB_vxm (q, v, NULL, NULL, q, graph, NULL);
+        GrB_vxm (q, v, NULL, NULL, q, A, NULL);
+        //GrB_print_Vector(q);
     }
-
     bfsTimer.stop();
+    mainTimer.stop();
+    //GrB_assign (v, v, -1, v, NULL, n, -1);
+    GrB_Vector_nvals (&nvals, v);
+
 
     GrB_Dump_Vector(v);
 
