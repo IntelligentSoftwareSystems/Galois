@@ -98,9 +98,9 @@ private:
   //! The graph to handle communication for
   GraphTy& userGraph;
   const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
-  const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   bool transposed;  //!< Marks if passed in graph is transposed or not.
   bool isVertexCut;  //!< Marks if passed in graph's partitioning is vertex cut.
+  const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
 
@@ -113,7 +113,6 @@ private:
   //! @todo pass the flag as function paramater instead
   BITVECTOR_STATUS* currentBVFlag;
 
-
   // memoization optimization
   //! Master nodes on different hosts. For broadcast;
   std::vector<std::vector<size_t>> masterNodes;
@@ -123,15 +122,12 @@ private:
   //! Maximum size of master or mirror nodes on different hosts
   size_t maxSharedSize;
 
-
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
   // Used for efficient comms
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
-
-
 
   /**
    * Reset a provided bitset given the type of synchronization performed
@@ -140,26 +136,29 @@ private:
    * @param bitset_reset_range Function to reset range with
    */
   void reset_bitset(SyncType syncType,
-                    void (*bitset_reset_range)(size_t, size_t)) const = 0;
-// TODO
-//    if (base_DistGraph::numOwned > 0) {
-//      if (syncType == base_DistGraph::syncBroadcast) { // reset masters
-//        bitset_reset_range(0, base_DistGraph::numOwned - 1);
-//      } else {
-//        assert(syncType == base_DistGraph::syncReduce);
-//        // mirrors occur after masters
-//        if (base_DistGraph::numOwned < numNodes) {
-//          bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
-//        }
-//      }
-//    } else { // all things are mirrors
-//      // only need to reset if reduce
-//      if (syncType == base_DistGraph::syncReduce) {
-//        if (numNodes > 0) {
-//          bitset_reset_range(0, numNodes - 1);
-//        }
-//      }
-//    }
+                    void (*bitset_reset_range)(size_t, size_t)) {
+    size_t numMasters = userGraph.numMasters();
+    if (numMasters > 0) {
+      // note this assumes masters are from 0 -> a number; CuSP should
+      // do this automatically
+      if (syncType == syncBroadcast) { // reset masters
+        bitset_reset_range(0, numMasters - 1);
+      } else {
+        assert(syncType == syncReduce);
+        // mirrors occur after masters
+        if (numMasters < userGraph.size()) {
+          bitset_reset_range(numMasters, userGraph.size() - 1);
+        }
+      }
+    } else { // all things are mirrors
+      // only need to reset if reduce
+      if (syncType == syncReduce) {
+        if (userGraph.size() > 0) {
+          bitset_reset_range(0, userGraph.size() - 1);
+        }
+      }
+    }
+  }
 
   // TODO this needs to be public
   /**
@@ -170,7 +169,7 @@ private:
    */
   template <typename FnTy>
   void reset_mirrorField() {
-    auto mirrorRanges = getMirrorRanges();
+    auto mirrorRanges = userGraph.getMirrorRanges();
     for (auto r : mirrorRanges) {
       if (r.first == r.second) continue;
       assert(r.first < r.second);
@@ -243,8 +242,8 @@ private:
   void sendInfoToHost() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    uint64_t global_total_mirror_nodes = size() - numOwned;
-    uint64_t global_total_owned_nodes  = numOwned;
+    uint64_t global_total_mirror_nodes = userGraph.size() - userGraph.numMasters();
+    uint64_t global_total_owned_nodes  = userGraph.numMasters();
 
     // send info to host
     for (unsigned x = 0; x < numHosts; ++x) {
@@ -275,7 +274,7 @@ private:
     }
     incrementEvilPhase();
 
-    assert(numGlobalNodes == global_total_owned_nodes);
+    assert(userGraph.globalSize() == global_total_owned_nodes);
     // report stats
     if (net.ID == 0) {
       reportProxyStats(global_total_mirror_nodes, global_total_owned_nodes);
@@ -368,13 +367,13 @@ private:
   void reportProxyStats(uint64_t global_total_mirror_nodes,
                         uint64_t global_total_owned_nodes) {
     float replication_factor =
-        (float)(global_total_mirror_nodes + numGlobalNodes) /
-        (float)numGlobalNodes;
+        (float)(global_total_mirror_nodes + userGraph.globalSize()) /
+        (float)userGraph.globalSize();
     galois::runtime::reportStat_Single(RNAME, "ReplicationFactor",
                                        replication_factor);
 
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
-        RNAME, "TotalNodes", numGlobalNodes);
+        RNAME, "TotalNodes", userGraph.globalSize());
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
         RNAME, "TotalGlobalMirrorNodes", global_total_mirror_nodes);
   }
@@ -427,12 +426,6 @@ private:
   }
 
 public:
-  // TODO see if necessary
-  //! Type representing a node in this graph
-  using GraphNode = typename GraphTy::GraphNode;
-  //! iterator type over edges
-  using edge_iterator = typename GraphTy::edge_iterator;
-
   /**
    * Delete default constructor: this class NEEDS to have a graph passed into
    * it.
@@ -449,17 +442,15 @@ public:
                  bool _transposed, bool _isVertexCut)
       : galois::runtime::GlobalObject(this), userGraph(_userGraph),
         id(host), transposed(_transposed), isVertexCut(_isVertexCut),
-        numHosts(numHosts), num_run(0), num_round(0), currentBVFlag(nullptr) {
+        numHosts(numHosts), num_run(0), num_round(0), currentBVFlag(nullptr),
+        mirrorNodes(userGraph.getMirrorNodes()) {
     enforce_data_mode = enforce_metadata;
     initBareMPI();
-    // get mirrors from passed in graph (should have it)
-    mirrorNodes = userGraph.getMirrorNodes();
-
     // master setup from mirrors done by setupCommunication call
     masterNodes.resize(numHosts);
     // setup proxy communication
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
-        "GraphCommSetupTime", GRNAME);
+        "GraphCommSetupTime", RNAME);
     Tgraph_construct_comm.start();
     setupCommunication();
     Tgraph_construct_comm.stop();
