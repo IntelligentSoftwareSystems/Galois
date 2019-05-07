@@ -35,7 +35,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif(default value 0)"), cll::init(0));
-static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
+static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -76,7 +76,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 	initialization(graph, queue);
 	if(show) printout_embeddings(0, miner, queue);
 	unsigned level = 1;
-	int queue_size = std::distance(queue.begin(), queue.end());
+	//int queue_size = std::distance(queue.begin(), queue.end());
 	//std::cout << "Queue size = " << queue_size << std::endl;
 
 	// a level-by-level approach for Apriori search space (breadth first seach)
@@ -160,7 +160,6 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinit("GraphReadingTime");
 	Tinit.start();
 	read_graph(graph, filetype, filename);
