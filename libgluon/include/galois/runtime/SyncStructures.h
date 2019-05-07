@@ -29,6 +29,7 @@
 
 #include <cstdint>                // for uint types used below
 #include <galois/AtomicHelpers.h> // for galois::max, min
+#include <galois/runtime/DataCommMode.h> // for galois::max, min
 #include <galois/gIO.h>           // for GALOIS DIE
 
 ////////////////////////////////////////////////////////////////////////////////
