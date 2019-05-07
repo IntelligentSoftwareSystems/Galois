@@ -28,6 +28,7 @@
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
+#include "galois/graphs/GluonSubstrate.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "bfs_push_cuda.h"
@@ -35,6 +36,7 @@ struct CUDA_Context* cuda_ctx;
 #endif
 
 constexpr static const char* const regionname = "BFS";
+
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -83,6 +85,8 @@ uint32_t numThreadBlocks;
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
+galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+
 #include "bfs_push_sync.hh"
 
 /******************************************************************************/
@@ -103,7 +107,7 @@ struct InitializeGraph {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str(_graph.get_run_identifier("InitializeGraph_"));
+      std::string impl_str(syncSubstrate->get_run_identifier("InitializeGraph_"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
@@ -115,7 +119,7 @@ struct InitializeGraph {
                      InitializeGraph{src_node, infinity, &_graph},
                      galois::no_stats(),
                      galois::loopname(
-                         _graph.get_run_identifier("InitializeGraph").c_str()));
+                         syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -156,10 +160,10 @@ struct FirstItr_BFS {
       __begin = 0;
       __end   = 0;
     }
-    _graph.set_num_round(0);
+    syncSubstrate->set_num_round(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str(_graph.get_run_identifier("BFS"));
+      std::string impl_str(syncSubstrate->get_run_identifier("BFS"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
 #if DIST_PER_ROUND_TIMER
@@ -170,10 +174,10 @@ struct FirstItr_BFS {
 #endif
       StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
-      std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-      std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
+      std::string identifer(syncSubstrate->get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
+      std::string tb_identifer(syncSubstrate->get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
       ReportThreadBlockWork(0, identifer, tb_identifer);
-      std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
+      std::string acive_identifer(syncSubstrate->get_run_identifier("NumActiveVertices"));
       galois::runtime::reportParam(regionname, acive_identifer, std::to_string(active_vertices));
 #endif
 
@@ -184,14 +188,14 @@ struct FirstItr_BFS {
       galois::do_all(
           galois::iterate(__begin, __end), FirstItr_BFS{&_graph},
           galois::no_stats(),
-          galois::loopname(_graph.get_run_identifier("BFS").c_str()));
+          galois::loopname(syncSubstrate->get_run_identifier("BFS").c_str()));
     }
 
-    _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                Bitset_dist_current>("BFS");
+    syncSubstrate->sync<writeDestination, readSource, Reduce_min_dist_current,
+                    Bitset_dist_current>("BFS");
 
     galois::runtime::reportStat_Tsum(
-        regionname, _graph.get_run_identifier("NumWorkItems"), __end - __begin);
+        regionname, syncSubstrate->get_run_identifier("NumWorkItems"), __end - __begin);
   }
 
   void operator()(GNode src) const {
@@ -244,13 +248,13 @@ struct BFS {
       //if (work_edges.reduce() == 0) 
       priority += delta;
 
-      _graph.set_num_round(_num_iterations);
+      syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
       work_edges.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
 
-        std::string impl_str(_graph.get_run_identifier("BFS"));
+        std::string impl_str(syncSubstrate->get_run_identifier("BFS"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
@@ -265,11 +269,11 @@ struct BFS {
         work_edges += __retval2;
         StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
-        std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-        std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
+        std::string identifer(syncSubstrate->get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
+        std::string tb_identifer(syncSubstrate->get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
         ReportThreadBlockWork(_num_iterations, identifer, tb_identifer);
 
-        std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
+        std::string acive_identifer(syncSubstrate->get_run_identifier("NumActiveVertices"));
         galois::runtime::reportParam(regionname, acive_identifer, std::to_string(active_vertices));
 #endif
       } else if (personality == CPU)
@@ -278,22 +282,22 @@ struct BFS {
         galois::do_all(
             galois::iterate(nodesWithEdges), BFS(priority, &_graph, dga, work_edges), galois::steal(),
             galois::no_stats(),
-            galois::loopname(_graph.get_run_identifier("BFS").c_str()));
+            galois::loopname(syncSubstrate->get_run_identifier("BFS").c_str()));
       }
-      _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Bitset_dist_current, async>("BFS");
+      syncSubstrate->sync<writeDestination, readSource, Reduce_min_dist_current,
+                          Bitset_dist_current, async>("BFS");
 
       galois::runtime::reportStat_Tsum(
-          regionname, _graph.get_run_identifier("NumWorkItems"),
+          regionname, syncSubstrate->get_run_identifier("NumWorkItems"),
           (unsigned long)work_edges.read_local());
 
       ++_num_iterations;
     } while (
              (async || (_num_iterations < maxIterations)) &&
-             dga.reduce(_graph.get_run_identifier()));
+             dga.reduce(syncSubstrate->get_run_identifier()));
 
     galois::runtime::reportStat_Tmax(
-        regionname, "NumIterations_" + std::to_string(_graph.get_run_num()),
+        regionname, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
         (unsigned long)_num_iterations);
   }
 
@@ -413,6 +417,9 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, void>();
 #endif
 
+  syncSubstrate = new galois::graphs::GluonSubstrate<Graph>(*hg, net.ID,
+                        net.Num, hg->isTransposed(), false);
+
   // bitset comm setup
   bitset_dist_current.resize(hg->size());
 
@@ -449,7 +456,7 @@ int main(int argc, char** argv) {
 #endif
         bitset_dist_current.reset();
 
-      (*hg).set_num_run(run + 1);
+      syncSubstrate->set_num_run(run + 1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
     }
