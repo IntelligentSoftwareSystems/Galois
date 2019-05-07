@@ -23,7 +23,7 @@
 #include "galois/Galois.h"
 #include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
-#include "galois/graphs/DistributedGraphLoader.h"
+#include "DistributedGraphLoader.h"
 #include "galois/AtomicHelpers.h"
 #ifdef GALOIS_USE_EXP
 #include "galois/CompilerHelpers.h"
