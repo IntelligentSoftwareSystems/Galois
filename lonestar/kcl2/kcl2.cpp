@@ -50,7 +50,6 @@ static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #include "Lonestar/subgraph.h"
 int core;
@@ -185,33 +184,11 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph(true);
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "mtx") {
-		printf("Reading .mtx file: %s\n", filename.c_str());
-		mgraph.read_mtx(filename.c_str(), true); //symmetrize
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		Graph g_temp;
-		galois::graphs::readGraph(g_temp, filename);
-		for (GNode n : g_temp) g_temp.getData(n) = 1;
-		mgraph.read_gr(g_temp); //symmetrize
-		genGraph(mgraph, graph);
-	} else { galois::gPrint("Unkown file format\n"); exit(1); }
-	core = mgraph.get_core();
+	core = read_graph(graph, filetype, filename, true);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	//print_graph(graph);
 
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
@@ -220,6 +197,7 @@ int main(int argc, char** argv) {
 			KclSolver(graph);
 			break;
 		case edgeiterator:
+			std::cerr << "Not supported currently\n";
 			break;
 		default:
 			std::cerr << "Unknown algo: " << algo << "\n";

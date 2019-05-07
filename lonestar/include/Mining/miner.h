@@ -2,8 +2,6 @@
 #define MINER_HPP_
 #include "quick_pattern.h"
 #include "canonical_graph.h"
-#include <omp.h>
-//#include "concurrent_map.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 #include "galois/substrate/PerThreadStorage.h"
@@ -120,7 +118,7 @@ public:
 			}
 		}
 	}
-	// given an embedding, extend it with one more vertex. Used for k-cliques
+	// Given an embedding, extend it with one more vertex. Used for k-cliques
 	void extend_vertex(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
@@ -136,7 +134,8 @@ public:
 			}
 		}
 	}
-	// given an embedding, extend it with one more vertex. Used for k-cliques
+	// Given an embedding, extend it with one more vertex. Used for k-cliques.
+	// Requires the input graph to be a DAG, and therefore ordering is pre-defined.
 	void extend_vertex_DAG(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
@@ -361,7 +360,6 @@ public:
 		delete cf;
 	}
 	inline void filter(EmbeddingQueue &in_queue, const UintMap id_map, const UintMap support_map, EmbeddingQueue &out_queue) {
-		//#pragma omp parallel for
 		for (auto emb : in_queue) {
 			unsigned qp_id = emb.get_qpid();
 			unsigned cg_id = id_map.at(qp_id);

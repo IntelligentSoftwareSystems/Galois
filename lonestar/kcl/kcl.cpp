@@ -27,41 +27,27 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <utility>
-#include <vector>
-#include <algorithm>
-#include <iostream>
-#include <fstream>
 #define USE_SIMPLE
-#define DEBUG 0
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph";
+const char* desc = "Counts the K-Cliques in a graph using BFS traversal";
 const char* url  = 0;
-
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
+static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 #include "Mining/miner.h"
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
 
 // insert edges into the worklist (task queue)
 void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
-	//printf("\n=============================== Init ===============================\n");
+	if(show) printf("\n=============================== Init ===============================\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
@@ -80,14 +66,14 @@ void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
 }
 
 void KclSolver(Graph& graph, Miner &miner) {
-	//std::cout << "=============================== Start ===============================\n";
+	if(show) std::cout << "\n=============================== Start ===============================\n";
 	BaseEmbeddingQueue queue, queue2;
 	initialization(graph, queue);
-	//printout_embeddings(0, miner, queue, DEBUG);
+	if(show) printout_embeddings(0, miner, queue);
 	unsigned level = 1;
 	while (level < k-1) {
-		//std::cout << "\n============================== Level " << level << " ==============================\n";
-		//std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
+		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
+		if(show) std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
 		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
@@ -99,12 +85,15 @@ void KclSolver(Graph& graph, Miner &miner) {
 			galois::loopname("ExtendVertex")
 		);
 		miner.update_base_embedding_size(); // increase the embedding size since one more edge added
-		//printout_embeddings(level, miner, queue2, DEBUG);
+		if(show) printout_embeddings(level, miner, queue2);
 
-		//std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
+		if(show) std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		queue.clear();
 #if 1
+		galois::StatTimer Tagg("Aggregation");
+		Tagg.start();
 		miner.aggregate_clique(queue2, queue); // sequential implementaion
+		Tagg.stop();
 /*
 		SimpleConcurrentMap map;
 		galois::for_each(
@@ -144,11 +133,10 @@ void KclSolver(Graph& graph, Miner &miner) {
 			}
 		}
 #endif
-		//printout_embeddings(level, miner, queue, DEBUG);
+		if(show) printout_embeddings(level, miner, queue);
 		level ++;
-		//std::cout << "Number of " << level+1 << "-cliques is: " << std::distance(queue.begin(), queue.end()) << "\n";
 	}
-	//std::cout << "\n=============================== Done ===============================\n\n";
+	if(show) std::cout << "\n=============================== Done ===============================\n";
 	galois::gPrint("\n\ttotal_num_cliques = ", std::distance(queue.begin(), queue.end()), "\n\n");
 }
 
@@ -156,42 +144,18 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "mtx") {
-		printf("Reading .mtx file: %s\n", filename.c_str());
-		mgraph.read_mtx(filename.c_str(), true); //symmetrize
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) graph.getData(n) = 1;
-	} else { printf("Unkown file format\n"); exit(1); }
-	//print_graph(graph);
+	read_graph(graph, filetype, filename);
+	Tinitial.stop();
+
 	unsigned sizeof_embedding = 2 * sizeof(SimpleElement);
 	Miner miner(&graph, sizeof_embedding);
-	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	switch (algo) {
-		case nodeiterator:
-			KclSolver(graph, miner);
-			break;
-		case edgeiterator:
-			break;
-		default:
-			std::cerr << "Unknown algo: " << algo << "\n";
-	}
+	KclSolver(graph, miner);
 	Tcomp.stop();
 	return 0;
 }

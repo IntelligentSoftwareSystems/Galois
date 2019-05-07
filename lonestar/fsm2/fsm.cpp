@@ -27,15 +27,9 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#include <vector>
-#include <utility>
-#include <fstream>
-#include <iostream>
-#include <algorithm>
 #include "Lonestar/common_types.h"
 
 #define ENABLE_LABEL
-#define DEBUG 0
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
@@ -50,7 +44,6 @@ typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::wi
 typedef Graph::GraphNode GNode;
 
 #include "Dfscode/miner.h"
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 4
 
@@ -101,8 +94,6 @@ void FsmSolver(Graph& graph, Miner& miner) {
 	PatternMap3D pattern_map; // mapping patterns to their embedding list
 	PatternQueue task_queue; // task queue holding the DFScodes of patterns
 	init(graph, miner, pattern_map, task_queue); // insert single-edge patterns into the queue
-	//if(DEBUG) printout_embeddings(miner, queue);
-	//std::cout << "numThreads = " << numThreads << " status.size() = " << status.size() << "\n";
 	for(size_t i = 0; i < status.size(); i++) {
 		status.getLocal(i)->frequent_patterns_count = 0;
 		status.getLocal(i)->thread_id = i;
@@ -150,34 +141,16 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinit("GraphReading");
 	Tinit.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) {
-			graph.getData(n) = rand() % 10 + 1;
-			for (auto e : graph.edges(n)) {
-				graph.getEdgeData(e) = 1;
-			}
-		}
-	} else { printf("Unkown file format\n"); exit(1); }
-	Miner miner(&graph, k, minsup, numThreads, show);
+	read_graph(graph, filetype, filename);
 	Tinit.stop();
-
-	std::cout << "k = " << k << std::endl;
-	std::cout << "minsup = " << minsup << std::endl;
-	std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+
+	//std::cout << "k = " << k << std::endl;
+	//std::cout << "minsup = " << minsup << std::endl;
+	//std::cout << "num_threads = " << numThreads << std::endl;
+	Miner miner(&graph, k, minsup, numThreads, show);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	FsmSolver(graph, miner);

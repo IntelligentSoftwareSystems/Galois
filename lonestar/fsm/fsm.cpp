@@ -30,33 +30,22 @@
 
 #define ENABLE_LABEL
 //#define USE_DOMAIN
-#define DEBUG 0
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using BFS traversal";
 const char* url  = 0;
 
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
-
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
 static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 int total_num = 0;
-unsigned long merge_time = 0;
 
 #include "Mining/miner.h"
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
 
@@ -270,33 +259,14 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinit("GraphReading");
 	Tinit.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) {
-			graph.getData(n) = rand() % 10 + 1;
-			for (auto e : graph.edges(n)) {
-				graph.getEdgeData(e) = 1;
-			}
-		}
-	} else { printf("Unkown file format\n"); exit(1); }
+	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	std::cout << "k = " << k << std::endl;
-	std::cout << "minsup = " << minsup << std::endl;
-	std::cout << "num_threads = " << numThreads << std::endl;
+	//std::cout << "k = " << k << std::endl;
+	//std::cout << "minsup = " << minsup << std::endl;
+	//std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	//print_graph(graph);
 	unsigned sizeof_emb = 2 * sizeof(ElementType);
 	Miner miner(&graph, sizeof_emb);
 	miner.set_threshold(minsup);

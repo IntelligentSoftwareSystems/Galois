@@ -1,3 +1,4 @@
+#include "Lonestar/mgraph.h"
 
 void print_graph(Graph &graph) {
 	for (GNode n : graph) {
@@ -27,6 +28,48 @@ void genGraph(MGraph &mg, Graph &g) {
 		}
 	}
 }
+
+// relabel is needed when we use DAG as input graph, and it is disabled when we use symmetrized graph
+int read_graph(Graph &graph, std::string filetype, std::string filename, bool need_relabel = false) {
+	MGraph mgraph(need_relabel);
+	if (filetype == "txt") {
+		printf("Reading .lg file: %s\n", filename.c_str());
+		mgraph.read_txt(filename.c_str());
+		genGraph(mgraph, graph);
+	} else if (filetype == "adj") {
+		printf("Reading .adj file: %s\n", filename.c_str());
+		mgraph.read_adj(filename.c_str());
+		genGraph(mgraph, graph);
+	} else if (filetype == "mtx") {
+		printf("Reading .mtx file: %s\n", filename.c_str());
+		mgraph.read_mtx(filename.c_str(), true); //symmetrize
+		genGraph(mgraph, graph);
+	} else if (filetype == "gr") {
+		printf("Reading .gr file: %s\n", filename.c_str());
+		if(need_relabel) {
+			Graph g_temp;
+			galois::graphs::readGraph(g_temp, filename);
+			for (GNode n : g_temp) g_temp.getData(n) = 1;
+			mgraph.read_gr(g_temp); //symmetrize
+			genGraph(mgraph, graph);
+		} else {
+			galois::graphs::readGraph(graph, filename);
+			for (GNode n : graph) {
+			#ifdef ENABLE_LABEL
+				graph.getData(n) = rand() % 10 + 1;
+				for (auto e : graph.edges(n)) graph.getEdgeData(e) = 1;
+			#else
+				graph.getData(n) = 1;
+			#endif
+			}
+		}
+	} else { printf("Unkown file format\n"); exit(1); }
+	//print_graph(graph);
+	int core = 0;
+	if (need_relabel) core = mgraph.get_core();
+	return core;
+}
+
 /*
 // construct the edge-list for later use. May not be necessary if Galois has this support
 void construct_edgelist(Graph& graph, std::vector<LabeledEdge> &edgelist) {

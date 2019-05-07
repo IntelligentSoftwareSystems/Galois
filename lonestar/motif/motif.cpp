@@ -27,7 +27,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define DEBUG 0
 
 const char* name = "Motif Counting";
 const char* desc = "Counts the motifs in a graph using BFS traversal";
@@ -36,11 +35,11 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif(default value 0)"), cll::init(0));
+static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 #include "Mining/miner.h"
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
 
@@ -75,10 +74,10 @@ void MotifSolver(Graph& graph, Miner &miner) {
 	EmbeddingQueue queue, queue2;
 	// initialize the task queue
 	initialization(graph, queue);
-	if(DEBUG) printout_embeddings(0, miner, queue);
+	if(show) printout_embeddings(0, miner, queue);
 	unsigned level = 1;
 	int queue_size = std::distance(queue.begin(), queue.end());
-	std::cout << "Queue size = " << queue_size << std::endl;
+	//std::cout << "Queue size = " << queue_size << std::endl;
 
 	// a level-by-level approach for Apriori search space (breadth first seach)
 	while (level < k) {
@@ -97,7 +96,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		miner.update_embedding_size(); // increase the embedding size since one more edge added
 		queue.swap(queue2);
 		queue2.clear();
-		printout_embeddings(level, miner, queue);
+		if(show) printout_embeddings(level, miner, queue);
 
 		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
@@ -150,8 +149,8 @@ void MotifSolver(Graph& graph, Miner &miner) {
 			}
 		}
 		miner.printout_agg(cg_map);
-		std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
-			<< " num_embeddings: " << std::distance(queue.begin(), queue.end()) << "\n";
+		if(show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
+					<< " num_embeddings: " << std::distance(queue.begin(), queue.end()) << "\n";
 		level ++;
 	}
 	std::cout << "\n=============================== Done ===============================\n\n";
@@ -164,27 +163,15 @@ int main(int argc, char** argv) {
 	MGraph mgraph;
 	galois::StatTimer Tinit("GraphReadingTime");
 	Tinit.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) graph.getData(n) = 1;
-	} else { printf("Unkown file format\n"); exit(1); }
-	//print_graph(graph);
+	read_graph(graph, filetype, filename);
+	Tinit.stop();
+
 	// the initial size of a embedding is 2 (nodes) for single-edge embeddings
 	unsigned sizeof_embedding = 2 * sizeof(ElementType);
-	galois::gPrint("Embedding Element size: ", sizeof(ElementType), "\n");
 	// a miner defines the operators (join and aggregation)
 	Miner miner(&graph, sizeof_embedding);
-	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	MotifSolver(graph, miner);
