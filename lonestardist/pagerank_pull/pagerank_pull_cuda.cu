@@ -1,10 +1,15 @@
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
+#include "thread_work.h"
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=True $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+struct ThreadWork t_work;
+bool enable_lb = true;
 #include "kernels/reduce.cuh"
 #include "pagerank_pull_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
@@ -31,7 +36,113 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __begin, unsigned int __
   }
   // FP: "10 -> 11;
 }
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout)
+__global__ void InitializeGraph_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, int * thread_prefix_work_wl, unsigned int num_items, PipeContextT<Worklist2> thread_src_wl)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ unsigned int total_work;
+  __shared__ unsigned block_start_src_index;
+  __shared__ unsigned block_end_src_index;
+  unsigned my_work;
+  unsigned src;
+  unsigned int offset;
+  unsigned int current_work;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  unsigned blockdim_x = BLOCK_DIM_X;
+  // FP: "3 -> 4;
+  // FP: "4 -> 5;
+  // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  // FP: "7 -> 8;
+  // FP: "8 -> 9;
+  // FP: "9 -> 10;
+  total_work = thread_prefix_work_wl[num_items - 1];
+  // FP: "10 -> 11;
+  my_work = ceilf((float)(total_work) / (float) nthreads);
+  // FP: "11 -> 12;
+
+  // FP: "12 -> 13;
+  __syncthreads();
+  // FP: "13 -> 14;
+
+  // FP: "14 -> 15;
+  if (my_work != 0)
+  {
+    current_work = tid;
+  }
+  // FP: "17 -> 18;
+  for (unsigned i =0; i < my_work; i++)
+  {
+    unsigned int block_start_work;
+    unsigned int block_end_work;
+    if (threadIdx.x == 0)
+    {
+      if (current_work < total_work)
+      {
+        block_start_work = current_work;
+        block_end_work=current_work + blockdim_x - 1;
+        if (block_end_work >= total_work)
+        {
+          block_end_work = total_work - 1;
+        }
+        block_start_src_index = compute_src_and_offset(0, num_items - 1,  block_start_work+1, thread_prefix_work_wl, num_items,offset);
+        block_end_src_index = compute_src_and_offset(0, num_items - 1, block_end_work+1, thread_prefix_work_wl, num_items, offset);
+      }
+    }
+    __syncthreads();
+
+    if (current_work < total_work)
+    {
+      unsigned src_index;
+      index_type nbr;
+      src_index = compute_src_and_offset(block_start_src_index, block_end_src_index, current_work+1, thread_prefix_work_wl,num_items, offset);
+      src= thread_src_wl.in_wl().dwl[src_index];
+      nbr = (graph).getFirstEdge(src)+ offset;
+      {
+        index_type dst;
+        dst = graph.getAbsDestination(nbr);
+        atomicTestAdd(&p_nout[dst], (uint32_t)1);
+        bitset_nout.set(dst);
+      }
+      current_work = current_work + nthreads;
+    }
+  }
+  // FP: "43 -> 44;
+}
+__global__ void Inspect_InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  index_type src_end;
+  // FP: "1 -> 2;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
+  {
+    int index;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
+    if (pop)
+    {
+    }
+    if (!pop)
+    {
+      continue;
+    }
+    if (pop)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+    }
+  }
+  // FP: "13 -> 14;
+}
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -45,6 +156,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -60,7 +172,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
@@ -263,7 +375,116 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
   active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "20 -> 21;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual)
+__global__ void PageRank_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, int * thread_prefix_work_wl, unsigned int num_items, PipeContextT<Worklist2> thread_src_wl)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ unsigned int total_work;
+  __shared__ unsigned block_start_src_index;
+  __shared__ unsigned block_end_src_index;
+  unsigned my_work;
+  unsigned src;
+  unsigned int offset;
+  unsigned int current_work;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  unsigned blockdim_x = BLOCK_DIM_X;
+  // FP: "3 -> 4;
+  // FP: "4 -> 5;
+  // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  // FP: "7 -> 8;
+  // FP: "8 -> 9;
+  // FP: "9 -> 10;
+  total_work = thread_prefix_work_wl[num_items - 1];
+  // FP: "10 -> 11;
+  my_work = ceilf((float)(total_work) / (float) nthreads);
+  // FP: "11 -> 12;
+
+  // FP: "12 -> 13;
+  __syncthreads();
+  // FP: "13 -> 14;
+
+  // FP: "14 -> 15;
+  if (my_work != 0)
+  {
+    current_work = tid;
+  }
+  // FP: "17 -> 18;
+  for (unsigned i =0; i < my_work; i++)
+  {
+    unsigned int block_start_work;
+    unsigned int block_end_work;
+    if (threadIdx.x == 0)
+    {
+      if (current_work < total_work)
+      {
+        block_start_work = current_work;
+        block_end_work=current_work + blockdim_x - 1;
+        if (block_end_work >= total_work)
+        {
+          block_end_work = total_work - 1;
+        }
+        block_start_src_index = compute_src_and_offset(0, num_items - 1,  block_start_work+1, thread_prefix_work_wl, num_items,offset);
+        block_end_src_index = compute_src_and_offset(0, num_items - 1, block_end_work+1, thread_prefix_work_wl, num_items, offset);
+      }
+    }
+    __syncthreads();
+
+    if (current_work < total_work)
+    {
+      unsigned src_index;
+      index_type nbr;
+      src_index = compute_src_and_offset(block_start_src_index, block_end_src_index, current_work+1, thread_prefix_work_wl,num_items, offset);
+      src= thread_src_wl.in_wl().dwl[src_index];
+      nbr = (graph).getFirstEdge(src)+ offset;
+      {
+        index_type dst;
+        dst = graph.getAbsDestination(nbr);
+        if (p_delta[dst] > 0)
+        {
+          atomicTestAdd(&p_residual[src], p_delta[dst]);
+          bitset_residual.set(src);
+        }
+      }
+      current_work = current_work + nthreads;
+    }
+  }
+  // FP: "45 -> 46;
+}
+__global__ void Inspect_PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  index_type src_end;
+  // FP: "1 -> 2;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
+  {
+    int index;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
+    if (pop)
+    {
+    }
+    if (!pop)
+    {
+      continue;
+    }
+    if (pop)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+    }
+  }
+  // FP: "13 -> 14;
+}
+__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -277,6 +498,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -292,7 +514,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
@@ -551,6 +773,7 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & l
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ResetGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, local_alpha, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -575,6 +798,7 @@ void ResetGraph_nodesWithEdges_cuda(const float & local_alpha, struct CUDA_Conte
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
 {
+  t_work.init_thread_work(ctx->gg.nnodes);
   dim3 blocks;
   dim3 threads;
   // FP: "1 -> 2;
@@ -582,7 +806,22 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()));
+  if (enable_lb)
+  {
+    t_work.reset_thread_work();
+    Inspect_InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+    cudaDeviceSynchronize();
+    int num_items = t_work.thread_work_wl.in_wl().nitems();
+    if (num_items != 0)
+    {
+      t_work.compute_prefix_sum();
+      cudaDeviceSynchronize();
+      InitializeGraph_TB_LB <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
+      cudaDeviceSynchronize();
+    }
+  }
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), enable_lb);
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -623,6 +862,7 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, unsigned in
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
   PageRank_delta <<<blocks, threads>>>(ctx->gg, __begin, __end, local_alpha, local_tolerance, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _active_vertices);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -656,7 +896,22 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()));
+  if (enable_lb)
+  {
+    t_work.reset_thread_work();
+    Inspect_PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+    cudaDeviceSynchronize();
+    int num_items = t_work.thread_work_wl.in_wl().nitems();
+    if (num_items != 0)
+    {
+      t_work.compute_prefix_sum();
+      cudaDeviceSynchronize();
+      PageRank_TB_LB <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
+      cudaDeviceSynchronize();
+    }
+  }
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), enable_lb);
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -745,6 +1000,7 @@ void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & 
   _min_value.rv = min_valueval.gpu_wr_ptr();
   // FP: "32 -> 33;
   PageRankSanity <<<blocks, threads>>>(ctx->gg, __begin, __end, local_tolerance, ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _DGAccumulator_residual_over_tolerance, _DGAccumulator_sum, _DGAccumulator_sum_residual, _max_residual, _max_value, _min_residual, _min_value);
+  cudaDeviceSynchronize();
   // FP: "33 -> 34;
   check_cuda_kernel;
   // FP: "34 -> 35;
