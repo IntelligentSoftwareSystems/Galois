@@ -19,6 +19,8 @@
 
 #include <array>
 #include <iostream>
+#include <optional>
+#include <variant>
 
 // Vendored from an old version of LLVM for Lonestar app command line handling.
 #include "llvm/Support/CommandLine.h"
@@ -62,16 +64,23 @@ static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum n
 // TODO: Try making edge data separate and shared to see if it helps
 // locality. It's not clear that it will, but it's something to try.
 
-using graph_t = galois::graphs::LC_CSR_Graph<void, std::array<double, 3>>;
+using edge_t = std::array<double, 3>;
+using node_t = std::optional<double*>;
+using graph_t = galois::graphs::LC_CSR_Graph<node_t, edge_t>;
 
 // Routine to initialize graph topology and face normals.
-// Note: C++17 will allow just returning the graph since copy elision will be guaranteed.
-// For now, the reference is needed though, since the built graph may not be copyable.
-void generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
+std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
 
   galois::graphs::FileGraphWriter temp_graph;
-  std::size_t num_nodes = nx * ny * nz;
-  std::size_t num_edges = 2 * (nx * ny * (nz - 1) + nx * (ny - 1) * nz + (nx - 1) * ny * nz);
+  // Each node represents a grid cell.
+  // Each edge represents a face.
+  // Ghost nodes are added to represent the exterior
+  // of the domain on the other side of each face.
+  // This is for boundary condition handling.
+  std::size_t num_outer_faces = (nx * ny + ny * nz + nx * nz) * 2;
+  std::size_t num_cells = nx * ny * nz;
+  std::size_t num_nodes = num_cells + num_outer_faces;
+  std::size_t num_edges = 4 * nx * ny * nz + num_outer_faces;
   temp_graph.setNumNodes(num_nodes);
   temp_graph.setNumEdges(num_edges);
   temp_graph.setSizeofEdgeData(galois::LargeArray<graph_t::edge_data_type>::size_of::value);
@@ -83,27 +92,73 @@ void generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
     for (std::size_t j = 0; j < ny; j++) {
       for (std::size_t k = 0; k < nz; k++) {
         std::size_t id = i * nx * ny + j * ny + k;
-        if (i > 0) temp_graph.incrementDegree(id);
-        if (i < nx - 1) temp_graph.incrementDegree(id);
-        if (j > 0) temp_graph.incrementDegree(id);
-        if (j < ny - 1) temp_graph.incrementDegree(id);
-        if (k > 0) temp_graph.incrementDegree(id);
-        if (k < nz - 1) temp_graph.incrementDegree(id);
+        for (std::size_t l = 0; l < 4; l++) {
+          temp_graph.incrementDegree(id);
+        }
       }
     }
   }
+  // Set the degrees for all the ghost cells to 1.
+  for (std::size_t id = num_cells; id < num_nodes; id++) {
+    temp_graph.incrementDegree(id);
+  }
 
+  // Now that the degree of each node is known,
+  // fill in the actual topology.
   temp_graph.phase2();
+  std::size_t xy_low_face_start = num_cells;
+  std::size_t xy_high_face_start = xy_low_face_start + nx * ny;
+  std::size_t yz_low_face_start = xy_high_face_start + nx * ny;
+  std::size_t yz_high_face_start = yz_low_face_start + ny * nz;
+  std::size_t xz_low_face_start = yz_high_face_start + ny * nz;
+  std::size_t xz_high_face_start = xz_low_face_start + nx * nz;
+  assert(num_nodes == xz_high_face_start + nx * nz);
   for (std::size_t i = 0; i < nx; i++) {
     for (std::size_t j = 0; j < ny; j++) {
       for (std::size_t k = 0; k < nz; k++) {
         std::size_t id = i * nx * ny + j * ny + k;
-        if (i > 0) edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {1., 0., 0.});
-        if (i < nx - 1) edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {-1., 0., 0.});
-        if (j > 0) edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., 1., 0.});
-        if (j < ny - 1) edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., -1., 0.});
-        if (k > 0) edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., 1.});
-        if (k < nz - 1) edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., -1.});
+        if (i > 0) {
+          edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {1., 0., 0.});
+        } else {
+          std::size_t ghost_id = yz_low_face_start + j * ny + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
+        }
+        if (i < nx - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {-1., 0., 0.});
+        } else {
+          std::size_t ghost_id = yz_high_face_start + j * ny + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {-1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {1., 0., 0.});
+        }
+        if (j > 0) {
+          edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., 1., 0.});
+        } else {
+          std::size_t ghost_id = xz_low_face_start + i * nx + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
+        }
+        if (j < ny - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., -1., 0.});
+        } else {
+          std::size_t ghost_id = xz_high_face_start + i * nx + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., -1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 1., 0.});
+        }
+        if (k > 0) {
+          edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., 1.});
+        } else {
+          std::size_t ghost_id = xy_low_face_start + i * nx + j;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
+        }
+        if (k < nz - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., -1.});
+        } else {
+          std::size_t ghost_id = xy_high_face_start + i * nx + j;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., -1.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., 1.});
+        }
       }
     }
   }
@@ -113,6 +168,7 @@ void generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   std::uninitialized_copy(std::make_move_iterator(edge_data.begin()), std::make_move_iterator(edge_data.end()), rawEdgeData);
 
   galois::graphs::readGraph(built_graph, temp_graph);
+  return num_cells;
 }
 
 int main(int argc, char**argv) noexcept {
@@ -120,6 +176,6 @@ int main(int argc, char**argv) noexcept {
   LonestarStart(argc, argv, name, desc, url);
 
   graph_t graph;
-  generate_grid(graph, nx, ny, nz);
+  auto ghost_threshold = generate_grid(graph, nx, ny, nz);
 }
 
