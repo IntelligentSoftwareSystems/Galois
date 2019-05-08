@@ -25,7 +25,8 @@
 #include <string>
 #include "llvm/Support/CommandLine.h"
 
-typedef double LatentValue;
+typedef float LatentValue;
+typedef float EdgeType;
 
 // Purdue, CSGD: 100; Intel: 20
 // static const int LATENT_VECTOR_SIZE = 100;
