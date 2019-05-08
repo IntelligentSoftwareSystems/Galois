@@ -135,16 +135,27 @@ public:
 		}
 	}
 	// Given an embedding, extend it with one more vertex. Used for k-cliques.
-	// Requires the input graph to be a DAG, and therefore ordering is pre-defined.
-	void extend_vertex_DAG(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
+	void extend_vertex_clique(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
-		for(unsigned i = 0; i < n; ++i) {
-			SimpleElement id = emb[i];
-			for(auto e : graph->edges(id)) {
-				GNode dst = graph->getEdgeDst(e);
-				emb.push_back(dst);
-				queue.push_back(emb);
-				emb.pop_back();
+		SimpleElement src = emb[n-1];
+		for(auto e1 : graph->edges(src)) {
+			GNode dst = graph->getEdgeDst(e1);
+			if(dst > src) {
+				unsigned num_edges = 0;
+				for(auto e2 : graph->edges(dst)) {
+					GNode dst_dst = graph->getEdgeDst(e2);
+					for(unsigned i = 0; i < n; ++i) {
+						if (dst_dst == emb[i]) {
+							num_edges ++;
+							break;
+						}
+					}
+				}
+				if(num_edges == n) {
+					emb.push_back(dst);
+					queue.push_back(emb);
+					emb.pop_back();
+				}
 			}
 		}
 	}
@@ -401,6 +412,8 @@ public:
 	void printout_agg(const CgMapFreq cg_map) {
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 			std::cout << "{" << it->first << " --> " << it->second << std::endl;
+		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
+		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 	}
 	unsigned support_count(const CgMapDomain cg_map, UintMap &support_map) {
 		unsigned count = 0;

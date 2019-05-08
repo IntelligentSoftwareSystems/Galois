@@ -243,12 +243,18 @@ private:
 //typedef std::vector<SimpleElement> BaseEmbedding;
 class BaseEmbedding: public std::vector<SimpleElement> {
 public:
+	BaseEmbedding() { num_edges = 0; }
+	~BaseEmbedding() {}
 	inline unsigned get_hash() const {
 		bliss::UintSeqHash h;
 		for(unsigned i = 0; i < size(); ++i)
 			h.update(data()[i]);
 		return h.get_value();
 	}
+	unsigned get_num_edges() { return num_edges; }
+	void set_num_edges(unsigned i) { num_edges = i; }
+private:
+	unsigned num_edges;
 };
 
 namespace std {
