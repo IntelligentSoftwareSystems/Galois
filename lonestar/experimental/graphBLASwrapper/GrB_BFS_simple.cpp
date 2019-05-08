@@ -40,6 +40,27 @@ void GrB_print_Vector (GrB_Vector<T> &v) {
         std::cout << i << ":" << v[i] << std::endl;
 }
 
+// assign to a subvector.
+// in this version, it only supports w<mask>(I) = accum (w(I), u).
+template <typename T, typename K=bool>
+void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
+        GrB_Vector<K>& mask, // optional mask for w, unused if NULL
+        const int accum, // incomplete type.
+        GrB_Vector<T>& u,
+        const GrB_Index *I, // row indices
+        const GrB_Index ni, // # of row indices
+        const int desc // incompelete type.
+        ) {
+    galois::do_all(galois::iterate((GrB_Index) 0, ni),
+            [&] (GrB_Index idx) {
+                if (mask[idx]) {
+                    w[idx] = u[idx];
+                }
+            },
+            galois::loopname("VVectorAssignment"),
+            galois::steal() );
+}
+
 // assign a scalar to subvector.
 // in this version, it only supports w<mask>(I) = accum (w(I), x).
 template <typename T, typename K=bool>
@@ -57,7 +78,7 @@ void GrB_assign (GrB_Vector<T>& w, // input/output vector for results
                     w[idx] = x;
                 }
             },
-            galois::loopname("VectorAssignment"),
+            galois::loopname("SVectorAssignment"),
             galois::steal() );
 }
 
@@ -189,6 +210,12 @@ void GrB_Matrix_nrows (GrB_Index *nrows,
     *nrows = A.size();
 }
 
+template <typename T>
+void GrB_free(T* target) {
+    target->destroy();
+    target->deallocate();
+}
+
 int main(int argc, char** argv) {
     galois::SharedMemSys G;
     llvm::cl::ParseCommandLineOptions(argc, argv);
@@ -201,7 +228,6 @@ int main(int argc, char** argv) {
     GrB_Index n, nvals;
 
     galois::graphs::readGraph(A, filename);
-    GrB_Matrix_nrows (&n, A);
 
     std::cout << " Input graph is : " << filename << "\n";
     std::cout << " The number of active threads is : " << numThreads << "\n";
@@ -210,6 +236,7 @@ int main(int argc, char** argv) {
     galois::StatTimer mainTimer("MainTimer");
     mainTimer.start();
 
+    GrB_Matrix_nrows (&n, A);
     // create an empty vector v, and make it dense.
     // v maintains labels for each node.
     GrB_Vector_new(&v, 0, n);
@@ -239,11 +266,12 @@ int main(int argc, char** argv) {
     }
     bfsTimer.stop();
     mainTimer.stop();
-    //GrB_assign (v, v, -1, v, NULL, n, -1);
+
+    GrB_assign (v, v, -1, v, NULL, n, -1);
     GrB_Vector_nvals (&nvals, v);
 
-
-    GrB_Dump_Vector(v);
+    //GrB_Dump_Vector(v);
+    GrB_free(&q);
 
     return 0;
 }
