@@ -1,10 +1,15 @@
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
+#include "thread_work.h"
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+struct ThreadWork t_work;
+bool enable_lb = false;
 #include "kernels/reduce.cuh"
 #include "pagerank_push_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
@@ -87,7 +92,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
   }
   // FP: "17 -> 18;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, HGAccumulator<unsigned int> active_vertices)
+__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, HGAccumulator<unsigned int> active_vertices, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -103,6 +108,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -122,7 +128,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "9 -> 10;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "10 -> 11;
     if (pop)
     {
@@ -384,6 +390,7 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ResetGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -408,6 +415,7 @@ void ResetGraph_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context*  ctx)
 {
+  t_work.init_thread_work(ctx->gg.nnodes);
   dim3 blocks;
   dim3 threads;
   // FP: "1 -> 2;
@@ -416,6 +424,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -448,6 +457,7 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, const float
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   PageRank_delta <<<blocks, threads>>>(ctx->gg, __begin, __end, local_alpha, local_tolerance, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -487,7 +497,8 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & ac
   // FP: "7 -> 8;
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), _active_vertices);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), _active_vertices, enable_lb);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -578,6 +589,7 @@ void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & 
   _min_value.rv = min_valueval.gpu_wr_ptr();
   // FP: "32 -> 33;
   PageRankSanity <<<blocks, threads>>>(ctx->gg, __begin, __end, local_tolerance, ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _DGAccumulator_residual_over_tolerance, _DGAccumulator_sum, _DGAccumulator_sum_residual, _max_residual, _max_value, _min_residual, _min_value);
+  cudaDeviceSynchronize();
   // FP: "33 -> 34;
   check_cuda_kernel;
   // FP: "34 -> 35;
