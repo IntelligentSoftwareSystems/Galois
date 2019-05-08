@@ -35,40 +35,27 @@ const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using BFS traversal";
 const char* url  = 0;
 
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
-
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
 static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 int total_num = 0;
-unsigned long merge_time = 0;
 
 #include "Mining/miner.h"
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
 
+// insert single-edge embeddings into the embedding queue
 void init(Graph& graph, EmbeddingQueue &queue) {
-	//print_graph(graph);
 	printf("\n=============================== Init ===============================\n\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
 			auto& src_label = graph.getData(src);
-			//Graph::edge_iterator first = graph.edge_begin(src);
-			//Graph::edge_iterator last = graph.edge_end(src);
-			//for (auto e = first; e != last; ++ e) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
 				if (src < dst) {
@@ -83,8 +70,8 @@ void init(Graph& graph, EmbeddingQueue &queue) {
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 		galois::loopname("Initialization")
 	);
-	//}
 }
+
 #ifdef USE_DOMAIN
 typedef DomainSupport SupportType;
 typedef QpMapDomain QpMap;
@@ -99,7 +86,7 @@ typedef LocalQpMapFreq LocalQpMap;
 typedef LocalCgMapFreq LocalCgMap;
 #endif
 
-void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
+int aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map, UintMap& id_map, UintMap& support_map) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
@@ -108,15 +95,18 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 ///*
 	// Parallel quick aggregation
 	LocalQpMap qp_localmap; // quick pattern local map for each thread
-	galois::for_each(
+	galois::do_all(
+	//galois::for_each(
 		galois::iterate(queue),
-		[&](const Embedding& emb, auto& ctx) {
+		//[&](Embedding &emb, auto& ctx) {
+		[&](Embedding &emb) {
 			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("QuickAggregation")
 	);
+	
 	galois::StatTimer TmergeQP("MergeQuickPatterns");
 	TmergeQP.start();
 	//std::cout << "Merging quick patterns\n";
@@ -139,19 +129,17 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	TmergeQP.stop();
 //*/
 	//std::cout << "Quick_aggregation: num_quick_patterns = " << qp_map.size() << "\n";
-
 	// Parallel canonical aggregation
 	//std::cout << "Aggregating canonical patterns\n";
 	LocalCgMap cg_localmap; // canonical pattern local map for each thread
 	galois::do_all(
 		galois::iterate(qp_map),
-		[&](std::pair<Quick_Pattern, SupportType> qp) {
-			Quick_Pattern subgraph = qp.first;
-			SupportType support = qp.second;
-			miner.canonical_aggregate_each(subgraph, support, *(cg_localmap.getLocal()));
+		[&](std::pair<QuickPattern, SupportType> qp) {
+			miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()), id_map);
+			//miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()));
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("CanonicalAggregation")
 	);
 	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
@@ -175,35 +163,37 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 	}
 	TmergeCG.stop();
 	int num_frequent_patterns = 0;
-	for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
-#ifdef USE_DOMAIN
-		if (miner.support_count(it->second) >= minsup) num_frequent_patterns ++;
-#else
-		if (it->second >= minsup) num_frequent_patterns ++;
-#endif
+	num_frequent_patterns = miner.support_count(cg_map, support_map);
 	total_num += num_frequent_patterns;
 	std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
 		<< " frequent patterns: " << num_frequent_patterns << "\n";
+	return num_frequent_patterns;
 }
 
-void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
-	//std::cout << "Filtering: num_patterns = " << cg_map.size() << " num_embeddings = " 
-	//	<< std::distance(in_queue.begin(), in_queue.end()) << "\n";
-	//miner.filter(in_queue, out_queue, cg_map);
-	///*
-	galois::for_each(
+void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap& cg_map, const UintMap id_map, const UintMap support_map) {
+	//miner.filter(in_queue, cg_map, out_queue);
+	galois::StatTimer Tfilter("Filter");
+	Tfilter.start();
+	miner.filter(in_queue, id_map, support_map, out_queue);
+	Tfilter.stop();
+	/*
+	std::cout << "id_map size: " << id_map.size() << ", support_map size: " << support_map.size() << "\n";
+	galois::do_all(
+	//galois::for_each(
 		galois::iterate(in_queue),
-		[&](Embedding& emb, auto& ctx) {
-			miner.filter_each(emb, out_queue, cg_map);
+		//[&](Embedding &emb, auto& ctx) {
+		[&](Embedding &emb) {
+			//miner.filter_each(emb, id_map, support_map, out_queue);
+			miner.filter_each(emb, cg_map, out_queue);
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("Filter")
 	);
+	std::cout << "Done filtering\n";
 	//*/
 }
 
-#define DEBUG 0
 void FsmSolver(Graph &graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueue queue, filtered_queue;
@@ -212,13 +202,21 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 	CgMap cg_map; // canonical graph map
-	aggregator(miner, queue, cg_map);
+	UintMap id_map, support_map;
+	cg_map.clear();
+	id_map.clear();
+	//EmbeddingLists emb_lists;
+	int num_freq_patterns = aggregator(miner, queue, cg_map, id_map, support_map);
+	if(num_freq_patterns == 0) {
+		std::cout << "No frequent pattern found\n";
+		return;
+	}
 	//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 	//	<< std::distance(queue.begin(), queue.end()) << "\n";
 	if(show) miner.printout_agg(cg_map);
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
-	filter(miner, queue, filtered_queue, cg_map);
+	filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 	printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
@@ -228,26 +226,28 @@ void FsmSolver(Graph &graph, Miner &miner) {
 		queue.clear();
 		galois::for_each(
 			galois::iterate(filtered_queue),
-			[&](const Embedding& embedding, auto& ctx) {
-				miner.extend_edge(k, embedding, queue);
+			[&](const Embedding& emb, auto& ctx) {
+				miner.extend_edge(k, emb, queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Join")
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Join")
 		);
 		miner.update_embedding_size();
 		printout_embeddings(level, miner, queue);
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
-		aggregator(miner, queue, cg_map);
+		id_map.clear();
+		support_map.clear();
+		num_freq_patterns = aggregator(miner, queue, cg_map, id_map, support_map);
 		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
 		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 		if(show) miner.printout_agg(cg_map);
+		if(num_freq_patterns == 0) break;
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
-		filter(miner, queue, filtered_queue, cg_map);
+		filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 		printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
@@ -259,42 +259,20 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinit("GraphReading");
 	Tinit.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) {
-			graph.getData(n) = rand() % 10 + 1;
-			for (auto e : graph.edges(n)) {
-				graph.getEdgeData(e) = 1;
-			}
-		}
-	} else { printf("Unkown file format\n"); exit(1); }
+	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	std::cout << "k = " << k << std::endl;
-	std::cout << "minsup = " << minsup << std::endl;
-	std::cout << "num_threads = " << numThreads << std::endl;
+	//std::cout << "k = " << k << std::endl;
+	//std::cout << "minsup = " << minsup << std::endl;
+	//std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	//print_graph(graph);
 	unsigned sizeof_emb = 2 * sizeof(ElementType);
-	Miner miner(true, sizeof_emb, &graph);
+	Miner miner(&graph, sizeof_emb);
 	miner.set_threshold(minsup);
-	//galois::reportPageAlloc("MeminfoPre");
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	FsmSolver(graph, miner);
 	Tcomp.stop();
-	//galois::reportPageAlloc("MeminfoPost");
-	//std::cout << "merge_time = " << merge_time << std::endl;
 	return 0;
 }

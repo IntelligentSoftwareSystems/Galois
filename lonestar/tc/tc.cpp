@@ -33,21 +33,12 @@ const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (only works for undirected neighbor-sorted graphs)";
 const char* url  = 0;
 
-enum Algo {
-	nodeiterator,
-	edgeiterator,
-};
-
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
-	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 
 void TcSolver(Graph& graph) {
@@ -85,39 +76,15 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
-	MGraph mgraph;
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	if (filetype == "txt") {
-		printf("Reading .lg file: %s\n", filename.c_str());
-		mgraph.read_txt(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "adj") {
-		printf("Reading .adj file: %s\n", filename.c_str());
-		mgraph.read_adj(filename.c_str());
-		genGraph(mgraph, graph);
-	} else if (filetype == "mtx") {
-		printf("Reading .mtx file: %s\n", filename.c_str());
-		mgraph.read_mtx(filename.c_str(), true); //symmetrize
-		genGraph(mgraph, graph);
-	} else if (filetype == "gr") {
-		printf("Reading .gr file: %s\n", filename.c_str());
-		galois::graphs::readGraph(graph, filename);
-		for (GNode n : graph) graph.getData(n) = 1;
-	} else { galois::gPrint("Unkown file format\n"); exit(1); }
+	read_graph(graph, filetype, filename);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
+
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	switch (algo) {
-		case nodeiterator:
-			TcSolver(graph);
-			break;
-		case edgeiterator:
-			break;
-		default:
-			std::cerr << "Unknown algo: " << algo << "\n";
-	}
+	TcSolver(graph);
 	Tcomp.stop();
 	return 0;
 }

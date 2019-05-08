@@ -28,7 +28,7 @@ public:
 			embeddings_regeneration_level.push_back(0);
 		}
 		task_split_threshold = 2;
-		init_lb(0, nthreads);
+		init_lb();
 #endif
 	}
 	virtual ~Miner() {}
@@ -59,6 +59,148 @@ public:
 		assert(edge_list.size() == graph->sizeEdges());
 	}
 #ifdef ENABLE_LB
+	void init_lb() {
+		//this->num_threads = num_threads;
+		next_work_request.clear();
+		message_queue.clear();
+		requested_work_from.clear();
+		for(int i = 0; i < num_threads; i++) {
+			int p =  (i + 1) % num_threads;
+			next_work_request.push_back(p);
+			std::deque<int> dq;
+			message_queue.push_back(dq);
+			std::vector<int> vc;
+			requested_work_from.push_back(vc);
+		}
+		all_idle_work_request_counter = 0;
+	}
+	void process_work_split_request(int source, LocalStatus &status) {
+		int thread_id = status.thread_id;
+		if(thread_id == 0 && all_threads_idle()) {
+			all_idle_work_request_counter++;
+			return;
+		}
+		if(thread_working(status) == false || can_thread_split_work(status) == false) {
+			int buffer[2];
+			buffer[0] = RT_WORK_RESPONSE;
+			buffer[1] = 0;
+			send_msg(buffer, 2, thread_id, source);
+			return;
+		}
+		int length;
+		thread_split_work(source, length, status);
+		int buffer_size[2];
+		buffer_size[0] = RT_WORK_RESPONSE;
+		buffer_size[1] = length; // put there length of the split stack split.size()+1;
+		send_msg(buffer_size, 2, thread_id, source);
+	}
+	bool receive_data(int source, int size, LocalStatus &status) {
+		int thread_id = status.thread_id;
+		if(size == 0) {
+			next_work_request[thread_id] = random() % num_threads;
+			while(next_work_request[thread_id] == thread_id)
+				next_work_request[thread_id] = random() % num_threads;
+			requested_work_from[thread_id].erase(requested_work_from[thread_id].begin());
+			return false;
+		}
+		if(requested_work_from[thread_id].size() != 1 || requested_work_from[thread_id][0] != source )
+			exit(1);
+		next_work_request[thread_id] = random() % num_threads;
+		while(next_work_request[thread_id] == thread_id)
+			next_work_request[thread_id] = random() % num_threads;
+		requested_work_from[thread_id].erase(requested_work_from[thread_id].begin());
+		thread_start_working(status);
+		return true;
+	}
+	void recv_msg(int *buffer, int length, int thr, int originating_thr) {
+		simple_lock.lock();
+		int source = message_queue[thr].front();
+		if(originating_thr != source) {
+			exit(0);
+		}
+		message_queue[thr].pop_front(); //take off source
+		for(int i = 0; i < length; i++) {
+			buffer[i] = message_queue[thr].front();
+			message_queue[thr].pop_front();
+		}
+		simple_lock.unlock();
+	}
+	void send_msg(int *buffer, int length, int src_thr, int dest_thr) {
+		simple_lock.lock();
+		message_queue[dest_thr].push_back(src_thr);
+		for(int i = 0; i <length; i++)
+			message_queue[dest_thr].push_back(buffer[i]);
+		simple_lock.unlock();
+	}
+	bool can_thread_split_work(LocalStatus &status) {
+		if(!thread_working(status)) return false;
+		status.task_split_level = 0; // start search from level 0 task queue
+		while(status.task_split_level < status.current_dfs_level && status.dfs_task_queue[status.task_split_level].size() < task_split_threshold )
+			status.task_split_level++;
+		if(status.dfs_task_queue.size() > status.task_split_level && status.dfs_task_queue[status.task_split_level].size() >= task_split_threshold )
+			return true;
+		return false;
+	}
+	void thread_split_work(int requesting_thread, int &length, LocalStatus &status) {
+		for(int i = 0; i < status.task_split_level; i++) {
+			if(dfs_task_queue_shared[requesting_thread].size() < (i + 1) ) {
+				std::deque<DFS> tmp;
+				dfs_task_queue_shared[requesting_thread].push_back(tmp);
+			}
+			dfs_task_queue_shared[requesting_thread][i].push_back(status.DFS_CODE[i]);
+		}
+		if(dfs_task_queue_shared[requesting_thread].size() < ( status.task_split_level + 1) ) {
+			std::deque<DFS> tmp;
+			dfs_task_queue_shared[requesting_thread].push_back(tmp);
+		}
+		int num_dfs = status.dfs_task_queue[status.task_split_level].size() / 2;
+		for(int j = 0; j < num_dfs; j++) {
+			DFS dfs = status.dfs_task_queue[status.task_split_level].back();
+			dfs_task_queue_shared[requesting_thread][status.task_split_level].push_front(dfs);
+			status.dfs_task_queue[status.task_split_level].pop_back();
+		}
+		embeddings_regeneration_level[requesting_thread] = status.task_split_level;
+		length = num_dfs;
+	}
+	void thread_process_received_data(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		status.embeddings_regeneration_level = embeddings_regeneration_level[thread_id];
+		int num_dfs = dfs_task_queue_shared[thread_id][status.embeddings_regeneration_level].size();
+		for(int i = 0; i < status.embeddings_regeneration_level; i++) {
+			if(status.dfs_task_queue.size() < (i + 1) ) {
+				std::deque<DFS> tmp;
+				status.dfs_task_queue.push_back(tmp);
+			}
+			DFS dfs = dfs_task_queue_shared[thread_id][i].back();
+			status.dfs_task_queue[i].push_back(dfs);
+			dfs_task_queue_shared[thread_id][i].pop_back();
+		}
+		if(status.dfs_task_queue.size() < ( status.embeddings_regeneration_level + 1) ) {
+			std::deque<DFS> tmp;
+			status.dfs_task_queue.push_back(tmp);
+		}
+		for(int j = 0; j < num_dfs; j++) {
+			DFS dfs = dfs_task_queue_shared[thread_id][status.embeddings_regeneration_level].back();
+			status.dfs_task_queue[status.embeddings_regeneration_level].push_front(dfs);
+			dfs_task_queue_shared[thread_id][status.embeddings_regeneration_level].pop_back();
+		}
+	}
+	void thread_start_working(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		activate_thread(thread_id);
+	}
+	void process_request(int source, LocalStatus &status) {
+		int thread_id = status.thread_id;
+		int recv_buf[2];
+		recv_msg(recv_buf, 2, thread_id, source);
+		switch(recv_buf[0]) {
+			case WORK_REQUEST:
+				process_work_split_request(source, status); break;
+			case WORK_RESPONSE:
+				receive_data(source, recv_buf[1], status); return;
+			default: exit(1);
+		}
+	}
 	void set_regen_level(int tid, int val) {
 		embeddings_regeneration_level[tid] = val;
 	}
@@ -94,6 +236,35 @@ public:
 		th_is_working = thread_is_working[thread_id];
 		simple_lock.unlock();
 		return th_is_working;
+	}
+	void threads_load_balance(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		int src = check_request(status);
+		if(src != -1) process_request(src, status);
+		if(thread_working(status) == false) {
+			if(all_threads_idle()) {
+				printf("All threads idle!\n");
+			} else send_work_request(status); //global load balance
+		}
+	}
+	int check_request(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		if(message_queue[thread_id].size() > 0 ) {
+			simple_lock.lock();
+			int source = message_queue[thread_id].front();
+			simple_lock.unlock();
+			return source;
+		}
+		return -1;
+	}
+	void send_work_request(LocalStatus &status) {
+		int thread_id = status.thread_id;
+		if(!requested_work_from[thread_id].empty()) return;
+		int buffer[2];
+		buffer[0] = WORK_REQUEST;
+		buffer[1] = 0;       // filler
+		send_msg(buffer, 2, thread_id, next_work_request[thread_id]);
+		requested_work_from[thread_id].push_back(next_work_request[thread_id]);
 	}
 #endif
 	// edge extension by DFS traversal: recursive call
@@ -222,8 +393,14 @@ protected:
 	std::vector<int> frequent_patterns_count;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread
 #ifdef ENABLE_LB
+	typedef enum {WORK_REQUEST = 0, WORK_RESPONSE = 1} REQUEST_TYPE;
+	galois::substrate::SimpleLock simple_lock;
 	int task_split_threshold;
+	int all_idle_work_request_counter;
+	std::vector<int> next_work_request;
 	std::vector<bool> thread_is_working;
+	std::vector<std::deque<int> > message_queue;
+	std::vector<std::vector<int> > requested_work_from;
 	std::vector<int> embeddings_regeneration_level;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue_shared;       //keep a separate queue for sharing work
 #endif

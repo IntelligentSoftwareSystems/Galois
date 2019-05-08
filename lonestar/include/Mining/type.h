@@ -1,46 +1,22 @@
 #ifndef TYPE_HPP_
 #define TYPE_HPP_
-//#include "common.hpp"
-#include <atomic>
-#include <sys/syscall.h>
-#include <iostream>
-#include <assert.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <thread>
-#include <fcntl.h>
-#include <queue>
-#include <mutex>
-#include <condition_variable>
-#include <fstream>
-#include <cassert>
-#include <vector>
-#include <ostream>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <time.h>
-#include <signal.h>
-#include <ctime>
-#include <sstream>
-#include <iomanip>
-#include <functional>
 #include <map>
 #include <set>
+#include <queue>
+#include <cassert>
+#include <vector>
+#include <cstdint>
+#include <cstdlib>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <cstring>
+#include <iostream>
+#include <string.h>
+#include <algorithm>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
-#include <stdlib.h>
-#include <exception>
-#include <algorithm>
-#include <climits>
-#include <memory>
-#include <cstring>
-#include <malloc.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
 
 // bliss headers
 #include "defs.hh"
@@ -48,20 +24,6 @@
 #include "utils.hh"
 #include "bignum.hh"
 #include "uintseqhash.hh"
-
-typedef uint32_t uint32;
-typedef int32_t int32;
-#if !(__APPLE__ & __MACH__)
-typedef uint64_t uint64;
-typedef int64_t int64;
-#else
-typedef size_t uint64;
-typedef size_t int64;
-#endif
-typedef uint16_t uint16;
-typedef int16_t int16;
-typedef int8_t int8;
-typedef uint8_t uint8;
 
 typedef int VertexId;
 typedef float Weight;
@@ -264,8 +226,20 @@ typedef unsigned SimpleElement;
 typedef std::set<int> IntSet;
 typedef std::unordered_set<int> HashIntSet;
 typedef std::vector<std::unordered_set<int> > HashIntSets;
+typedef std::unordered_map<unsigned, unsigned> UintHashMap;
+typedef std::map<unsigned, unsigned> UintMap;
 
-typedef std::vector<ElementType> Embedding;
+//typedef std::vector<ElementType> Embedding;
+class Embedding: public std::vector<ElementType> {
+public:
+	Embedding() { qp_id = 0xFFFFFFFF; }
+	~Embedding() {}
+	void set_qpid(unsigned i) { qp_id = i; }
+	unsigned get_qpid() { return qp_id; }
+private:
+	unsigned qp_id;
+};
+
 //typedef std::vector<SimpleElement> BaseEmbedding;
 class BaseEmbedding: public std::vector<SimpleElement> {
 public:
