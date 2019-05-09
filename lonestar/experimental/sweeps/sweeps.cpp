@@ -44,7 +44,8 @@ static llvm::cl::opt<std::size_t> nz{"nz", llvm::cl::desc("number of cells in z 
 static llvm::cl::opt<double> freq_min{"freq_min", llvm::cl::desc("minimum frequency"), llvm::cl::init(.01)};
 static llvm::cl::opt<double> freq_max{"freq_max", llvm::cl::desc("maximum frequency"), llvm::cl::init(1.)};
 static llvm::cl::opt<std::size_t> num_groups{"num_groups", llvm::cl::desc("number of frequency groups"), llvm::cl::init(4u)};
-static llvm::cl::opt<std::size_t> num_directions{"num_directions", llvm::cl::desc("number of directions"), llvm::cl::init(32u)};
+static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llvm::cl::desc("number of vertical directions"), llvm::cl::init(32u)};
+static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions.", llvm::cl::init(32u));
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
 
 // TODO: We need a graph type with dynamically sized node/edge data for this problem.
