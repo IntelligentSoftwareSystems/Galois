@@ -47,7 +47,7 @@ typedef Graph::GraphNode GNode;
 
 // insert edges into the worklist (task queue)
 void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
-	if(show) printf("\n=============================== Init ===============================\n");
+	if(show) printf("\n=============================== Init ================================\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
@@ -73,7 +73,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 	unsigned level = 1;
 	while (level < k-1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		if(show) std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
+		if(show) std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
 		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
@@ -84,28 +84,16 @@ void KclSolver(Graph& graph, Miner &miner) {
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("ExtendVertex")
 		);
-		miner.update_base_embedding_size(); // increase the embedding size since one more edge added
+		miner.update_embedding_size(); // increase the embedding size since one more edge added
 		if(show) printout_embeddings(level, miner, queue2);
 
-		if(show) std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
+		if(show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		queue.clear();
 #if 1
 		galois::StatTimer Tagg("Aggregation");
 		Tagg.start();
 		miner.aggregate_clique(queue2, queue); // sequential implementaion
 		Tagg.stop();
-/*
-		SimpleConcurrentMap map;
-		galois::for_each(
-			galois::iterate(queue2),
-			[&](BaseEmbedding& emb, auto& ctx) {
-				miner.aggregate_clique_each(emb, map, queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-//*/
 #else
 		// Parallel aggregation
 		LocalSimpleMap lmap;
@@ -136,7 +124,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 		if(show) printout_embeddings(level, miner, queue);
 		level ++;
 	}
-	if(show) std::cout << "\n=============================== Done ===============================\n";
+	if(show) std::cout << "\n=============================== Done ================================\n";
 	galois::gPrint("\n\ttotal_num_cliques = ", std::distance(queue.begin(), queue.end()), "\n\n");
 }
 
@@ -148,11 +136,9 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	read_graph(graph, filetype, filename);
 	Tinitial.stop();
-
-	unsigned sizeof_embedding = 2 * sizeof(SimpleElement);
-	Miner miner(&graph, sizeof_embedding);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
+	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(graph, miner);

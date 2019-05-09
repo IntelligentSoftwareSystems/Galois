@@ -17,28 +17,26 @@ typedef std::unordered_map<CanonicalGraph, Frequency> CgMapFreq; // mapping cano
 typedef std::unordered_map<QuickPattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
 typedef std::unordered_map<CanonicalGraph, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
 typedef std::unordered_map<BaseEmbedding, Frequency> SimpleMap;
-//typedef CTSL::HashMap<BaseEmbedding, Frequency> SimpleConcurrentMap;
-//typedef utils::concurrent_map<BaseEmbedding, Frequency> SimpleConcurrentMap;
 typedef galois::substrate::PerThreadStorage<QpMapDomain> LocalQpMapDomain;
 typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
 typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
 typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
 typedef galois::substrate::PerThreadStorage<SimpleMap> LocalSimpleMap;
 typedef galois::InsertBag<Embedding> EmbeddingQueue;
-typedef galois::InsertBag<int> IntQueue;
 typedef galois::InsertBag<BaseEmbedding> BaseEmbeddingQueue;
-//typedef std::vector<Embedding> EmbeddingVec;
-typedef galois::gstl::Vector<Embedding> EmbeddingVec;
-//typedef galois::gstl::Vector<EmbeddingQueue> EmbeddingLists;
-typedef std::vector<EmbeddingQueue> EmbeddingLists;
-typedef galois::gstl::Vector<int> IntVec; // quick pattern ID list, used for each canonical pattern
-typedef galois::gstl::Vector<IntQueue> QpLists;
+typedef galois::InsertBag<VertexInducedEmbedding> VertexInducedEmbeddingQueue;
 
 class Miner {
 public:
-	Miner(Graph *g, unsigned emb_size = 16) : embedding_size(emb_size) {
+	Miner(Graph *g) {
 		graph = g;
 		num_cliques = 0;
+		// the initial size of a embedding is 2 (vertices) for single-edge embeddings
+#ifndef USE_SIMPLE
+		embedding_size = 2 * sizeof(ElementType);
+#else
+		embedding_size = 2 * sizeof(SimpleElement);
+#endif
 	}
 	virtual ~Miner() {};
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
@@ -118,11 +116,38 @@ public:
 			}
 		}
 	}
+	// Given an embedding, extend it with one more vertex. Used for vertex-induced k-motif
+	void extend_vertex(VertexInducedEmbedding emb, VertexInducedEmbeddingQueue &queue) {
+		unsigned num_vertices = emb.get_num_vertices();
+		VertexId vid = emb.get_vertex(num_vertices-1); // get the last vertex
+		// expand the last vertex
+		for(auto e : graph->edges(vid)) {
+			GNode dst = graph->getEdgeDst(e);
+			if(dst > vid) {
+				emb.add_vertex(dst);
+				unsigned added_edges = 0;
+				for(auto e2 : graph->edges(dst)) {
+					GNode dst_dst = graph->getEdgeDst(e2);
+					for(unsigned i = 0; i < num_vertices; ++i) {
+						VertexId src = emb.get_vertex(i);
+						if (dst_dst == src) {
+							added_edges ++;
+							ElementType new_element(dst, (BYTE)num_vertices, 0, 0, (BYTE)src);
+							emb.push_back(new_element);
+							break;
+						}
+					}
+				}
+				queue.push_back(emb);
+				for (unsigned i = 0; i < added_edges; ++i) emb.pop_back();
+			}
+		}
+	}
 	// Given an embedding, extend it with one more vertex. Used for k-cliques
 	void extend_vertex(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
-			SimpleElement id = emb[i];
+			VertexId id = emb[i];
 			for(auto e : graph->edges(id)) {
 				GNode dst = graph->getEdgeDst(e);
 				// extend vertex in ascending order to avoid unnecessary enumeration
@@ -137,7 +162,7 @@ public:
 	// Given an embedding, extend it with one more vertex. Used for k-cliques.
 	void extend_vertex_clique(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
-		SimpleElement src = emb[n-1];
+		VertexId src = emb[n-1];
 		for(auto e1 : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e1);
 			if(dst > src) {
@@ -158,6 +183,33 @@ public:
 				}
 			}
 		}
+	}
+	void aggregate_clique(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
+		SimpleMap simple_agg;
+		for (auto emb : in_queue) {
+			auto it = simple_agg.find(emb);
+			if(it != simple_agg.end()) {
+				if(it->second == it->first.size() - 2) {
+					out_queue.push_back(emb);
+					simple_agg.erase(it);
+				}
+				else simple_agg[emb] += 1;
+			}
+			else simple_agg[emb] = 1;
+		}
+	}
+	// check each embedding to find the cliques
+	void aggregate_clique_each(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
+		auto it = sm.find(emb);
+		if(it != sm.end()) {
+			// check if this is a clique
+			if(it->second == it->first.size() - 2) {
+				out_queue.push_back(emb);
+				sm.erase(it);
+			}
+			else sm[emb] += 1;
+		}
+		else sm[emb] = 1;
 	}
 	void quick_aggregate(EmbeddingQueue &queue, QpMapFreq &qp_map) {
 		for (auto emb : queue) {
@@ -283,33 +335,6 @@ public:
 		}
 		delete cg;
 	}
-	void aggregate_clique(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
-		SimpleMap simple_agg;
-		for (auto emb : in_queue) {
-			auto it = simple_agg.find(emb);
-			if(it != simple_agg.end()) {
-				if(it->second == it->first.size() - 2) {
-					out_queue.push_back(emb);
-					simple_agg.erase(it);
-				}
-				else simple_agg[emb] += 1;
-			}
-			else simple_agg[emb] = 1;
-		}
-	}
-	// check each embedding to find the cliques
-	void aggregate_clique_each(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
-		auto it = sm.find(emb);
-		if(it != sm.end()) {
-			// check if this is a clique
-			if(it->second == it->first.size() - 2) {
-				out_queue.push_back(emb);
-				sm.erase(it);
-			}
-			else sm[emb] += 1;
-		}
-		else sm[emb] = 1;
-	}
 	// check if the pattern of each embedding in the queue is frequent
 	void filter(EmbeddingQueue &in_queue, CgMapFreq &cg_map, EmbeddingQueue &out_queue) {
 		for (auto emb : in_queue) {
@@ -383,8 +408,13 @@ public:
 		if (support_map.at(cg_id) >= threshold) out_queue.push_back(emb);
 	}
 	void set_threshold(unsigned minsup) { threshold = minsup; }
-	void update_embedding_size() { embedding_size += sizeof(ElementType); }
-	void update_base_embedding_size() { embedding_size += sizeof(SimpleElement); }
+	void update_embedding_size() { 
+#ifndef USE_SIMPLE
+		embedding_size += sizeof(ElementType);
+#else
+		embedding_size += sizeof(SimpleElement);
+#endif
+	}
 	inline unsigned get_embedding_size() { return embedding_size; }
 	unsigned get_total_num_cliques() { return num_cliques; }
 	void printout_embedding(int level, Embedding emb) {
@@ -463,35 +493,6 @@ private:
 	Graph *graph;
 	unsigned num_cliques;
 	galois::substrate::SimpleLock slock;
-#if 0
-	std::vector<LabeledEdge> edge_list;
-	void construct_edgelist() {
-		for (GNode src : *graph) {
-			auto& src_label = graph->getData(src);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				auto& dst_label = graph->getData(dst);
-				LabeledEdge edge(src, dst, src_label, dst_label);
-				edge_list.push_back(edge);
-			}
-		}
-		assert(edge_list.size() == graph->sizeEdges());
-	}
-	void turn_quick_pattern_pure(const Embedding & emb, QuickPattern & qp) {
-		std::memcpy(qp.get_elements(), emb.data(), qp.get_size() * sizeof(ElementType));
-		std::unordered_map<VertexId, VertexId> map;
-		VertexId new_id = 1;
-		for(unsigned i = 0; i < qp.get_size(); i++) {
-			auto& element = qp.at(i);
-			VertexId old_id = element.vertex_id;
-			auto iterator = map.find(old_id);
-			if(iterator == map.end()) {
-				element.set_vertex_id(new_id);
-				map[old_id] = new_id++;
-			} else element.set_vertex_id(iterator->second);
-		}
-	}
-#endif
 	inline bool is_automorphism(Embedding & emb, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
 		//check with the first element
 		if(dst < emb.front().vertex_id) return true;
@@ -616,8 +617,8 @@ void printout_embeddings(int level, Miner& miner, EmbeddingQueue& queue, bool ve
 #endif
 	int num_embeddings = std::distance(queue.begin(), queue.end());
 	unsigned embedding_size = miner.get_embedding_size();
-	std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size=" << embedding_size << ")" << std::endl;
+	std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size = " << embedding_size << " Bytes)" << std::endl;
 	if(verbose) for (auto embedding : queue) miner.printout_embedding(level, embedding);
 }
 
-#endif /* MINER_HPP_ */
+#endif // MINER_HPP_

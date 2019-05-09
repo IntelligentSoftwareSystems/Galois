@@ -51,7 +51,7 @@ int total_num = 0;
 
 // insert single-edge embeddings into the embedding queue
 void init(Graph& graph, EmbeddingQueue &queue) {
-	printf("\n=============================== Init ===============================\n\n");
+	printf("\n=============================== Init ================================\n\n");
 	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
@@ -199,7 +199,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 	init(graph, queue);
 	printout_embeddings(0, miner, queue);
 
-	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
+	std::cout << "\n---------------------------- Aggregating ----------------------------\n";
 	CgMap cg_map; // canonical graph map
 	UintMap id_map, support_map;
 	cg_map.clear();
@@ -211,14 +211,14 @@ void FsmSolver(Graph &graph, Miner &miner) {
 	}
 	if(show) miner.printout_agg(cg_map);
 
-	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
+	std::cout << "\n----------------------------- Filtering -----------------------------\n";
 	filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 	printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
 	while (level < k) {
 		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n------------------------------------- Joining -------------------------------------\n";
+		std::cout << "\n----------------------------- Expanding -----------------------------\n";
 		queue.clear();
 		galois::for_each(
 			galois::iterate(filtered_queue),
@@ -226,12 +226,12 @@ void FsmSolver(Graph &graph, Miner &miner) {
 				miner.extend_edge(k, emb, queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Join")
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Expanding")
 		);
 		miner.update_embedding_size();
 		printout_embeddings(level, miner, queue);
 
-		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
+		std::cout << "\n---------------------------- Aggregating ----------------------------\n";
 		cg_map.clear();
 		id_map.clear();
 		support_map.clear();
@@ -239,13 +239,13 @@ void FsmSolver(Graph &graph, Miner &miner) {
 		if(show) miner.printout_agg(cg_map);
 		if(num_freq_patterns == 0) break;
 
-		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
+		std::cout << "\n----------------------------- Filtering -----------------------------\n";
 		filtered_queue.clear();
 		filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
 		printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
-	std::cout << "\n=============================== Done ===============================\n\n";
+	std::cout << "\n=============================== Done ================================\n\n";
 	std::cout << "Number of frequent subgraphs (minsup=" << minsup << "): " << total_num << "\n\n";
 }
 
@@ -257,12 +257,9 @@ int main(int argc, char** argv) {
 	Tinit.start();
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	//std::cout << "k = " << k << std::endl;
-	//std::cout << "minsup = " << minsup << std::endl;
-	//std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	unsigned sizeof_emb = 2 * sizeof(ElementType);
-	Miner miner(&graph, sizeof_emb);
+
+	Miner miner(&graph);
 	miner.set_threshold(minsup);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();

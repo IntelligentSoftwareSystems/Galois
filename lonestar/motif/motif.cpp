@@ -45,7 +45,7 @@ typedef Graph::GraphNode GNode;
 
 // insert edges into the worklist (task queue)
 void initialization(Graph& graph, EmbeddingQueue &queue) {
-	printf("\n=============================== Init ===============================\n\n");
+	printf("\n=============================== Init ================================\n\n");
 	galois::do_all(
 		// for each vertex
 		galois::iterate(graph.begin(), graph.end()),
@@ -70,19 +70,18 @@ void initialization(Graph& graph, EmbeddingQueue &queue) {
 
 void MotifSolver(Graph& graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
-	// task queues. double buffering
-	EmbeddingQueue queue, queue2;
-	// initialize the task queue
-	initialization(graph, queue);
+	EmbeddingQueue queue, queue2; // task queues. double buffering
+	initialization(graph, queue); // initialize the task queue
 	if(show) printout_embeddings(0, miner, queue);
 	unsigned level = 1;
-	//int queue_size = std::distance(queue.begin(), queue.end());
-	//std::cout << "Queue size = " << queue_size << std::endl;
+	int queue_size = std::distance(queue.begin(), queue.end());
+	unsigned max_num_edges = k * (k - 1) / 2; // maximum number of edges in k-motif (i.e. k-clique)
 
 	// a level-by-level approach for Apriori search space (breadth first seach)
-	while (level < k) {
+	//while (level < k) { // to get the same output as RStream (which is not complete)
+	while (queue_size > 0 && level < max_num_edges) { // to get the complete (correct) k-motif output
 		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
+		std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
 		// for each embedding in the task queue, do the edge-extension operation
 		galois::for_each(
 			galois::iterate(queue),
@@ -91,14 +90,14 @@ void MotifSolver(Graph& graph, Miner &miner) {
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Join")
+			galois::loopname("Expanding")
 		);
 		miner.update_embedding_size(); // increase the embedding size since one more edge added
 		queue.swap(queue2);
 		queue2.clear();
 		if(show) printout_embeddings(level, miner, queue);
 
-		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
+		std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
 		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		//miner.quick_aggregate(queue, qp_map); // sequential implementaion
@@ -149,8 +148,9 @@ void MotifSolver(Graph& graph, Miner &miner) {
 			}
 		}
 		miner.printout_agg(cg_map);
+		queue_size = std::distance(queue.begin(), queue.end());
 		if(show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
-					<< " num_embeddings: " << std::distance(queue.begin(), queue.end()) << "\n";
+					<< " num_embeddings: " << queue_size << "\n";
 		level ++;
 	}
 	std::cout << "\n=============================== Done ===============================\n\n";
@@ -164,13 +164,10 @@ int main(int argc, char** argv) {
 	Tinit.start();
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
-
-	// the initial size of a embedding is 2 (nodes) for single-edge embeddings
-	unsigned sizeof_embedding = 2 * sizeof(ElementType);
-	// a miner defines the operators (join and aggregation)
-	Miner miner(&graph, sizeof_embedding);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
+	// a miner defines the operators (expanding and aggregation)
+	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	MotifSolver(graph, miner);
