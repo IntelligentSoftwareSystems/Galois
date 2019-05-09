@@ -18,8 +18,10 @@
  */
 
 #include <array>
+#include <cmath>
 #include <iostream>
 #include <optional>
+#include <utility>
 #include <variant>
 
 // Vendored from an old version of LLVM for Lonestar app command line handling.
@@ -45,7 +47,7 @@ static llvm::cl::opt<double> freq_min{"freq_min", llvm::cl::desc("minimum freque
 static llvm::cl::opt<double> freq_max{"freq_max", llvm::cl::desc("maximum frequency"), llvm::cl::init(1.)};
 static llvm::cl::opt<std::size_t> num_groups{"num_groups", llvm::cl::desc("number of frequency groups"), llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llvm::cl::desc("number of vertical directions"), llvm::cl::init(32u)};
-static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions.", llvm::cl::init(32u));
+static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions."), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
 
 // TODO: We need a graph type with dynamically sized node/edge data for this problem.
@@ -172,11 +174,51 @@ std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, 
   return num_cells;
 }
 
+// Idk why this hasn't been standardized yet, but here it is.
+static constexpr double pi = 3.1415926535897932384626433832795028841971693993751;
+
+// Generate discrete directions corresponding to an
+// equal area partition of the sphere.
+// Follow the forumlas from
+// https://stackoverflow.com/a/24458877/1935144
+// There are many more sophisticated things that could be done here,
+// but this is good enough since this is really intended as a
+// performance proxy anyway.
+auto generate_directions(std::size_t latitude_divisions, std::size_t longitude_divisions) noexcept {
+  std::size_t num_directions = latitude_divisions * longitude_divisions;
+  auto directions = std::make_unique<std::array<double, 3>[]>(num_directions);
+  auto average_longitudes = std::make_unique<double[]>(longitude_divisions);
+
+  // For floating point precision improvement it may be
+  // better to rewrite these things in terms of std::lerp,
+  // but that's only available in c++20.
+  for (std::size_t k = 0; k < longitude_divisions; k++) {
+    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi);
+  }
+
+  for (std::size_t j = 0; j < latitude_divisions; j++) {
+    // Since the even spacing is in the sine of the latitude,
+    // compute the center point in the sine as well to better
+    // match what the average direction is for that
+    // particular piece of the partition.
+    // TODO: actually prove that this is the right thing to do.
+    double average_latitude = std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
+    for (std::size_t k = 0; k < longitude_divisions; k++) {
+      std::size_t direction_index = j * longitude_divisions + k;
+      double average_longitude = average_longitudes[k];
+      directions[direction_index] = {std::cos(average_longitude), std::sin(average_longitude), std::sin(average_latitude)};
+      // Could renormalize here if really precise computation is desired.
+    }
+  }
+  return directions;
+}
+
 int main(int argc, char**argv) noexcept {
   galois::SharedMemSys galois_system;
   LonestarStart(argc, argv, name, desc, url);
 
   graph_t graph;
   auto ghost_threshold = generate_grid(graph, nx, ny, nz);
+  auto directions = generate_directions(num_vert_directions, num_horiz_directions);
 }
 
