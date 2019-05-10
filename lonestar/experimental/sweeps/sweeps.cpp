@@ -125,7 +125,7 @@ struct node_t {
 using graph_t = typename galois::graphs::LC_CSR_Graph<node_t, edge_t>::with_no_lockable<true>::type;
 
 // Routine to initialize graph topology and face normals.
-std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
+auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
 
   galois::graphs::FileGraphWriter temp_graph;
   // Each node represents a grid cell.
@@ -227,7 +227,7 @@ std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, 
   std::uninitialized_copy(std::make_move_iterator(edge_data.begin()), std::make_move_iterator(edge_data.end()), rawEdgeData);
 
   galois::graphs::readGraph(built_graph, temp_graph);
-  return num_cells;
+  return std::make_tuple(num_nodes, num_cells, num_outer_faces);
 }
 
 // Idk why this hasn't been standardized yet, but here it is.
@@ -274,7 +274,10 @@ int main(int argc, char**argv) noexcept {
   LonestarStart(argc, argv, name, desc, url);
 
   graph_t graph;
-  auto ghost_threshold = generate_grid(graph, nx, ny, nz);
+  auto [num_nodes, num_cells, num_outer_faces] = generate_grid(graph, nx, ny, nz);
+  // node id at least as large as num_cells
+  // indicates a boundary node.
+  auto ghost_threshold = num_cells;
   auto directions = generate_directions(num_vert_directions, num_horiz_directions);
 }
 
