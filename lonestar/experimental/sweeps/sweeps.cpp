@@ -156,6 +156,9 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   galois::LargeArray<graph_t::edge_data_type> edge_data;
   edge_data.create(num_edges);
 
+  // Interior cells will have degree 6
+  // since they will have either other cells or
+  // ghost cells on every side.
   temp_graph.phase1();
   for (std::size_t i = 0; i < nx; i++) {
     for (std::size_t j = 0; j < ny; j++) {
@@ -168,6 +171,8 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
     }
   }
   // Set the degrees for all the ghost cells to 1.
+  // No ghost cell should share a boundary with more
+  // than one actual cell in the domain.
   for (std::size_t id = num_cells; id < num_nodes; id++) {
     temp_graph.incrementDegree(id);
   }
