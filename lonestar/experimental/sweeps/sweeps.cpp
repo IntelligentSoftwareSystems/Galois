@@ -62,13 +62,13 @@ static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum n
 // Some helper functions for atomic operations with doubles:
 // Atomically do += operation on a double.
 void atomic_relaxed_double_increment(std::atomic<double> base, double increment) noexcept {
-  auto current = base.load();
+  auto current = base.load(std::memory_order_relaxed);
   while (!base.compare_exchange_weak(current, current + increment, std::memory_order_relaxed, std::memory_order_relaxed));
 }
 
 // Atomically do base = max(base, newval)
 void atomic_relaxed_update_max(std::atomic<double> base, double newval) noexcept {
-  auto current = base.load();
+  auto current = base.load(std::memory_order_relaxed);
   while (current != std::max(current, newval)) {
     base.compare_exchange_weak(current, newval, std::memory_order_relaxed, std::memory_order_relaxed);
   }
