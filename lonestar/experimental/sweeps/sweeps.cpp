@@ -17,6 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -347,13 +348,20 @@ auto generate_directions(std::size_t latitude_divisions, std::size_t longitude_d
   for (std::size_t j = 0; j < 3; j++) {
     averages[j] /= num_directions;
     // This is a pretty generous tolerance,
-    // so if this doesn't pass, sometihng is
+    // so if this doesn't pass, something is
     // very likely wrong.
     assert(("Dubious values from direction discretization.",
             std::abs(averages[j]) < 1E-7));
   }
 
-  return directions;
+  return std::make_tuple(std::move(directions), num_directions);
+}
+
+// Of the given discrete directions, find the one
+// that's closest to {1., 0., 0.};
+std::size_t find_x_direction(std::array<double, 3> const *directions, std::size_t num_directions) noexcept {
+  auto comparison = [](auto a1, auto a2) noexcept {return a1[0] < a2[0];};
+  return std::max_element(directions, directions + num_directions, comparison) - directions;
 }
 
 int main(int argc, char**argv) noexcept {
@@ -366,6 +374,7 @@ int main(int argc, char**argv) noexcept {
   // node id at least as large as num_cells
   // indicates a boundary node.
   auto ghost_threshold = num_cells;
-  auto directions = generate_directions(num_vert_directions, num_horiz_directions);
+  auto [directions, num_directions] = generate_directions(num_vert_directions, num_horiz_directions);
+  auto approx_x_direction_index = find_x_direction(directions.get(), num_directions);
 }
 
