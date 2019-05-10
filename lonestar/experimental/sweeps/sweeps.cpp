@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 #include <utility>
 
 // Silence erroneous warnings from within Boost headers
@@ -376,5 +377,17 @@ int main(int argc, char**argv) noexcept {
   auto ghost_threshold = num_cells;
   auto [directions, num_directions] = generate_directions(num_vert_directions, num_horiz_directions);
   auto approx_x_direction_index = find_x_direction(directions.get(), num_directions);
+
+  // Both these limitations could be lifted,
+  // but in the interest of keeping the buffer management
+  // code simple, I'm just going to assume them.
+  static_assert(sizeof(std::atomic<std::size_t>) <= sizeof(double),
+                "Current buffer allocation code assumes atomic "
+                "counters smaller than sizeof(double).");
+  static_assert(std::is_trivial_v<std::atomic<std::size_t>> &&
+                std::is_standard_layout_v<std::atomic<std::size_t>>,
+                "Current buffer allocation code assumes no special "
+                "construction/deletion code is needed for atomic counters.");
+  ;
 }
 
