@@ -18,11 +18,10 @@
  */
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <iostream>
-#include <optional>
 #include <utility>
-#include <variant>
 
 // Vendored from an old version of LLVM for Lonestar app command line handling.
 #include "llvm/Support/CommandLine.h"
@@ -53,23 +52,60 @@ static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum n
 // TODO: We need a graph type with dynamically sized node/edge data for this problem.
 // For now, indexing into a separate data structure will have to be sufficient.
 
-// TODO: This is another example of an undirected graph being important.
-// We need one of those as well.
-
 // Note: I'm going to use a CSR graph, so each node will already have a
 // unique integer id that can be used to index other data structures, so
 // it's not necessary to store anything other than the actual topology
 // on the graph nodes. Since the rest of the data is dynamically sized,
 // it'll be in a separate array.
-// Each edge does need to store the unit normal going outward through
-// the corresponding face though.
 
-// TODO: Try making edge data separate and shared to see if it helps
-// locality. It's not clear that it will, but it's something to try.
-
+// Each edge holds the unit normal pointing inward
+// from the corresponding face in the graph.
+// In the regular grid case, this info is mostly redundant.
+// It's still used here to determine the dependency direction
+// for each discrete radiation direction.
+// NOTE: The sweeping direction for each edge could just be
+// pre-computed, but that'd noticeably increase storage requirements.
+// TODO: Try caching sweep directions and see if it's any better.
+// TODO: Would shared edge data help at all here?
 using edge_t = std::array<double, 3>;
-using node_t = std::optional<double*>;
-using graph_t = galois::graphs::LC_CSR_Graph<node_t, edge_t>;
+
+// Note: in this representation of the mesh,
+// boundaries are "cells" that
+// have only one outgoing edge.
+// No sentinel is actually needed.
+struct node_t {
+  // opaque pointer to:
+  // memory block with one atomic per
+  // direction (to track remaining dependencies),
+  // and num_groups number of doubles.
+  void *magnitudes_and_counters = nullptr;
+  // Amounts of scattering in each direction.
+  // As a simplifying assumption, I'm assuming that
+  // radiation that scatters from any direction is equally likely to scatter into
+  // any direction at all, so everything can be accumulated into a single term.
+  // In general, there could be a scattering source term for every direction,
+  // but I'm assuming that they are all equal.
+  // On even iterations use scattering term 1 and accumulate into scattering term 0.
+  // Do the opposite for the odd iterations.
+  std::atomic<double> previous_accumulated_scattering = 0.;
+  std::atomic<double> currently_accumulating_scattering = 0.;
+  // Rather than do a separate pass over the data to zero out the previous
+  // scattering term for the next iteration, just count the number of
+  // times that the old scattering term is used. Once all the computations
+  // for a given round are done (i.e. when this counter hits zero),
+  // it's safe to move the currently accumulating scattering term value
+  // into the previous accumulated scattering variable and
+  // reset the dependency counters that track when the upstream dependencies
+  // for a given cell/direction have completed.
+  // TODO: Swapping values separately could be faster. Try and see.
+  std::atomic<std::size_t> scatter_use_counter = 0u;
+  // TODO: It wouldn't be hard to just add an iteration counter here too
+  // and then just let the whole thing run fully asynchronously. Try that some time.
+};
+
+// No fine-grained locks built into the graph.
+// Use atomics for ALL THE THINGS!
+using graph_t = typename galois::graphs::LC_CSR_Graph<node_t, edge_t>::with_no_lockable<true>::type;
 
 // Routine to initialize graph topology and face normals.
 std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
