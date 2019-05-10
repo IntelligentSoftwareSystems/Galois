@@ -314,6 +314,23 @@ auto generate_directions(std::size_t latitude_divisions, std::size_t longitude_d
       // Could renormalize here if really precise computation is desired.
     }
   }
+
+  // Sanity check: make sure average in each direction is 0.
+  std::array<double, 3> averages = {0., 0., 0.};
+  for (std::size_t i = 0; i < num_directions; i++) {
+    for (std::size_t j = 0; j < 3; j++) {
+      averages[j] += directions[i][j];
+    }
+  }
+  for (std::size_t j = 0; j < 3; j++) {
+    averages[j] /= num_directions;
+    // This is a pretty generous tolerance,
+    // so if this doesn't pass, sometihng is
+    // very likely wrong.
+    assert(("Dubious values from direction discretization.",
+            std::abs(averages[j]) < 1E-7));
+  }
+
   return directions;
 }
 
