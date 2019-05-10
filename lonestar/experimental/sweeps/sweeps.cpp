@@ -23,6 +23,11 @@
 #include <iostream>
 #include <utility>
 
+// Silence erroneous warnings from within Boost headers
+// that show up with gcc 8.1.
+#pragma GCC diagnostic ignored "-Wparentheses"
+#pragma GCC diagnostic ignored "-Wunused-value"
+
 // Vendored from an old version of LLVM for Lonestar app command line handling.
 #include "llvm/Support/CommandLine.h"
 
