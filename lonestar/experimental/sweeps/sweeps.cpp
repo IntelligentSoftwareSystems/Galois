@@ -60,6 +60,9 @@ static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", l
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
 
 // Some helper functions for atomic operations with doubles:
+// TODO: try switching these to a load/compute/load/compare/CAS
+// style loop and see if it speeds it up.
+
 // Atomically do += operation on a double.
 void atomic_relaxed_double_increment(std::atomic<double> base, double increment) noexcept {
   auto current = base.load(std::memory_order_relaxed);
