@@ -26,6 +26,11 @@
 // Silence erroneous warnings from within Boost headers
 // that show up with gcc 8.1.
 #pragma GCC diagnostic ignored "-Wparentheses"
+// This warning triggers with the assert(("explanation", check));
+// syntax since the left hand argument has no side-effects.
+// I prefer using the comma operator over && though because
+// the parentheses are more readable, so I'm silencing
+// the warning for this file.
 #pragma GCC diagnostic ignored "-Wunused-value"
 
 // Vendored from an old version of LLVM for Lonestar app command line handling.
@@ -175,7 +180,8 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   std::size_t yz_high_face_start = yz_low_face_start + ny * nz;
   std::size_t xz_low_face_start = yz_high_face_start + ny * nz;
   std::size_t xz_high_face_start = xz_low_face_start + nx * nz;
-  assert(num_nodes == xz_high_face_start + nx * nz);
+  assert(("Error in logic for dividing up node ids for exterior faces.",
+          num_nodes == xz_high_face_start + nx * nz));
   for (std::size_t i = 0; i < nx; i++) {
     for (std::size_t j = 0; j < ny; j++) {
       for (std::size_t k = 0; k < nz; k++) {
