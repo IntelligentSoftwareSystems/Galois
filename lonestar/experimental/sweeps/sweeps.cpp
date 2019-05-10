@@ -49,6 +49,21 @@ static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llv
 static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions."), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
 
+// Some helper functions for atomic operations with doubles:
+// Atomically do += operation on a double.
+void atomic_relaxed_double_increment(std::atomic<double> base, double increment) noexcept {
+  auto current = base.load();
+  while (!base.compare_exchange_weak(current, current + increment, std::memory_order_relaxed, std::memory_order_relaxed));
+}
+
+// Atomically do base = max(base, newval)
+void atomic_relaxed_update_max(std::atomic<double> base, double newval) noexcept {
+  auto current = base.load();
+  while (current != std::max(current, newval)) {
+    base.compare_exchange_weak(current, newval, std::memory_order_relaxed, std::memory_order_relaxed);
+  }
+}
+
 // TODO: We need a graph type with dynamically sized node/edge data for this problem.
 // For now, indexing into a separate data structure will have to be sufficient.
 
