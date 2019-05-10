@@ -108,6 +108,9 @@ struct node_t {
   // memory block with one atomic per
   // direction (to track remaining dependencies),
   // and num_groups number of doubles.
+  // It'd be nice to not use an opaque pointer here,
+  // but solving that would require adding a bunch
+  // of extra metadata or doing some non-obvious templating.
   void *magnitudes_and_counters = nullptr;
   // Amounts of scattering in each direction.
   // As a simplifying assumption, I'm assuming that
