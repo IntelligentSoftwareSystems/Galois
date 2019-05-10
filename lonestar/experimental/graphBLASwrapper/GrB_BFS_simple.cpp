@@ -217,7 +217,7 @@ void GrB_vxm (GrB_Vector<T, GrB_Index> &w,
             galois::steal() );
     //std::cout << "vxm finished\n";
     //std::cout << "SWAP? " << w.getBagSize() << ", " << next.getBagSize() <<"\n";
-    std::swap(w, next);
+    std::swap(w.getSparseVec(), next.getSparseVec());
 }
 
 // create a vector.
