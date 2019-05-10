@@ -136,7 +136,7 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   std::size_t num_outer_faces = (nx * ny + ny * nz + nx * nz) * 2;
   std::size_t num_cells = nx * ny * nz;
   std::size_t num_nodes = num_cells + num_outer_faces;
-  std::size_t num_edges = 4 * nx * ny * nz + num_outer_faces;
+  std::size_t num_edges = 6 * nx * ny * nz + num_outer_faces;
   temp_graph.setNumNodes(num_nodes);
   temp_graph.setNumEdges(num_edges);
   temp_graph.setSizeofEdgeData(galois::LargeArray<graph_t::edge_data_type>::size_of::value);
@@ -148,7 +148,7 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
     for (std::size_t j = 0; j < ny; j++) {
       for (std::size_t k = 0; k < nz; k++) {
         std::size_t id = i * nx * ny + j * ny + k;
-        for (std::size_t l = 0; l < 4; l++) {
+        for (std::size_t l = 0; l < 6; l++) {
           temp_graph.incrementDegree(id);
         }
       }
@@ -230,6 +230,54 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   return std::make_tuple(num_nodes, num_cells, num_outer_faces);
 }
 
+// Series of asserts to check that the graph construction
+// code is actually working.
+void assert_face_directions(graph_t &graph, std::size_t num_nodes, std::size_t num_cells, std::size_t num_outer_faces) noexcept {
+  assert(("artimetic error in mesh generation.",
+          num_cells + num_outer_faces == num_nodes));
+  assert(("Mismatch between graph size and number of nodes",
+          num_nodes == graph.size()));
+  for (auto node : graph) {
+    // std::distance ought to work on the edge iterator,
+    // but it doesn't, so count the degree manually.
+    // TODO: fix this in the library.
+    std::size_t degree = 0;
+    // Note: Rely on node type to decay to std::size_t here.
+    // This is a feature of the Galois CSR graph, but not other graph types.
+    assert(("Unexpectedly large node id.",
+            node < num_nodes));
+    for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+      // More verification is possible, but here's a sanity check.
+      // Confirm that edges coming back the other direction
+      // have edge data that is the negative of the edge data
+      // on the outgoing edge.
+      auto &edge_data = graph.getEdgeData(edge);
+      auto destination = graph.getEdgeDst(edge);
+      for (auto neighbor_edge : graph.edges(destination, galois::MethodFlag::UNPROTECTED)) {
+        if (graph.getEdgeDst(neighbor_edge) == node) {
+          auto &back_edge_data = graph.getEdgeData(neighbor_edge);
+          for (std::size_t i = 0; i < 3; i++) {
+            assert(("Back edge must be the negative of the forward edge.",
+                    edge_data[i] == -back_edge_data[i]));
+          }
+          goto back_edge_found;
+        }
+      }
+      // If loop exits without jumping past this assert,
+      // no back edge was found.
+      assert(("Edge with no back edge found.", false));
+      back_edge_found:;
+      degree++;
+    }
+    assert(("Found node with incorrect degree. "
+            "Interior nodes should all have "
+            "degree 6 and boundary nodes "
+            "should all have degree 1.",
+            degree == 6 && node < num_cells ||
+            degree == 1 && node >= num_cells));
+  }
+}
+
 // Idk why this hasn't been standardized yet, but here it is.
 static constexpr double pi = 3.1415926535897932384626433832795028841971693993751;
 
@@ -275,6 +323,7 @@ int main(int argc, char**argv) noexcept {
 
   graph_t graph;
   auto [num_nodes, num_cells, num_outer_faces] = generate_grid(graph, nx, ny, nz);
+  assert_face_directions(graph, num_nodes, num_cells, num_outer_faces);
   // node id at least as large as num_cells
   // indicates a boundary node.
   auto ghost_threshold = num_cells;
