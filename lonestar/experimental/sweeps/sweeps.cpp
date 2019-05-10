@@ -73,12 +73,14 @@ void atomic_relaxed_update_max(std::atomic<double> base, double newval) noexcept
 // on the graph nodes. Since the rest of the data is dynamically sized,
 // it'll be in a separate array.
 
-// Each edge holds the unit normal pointing inward
-// from the corresponding face in the graph.
-// In the regular grid case, this info is mostly redundant.
+// Each edge holds the unit normal pointing outward
+// from the corresponding source cell in the graph.
+// Note: this will be the negative of the vector stored
+// on the edge coming the opposite direction.
+// Note: In the regular grid case, this info is mostly redundant.
 // It's still used here to determine the dependency direction
 // for each discrete radiation direction.
-// NOTE: The sweeping direction for each edge could just be
+// Note: The sweeping direction for each edge could just be
 // pre-computed, but that'd noticeably increase storage requirements.
 // TODO: Try caching sweep directions and see if it's any better.
 // TODO: Would shared edge data help at all here?
@@ -159,6 +161,8 @@ std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, 
 
   // Now that the degree of each node is known,
   // fill in the actual topology.
+  // Also fill in the node data with the vector
+  // normal to the face, going out from the current cell.
   temp_graph.phase2();
   std::size_t xy_low_face_start = num_cells;
   std::size_t xy_high_face_start = xy_low_face_start + nx * ny;
@@ -172,52 +176,53 @@ std::size_t generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, 
       for (std::size_t k = 0; k < nz; k++) {
         std::size_t id = i * nx * ny + j * ny + k;
         if (i > 0) {
-          edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {-1., 0., 0.});
         } else {
           std::size_t ghost_id = yz_low_face_start + j * ny + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
-        }
-        if (i < nx - 1) {
-          edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {-1., 0., 0.});
-        } else {
-          std::size_t ghost_id = yz_high_face_start + j * ny + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {-1., 0., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {1., 0., 0.});
         }
+        if (i < nx - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {1., 0., 0.});
+        } else {
+          std::size_t ghost_id = yz_high_face_start + j * ny + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
+        }
         if (j > 0) {
-          edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., 1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., -1., 0.});
         } else {
           std::size_t ghost_id = xz_low_face_start + i * nx + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
-        }
-        if (j < ny - 1) {
-          edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., -1., 0.});
-        } else {
-          std::size_t ghost_id = xz_high_face_start + i * nx + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., -1., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 1., 0.});
         }
+        if (j < ny - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., 1., 0.});
+        } else {
+          std::size_t ghost_id = xz_high_face_start + i * nx + k;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
+        }
         if (k > 0) {
-          edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., 1.});
+          edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., -1.});
         } else {
           std::size_t ghost_id = xy_low_face_start + i * nx + j;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
-        }
-        if (k < nz - 1) {
-          edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., -1.});
-        } else {
-          std::size_t ghost_id = xy_high_face_start + i * nx + j;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., -1.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., 1.});
+        }
+        if (k < nz - 1) {
+          edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., 1.});
+        } else {
+          std::size_t ghost_id = xy_high_face_start + i * nx + j;
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
         }
       }
     }
   }
 
-  // TODO: is it possible to set the edge data during construction?
+  // TODO: is it possible to set the edge data
+  // during construction without copying here?
   auto *rawEdgeData = temp_graph.finish<graph_t::edge_data_type>();
   std::uninitialized_copy(std::make_move_iterator(edge_data.begin()), std::make_move_iterator(edge_data.end()), rawEdgeData);
 
