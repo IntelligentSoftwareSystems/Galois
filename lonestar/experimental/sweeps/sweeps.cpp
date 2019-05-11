@@ -358,19 +358,18 @@ auto generate_directions(std::size_t latitude_divisions, std::size_t longitude_d
   }
 
   // Sanity check: make sure average in each direction is 0.
-  std::array<double, 3> averages = {0., 0., 0.};
-  for (std::size_t i = 0; i < num_directions; i++) {
-    for (std::size_t j = 0; j < 3; j++) {
-      averages[j] += directions[i][j];
-    }
-  }
+  auto elwise_sum = [](auto a1, auto a2) noexcept {
+    return std::array<double, 3>({a1[0] + a2[0], a1[1] + a2[1], a1[2] + a2[2]});
+  };
+  std::array<double, 3> identity = {0., 0., 0.};
+  auto totals = std::accumulate(directions.get(), directions.get() + num_directions, identity, elwise_sum);
   for (std::size_t j = 0; j < 3; j++) {
-    averages[j] /= num_directions;
+    totals[j] /= num_directions;
     // This is a pretty generous tolerance,
     // so if this doesn't pass, something is
     // very likely wrong.
     assert(("Dubious values from direction discretization.",
-            std::abs(averages[j]) < 1E-7));
+            std::abs(totals[j]) < 1E-7));
   }
 
   return std::make_tuple(std::move(directions), num_directions);
