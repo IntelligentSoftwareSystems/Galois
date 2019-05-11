@@ -54,13 +54,13 @@ static char const *url = "sweeps";
 static llvm::cl::opt<std::size_t> nx{"nx", llvm::cl::desc("number of cells in x direction"), llvm::cl::init(10u)};
 static llvm::cl::opt<std::size_t> ny{"ny", llvm::cl::desc("number of cells in y direction"), llvm::cl::init(10u)};
 static llvm::cl::opt<std::size_t> nz{"nz", llvm::cl::desc("number of cells in z direction"), llvm::cl::init(10u)};
-static llvm::cl::opt<double> freq_min{"freq_min", llvm::cl::desc("minimum frequency"), llvm::cl::init(.01)};
-static llvm::cl::opt<double> freq_max{"freq_max", llvm::cl::desc("maximum frequency"), llvm::cl::init(1.)};
 static llvm::cl::opt<std::size_t> num_groups{"num_groups", llvm::cl::desc("number of frequency groups"), llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llvm::cl::desc("number of vertical directions"), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions."), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
 static llvm::cl::opt<double> pulse_strength{"pulse_strength", llvm::cl::desc("radiation pulse strength"), llvm::cl::init(1.)};
+static llvm::cl::opt<double> absorption_coef{"absorption_coef", llvm::cl::desc("Absorption coefficient (between 0 and 1), absorption and scattering must sum to less than 1."), llvm::cl::init(.01)};
+static llvm::cl::opt<double> scattering_coef{"scattering_coef", llvm::cl::desc("Scattering coefficient (between 0 and 1), absorption and scattering must sum to less than 1."), llvm::cl::init(.01)};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
@@ -141,7 +141,7 @@ struct node_t {
   // but I'm assuming that they are all equal.
   // On even iterations use scattering term 1 and accumulate into scattering term 0.
   // Do the opposite for the odd iterations.
-  std::atomic<double> previous_accumulated_scattering = 0.;
+  double previous_accumulated_scattering = 0.;
   std::atomic<double> currently_accumulating_scattering = 0.;
   // Rather than do a separate pass over the data to zero out the previous
   // scattering term for the next iteration, just count the number of
@@ -441,6 +441,8 @@ int main(int argc, char**argv) noexcept {
     radiation_magnitudes[boundary_pulse_index + 1 + i].magnitude = pulse_strength;
   }
 
+  std::array<double, 3> grid_spacing{1. / nx, 1. / ny, 1. / nz};
+
   // For the regular grid, this will just be the corners.
   // Mimic the irregular case though by finding nodes with
   // no dependencies during the pass that initializes the sweep counters.
@@ -479,6 +481,12 @@ int main(int argc, char**argv) noexcept {
   auto indexer = [](const work_t& n) { return 1; };
   typedef galois::worklists::OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
+  // set up separate buffers for accumulating the per-group fluxes.
+  galois::substrate::PerThreadStorage<std::unique_ptr<double[]>> accumulation_buffers;
+  galois::on_each([&](unsigned int tid, unsigned int nthreads) noexcept {
+    *accumulation_buffers.getLocal() = std::make_unique<double[]>(num_groups);
+  });
+
   std::atomic<double> global_abs_change = 0.;
   galois::for_each(
     galois::iterate(starting_nodes.begin(), starting_nodes.end()),
@@ -486,13 +494,19 @@ int main(int argc, char**argv) noexcept {
       auto [node, dir_idx] = work_item;
       auto &direction = directions[dir_idx];
       assert(node < ghost_threshold);
-      auto base_magnitude_index = num_per_element * node + num_per_element_and_direction * dir_idx;
-      auto &counter = radiation_magnitudes[base_magnitude_index].counter;
+      auto node_magnitude_idx = num_per_element * node + num_per_element_and_direction * dir_idx;
+      auto &counter = radiation_magnitudes[node_magnitude_idx].counter;
       assert(!counter);
+      auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
       // Re-count incoming edges during this computation.
       std::size_t incoming_edges = 0;
-      double scattering_contribution = 0.;
+
+      // Reset accumulation buffers.
+      auto &new_magnitude_numerators = *accumulation_buffers.getLocal();
+      std::fill(new_magnitude_numerators.get(), new_magnitude_numerators.get() + num_groups, node_data.previous_accumulated_scattering);
+      // Partial computation of the coefficient that will divide the previous term later.
+      double new_magnitude_denominator = absorption_coef + scattering_coef;
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
         auto other_node = graph.getEdgeDst(edge);
         std::size_t other_magnitude_idx = num_per_element * other_node + num_per_element_and_direction * dir_idx;
@@ -512,15 +526,38 @@ int main(int argc, char**argv) noexcept {
           continue;
         }
 
-        auto &other_node_data = graph.getData(graph.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
-
         incoming_edges++;
-        ;;;; // update current based on incoming.
+
+        // More partial computation of this node's estimated radiative fluxes in
+        // the given direction. This time based off of the incoming fluxes from
+        // its upwind neighbors.
+        // TODO: Try storing this direction info on the edge.
+        std::size_t axis = face_normal[0]!=0 ? 0 : (face_normal[1]!=0 ? 1 : 2);
+        double sign = std::signbit(face_normal[axis]) ? -1. : 1.;
+        double term_coef = direction[axis] * sign;
+        new_magnitude_denominator -= term_coef / grid_spacing[axis];
+        for (std::size_t i = 0; i < num_groups; i++) {
+          std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
+          double &other_magnitude = radiation_magnitudes[other_mag_and_group_idx].magnitude;
+          new_magnitude_numerators[i] -= term_coef * other_magnitude / grid_spacing[axis];
+        }
       }
+      // Finish computing new flux magnitude.
+      // Also compute a new scattering amount
+      // for use in the next iteration based
+      // off of this new flux.
+      double scattering_contribution = 0.;
+      double scattering_contribution_coef = scattering_coef / (num_groups * num_directions);
+      for (std::size_t i = 0; i < num_groups; i++) {
+        std::size_t node_mag_and_group_idx = node_magnitude_idx + i + 1;
+        double &node_magnitude = radiation_magnitudes[node_mag_and_group_idx].magnitude;
+        node_magnitude = new_magnitude_numerators[i] / new_magnitude_denominator;
+        scattering_contribution += scattering_contribution_coef * node_magnitude;
+      }
+
       // Reset dependency counter for next pass.
       counter = incoming_edges;
       // Update scattering source for use in next step.
-      auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       auto &scattering_atomic = node_data.currently_accumulating_scattering;
       atomic_relaxed_double_increment(scattering_atomic, scattering_contribution);
 
