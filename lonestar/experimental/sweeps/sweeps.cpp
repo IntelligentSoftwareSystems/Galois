@@ -376,6 +376,20 @@ auto generate_directions(std::size_t latitude_divisions, std::size_t longitude_d
   return std::make_tuple(std::move(directions), num_directions);
 }
 
+bool is_outgoing(std::array<double, 3> direction, std::array<double, 3> face_normal) noexcept {
+  return direction[0] * face_normal[0] +
+         direction[1] * face_normal[1] +
+         direction[2] * face_normal[2]
+         > 0.;
+}
+
+bool is_incoming(std::array<double, 3> direction, std::array<double, 3> face_normal) noexcept {
+  return direction[0] * face_normal[0] +
+         direction[1] * face_normal[1] +
+         direction[2] * face_normal[2]
+         < 0.;
+}
+
 // Of the given discrete directions, find the one
 // that's closest to {1., 0., 0.};
 std::size_t find_x_direction(std::array<double, 3> const *directions, std::size_t num_directions) noexcept {
