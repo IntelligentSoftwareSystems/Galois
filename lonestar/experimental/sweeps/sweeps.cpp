@@ -494,14 +494,26 @@ int main(int argc, char**argv) noexcept {
       std::size_t incoming_edges = 0;
       double scattering_contribution = 0.;
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        // Work items are buffered locally until the end of each loop iteration,
-        // so we can send outgoing edges here immediately.
+        auto other_node = graph.getEdgeDst(edge);
+        std::size_t other_magnitude_idx = num_per_element * other_node + num_per_element_and_direction * dir_idx;
         auto &face_normal = graph.getEdgeData(edge);
         if (!is_incoming(direction, face_normal)) {
-          ;
-          ;;;; // decrement and push if ready here
+          // Don't send anything to a ghost node.
+          if (other_node >= ghost_threshold) continue;
+
+          auto &other_counter = radiation_magnitudes[other_magnitude_idx].counter;
+          // Work items are buffered locally until the end of each loop iteration,
+          // so we can send outgoing edges here immediately.
+          // TODO: Relax atomic consistency here.
+          if (--other_counter == 0) {
+            work_t new_work_item{other_node, dir_idx};
+            ctx.push(new_work_item);
+          }
           continue;
         }
+
+        auto &other_node_data = graph.getData(graph.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
+
         incoming_edges++;
         ;;;; // update current based on incoming.
       }
