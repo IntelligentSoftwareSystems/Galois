@@ -101,6 +101,24 @@ void atomic_relaxed_update_max(std::atomic<double> base, double newval) noexcept
 // TODO: Would shared edge data help at all here?
 using edge_t = std::array<double, 3>;
 
+// This type is used to allocate buffers where
+// some elements are doubles and some are atomic counters
+// and the offsets between them are only known at runtime.
+union direction_buffer_element_t {
+  double magnitude;
+  std::atomic<std::size_t> counter;
+};
+// Both these limitations could be lifted,
+// but in the interest of keeping the buffer management
+// code simple, I'm just going to assume them.
+static_assert(sizeof(std::atomic<std::size_t>) <= sizeof(double),
+              "Current buffer allocation code assumes atomic "
+              "counters smaller than sizeof(double).");
+static_assert(std::is_trivial_v<std::atomic<std::size_t>> &&
+              std::is_standard_layout_v<std::atomic<std::size_t>>,
+              "Current buffer allocation code assumes no special "
+              "construction/deletion code is needed for atomic counters.");
+
 // Note: in this representation of the mesh,
 // boundaries are "cells" that
 // have only one outgoing edge.
@@ -113,7 +131,7 @@ struct node_t {
   // It'd be nice to not use an opaque pointer here,
   // but solving that would require adding a bunch
   // of extra metadata or doing some non-obvious templating.
-  void *magnitudes_and_counters = nullptr;
+  direction_buffer_element_t *magnitudes_and_counters = nullptr;
   // Amounts of scattering in each direction.
   // As a simplifying assumption, I'm assuming that
   // radiation that scatters from any direction is equally likely to scatter into
@@ -378,16 +396,5 @@ int main(int argc, char**argv) noexcept {
   auto [directions, num_directions] = generate_directions(num_vert_directions, num_horiz_directions);
   auto approx_x_direction_index = find_x_direction(directions.get(), num_directions);
 
-  // Both these limitations could be lifted,
-  // but in the interest of keeping the buffer management
-  // code simple, I'm just going to assume them.
-  static_assert(sizeof(std::atomic<std::size_t>) <= sizeof(double),
-                "Current buffer allocation code assumes atomic "
-                "counters smaller than sizeof(double).");
-  static_assert(std::is_trivial_v<std::atomic<std::size_t>> &&
-                std::is_standard_layout_v<std::atomic<std::size_t>>,
-                "Current buffer allocation code assumes no special "
-                "construction/deletion code is needed for atomic counters.");
-  ;
 }
 
