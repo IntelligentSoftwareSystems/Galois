@@ -473,5 +473,15 @@ int main(int argc, char**argv) noexcept {
   auto indexer = [](const work_t& n) { return 1; };
   typedef galois::worklists::OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
+  galois::for_each(
+    galois::iterate(starting_nodes.begin(), starting_nodes.end()),
+    [&](work_t work_item, auto &ctx) noexcept {
+      ;
+    },
+    galois::loopname("Sweep"),
+    galois::no_conflicts(),
+    galois::wl<OBIM>(indexer)
+  );
+
 }
 
