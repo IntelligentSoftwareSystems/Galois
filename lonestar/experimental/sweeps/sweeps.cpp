@@ -57,7 +57,7 @@ static llvm::cl::opt<std::size_t> nz{"nz", llvm::cl::desc("number of cells in z 
 static llvm::cl::opt<std::size_t> num_groups{"num_groups", llvm::cl::desc("number of frequency groups"), llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llvm::cl::desc("number of vertical directions"), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions."), llvm::cl::init(32u)};
-static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
+static llvm::cl::opt<std::size_t> num_iters{"num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(100u)};
 static llvm::cl::opt<double> pulse_strength{"pulse_strength", llvm::cl::desc("radiation pulse strength"), llvm::cl::init(1.)};
 static llvm::cl::opt<double> absorption_coef{"absorption_coef", llvm::cl::desc("Absorption coefficient (between 0 and 1), absorption and scattering must sum to less than 1."), llvm::cl::init(.01)};
 static llvm::cl::opt<double> scattering_coef{"scattering_coef", llvm::cl::desc("Scattering coefficient (between 0 and 1), absorption and scattering must sum to less than 1."), llvm::cl::init(.01)};
@@ -488,91 +488,95 @@ int main(int argc, char**argv) noexcept {
   });
 
   std::atomic<double> global_abs_change = 0.;
-  galois::for_each(
-    galois::iterate(starting_nodes.begin(), starting_nodes.end()),
-    [&](work_t work_item, auto &ctx) noexcept {
-      auto [node, dir_idx] = work_item;
-      auto &direction = directions[dir_idx];
-      assert(node < ghost_threshold);
-      auto node_magnitude_idx = num_per_element * node + num_per_element_and_direction * dir_idx;
-      auto &counter = radiation_magnitudes[node_magnitude_idx].counter;
-      assert(!counter);
-      auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
-      // Re-count incoming edges during this computation.
-      std::size_t incoming_edges = 0;
+  for (std::size_t current_iteration = 0; current_iteration < num_iters; current_iteration++) {
+    galois::for_each(
+      galois::iterate(starting_nodes.begin(), starting_nodes.end()),
+      [&](work_t work_item, auto &ctx) noexcept {
+        auto [node, dir_idx] = work_item;
+        auto &direction = directions[dir_idx];
+        assert(node < ghost_threshold);
+        auto node_magnitude_idx = num_per_element * node + num_per_element_and_direction * dir_idx;
+        auto &counter = radiation_magnitudes[node_magnitude_idx].counter;
+        assert(!counter);
+        auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
-      // Reset accumulation buffers.
-      auto &new_magnitude_numerators = *accumulation_buffers.getLocal();
-      std::fill(new_magnitude_numerators.get(), new_magnitude_numerators.get() + num_groups, node_data.previous_accumulated_scattering);
-      // Partial computation of the coefficient that will divide the previous term later.
-      double new_magnitude_denominator = absorption_coef + scattering_coef;
-      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        auto other_node = graph.getEdgeDst(edge);
-        std::size_t other_magnitude_idx = num_per_element * other_node + num_per_element_and_direction * dir_idx;
-        auto &face_normal = graph.getEdgeData(edge);
-        if (!is_incoming(direction, face_normal)) {
-          // Don't send anything to a ghost node.
-          if (other_node >= ghost_threshold) continue;
+        // Re-count incoming edges during this computation.
+        std::size_t incoming_edges = 0;
 
-          auto &other_counter = radiation_magnitudes[other_magnitude_idx].counter;
-          // Work items are buffered locally until the end of each loop iteration,
-          // so we can send outgoing edges here immediately.
-          // TODO: Relax atomic consistency here.
-          if (--other_counter == 0) {
-            work_t new_work_item{other_node, dir_idx};
-            ctx.push(new_work_item);
+        // Reset accumulation buffers.
+        auto &new_magnitude_numerators = *accumulation_buffers.getLocal();
+        std::fill(new_magnitude_numerators.get(), new_magnitude_numerators.get() + num_groups, node_data.previous_accumulated_scattering);
+        // Partial computation of the coefficient that will divide the previous term later.
+        double new_magnitude_denominator = absorption_coef + scattering_coef;
+        for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+          auto other_node = graph.getEdgeDst(edge);
+          std::size_t other_magnitude_idx = num_per_element * other_node + num_per_element_and_direction * dir_idx;
+          auto &face_normal = graph.getEdgeData(edge);
+          if (!is_incoming(direction, face_normal)) {
+            // Don't send anything to a ghost node.
+            if (other_node >= ghost_threshold) continue;
+
+            auto &other_counter = radiation_magnitudes[other_magnitude_idx].counter;
+            // Work items are buffered locally until the end of each loop iteration,
+            // so we can send outgoing edges here immediately.
+            // TODO: Relax atomic consistency here.
+            if (--other_counter == 0) {
+              work_t new_work_item{other_node, dir_idx};
+              ctx.push(new_work_item);
+            }
+            continue;
           }
-          continue;
+
+          incoming_edges++;
+
+          // More partial computation of this node's estimated radiative fluxes in
+          // the given direction. This time based off of the incoming fluxes from
+          // its upwind neighbors.
+          // TODO: Try storing this direction info on the edge.
+          std::size_t axis = face_normal[0]!=0 ? 0 : (face_normal[1]!=0 ? 1 : 2);
+          double sign = std::signbit(face_normal[axis]) ? -1. : 1.;
+          double term_coef = direction[axis] * sign;
+          new_magnitude_denominator -= term_coef / grid_spacing[axis];
+          for (std::size_t i = 0; i < num_groups; i++) {
+            std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
+            double &other_magnitude = radiation_magnitudes[other_mag_and_group_idx].magnitude;
+            new_magnitude_numerators[i] -= term_coef * other_magnitude / grid_spacing[axis];
+          }
         }
-
-        incoming_edges++;
-
-        // More partial computation of this node's estimated radiative fluxes in
-        // the given direction. This time based off of the incoming fluxes from
-        // its upwind neighbors.
-        // TODO: Try storing this direction info on the edge.
-        std::size_t axis = face_normal[0]!=0 ? 0 : (face_normal[1]!=0 ? 1 : 2);
-        double sign = std::signbit(face_normal[axis]) ? -1. : 1.;
-        double term_coef = direction[axis] * sign;
-        new_magnitude_denominator -= term_coef / grid_spacing[axis];
+        // Finish computing new flux magnitude.
+        // Also compute a new scattering amount
+        // for use in the next iteration based
+        // off of this new flux.
+        double scattering_contribution = 0.;
+        double scattering_contribution_coef = scattering_coef / (num_groups * num_directions);
         for (std::size_t i = 0; i < num_groups; i++) {
-          std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
-          double &other_magnitude = radiation_magnitudes[other_mag_and_group_idx].magnitude;
-          new_magnitude_numerators[i] -= term_coef * other_magnitude / grid_spacing[axis];
+          std::size_t node_mag_and_group_idx = node_magnitude_idx + i + 1;
+          double &node_magnitude = radiation_magnitudes[node_mag_and_group_idx].magnitude;
+          node_magnitude = new_magnitude_numerators[i] / new_magnitude_denominator;
+          scattering_contribution += scattering_contribution_coef * node_magnitude;
         }
-      }
-      // Finish computing new flux magnitude.
-      // Also compute a new scattering amount
-      // for use in the next iteration based
-      // off of this new flux.
-      double scattering_contribution = 0.;
-      double scattering_contribution_coef = scattering_coef / (num_groups * num_directions);
-      for (std::size_t i = 0; i < num_groups; i++) {
-        std::size_t node_mag_and_group_idx = node_magnitude_idx + i + 1;
-        double &node_magnitude = radiation_magnitudes[node_mag_and_group_idx].magnitude;
-        node_magnitude = new_magnitude_numerators[i] / new_magnitude_denominator;
-        scattering_contribution += scattering_contribution_coef * node_magnitude;
-      }
 
-      // Reset dependency counter for next pass.
-      counter = incoming_edges;
-      // Update scattering source for use in next step.
-      auto &scattering_atomic = node_data.currently_accumulating_scattering;
-      atomic_relaxed_double_increment(scattering_atomic, scattering_contribution);
+        // Reset dependency counter for next pass.
+        counter = incoming_edges;
+        // Update scattering source for use in next step.
+        auto &scattering_atomic = node_data.currently_accumulating_scattering;
+        atomic_relaxed_double_increment(scattering_atomic, scattering_contribution);
 
-      // TODO: Relax memory consistency requirements here.
-      if (--node_data.scatter_use_counter==0) {
-        // Reset counter for next time step.
-        node_data.scatter_use_counter = num_directions;
-        double abs_change = std::abs(node_data.currently_accumulating_scattering - node_data.previous_accumulated_scattering);
-        atomic_relaxed_double_max(global_abs_change, abs_change);
-      }
-    },
-    galois::loopname("Sweep"),
-    galois::no_conflicts(),
-    galois::wl<OBIM>(indexer)
-  );
-
+        // TODO: Relax memory consistency requirements here.
+        if (--node_data.scatter_use_counter==0) {
+          // Reset counter for next time step.
+          node_data.scatter_use_counter = num_directions;
+          double abs_change = std::abs(node_data.currently_accumulating_scattering - node_data.previous_accumulated_scattering);
+          atomic_relaxed_double_max(global_abs_change, abs_change);
+        }
+      },
+      galois::loopname("Sweep"),
+      galois::no_conflicts(),
+      galois::wl<OBIM>(indexer)
+    );
+    std::cout << global_abs_change << std::endl;
+    global_abs_change = 0;
+  }
 }
 
