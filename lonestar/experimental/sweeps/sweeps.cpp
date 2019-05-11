@@ -60,6 +60,7 @@ static llvm::cl::opt<std::size_t> num_groups{"num_groups", llvm::cl::desc("numbe
 static llvm::cl::opt<std::size_t> num_vert_directions{"num_vert_directions", llvm::cl::desc("number of vertical directions"), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{"num_horiz_directions", llvm::cl::desc("number of horizontal directions."), llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> maxiters{"maxiters", llvm::cl::desc("maximum number of iterations"), llvm::cl::init(100u)};
+static llvm::cl::opt<double> pulse_strength{"pulse_strength", llvm::cl::desc("radiation pulse strength"), llvm::cl::init(1.)};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
@@ -397,8 +398,8 @@ int main(int argc, char**argv) noexcept {
 
   // Now create buffers to hold all the radiation magnitudes and
   // the atomic counters used to trace dependencies.
-  std::size_t num_per_element_and_direction_vals = 1u + num_groups;
-  std::size_t num_per_element = num_directions * num_per_element_and_direction_vals;
+  std::size_t num_per_element_and_direction = 1u + num_groups;
+  std::size_t num_per_element = num_directions * num_per_element_and_direction;
   // Could potentially save a little space by reducing the storage allocated for
   // fluxes in ghost cells, but that'd be way more complicated and not necessarily helpful.
   std::size_t buffer_size = num_nodes * num_per_element;
@@ -411,5 +412,12 @@ int main(int argc, char**argv) noexcept {
 
   // Index of center face on yz boundary.
   std::size_t yz_face_center_boundary = yz_low + (ny / 2) * nz + nz / 2;
+
+  // Make the boundary condition be an intense ray entering the domain
+  // in the middle of the low yz face in approximately the positive x direction.
+  std::size_t boundary_pulse_index = yz_face_center_boundary * num_per_element + approx_x_direction_index * num_per_element_and_direction;
+  for (std::size_t i = 0; i < num_groups; i++) {
+    radiation_magnitudes[boundary_pulse_index + 1 + i].magnitude = pulse_strength;
+  }
 }
 
