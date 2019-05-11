@@ -220,42 +220,42 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
         if (i > 0) {
           edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {-1., 0., 0.});
         } else {
-          std::size_t ghost_id = yz_low_face_start + j * ny + k;
+          std::size_t ghost_id = yz_low_face_start + j * nz + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {-1., 0., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {1., 0., 0.});
         }
         if (i < nx - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {1., 0., 0.});
         } else {
-          std::size_t ghost_id = yz_high_face_start + j * ny + k;
+          std::size_t ghost_id = yz_high_face_start + j * nz + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
         }
         if (j > 0) {
           edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., -1., 0.});
         } else {
-          std::size_t ghost_id = xz_low_face_start + i * nx + k;
+          std::size_t ghost_id = xz_low_face_start + i * nz + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., -1., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 1., 0.});
         }
         if (j < ny - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., 1., 0.});
         } else {
-          std::size_t ghost_id = xz_high_face_start + i * nx + k;
+          std::size_t ghost_id = xz_high_face_start + i * nz + k;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
         }
         if (k > 0) {
           edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., -1.});
         } else {
-          std::size_t ghost_id = xy_low_face_start + i * nx + j;
+          std::size_t ghost_id = xy_low_face_start + i * ny + j;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., -1.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., 1.});
         }
         if (k < nz - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., 1.});
         } else {
-          std::size_t ghost_id = xy_high_face_start + i * nx + j;
+          std::size_t ghost_id = xy_high_face_start + i * ny + j;
           edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
           edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
         }
@@ -269,7 +269,7 @@ auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::si
   std::uninitialized_copy(std::make_move_iterator(edge_data.begin()), std::make_move_iterator(edge_data.end()), rawEdgeData);
 
   galois::graphs::readGraph(built_graph, temp_graph);
-  return std::make_tuple(num_nodes, num_cells, num_outer_faces);
+  return std::make_tuple(num_nodes, num_cells, num_outer_faces, xy_low_face_start, xy_high_face_start, yz_low_face_start, yz_high_face_start, xz_low_face_start, xz_high_face_start);
 }
 
 // Series of asserts to check that the graph construction
@@ -387,7 +387,7 @@ int main(int argc, char**argv) noexcept {
   LonestarStart(argc, argv, name, desc, url);
 
   graph_t graph;
-  auto [num_nodes, num_cells, num_outer_faces] = generate_grid(graph, nx, ny, nz);
+  auto [num_nodes, num_cells, num_outer_faces, xy_low, xy_high, yz_low, yz_high, xz_low, xz_high] = generate_grid(graph, nx, ny, nz);
   assert_face_directions(graph, num_nodes, num_cells, num_outer_faces);
   // node id at least as large as num_cells
   // indicates a boundary node.
@@ -408,5 +408,8 @@ int main(int argc, char**argv) noexcept {
   // https://stackoverflow.com/a/49495687/1935144
   std::fill(reinterpret_cast<double*>(radiation_magnitudes.begin()),
             reinterpret_cast<double*>(radiation_magnitudes.end()), 0.);
+
+  // Index of center face on yz boundary.
+  std::size_t yz_face_center_boundary = yz_low + (ny / 2) * nz + nz / 2;
 }
 
