@@ -67,13 +67,13 @@ static llvm::cl::opt<double> pulse_strength{"pulse_strength", llvm::cl::desc("ra
 // style loop and see if it speeds it up.
 
 // Atomically do += operation on a double.
-void atomic_relaxed_double_increment(std::atomic<double> base, double increment) noexcept {
+void atomic_relaxed_double_increment(std::atomic<double> &base, double increment) noexcept {
   auto current = base.load(std::memory_order_relaxed);
   while (!base.compare_exchange_weak(current, current + increment, std::memory_order_relaxed, std::memory_order_relaxed));
 }
 
 // Atomically do base = max(base, newval)
-void atomic_relaxed_update_max(std::atomic<double> base, double newval) noexcept {
+void atomic_relaxed_double_max(std::atomic<double> &base, double newval) noexcept {
   auto current = base.load(std::memory_order_relaxed);
   while (current != std::max(current, newval)) {
     base.compare_exchange_weak(current, newval, std::memory_order_relaxed, std::memory_order_relaxed);
@@ -454,6 +454,7 @@ int main(int argc, char**argv) noexcept {
       if (node >= ghost_threshold) return;
       for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
         std::atomic<std::size_t> &counter = radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter;
+        // TODO: relax consistency model here.
         for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
           counter += is_incoming(directions[dir_idx], graph.getEdgeData(edge));
         }
@@ -462,6 +463,11 @@ int main(int argc, char**argv) noexcept {
           starting_nodes.emplace(work_item);
         }
       }
+      // Also set the counter for how many directions are remaining
+      // on the current node.
+      auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
+      // TODO: relax consistency model here.
+      node_data.scatter_use_counter = num_directions;
     },
     galois::loopname("Initialize counters")
   );
@@ -473,10 +479,46 @@ int main(int argc, char**argv) noexcept {
   auto indexer = [](const work_t& n) { return 1; };
   typedef galois::worklists::OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
+  std::atomic<double> global_abs_change = 0.;
   galois::for_each(
     galois::iterate(starting_nodes.begin(), starting_nodes.end()),
     [&](work_t work_item, auto &ctx) noexcept {
-      ;
+      auto [node, dir_idx] = work_item;
+      auto &direction = directions[dir_idx];
+      assert(node < ghost_threshold);
+      auto base_magnitude_index = num_per_element * node + num_per_element_and_direction * dir_idx;
+      auto &counter = radiation_magnitudes[base_magnitude_index].counter;
+      assert(!counter);
+
+      // Re-count incoming edges during this computation.
+      std::size_t incoming_edges = 0;
+      double scattering_contribution = 0.;
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        // Work items are buffered locally until the end of each loop iteration,
+        // so we can send outgoing edges here immediately.
+        auto &face_normal = graph.getEdgeData(edge);
+        if (!is_incoming(direction, face_normal)) {
+          ;
+          ;;;; // decrement and push if ready here
+          continue;
+        }
+        incoming_edges++;
+        ;;;; // update current based on incoming.
+      }
+      // Reset dependency counter for next pass.
+      counter = incoming_edges;
+      // Update scattering source for use in next step.
+      auto &node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
+      auto &scattering_atomic = node_data.currently_accumulating_scattering;
+      atomic_relaxed_double_increment(scattering_atomic, scattering_contribution);
+
+      // TODO: Relax memory consistency requirements here.
+      if (--node_data.scatter_use_counter==0) {
+        // Reset counter for next time step.
+        node_data.scatter_use_counter = num_directions;
+        double abs_change = std::abs(node_data.currently_accumulating_scattering - node_data.previous_accumulated_scattering);
+        atomic_relaxed_double_max(global_abs_change, abs_change);
+      }
     },
     galois::loopname("Sweep"),
     galois::no_conflicts(),
