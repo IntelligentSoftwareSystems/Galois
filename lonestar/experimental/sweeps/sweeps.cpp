@@ -161,6 +161,13 @@ struct node_t {
 // Use atomics for ALL THE THINGS!
 using graph_t = typename galois::graphs::LC_CSR_Graph<node_t, edge_t>::with_no_lockable<true>::type;
 
+// The label for a piece of work in the for_each loop
+// that actually runs the sweeping computation.
+struct work_t {
+  std::size_t node_index;
+  std::size_t direction_index;
+};
+
 // Routine to initialize graph topology and face normals.
 auto generate_grid(graph_t &built_graph, std::size_t nx, std::size_t ny, std::size_t nz) noexcept {
 
@@ -433,5 +440,30 @@ int main(int argc, char**argv) noexcept {
   for (std::size_t i = 0; i < num_groups; i++) {
     radiation_magnitudes[boundary_pulse_index + 1 + i].magnitude = pulse_strength;
   }
+
+  // For the regular grid, this will just be the corners.
+  // Mimic the irregular case though by finding nodes with
+  // no dependencies during the pass that initializes the sweep counters.
+  galois::InsertBag<work_t> starting_nodes;
+  // Initialize the dependency counters so that no cell/direction executes
+  // before its predecessors have.
+  // This uses a simpler Galois parallel loop.
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) noexcept {
+      // Nothing to do on boundary nodes.
+      if (node >= ghost_threshold) return;
+      for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
+        std::atomic<std::size_t> &counter = radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter;
+        for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+          counter += is_incoming(directions[dir_idx], graph.getEdgeData(edge));
+        }
+        if (counter == 0) {
+          work_t work_item{node, dir_idx};
+          starting_nodes.emplace(work_item);
+        }
+      }
+    },
+    galois::loopname("Initialize counters")
+  );
 }
 
