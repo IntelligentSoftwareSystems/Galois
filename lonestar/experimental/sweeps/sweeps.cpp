@@ -396,5 +396,18 @@ int main(int argc, char**argv) noexcept {
   auto [directions, num_directions] = generate_directions(num_vert_directions, num_horiz_directions);
   auto approx_x_direction_index = find_x_direction(directions.get(), num_directions);
 
+  // Now create buffers to hold all the radiation magnitudes and
+  // the atomic counters used to trace dependencies.
+  std::size_t num_per_element_and_direction_vals = 1u + num_groups;
+  std::size_t num_per_element = num_directions * num_per_element_and_direction_vals;
+  // Could potentially save a little space by reducing the storage allocated for
+  // fluxes in ghost cells, but that'd be way more complicated and not necessarily helpful.
+  std::size_t buffer_size = num_nodes * num_per_element;
+  galois::LargeArray<direction_buffer_element_t> radiation_magnitudes;
+  radiation_magnitudes.create(buffer_size);
+  // Okay to use reinterpret_cast here. See
+  // https://stackoverflow.com/a/49495687/1935144
+  std::fill(reinterpret_cast<double*>(radiation_magnitudes.begin()),
+            reinterpret_cast<double*>(radiation_magnitudes.end()), 0.);
 }
 
