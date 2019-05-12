@@ -25,7 +25,7 @@
 #include "bignum.hh"
 #include "uintseqhash.hh"
 
-typedef int VertexId;
+typedef unsigned VertexId;
 typedef float Weight;
 typedef unsigned char BYTE;
 
@@ -104,7 +104,7 @@ struct LabeledElement {
 	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
 		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) { }
 	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
-				vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
+		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
 	LabeledElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
 	~LabeledElement() { }
@@ -149,19 +149,21 @@ inline std::ostream & operator<<(std::ostream & strm, const std::vector<LabeledE
 	return strm;
 }
 
-struct Base_Element {
-	VertexId id;
-	//Base_Element() : id(0) {}
-	Base_Element(VertexId vid) : id(vid) {}
-	~Base_Element() {}
+struct BasicElement {
+	VertexId vertex_id;
+	BasicElement() : vertex_id(0) {}
+	BasicElement(VertexId vid) : vertex_id(vid) {}
+	BasicElement(VertexId vid, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+		vertex_id(vid) {}
+	~BasicElement() {}
 };
 
-inline std::ostream & operator<<(std::ostream & strm, const Base_Element& element) {
-	strm << "[" << element.id << "]";
+inline std::ostream & operator<<(std::ostream & strm, const BasicElement& element) {
+	strm << "[" << element.vertex_id << "]";
 	return strm;
 }
 
-inline std::ostream & operator<<(std::ostream & strm, const std::vector<Base_Element>& tuple) {
+inline std::ostream & operator<<(std::ostream & strm, const std::vector<BasicElement>& tuple) {
 	if(tuple.empty()){
 		strm << "(empty)";
 		return strm;
@@ -220,10 +222,15 @@ typedef unsigned SimpleElement;
 #ifdef ENABLE_LABEL
 #define ElementType LabeledElement
 #else
+//#ifdef USE_SIMPLE
+//#define ElementType BasicElement
+//#else
 #define ElementType StructuralElement
 #endif
+//#endif
 
 typedef std::set<int> IntSet;
+typedef std::vector<VertexId> VertexList;
 typedef std::unordered_set<int> HashIntSet;
 typedef std::vector<std::unordered_set<int> > HashIntSets;
 typedef std::unordered_map<unsigned, unsigned> UintHashMap;
@@ -243,12 +250,38 @@ private:
 //typedef std::vector<SimpleElement> BaseEmbedding;
 class BaseEmbedding: public std::vector<SimpleElement> {
 public:
+	BaseEmbedding() { num_edges = 0; }
+	~BaseEmbedding() {}
 	inline unsigned get_hash() const {
 		bliss::UintSeqHash h;
 		for(unsigned i = 0; i < size(); ++i)
 			h.update(data()[i]);
 		return h.get_value();
 	}
+	unsigned get_num_edges() { return num_edges; }
+	void set_num_edges(unsigned i) { num_edges = i; }
+private:
+	unsigned num_edges;
+};
+
+class VertexInducedEmbedding {
+public:
+	VertexInducedEmbedding() { qp_id = 0xFFFFFFFF; }
+	~VertexInducedEmbedding() {}
+	void set_qpid(unsigned i) { qp_id = i; }
+	unsigned get_qpid() { return qp_id; }
+	VertexId get_vertex(unsigned i) { return vertices[i]; }
+	void add_vertex(VertexId vid) { vertices.push_back(vid); }
+	unsigned get_num_vertices() { return vertices.size(); }
+	void push_back(ElementType ele) { elements.push_back(ele); }
+	void pop_back() { elements.pop_back(); }
+	size_t size() { return elements.size(); }
+	ElementType *data() { return elements.data(); }
+	ElementType operator[](size_t i) const { return elements[i]; }
+private:
+	VertexList vertices;
+	unsigned qp_id;
+	std::vector<ElementType> elements;
 };
 
 namespace std {
@@ -259,5 +292,4 @@ namespace std {
 		}
 	};
 }
-
-#endif /* TYPE_HPP_ */
+#endif // TYPE_HPP_

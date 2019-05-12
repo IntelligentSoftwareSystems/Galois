@@ -73,55 +73,19 @@ void KclSolver(Graph& graph, Miner &miner) {
 	unsigned level = 1;
 	while (level < k-1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		if(show) std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
-		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
 			[&](const BaseEmbedding& emb, auto& ctx) {
-				miner.extend_vertex(emb, queue2);
+				miner.extend_vertex_clique(emb, queue2);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("ExtendVertex")
+			galois::loopname("Expanding")
 		);
 		miner.update_embedding_size(); // increase the embedding size since one more edge added
 		if(show) printout_embeddings(level, miner, queue2);
-
-		if(show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
-		queue.clear();
-#if 1
-		galois::StatTimer Tagg("Aggregation");
-		Tagg.start();
-		miner.aggregate_clique(queue2, queue); // sequential implementaion
-		Tagg.stop();
-#else
-		// Parallel aggregation
-		LocalSimpleMap lmap;
-		SimpleMap map;
-		galois::for_each(
-			galois::iterate(queue2),
-			[&](BaseEmbedding& emb, auto& ctx) {
-				miner.aggregate_clique_each(emb, *(lmap.getLocal()), queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-		for (unsigned i = 0; i < lmap.size(); i++) {
-			SimpleMap sm = *lmap.getLocal(i);
-			for (auto element : sm) {
-				auto it = map.find(element.first);
-				if (it != map.end()) {
-					if(it->second + element.second == it->first.size() - 1) {
-						queue.push_back(it->first);
-						map.erase(it);
-					} else map[element.first] += element.second;
-				} else
-					map[element.first] = element.second;
-			}
-		}
-#endif
-		if(show) printout_embeddings(level, miner, queue);
+		queue.swap(queue2);
+		queue2.clear();
 		level ++;
 	}
 	if(show) std::cout << "\n=============================== Done ================================\n";

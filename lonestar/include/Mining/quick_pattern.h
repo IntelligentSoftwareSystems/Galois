@@ -1,12 +1,5 @@
-/*
- * quick_pattern.hpp
- *
- *  Created on: Aug 4, 2017
- *      Author: icuzzq
- */
-
-#ifndef CORE_QUICK_PATTERN_HPP_
-#define CORE_QUICK_PATTERN_HPP_
+#ifndef QUICK_PATTERN_HPP_
+#define QUICK_PATTERN_HPP_
 
 #include "type.h"
 
@@ -114,4 +107,4 @@ namespace std {
 		}
 	};
 }
-#endif /* CORE_QUICK_PATTERN_HPP_ */
+#endif // QUICK_PATTERN_HPP_
