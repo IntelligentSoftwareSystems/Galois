@@ -62,7 +62,6 @@ struct NodeData {
 };
 
 galois::DynamicBitSet bitset_comp_current;
-uint32_t numThreadBlocks;
 
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -105,21 +104,6 @@ struct InitializeGraph {
   }
 };
 
-#ifdef __GALOIS_HET_CUDA__
-#if DIST_PER_ROUND_TIMER
-void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
-
-	std::string str = get_thread_block_work_into_string(cuda_ctx);
-	galois::runtime::reportParam(REGION_NAME, run_identifier, str);
-
-	if (galois::runtime::getSystemNetworkInterface().ID == 0 && iteration_num == 0) {
-		//Assumption: The number of thread blocks in all the iterations
-		std::string num_thread_blocks = get_num_thread_blocks(cuda_ctx);
-		galois::runtime::reportParam(REGION_NAME, tb_identifer, num_thread_blocks);
-	}
-}
-#endif
-#endif
 
 struct FirstItr_ConnectedComp {
   Graph* graph;
@@ -134,21 +118,8 @@ struct FirstItr_ConnectedComp {
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-      unsigned int active_vertices = 0;	
-      FirstItr_ConnectedComp_nodesWithEdges_cuda(active_vertices, cuda_ctx);
-#else
       FirstItr_ConnectedComp_nodesWithEdges_cuda(cuda_ctx);
-#endif
       StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-      std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-      std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
-      ReportThreadBlockWork(0, identifer, tb_identifer);
-      std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
-      galois::runtime::reportParam(REGION_NAME, acive_identifer, std::to_string(active_vertices));
-#endif
-
     } else if (personality == CPU)
 #endif
     {
@@ -212,22 +183,9 @@ struct ConnectedComp {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
-#if DIST_PER_ROUND_TIMER
-        unsigned int active_vertices = 0;
-        ConnectedComp_nodesWithEdges_cuda(__retval, active_vertices, cuda_ctx);
-#else
         ConnectedComp_nodesWithEdges_cuda(__retval, cuda_ctx);
-#endif
         dga += __retval;
         StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-        std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-        std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
-        ReportThreadBlockWork(_num_iterations, identifer, tb_identifer);
-
-        std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
-        galois::runtime::reportParam(REGION_NAME, acive_identifer, std::to_string(active_vertices));
-#endif
       } else if (personality == CPU)
 #endif
       {

@@ -73,7 +73,6 @@ struct NodeData {
 };
 
 galois::DynamicBitSet bitset_dist_current;
-uint32_t numThreadBlocks;
 
 typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -121,22 +120,6 @@ struct InitializeGraph {
   }
 };
 
-#ifdef __GALOIS_HET_CUDA__
-#if DIST_PER_ROUND_TIMER
-void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
-
-	std::string str = get_thread_block_work_into_string(cuda_ctx);
-	galois::runtime::reportParam(REGION_NAME, run_identifier, str);
-
-	if (galois::runtime::getSystemNetworkInterface().ID == 0 && iteration_num == 0) {
-		//Assumption: The number of thread blocks in all the iterations
-		std::string num_thread_blocks = get_num_thread_blocks(cuda_ctx);
-		galois::runtime::reportParam(REGION_NAME, tb_identifer, num_thread_blocks);
-	}
-}
-#endif
-#endif
-
 struct FirstItr_SSSP {
   Graph* graph;
   FirstItr_SSSP(Graph* _graph) : graph(_graph) {}
@@ -156,21 +139,8 @@ struct FirstItr_SSSP {
       std::string impl_str("SSSP_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-#if DIST_PER_ROUND_TIMER
-      unsigned int active_vertices = 0;	
-      FirstItr_SSSP_cuda(__begin, __end, active_vertices, cuda_ctx);
-#else
       FirstItr_SSSP_cuda(__begin, __end, cuda_ctx);
-#endif
       StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-      std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-      std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
-      ReportThreadBlockWork(0, identifer, tb_identifer);
-      std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
-      galois::runtime::reportParam(REGION_NAME, acive_identifer, std::to_string(active_vertices));
-#endif
-
     } else if (personality == CPU)
 #endif
     {
@@ -249,23 +219,10 @@ struct SSSP {
         StatTimer_cuda.start();
         unsigned int __retval = 0;
         unsigned int __retval2 = 0;
-#if DIST_PER_ROUND_TIMER
-        unsigned int active_vertices = 0;
-        SSSP_nodesWithEdges_cuda(__retval, __retval2, active_vertices, priority, cuda_ctx);
-#else
         SSSP_nodesWithEdges_cuda(__retval, __retval2, priority, cuda_ctx);
-#endif
         dga += __retval;
         work_edges += __retval2;
         StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-        std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-        std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
-        ReportThreadBlockWork(_num_iterations, identifer, tb_identifer);
-
-        std::string acive_identifer(_graph.get_run_identifier("NumActiveVertices"));
-        galois::runtime::reportParam(REGION_NAME, acive_identifer, std::to_string(active_vertices));
-#endif
       } else if (personality == CPU)
 #endif
       {

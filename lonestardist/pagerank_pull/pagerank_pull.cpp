@@ -72,7 +72,6 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_residual;
 galois::DynamicBitSet bitset_nout;
-uint32_t numThreadBlocks;
 
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -117,22 +116,6 @@ struct ResetGraph {
     sdata.residual = local_alpha;
   }
 };
-
-#ifdef __GALOIS_HET_CUDA__
-#if DIST_PER_ROUND_TIMER
-void ReportThreadBlockWork(uint32_t iteration_num, std::string run_identifier, std::string tb_identifer){
-
-	std::string str = get_thread_block_work_into_string(cuda_ctx);
-	galois::runtime::reportParam(REGION_NAME, run_identifier, str);
-
-	if (galois::runtime::getSystemNetworkInterface().ID == 0 && iteration_num == 0) {
-		//Assumption: The number of thread blocks in all the iterations
-		std::string num_thread_blocks = get_num_thread_blocks(cuda_ctx);
-		galois::runtime::reportParam(REGION_NAME, tb_identifer, num_thread_blocks);
-	}
-}
-#endif
-#endif
 
 struct InitializeGraph {
   Graph* graph;
@@ -264,12 +247,6 @@ struct PageRank {
         StatTimer_cuda.start();
         PageRank_nodesWithEdges_cuda(cuda_ctx);
         StatTimer_cuda.stop();
-#if DIST_PER_ROUND_TIMER
-        std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-        std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
-        ReportThreadBlockWork(_num_iterations, identifer, tb_identifer);
-        
-#endif
       } else if (personality == CPU)
 #endif
         galois::do_all(
