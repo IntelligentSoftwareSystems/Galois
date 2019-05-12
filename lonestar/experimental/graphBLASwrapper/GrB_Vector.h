@@ -13,12 +13,12 @@ private:
     };
     using DenseVecTy  = galois::LargeArray<T>;
     //using SparseVecTy = galois::worklists::FIFO<ItemTy>;
-    //using SparseVecTy = galois::InsertBag<ItemTy>;
-    using SparseVecTy = galois::gstl::Vector<ItemTy>;
+    using SparseVecTy = galois::InsertBag<ItemTy>;
+    //using SparseVecTy = galois::gstl::Vector<ItemTy>;
 
     DenseVecTy denseVec;
     SparseVecTy sparseVec;
-    galois::GAccumulator<size_t> spAccum;
+    //galois::GAccumulator<size_t> spAccum;
     I size;
     bool isSparse;
 public:
@@ -32,16 +32,23 @@ public:
         isSparse = true;
     }
 
+    /*
+     * handling size
+     */
     void setSize(I n) { size = n; }
     I getSize() { return size; }
+    //void setBagSize(I n) { spAccum.reset(); spAccum += n; }
+    /*
     I getBagSize() {
         if (isSparse) {
-            return sparseVec.size();
-            //return spAccum.reduce();
+            //return sparseVec.size();
+            return spAccum.reduce();
         } else {
             return denseVec.size();
         }
     }
+    */
+    I getDenseVecSize() { return denseVec.size(); }
 
     void print() {
         for (size_t i = 0; i < size; i++)
@@ -57,12 +64,10 @@ public:
 
     void setElement(T newItem, I idx) {
         if (isSparse) {
-            spAccum += 1;
-            sparseVec.push_back({idx, newItem});
-            /*
+            //spAccum += 1;
+            //sparseVec.push_back({idx, newItem});
             ItemTy item = {idx, newItem};
             sparseVec.emplace(item);
-            */
         } else {
             denseVec[idx] = newItem;
         }
