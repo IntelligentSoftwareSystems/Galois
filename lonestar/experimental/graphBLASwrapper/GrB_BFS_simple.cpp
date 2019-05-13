@@ -19,11 +19,6 @@
 
 namespace cll = llvm::cl;
 
-//template <typename T>
-//using GrB_Vector = galois::gstl::Vector<T>;
-//using GrB_Vector = galois::InsertBag<T>;
-using VecByteTy  = galois::gstl::Vector<uint8_t>;
-//using GrB_Vector = galois::LargeArray<T>;
 using GrB_Index  = uint64_t;
 using GrB_Matrix =
     galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_no_lockable<true>::type;
@@ -82,23 +77,6 @@ void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
         const GrB_Index ni, // # of row indices
         const int desc // incompelete type.
         ) {
-    /*
-    galois::do_all(galois::iterate((GrB_Index) 0, ni),
-            [&] (GrB_Index idx) {
-                if (mask[idx]) {
-                    w[idx] = x;
-                }
-            },
-            galois::loopname("SVectorAssignment"),
-            galois::steal() );
-            */
-    /*
-    galois::do_all(galois::iterate(mask),
-            [&] (K idx) {
-                w[idx] = x;
-            }, galois::loopname("SVectorAssignment"),
-            galois::steal() );
-            */
     // mask should be sparse
     galois::do_all(galois::iterate(mask.getSparseVec()),
             [&] (auto &elem) {
@@ -118,18 +96,8 @@ void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
         const GrB_Index ni, // # of row indices
         const int desc // incompelete type.
         ) {
-    /*
-    w.resize(ni);
-    galois::do_all(galois::iterate((GrB_Index) 0, ni),
-            [&] (GrB_Index idx) { w[idx] = x; },
-            galois::loopname("VectorAssignment"),
-            galois::steal() );
-            */
-    //if (I == GrB_ALL || w.getBagSize() > 2/(float)3*w.getSize()) {
-        //std::cout << "Condition is satisfied\n";
-      if (I == GrB_ALL)
+    if (I == GrB_ALL)
         w.trySDConvert();
-    //}
 
     galois::do_all(galois::iterate(0lu, w.getSize()),
             [&] (GrB_Index idx) {
@@ -143,13 +111,6 @@ template <typename T, typename K>
 void GrB_Vector_setElement (GrB_Vector<T, GrB_Index>& w,
         const K x,
         const GrB_Index i) {
-    /*
-    if (std::is_same<K, bool>::value) {
-        if (x) {
-            w.push_back(i);
-        }
-    }
-    */
     w.setElement(x, i);
 }
 
@@ -162,15 +123,6 @@ void GrB_reduce (T *c,
         GrB_Vector<K, GrB_Index> &u,
         const void *desc) {
     T& cr = *c;
-    /*
-    galois::do_all(galois::iterate(0ul, u.size()),
-            [&] (uint64_t idx) {
-               if (!cr && u[idx]) {
-                   cr = u[idx] || cr;
-               }
-            }, galois::loopname("Reduce"),
-               galois::steal() );
-               */
     if (!u.getSparseVec().empty()) cr = true;
 }
 
@@ -198,19 +150,15 @@ void GrB_vxm (GrB_Vector<T, GrB_Index> &w,
     GrB_Vector<T, GrB_Index> next;
     GrB_Vector_new(&next, 0, w.getSize());
     bset.resize(mask.getSize());
-    //std::cout << "Bag size:" << w.getBagSize() << "\n";
     // w must be sparse, mask must be dense,
-    
     //galois::GAccumulator<size_t> spAccum;
     galois::do_all(galois::iterate(w.getSparseVec()),
             [&] (auto &item) {
                 GNode src = item.idx;
-                //std::cout << "vxm: " << src << "\n";
                 for (auto e : A.edges(src)) {
                     auto dst = A.getEdgeDst(e);
                     if (!mask.getDenseElement(dst) &&
                         !bset.test(dst)) {
-                    //if (!mask.getDenseElement(dst)) {
                        bset.set(dst);
                        //spAccum+=1;
                        next.setElement(true, dst);
@@ -218,16 +166,12 @@ void GrB_vxm (GrB_Vector<T, GrB_Index> &w,
                 }
             }, galois::loopname("SVxSPM-checkActive"),
             galois::steal() );
-    //std::cout << "size: " << spAccum.reduce() << "\n";
 
     size_t cnt = 0;
     for (int i = 0; i < bset.size(); i++)
         if (bset.test(i))   cnt++;
     activeSize << cnt << "\n";
 
-    //std::cout << "vxm finished\n";
-    //w.setBagSize(next.getBagSize());
-    //std::cout << "SWAP? " << w.getBagSize() << ", " << next.getBagSize() <<"\n";
     std::swap(w.getSparseVec(), next.getSparseVec());
     next.clear();
 }
@@ -236,7 +180,6 @@ void GrB_vxm (GrB_Vector<T, GrB_Index> &w,
 template <typename T>
 void GrB_Vector_new (GrB_Vector<T, GrB_Index> *v,
                     int type, uint64_t size) {
-    //v->allocateInterleaved(size);
     v->Initialize(size);
 }
 
@@ -255,8 +198,6 @@ void GrB_Matrix_nrows (GrB_Index *nrows,
 
 template <typename T>
 void GrB_free(T* target) {
-    //target->destroy();
-    //target->deallocate();
 }
 
 int main(int argc, char** argv) {
@@ -275,7 +216,6 @@ int main(int argc, char** argv) {
     std::cout << " Input graph is : " << filename << "\n";
     std::cout << " The number of active threads is : " << numThreads << "\n";
     std::cout << " The number of nodes is : " << A.size() << "\n";
-
 
     activeSize.open("activeElems");
 
@@ -299,7 +239,6 @@ int main(int argc, char** argv) {
     // BFS traversal and label the nodes.
     uint32_t level = 1;
     for (; level <= n; level ++) {
-        //std::cout << "Level:" << level << "\n";
         // v<q> = level
         GrB_assign (v, q, -1, level, NULL, n, -1); // line 77
 
@@ -308,7 +247,6 @@ int main(int argc, char** argv) {
         GrB_reduce (&anyq, NULL, NULL, q, NULL); // line 159
         if (!anyq) { break; }
 
-        //std::cout << "VxM pre\n";
         // q`[!v] = `q or.and A
         GrB_vxm (q, v, NULL, NULL, q, A, NULL); // line 192
         //GrB_print_Vector(q);

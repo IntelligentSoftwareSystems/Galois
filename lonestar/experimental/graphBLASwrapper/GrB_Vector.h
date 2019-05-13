@@ -12,9 +12,7 @@ private:
         T data;
     };
     using DenseVecTy  = galois::LargeArray<T>;
-    //using SparseVecTy = galois::worklists::FIFO<ItemTy>;
     using SparseVecTy = galois::InsertBag<ItemTy>;
-    //using SparseVecTy = galois::gstl::Vector<ItemTy>;
 
     DenseVecTy denseVec;
     SparseVecTy sparseVec;
@@ -27,28 +25,12 @@ public:
     }
 
     void Initialize(I n) {
-        //denseVec.allocateInterleaved(n);
         size = n;
         isSparse = true;
     }
 
-    /*
-     * handling size
-     */
     void setSize(I n) { size = n; }
     I getSize() { return size; }
-    //void setBagSize(I n) { spAccum.reset(); spAccum += n; }
-    /*
-    I getBagSize() {
-        if (isSparse) {
-            //return sparseVec.size();
-            return spAccum.reduce();
-        } else {
-            return denseVec.size();
-        }
-    }
-    */
-    I getDenseVecSize() { return denseVec.size(); }
 
     void print() {
         for (size_t i = 0; i < size; i++)
@@ -85,11 +67,6 @@ public:
         return denseVec[idx];
     }
 
-    bool getMode() {
-        return isSparse;
-    }
-
-    // not multithreading safe.
     void trySDConvert() {
         if (isSparse) {
             isSparse = false;
@@ -99,7 +76,6 @@ public:
                     [&](ItemTy& item) {
                         denseVec[item.idx] = item.data;
                     }, galois::steal() );
-            //sparseVec.clear();
         }
     }
 
