@@ -13,7 +13,6 @@
 #include "llvm/Support/CommandLine.h"
 
 #include <iostream>
-#include <fstream>
 
 #define GrB_ALL 0
 
@@ -25,7 +24,6 @@ using GrB_Matrix =
 using GNode = GrB_Matrix::GraphNode;
 
 galois::DynamicBitSet bset;
-std::ofstream activeSize;
 
 struct WorkItem {
     GNode node;
@@ -69,16 +67,15 @@ void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
 // assign a scalar to subvector.
 // in this version, it only supports w<mask>(I) = accum (w(I), x).
 template <typename T, typename K=bool>
-void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
-        GrB_Vector<K, GrB_Index>& mask, // optional mask for w, unused if NULL
-        const int accum, // incomplete type.
+void GrB_assign (GrB_Vector<T, GrB_Index>& w, // should be sparse
+        GrB_Vector<K, GrB_Index>& mask, // should be sparse
+        const int accum, // not supported, (just accum)
         const T x, // scalar to assign to w(I)
-        const GrB_Index *I, // row indices
-        const GrB_Index ni, // # of row indices
-        const int desc // incompelete type.
+        const GrB_Index *I, // not supported
+        const GrB_Index ni, // # of row indices, not supported
+        const int desc // not supported (ooco)
         ) {
-    // mask should be sparse
-    galois::do_all(galois::iterate(mask.getSparseVec()),
+    galois::do_all(galois::iterate(mask.iterateSPVec()),
             [&] (auto &elem) {
                 w.setElement(x, elem.idx);
             }, galois::loopname("assign"), galois::steal() );
@@ -88,17 +85,18 @@ void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
 // in this version, it only supports w<mask>(I) = accum (w(I), x).
 // assume that I is GrB_ALL
 template <typename T>
-void GrB_assign (GrB_Vector<T, GrB_Index>& w, // input/output vector for results
-        void* mask, // NULL
-        const int accum, // incomplete type.
+void GrB_assign (GrB_Vector<T, GrB_Index>& w, // become dense
+        void* mask, // NULL (GrB_ALL)
+        const int accum, // not supported
         const T x, // scalar to assign to w(I)
-        const GrB_Index *I, // row indices
-        const GrB_Index ni, // # of row indices
-        const int desc // incompelete type.
+        const GrB_Index *I, // not supported
+        const GrB_Index ni, // # of row indices, not supported
+        const int desc // not supported (ooco)
         ) {
     if (I == GrB_ALL)
         w.trySDConvert();
 
+    // Handling dense vector
     galois::do_all(galois::iterate(0lu, w.getSize()),
             [&] (GrB_Index idx) {
                 w.setElement(x, idx);
@@ -120,7 +118,7 @@ template <typename T, typename K>
 void GrB_reduce (T *c,
         const void *accum,
         const void *monoid, // assume LOR
-        GrB_Vector<K, GrB_Index> &u,
+        GrB_Vector<K, GrB_Index> &u, // should sparse
         const void *desc) {
     T& cr = *c;
     if (!u.getSparseVec().empty()) cr = true;
@@ -140,37 +138,28 @@ void GrB_reduce (T *c,
  *
  */
 template <typename T, typename K>
-void GrB_vxm (GrB_Vector<T, GrB_Index> &w,
-        GrB_Vector<K, GrB_Index> &mask,
+void GrB_vxm (GrB_Vector<T, GrB_Index> &w, // sparse
+        GrB_Vector<K, GrB_Index> &mask, // dense
         const void *accum, // assume NULL
         const void *semiring, // assume LOR_LAND_BOOL
-        GrB_Vector<T, GrB_Index> &u,
-        GrB_Matrix &A,
+        GrB_Vector<T, GrB_Index> &u, // sparse
+        GrB_Matrix &A, // CSR
         const void *desc) {
     GrB_Vector<T, GrB_Index> next;
     GrB_Vector_new(&next, 0, w.getSize());
-    bset.resize(mask.getSize());
-    // w must be sparse, mask must be dense,
-    //galois::GAccumulator<size_t> spAccum;
-    galois::do_all(galois::iterate(w.getSparseVec()),
+    next.setDupCheckMode();
+    galois::do_all(galois::iterate(w.iterateSPVec()),
             [&] (auto &item) {
                 GNode src = item.idx;
                 for (auto e : A.edges(src)) {
                     auto dst = A.getEdgeDst(e);
-                    if (!mask.getDenseElement(dst) &&
-                        !bset.test(dst)) {
-                       bset.set(dst);
-                       //spAccum+=1;
+                    if (!mask.getDenseElement(dst)) {
                        next.setElement(true, dst);
                     }
                 }
             }, galois::loopname("SVxSPM-checkActive"),
             galois::steal() );
-
-    size_t cnt = 0;
-    for (int i = 0; i < bset.size(); i++)
-        if (bset.test(i))   cnt++;
-    activeSize << cnt << "\n";
+    next.unsetDupCheckMode();
 
     std::swap(w.getSparseVec(), next.getSparseVec());
     next.clear();
@@ -217,8 +206,6 @@ int main(int argc, char** argv) {
     std::cout << " The number of active threads is : " << numThreads << "\n";
     std::cout << " The number of nodes is : " << A.size() << "\n";
 
-    activeSize.open("activeElems");
-
     galois::StatTimer mainTimer("MainTimer");
     mainTimer.start();
 
@@ -260,7 +247,6 @@ int main(int argc, char** argv) {
     GrB_free(&q);
 
     v.dump();
-    activeSize.close();
 
     return 0;
 }
