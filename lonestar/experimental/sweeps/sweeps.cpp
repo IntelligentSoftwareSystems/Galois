@@ -53,24 +53,24 @@ static char const* url = "sweeps";
 
 static llvm::cl::opt<std::size_t> nx{
     "nx", llvm::cl::desc("number of cells in x direction"),
-    llvm::cl::init(10u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> ny{
     "ny", llvm::cl::desc("number of cells in y direction"),
-    llvm::cl::init(10u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> nz{
     "nz", llvm::cl::desc("number of cells in z direction"),
-    llvm::cl::init(10u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_groups{
     "num_groups", llvm::cl::desc("number of frequency groups"),
-    llvm::cl::init(4u)};
+    llvm::cl::init(2u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{
     "num_vert_directions", llvm::cl::desc("number of vertical directions"),
-    llvm::cl::init(32u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{
     "num_horiz_directions", llvm::cl::desc("number of horizontal directions."),
-    llvm::cl::init(32u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_iters{
-    "num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(100u)};
+    "num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(1u)};
 static llvm::cl::opt<double> pulse_strength{
     "pulse_strength", llvm::cl::desc("radiation pulse strength"),
     llvm::cl::init(1.)};
@@ -411,8 +411,8 @@ auto generate_directions(std::size_t latitude_divisions,
     for (std::size_t k = 0; k < longitude_divisions; k++) {
       std::size_t direction_index = j * longitude_divisions + k;
       double average_longitude    = average_longitudes[k];
-      directions[direction_index] = {std::cos(average_longitude),
-                                     std::sin(average_longitude),
+      directions[direction_index] = {std::cos(average_longitude) * std::cos(average_latitude),
+                                     std::sin(average_longitude) * std::cos(average_latitude),
                                      std::sin(average_latitude)};
       // Could renormalize here if really precise computation is desired.
     }
@@ -435,6 +435,14 @@ auto generate_directions(std::size_t latitude_divisions,
             std::abs(totals[j]) < 1E-7));
   }
 
+  /*
+  std::cout << "directions:" << std::endl;
+  for (std::size_t i = 0; i < num_directions; i++) {
+    std::cout << directions[i][0] << " " << directions[i][1] << " " << directions[i][2] << std::endl;
+  }
+  std::cout << std::endl;
+  */
+
   return std::make_tuple(std::move(directions), num_directions);
 }
 
@@ -456,7 +464,7 @@ bool is_incoming(std::array<double, 3> direction,
 // that's closest to {1., 0., 0.};
 std::size_t find_x_direction(std::array<double, 3> const* directions,
                              std::size_t num_directions) noexcept {
-  auto comparison = [](auto a1, auto a2) noexcept { return a1[0] < a2[0]; };
+  auto comparison = [](auto a1, auto a2) noexcept { return a1[0] > a2[0]; };
   return std::max_element(directions, directions + num_directions, comparison) -
          directions;
 }
@@ -546,6 +554,18 @@ int main(int argc, char** argv) noexcept {
       },
       galois::loopname("Initialize counters"));
 
+  /*// Check that the counters are properly set.
+  for (auto node : graph) {
+    if (node >= ghost_threshold) continue;
+    for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
+      std::size_t local_counter = 0;
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge))) local_counter++;
+      }
+      assert(local_counter ==  radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter);
+    }
+  }*/
+
   // Approximate priority used to improve performance of main loop.
   // Currently just a placeholder for a more intelligent priority.
   // Various sweeps papers mention heuristics for this.
@@ -566,6 +586,7 @@ int main(int argc, char** argv) noexcept {
 
   std::atomic<double> global_abs_change = 0.;
 
+  //std::mutex print_lock;
   // Iterations in the algorithm.
   // TODO: Try doing this whole thing asynchronously
   // instead of just using a parallel loop for each step.
@@ -664,12 +685,17 @@ int main(int argc, char** argv) noexcept {
               std::abs(node_data.currently_accumulating_scattering -
                        node_data.previous_accumulated_scattering);
           atomic_relaxed_double_max(global_abs_change, abs_change);
+          //{
+          //  std::lock_guard<std::mutex> lk{print_lock};
+          //  std::cout << abs_change << "  ";
+          //}
         }
       },
       galois::loopname("Sweep"), galois::no_conflicts(),
       galois::wl<OBIM>(indexer)
     );
-    std::cout << global_abs_change << std::endl;
+    //std::cout << std::endl << std::endl;
+    //std::cout << global_abs_change << std::endl;
     global_abs_change = 0;
   }
 }
