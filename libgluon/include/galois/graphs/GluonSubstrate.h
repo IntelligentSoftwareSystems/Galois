@@ -162,36 +162,6 @@ private:
     }
   }
 
-  // TODO this needs to be public
-  /**
-   * Given a sync structure, reset the field specified by the structure
-   * to the 0 of the reduction on mirrors.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   */
-  template <typename FnTy>
-  void reset_mirrorField() {
-    auto mirrorRanges = userGraph.getMirrorRanges();
-    for (auto r : mirrorRanges) {
-      if (r.first == r.second) continue;
-      assert(r.first < r.second);
-
-      // GPU call
-      bool batch_succeeded = FnTy::reset_batch(r.first, r.second - 1);
-
-      // CPU always enters this block
-      if (!batch_succeeded) {
-        galois::do_all(
-            galois::iterate(r.first, r.second),
-            [&](uint32_t lid) {
-              FnTy::reset(lid, userGraph.getData(lid));
-            },
-            galois::no_stats(),
-            galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
-      }
-    }
-  }
-
   //! Increments evilPhase, a phase counter used by communication.
   void inline incrementEvilPhase() {
     ++galois::runtime::evilPhase;
@@ -200,8 +170,6 @@ private:
       galois::runtime::evilPhase = 1;
     }
   }
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Proxy communication setup
@@ -3495,6 +3463,37 @@ public:
                        "_" + std::to_string(num_run));
 #endif
   }
+
+  /**
+   * Given a sync structure, reset the field specified by the structure
+   * to the 0 of the reduction on mirrors.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   */
+  template <typename FnTy>
+  void reset_mirrorField() {
+    // TODO make sure this is correct still
+    auto mirrorRanges = userGraph.getMirrorRanges();
+    for (auto r : mirrorRanges) {
+      if (r.first == r.second) continue;
+      assert(r.first < r.second);
+
+      // GPU call
+      bool batch_succeeded = FnTy::reset_batch(r.first, r.second - 1);
+
+      // CPU always enters this block
+      if (!batch_succeeded) {
+        galois::do_all(
+            galois::iterate(r.first, r.second),
+            [&](uint32_t lid) {
+              FnTy::reset(lid, userGraph.getData(lid));
+            },
+            galois::no_stats(),
+            galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
+      }
+    }
+  }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Checkpointing code for graph
