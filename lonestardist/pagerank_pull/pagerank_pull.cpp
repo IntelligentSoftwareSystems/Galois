@@ -77,6 +77,8 @@ uint32_t numThreadBlocks;
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
+galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+
 #include "pagerank_pull_sync.hh"
 
 /******************************************************************************/
@@ -96,7 +98,7 @@ struct ResetGraph {
     const auto& allNodes = _graph.allNodesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("ResetGraph_" + (_graph.get_run_identifier()));
+      std::string impl_str("ResetGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       ResetGraph_allNodes_cuda(alpha, cuda_ctx);
@@ -106,7 +108,7 @@ struct ResetGraph {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           ResetGraph{alpha, &_graph}, galois::no_stats(),
-          galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
+          galois::loopname(syncSubstrate->get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -147,7 +149,7 @@ struct InitializeGraph {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("InitializeGraph_" + (_graph.get_run_identifier()));
+      std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph_nodesWithEdges_cuda(cuda_ctx);
@@ -158,9 +160,9 @@ struct InitializeGraph {
       galois::do_all(galois::iterate(nodesWithEdges), InitializeGraph{&_graph},
                      galois::steal(), galois::no_stats(),
                      galois::loopname(
-                         _graph.get_run_identifier("InitializeGraph").c_str()));
+                         syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout,
+    syncSubstrate->sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
   }
 
@@ -198,7 +200,7 @@ struct PageRank_delta {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("PageRank_" + (_graph.get_run_identifier()));
+      std::string impl_str("PageRank_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       unsigned int __retval = 0;
@@ -211,7 +213,7 @@ struct PageRank_delta {
                      PageRank_delta{alpha, tolerance, &_graph, dga},
                      galois::no_stats(),
                      galois::loopname(
-                         _graph.get_run_identifier("PageRank_delta").c_str()));
+                         syncSubstrate->get_run_identifier("PageRank_delta").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -251,22 +253,22 @@ struct PageRank {
     // unsigned int reduced = 0;
 
     do {
-      _graph.set_num_round(_num_iterations);
+      syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
       PageRank_delta<async>::go(_graph, dga);
       // reset residual on mirrors
-      _graph.reset_mirrorField<Reduce_add_residual>();
+      syncSubstrate->reset_mirrorField<Reduce_add_residual>();
 
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("PageRank_" + (_graph.get_run_identifier()));
+        std::string impl_str("PageRank_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         PageRank_nodesWithEdges_cuda(cuda_ctx);
         StatTimer_cuda.stop();
 #if DIST_PER_ROUND_TIMER
-        std::string identifer(_graph.get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
-        std::string tb_identifer(_graph.get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
+        std::string identifer(syncSubstrate->get_run_identifier("GPUThreadBlocksWork_Host", galois::runtime::getSystemNetworkInterface().ID));
+        std::string tb_identifer(syncSubstrate->get_run_identifier("ThreadBlocks_Host", galois::runtime::getSystemNetworkInterface().ID));
         ReportThreadBlockWork(_num_iterations, identifer, tb_identifer);
         
 #endif
@@ -275,22 +277,22 @@ struct PageRank {
         galois::do_all(
             galois::iterate(nodesWithEdges), PageRank{&_graph}, galois::steal(),
             galois::no_stats(),
-            galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
+            galois::loopname(syncSubstrate->get_run_identifier("PageRank").c_str()));
 
-      _graph.sync<writeSource, readDestination, Reduce_add_residual,
+      syncSubstrate->sync<writeSource, readDestination, Reduce_add_residual,
                   Bitset_residual, async>("PageRank");
 
       galois::runtime::reportStat_Tsum(
-          REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
+          REGION_NAME, "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
           (unsigned long)_graph.sizeEdges());
 
       ++_num_iterations;
     } while (
              (async || (_num_iterations < maxIterations)) &&
-             dga.reduce(_graph.get_run_identifier()));
+             dga.reduce(syncSubstrate->get_run_identifier()));
 
     galois::runtime::reportStat_Tmax(
-        REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
+        REGION_NAME, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
         (unsigned long)_num_iterations);
   }
 
@@ -460,10 +462,11 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
+  Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
   Graph* hg = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
 #else
-  Graph* hg = distGraphInitialization<NodeData, void, false>();
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void, false>();
 #endif
 
   bitset_residual.resize(hg->size());
@@ -512,7 +515,7 @@ int main(int argc, char** argv) {
         bitset_nout.reset();
       }
 
-      (*hg).set_num_run(run + 1);
+      (*syncSubstrate).set_num_run(run + 1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
