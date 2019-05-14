@@ -456,6 +456,9 @@ public:
                       cartesianGrid.first, " x ", cartesianGrid.second);
       }
       isCartCut = true;
+    } else {
+      assert(cartesianGrid.first == 0 && cartesianGrid.second == 0);
+      isCartCut = false;
     }
 
     enforce_data_mode = enforce_metadata;
@@ -867,9 +870,91 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Other helper functions
 ////////////////////////////////////////////////////////////////////////////////
-  // TODO problem for cartesian cut, need to somehow make it work
-  bool isNotCommPartnerCVC() {
-    // TODO needs to know grid row/column ID; need grid split from constructor
+
+  //! Returns the grid row ID of this host
+  unsigned gridRowID() const { return (id / cartesianGrid.second); }
+  //! Returns the grid row ID of the specified host
+  unsigned gridRowID(unsigned hid) const {
+    return (hid / cartesianGrid.second);
+  }
+  //! Returns the grid column ID of this host
+  unsigned gridColumnID() const { return (id % cartesianGrid.second); }
+  //! Returns the grid column ID of the specified host
+  unsigned gridColumnID(unsigned hid) const {
+    return (hid % cartesianGrid.second);
+  }
+
+  /**
+   * Determine if a host is a communication partner using cartesian grid.
+   */
+  bool isNotCommPartnerCVC(unsigned host, SyncType syncType,
+                           WriteLocation writeLocation,
+                           ReadLocation readLocation) {
+    assert(cartesianGrid.first != 0);
+    assert(cartesianGrid.second != 0);
+
+    if (transposed) {
+      if (syncType == syncReduce) {
+        switch (writeLocation) {
+        case writeSource:
+          return (gridColumnID() != gridColumnID(host));
+        case writeDestination:
+          return (gridRowID() != gridRowID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          GALOIS_DIE("isNotCommPartnerCVC error");
+        }
+      } else { // syncBroadcast
+        switch (readLocation) {
+        case readSource:
+          return (gridColumnID() != gridColumnID(host));
+        case readDestination:
+          return (gridRowID() != gridRowID(host));
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          GALOIS_DIE("isNotCommPartnerCVC error");
+        }
+      }
+    } else {
+      if (syncType == syncReduce) {
+        switch (writeLocation) {
+        case writeSource:
+          return (gridRowID() != gridRowID(host));
+        case writeDestination:
+          return (gridColumnID() != gridColumnID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          GALOIS_DIE("isNotCommPartnerCVC error");
+        }
+      } else { // syncBroadcast, 1
+        switch (readLocation) {
+        case readSource:
+          return (gridRowID() != gridRowID(host));
+        case readDestination:
+          return (gridColumnID() != gridColumnID(host));
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          GALOIS_DIE("isNotCommPartnerCVC error");
+        }
+      }
+      return false;
+    }
   }
 
   // Requirement: For all X and Y,
@@ -889,9 +974,18 @@ private:
   bool nothingToSend(unsigned host, SyncType syncType,
                      WriteLocation writeLocation, ReadLocation readLocation) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
-    return (sharedNodes[host].size() == 0);
-
-    // TODO If CVC, call is not comm partner else use default above
+    // TODO refactor (below)
+    if (!isCartCut) {
+      return (sharedNodes[host].size() == 0);
+    } else {
+      // TODO If CVC, call is not comm partner else use default above
+      if (sharedNodes[host].size() > 0) {
+        return isNotCommPartnerCVC(host, syncType, writeLocation,
+                                   readLocation);
+      } else {
+        return true;
+      }
+    }
   }
 
   /**
@@ -910,7 +1004,17 @@ private:
   bool nothingToRecv(unsigned host, SyncType syncType,
                      WriteLocation writeLocation, ReadLocation readLocation) {
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    return (sharedNodes[host].size() == 0);
+    // TODO refactor (above)
+    if (!isCartCut) {
+      return (sharedNodes[host].size() == 0);
+    } else {
+      if (sharedNodes[host].size() > 0) {
+        return isNotCommPartnerCVC(host, syncType, writeLocation,
+                                   readLocation);
+      } else {
+        return true;
+      }
+    }
   }
 
   /**
