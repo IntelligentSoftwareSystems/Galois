@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
 #endif
 
   syncSubstrate = new galois::graphs::GluonSubstrate<Graph>(*hg, net.ID,
-                        net.Num, hg->isTransposed(), false);
+                        net.Num, hg->isTransposed(), hg->cartesianGrid());
 
   // bitset comm setup
   bitset_dist_current.resize(hg->size());

@@ -100,9 +100,11 @@ private:
   const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
   bool transposed;  //!< Marks if passed in graph is transposed or not.
   bool isVertexCut;  //!< Marks if passed in graph's partitioning is vertex cut.
+  std::pair<unsigned, unsigned> cartesianGrid;  //!< cartesian grid (if any)
   const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
+  bool isCartCut;
 
   // bitvector status hasn't been maintained
   //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be
@@ -439,11 +441,23 @@ public:
    * @param numHosts total number of hosts in the currently executing program
    */
   GluonSubstrate(GraphTy& _userGraph, unsigned host, unsigned numHosts,
-                 bool _transposed, bool _isVertexCut)
-      : galois::runtime::GlobalObject(this), userGraph(_userGraph),
-        id(host), transposed(_transposed), isVertexCut(_isVertexCut),
-        numHosts(numHosts), num_run(0), num_round(0), currentBVFlag(nullptr),
+       bool _transposed,
+       std::pair<unsigned, unsigned> _cartesianGrid=std::make_pair(0u, 0u))
+      : galois::runtime::GlobalObject(this), userGraph(_userGraph), id(host),
+        transposed(_transposed), isVertexCut(userGraph.is_vertex_cut()),
+        cartesianGrid(_cartesianGrid), numHosts(numHosts), num_run(0),
+        num_round(0), currentBVFlag(nullptr),
         mirrorNodes(userGraph.getMirrorNodes()) {
+    if (cartesianGrid.first != 0 && cartesianGrid.second != 0) {
+      GALOIS_ASSERT(cartesianGrid.first * cartesianGrid.second == numHosts,
+                    "Cartesian split doesn't equal number of hosts");
+      if (id == 0) {
+        galois::gInfo("Gluon optimizing communication for 2-D cartesian cut: ",
+                      cartesianGrid.first, " x ", cartesianGrid.second);
+      }
+      isCartCut = true;
+    }
+
     enforce_data_mode = enforce_metadata;
     initBareMPI();
     // master setup from mirrors done by setupCommunication call
@@ -854,6 +868,9 @@ private:
 // Other helper functions
 ////////////////////////////////////////////////////////////////////////////////
   // TODO problem for cartesian cut, need to somehow make it work
+  bool isNotCommPartnerCVC() {
+    // TODO needs to know grid row/column ID; need grid split from constructor
+  }
 
   // Requirement: For all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
@@ -870,10 +887,11 @@ private:
    * @returns true if there is nothing to send to a host, false otherwise
    */
   bool nothingToSend(unsigned host, SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
+                     WriteLocation writeLocation, ReadLocation readLocation) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
     return (sharedNodes[host].size() == 0);
+
+    // TODO If CVC, call is not comm partner else use default above
   }
 
   /**
@@ -890,8 +908,7 @@ private:
    * @returns true if there is nothing to receive from a host, false otherwise
    */
   bool nothingToRecv(unsigned host, SyncType syncType,
-                             WriteLocation writeLocation,
-                             ReadLocation readLocation) {
+                     WriteLocation writeLocation, ReadLocation readLocation) {
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
     return (sharedNodes[host].size() == 0);
   }

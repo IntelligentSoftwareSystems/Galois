@@ -16,9 +16,8 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
     return getMaster(src);
   }
 
-  bool noCommunication() { return true; }
+  virtual bool noCommunication() { return true; }
   bool isVertexCut() const { return false; }
-  bool isCartCut() { return false; }
   void serializePartition(boost::archive::binary_oarchive&) { return; }
   void deserializePartition(boost::archive::binary_iarchive&) { return; }
 };
@@ -85,7 +84,6 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
     return true;
   }
-  constexpr static bool isCartCut() { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) {
     ar << numRowHosts;
     ar << numColumnHosts;
@@ -94,7 +92,10 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     ar >> numRowHosts;
     ar >> numColumnHosts;
   }
-  bool noCommunication() { return false; }
+
+  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(numRowHosts, numColumnHosts);
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,8 +162,6 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     return true;
   }
 
-  constexpr static bool isCartCut() { return true; }
-
   void serializePartition(boost::archive::binary_oarchive& ar) {
     ar << numRowHosts;
     ar << numColumnHosts;
@@ -173,7 +172,9 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  bool noCommunication() { return false; }
+  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(numRowHosts, numColumnHosts);
+  }
 };
 ////////////////////////////////////////////////////////////////////////////////
 class GenericHVC : public galois::graphs::ReadMasterAssignment {
@@ -196,19 +197,16 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
 
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
-  constexpr static bool isCartCut() { return false; }
   void serializePartition(boost::archive::binary_oarchive& ar) {
     return;
   }
   void deserializePartition(boost::archive::binary_iarchive& ar) {
     return;
   }
-  bool noCommunication() { return false; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO make class for these as well like ones above
 class GingerP : public galois::graphs::CustomMasterAssignment {
   // used in hybrid cut
   uint32_t _vCutThreshold;
@@ -348,10 +346,8 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
 
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
-  constexpr static bool isCartCut() { return false; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
-  bool noCommunication() { return false; }
 };
 
 class FennelP : public galois::graphs::CustomMasterAssignment {
@@ -487,10 +483,8 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
 
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return false; }
-  constexpr static bool isCartCut() { return false; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
-  bool noCommunication() { return false; }
 };
 
 class SugarP : public galois::graphs::CustomMasterAssignment {
@@ -673,8 +667,6 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     return true;
   }
 
-  constexpr static bool isCartCut() { return true; }
-
   //bool isNotCommunicationPartner(unsigned host, unsigned syncType,
   //                               WriteLocation writeLocation,
   //                               ReadLocation readLocation,
@@ -754,7 +746,9 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  bool noCommunication() { return false; }
+  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(numRowHosts, numColumnHosts);
+  }
 };
 
 class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
@@ -938,7 +932,6 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
     return true;
   }
-  constexpr static bool isCartCut() { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) {
     ar << numRowHosts;
     ar << numColumnHosts;
@@ -947,7 +940,11 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     ar >> numRowHosts;
     ar >> numColumnHosts;
   }
-  bool noCommunication() { return false; }
+
+  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(numRowHosts, numColumnHosts);
+  }
+
 };
 
 #endif

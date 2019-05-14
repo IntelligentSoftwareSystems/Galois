@@ -23,6 +23,11 @@ class PartitioningScaffold {
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
   }
+
+  virtual bool noCommunication() { return false; }
+  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 /**

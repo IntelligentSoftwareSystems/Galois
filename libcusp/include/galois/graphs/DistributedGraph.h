@@ -497,6 +497,13 @@ public:
    * @returns true if partition being stored in this graph is a vertex cut
    */
   virtual bool is_vertex_cut() const = 0;
+  /**
+   * Returns Cartesian split (if it exists, else returns pair of 0s
+   */
+  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
+    return std::make_pair(0u, 0u);
+  }
+
   bool isTransposed() { return transposed; }
 
   /**

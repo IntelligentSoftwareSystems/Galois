@@ -95,6 +95,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   virtual bool is_vertex_cut() const {
     return graphPartitioner->isVertexCut();
   }
+  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
+    return graphPartitioner->cartesianGrid();
+  }
 
   // TODO : user should not need to know about write and read locations,
   // so move this out or hide somehow....
@@ -312,7 +315,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // Finalization
 
     // TODO this is a hack; fix it somehow
-    if (graphPartitioner->isVertexCut() && !graphPartitioner->isCartCut()) {
+    // if vertex cut but not a cart cut is the condition
+    if (graphPartitioner->isVertexCut() &&
+        graphPartitioner->cartesianGrid().first == 0) {
       base_DistGraph::numNodesWithEdges = base_DistGraph::numNodes;
     }
 
