@@ -75,6 +75,8 @@ typedef typename Graph::GraphNode GNode;
 galois::DynamicBitSet bitset_current_degree;
 galois::DynamicBitSet bitset_trim;
 
+galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+
 // add all sync/bitset structs (needs above declarations)
 #include "kcore_push_sync.hh"
 
@@ -95,7 +97,7 @@ struct InitializeGraph2 {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("InitializeGraph2_" + (_graph.get_run_identifier()));
+      std::string impl_str("InitializeGraph2_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph2_nodesWithEdges_cuda(cuda_ctx);
@@ -106,9 +108,9 @@ struct InitializeGraph2 {
           galois::iterate(nodesWithEdges), InitializeGraph2{&_graph},
           galois::steal(), galois::no_stats(),
           galois::loopname(
-              _graph.get_run_identifier("InitializeGraph2").c_str()));
+              syncSubstrate->get_run_identifier("InitializeGraph2").c_str()));
 
-    _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
+    syncSubstrate->sync<writeDestination, readSource, Reduce_add_current_degree,
                 Bitset_current_degree>(
         "InitializeGraph2");
   }
@@ -139,7 +141,7 @@ struct InitializeGraph1 {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("InitializeGraph1_" + (_graph.get_run_identifier()));
+      std::string impl_str("InitializeGraph1_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph1_allNodes_cuda(cuda_ctx);
@@ -150,7 +152,7 @@ struct InitializeGraph1 {
           galois::iterate(allNodes.begin(), allNodes.end()),
           InitializeGraph1{&_graph}, galois::no_stats(),
           galois::loopname(
-              _graph.get_run_identifier("InitializeGraph1").c_str()));
+              syncSubstrate->get_run_identifier("InitializeGraph1").c_str()));
 
     // degree calculation
     InitializeGraph2::go(_graph);
@@ -177,7 +179,7 @@ struct KCoreStep2 {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("KCore_" + (_graph.get_run_identifier()));
+      std::string impl_str("KCore_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       KCoreStep2_nodesWithEdges_cuda(cuda_ctx);
@@ -187,7 +189,7 @@ struct KCoreStep2 {
       galois::do_all(
           galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
           KCoreStep2{&_graph}, galois::no_stats(),
-          galois::loopname(_graph.get_run_identifier("KCore").c_str()));
+          galois::loopname(syncSubstrate->get_run_identifier("KCore").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -229,11 +231,11 @@ struct KCoreStep1 {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_round(iterations);
+      syncSubstrate->set_num_round(iterations);
       dga.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("KCore_" + (_graph.get_run_identifier()));
+        std::string impl_str("KCore_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
@@ -246,13 +248,13 @@ struct KCoreStep1 {
             galois::iterate(nodesWithEdges),
             KCoreStep1{k_core_num, &_graph, dga}, galois::steal(),
             galois::no_stats(),
-            galois::loopname(_graph.get_run_identifier("KCore").c_str()));
+            galois::loopname(syncSubstrate->get_run_identifier("KCore").c_str()));
 
       // do the trim sync; readSource because in symmetric graph
       // source=destination; not a readAny because any will grab non
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
-      _graph.sync<writeDestination, readSource, Reduce_add_trim,
+      syncSubstrate->sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim, async>("KCore");
 
       // handle trimming (locally)
@@ -261,11 +263,11 @@ struct KCoreStep1 {
       iterations++;
     } while (
              (async || (iterations < maxIterations)) &&
-             dga.reduce(_graph.get_run_identifier()));
+             dga.reduce(syncSubstrate->get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
+          REGION_NAME, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
           (unsigned long)iterations);
     }
   }
@@ -364,10 +366,11 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
+  Graph* h_graph;
 #ifdef __GALOIS_HET_CUDA__
   Graph* h_graph = symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
-  Graph* h_graph = symmetricDistGraphInitialization<NodeData, void>();
+  std::tie(h_graph, syncSubstrate) = symmetricDistGraphInitialization<NodeData, void>();
 #endif
 
   bitset_current_degree.resize(h_graph->size());
@@ -397,7 +400,7 @@ int main(int argc, char** argv) {
 
     // re-init graph for next run
     if ((run + 1) != numRuns) {
-      (*h_graph).set_num_run(run + 1);
+      (*syncSubstrate).set_num_run(run + 1);
 
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
