@@ -107,6 +107,8 @@ galois::DynamicBitSet bitset_num_shortest_paths;
 galois::DynamicBitSet bitset_current_length;
 galois::DynamicBitSet bitset_dependency;
 
+galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+
 // sync structures
 #include "bc_level_sync.hh"
 
@@ -125,7 +127,7 @@ struct InitializeGraph {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("InitializeGraph")
+            //syncSubstrate->get_run_identifier("InitializeGraph")
             "InitializeGraph");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -169,7 +171,7 @@ struct InitializeIteration {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("InitializeIteration")
+            //syncSubstrate->get_run_identifier("InitializeIteration")
             "InitializeIteration");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -180,7 +182,7 @@ struct InitializeIteration {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           InitializeIteration{infinity, current_src_node, &_graph},
-          galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()),
+          galois::loopname(syncSubstrate->get_run_identifier("InitializeIteration").c_str()),
           galois::no_stats());
   }
 
@@ -235,7 +237,7 @@ struct ForwardPass {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("ForwardPass")
+            //syncSubstrate->get_run_identifier("ForwardPass")
             "ForwardPass");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -248,7 +250,7 @@ struct ForwardPass {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         ForwardPass(&_graph, _dga, globalRoundNumber),
-        galois::loopname(_graph.get_run_identifier("ForwardPass").c_str()),
+        galois::loopname(syncSubstrate->get_run_identifier("ForwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
       );
@@ -257,14 +259,14 @@ struct ForwardPass {
       // read any because a destination node without the correct distance
       // may use a different distance (leading to incorrectness)
       if (moreThanOne) {
-        _graph.sync<writeDestination, readAny, Reduce_min_current_length,
+        syncSubstrate->sync<writeDestination, readAny, Reduce_min_current_length,
                     Bitset_current_length>("ForwardPass");
-        _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
+        syncSubstrate->sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
                     Bitset_num_shortest_paths>("ForwardPass");
       }
 
       globalRoundNumber++;
-    } while (_dga.reduce(_graph.get_run_identifier()));
+    } while (_dga.reduce(syncSubstrate->get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -322,7 +324,7 @@ struct MiddleSync {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("MiddleSync")
+            //syncSubstrate->get_run_identifier("MiddleSync")
             "MiddleSync");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -333,11 +335,11 @@ struct MiddleSync {
       galois::do_all(
         galois::iterate(masters.begin(), masters.end()),
         MiddleSync(&_graph, _li),
-        galois::loopname(_graph.get_run_identifier("MiddleSync").c_str()),
+        galois::loopname(syncSubstrate->get_run_identifier("MiddleSync").c_str()),
         galois::no_stats()
       );
 
-      _graph.sync<writeSource, readAny, Reduce_set_num_shortest_paths>("MiddleSync");
+      syncSubstrate->sync<writeSource, readAny, Reduce_set_num_shortest_paths>("MiddleSync");
     }
   }
 
@@ -373,7 +375,7 @@ struct BackwardPass {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("BackwardPass")
+            //syncSubstrate->get_run_identifier("BackwardPass")
             "BackwardPass");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -384,13 +386,13 @@ struct BackwardPass {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         BackwardPass(&_graph, backRoundCount),
-        galois::loopname(_graph.get_run_identifier("BackwardPass").c_str()),
+        galois::loopname(syncSubstrate->get_run_identifier("BackwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
       );
 
       if (moreThanOne) {
-        _graph.sync<writeSource, readDestination, Reduce_add_dependency,
+        syncSubstrate->sync<writeSource, readDestination, Reduce_add_dependency,
                     Bitset_dependency>("BackwardPass");
       }
     }
@@ -445,7 +447,7 @@ struct BC {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-            //_graph.get_run_identifier("BC")
+            //syncSubstrate->get_run_identifier("BC")
             "BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -457,7 +459,7 @@ struct BC {
         galois::iterate(masters.begin(), masters.end()),
         BC(&_graph),
         galois::no_stats(),
-        galois::loopname(_graph.get_run_identifier("BC").c_str())
+        galois::loopname(syncSubstrate->get_run_identifier("BC").c_str())
       );
     }
   }
@@ -502,7 +504,7 @@ struct Sanity {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // std::string impl_str(_graph.get_run_identifier("Sanity"));
+      // std::string impl_str(syncSubstrate->get_run_identifier("Sanity"));
       std::string impl_str("Sanity");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -561,10 +563,11 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
+  Graph* h_graph;
 #ifdef __GALOIS_HET_CUDA__
   Graph* h_graph = distGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
-  Graph* h_graph = distGraphInitialization<NodeData, void>();
+  std::tie(h_graph, syncSubstrate) = distGraphInitialization<NodeData, void>();
 #endif
 
   if (sourcesToUse != "") {
@@ -640,7 +643,7 @@ int main(int argc, char** argv) {
       // Round reporting
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumRounds", i), globalRoundNumber);
+          syncSubstrate->get_run_identifier("NumRounds", i), globalRoundNumber);
         uint32_t backRounds;
         if (globalRoundNumber > 2) {
           backRounds = globalRoundNumber - 2;
@@ -648,10 +651,10 @@ int main(int argc, char** argv) {
           backRounds = 0;
         }
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumForwardRounds", i),
+          syncSubstrate->get_run_identifier("NumForwardRounds", i),
           globalRoundNumber);
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumBackRounds", i), backRounds);
+          syncSubstrate->get_run_identifier("NumBackRounds", i), backRounds);
         galois::runtime::reportStat_Single(REGION_NAME,
           std::string("TotalRounds_") + std::to_string(run),
           globalRoundNumber + backRounds);
@@ -663,7 +666,7 @@ int main(int argc, char** argv) {
     // re-init graph for next run
     if ((run + 1) != numRuns) {
       galois::runtime::getHostBarrier().wait();
-      (*h_graph).set_num_run(run + 1);
+      (*syncSubstrate).set_num_run(run + 1);
 
 
 #ifdef __GALOIS_HET_CUDA__
