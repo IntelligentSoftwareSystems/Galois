@@ -24,6 +24,7 @@
 #include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
 #include "DistributedGraphLoader.h"
+#include "galois/graphs/GluonSubstrate.h"
 #include "galois/AtomicHelpers.h"
 #ifdef GALOIS_USE_EXP
 #include "galois/CompilerHelpers.h"
@@ -81,12 +82,15 @@ void heteroSetup(std::vector<unsigned>& scaleFactor);
  * Given a loaded graph, marshal it over to the GPU device for use
  * on the GPU.
  *
- * @param loadedGraph a loaded graph that you want to marshal
+ * @param gluonSubstrate Gluon substrate containing info needed to marshal
+ * to GPU
  * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
 static void
-marshalGPUGraph(galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph,
+marshalGPUGraph(galois::graphs::GluonSubstrate<
+                  galois::graphs::DistGraph<NodeData, EdgeData>
+                >* gluonSubstrate,
                 struct CUDA_Context** cuda_ctx) {
   auto& net                 = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
@@ -103,7 +107,7 @@ marshalGPUGraph(galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph,
     }
 
     MarshalGraph m;
-    (*loadedGraph).getMarshalGraph(m);
+    (*gluonSubstrate).getMarshalGraph(m);
     load_graph_CUDA(*cuda_ctx, m, net.Num);
   }
 
@@ -142,15 +146,12 @@ loadDGraph(std::vector<unsigned>& scaleFactor,
           scaleFactor);
   assert(loadedGraph != nullptr);
 
-#ifdef __GALOIS_HET_CUDA__
-  marshalGPUGraph(loadedGraph, cuda_ctx);
-#endif
 
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph)
-    (*loadedGraph).save_local_graph_to_file(localGraphFileName);
+  //if (saveLocalGraph)
+  //  (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
@@ -191,15 +192,11 @@ loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
 
   assert(loadedGraph != nullptr);
 
-#ifdef __GALOIS_HET_CUDA__
-  marshalGPUGraph(loadedGraph, cuda_ctx);
-#endif
-
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph)
-    (*loadedGraph).save_local_graph_to_file(localGraphFileName);
+  //if (saveLocalGraph)
+  //  (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
@@ -217,18 +214,36 @@ loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
  * @param cuda_ctx CUDA context of the currently running program; only matters
  * if using GPU
  *
- * @returns Pointer to the loaded graph
+ * @returns Pointer to the loaded graph and Gluon substrate
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-galois::graphs::DistGraph<NodeData, EdgeData>*
+std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
+         galois::graphs::GluonSubstrate<
+           galois::graphs::DistGraph<NodeData, EdgeData>
+         >*>
 distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
+  using Graph = galois::graphs::DistGraph<NodeData, EdgeData>;
+  using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
+  Graph* g;
+  Substrate* s;
+
 #ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
-  return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
+  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
 #else
-  return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
+  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
 #endif
+  // load substrate
+  const auto& net = galois::runtime::getSystemNetworkInterface();
+  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid());
+
+  // marshal graph to GPU as necessary
+  #ifdef __GALOIS_HET_CUDA__
+  marshalGPUGraph(s, cuda_ctx);
+  #endif
+
+  return std::make_pair(g, s);
 }
 
 /**
