@@ -299,126 +299,135 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   }
 }
 
-///**
-// * Loads a graph file with the purpose of iterating over the in edges
-// * of the graph.
-// *
-// * @tparam NodeData node data to store in graph
-// * @tparam EdgeData edge data to store in graph
-// * @tparam iterateOut says if you want to iterate over out edges or not; if
-// * false, will iterate over in edges
-// * @tparam enable_if this function  will only be enabled if iterateOut is false
-// * (i.e. iterate over in-edges)
-// * @param scaleFactor How to split nodes among hosts
-// * @returns a pointer to a newly allocated DistGraph based on the command line
-// * loaded based on command line arguments
-// */
-//template <typename NodeData, typename EdgeData, bool iterateOut = true,
-//          typename std::enable_if<!iterateOut>::type* = nullptr>
-//DistGraph<NodeData, EdgeData>*
-//constructGraph(std::vector<unsigned>& scaleFactor) {
-//  typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
-//  using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-//  using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
-//  using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
-//  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
-//  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
-//  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarColumnFlipP>;
-//
-//  auto& net = galois::runtime::getSystemNetworkInterface();
-//
-//  // 1 host = no concept of cut; just load from edgeCut
-//  if (net.Num == 1) {
-//    if (inputFileTranspose.size()) {
-//      return new GenericEC(inputFileTranspose, net.ID, net.Num, false,
-//                           readFromFile, localGraphFileName);
-//    } else {
-//      fprintf(stderr, "WARNING: Loading transpose graph through in-memory "
-//                      "transpose to iterate over in-edges: pass in transpose "
-//                      "graph with -graphTranspose to avoid unnecessary "
-//                      "overhead.\n");
-//      return new GenericEC(inputFile, net.ID, net.Num, true, readFromFile,
-//                           localGraphFileName);
-//    }
-//  }
-//
-//  switch (partitionScheme) {
-//  case OEC:
-//    return new GenericEC(inputFile, net.ID, net.Num, true, readFromFile,
-//                         localGraphFileName);
-//  case IEC:
-//    if (inputFileTranspose.size()) {
-//      return new GenericEC(inputFileTranspose, net.ID, net.Num, false,
-//                           readFromFile, localGraphFileName);
-//    } else {
-//      GALOIS_DIE("Error: attempting incoming edge cut without transpose "
-//                 "graph");
-//      break;
-//    }
-//
-//  case HOVC:
-//    return new GenericHVC(inputFile, net.ID, net.Num, true, readFromFile,
-//                          localGraphFileName);
-//  case HIVC:
-//    if (inputFileTranspose.size()) {
-//      return new GenericHVC(inputFileTranspose, net.ID, net.Num, false,
-//                            readFromFile, localGraphFileName);
-//    } else {
-//      GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
-//      break;
-//    }
-//
-//  case CART_VCUT:
-//    // read regular partition and then flip it
-//    return new GenericCVC(inputFile, net.ID, net.Num, true, readFromFile,
-//                          localGraphFileName);
-//  case CART_VCUT_IEC:
-//    if (inputFileTranspose.size()) {
-//      return new GenericCVC(inputFileTranspose, net.ID, net.Num, false,
-//                            readFromFile, localGraphFileName);
-//    } else {
-//      GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
-//      break;
-//    }
-//
-//  //case CEC:
-//  //  if (inputFileTranspose.size()) {
-//  //    return new Graph_customEdgeCut(inputFileTranspose, "", net.ID,
-//  //                                   net.Num, scaleFactor, vertexIDMapFileName,
-//  //                                   false);
-//  //  } else {
-//  //    GALOIS_DIE("Error: (cec) iterate over in-edges without transpose graph");
-//  //    break;
-//  //  }
-//
-//  case GINGER_O:
-//    return new Ginger(inputFile, net.ID, net.Num, true);
-//  case GINGER_I:
-//    if (inputFileTranspose.size()) {
-//      return new Ginger(inputFileTranspose, net.ID, net.Num, false);
-//    } else {
-//      GALOIS_DIE("Error: attempting Ginger without transpose graph");
-//      break;
-//    }
-//
-//  case FENNEL_O:
-//    return new Fennel(inputFile, net.ID, net.Num, true);
-//  case FENNEL_I:
-//    if (inputFileTranspose.size()) {
-//      return new Fennel(inputFileTranspose, net.ID, net.Num, false);
-//    } else {
-//      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
-//      break;
-//    }
-//
-//  case SUGAR_O:
-//    return new Sugar(inputFile, net.ID, net.Num, true);
-//
-//  default:
-//    GALOIS_DIE("Error: partition scheme specified is invalid");
-//    return nullptr;
-//  }
-//}
+/**
+ * Loads a graph file with the purpose of iterating over the in edges
+ * of the graph.
+ *
+ * @tparam NodeData node data to store in graph
+ * @tparam EdgeData edge data to store in graph
+ * @tparam iterateOut says if you want to iterate over out edges or not; if
+ * false, will iterate over in edges
+ * @tparam enable_if this function  will only be enabled if iterateOut is false
+ * (i.e. iterate over in-edges)
+ * @param scaleFactor How to split nodes among hosts
+ * @returns a pointer to a newly allocated DistGraph based on the command line
+ * loaded based on command line arguments
+ */
+template <typename NodeData, typename EdgeData, bool iterateOut = true,
+          typename std::enable_if<!iterateOut>::type* = nullptr>
+DistGraph<NodeData, EdgeData>*
+constructGraph(std::vector<unsigned>& scaleFactor) {
+  auto& net = galois::runtime::getSystemNetworkInterface();
+
+  // 1 host = no concept of cut; just load from edgeCut
+  if (net.Num == 1) {
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      fprintf(stderr, "WARNING: Loading transpose graph through in-memory "
+                      "transpose to iterate over in-edges: pass in transpose "
+                      "graph with -graphTranspose to avoid unnecessary "
+                      "overhead.\n");
+      return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    }
+  }
+
+  switch (partitionScheme) {
+  case OEC:
+    return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+  case IEC:
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      GALOIS_DIE("Error: attempting incoming edge cut without transpose "
+                 "graph");
+      break;
+    }
+
+  case HOVC:
+    return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+  case HIVC:
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
+      break;
+    }
+
+  case CART_VCUT:
+    return cuspPartitionGraph<GenericCVCColumnFlip, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+  case CART_VCUT_IEC:
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<GenericCVCColumnFlip, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
+      break;
+    }
+
+  //case CEC:
+  //  if (inputFileTranspose.size()) {
+  //    return new Graph_customEdgeCut(inputFileTranspose, "", net.ID,
+  //                                   net.Num, scaleFactor, vertexIDMapFileName,
+  //                                   false);
+  //  } else {
+  //    GALOIS_DIE("Error: (cec) iterate over in-edges without transpose graph");
+  //    break;
+  //  }
+
+  case GINGER_O:
+    return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+  case GINGER_I:
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      break;
+    }
+
+  case FENNEL_O:
+    return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+  case FENNEL_I:
+    if (inputFileTranspose.size()) {
+      return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+      );
+    } else {
+      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      break;
+    }
+
+  case SUGAR_O:
+    return cuspPartitionGraph<SugarColumnFlipP, NodeData, EdgeData>(
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+    );
+
+  default:
+    GALOIS_DIE("Error: partition scheme specified is invalid");
+    return nullptr;
+  }
+}
 
 } // end namespace graphs
 } // end namespace galois
