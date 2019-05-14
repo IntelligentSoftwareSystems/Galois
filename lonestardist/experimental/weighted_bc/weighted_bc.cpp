@@ -152,7 +152,7 @@ struct InitializeGraph {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-          //_graph.get_run_identifier("InitializeGraph")
+          //syncSubstrate->get_run_identifier("InitializeGraph")
           "InitializeGraph");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -202,7 +202,7 @@ struct InitializeIteration {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-          //_graph.get_run_identifier("InitializeIteration")
+          //syncSubstrate->get_run_identifier("InitializeIteration")
           "InitializeIteration");
 
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -215,7 +215,7 @@ struct InitializeIteration {
           galois::iterate(allNodes.begin(), allNodes.end()),
           InitializeIteration{infinity, current_src_node, &_graph},
           galois::loopname("InitializeIteration"),
-          // galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()),
+          // galois::loopname(syncSubstrate->get_run_identifier("InitializeIteration").c_str()),
           galois::no_stats());
   }
 
@@ -268,7 +268,7 @@ struct FirstIterationSSSP {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-          //_graph.get_run_identifier("FirstIterationSSSP")
+          //syncSubstrate->get_run_identifier("FirstIterationSSSP")
           "SSSP");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -279,11 +279,11 @@ struct FirstIterationSSSP {
       galois::do_all(
           galois::iterate(__begin, __end), FirstIterationSSSP(&_graph),
           galois::loopname("SSSP"),
-          // galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
+          // galois::loopname(syncSubstrate->get_run_identifier("FirstIterationSSSP").c_str()),
           galois::no_stats());
 
     // Next op will read src, current length
-    _graph.sync<writeDestination, readSource, Reduce_min_current_length,
+    syncSubstrate->sync<writeDestination, readSource, Reduce_min_current_length,
                 Bitset_current_length>("SSSP");
   }
 
@@ -328,14 +328,14 @@ struct SSSP {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_round(iterations);
+      syncSubstrate->set_num_round(iterations);
       dga.reset();
 
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         // std::string impl_str("SSSP_0");
         std::string impl_str(
-            //_graph.get_run_identifier("SSSP")
+            //syncSubstrate->get_run_identifier("SSSP")
             "SSSP");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -349,7 +349,7 @@ struct SSSP {
         galois::do_all(
             galois::iterate(nodesWithEdges), SSSP(&_graph, dga),
             galois::loopname("SSSP"),
-            // galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
+            // galois::loopname(syncSubstrate->get_run_identifier("SSSP").c_str()),
             galois::no_stats());
       }
 
@@ -358,7 +358,7 @@ struct SSSP {
       accum_result = dga.reduce();
 
       if (accum_result) {
-        _graph.sync<writeDestination, readSource, Reduce_min_current_length,
+        syncSubstrate->sync<writeDestination, readSource, Reduce_min_current_length,
                     Bitset_current_length>("SSSP");
       } else {
         // write destination, read any, fails.....
@@ -368,13 +368,13 @@ struct SSSP {
           // syncs cause the bit to be reset prematurely, so using the bitset
           // will lead to incorrect results as it will not sync what is
           // necessary
-          _graph.sync<writeDestination, readSource, Reduce_min_current_length,
+          syncSubstrate->sync<writeDestination, readSource, Reduce_min_current_length,
                       Bitset_current_length>("SSSP");
-          _graph.sync<writeDestination, readDestination,
+          syncSubstrate->sync<writeDestination, readDestination,
                       Reduce_min_current_length>(
               "SSSP");
         } else {
-          _graph.sync<writeDestination, readAny, Reduce_min_current_length,
+          syncSubstrate->sync<writeDestination, readAny, Reduce_min_current_length,
                       Bitset_current_length>("SSSP");
         }
       }
@@ -427,7 +427,7 @@ struct PredAndSucc {
     if (personality == GPU_CUDA) {
       // std::string impl_str("PredAndSucc");
       std::string impl_str(
-          //_graph.get_run_identifier("PredAndSucc")
+          //syncSubstrate->get_run_identifier("PredAndSucc")
           "PredAndSucc");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -439,17 +439,17 @@ struct PredAndSucc {
       galois::do_all(
           galois::iterate(nodesWithEdges), PredAndSucc(infinity, &_graph),
           galois::loopname("PredAndSucc"),
-          // galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
+          // galois::loopname(syncSubstrate->get_run_identifier("PredAndSucc").c_str()),
           galois::no_stats());
     }
 
     // sync for use in NumShortPath calculation
-    _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors,
+    syncSubstrate->sync<writeDestination, readSource, Reduce_add_num_predecessors,
                 Bitset_num_predecessors>(
         "PredAndSucc");
 
     // sync now for later DependencyPropagation use
-    _graph.sync<writeSource, readSource, Reduce_add_num_successors,
+    syncSubstrate->sync<writeSource, readSource, Reduce_add_num_successors,
                 Bitset_num_successors>("PredAndSucc");
   }
 
@@ -507,7 +507,7 @@ struct NumShortestPathsChanges {
     if (personality == GPU_CUDA) {
       // std::string impl_str("NumShortestPathsChanges");
       std::string impl_str(
-          //_graph.get_run_identifier("NumShortestPathsChanges")
+          //syncSubstrate->get_run_identifier("NumShortestPathsChanges")
           "NumShortestPathsChanges");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -519,7 +519,7 @@ struct NumShortestPathsChanges {
           galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
           NumShortestPathsChanges{infinity, &_graph},
           galois::loopname("NumShortestPathsChanges"),
-          // galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()),
+          // galois::loopname(syncSubstrate->get_run_identifier("NumShortestPathsChanges").c_str()),
           galois::no_stats());
 
     // predecessors does not require syncing as syncing trim accomplishes the
@@ -592,14 +592,14 @@ struct NumShortestPaths {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_round(iterations);
+      syncSubstrate->set_num_round(iterations);
       dga.reset();
 
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         // std::string impl_str("NumShortestPaths");
         std::string impl_str(
-            //_graph.get_run_identifier("NumShortestPaths")
+            //syncSubstrate->get_run_identifier("NumShortestPaths")
             "NumShortestPaths");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -615,14 +615,14 @@ struct NumShortestPaths {
             galois::iterate(nodesWithEdges),
             NumShortestPaths(infinity, current_src_node, &_graph, dga),
             galois::loopname("NumShortestPaths"),
-            // galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
+            // galois::loopname(syncSubstrate->get_run_identifier("NumShortestPaths").c_str()),
             galois::no_stats());
       }
 
       // sync to_adds and trim on source
-      _graph.sync<writeDestination, readSource, Reduce_add_trim,
+      syncSubstrate->sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim>("NumShortestPaths");
-      _graph.sync<writeDestination, readSource, Reduce_add_to_add,
+      syncSubstrate->sync<writeDestination, readSource, Reduce_add_to_add,
                   Bitset_to_add>("NumShortestPaths");
 
       // do predecessor decrementing using trim + dependency changes with
@@ -636,7 +636,7 @@ struct NumShortestPaths {
       // sync num_short_paths on dest (will be sync'd on source
       // already, i.e. all sources should already have the correct value)
       if (!accum_result) {
-        _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths,
+        syncSubstrate->sync<writeSource, readDestination, Reduce_set_num_shortest_paths,
                     Bitset_num_shortest_paths>(
             "NumShortestPaths");
       }
@@ -724,7 +724,7 @@ struct PropagationFlagUpdate {
     if (personality == GPU_CUDA) {
       // std::string impl_str("PropagationFlagUpdate");
       std::string impl_str(
-          //_graph.get_run_identifier("PropagationFlagUpdate")
+          //syncSubstrate->get_run_identifier("PropagationFlagUpdate")
           "PropagationFlagUpdate");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -740,7 +740,7 @@ struct PropagationFlagUpdate {
     // note that only nodes with succ == 0 will have their flags sync'd
     // by this call (through bitset; only set for those cases); the others
     // do not need to be sync'd as they will (or should) all be false already
-    _graph.sync<writeSource, readDestination, Reduce_set_propagation_flag,
+    syncSubstrate->sync<writeSource, readDestination, Reduce_set_propagation_flag,
                 Bitset_propagation_flag>(
         "PropagationFlagUpdate");
   }
@@ -782,7 +782,7 @@ struct DependencyPropChanges {
     if (personality == GPU_CUDA) {
       // std::string impl_str("DependencyPropChanges");
       std::string impl_str(
-          //_graph.get_run_identifier("DependencyPropChanges")
+          //syncSubstrate->get_run_identifier("DependencyPropChanges")
           "DependencyPropChanges");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -794,11 +794,11 @@ struct DependencyPropChanges {
           galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
           DependencyPropChanges{infinity, &_graph},
           galois::loopname("DependencyPropChanges"),
-          // galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
+          // galois::loopname(syncSubstrate->get_run_identifier("DependencyPropChanges").c_str()),
           galois::no_stats());
 
     // need reduce set for flag
-    _graph.sync<writeSource, readDestination, Reduce_set_propagation_flag,
+    syncSubstrate->sync<writeSource, readDestination, Reduce_set_propagation_flag,
                 // Bitset_propagation_flag>("DependencyPropChanges_prop_flag");
                 Bitset_propagation_flag>("DependencyPropChanges");
   }
@@ -869,7 +869,7 @@ struct DependencyPropagation {
     uint32_t accum_result;
 
     do {
-      _graph.set_num_round(iterations);
+      syncSubstrate->set_num_round(iterations);
       dga.reset();
 
       const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -878,7 +878,7 @@ struct DependencyPropagation {
       if (personality == GPU_CUDA) {
         // std::string impl_str("DependencyPropagation");
         std::string impl_str(
-            //_graph.get_run_identifier("DependencyPropagation")
+            //syncSubstrate->get_run_identifier("DependencyPropagation")
             "DependencyPropagation");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -894,13 +894,13 @@ struct DependencyPropagation {
             galois::iterate(nodesWithEdges),
             DependencyPropagation(infinity, current_src_node, &_graph, dga),
             galois::loopname("DependencyPropagation"),
-            // galois::loopname(_graph.get_run_identifier("DependencyPropagation").c_str()),
+            // galois::loopname(syncSubstrate->get_run_identifier("DependencyPropagation").c_str()),
             galois::no_stats());
       }
 
-      _graph.sync<writeSource, readSource, Reduce_add_trim,
+      syncSubstrate->sync<writeSource, readSource, Reduce_add_trim,
                   Bitset_trim>("DependencyPropagation");
-      _graph.sync<writeSource, readSource, Reduce_add_to_add_float,
+      syncSubstrate->sync<writeSource, readSource, Reduce_add_to_add_float,
                   Bitset_to_add_float>(
           "DependencyPropagation");
 
@@ -913,7 +913,7 @@ struct DependencyPropagation {
       // while the loop still goes on...
       if (accum_result) {
         // sync dependency on dest; source should all have same dep
-        _graph.sync<writeSource, readDestination, Reduce_set_dependency,
+        syncSubstrate->sync<writeSource, readDestination, Reduce_set_dependency,
                     Bitset_dependency>(
             "DependencyPropagation");
       }
@@ -1043,7 +1043,7 @@ struct BC {
       }
 #endif
 
-      _graph.set_num_round(0);
+      syncSubstrate->set_num_round(0);
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -1053,7 +1053,7 @@ struct BC {
       SSSP::go(_graph, dga);
       // galois::gDebug("SSSP done");
 
-      _graph.set_num_round(0);
+      syncSubstrate->set_num_round(0);
 
       // calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
@@ -1063,7 +1063,7 @@ struct BC {
       NumShortestPaths::go(_graph, dga);
       // galois::gDebug("NumShortestPaths done");
 
-      _graph.set_num_round(0);
+      syncSubstrate->set_num_round(0);
 
       PropagationFlagUpdate::go(_graph);
 
@@ -1071,7 +1071,7 @@ struct BC {
       DependencyPropagation::go(_graph, dga);
       // galois::gDebug("DepPropagation done");
 
-      _graph.set_num_round(0);
+      syncSubstrate->set_num_round(0);
 
       const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -1079,7 +1079,7 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        // std::string impl_str(_graph.get_run_identifier("BC"));
+        // std::string impl_str(syncSubstrate->get_run_identifier("BC"));
         std::string impl_str("BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -1132,7 +1132,7 @@ struct Sanity {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // std::string impl_str(_graph.get_run_identifier("Sanity"));
+      // std::string impl_str(syncSubstrate->get_run_identifier("Sanity"));
       std::string impl_str("Sanity");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
