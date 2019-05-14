@@ -3259,6 +3259,130 @@ private:
     }
   };
 
+////////////////////////////////////////////////////////////////////////////////
+// GPU marshaling
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef __GALOIS_HET_CUDA__
+private:
+  using GraphNode = typename GraphTy::GraphNode;
+  using edge_iterator = typename GraphTy::edge_iterator;
+  using EdgeTy = typename GraphTy::EdgeType;
+
+  // Code that handles getting the graph onto the GPU
+  template <bool isVoidType,
+            typename std::enable_if<isVoidType>::type* = nullptr>
+  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
+                             const edge_iterator& e) {
+    // do nothing
+  }
+
+  template <bool isVoidType,
+            typename std::enable_if<!isVoidType>::type* = nullptr>
+  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
+                             const edge_iterator& e) {
+    m.edge_data[index] = userGraph.getEdgeData(e);
+  }
+
+public:
+  void getMarshalGraph(MarshalGraph& m) {
+    m.nnodes = userGraph.size();
+    m.nedges = userGraph.sizeEdges();
+    m.numOwned          = userGraph.numMasters();
+    // Assumption: master occurs at beginning in contiguous range
+    m.beginMaster       = 0;
+    m.numNodesWithEdges = userGraph.getNumNodesWithEdges();
+    m.id                = id;
+    m.numHosts          = numHosts;
+    m.row_start         = (index_type*)calloc(m.nnodes + 1, sizeof(index_type));
+    m.edge_dst          = (index_type*)calloc(m.nedges, sizeof(index_type));
+    m.node_data         = (index_type*)calloc(m.nnodes, sizeof(node_data_type));
+
+    // TODO deal with edgety
+    if (std::is_void<EdgeTy>::value) {
+      m.edge_data = NULL;
+    } else {
+      if (!std::is_same<EdgeTy, edge_data_type>::value) {
+        galois::gWarn("Edge data type mismatch between CPU and GPU\n");
+      }
+      m.edge_data = (edge_data_type*)calloc(m.nedges, sizeof(edge_data_type));
+    }
+
+    galois::do_all(
+      // TODO not using thread ranges, can be optimized if I can iterate
+      // directly over userGraph
+      galois::iterate(userGraph.begin(), userGraph.end()),
+      [&](const GraphNode& nodeID) {
+        // initialize node_data with localID-to-globalID mapping
+        m.node_data[nodeID] = userGraph.getGID(nodeID);
+        m.row_start[nodeID] = *(userGraph.edge_begin(nodeID));
+        for (auto e = userGraph.edge_begin(nodeID);
+             e != userGraph.edge_end(nodeID);
+             e++) {
+          auto edgeID = *e;
+          setMarshalEdge<std::is_void<EdgeTy>::value>(m, edgeID, e);
+          m.edge_dst[edgeID] = userGraph.getEdgeDst(e);
+        }
+      },
+      galois::steal()
+    );
+
+    m.row_start[m.nnodes] = m.nedges;
+
+    ////// TODO
+
+    // copy memoization meta-data
+    m.num_master_nodes =
+        (unsigned int*)calloc(masterNodes.size(), sizeof(unsigned int));
+    ;
+    m.master_nodes =
+        (unsigned int**)calloc(masterNodes.size(), sizeof(unsigned int*));
+    ;
+
+    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
+      m.num_master_nodes[h] = masterNodes[h].size();
+
+      if (masterNodes[h].size() > 0) {
+        m.master_nodes[h] =
+            (unsigned int*)calloc(masterNodes[h].size(), sizeof(unsigned int));
+        ;
+        std::copy(masterNodes[h].begin(), masterNodes[h].end(),
+                  m.master_nodes[h]);
+      } else {
+        m.master_nodes[h] = NULL;
+      }
+    }
+
+    m.num_mirror_nodes =
+        (unsigned int*)calloc(mirrorNodes.size(), sizeof(unsigned int));
+    ;
+    m.mirror_nodes =
+        (unsigned int**)calloc(mirrorNodes.size(), sizeof(unsigned int*));
+    ;
+    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
+      m.num_mirror_nodes[h] = mirrorNodes[h].size();
+
+      if (mirrorNodes[h].size() > 0) {
+        m.mirror_nodes[h] =
+            (unsigned int*)calloc(mirrorNodes[h].size(), sizeof(unsigned int));
+        ;
+        std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(),
+                  m.mirror_nodes[h]);
+      } else {
+        m.mirror_nodes[h] = NULL;
+      }
+    }
+
+    // user needs to provide method of freeing up graph (it can do nothing
+    // if they wish)
+    userGraph.deallocate();
+  }
+#endif // het galois def
+
+////////////////////////////////////////////////////////////////////////////////
+// Public sync interface
+////////////////////////////////////////////////////////////////////////////////
+
 public:
   /**
    * Given a structure that contains flags signifying what needs to be
