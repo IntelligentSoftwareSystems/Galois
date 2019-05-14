@@ -146,7 +146,6 @@ loadDGraph(std::vector<unsigned>& scaleFactor,
           scaleFactor);
   assert(loadedGraph != nullptr);
 
-
   dGraphTimer.stop();
 
   // Save local graph structure
@@ -218,9 +217,9 @@ loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
-         galois::graphs::GluonSubstrate<
-           galois::graphs::DistGraph<NodeData, EdgeData>
-         >*>
+          galois::graphs::GluonSubstrate<
+            galois::graphs::DistGraph<NodeData, EdgeData>
+          >*>
 distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   using Graph = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
@@ -260,16 +259,33 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-galois::graphs::DistGraph<NodeData, EdgeData>*
+std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
+          galois::graphs::GluonSubstrate<
+            galois::graphs::DistGraph<NodeData, EdgeData>
+          >*>
 symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
+  using Graph = galois::graphs::DistGraph<NodeData, EdgeData>;
+  using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
+  Graph* g;
+  Substrate* s;
 
 #ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
-  return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
+  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
 #else
-  return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
+  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
 #endif
+  // load substrate
+  const auto& net = galois::runtime::getSystemNetworkInterface();
+  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid());
+
+  // marshal graph to GPU as necessary
+  #ifdef __GALOIS_HET_CUDA__
+  marshalGPUGraph(s, cuda_ctx);
+  #endif
+
+  return std::make_pair(g, s);
 }
 
 #endif
