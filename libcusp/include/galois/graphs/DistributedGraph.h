@@ -435,6 +435,8 @@ protected:
 public:
   //! Type representing a node in this graph
   using GraphNode = typename GraphTy::GraphNode;
+  //! Expose EdgeTy to other classes
+  using EdgeType = EdgeTy;
   //! iterator type over nodes
   using iterator = typename GraphTy::iterator;
   //! constant iterator type over nodes
@@ -613,6 +615,15 @@ public:
   inline size_t numMasters() const { return numOwned; }
 
   /**
+   * Gets number of nodes with edges (may include nodes without edges)
+   * on this (local) graph.
+   *
+   * @returns number of nodes with edges (may include nodes without edges
+   * as it measures a contiguous range)
+   */
+  inline size_t getNumNodesWithEdges() const { return numNodesWithEdges; }
+
+  /**
    * Gets number of nodes on the global unpartitioned graph.
    *
    * @returns number of nodes present in the global unpartitioned graph
@@ -769,6 +780,7 @@ public:
    * Write the local LC_CSR graph to the file on a disk.
    *
    * @param localGraphFileName file name to write local graph to.
+   * @todo revive this
    */
   void save_local_graph_to_file(std::string localGraphFileName = "local_graph") {
     galois::gWarn("Currently not implemented. TODO");
@@ -820,6 +832,7 @@ public:
    * Read the local LC_CSR graph from the file on a disk.
    *
    * @param localGraphFileName file name to read local graph from.
+   * @todo revive this
    */
   void
   read_local_graph_from_file(std::string localGraphFileName = "local_graph") {
@@ -882,6 +895,13 @@ public:
     //dGraphTimerReadLocalGraph.stop();
   }
 
+  /**
+   * Deallocates underlying LC CSR Graph
+   */
+  void deallocate() {
+    galois::gDebug("Deallocating CSR in DistGraph");
+    graph.deallocate();
+  }
 };
 
 template <typename NodeTy, typename EdgeTy>
