@@ -28,7 +28,6 @@
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
-#include "galois/graphs/GluonSubstrate.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "bfs_push_cuda.h"
@@ -411,15 +410,14 @@ int main(int argc, char** argv) {
   galois::StatTimer StatTimer_total("TimerTotal", regionname);
 
   StatTimer_total.start();
+
+  Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
+  // TODO fix this
   Graph* hg = distGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
-  Graph* hg = distGraphInitialization<NodeData, void>();
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>();
 #endif
-
-  syncSubstrate = new galois::graphs::GluonSubstrate<Graph>(*hg, net.ID,
-                        net.Num, hg->isTransposed(), hg->cartesianGrid());
-
   // bitset comm setup
   bitset_dist_current.resize(hg->size());
 
