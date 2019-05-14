@@ -65,6 +65,8 @@ galois::DynamicBitSet bitset_comp_current;
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
+galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+
 #include "cc_pull_sync.hh"
 
 /******************************************************************************/
@@ -80,7 +82,7 @@ struct InitializeGraph {
     const auto& allNodes = _graph.allNodesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("InitializeGraph_" + (_graph.get_run_identifier()));
+      std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
 
@@ -93,7 +95,7 @@ struct InitializeGraph {
       galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()),
                      InitializeGraph{&_graph}, galois::no_stats(),
                      galois::loopname(
-                         _graph.get_run_identifier("InitializeGraph").c_str()));
+                         syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -121,11 +123,11 @@ struct ConnectedComp {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
-      _graph.set_num_round(_num_iterations);
+      syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("ConnectedComp_" + (_graph.get_run_identifier()));
+        std::string impl_str("ConnectedComp_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
@@ -138,22 +140,22 @@ struct ConnectedComp {
                        ConnectedComp(&_graph, dga), galois::steal(),
                        galois::no_stats(),
                        galois::loopname(
-                           _graph.get_run_identifier("ConnectedComp").c_str()));
+                           syncSubstrate->get_run_identifier("ConnectedComp").c_str()));
 
-      _graph.sync<writeSource, readDestination, Reduce_min_comp_current,
+      syncSubstrate->sync<writeSource, readDestination, Reduce_min_comp_current,
                   Bitset_comp_current, async>("ConnectedComp");
 
       galois::runtime::reportStat_Tsum(
-          REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
+          REGION_NAME, "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
           (unsigned long)dga.read_local());
       ++_num_iterations;
     } while (
              (async || (_num_iterations < maxIterations)) &&
-             dga.reduce(_graph.get_run_identifier()));
+             dga.reduce(syncSubstrate->get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
+          REGION_NAME, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
           (unsigned long)_num_iterations);
     }
   }
@@ -246,10 +248,11 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
+  Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
   Graph* hg = symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
-  Graph* hg = symmetricDistGraphInitialization<NodeData, void>();
+  std::tie(hg, syncSubstrate) = symmetricDistGraphInitialization<NodeData, void>();
 #endif
 
   bitset_comp_current.resize(hg->size());
@@ -283,7 +286,7 @@ int main(int argc, char** argv) {
 #endif
         bitset_comp_current.reset();
 
-      (*hg).set_num_run(run + 1);
+      (*syncSubstrate).set_num_run(run + 1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
     }
