@@ -140,7 +140,18 @@ struct DegreeLess : public std::binary_function<typename G::GraphNode,
            std::distance(g->edge_begin(n2), g->edge_end(n2));
   }
 };
+template <typename G>
+struct DegreeGreater : public std::binary_function<typename G::GraphNode,
+                                                typename G::GraphNode, bool> {
+  typedef typename G::GraphNode N;
+  G* g;
+  DegreeGreater(G& g) : g(&g) {}
 
+  bool operator()(const N& n1, const N& n2) const {
+    return std::distance(g->edge_begin(n1), g->edge_end(n1)) >
+           std::distance(g->edge_begin(n2), g->edge_end(n2));
+  }
+}
 template <typename G>
 struct GetDegree
     : public std::unary_function<typename G::GraphNode, ptrdiff_t> {
@@ -304,8 +315,17 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   // Getting around lack of resize for deque
   std::deque<N> nodes;
   std::copy(initial.begin(), initial.end(), std::back_inserter(nodes));
-  // Sort by degree
-  galois::ParallelSTL::sort(nodes.begin(), nodes.end(), DegreeLess<G>(initial));
+
+
+  /* Sort by degree:
+   *  DegreeLess: Sorts in the ascending order of node degrees
+   *  DegreeGreater: Sorts in the descending order of the node degrees
+   *
+   *  The order of sorting has a huge impact on performance
+   *  For this algorithm, sorting in descending order delivers the 
+   *  best performance due to the way ties are broken.
+   */
+  galois::ParallelSTL::sort(nodes.begin(), nodes.end(), DegreeGreater<G>(initial));
 
   std::deque<N> p;
   std::copy(nodes.begin(), nodes.end(), std::back_inserter(p));
