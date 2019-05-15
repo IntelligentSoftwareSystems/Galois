@@ -65,7 +65,7 @@ static llvm::cl::opt<std::size_t> num_groups{
     llvm::cl::init(2u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{
     "num_vert_directions", llvm::cl::desc("number of vertical directions"),
-    llvm::cl::init(4u)};
+    llvm::cl::init(2u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{
     "num_horiz_directions", llvm::cl::desc("number of horizontal directions."),
     llvm::cl::init(4u)};
@@ -435,14 +435,6 @@ auto generate_directions(std::size_t latitude_divisions,
             std::abs(totals[j]) < 1E-7));
   }
 
-  /*
-  std::cout << "directions:" << std::endl;
-  for (std::size_t i = 0; i < num_directions; i++) {
-    std::cout << directions[i][0] << " " << directions[i][1] << " " << directions[i][2] << std::endl;
-  }
-  std::cout << std::endl;
-  */
-
   return std::make_tuple(std::move(directions), num_directions);
 }
 
@@ -508,10 +500,7 @@ int main(int argc, char** argv) noexcept {
   std::size_t boundary_pulse_index =
       yz_face_center_boundary * num_per_element +
       approx_x_direction_index * num_per_element_and_direction;
-  for (std::size_t i = 0; i < num_groups; i++) {
-    radiation_magnitudes[boundary_pulse_index + 1 + i].magnitude =
-        pulse_strength;
-  }
+  radiation_magnitudes[boundary_pulse_index + 1].magnitude = pulse_strength;
 
   // Constants used in the differencing scheme at each cell/direction.
   std::array<double, 3> grid_spacing{1. / nx, 1. / ny, 1. / nz};
@@ -538,6 +527,7 @@ int main(int argc, char** argv) noexcept {
                   .counter;
           // TODO: relax consistency model here.
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+            if (graph.getEdgeDst(edge) >= ghost_threshold) continue;
             counter +=
                 is_incoming(directions[dir_idx], graph.getEdgeData(edge));
           }
@@ -584,9 +574,9 @@ int main(int argc, char** argv) noexcept {
     *accumulation_buffers.getLocal() = std::make_unique<double[]>(num_groups);
   });
 
+  std::mutex abs_change_lock;
   std::atomic<double> global_abs_change = 0.;
 
-  //std::mutex print_lock;
   // Iterations in the algorithm.
   // TODO: Try doing this whole thing asynchronously
   // instead of just using a parallel loop for each step.
@@ -684,18 +674,17 @@ int main(int argc, char** argv) noexcept {
           double abs_change =
               std::abs(node_data.currently_accumulating_scattering -
                        node_data.previous_accumulated_scattering);
-          atomic_relaxed_double_max(global_abs_change, abs_change);
-          //{
-          //  std::lock_guard<std::mutex> lk{print_lock};
-          //  std::cout << abs_change << "  ";
-          //}
+          {
+            std::lock_guard<std::mutex> lk{abs_change_lock};
+            global_abs_change = std::max(abs_change, global_abs_change.load());
+            //atomic_relaxed_double_max(global_abs_change, abs_change);
+          }
         }
       },
       galois::loopname("Sweep"), galois::no_conflicts(),
       galois::wl<OBIM>(indexer)
     );
-    //std::cout << std::endl << std::endl;
-    //std::cout << global_abs_change << std::endl;
+    std::cout << global_abs_change << std::endl;
     global_abs_change = 0;
   }
 }
