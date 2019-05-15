@@ -1,10 +1,14 @@
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
+#include "thread_work.h"
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+bool enable_lb = false;
 #include "kernels/reduce.cuh"
 #include "bc_level_cuda.cuh"
 __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_betweeness_centrality, float * p_dependency, ShortPathType * p_num_shortest_paths)
@@ -266,6 +270,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -298,6 +303,7 @@ void InitializeIteration_cuda(unsigned int  __begin, unsigned int  __end, const 
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeIteration <<<blocks, threads>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -338,6 +344,7 @@ void ForwardPass_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & dga
   _dga.rv = dgaval.gpu_wr_ptr();
   // FP: "8 -> 9;
   ForwardPass <<<blocks, threads>>>(ctx->gg, __begin, __end, local_r, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), *(ctx->num_shortest_paths.is_updated.gpu_rd_ptr()), _dga);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -372,6 +379,7 @@ void MiddleSync_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t 
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   MiddleSync <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), *(ctx->num_shortest_paths.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -404,6 +412,7 @@ void BackwardPass_cuda(unsigned int  __begin, unsigned int  __end, uint32_t loca
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   BackwardPass <<<blocks, threads>>>(ctx->gg, __begin, __end, local_r, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), *(ctx->dependency.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -436,6 +445,7 @@ void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  c
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   BC <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -492,6 +502,7 @@ void Sanity_cuda(unsigned int  __begin, unsigned int  __end, float & DGAccumulat
   _DGAccumulator_min.rv = DGAccumulator_minval.gpu_wr_ptr();
   // FP: "16 -> 17;
   Sanity <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), _DGAccumulator_sum, _DGAccumulator_max, _DGAccumulator_min);
+  cudaDeviceSynchronize();
   // FP: "17 -> 18;
   check_cuda_kernel;
   // FP: "18 -> 19;

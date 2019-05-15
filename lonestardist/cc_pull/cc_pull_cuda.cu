@@ -1,10 +1,15 @@
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
+#include "thread_work.h"
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=True $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+struct ThreadWork t_work;
+bool enable_lb = true;
 #include "kernels/reduce.cuh"
 #include "cc_pull_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
@@ -27,7 +32,126 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   }
   // FP: "7 -> 8;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> active_vertices)
+__global__ void ConnectedComp_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> active_vertices, int * thread_prefix_work_wl, unsigned int num_items, PipeContextT<Worklist2> thread_src_wl)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ unsigned int total_work;
+  __shared__ unsigned block_start_src_index;
+  __shared__ unsigned block_end_src_index;
+  unsigned my_work;
+  unsigned src;
+  unsigned int offset;
+  unsigned int current_work;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  unsigned blockdim_x = BLOCK_DIM_X;
+  // FP: "3 -> 4;
+  // FP: "4 -> 5;
+  // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  // FP: "7 -> 8;
+  // FP: "8 -> 9;
+  // FP: "9 -> 10;
+  total_work = thread_prefix_work_wl[num_items - 1];
+  // FP: "10 -> 11;
+  my_work = ceilf((float)(total_work) / (float) nthreads);
+  // FP: "11 -> 12;
+
+  // FP: "12 -> 13;
+  __syncthreads();
+  // FP: "13 -> 14;
+
+  // FP: "14 -> 15;
+  if (my_work != 0)
+  {
+    current_work = tid;
+  }
+  // FP: "17 -> 18;
+  for (unsigned i =0; i < my_work; i++)
+  {
+    unsigned int block_start_work;
+    unsigned int block_end_work;
+    if (threadIdx.x == 0)
+    {
+      if (current_work < total_work)
+      {
+        block_start_work = current_work;
+        block_end_work=current_work + blockdim_x - 1;
+        if (block_end_work >= total_work)
+        {
+          block_end_work = total_work - 1;
+        }
+        block_start_src_index = compute_src_and_offset(0, num_items - 1,  block_start_work+1, thread_prefix_work_wl, num_items,offset);
+        block_end_src_index = compute_src_and_offset(0, num_items - 1, block_end_work+1, thread_prefix_work_wl, num_items, offset);
+      }
+    }
+    __syncthreads();
+
+    if (current_work < total_work)
+    {
+      unsigned src_index;
+      index_type jj;
+      src_index = compute_src_and_offset(block_start_src_index, block_end_src_index, current_work+1, thread_prefix_work_wl,num_items, offset);
+      src= thread_src_wl.in_wl().dwl[src_index];
+      jj = (graph).getFirstEdge(src)+ offset;
+      {
+        index_type dst;
+        uint32_t new_comp;
+        uint32_t old_comp;
+        dst = graph.getAbsDestination(jj);
+        new_comp = p_comp_current[dst];
+        old_comp = atomicTestMin(&p_comp_current[src], new_comp);
+        if (old_comp > new_comp)
+        {
+          bitset_comp_current.set(src);
+          active_vertices.reduce( 1);
+        }
+      }
+      current_work = current_work + nthreads;
+    }
+  }
+  // FP: "49 -> 50;
+}
+__global__ void Inspect_ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> active_vertices, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
+  index_type src_end;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  active_vertices.thread_entry();
+  // FP: "3 -> 4;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
+  {
+    int index;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
+    if (pop)
+    {
+    }
+    if (!pop)
+    {
+      continue;
+    }
+    if (pop)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+    }
+  }
+  // FP: "15 -> 16;
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
+  // FP: "16 -> 17;
+}
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> active_vertices, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -42,6 +166,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -60,7 +185,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "8 -> 9;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "9 -> 10;
     if (pop)
     {
@@ -283,6 +408,7 @@ __global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, u
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
 {
+  t_work.init_thread_work(ctx->gg.nnodes);
   dim3 blocks;
   dim3 threads;
   // FP: "1 -> 2;
@@ -291,6 +417,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -330,7 +457,22 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int
   // FP: "7 -> 8;
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _active_vertices);
+  if (enable_lb)
+  {
+    t_work.reset_thread_work();
+    Inspect_ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _active_vertices, t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+    cudaDeviceSynchronize();
+    int num_items = t_work.thread_work_wl.in_wl().nitems();
+    if (num_items != 0)
+    {
+      t_work.compute_prefix_sum();
+      cudaDeviceSynchronize();
+      ConnectedComp_TB_LB <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _active_vertices, t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
+      cudaDeviceSynchronize();
+    }
+  }
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _active_vertices, enable_lb);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -373,6 +515,7 @@ void ConnectedCompSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, u
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
   ConnectedCompSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), _active_vertices);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;

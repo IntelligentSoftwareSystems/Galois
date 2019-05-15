@@ -1,26 +1,40 @@
-/*
- * quick_pattern.hpp
- *
- *  Created on: Aug 4, 2017
- *      Author: icuzzq
- */
-
-#ifndef CORE_QUICK_PATTERN_HPP_
-#define CORE_QUICK_PATTERN_HPP_
+#ifndef QUICK_PATTERN_HPP_
+#define QUICK_PATTERN_HPP_
 
 #include "type.h"
 
-class Quick_Pattern {
-friend std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern);
+class QuickPattern {
+friend std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern);
 public:
-	Quick_Pattern() { }
-	Quick_Pattern(unsigned subgraph_size) {
-		size = subgraph_size/ sizeof(ElementType);
+	QuickPattern() { }
+	QuickPattern(unsigned subgraph_size) {
+		hash_value = 0;
+		cg_id = 0;
+		size = subgraph_size / sizeof(ElementType);
 		elements = new ElementType[size];
 	}
-	~Quick_Pattern() {}
+	QuickPattern(const Embedding & emb) {
+		cg_id = 0;
+		size = emb.size();
+		unsigned bytes = size * sizeof(ElementType);
+		elements = new ElementType[size];
+		std::memcpy(elements, emb.data(), bytes);
+		std::unordered_map<VertexId, VertexId> map;
+		VertexId new_id = 1;
+		for(unsigned i = 0; i < size; i++) {
+			auto& element = elements[i];
+			VertexId old_id = element.vertex_id;
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				element.set_vertex_id(new_id);
+				map[old_id] = new_id++;
+			} else element.set_vertex_id(iterator->second);
+		}
+		set_hash();
+	}
+	~QuickPattern() {}
 	//operator for map
-	bool operator==(const Quick_Pattern& other) const {
+	bool operator==(const QuickPattern& other) const {
 		//compare edges
 		assert(size == other.size);
 		for (unsigned i = 0; i < size; ++i) {
@@ -41,8 +55,8 @@ public:
 		}
 		return a; 
 	}
-	unsigned get_hash() const {
-		//TODO
+	inline unsigned get_hash() const { return hash_value; }
+	inline void set_hash() {
 		bliss::UintSeqHash h;
 		h.update(size);
 		//hash vertex labels and edges
@@ -54,21 +68,25 @@ public:
 #endif
 			h.update(element.history_info);
 		}
-		return h.get_value();
+		hash_value = h.get_value();
+		//return h.get_value();
 	}
-	ElementType& at(unsigned index) const {
-		return elements[index];
-	}
+	ElementType& at(unsigned index) const { return elements[index]; }
 	inline unsigned get_size() const { return size; }
 	inline ElementType* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
+	inline unsigned get_id() const { return hash_value; }
+	inline unsigned get_cgid() const { return cg_id; }
+	void set_cgid(unsigned i) { cg_id = i; }
 
 private:
 	unsigned size;
 	ElementType* elements;
+	unsigned hash_value; // quick pattern ID
+	unsigned cg_id; // ID of the canonical pattern that this quick pattern belongs to
 };
 
-std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern) {
+std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern) {
 	if(quick_pattern.get_size() == 0) {
 		strm << "(empty)";
 		return strm;
@@ -83,10 +101,10 @@ std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_patter
 
 namespace std {
 	template<>
-	struct hash<Quick_Pattern> {
-		std::size_t operator()(const Quick_Pattern& qp) const {
+	struct hash<QuickPattern> {
+		std::size_t operator()(const QuickPattern& qp) const {
 			return std::hash<int>()(qp.get_hash());
 		}
 	};
 }
-#endif /* CORE_QUICK_PATTERN_HPP_ */
+#endif // QUICK_PATTERN_HPP_

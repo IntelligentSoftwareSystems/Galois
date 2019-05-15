@@ -27,49 +27,69 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define CHUNK_SIZE 256
+#define USE_SIMPLE
 
-const char* name = "TC";
-const char* desc = "Counts the triangles in a graph (only works for undirected neighbor-sorted graphs)";
+const char* name = "Kcl";
+const char* desc = "Counts the K-Cliques in a graph using BFS traversal";
 const char* url  = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
+static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
+static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#include "Mining/miner.h"
 #include "Mining/util.h"
+#define CHUNK_SIZE 256
 
-void TcSolver(Graph& graph) {
-	galois::GAccumulator<unsigned int> total_num;
-	total_num.reset();
-	//galois::do_all(
-	galois::for_each(
+// insert edges into the worklist (task queue)
+void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
+	if(show) printf("\n=============================== Init ================================\n");
+	galois::do_all(
 		galois::iterate(graph.begin(), graph.end()),
-		//[&](const GNode& src) {
-		[&](const GNode& src, auto& ctx) {
-			for (auto e1 : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e1);
-				if (dst > src) break;
-				for (auto e2 : graph.edges(dst)) {
-					GNode dst_dst = graph.getEdgeDst(e2);
-					if (dst_dst > dst) break;
-					for (auto e3 : graph.edges(src)) {
-						GNode dst2 = graph.getEdgeDst(e3);
-						if (dst_dst == dst2) {
-							total_num += 1;
-							break;
-						}
-						if (dst2 > dst_dst) break;
-					}
+		[&](const GNode& src) {
+			for (auto e : graph.edges(src)) {
+				GNode dst = graph.getEdgeDst(e);
+				if (src < dst) {
+					BaseEmbedding new_emb;
+					new_emb.push_back(src);
+					new_emb.push_back(dst);
+					queue.push_back(new_emb);
 				}
 			}
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-		galois::loopname("Couting")
+		galois::chunk_size<512>(), galois::steal(), galois::loopname("Initialization")
 	);
-	galois::gPrint("\ttotal_num_triangles = ", total_num.reduce(), "\n\n");
+}
+
+void KclSolver(Graph& graph, Miner &miner) {
+	if(show) std::cout << "\n=============================== Start ===============================\n";
+	BaseEmbeddingQueue queue, queue2;
+	initialization(graph, queue);
+	if(show) printout_embeddings(0, miner, queue);
+	unsigned level = 1;
+	while (level < k-1) {
+		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
+		galois::for_each(
+			galois::iterate(queue),
+			[&](const BaseEmbedding& emb, auto& ctx) {
+				miner.extend_vertex_clique(emb, queue2);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Expanding")
+		);
+		miner.update_embedding_size(); // increase the embedding size since one more edge added
+		if(show) printout_embeddings(level, miner, queue2);
+		queue.swap(queue2);
+		queue2.clear();
+		level ++;
+	}
+	if(show) std::cout << "\n=============================== Done ================================\n";
+	galois::gPrint("\n\ttotal_num_cliques = ", std::distance(queue.begin(), queue.end()), "\n\n");
 }
 
 int main(int argc, char** argv) {
@@ -80,11 +100,12 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	read_graph(graph, filetype, filename);
 	Tinitial.stop();
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
+	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
+	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	TcSolver(graph);
+	KclSolver(graph, miner);
 	Tcomp.stop();
 	return 0;
 }

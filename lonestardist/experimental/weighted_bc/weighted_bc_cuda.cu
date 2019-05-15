@@ -1,10 +1,14 @@
 /*  -*- mode: c++ -*-  */
 #include "gg.h"
 #include "ggcuda.h"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
+#include "thread_work.h"
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+bool enable_lb = false;
 #include "kernels/reduce.cuh"
 #include "weighted_bc_cuda.cuh"
 static const int __tb_FirstIterationSSSP = TB_SIZE;
@@ -75,7 +79,7 @@ __global__ void InitializeIteration(CSRGraph graph, unsigned int __begin, unsign
   }
   // FP: "21 -> 22;
 }
-__global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, DynamicBitset& bitset_current_length)
+__global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, DynamicBitset& bitset_current_length, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -89,6 +93,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -104,7 +109,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
@@ -295,7 +300,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
   }
   // FP: "112 -> 113;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, DynamicBitset& bitset_current_length, HGAccumulator<uint32_t> active_vertices)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, DynamicBitset& bitset_current_length, HGAccumulator<uint32_t> active_vertices, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -310,6 +315,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -328,7 +334,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "8 -> 9;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "9 -> 10;
     if (pop)
     {
@@ -544,7 +550,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   active_vertices.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(active_vertices_ts);
   // FP: "131 -> 132;
 }
-__global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors, DynamicBitset& bitset_num_predecessors, DynamicBitset& bitset_num_successors)
+__global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors, DynamicBitset& bitset_num_predecessors, DynamicBitset& bitset_num_successors, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -558,6 +564,7 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
   // FP: "2 -> 3;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
+  unsigned d_limit = DEGREE_LIMIT;
   // FP: "3 -> 4;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
@@ -573,7 +580,7 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end;
+    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
@@ -1103,6 +1110,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1135,6 +1143,7 @@ void InitializeIteration_cuda(unsigned int  __begin, unsigned int  __end, const 
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeIteration <<<blocks, threads>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1166,7 +1175,8 @@ void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct 
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()));
+  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), enable_lb);
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1206,7 +1216,8 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & active_ver
   // FP: "7 -> 8;
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), _active_vertices);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), _active_vertices, enable_lb);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -1240,7 +1251,8 @@ void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), *(ctx->num_predecessors.is_updated.gpu_rd_ptr()), *(ctx->num_successors.is_updated.gpu_rd_ptr()));
+  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), *(ctx->num_predecessors.is_updated.gpu_rd_ptr()), *(ctx->num_successors.is_updated.gpu_rd_ptr()), enable_lb);
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1273,6 +1285,7 @@ void NumShortestPathsChanges_cuda(unsigned int  __begin, unsigned int  __end, co
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   NumShortestPathsChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->num_shortest_paths.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1313,6 +1326,7 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, uint32_t 
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
   NumShortestPaths <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _active_vertices);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -1347,6 +1361,7 @@ void PropagationFlagUpdate_cuda(unsigned int  __begin, unsigned int  __end, cons
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   PropagationFlagUpdate <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), *(ctx->propagation_flag.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1379,6 +1394,7 @@ void DependencyPropChanges_cuda(unsigned int  __begin, unsigned int  __end, cons
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   DependencyPropChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->dependency.is_updated.gpu_rd_ptr()), *(ctx->propagation_flag.is_updated.gpu_rd_ptr()));
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1419,6 +1435,7 @@ void DependencyPropagation_cuda(unsigned int  __begin, unsigned int  __end, uint
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
   DependencyPropagation <<<blocks, threads>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add_float.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _active_vertices);
+  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -1453,6 +1470,7 @@ void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  c
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   BC <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr());
+  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1509,6 +1527,7 @@ void Sanity_cuda(unsigned int  __begin, unsigned int  __end, float & DGAccumulat
   _DGAccumulator_min.rv = DGAccumulator_minval.gpu_wr_ptr();
   // FP: "16 -> 17;
   Sanity <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), _DGAccumulator_sum, _DGAccumulator_max, _DGAccumulator_min);
+  cudaDeviceSynchronize();
   // FP: "17 -> 18;
   check_cuda_kernel;
   // FP: "18 -> 19;
