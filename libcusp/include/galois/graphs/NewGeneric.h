@@ -1499,6 +1499,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::localToGlobalVector.resize(base_DistGraph::numOwned);
     prefixSumOfEdges.resize(base_DistGraph::numOwned);
 
+    auto& ltgv = base_DistGraph::localToGlobalVector;
     galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                       base_DistGraph::gid2host[base_DistGraph::id].second),
@@ -1512,7 +1513,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           }
         }
         prefixSumOfEdges[n - globalOffset] = (*ee) - edgeOffset;
-        base_DistGraph::localToGlobalVector[n - globalOffset] = n;
+        ltgv[n - globalOffset] = n;
       },
       #if MORE_DIST_STATS
       galois::loopname("EdgeInspectionLoop"),
