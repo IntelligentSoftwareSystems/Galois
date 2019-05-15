@@ -375,7 +375,7 @@ int main(int argc, char** argv) {
 
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  Graph* hg = distGraphInitialization<NodeData, unsigned int>(&cuda_ctx);
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, unsigned int>(&cuda_ctx);
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, unsigned int>();
 #endif

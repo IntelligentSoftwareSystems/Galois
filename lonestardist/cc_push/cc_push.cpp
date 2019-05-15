@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
 
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  Graph* hg = symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
+  std::tie(hg, syncSubstrate) = symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
   std::tie(hg, syncSubstrate) = symmetricDistGraphInitialization<NodeData, void>();
 #endif

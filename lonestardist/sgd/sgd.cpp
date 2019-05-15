@@ -325,7 +325,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  Graph* hg = distGraphInitialization<NodeData, double>(&cuda_ctx);
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, double>(&cuda_ctx);
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, double>();
 #endif

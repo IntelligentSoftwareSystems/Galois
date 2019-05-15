@@ -3279,7 +3279,7 @@ public:
     galois::do_all(
       // TODO not using thread ranges, can be optimized if I can iterate
       // directly over userGraph
-      galois::iterate(userGraph.begin(), userGraph.end()),
+      galois::iterate(userGraph.allNodesRange()),
       [&](const GraphNode& nodeID) {
         // initialize node_data with localID-to-globalID mapping
         m.node_data[nodeID] = userGraph.getGID(nodeID);
