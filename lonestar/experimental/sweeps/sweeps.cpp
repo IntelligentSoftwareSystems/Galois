@@ -70,7 +70,7 @@ static llvm::cl::opt<std::size_t> num_horiz_directions{
     "num_horiz_directions", llvm::cl::desc("number of horizontal directions."),
     llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_iters{
-    "num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(1u)};
+    "num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(10u)};
 static llvm::cl::opt<double> pulse_strength{
     "pulse_strength", llvm::cl::desc("radiation pulse strength"),
     llvm::cl::init(1.)};
@@ -265,47 +265,46 @@ auto generate_grid(graph_t& built_graph, std::size_t nx, std::size_t ny,
       for (std::size_t k = 0; k < nz; k++) {
         std::size_t id = i * nx * ny + j * ny + k;
         if (i > 0) {
-          edge_data.set(temp_graph.addNeighbor(id, id - ny * nz),
-                        {-1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, id - ny * nz), {-1., 0., 0.});
         } else {
           std::size_t ghost_id = yz_low_face_start + j * nz + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {-1., 0., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
         }
         if (i < nx - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + ny * nz), {1., 0., 0.});
         } else {
           std::size_t ghost_id = yz_high_face_start + j * nz + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {1., 0., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {-1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {-1., 0., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {1., 0., 0.});
         }
         if (j > 0) {
           edge_data.set(temp_graph.addNeighbor(id, id - nz), {0., -1., 0.});
         } else {
           std::size_t ghost_id = xz_low_face_start + i * nz + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., -1., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 1., 0.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
         }
         if (j < ny - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + nz), {0., 1., 0.});
         } else {
           std::size_t ghost_id = xz_high_face_start + i * nz + k;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 1., 0.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., -1., 0.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., -1., 0.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 1., 0.});
         }
         if (k > 0) {
           edge_data.set(temp_graph.addNeighbor(id, id - 1), {0., 0., -1.});
         } else {
           std::size_t ghost_id = xy_low_face_start + i * ny + j;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., -1.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., 1.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
         }
         if (k < nz - 1) {
           edge_data.set(temp_graph.addNeighbor(id, id + 1), {0., 0., 1.});
         } else {
           std::size_t ghost_id = xy_high_face_start + i * ny + j;
-          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., 1.});
-          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., -1.});
+          edge_data.set(temp_graph.addNeighbor(ghost_id, id), {0., 0., -1.});
+          edge_data.set(temp_graph.addNeighbor(id, ghost_id), {0., 0., 1.});
         }
       }
     }
@@ -456,7 +455,7 @@ bool is_incoming(std::array<double, 3> direction,
 // that's closest to {1., 0., 0.};
 std::size_t find_x_direction(std::array<double, 3> const* directions,
                              std::size_t num_directions) noexcept {
-  auto comparison = [](auto a1, auto a2) noexcept { return a1[0] > a2[0]; };
+  auto comparison = [](auto a1, auto a2) noexcept { return a1[0] < a2[0]; };
   return std::max_element(directions, directions + num_directions, comparison) -
          directions;
 }
@@ -626,7 +625,7 @@ int main(int argc, char** argv) noexcept {
             }
             continue;
           }
-          incoming_edges++;
+          if (other_node < ghost_threshold) incoming_edges++;
           // More partial computation of this node's estimated radiative
           // fluxes in the given direction. This time based off of the
           // incoming fluxes from its upwind neighbors.
@@ -635,12 +634,12 @@ int main(int argc, char** argv) noexcept {
               face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
           double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
           double term_coef = direction[axis] * sign;
-          new_magnitude_denominator -= term_coef / grid_spacing[axis];
+          new_magnitude_denominator += term_coef / grid_spacing[axis];
           for (std::size_t i = 0; i < num_groups; i++) {
             std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
             double& other_magnitude =
                 radiation_magnitudes[other_mag_and_group_idx].magnitude;
-            new_magnitude_numerators[i] -=
+            new_magnitude_numerators[i] +=
                 term_coef * other_magnitude / grid_spacing[axis];
           }
         }
@@ -668,6 +667,7 @@ int main(int argc, char** argv) noexcept {
                                         scattering_contribution);
 
         // TODO: Relax memory consistency requirements here.
+        // NOT MUCH THOUGH.
         if (--node_data.scatter_use_counter == 0) {
           // Reset counter for next time step.
           node_data.scatter_use_counter = num_directions;
@@ -679,6 +679,11 @@ int main(int argc, char** argv) noexcept {
             global_abs_change = std::max(abs_change, global_abs_change.load());
             //atomic_relaxed_double_max(global_abs_change, abs_change);
           }
+          // Move currently_accumulating_scattering value into
+          // previous_accumulating_scattering
+          // and then zero currently_accumulating_scattering for the next iteration.
+          node_data.previous_accumulated_scattering = node_data.currently_accumulating_scattering;
+          node_data.currently_accumulating_scattering = 0.;
         }
       },
       galois::loopname("Sweep"), galois::no_conflicts(),
