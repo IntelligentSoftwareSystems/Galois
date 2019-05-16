@@ -84,6 +84,11 @@ static llvm::cl::opt<double> scattering_coef{
     llvm::cl::desc("Scattering coefficient (between 0 and 1), absorption and "
                    "scattering must sum to less than 1."),
     llvm::cl::init(.25)};
+static llvm::cl::opt<bool> print_convergence{
+    "print_convergence",
+    llvm::cl::desc("Print the max change in amount of scattering at a given "
+                   "each iteration."),
+    llvm::cl::init(false)};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
@@ -684,7 +689,7 @@ int main(int argc, char** argv) noexcept {
       galois::loopname("Sweep"), galois::no_conflicts(),
       galois::wl<OBIM>(indexer)
     );
-    std::cout << global_abs_change << std::endl;
+    if (print_convergence) std::cout << global_abs_change << std::endl;
     global_abs_change = 0;
   }
 }
