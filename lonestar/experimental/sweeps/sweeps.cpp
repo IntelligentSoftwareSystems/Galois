@@ -53,22 +53,22 @@ static char const* url = "sweeps";
 
 static llvm::cl::opt<std::size_t> nx{
     "nx", llvm::cl::desc("number of cells in x direction"),
-    llvm::cl::init(4u)};
+    llvm::cl::init(10u)};
 static llvm::cl::opt<std::size_t> ny{
     "ny", llvm::cl::desc("number of cells in y direction"),
-    llvm::cl::init(4u)};
+    llvm::cl::init(10u)};
 static llvm::cl::opt<std::size_t> nz{
     "nz", llvm::cl::desc("number of cells in z direction"),
-    llvm::cl::init(4u)};
+    llvm::cl::init(10u)};
 static llvm::cl::opt<std::size_t> num_groups{
     "num_groups", llvm::cl::desc("number of frequency groups"),
-    llvm::cl::init(2u)};
+    llvm::cl::init(4u)};
 static llvm::cl::opt<std::size_t> num_vert_directions{
     "num_vert_directions", llvm::cl::desc("number of vertical directions"),
-    llvm::cl::init(2u)};
+    llvm::cl::init(16u)};
 static llvm::cl::opt<std::size_t> num_horiz_directions{
     "num_horiz_directions", llvm::cl::desc("number of horizontal directions."),
-    llvm::cl::init(4u)};
+    llvm::cl::init(32u)};
 static llvm::cl::opt<std::size_t> num_iters{
     "num_iters", llvm::cl::desc("number of iterations"), llvm::cl::init(10u)};
 static llvm::cl::opt<double> pulse_strength{
@@ -83,7 +83,7 @@ static llvm::cl::opt<double> scattering_coef{
     "scattering_coef",
     llvm::cl::desc("Scattering coefficient (between 0 and 1), absorption and "
                    "scattering must sum to less than 1."),
-    llvm::cl::init(.01)};
+    llvm::cl::init(.25)};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
