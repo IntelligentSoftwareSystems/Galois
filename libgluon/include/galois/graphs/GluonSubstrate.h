@@ -1787,7 +1787,13 @@ private:
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
       } else { // onlyData or noData (auto)
+        size_t bitset_alloc_size =
+            ((num + 63) / 64) * sizeof(uint64_t);
         b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t) // bitset size
+            + sizeof(size_t) // bitset vector size
+            + bitset_alloc_size
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
       }
