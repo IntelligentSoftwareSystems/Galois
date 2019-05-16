@@ -573,7 +573,6 @@ int main(int argc, char** argv) noexcept {
     *accumulation_buffers.getLocal() = std::make_unique<double[]>(num_groups);
   });
 
-  std::mutex abs_change_lock;
   std::atomic<double> global_abs_change = 0.;
 
   // Iterations in the algorithm.
@@ -674,11 +673,7 @@ int main(int argc, char** argv) noexcept {
           double abs_change =
               std::abs(node_data.currently_accumulating_scattering -
                        node_data.previous_accumulated_scattering);
-          {
-            std::lock_guard<std::mutex> lk{abs_change_lock};
-            global_abs_change = std::max(abs_change, global_abs_change.load());
-            //atomic_relaxed_double_max(global_abs_change, abs_change);
-          }
+          atomic_relaxed_double_max(global_abs_change, abs_change);
           // Move currently_accumulating_scattering value into
           // previous_accumulating_scattering
           // and then zero currently_accumulating_scattering for the next iteration.
