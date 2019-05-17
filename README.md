@@ -138,7 +138,7 @@ We provide a few sample inputs that can be downloaded by running:
 make input
 ```
 
-'make input' will download a big (~2GB) tar-ball of inputs  and extract it to
+'make input' will download a tar-ball of inputs  and extract it to
 `$BUILD_DIR/inputs/reference` directory. The tar-ball is downloaded to
 `$BUILD_DIR/inputs`
 
