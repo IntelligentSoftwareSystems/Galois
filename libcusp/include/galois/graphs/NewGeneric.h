@@ -48,6 +48,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_Generic";
   Partitioner* graphPartitioner;
 
+  //! How many rounds to sync state during edge assignment phase
+  uint32_t _edgeStateRounds;
+  std::vector<galois::DGAccumulator<uint64_t>> hostLoads;
+  std::vector<uint64_t> old_hostLoads;
+
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
     assert(isLocal(gid));
     // optimized for edge cuts
@@ -99,61 +104,43 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     return graphPartitioner->cartesianGrid();
   }
 
-  // TODO : user should not need to know about write and read locations,
-  // so move this out or hide somehow....
-  //virtual bool nothingToSend(unsigned host,
-  //                           typename base_DistGraph::SyncType syncType,
-  //                           WriteLocation writeLocation,
-  //                           ReadLocation readLocation) {
-  //  auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
-  //                      base_DistGraph::mirrorNodes :
-  //                      base_DistGraph::masterNodes;
+  /**
+   * Reset load balance on host reducibles.
+   */
+  void resetEdgeLoad() {
+    if (_edgeStateRounds > 1) {
+      for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+        hostLoads[i].reset();
+        old_hostLoads[i] = 0;
+      }
+    }
+  }
 
-  //  unsigned map = 2;
-  //  if (syncType == base_DistGraph::syncReduce) {
-  //    map = 0;
-  //  } else {
-  //    map = 1;
-  //  }
+  /**
+   * Sync load balance on hosts using reducibles.
+   */
+  void syncEdgeLoad() {
+    if (_edgeStateRounds > 1) {
+      for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+        old_hostLoads[i] += hostLoads[i].reduce();
+        hostLoads[i].reset();
+      }
+    }
+  }
 
-  //  if (graphPartitioner->isCartCut()) {
-  //    if (sharedNodes[host].size() > 0) {
-  //      return graphPartitioner->isNotCommunicationPartner(host, map,
-  //                               writeLocation, readLocation,
-  //                               base_DistGraph::transposed);
-  //    }
-  //  } else {
-  //    return (sharedNodes[host].size() == 0);
-  //  }
-  //  return true;
-  //}
-
-  //virtual bool nothingToRecv(unsigned host,
-  //                           typename base_DistGraph::SyncType syncType,
-  //                           WriteLocation writeLocation,
-  //                           ReadLocation readLocation) {
-  //  auto& sharedNodes = (syncType == base_DistGraph::syncReduce) ?
-  //                      base_DistGraph::masterNodes :
-  //                      base_DistGraph::mirrorNodes;
-
-  //  unsigned map = 2;
-  //  if (syncType == base_DistGraph::syncReduce) {
-  //    map = 0;
-  //  } else {
-  //    map = 1;
-  //  }
-
-  //  if (graphPartitioner->isCartCut()) {
-  //    if (sharedNodes[host].size() > 0) {
-  //      return graphPartitioner->isNotCommunicationPartner(host, map,
-  //                               writeLocation, readLocation,
-  //                               base_DistGraph::transposed);
-  //    }
-  //  } else {
-  //    return (sharedNodes[host].size() == 0);
-  //  }
-  //  return true;
-  //}
+  /**
+   * Debug function: prints host loads.
+   */
+  void printEdgeLoad() {
+    if (_edgeStateRounds > 1) {
+      if (base_DistGraph::id == 0) {
+        for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+          galois::gDebug("[", base_DistGraph::id, "] ", i, " ",
+                         old_hostLoads[i], "\n");
+        }
+      }
+    }
+  }
 
   /**
    * Constructor
@@ -164,8 +151,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
              galois::graphs::MASTERS_DISTRIBUTION md=BALANCED_EDGES_OF_MASTERS,
              uint32_t nodeWeight=0, uint32_t edgeWeight=0,
              bool readFromFile=false,
-             std::string localGraphFileName="local_graph")
-      : base_DistGraph(host, _numHosts) {
+             std::string localGraphFileName="local_graph",
+             uint32_t edgeStateRounds=1)
+      : base_DistGraph(host, _numHosts), _edgeStateRounds(edgeStateRounds) {
     galois::runtime::reportParam("dGraph", "GenericPartitioner", "0");
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
         "GraphPartitioningTime", GRNAME);
@@ -208,6 +196,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // only need to use for things that need communication
     if (!graphPartitioner->noCommunication()) {
+      if (_edgeStateRounds > 1) {
+        hostLoads.resize(base_DistGraph::numHosts);
+        old_hostLoads.resize(base_DistGraph::numHosts);
+        resetEdgeLoad();
+      }
       numOutgoingEdges.resize(base_DistGraph::numHosts);
       hasIncomingEdge.resize(base_DistGraph::numHosts);
     }
@@ -302,6 +295,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     TfillMirrors.stop();
 
     base_DistGraph::printStatistics();
+
+    if (_edgeStateRounds > 1) {
+      // reset edge load since we need exact same answers again
+      resetEdgeLoad();
+    }
 
     // Edge loading
     if (!graphPartitioner->noCommunication()) {
@@ -1799,10 +1797,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
     uint32_t globalNodes = base_DistGraph::numGlobalNodes;
 
+    for (unsigned syncRound = 0; syncRound < _edgeStateRounds; syncRound++) {
+    uint32_t beginNode;
+    uint32_t endNode;
+    std::tie(beginNode, endNode) = galois::block_range(globalOffset,
+                                     base_DistGraph::gid2host[base_DistGraph::id].second,
+                                     syncRound, _edgeStateRounds);
+    // TODO maybe edge range this?
+
     galois::do_all(
         // iterate over my read nodes
-        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        galois::iterate(beginNode, endNode),
         [&](auto src) {
           auto ee        = bufGraph.edgeBegin(src);
           auto ee_end    = bufGraph.edgeEnd(src);
@@ -1812,6 +1817,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             uint32_t dst = bufGraph.edgeDestination(*ee);
             uint32_t hostBelongs = -1;
             hostBelongs = graphPartitioner->getEdgeOwner(src, dst, numEdgesL);
+            if (_edgeStateRounds > 1) {
+              hostLoads[hostBelongs] += 1;
+            }
 
             numOutgoingEdges[hostBelongs][src - globalOffset] += 1;
             hostHasOutgoing.set(hostBelongs);
@@ -1847,6 +1855,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::steal(),
         galois::no_stats()
     );
+    syncEdgeLoad();
+  }
+
   }
 
   /**
@@ -2669,10 +2680,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     bytesSent.reset();
     maxBytesSent.reset();
 
+    for (unsigned syncRound = 0; syncRound < _edgeStateRounds; syncRound++) {
+    uint32_t beginNode;
+    uint32_t endNode;
+    std::tie(beginNode, endNode) = galois::block_range(
+                                     base_DistGraph::gid2host[base_DistGraph::id].first,
+                                     base_DistGraph::gid2host[base_DistGraph::id].second,
+                                     syncRound, _edgeStateRounds);
+
     // Go over assigned nodes and distribute edges.
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),
+      galois::iterate(beginNode, endNode),
       [&](auto src) {
         uint32_t lsrc       = 0;
         uint64_t curEdge    = 0;
@@ -2700,6 +2718,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
           uint32_t hostBelongs =
             graphPartitioner->getEdgeOwner(src, gdst, numEdgesL);
+          if (_edgeStateRounds > 1) {
+            hostLoads[hostBelongs] += 1;
+          }
+
           if (hostBelongs == id) {
             // edge belongs here, construct on self
             assert(this->isLocal(src));
@@ -2752,6 +2774,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::steal(),
       galois::no_stats()
     );
+    syncEdgeLoad();
+    //printEdgeLoad();
+    }
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
@@ -2809,10 +2834,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     bytesSent.reset();
     maxBytesSent.reset();
 
+    for (unsigned syncRound = 0; syncRound < _edgeStateRounds; syncRound++) {
+    uint32_t beginNode;
+    uint32_t endNode;
+    std::tie(beginNode, endNode) = galois::block_range(
+                                     base_DistGraph::gid2host[base_DistGraph::id].first,
+                                     base_DistGraph::gid2host[base_DistGraph::id].second,
+                                     syncRound, _edgeStateRounds);
+
     // Go over assigned nodes and distribute edges.
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),
+      galois::iterate(beginNode, endNode),
       [&](auto src) {
         uint32_t lsrc       = 0;
         uint64_t curEdge    = 0;
@@ -2835,6 +2867,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           uint32_t gdst = bufGraph.edgeDestination(*ee);
           uint32_t hostBelongs =
             graphPartitioner->getEdgeOwner(src, gdst, numEdgesL);
+          if (_edgeStateRounds > 1) {
+            hostLoads[hostBelongs] += 1;
+          }
 
           if (hostBelongs == id) {
             // edge belongs here, construct on self
@@ -2886,6 +2921,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::steal(),
       galois::no_stats()
     );
+    syncEdgeLoad();
+    }
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
