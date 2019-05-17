@@ -363,6 +363,15 @@ else()
 endif()
 set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
+###### Test Outputs ######
+if(EXISTS /net/ohm/export/iss/dist-outputs)
+  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
+elseif(EXISTS /net/ohm/export/cdgc/dist-outputs)
+  set(BASEOUTPUT /net/ohm/export/cdgc/dist-outputs)
+elseif(EXISTS /workspace/dist-outputs)
+  set(BASEOUTPUT /workspace/dist-outputs)
+endif()
+
 ###### Global Functions ######
 
 function(add_internal_library name)
