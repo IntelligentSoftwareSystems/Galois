@@ -36,7 +36,6 @@ struct APSPReduce {
       // get min distance and # shortest paths
       b = node.sourceData[indexToGet].minDistance;
       c = node.sourceData[indexToGet].shortPathCount;
-      node.sourceData[indexToGet].shortPathCount = 0;
     } else {
       // no-op
       b = infinity;
