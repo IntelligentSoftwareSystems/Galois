@@ -232,7 +232,7 @@ before_script:
     fi
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 .. || exit 1
+  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
 
 script:
   - make input
