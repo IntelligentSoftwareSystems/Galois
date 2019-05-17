@@ -843,7 +843,7 @@ public:
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { std::cout << "here\n";galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
 
   std::string name() const { return "sgdBlockEdge"; }
 
@@ -1337,11 +1337,36 @@ size_t initializeGraphData(Graph& g) {
     });
   }
 
-  // Count number of item nodes, i.e. nodes with edges
-  size_t numItemNodes = galois::ParallelSTL::count_if(
-      g.begin(), g.end(), [&](typename Graph::GraphNode n) -> bool {
-        return std::distance(g.edge_begin(n), g.edge_end(n)) != 0;
-      });
+
+   auto activeThreads = galois::getActiveThreads();
+   std::vector<uint32_t> largestNodeID_perThread(activeThreads);
+
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      unsigned int block_size = g.size() / nthreads;
+      if ((g.size() % nthreads) > 0)
+        ++block_size;
+      assert((block_size * nthreads) >= bitset_comm.size());
+
+      uint32_t start = tid * block_size;
+      uint32_t end   = (tid + 1) * block_size;
+      if (end > g.size())
+        end = g.size();
+
+      largestNodeID_perThread[tid] = 0;
+      for (uint32_t i = start; i < end; ++i) {
+        if(std::distance(g.edge_begin(i), g.edge_end(i))) {
+          if(largestNodeID_perThread[tid] < i)
+            largestNodeID_perThread[tid] = i;
+          }
+      }
+    });
+
+    uint32_t largestNodeID = 0;
+    for(uint32_t t = 0; t < activeThreads; ++t){
+      if(largestNodeID < largestNodeID_perThread[t])
+        largestNodeID = largestNodeID_perThread[t];
+    }
+    size_t numItemNodes = largestNodeID + 1;
 
   initTimer.stop();
   return numItemNodes;
