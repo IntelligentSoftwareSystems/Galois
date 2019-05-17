@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <type_traits>
 #include <utility>
@@ -89,6 +90,10 @@ static llvm::cl::opt<bool> print_convergence{
     llvm::cl::desc("Print the max change in amount of scattering at a given "
                    "each iteration."),
     llvm::cl::init(false)};
+static llvm::cl::opt<std::string> scattering_outfile{
+    "scattering_outfile",
+    llvm::cl::desc("Text file name to use to write final scattering term values after each step."),
+    llvm::cl::init("")};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
@@ -580,6 +585,12 @@ int main(int argc, char** argv) noexcept {
 
   std::atomic<double> global_abs_change = 0.;
 
+  if (scattering_outfile != "") {
+    // empty the output file of previous data.
+    std::ofstream outfile{scattering_outfile, std::ofstream::trunc};
+    if (!outfile) GALOIS_DIE("Unable to write to desired output file.");
+  }
+
   // Iterations in the algorithm.
   // TODO: Try doing this whole thing asynchronously
   // instead of just using a parallel loop for each step.
@@ -690,6 +701,17 @@ int main(int argc, char** argv) noexcept {
       galois::wl<OBIM>(indexer)
     );
     if (print_convergence) std::cout << global_abs_change << std::endl;
+
+    if (scattering_outfile != "") {
+      if (std::ofstream outfile{scattering_outfile, std::ios_base::app}) {
+        for (std::size_t node = 0; node < num_cells; node++) {
+          outfile << graph.getData(node, galois::MethodFlag::UNPROTECTED).previous_accumulated_scattering << std::endl;
+        }
+      } else {
+        GALOIS_DIE("Unable to write to desired output file.");
+      }
+    }
+
     global_abs_change = 0;
   }
 }
