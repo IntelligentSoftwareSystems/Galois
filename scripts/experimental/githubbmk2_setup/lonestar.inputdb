@@ -1,6 +1,6 @@
 [bmktest2]
 version = 2
-basepath = /net/ohm/export/iss/inputs
+basepath = ../../../build/small_inputs
 
 [rmat10]
 flags =

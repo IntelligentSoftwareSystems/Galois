@@ -72,6 +72,7 @@ void test(std::unique_ptr<galois::substrate::Barrier> b) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   if (argc > 1)
     iter = atoi(argv[1]);
   if (!iter)

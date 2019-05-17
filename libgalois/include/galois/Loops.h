@@ -48,10 +48,10 @@ namespace galois {
  */
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
+void for_each(const RangeFunc& rangeMaker, FunctionTy &&fn,
               const Args&... args) {
   auto tpl = std::make_tuple(args...);
-  runtime::for_each_gen(rangeMaker(tpl), fn, tpl);
+  runtime::for_each_gen(rangeMaker(tpl), std::forward<FunctionTy>(fn), tpl);
 }
 
 /**
@@ -67,10 +67,10 @@ void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
  * @param args optional arguments to loop
  */
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn,
+void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn,
             const Args&... args) {
   auto tpl = std::make_tuple(args...);
-  runtime::do_all_gen(rangeMaker(tpl), fn, tpl);
+  runtime::do_all_gen(rangeMaker(tpl), std::forward<FunctionTy>(fn), tpl);
 }
 
 /**
@@ -83,22 +83,8 @@ void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn,
  * @param args optional arguments to loop
  */
 template <typename FunctionTy, typename... Args>
-void on_each(const FunctionTy& fn, const Args&... args) {
-  runtime::on_each_gen(fn, std::make_tuple(args...));
-}
-
-/**
- * Low-level parallel loop. Operator is applied for each running thread.
- * Operator should confirm to <code>fn(tid, numThreads)</code> where tid is
- * the id of the current thread and numThreads is the total number of running
- * threads.
- *
- * @param fn operator, which is never copied
- * @param args optional arguments to loop
- */
-template <typename FunctionTy, typename... Args>
-void on_each(FunctionTy& fn, const Args&... args) {
-  runtime::on_each_gen(fn, std::make_tuple(args...));
+void on_each(FunctionTy&& fn, const Args&... args) {
+  runtime::on_each_gen(std::forward<FunctionTy>(fn), std::make_tuple(args...));
 }
 
 /**

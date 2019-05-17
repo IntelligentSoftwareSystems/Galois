@@ -339,7 +339,7 @@ struct SGDBlockJumpAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef galois::graphs::LC_CSR_Graph<Node, double>
+  typedef galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //    ::with_numa_alloc<true>::type
       ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -656,7 +656,7 @@ class SGDItemsAlgo {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -738,7 +738,7 @@ class SGDEdgeItem {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -840,7 +840,7 @@ class SGDBlockEdgeAlgo {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -911,7 +911,7 @@ struct SimpleALSalgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>::with_no_lockable<
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>::with_no_lockable<
       true>::type Graph;
   typedef Graph::GraphNode GNode;
   // Column-major access
@@ -1080,7 +1080,7 @@ struct SyncALSalgo {
   };
 
   static const bool NEEDS_LOCKS = false;
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double> BaseGraph;
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType> BaseGraph;
   typedef typename std::conditional<
       NEEDS_LOCKS,
       typename BaseGraph::template with_out_of_line_lockable<true>::type,

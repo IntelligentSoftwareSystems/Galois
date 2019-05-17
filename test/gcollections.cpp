@@ -18,6 +18,7 @@
  */
 
 #include "galois/Bag.h"
+#include "galois/Galois.h"
 #include "galois/gdeque.h"
 #include "galois/gslist.h"
 #include "galois/Timer.h"
@@ -192,6 +193,7 @@ struct element {
 };
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   testBasic("galois::gslist", galois::gslist<int>(), 32 * 32);
   testNormal("galois::gdeque", galois::gdeque<int>(), 32 * 32);
   // testSort("galois::gdeque", galois::gdeque<int>(), 32 * 32);

@@ -180,8 +180,7 @@ public:
   }
 
   /**
-   * Check a bit to see if it is currently set. Assumes the bit set is not
-   * updated (set) in parallel.
+   * Check a bit to see if it is currently set.
    *
    * @param index Bit to check to see if set
    * @returns true if index is set
@@ -190,7 +189,7 @@ public:
     size_t bit_index    = index / bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index % bits_uint64);
-    return ((bitvec[bit_index] & bit_offset) != 0);
+    return ((bitvec[bit_index].load(std::memory_order_relaxed) & bit_offset) != 0);
   }
 
   /**

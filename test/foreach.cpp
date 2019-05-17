@@ -33,6 +33,7 @@ struct function_object {
 };
 
 int main() {
+  galois::SharedMemSys Galois_runtime;
   std::vector<int> v(10);
   galois::InsertBag<int> b;
 

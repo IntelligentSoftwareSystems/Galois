@@ -23,6 +23,7 @@ matrix:
             - g++-5
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - GCC_VER=6
       addons:
@@ -35,6 +36,7 @@ matrix:
             - g++-6
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - GCC_VER=7
       addons:
@@ -47,6 +49,7 @@ matrix:
             - g++-7
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - GCC_VER=8
       addons:
@@ -59,6 +62,7 @@ matrix:
             - g++-8
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - GCC_VER=8
         - BUILD_TYPE=Debug
@@ -72,6 +76,7 @@ matrix:
             - g++-8
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - CLANG_VER=3.8
       addons:
@@ -86,6 +91,7 @@ matrix:
             - g++-5
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - CLANG_VER=3.9
       addons:
@@ -100,6 +106,7 @@ matrix:
             - g++-5
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - CLANG_VER=4.0
       addons:
@@ -114,6 +121,7 @@ matrix:
             - g++-5
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - CLANG_VER=5.0
       addons:
@@ -128,6 +136,7 @@ matrix:
             - g++-7
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
         - CLANG_VER=6.0
       addons:
@@ -156,21 +165,38 @@ matrix:
             - g++-8
             - cmake3
             - boost1.67
+            - libeigen3-dev
     - env:
-        - CLANG_VER=7
+        - CLANG_VER=8
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-8
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-8
+            - gcc-8
+            - g++-8
+            - cmake3
+            - boost1.67
+            - libeigen3-dev
+    - env:
+        - CLANG_VER=8
         - BUILD_TYPE=Debug
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-7
+            - llvm-toolchain-trusty-8
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - clang-7
+            - clang-8
             - gcc-8
             - g++-8
             - cmake3
             - boost1.67
+            - libeigen3-dev
 
 before_script:
   # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
