@@ -339,6 +339,8 @@ auto generate_grid(graph_t& built_graph, std::size_t nx, std::size_t ny,
 void assert_face_directions(graph_t& graph, std::size_t num_nodes,
                             std::size_t num_cells,
                             std::size_t num_outer_faces) noexcept {
+#if !defined(NDEBUG)
+
   assert(("artimetic error in mesh generation.",
           num_cells + num_outer_faces == num_nodes));
   assert(("Mismatch between graph size and number of nodes",
@@ -383,6 +385,8 @@ void assert_face_directions(graph_t& graph, std::size_t num_nodes,
          "should all have degree 1.",
          degree == 6 && node < num_cells || degree == 1 && node >= num_cells));
   }
+
+#endif // !defined(NDEBUG)
 }
 
 // Idk why this hasn't been standardized in C++ yet, but here it is.
@@ -553,7 +557,8 @@ int main(int argc, char** argv) noexcept {
       },
       galois::loopname("Initialize counters"));
 
-  /*// Check that the counters are properly set.
+  // Check that the counters are properly set.
+#if !defined(NDEBUG)
   for (auto node : graph) {
     if (node >= ghost_threshold) continue;
     for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
@@ -563,7 +568,8 @@ int main(int argc, char** argv) noexcept {
       }
       assert(local_counter ==  radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter);
     }
-  }*/
+  }
+#endif // !defined(NDEBUG)
 
   // Approximate priority used to improve performance of main loop.
   // Currently just a placeholder for a more intelligent priority.
