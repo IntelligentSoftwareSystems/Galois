@@ -566,7 +566,7 @@ int main(int argc, char** argv) noexcept {
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
         if (is_incoming(directions[dir_idx], graph.getEdgeData(edge))) local_counter++;
       }
-      assert(local_counter ==  radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter);
+      assert(("Dependency counter not set propertly.", local_counter ==  radiation_magnitudes[num_per_element * node + num_per_element_and_direction * dir_idx].counter));
     }
   }
 #endif // !defined(NDEBUG)
@@ -608,11 +608,11 @@ int main(int argc, char** argv) noexcept {
       [&](work_t work_item, auto& ctx) noexcept {
         auto [node, dir_idx] = work_item;
         auto& direction      = directions[dir_idx];
-        assert(node < ghost_threshold);
+        assert(("Work item for ghost node generated erroneously.", node < ghost_threshold));
         auto node_magnitude_idx =
             num_per_element * node + num_per_element_and_direction * dir_idx;
         auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-        assert(!counter);
+        assert(("Work item asked to run before it was actually ready.", !counter));
         auto& node_data =
             graph.getData(node, galois::MethodFlag::UNPROTECTED);
          // Re-count incoming edges during this computation.
