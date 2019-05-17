@@ -13,6 +13,7 @@
 
 import sys
 import argparse
+import os
 
 def check_results(masterFile, otherFiles, tolerance, 
   offset, errors, mrows, global_error_squared, num_nodes):
@@ -106,8 +107,10 @@ def main(masterFile, allFiles_arr, tolerance, mean_tolerance):
 
   if (errors > 0) or (offset == -1) or (mrows > 0) or (rmse > mean_tolerance):
     print "\nFAILED\n"
+    return 1
   else:
     print "\nSUCCESS\n"
+    return 0
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check graph output results")
@@ -116,6 +119,10 @@ if __name__ == "__main__":
   parser.add_argument('files', type=str, nargs='+', help='input + output files')
   parser.add_argument('-tolerance', '-t', type=float, nargs=1, default=0.0001,
                       help='tolerance for difference in fields (error)')
+  parser.add_argument('-sort', '-s', type=bool, nargs=1, default=False,
+                      help='sort the generated output files')
+  parser.add_argument('-delete', '-d', type=bool, nargs=1, default=False,
+                      help='delete the generated output files')
   parser.add_argument('-mean_tolerance', '-m', type=float, nargs=1, default=0.000001,
                       help='tolerance for root mean square error')
 
@@ -128,8 +135,30 @@ if __name__ == "__main__":
   print masterFile  
   print allFiles_arr  
 
+  if parsed_arguments.sort:
+    sortstr = "sort -nu"  
+    for f in allFiles_arr:
+      sortstr += " " + f
+    sortstr += " -o .output_log"
+    os.system(sortstr)
+
+  if parsed_arguments.delete:
+    rmstr = "rm -f"
+    for f in allFiles_arr:
+      rmstr += " " + f
+    os.system(rmstr)
+
+  if parsed_arguments.sort:
+    allFiles_arr = ['.output_log']
+
   tolerance = parsed_arguments.tolerance
   mean_tolerance = parsed_arguments.mean_tolerance
 
   print("Starting comparison...")
-  main(masterFile, allFiles_arr, tolerance, mean_tolerance)
+  ret = main(masterFile, allFiles_arr, tolerance, mean_tolerance)
+
+  if parsed_arguments.sort:
+    os.system("rm -f .output_log")
+
+  if ret:
+    sys.exit(1)

@@ -188,8 +188,8 @@ void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
         }
       }
     }
-  } else if (personality_set.length() == (net.Num / num_nodes)) {
-    galois::gWarn("Command line option -pset ignored because its string length is more than the number of processes/hosts on each physical node");
+  } else {
+    galois::gWarn("Command line option -pset ignored because its string length is not equal to the number of processes/hosts on each physical node");
   } 
 }
 #endif

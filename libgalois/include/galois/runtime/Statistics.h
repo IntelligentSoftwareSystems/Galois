@@ -40,7 +40,7 @@
  * Print intra host stats with per-thread details and inter-host stats with
  per-host details
  * print to 2 files if supporting R format
- * libdist implements an addToStat with host ID and manages inter-host stats and
+ * dist implements an addToStat with host ID and manages inter-host stats and
  their combining
 
  */
