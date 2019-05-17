@@ -138,8 +138,8 @@ We provide a few sample inputs that can be downloaded by running:
 make input
 ```
 
-'make input' will download a tar-ball of inputs  and extract it to
-`$BUILD_DIR/inputs/reference` directory. The tar-ball is downloaded to
+'make input' will download a tarball of inputs  and extract it to
+`$BUILD_DIR/inputs/reference` directory. The tarball is downloaded to
 `$BUILD_DIR/inputs`
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
