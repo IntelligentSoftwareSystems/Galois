@@ -13,7 +13,7 @@ jobs:
   "Debian":
      # As of this writing, runs on Debian 9.5
     docker:
-      - image: gcc:8
+      - image: gcc:9
     steps:
       - checkout
       - run: |
