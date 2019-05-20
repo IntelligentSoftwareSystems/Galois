@@ -222,7 +222,7 @@ jobs:
           make test || :
   "openSUSE":
     docker:
-      - image: opensuse/leap:15
+      - image: opensuse/leap:latest
     steps:
       - checkout
       - run: |
