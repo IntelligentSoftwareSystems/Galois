@@ -239,7 +239,7 @@ jobs:
           make test || :
   "Fedora-gcc":
     docker:
-      - image: fedora:28
+      - image: fedora:latest
     steps:
       - checkout
       - run: |
@@ -254,7 +254,7 @@ jobs:
           make test || :
   "Fedora-clang":
     docker:
-      - image: fedora:28
+      - image: fedora:latest
     steps:
       - checkout
       - run: |
