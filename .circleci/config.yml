@@ -24,7 +24,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -38,7 +38,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Ubuntu-16.04":
     docker:
       - image: ubuntu:16.04
@@ -55,7 +55,7 @@ jobs:
           rm small_inputs.tar.gz
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
-          make test || :
+          make test
   "CentOS-7-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -89,7 +89,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "CentOS-7-clang":
     # Clang on CentOS 7
     docker:
@@ -120,7 +120,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "CentOS-6-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -153,7 +153,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "CentOS-6-clang-libc++":
     # Clang on CentOS 7
     docker:
@@ -177,7 +177,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Arch":
     docker:
       - image: archlinux/base
@@ -191,7 +191,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Alpine":
     docker:
       - image: frolvlad/alpine-gxx
@@ -204,7 +204,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "openSUSE":
     docker:
       - image: opensuse/leap:latest
@@ -219,7 +219,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Fedora-gcc":
     docker:
       - image: fedora:latest
@@ -232,7 +232,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
   "Fedora-clang":
     docker:
       - image: fedora:latest
@@ -248,7 +248,7 @@ jobs:
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
-          make test || :
+          make test
  
 workflows:
   version: 2
