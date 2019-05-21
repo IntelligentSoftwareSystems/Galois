@@ -8,12 +8,12 @@ COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/download.cmake
 )
 
 add_custom_command(
-OUTPUT reference/graph_readme.txt
-COMMAND ${CMAKE_COMMAND} -E tar xJf lonestar-cpu-inputs.tar.gz && mkdir reference && touch reference/graph_readme.txt
+OUTPUT small_inputs
+COMMAND ${CMAKE_COMMAND} -E tar xJf lonestar-cpu-inputs.tar.gz
 DEPENDS lonestar-cpu-inputs.tar.gz
 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/inputs
 COMMENT "Unpacking lonestar-cpu-inputs.tar.gz"
 VERBATIM
 )
 
-add_custom_target(input DEPENDS reference/graph_readme.txt)
+add_custom_target(input DEPENDS small_inputs)
