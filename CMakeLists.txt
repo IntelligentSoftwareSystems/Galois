@@ -491,7 +491,6 @@ endfunction()
 
 add_subdirectory(libllvm)
 add_subdirectory(libgalois)
-add_subdirectory(bliss)
 if(ENABLE_DIST_GALOIS)
   add_subdirectory(libnet)
   add_subdirectory(libdist)

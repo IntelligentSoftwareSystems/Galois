@@ -1,3 +1,6 @@
 [submodule "liblci"]
 	path = liblci
 	url = https://github.com/uiuc-hpc/LC.git
+[submodule "bliss"]
+	path = bliss
+	url = https://github.com/chenxuhao/bliss.git
