@@ -1347,7 +1347,6 @@ size_t initializeGraphData(Graph& g) {
       unsigned int block_size = g.size() / nthreads;
       if ((g.size() % nthreads) > 0)
         ++block_size;
-      assert((block_size * nthreads) >= bitset_comm.size());
 
       uint32_t start = tid * block_size;
       uint32_t end   = (tid + 1) * block_size;
