@@ -219,10 +219,12 @@ before_script:
     fi
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. || exit 1
+  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 .. || exit 1
 
 script:
+  - make input
   - make -j4 || exit 1
+  - make test || true
 
 notifications:
   email: false

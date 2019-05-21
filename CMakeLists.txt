@@ -89,6 +89,13 @@ enable_testing()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 
+# Some apps break with -O3 on recent clang versions.
+# Tracking that down is a work in progress, so for the current release,
+# only use -O2 with clang.
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+endif()
+
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -352,7 +359,7 @@ elseif(EXISTS /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   add_subdirectory(inputs)
-  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
+  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
   MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
 

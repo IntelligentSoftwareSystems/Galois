@@ -79,18 +79,17 @@ Here are the dependencies for the optional features:
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
-Compiling Galois
---------------------------
+Compiling and Testing Galois
+----------------------------
 We use CMake. Let's assume that SRC_DIR is the directory where the source code for Galois resides, and you wish to build galois in some BUILD_DIR. Run the following commands to set up a build directory:
 
 ```Shell
 SRC_DIR=`pwd` # Or top-level Galois source dir
 BUILD_DIR=<path-to-your-build-dir>
-mkdir -p $BUILD_DIR; cd $BUILD_DIR; cmake $SRC_DIR
+mkdir -p $BUILD_DIR; cd $BUILD_DIR; cmake -DCMAKE_BUILD_TYPE=Release $SRC_DIR
 ```
 
-By default, cmake sets up a "Release" build. You can also set up a "Debug" build,
-as follows:
+You can also set up a "Debug" build by running the following instead of the last command above:
 
 ```Shell
 mkdir -p $BUILD_DIR; cd $BUILD_DIR; cmake -DCMAKE_BUILD_TYPE=Debug $SRC_DIR
@@ -103,23 +102,25 @@ cd $BUILD_DIR/lonestar/<app-dir-name>; make -j
 ```
 
 You can also build everything by running `make -j` in the top-level of build directory, but that may
-take a lot of time and will download additional files.
+take a lot of time.
 
-More esoteric systems may require a toolchain file; check `../cmake/Toolchain`
-if there is a file corresponding to your system. If so, use the following
-CMake command:
+Setting the `BUILD_SHARED_LIBS` to `ON` when calling CMake will make the core runtime library be built as a shared object instead of a static library.
+
+Once the core library has been built, it can be installed by running
 
 ```Shell
-cmake -C ${SRC_DIR}/cmake/Toolchain/${platform}-tryrunresults.cmake \
-  -DCMAKE_TOOLCHAIN_FILE=${SRC_DIR}/cmake/Toolchain/${platform}.cmake ${SRC_DIR}
+make install
 ```
 
+The apps will not be installed by default.
 
-Running Galois Applications
-=============================
-
-Inputs
--------
+The tests for the core runtime will be built by default when you run `make` with no target specified.
+They can be built specifically by running
+```Shell
+cd $BUILD_DIR/test
+make -j
+make test
+```
 
 We provide a few sample inputs that can be downloaded by running:
 
@@ -127,9 +128,24 @@ We provide a few sample inputs that can be downloaded by running:
 make input
 ```
 
-'make input' will download a big (~2GB) tar-ball of inputs  and extract it to
-`$BUILD_DIR/inputs/reference` directory. The tar-ball is downloaded to
+`make input` will download a tarball of inputs  and extract it to
+`$BUILD_DIR/inputs/small_inputs` directory. The tarball is downloaded to
 `$BUILD_DIR/inputs`
+
+Most of the Galois apps have corresponding tests.
+These tests depend on downloading the reference inputs and building the corresponding apps and test binaries.
+Once the reference inputs have been downloaded and everything has been built, the tests for the core library and all the apps can be run by running
+```Shell
+make test
+```
+in the root build directory.
+
+
+Running Galois Applications
+=============================
+
+Graph Format
+------------
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
 called *galois graph file* 
