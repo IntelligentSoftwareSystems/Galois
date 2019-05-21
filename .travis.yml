@@ -24,6 +24,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - GCC_VER=6
       addons:
@@ -37,6 +39,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - GCC_VER=7
       addons:
@@ -50,6 +54,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - GCC_VER=8
       addons:
@@ -63,6 +69,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - GCC_VER=9
       addons:
@@ -90,6 +98,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=3.8
       addons:
@@ -105,6 +115,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=3.9
       addons:
@@ -120,6 +132,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=4.0
       addons:
@@ -135,6 +149,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=5.0
       addons:
@@ -150,6 +166,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=6.0
       addons:
@@ -164,6 +182,8 @@ matrix:
             - g++-8
             - cmake3
             - boost1.67
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=7
       addons:
@@ -179,6 +199,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=8
       addons:
@@ -194,6 +216,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - CLANG_VER=8
         - BUILD_TYPE=Debug
@@ -210,6 +234,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
 
 before_script:
   # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
