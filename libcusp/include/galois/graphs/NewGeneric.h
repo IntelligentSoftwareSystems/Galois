@@ -109,9 +109,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void resetEdgeLoad() {
     if (_edgeStateRounds > 1) {
-      for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
-        hostLoads[i].reset();
-        old_hostLoads[i] = 0;
+      if (!graphPartitioner->noCommunication()) {
+        for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+          hostLoads[i].reset();
+          old_hostLoads[i] = 0;
+        }
       }
     }
   }
@@ -121,9 +123,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void syncEdgeLoad() {
     if (_edgeStateRounds > 1) {
-      for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
-        old_hostLoads[i] += hostLoads[i].reduce();
-        hostLoads[i].reset();
+      if (!graphPartitioner->noCommunication()) {
+        for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+          old_hostLoads[i] += hostLoads[i].reduce();
+          hostLoads[i].reset();
+        }
       }
     }
   }
@@ -133,10 +137,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void printEdgeLoad() {
     if (_edgeStateRounds > 1) {
-      if (base_DistGraph::id == 0) {
-        for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
-          galois::gDebug("[", base_DistGraph::id, "] ", i, " ",
-                         old_hostLoads[i], "\n");
+      if (!graphPartitioner->noCommunication()) {
+        if (base_DistGraph::id == 0) {
+          for (unsigned i = 0; i < base_DistGraph::numHosts; i++) {
+            galois::gDebug("[", base_DistGraph::id, "] ", i, " ",
+                           old_hostLoads[i], "\n");
+          }
         }
       }
     }
@@ -2922,6 +2928,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::no_stats()
     );
     syncEdgeLoad();
+    //printEdgeLoad();
     }
 
     // flush buffers
