@@ -357,7 +357,7 @@ elseif(EXISTS /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   add_subdirectory(inputs)
-  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
+  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
   MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
   
