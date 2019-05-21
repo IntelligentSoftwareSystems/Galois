@@ -279,7 +279,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     auto& base_graph = base_DistGraph::graph;
     galois::do_all(
       galois::iterate((uint32_t)0, base_DistGraph::numNodes),
-      [&](auto n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
+      [&](uint64_t n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
 #if MORE_DIST_STATS
       galois::loopname("FixEndEdgeLoop"),
 #endif
@@ -1501,7 +1501,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                       base_DistGraph::gid2host[base_DistGraph::id].second),
-      [&] (auto n) {
+      [&] (size_t n) {
         auto ii = bufGraph.edgeBegin(n);
         auto ee = bufGraph.edgeEnd(n);
         for (; ii < ee; ++ii) {
@@ -1638,7 +1638,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                         base_DistGraph::gid2host[base_DistGraph::id].second),
-        [&](auto n) {
+        [&](size_t n) {
           auto ii       = bGraph.edgeBegin(n);
           auto ee       = bGraph.edgeEnd(n);
           uint32_t lsrc = this->G2LEdgeCut(n, globalOffset);
@@ -1691,7 +1691,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                         base_DistGraph::gid2host[base_DistGraph::id].second),
-        [&](auto n) {
+        [&](size_t n) {
           auto ii       = bGraph.edgeBegin(n);
           auto ee       = bGraph.edgeEnd(n);
           uint32_t lsrc = this->G2LEdgeCut(n, globalOffset);
@@ -1808,7 +1808,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::do_all(
         // iterate over my read nodes
         galois::iterate(beginNode, endNode),
-        [&](auto src) {
+        [&](size_t src) {
           auto ee        = bufGraph.edgeBegin(src);
           auto ee_end    = bufGraph.edgeEnd(src);
           uint64_t numEdgesL = std::distance(ee, ee_end);
@@ -2691,7 +2691,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // Go over assigned nodes and distribute edges.
     galois::do_all(
       galois::iterate(beginNode, endNode),
-      [&](auto src) {
+      [&](uint64_t src) {
         uint32_t lsrc       = 0;
         uint64_t curEdge    = 0;
         if (this->isLocal(src)) {
@@ -2835,8 +2835,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     maxBytesSent.reset();
 
     for (unsigned syncRound = 0; syncRound < _edgeStateRounds; syncRound++) {
-    uint32_t beginNode;
-    uint32_t endNode;
+    uint64_t beginNode;
+    uint64_t endNode;
     std::tie(beginNode, endNode) = galois::block_range(
                                      base_DistGraph::gid2host[base_DistGraph::id].first,
                                      base_DistGraph::gid2host[base_DistGraph::id].second,
@@ -2845,7 +2845,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // Go over assigned nodes and distribute edges.
     galois::do_all(
       galois::iterate(beginNode, endNode),
-      [&](auto src) {
+      [&](uint64_t src) {
         uint32_t lsrc       = 0;
         uint64_t curEdge    = 0;
         if (this->isLocal(src)) {
