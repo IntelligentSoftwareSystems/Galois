@@ -219,12 +219,10 @@ before_script:
     fi
   - mkdir build
   - pushd build
-  - wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
-  - tar -xvzf small_inputs.tar.gz
-  - rm small_inputs.tar.gz
-  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 .. || exit 1
+  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 .. || exit 1
 
 script:
+  - make input
   - make -j4 || exit 1
   - make test || true
 
