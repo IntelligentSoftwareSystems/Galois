@@ -79,8 +79,8 @@ Here are the dependencies for the optional features:
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
-Compiling Galois
---------------------------
+Compiling and Testing Galois
+----------------------------
 We use CMake. Let's assume that SRC_DIR is the directory where the source code for Galois resides, and you wish to build galois in some BUILD_DIR. Run the following commands to set up a build directory:
 
 ```Shell
@@ -122,16 +122,6 @@ make -j
 make test
 ```
 
-Most of the Galois apps have tests that can be run as well, but these tests depend on downloading the reference inputs, unpacking the corresponding tarball into a directory, and specifying the directory with the unpacked sample inputs.
-More on that further down.
-
-
-Running Galois Applications
-=============================
-
-Inputs
--------
-
 We provide a few sample inputs that can be downloaded by running:
 
 ```Shell
@@ -139,8 +129,23 @@ make input
 ```
 
 'make input' will download a tarball of inputs  and extract it to
-`$BUILD_DIR/inputs/reference` directory. The tarball is downloaded to
+`$BUILD_DIR/inputs/small_inputs` directory. The tarball is downloaded to
 `$BUILD_DIR/inputs`
+
+Most of the Galois apps have corresponding tests.
+These tests depend on downloading the reference inputs and building the corresponding apps and test binaries.
+Once the reference inputs have been downloaded and everything has been built, the tests for the core library and all the apps can be run by running
+```Shell
+make test
+```
+in the root build directory.
+
+
+Running Galois Applications
+=============================
+
+Graph Format
+------------
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
 called *galois graph file* 
