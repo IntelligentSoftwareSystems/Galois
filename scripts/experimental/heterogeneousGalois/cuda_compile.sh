@@ -22,7 +22,7 @@ CXX_DEFINES="-DBOOST_NO_AUTO_PTR -DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_VERSION=2
 CXX_FLAGS="-g -Wall -gcc-toolchain $GCC_BIN/.. -fopenmp -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libdist/include -I$ABELIAN_GALOIS_ROOT/lonestardist/include -I$MPI_INCLUDE -I$BOOST_INC -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libgalois/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -std=gnu++14"
 
 GGC_FLAGS=" --cuda-worklist basic --cuda-graph basic --opt parcomb "
-if [[ $1 == *"bfs"* || $1 == *"sssp"* || $1 == *"cc"* || $1 == *"pagerank_pull"* ]]; then
+if [[ $1 == *"bfs"* || $1 == *"sssp"* || $1 == *"cc"* || $1 == *"pagerank_pull"* || $1 == *"kcore"*  ]]; then
 	GGC_FLAGS+=" --opt np --npf 8 --opt tb_lb --cuda_graph basic"
 else
 	GGC_FLAGS+=" --opt np --npf 8 --cuda_graph basic"

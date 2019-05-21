@@ -23,6 +23,7 @@
 #include "galois/gtuple.h"
 #include "galois/Traits.h"
 #include "galois/Timer.h"
+#include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/Threads.h"
 #include "galois/gIO.h"
@@ -36,7 +37,7 @@ namespace runtime {
 namespace internal {
 
 template <typename FunctionTy, typename ArgsTy>
-inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
+inline void on_each_impl(FunctionTy&& fn, const ArgsTy& argsTuple) {
 
   static_assert(!exists_by_supertype<char*, ArgsTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const*, ArgsTy>::value,
@@ -55,10 +56,12 @@ inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
 
   const auto numT = getActiveThreads();
 
+  OperatorReferenceType<decltype(std::forward<FunctionTy>(fn))> fn_ref = fn;
+
   auto runFun = [&] {
     execTime.start();
 
-    fn(substrate::ThreadPool::getTID(), numT);
+    fn_ref(substrate::ThreadPool::getTID(), numT);
 
     execTime.stop();
   };
@@ -71,13 +74,8 @@ inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
 } // namespace internal
 
 template <typename FunctionTy, typename TupleTy>
-inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
-  internal::on_each_impl<FunctionTy, TupleTy>(fn, tpl);
-}
-
-template <typename FunctionTy, typename TupleTy>
-inline void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
-  internal::on_each_impl<const FunctionTy, TupleTy>(fn, tpl);
+inline void on_each_gen(FunctionTy&& fn, const TupleTy& tpl) {
+  internal::on_each_impl(std::forward<FunctionTy>(fn), tpl);
 }
 
 } // end namespace runtime

@@ -35,7 +35,7 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
 fi
 
 CXX_DEFINES="-DBOOST_NO_AUTO_PTR -DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS"
-CXX_FLAGS="-g -Wall -gcc-toolchain $GCC_BIN/.. -fopenmp -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libdist/include -I$ABELIAN_GALOIS_ROOT/dist_apps/include -I$MPI_INCLUDE -I$BOOST_INC -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libgalois/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -std=gnu++14"
+CXX_FLAGS="-g -Wall -gcc-toolchain $GCC_BIN/.. -fopenmp -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libdist/include -I$ABELIAN_GALOIS_ROOT/dist_apps/include -I$MPI_INCLUDE -I$BOOST_INC -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libgalois/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libdist/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -std=gnu++14"
 
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   GGC_FLAGS="--cuda-worklist basic --cuda-graph basic --opt parcomb --opt np --npf 8 "

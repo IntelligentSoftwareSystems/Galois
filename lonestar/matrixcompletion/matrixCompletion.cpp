@@ -145,6 +145,7 @@ size_t countEdges(Graph& g) {
   typedef typename Graph::GraphNode GNode;
   galois::GAccumulator<size_t> edges;
   galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  std::cout << "NUM_ITEM_NODES : " << NUM_ITEM_NODES << "\n";
   executor.execute(g.begin(), g.begin() + NUM_ITEM_NODES,
                    g.begin() + NUM_ITEM_NODES, g.end(), itemsPerBlock,
                    usersPerBlock,
@@ -156,6 +157,7 @@ size_t countEdges(Graph& g) {
 
 template <typename Graph>
 void verify(Graph& g, const std::string& prefix) {
+  std::cout << countEdges(g) << " : " << g.sizeEdges() << "\n";
   if (countEdges(g) != g.sizeEdges()) {
     GALOIS_DIE("Error: edge list of input graph probably not sorted");
   }
@@ -337,7 +339,7 @@ struct SGDBlockJumpAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef galois::graphs::LC_CSR_Graph<Node, double>
+  typedef galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //    ::with_numa_alloc<true>::type
       ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -654,7 +656,7 @@ class SGDItemsAlgo {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -736,7 +738,7 @@ class SGDEdgeItem {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -838,7 +840,7 @@ class SGDBlockEdgeAlgo {
 public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>
       //::template with_numa_alloc<true>::type
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
@@ -909,7 +911,7 @@ struct SimpleALSalgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double>::with_no_lockable<
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>::with_no_lockable<
       true>::type Graph;
   typedef Graph::GraphNode GNode;
   // Column-major access
@@ -1078,7 +1080,7 @@ struct SyncALSalgo {
   };
 
   static const bool NEEDS_LOCKS = false;
-  typedef typename galois::graphs::LC_CSR_Graph<Node, double> BaseGraph;
+  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType> BaseGraph;
   typedef typename std::conditional<
       NEEDS_LOCKS,
       typename BaseGraph::template with_out_of_line_lockable<true>::type,
@@ -1337,11 +1339,36 @@ size_t initializeGraphData(Graph& g) {
     });
   }
 
-  // Count number of item nodes, i.e. nodes with edges
-  size_t numItemNodes = galois::ParallelSTL::count_if(
-      g.begin(), g.end(), [&](typename Graph::GraphNode n) -> bool {
-        return std::distance(g.edge_begin(n), g.edge_end(n)) != 0;
-      });
+
+   auto activeThreads = galois::getActiveThreads();
+   std::vector<uint32_t> largestNodeID_perThread(activeThreads);
+
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      unsigned int block_size = g.size() / nthreads;
+      if ((g.size() % nthreads) > 0)
+        ++block_size;
+      assert((block_size * nthreads) >= bitset_comm.size());
+
+      uint32_t start = tid * block_size;
+      uint32_t end   = (tid + 1) * block_size;
+      if (end > g.size())
+        end = g.size();
+
+      largestNodeID_perThread[tid] = 0;
+      for (uint32_t i = start; i < end; ++i) {
+        if(std::distance(g.edge_begin(i), g.edge_end(i))) {
+          if(largestNodeID_perThread[tid] < i)
+            largestNodeID_perThread[tid] = i;
+          }
+      }
+    });
+
+    uint32_t largestNodeID = 0;
+    for(uint32_t t = 0; t < activeThreads; ++t){
+      if(largestNodeID < largestNodeID_perThread[t])
+        largestNodeID = largestNodeID_perThread[t];
+    }
+    size_t numItemNodes = largestNodeID + 1;
 
   initTimer.stop();
   return numItemNodes;

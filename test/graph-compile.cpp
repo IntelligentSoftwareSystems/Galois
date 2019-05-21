@@ -69,6 +69,7 @@ void check() {
 }
 
 int main() {
+  galois::SharedMemSys Galois_runtime;
   check<galois::graphs::MorphGraph<NoDefault, NoDefault, true>>();
   check<galois::graphs::MorphGraph<NoDefault, NoDefault, false>>();
   check<galois::graphs::MorphGraph<NoDefault, NoDefault, true, true>>();

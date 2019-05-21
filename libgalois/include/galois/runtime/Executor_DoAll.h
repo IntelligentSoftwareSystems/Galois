@@ -24,6 +24,7 @@
 #include "galois/Timer.h"
 
 #include "galois/runtime/Executor_OnEach.h"
+#include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Barrier.h"
 #include "galois/substrate/PerThreadStorage.h"
@@ -74,7 +75,7 @@ class DoAllStealingExec {
         : work_mutex(), id(id), shared_beg(beg), shared_end(end),
           m_size(std::distance(beg, end)), num_iter(0) {}
 
-    bool doWork(F& func, const unsigned chunk_size) {
+    bool doWork(F func, const unsigned chunk_size) {
       Iter beg(shared_beg);
       Iter end(shared_end);
 
@@ -434,7 +435,7 @@ private:
   PerThreadTimer<MORE_STATS> termTime;
 
 public:
-  DoAllStealingExec(const R& _range, const F& _func, const ArgsTuple& argsTuple)
+  DoAllStealingExec(const R& _range, F _func, const ArgsTuple& argsTuple)
       : range(_range), func(_func),
         loopname(galois::internal::getLoopName(argsTuple)),
         chunk_size(get_by_supertype<chunk_size_tag>(argsTuple).value),
@@ -531,9 +532,9 @@ template <bool _STEAL>
 struct ChooseDoAllImpl {
 
   template <typename R, typename F, typename ArgsT>
-  static void call(const R& range, const F& func, const ArgsT& argsTuple) {
+  static void call(const R& range, F &&func, const ArgsT& argsTuple) {
 
-    internal::DoAllStealingExec<R, F, ArgsT> exec(range, func, argsTuple);
+    internal::DoAllStealingExec<R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT> exec(range, std::forward<F>(func), argsTuple);
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
@@ -547,7 +548,7 @@ template <>
 struct ChooseDoAllImpl<false> {
 
   template <typename R, typename F, typename ArgsT>
-  static void call(const R& range, const F& func, const ArgsT& argsTuple) {
+  static void call(const R& range, F func, const ArgsT& argsTuple) {
 
     runtime::on_each_gen(
         [&](const unsigned tid, const unsigned numT) {
@@ -595,7 +596,7 @@ struct ChooseDoAllImpl<false> {
 } // end namespace internal
 
 template <typename R, typename F, typename ArgsTuple>
-void do_all_gen(const R& range, const F& func, const ArgsTuple& argsTuple) {
+void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
 
   static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
   static_assert(!exists_by_supertype<char const*, ArgsTuple>::value,
@@ -616,7 +617,8 @@ void do_all_gen(const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   constexpr bool STEAL = exists_by_supertype<steal_tag, ArgsT>::value;
 
-  internal::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
+  OperatorReferenceType<decltype(std::forward<F>(func))> func_ref = func;
+  internal::ChooseDoAllImpl<STEAL>::call(range, func_ref, argsT);
 
   timer.stop();
 }

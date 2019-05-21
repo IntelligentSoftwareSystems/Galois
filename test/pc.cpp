@@ -71,6 +71,7 @@ void testf(const char* str) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   if (argc > 1)
     num = atoi(argv[1]);
   if (num <= 0)

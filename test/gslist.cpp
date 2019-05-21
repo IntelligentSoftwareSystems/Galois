@@ -24,6 +24,7 @@
 #include <map>
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   typedef galois::runtime::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
   typedef galois::substrate::PerThreadStorage<HeapPtr> Heaps;

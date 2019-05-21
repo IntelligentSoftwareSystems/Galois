@@ -35,6 +35,7 @@ typedef uint64_t DegreeTy;
 typedef std::atomic<DegreeTy> aDegreeTy;
 //! Per-Thread-Storage Declaration
 typedef galois::gstl::Vector<DegreeTy> VecTy;
+typedef galois::gstl::Vector<uint8_t> VecByteTy;
 typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
 //! Per-Thread-Storage Declaration
 
@@ -286,7 +287,7 @@ DegreeTy peelingCoreness(Graph &graph, galois::InsertBag<GNode>& curr) {
     return cand_k;
 }
 
-bool H(Graph &graph, DynamicBitSet &isDead, GNode cNode,
+bool H(Graph &graph, VecByteTy &isDead, GNode cNode,
             ThreadLocalData &nodesThreadLocal) {
     auto& adjHs = *nodesThreadLocal.getLocal();
     adjHs.clear();
@@ -315,7 +316,8 @@ bool H(Graph &graph, DynamicBitSet &isDead, GNode cNode,
 
     for (auto e : graph.edges(cNode)) {
         GNode neigh = graph.getEdgeDst(e);
-        isDead.reset(neigh);
+        if (kcoreMap[neigh] > kcoreMap[cNode])
+            isDead[neigh] = false;
     }
 
     return true;
@@ -331,7 +333,8 @@ bool H(Graph &graph, DynamicBitSet &isDead, GNode cNode,
  */
 DegreeTy hIndexCoreness(Graph &graph, ThreadLocalData &nodesThreadLocal) {
     aDegreeTy maxDegree(MIN_DEGREE);
-    DynamicBitSet isDead;
+    VecByteTy isDead;
+    //DynamicBitSet isDead;
     isDead.resize(graph.size());
 
     /* Initially, put all nodes onto the current bag */
@@ -347,8 +350,8 @@ DegreeTy hIndexCoreness(Graph &graph, ThreadLocalData &nodesThreadLocal) {
         isChange = false;
         galois::do_all(galois::iterate(graph.begin(), graph.end()),
                 [&](GNode cNode) {
-                    if (!isDead.test(cNode)) {
-                        isDead.set(cNode);
+                    if (!isDead[cNode]) {
+                        isDead[cNode]=true;
                         if (H(graph, isDead, cNode, nodesThreadLocal))
                             isChange = true;
                     }
@@ -415,7 +418,6 @@ int main(int argc, char** argv) {
         fp.open("kcore_output", std::ofstream::out);
         for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
             fp << *ii << "," << kcoreMap[*ii] << std::endl;
-//            std::cout << *ii << "," << kcoreMap[*ii] << std::endl;
         }
         fp.close();
     }

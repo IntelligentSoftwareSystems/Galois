@@ -161,6 +161,7 @@ int do_accumulate() {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   if (argc > 1)
     vectorSize = atoi(argv[1]);
   if (vectorSize <= 0)

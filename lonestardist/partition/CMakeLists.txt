@@ -1,0 +1,1 @@
+distAppNoGPU(partition)

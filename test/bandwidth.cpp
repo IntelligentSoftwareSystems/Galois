@@ -111,6 +111,7 @@ struct F2 {
 };
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys Galois_runtime;
   unsigned M  = galois::substrate::getThreadPool().getMaxThreads() / 2;
   size_t mega = 1;
   if (argc > 1)
