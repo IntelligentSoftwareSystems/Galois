@@ -101,6 +101,8 @@ struct LabeledElement {
 	LabeledElement() { }
 	LabeledElement(VertexId _vertex_id) :
 		vertex_id(_vertex_id), key_index(0), edge_label(0), vertex_label(0), history_info(0) { }
+	LabeledElement(VertexId _vertex_id, BYTE _history) :
+		vertex_id(_vertex_id), key_index(0), edge_label(0), vertex_label(0), history_info(_history) { }
 	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
 		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) { }
 	LabeledElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
@@ -264,25 +266,34 @@ private:
 	unsigned num_edges;
 };
 
-class VertexInducedEmbedding {
+class VertexInducedEmbedding: public Embedding {
 public:
-	VertexInducedEmbedding() { qp_id = 0xFFFFFFFF; }
+	VertexInducedEmbedding() : Embedding() {}
 	~VertexInducedEmbedding() {}
-	void set_qpid(unsigned i) { qp_id = i; }
-	unsigned get_qpid() { return qp_id; }
 	VertexId get_vertex(unsigned i) { return vertices[i]; }
 	void add_vertex(VertexId vid) { vertices.push_back(vid); }
 	unsigned get_num_vertices() { return vertices.size(); }
+	unsigned get_num_edges() { return size(); }
+/*
+	void set_qpid(unsigned i) { qp_id = i; }
+	unsigned get_qpid() { return qp_id; }
+	unsigned get_num_edges() { return elements.size()-1; }
 	void push_back(ElementType ele) { elements.push_back(ele); }
 	void pop_back() { elements.pop_back(); }
 	size_t size() { return elements.size(); }
 	ElementType *data() { return elements.data(); }
 	ElementType operator[](size_t i) const { return elements[i]; }
-private:
-	VertexList vertices;
-	unsigned qp_id;
 	std::vector<ElementType> elements;
+*/
+	VertexList vertices;
+private:
+	//unsigned qp_id;
 };
+
+//inline std::ostream & operator<<(std::ostream & strm, const VertexInducedEmbedding& emb) {
+//	strm << emb.elements;
+//	return strm;
+//}
 
 namespace std {
 	template<>

@@ -15,6 +15,7 @@ public:
 	}
 	QuickPattern(const Embedding & emb) {
 		cg_id = 0;
+		vertex_induced = false;
 		size = emb.size();
 		unsigned bytes = size * sizeof(ElementType);
 		elements = new ElementType[size];
@@ -30,6 +31,30 @@ public:
 				map[old_id] = new_id++;
 			} else element.set_vertex_id(iterator->second);
 		}
+		set_hash();
+	}
+	QuickPattern(const VertexInducedEmbedding & emb) {
+		cg_id = 0;
+		vertex_induced = true;
+		size = emb.size();
+		unsigned bytes = size * sizeof(ElementType);
+		elements = new ElementType[size];
+		std::memcpy(elements, emb.data(), bytes);
+		vertices.resize(emb.vertices.size());
+		//vertices.insert(vertices.begin(), emb.vertices.begin(), emb.vertices.end());
+		std::unordered_map<VertexId, VertexId> map;
+		VertexId new_id = 1;
+		for(unsigned i = 0; i < size; i++) {
+			auto& element = elements[i];
+			VertexId old_id = element.vertex_id;
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				element.set_vertex_id(new_id);
+				map[old_id] = new_id++;
+			} else element.set_vertex_id(iterator->second);
+		}
+		for(unsigned i = 0; i < vertices.size(); i++)
+			vertices[i] = map[emb.vertices[i]];
 		set_hash();
 	}
 	~QuickPattern() {}
@@ -56,6 +81,8 @@ public:
 		return a; 
 	}
 	inline unsigned get_hash() const { return hash_value; }
+	inline unsigned get_vertex(int i) const { return vertices[i]; }
+	inline bool is_vertex_induced() const { return vertex_induced; }
 	inline void set_hash() {
 		bliss::UintSeqHash h;
 		h.update(size);
@@ -84,6 +111,8 @@ private:
 	ElementType* elements;
 	unsigned hash_value; // quick pattern ID
 	unsigned cg_id; // ID of the canonical pattern that this quick pattern belongs to
+	bool vertex_induced;
+	VertexList vertices; // only used for vertex-induced embedding
 };
 
 std::ostream & operator<<(std::ostream & strm, const QuickPattern& quick_pattern) {

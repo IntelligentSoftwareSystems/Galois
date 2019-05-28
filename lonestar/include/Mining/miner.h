@@ -132,12 +132,13 @@ public:
 						VertexId src = emb.get_vertex(i);
 						if (dst_dst == src) {
 							added_edges ++;
-							ElementType new_element(dst, (BYTE)num_vertices, 0, 0, (BYTE)src);
+							ElementType new_element(dst, (BYTE)i);
 							emb.push_back(new_element);
 							break;
 						}
 					}
 				}
+				//std::cout << "Inserting new embedding: " << emb << "\n";
 				queue.push_back(emb);
 				for (unsigned i = 0; i < added_edges; ++i) emb.pop_back();
 			}
@@ -249,6 +250,14 @@ public:
 			qp_map[qp] = 1;
 			emb.set_qpid(qp.get_id());
 		}
+	}
+	inline void quick_aggregate_each(VertexInducedEmbedding& emb, QpMapFreq& qp_map) {
+		QuickPattern qp(emb);
+		std::cout << "Constructing quick_pattern: " << qp << "\n";
+		if (qp_map.find(qp) != qp_map.end()) {
+			qp_map[qp] += 1;
+			qp.clean();
+		} else qp_map[qp] = 1;
 	}
 	inline void quick_aggregate_each(Embedding& emb, QpMapDomain& qp_map) {
 		QuickPattern qp(emb);
@@ -565,6 +574,7 @@ private:
 			vertices[element.vertex_id] = 0;
 #endif
 		}
+		//std::cout << "Transforming quick_pattern: " << qp << ", num_vertices = " << vertices.size() << "\n";
 		//construct graph
 		const unsigned number_vertices = vertices.size();
 		assert(!opt_directed);
@@ -579,9 +589,12 @@ private:
 		assert(qp.get_size() > 1);
 		for(unsigned index = 1; index < qp.get_size(); ++index) {
 			auto element = qp.at(index);
-			VertexId from = qp.at(element.history_info).vertex_id;
-			VertexId to = element.vertex_id;
-			//std::cout << "add edge " << index << " ...\n";
+			//std::cout << "element: " << element << "\n";
+			VertexId from, to;
+			if (qp.is_vertex_induced()) from = qp.get_vertex(element.history_info);
+			else from = qp.at(element.history_info).vertex_id;
+			to = element.vertex_id;
+			//std::cout << "add edge (" << from << "," << to << ")\n";
 			g->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.history_info, index));
 			//std::cout << "edge added\n";
 		}
