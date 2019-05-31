@@ -561,8 +561,8 @@ int main(int argc, char** argv) noexcept {
         // Also set the counter for how many directions are remaining
         // on the current node.
         auto& node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
-        // TODO: relax consistency model here.
-        node_data.scatter_use_counter = num_directions;
+        // TODO: Can this be done without atomics as well?
+        node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
       },
       galois::loopname("Initialize counters"));
 
@@ -657,7 +657,6 @@ int main(int argc, char** argv) noexcept {
                   radiation_magnitudes[other_magnitude_idx].counter;
               // Work items are buffered locally until the end of each loop
               // iteration, so we can send outgoing edges here immediately.
-              // TODO: Relax atomic consistency here.
               if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
                 work_t new_work_item{other_node, dir_idx};
                 ctx.push(new_work_item);
@@ -706,8 +705,6 @@ int main(int argc, char** argv) noexcept {
           atomic_relaxed_double_increment(scattering_atomic,
                                           scattering_contribution);
 
-          // TODO: Relax memory consistency requirements here.
-          // NOT MUCH THOUGH.
           if (!(node_data.scatter_use_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
             // Reset counter for next time step.
             node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
