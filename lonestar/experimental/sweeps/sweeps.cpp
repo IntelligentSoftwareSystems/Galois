@@ -542,14 +542,18 @@ int main(int argc, char** argv) noexcept {
               radiation_magnitudes[num_per_element * node +
                                    num_per_element_and_direction * dir_idx]
                   .counter;
-          // TODO: relax consistency model here.
+          std::size_t local_counter = 0;
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
             if (graph.getEdgeDst(edge) >= ghost_threshold)
               continue;
-            counter +=
-                is_incoming(directions[dir_idx], graph.getEdgeData(edge));
+            local_counter += is_incoming(directions[dir_idx], graph.getEdgeData(edge));
           }
-          if (counter == 0) {
+          // TODO: This stage is embarassingly parallel,
+          // but writing the value as a size_t and then
+          // later using it as an atomic is undefined behavior,
+          // so, is there some way around this?
+          counter.store(local_counter, std::memory_order_relaxed);
+          if (!local_counter) {
             work_t work_item{node, dir_idx};
             starting_nodes.emplace(work_item);
           }
@@ -570,7 +574,7 @@ int main(int argc, char** argv) noexcept {
     for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
       std::size_t local_counter = 0;
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)))
+        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) && graph.getEdgeDst(edge) < ghost_threshold)
           local_counter++;
       }
       assert(("Dependency counter not set propertly.",
@@ -626,7 +630,7 @@ int main(int argc, char** argv) noexcept {
               num_per_element * node + num_per_element_and_direction * dir_idx;
           auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
           assert(("Work item asked to run before it was actually ready.",
-                  !counter));
+                  !counter.load(std::memory_order_relaxed)));
           auto& node_data =
               graph.getData(node, galois::MethodFlag::UNPROTECTED);
           // Re-count incoming edges during this computation.
@@ -654,7 +658,7 @@ int main(int argc, char** argv) noexcept {
               // Work items are buffered locally until the end of each loop
               // iteration, so we can send outgoing edges here immediately.
               // TODO: Relax atomic consistency here.
-              if (--other_counter == 0) {
+              if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
                 work_t new_work_item{other_node, dir_idx};
                 ctx.push(new_work_item);
               }
@@ -696,7 +700,7 @@ int main(int argc, char** argv) noexcept {
                 scattering_contribution_coef * node_magnitude;
           }
           // Reset dependency counter for next pass.
-          counter = incoming_edges;
+          counter.store(incoming_edges, std::memory_order_relaxed);
           // Update scattering source for use in next step.
           auto& scattering_atomic = node_data.currently_accumulating_scattering;
           atomic_relaxed_double_increment(scattering_atomic,
@@ -704,11 +708,11 @@ int main(int argc, char** argv) noexcept {
 
           // TODO: Relax memory consistency requirements here.
           // NOT MUCH THOUGH.
-          if (--node_data.scatter_use_counter == 0) {
+          if (!(node_data.scatter_use_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
             // Reset counter for next time step.
-            node_data.scatter_use_counter = num_directions;
+            node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
             double abs_change =
-                std::abs(node_data.currently_accumulating_scattering -
+                std::abs(node_data.currently_accumulating_scattering.load(std::memory_order_relaxed) -
                          node_data.previous_accumulated_scattering);
             atomic_relaxed_double_max(global_abs_change, abs_change);
             // Move currently_accumulating_scattering value into
@@ -716,8 +720,8 @@ int main(int argc, char** argv) noexcept {
             // and then zero currently_accumulating_scattering for the next
             // iteration.
             node_data.previous_accumulated_scattering =
-                node_data.currently_accumulating_scattering;
-            node_data.currently_accumulating_scattering = 0.;
+                node_data.currently_accumulating_scattering.load(std::memory_order_relaxed);
+            node_data.currently_accumulating_scattering.store(0., std::memory_order_relaxed);
           }
         },
         galois::loopname("Sweep"), galois::no_conflicts(),
