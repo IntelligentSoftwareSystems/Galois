@@ -589,10 +589,7 @@ int main(int argc, char** argv) noexcept {
   // Approximate priority used to improve performance of main loop.
   // Currently just a placeholder for a more intelligent priority.
   // Various sweeps papers mention heuristics for this.
-  typedef galois::worklists::PerSocketChunkFIFO<32> PSchunk;
-  auto indexer = [](const work_t& n) { return 1; };
-  typedef galois::worklists::OrderedByIntegerMetric<decltype(indexer), PSchunk>
-      OBIM;
+  typedef galois::worklists::PerSocketChunkFIFO<64> PSchunk;
 
   // Set up separate buffers for accumulating the per-group fluxes.
   // This is just to hold temporaries inside the main parallel loop,
@@ -722,7 +719,7 @@ int main(int argc, char** argv) noexcept {
           }
         },
         galois::loopname("Sweep"), galois::no_conflicts(),
-        galois::wl<OBIM>(indexer));
+        galois::wl<PSchunk>());
     if (print_convergence)
       std::cout << global_abs_change << std::endl;
 
