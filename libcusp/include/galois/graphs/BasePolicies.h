@@ -64,20 +64,6 @@ class PartitioningScaffold {
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
   }
-
-  /**
-   * If a policy doesn't communicate during partitioning, this function should
-   * return true. By default, it returns false.
-   */
-  virtual bool noCommunication() { return false; }
-  /**
-   * Returns the cartesian grid of hosts used for a Cartesian cut. If there is
-   * no concept of this in partitioning policy being used, it should return
-   * (0,0).
-   */
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
-    return std::make_pair(0u, 0u);
-  }
 };
 
 /**
@@ -313,7 +299,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
       const std::vector<uint64_t>& edgeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
-    return 0;
+    return (uint32_t)-1;
   }
 
   /**

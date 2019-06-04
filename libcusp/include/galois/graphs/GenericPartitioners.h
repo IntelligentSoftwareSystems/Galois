@@ -16,10 +16,13 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
     return getMaster(src);
   }
 
-  virtual bool noCommunication() { return true; }
+  bool noCommunication() { return true; }
   bool isVertexCut() const { return false; }
   void serializePartition(boost::archive::binary_oarchive&) { return; }
   void deserializePartition(boost::archive::binary_iarchive&) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,6 +83,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     return _h_offset + i;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
     return true;
@@ -93,7 +97,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -157,6 +161,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     return _h_offset + i;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
     return true;
@@ -172,7 +177,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -195,6 +200,7 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
     }
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) {
@@ -202,6 +208,9 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
   }
   void deserializePartition(boost::archive::binary_iarchive& ar) {
     return;
+  }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
   }
 };
 
@@ -344,10 +353,14 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
     }
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 class FennelP : public galois::graphs::CustomMasterAssignment {
@@ -481,10 +494,14 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
     return getMaster(src);
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return false; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 class SugarP : public galois::graphs::CustomMasterAssignment {
@@ -662,79 +679,11 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     return blockedRowOffset + cyclicColumnOffset;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
     return true;
   }
-
-  //bool isNotCommunicationPartner(unsigned host, unsigned syncType,
-  //                               WriteLocation writeLocation,
-  //                               ReadLocation readLocation,
-  //                               bool transposed) {
-  //  if (transposed) {
-  //    if (syncType == 0) {
-  //      switch (writeLocation) {
-  //      case writeSource:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case writeDestination:
-  //        return (gridRowID() != gridRowID(host));
-  //      case writeAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    } else { // syncBroadcast
-  //      switch (readLocation) {
-  //      case readSource:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case readDestination:
-  //        return (gridRowID() != gridRowID(host));
-  //      case readAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    }
-  //  } else {
-  //    if (syncType == 0) {
-  //      switch (writeLocation) {
-  //      case writeSource:
-  //        return (gridRowID() != gridRowID(host));
-  //      case writeDestination:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case writeAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    } else { // syncBroadcast, 1
-  //      switch (readLocation) {
-  //      case readSource:
-  //        return (gridRowID() != gridRowID(host));
-  //      case readDestination:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case readAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    }
-  //    return false;
-  //  }
-  //  return false;
-  //}
 
   void serializePartition(boost::archive::binary_oarchive& ar) {
     ar << numRowHosts;
@@ -746,7 +695,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -928,6 +877,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     return blockedRowOffset + cyclicColumnOffset;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
     return true;
@@ -941,10 +891,9 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
-
 };
 
 #endif
