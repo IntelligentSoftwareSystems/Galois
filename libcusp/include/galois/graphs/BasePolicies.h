@@ -86,7 +86,7 @@ class ReadMasterAssignment : public PartitioningScaffold {
    * @param gid GID of node to get master of
    * @returns Host ID of host that read the node specified by the GID.
    */
-  uint32_t getMaster(uint32_t gid) const {
+  uint32_t retrieveMaster(uint32_t gid) const {
     for (auto h = 0U; h < _numHosts; ++h) {
       uint64_t start, end;
       std::tie(start, end) = _gid2host[h];
@@ -113,8 +113,9 @@ class ReadMasterAssignment : public PartitioningScaffold {
 
   /**
    * Does nothing because this policy doesn't have a master assignment phase.
+   * (uses read assignment)
    */
-  template<typename EdgeTy> uint32_t determineMaster(uint32_t,
+  template<typename EdgeTy> uint32_t getMaster(uint32_t,
       galois::graphs::BufferedGraph<EdgeTy>&,
       const std::vector<uint32_t>&,
       std::unordered_map<uint64_t, uint32_t>&,
@@ -176,17 +177,14 @@ class CustomMasterAssignment : public PartitioningScaffold {
     PartitioningScaffold(hostID, numHosts, numNodes, numEdges), _status(0) {}
 
   /**
-   * Implementation of get master: does not fail if a GID
+   * Retrieves a saved master mapping: does not fail if a GID
    * mapping is not found but instead returns -1 if in stage 1, else
    * fails.
-   *
-   * @todo This should be internal getMaster call; user should not redefine this
-   * Also change function name since this is internal call
    *
    * @param gid GID to get master of
    * @returns Master of specified GID, -1, unsigned, if not found
    */
-  uint32_t getMaster(uint32_t gid) const {
+  uint32_t retrieveMaster(uint32_t gid) const {
     if (_status != 0) {
       // use map if not a locally read node, else use vector
       if (getHostReader(gid) != _hostID) {
@@ -206,7 +204,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
           if (_status == 2) {
             // die if we expect all gids to be mapped already (stage 2)
             GALOIS_DIE("should not fail to find a GID after stage 2 "
-                       "partitioning");
+                       "of master assignment phase");
           }
           return (uint32_t)-1;
         }
@@ -277,7 +275,6 @@ class CustomMasterAssignment : public PartitioningScaffold {
    * This function should be defined by user in child class to assign a node to
    * a host.
    *
-   * @todo Rename to "getMaster" to be consistent with CuSP paper.
    * @todo Consolidate metadata into single struct to clean up function.
    *
    * @param src Node to determine master of
@@ -289,8 +286,10 @@ class CustomMasterAssignment : public PartitioningScaffold {
    * @param nodeAccum Newly accumualted node counts to be processed later
    * @param edgeLoads Current edge load information for each host in system
    * @param edgeAccum Newly accumulated edge counts to be processed later
+   *
+   * @returns Host id in which to assing a node
    */
-  template<typename EdgeTy> uint32_t determineMaster(
+  template<typename EdgeTy> uint32_t getMaster(
       uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,

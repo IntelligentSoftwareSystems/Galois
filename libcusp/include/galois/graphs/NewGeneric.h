@@ -79,12 +79,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
   virtual unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    return graphPartitioner->getMaster(gid);
+    return graphPartitioner->retrieveMaster(gid);
   }
 
   virtual bool isOwned(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    return (graphPartitioner->getMaster(gid) == base_DistGraph::id);
+    return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
   }
 
   virtual bool isLocal(uint64_t gid) const {
@@ -1267,9 +1267,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
   /**
-   * Phase responsible for initial master assignment. Partitioner should
-   * have required functions such as determineMasters and such to make this
-   * run without issue.
+   * Phase responsible for initial master assignment.
    *
    * @param bufGraph Locally read graph on this host
    * @param async Specifies whether or not do synchronization of node
@@ -1370,7 +1368,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           //ptt.start();
           // determine master function takes source node, iterator of
           // neighbors
-          uint32_t assignedHost = graphPartitioner->determineMaster(node,
+          uint32_t assignedHost = graphPartitioner->getMaster(node,
                                     bufGraph, localNodeToMaster, gid2offsets,
                                     nodeLoads, nodeAccum, edgeLoads, edgeAccum);
           // != -1 means it was assigned a host
@@ -1512,7 +1510,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         auto ee = bufGraph.edgeEnd(n);
         for (; ii < ee; ++ii) {
           uint32_t dst = bufGraph.edgeDestination(*ii);
-          if (graphPartitioner->getMaster(dst) != myID) {
+          if (graphPartitioner->retrieveMaster(dst) != myID) {
             incomingMirrors.set(dst);
           }
         }
@@ -1830,7 +1828,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             numOutgoingEdges[hostBelongs][src - globalOffset] += 1;
             hostHasOutgoing.set(hostBelongs);
             bool hostIsMasterOfDest =
-              (hostBelongs == graphPartitioner->getMaster(dst));
+              (hostBelongs == graphPartitioner->retrieveMaster(dst));
 
             // this means a mirror must be created for destination node on
             // that host since it will not be created otherwise
@@ -1936,7 +1934,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           if (hostOutgoingEdges[i] > 0) {
             // get master of i
             masterLocation[threadStartLocation + handledNodes] =
-                graphPartitioner->getMaster(i + startNode);
+                graphPartitioner->retrieveMaster(i + startNode);
             handledNodes++;
           }
         }
@@ -1968,7 +1966,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     //galois::do_all(
     //  galois::iterate((size_t)0, firstBound),
     //  [&] (size_t offset) {
-    //    masterMap[offset] = graphPartitioner->getMaster(bitsetOffsets[offset]);
+    //    masterMap[offset] = graphPartitioner->retrieveMaster(bitsetOffsets[offset]);
     //  },
     //  galois::no_stats()
     //);
@@ -1977,7 +1975,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       //galois::iterate((size_t)secondBound, numOfNodes),
       galois::iterate((size_t)0, numOfNodes),
       [&] (size_t offset) {
-        masterMap[offset] = graphPartitioner->getMaster(bitsetOffsets[offset]);
+        masterMap[offset] = graphPartitioner->retrieveMaster(bitsetOffsets[offset]);
       },
       galois::no_stats()
     );
@@ -2297,8 +2295,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           for (size_t i = beginNode; i < endNode; i++) {
             //galois::gDebug("[", base_DistGraph::id, "] ", i + startNode,
             //               " mapped to ",
-            //               graphPartitioner->getMaster(i+startNode));
-            if (graphPartitioner->getMaster(i + startNode) == myHID) {
+            //               graphPartitioner->retrieveMaster(i+startNode));
+            if (graphPartitioner->retrieveMaster(i + startNode) == myHID) {
               count++;
             }
           }
@@ -2343,7 +2341,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             for (size_t i = beginNode; i < endNode; i++) {
               uint32_t globalID = startNode + i;
               // if this node is master, get outgoing edges + save mapping
-              if (graphPartitioner->getMaster(globalID) == myHID) {
+              if (graphPartitioner->retrieveMaster(globalID) == myHID) {
                 // check size
                 if (numOutgoingEdges[h].size() > 0) {
                   uint64_t myEdges = numOutgoingEdges[h][i];
@@ -2609,7 +2607,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::mirrorNodes.reserve(base_DistGraph::numNodes - base_DistGraph::numOwned);
     for (uint32_t i = base_DistGraph::numOwned; i < base_DistGraph::numNodes; i++) {
       uint32_t globalID = base_DistGraph::localToGlobalVector[i];
-      base_DistGraph::mirrorNodes[graphPartitioner->getMaster(globalID)].
+      base_DistGraph::mirrorNodes[graphPartitioner->retrieveMaster(globalID)].
               push_back(globalID);
     }
   }
