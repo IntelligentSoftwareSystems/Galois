@@ -586,9 +586,11 @@ int main(int argc, char** argv) noexcept {
   }
 #endif // !defined(NDEBUG)
 
-  // Approximate priority used to improve performance of main loop.
-  // Currently just a placeholder for a more intelligent priority.
-  // Various sweeps papers mention heuristics for this.
+  // Various sweeps papers mention that using topological depth as a
+  // heuristic to make sure that parallelism opens up quickly is an important
+  // optimization, but that isn't true with this implementation. Perhaps it'll
+  // matter more in distributed settings or when using GPUs.
+  // For shared memory though, a simple chunked FIFO queue is better.
   typedef galois::worklists::PerSocketChunkFIFO<64> PSchunk;
 
   // Set up separate buffers for accumulating the per-group fluxes.
