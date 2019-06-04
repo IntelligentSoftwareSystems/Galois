@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file BasePolicies.h
+ *
+ * Header file that includes the base classes for defining CuSP partitioning
+ * policies.
+ */
+
 #ifndef _GALOIS_CUSP_PSCAFFOLD_H_
 #define _GALOIS_CUSP_PSCAFFOLD_H_
 
