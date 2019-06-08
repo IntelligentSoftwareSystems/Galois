@@ -41,22 +41,25 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#include "Mining/element.h"
+typedef SimpleElement ElementType;
 #include "Mining/miner.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
+typedef BaseEmbedding EmbeddingT;
+typedef BaseEmbeddingQueue EmbeddingQueueT;
 
 // insert edges into the worklist (task queue)
-void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
+void initialization(Graph& graph, EmbeddingQueueT &queue) {
 	if(show) printf("\n=============================== Init ================================\n");
-	galois::do_all(
-		galois::iterate(graph.begin(), graph.end()),
+	galois::do_all(galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
 				if (src < dst) {
-					BaseEmbedding new_emb;
-					new_emb.push_back(src);
-					new_emb.push_back(dst);
+					EmbeddingT new_emb;
+					new_emb.push_back(ElementType(src));
+					new_emb.push_back(ElementType(dst));
 					queue.push_back(new_emb);
 				}
 			}
@@ -67,9 +70,9 @@ void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
 
 void KclSolver(Graph& graph, Miner &miner) {
 	if(show) std::cout << "\n=============================== Start ===============================\n";
-	BaseEmbeddingQueue queue, queue2;
+	EmbeddingQueueT queue, queue2;
 	initialization(graph, queue);
-	if(show) printout_embeddings(0, miner, queue);
+	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (level < k-1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
@@ -77,15 +80,14 @@ void KclSolver(Graph& graph, Miner &miner) {
 		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
-			[&](const BaseEmbedding& emb, auto& ctx) {
+			[&](const EmbeddingT& emb, auto& ctx) {
 				miner.extend_vertex(emb, queue2);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("ExtendVertex")
 		);
-		miner.update_embedding_size(); // increase the embedding size since one more edge added
-		if(show) printout_embeddings(level, miner, queue2);
+		if(show) queue.printout_embeddings(level);
 
 		if(show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		queue.clear();
@@ -100,7 +102,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 		SimpleMap map;
 		galois::for_each(
 			galois::iterate(queue2),
-			[&](BaseEmbedding& emb, auto& ctx) {
+			[&](EmbeddingT& emb, auto& ctx) {
 				miner.aggregate_clique_each(emb, *(lmap.getLocal()), queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -121,7 +123,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 			}
 		}
 #endif
-		if(show) printout_embeddings(level, miner, queue);
+		if(show) queue.printout_embeddings(level);
 		level ++;
 	}
 	if(show) std::cout << "\n=============================== Done ================================\n";

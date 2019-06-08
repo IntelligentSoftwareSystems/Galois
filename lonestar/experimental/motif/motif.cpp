@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 const char* name = "Motif Counting";
-const char* desc = "Counts the motifs in a graph using BFS traversal";
+const char* desc = "Counts the edge-induced motifs in a graph using BFS traversal";
 const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
@@ -39,12 +39,16 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#include "Mining/element.h"
+typedef StructuralElement ElementType;
 #include "Mining/miner.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
+typedef EdgeEmbedding EmbeddingT;
+typedef EdgeEmbeddingQueue EmbeddingQueueT;
 
 // insert edges into the worklist (task queue)
-void initialization(Graph& graph, EmbeddingQueue &queue) {
+void initialization(Graph& graph, EmbeddingQueueT &queue) {
 	printf("\n=============================== Init ================================\n\n");
 	galois::do_all(
 		// for each vertex
@@ -55,7 +59,7 @@ void initialization(Graph& graph, EmbeddingQueue &queue) {
 				GNode dst = graph.getEdgeDst(e);
 				if(src < dst) {
 					// create a new embedding
-					Embedding new_emb;
+					EmbeddingT new_emb;
 					new_emb.push_back(ElementType(src));
 					new_emb.push_back(ElementType(dst));
 					queue.push_back(new_emb);
@@ -70,9 +74,9 @@ void initialization(Graph& graph, EmbeddingQueue &queue) {
 
 void MotifSolver(Graph& graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
-	EmbeddingQueue queue, queue2; // task queues. double buffering
+	EmbeddingQueueT queue, queue2; // task queues. double buffering
 	initialization(graph, queue); // initialize the task queue
-	if(show) printout_embeddings(0, miner, queue);
+	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	int queue_size = std::distance(queue.begin(), queue.end());
 	unsigned max_num_edges = k * (k - 1) / 2; // maximum number of edges in k-motif (i.e. k-clique)
@@ -85,17 +89,16 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		// for each embedding in the task queue, do the edge-extension operation
 		galois::for_each(
 			galois::iterate(queue),
-			[&](const Embedding& emb, auto& ctx) {
+			[&](const EmbeddingT& emb, auto& ctx) {
 				miner.extend_edge(k, emb, queue2); // edge extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Expanding")
 		);
-		miner.update_embedding_size(); // increase the embedding size since one more edge added
 		queue.swap(queue2);
 		queue2.clear();
-		if(show) printout_embeddings(level, miner, queue);
+		if(show) queue.printout_embeddings(level);
 
 		std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
@@ -105,7 +108,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
 		galois::for_each(
 			galois::iterate(queue),
-			[&](Embedding& emb, auto& ctx) {
+			[&](EmbeddingT& emb, auto& ctx) {
 				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -130,7 +133,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(
 			galois::iterate(qp_map),
-			[&](std::pair<QuickPattern, Frequency> qp) {
+			[&](std::pair<QPattern, Frequency> qp) {
 				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),

@@ -7,8 +7,12 @@ typedef std::unordered_set<VertexId> VertexSet;
 typedef std::unordered_map<VertexId, BYTE> VertexMap;
 typedef std::vector<bliss::Graph::Vertex> BlissVertexList;
 
+template <typename EmbeddingTy, typename ElementTy> class CanonicalGraph;
+template <typename EmbeddingTy, typename ElementTy> std::ostream& operator<<(std::ostream& strm, const CanonicalGraph<EmbeddingTy, ElementTy>& cg);
+
+template <typename EmbeddingTy, typename ElementTy>
 class CanonicalGraph {
-	friend std::ostream & operator<<(std::ostream & strm, const CanonicalGraph& cg);
+	friend std::ostream & operator<< <>(std::ostream & strm, const CanonicalGraph<EmbeddingTy,ElementTy>& cg);
 public:
 	CanonicalGraph() : number_of_vertices(0), hash_value(0) {}
 	CanonicalGraph(bliss::AbstractGraph* ag, bool is_directed) {
@@ -17,34 +21,34 @@ public:
 	~CanonicalGraph() {}
 	int cmp(const CanonicalGraph& other_cg) const {
 		//compare the numbers of vertices
-		if(get_number_vertices() < other_cg.get_number_vertices()) return -1;
-		if(get_number_vertices() > other_cg.get_number_vertices()) return 1;
+		if(get_num_vertices() < other_cg.get_num_vertices()) return -1;
+		if(get_num_vertices() > other_cg.get_num_vertices()) return 1;
 		//compare hash value
 		if(get_hash() < other_cg.get_hash()) return -1;
 		if(get_hash() > other_cg.get_hash()) return 1;
 		//compare edges
 		assert(embedding.size() == other_cg.embedding.size());
 		for(unsigned i = 0; i < embedding.size(); ++i) {
-			const auto & t1 = embedding[i];
-			const auto & t2 = other_cg.embedding[i];
+			const auto & t1 = embedding.get_element(i);
+			const auto & t2 = other_cg.embedding.get_element(i);
 			int cmp_element = t1.cmp(t2);
 			if(cmp_element != 0) return cmp_element;
 		}
 		return 0;
 	}
 	inline unsigned get_hash() const { return hash_value; }
-	inline int get_number_vertices() const { return number_of_vertices; }
+	inline int get_num_vertices() const { return number_of_vertices; }
 	//operator for map
 	inline bool operator==(const CanonicalGraph& other) const { return cmp(other) == 0; }
-	inline Embedding& get_embedding() { return embedding; }
-	inline Embedding get_embedding_const() const { return embedding; }
+	//inline EmbeddingTy& get_embedding() { return embedding; }
+	inline EmbeddingTy get_embedding() const { return embedding; }
 	inline void set_number_vertices(int num_vertices) { number_of_vertices = num_vertices; }
 	inline void set_hash_value(unsigned int hash) { hash_value = hash; }
 	inline unsigned get_quick_pattern_index(unsigned i) { return qp_idx[i]; }
 	inline unsigned get_id() const { return hash_value; }
 
 private:
-	Embedding embedding;
+	EmbeddingTy embedding;
 	std::vector<int> qp_idx;
 	int number_of_vertices;
 	unsigned hash_value;
@@ -100,12 +104,12 @@ private:
 	}
 	void push_first_element(VertexId first, VertexMap& map, BlissVertexList& vertices){
 		map[first] = 0;
-		embedding.push_back(ElementType(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
+		embedding.push_back(ElementTy(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
 	}
 	void push_element(Edge& edge, VertexMap& map, BlissVertexList& vertices){
 		assert(edge.src < edge.target);
 		if(map.find(edge.src) != map.end()) {
-			embedding.push_back(ElementType(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
+			embedding.push_back(ElementTy(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
 #ifdef USE_DOMAIN
 			qp_idx.push_back(edge.target_domain);
 #endif
@@ -114,7 +118,7 @@ private:
 				map[edge.target] = s;
 			}
 		} else if(map.find(edge.target) != map.end()) {
-			embedding.push_back(ElementType(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
+			embedding.push_back(ElementTy(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
 #ifdef USE_DOMAIN
 			qp_idx.push_back(edge.src_domain);
 #endif
@@ -155,16 +159,17 @@ private:
 	}
 };
 
-std::ostream & operator<<(std::ostream & strm, const CanonicalGraph& cg) {
-	//strm << "{" << cg.get_embedding_const() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
-	strm << "{" << cg.get_embedding_const() << "; " << cg.get_number_vertices() << "}";
+template <typename EmbeddingTy, typename ElementTy>
+std::ostream & operator<<(std::ostream & strm, const CanonicalGraph<EmbeddingTy,ElementTy>& cg) {
+	strm << "{" << cg.embedding << "; " << cg.get_num_vertices() << "}";
 	return strm;
 }
 
 namespace std {
-template<>
-struct hash<CanonicalGraph> {
-	std::size_t operator()(const CanonicalGraph& cg) const {
+//template<>
+template <typename EmbeddingTy, typename ElementTy>
+struct hash<CanonicalGraph<EmbeddingTy,ElementTy> > {
+	std::size_t operator()(const CanonicalGraph<EmbeddingTy,ElementTy>& cg) const {
 		return std::hash<int>()(cg.get_hash());
 	}
 };
