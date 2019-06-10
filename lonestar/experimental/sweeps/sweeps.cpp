@@ -478,9 +478,26 @@ bool is_outgoing(std::array<double, 3> direction,
 
 bool is_incoming(std::array<double, 3> direction,
                  std::array<double, 3> face_normal) noexcept {
-  return direction[0] * face_normal[0] + direction[1] * face_normal[1] +
-             direction[2] * face_normal[2] <
-         0.;
+  auto inner_prod = direction[0] * face_normal[0] +
+                    direction[1] * face_normal[1] +
+                    direction[2] * face_normal[2];
+  if (inner_prod < 0) {
+    return true;
+  } else if (inner_prod > 0) {
+    return false;
+  }
+  // TODO: It may be better not to disambiguate at all and let
+  // cells not have as many incoming edges.
+  // That's fine from the point of view of the numerical method,
+  // but some more restructuring would be needed to handle that
+  // gracefully.
+  // If they are exactly orthogonal, break ties by only using
+  // the normal. Say negative sign indicates incoming.
+  for (std::size_t dim_idx = 0; dim_idx < 3; dim_idx++) {
+    if (face_normal[dim_idx] < 0) return true;
+    if (face_normal[dim_idx] > 0) return false;
+  }
+  assert(("All zero face_normal passed to is_incoming. Can't disambiguate.", false));
 }
 
 // Of the given discrete directions, find the one
