@@ -1,7 +1,7 @@
 #ifndef QUICK_PATTERN_HPP_
 #define QUICK_PATTERN_HPP_
 
-#include "type.h"
+#include "embedding.h"
 
 template <typename EmbeddingTy, typename ElementTy> class QuickPattern;
 template <typename EmbeddingTy, typename ElementTy> std::ostream& operator<<(std::ostream& strm, const QuickPattern<EmbeddingTy, ElementTy>& qp);

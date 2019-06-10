@@ -41,53 +41,35 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define CHUNK_SIZE 256
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
-#include "Mining/miner.h"
-#include "Mining/util.h"
-#define CHUNK_SIZE 256
+#include "Mining/embedding.h"
 typedef BaseEmbedding EmbeddingT;
 typedef BaseEmbeddingQueue EmbeddingQueueT;
+#include "Mining/miner.h"
+#include "Mining/util.h"
 
-// insert edges into the worklist (task queue)
-void initialization(Graph& graph, EmbeddingQueueT &queue) {
-	if(show) printf("\n=============================== Init ================================\n");
-	galois::do_all(galois::iterate(graph.begin(), graph.end()),
-		[&](const GNode& src) {
-			for (auto e : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e);
-				if (src < dst) {
-					EmbeddingT new_emb;
-					new_emb.push_back(ElementType(src));
-					new_emb.push_back(ElementType(dst));
-					queue.push_back(new_emb);
-				}
-			}
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Initialization")
-	);
-}
-
-void KclSolver(Graph& graph, Miner &miner) {
+void KclSolver(Miner &miner) {
 	galois::GAccumulator<unsigned> total_num;
+	total_num.reset();
 	if(show) std::cout << "\n=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2;
-	initialization(graph, queue);
+	miner.init(queue);
 	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
-	assert(k > 2);
 	while (1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		galois::for_each(galois::iterate(queue),
 			[&](const EmbeddingT& emb, auto& ctx) {
-				miner.extend_vertex_clique(emb, queue2, total_num, (level==k-2));
+				miner.extend_vertex_clique(emb, queue2, total_num, (level < k-2));
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Expanding")
 		);
+		if (level == k-2) break;
 		level ++;
-		if (level == k-1) break;
 		queue.swap(queue2);
 		queue2.clear();
 		if(show) queue.printout_embeddings(level);
@@ -104,12 +86,13 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	read_graph(graph, filetype, filename);
 	Tinitial.stop();
+	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	KclSolver(graph, miner);
+	KclSolver(miner);
 	Tcomp.stop();
 	return 0;
 }

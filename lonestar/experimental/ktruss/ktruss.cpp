@@ -42,9 +42,8 @@ typedef Graph::GraphNode GNode;
 typedef std::pair<GNode, GNode> NodePair;
 typedef galois::InsertBag<NodePair> EdgeVec;
 
-#include "Mining/miner.h"
-#include "Mining/util.h"
 #define CHUNK_SIZE 256
+#include "Mining/util.h"
 
 static const uint32_t valid   = 0x0;
 static const uint32_t removed = 0x1;

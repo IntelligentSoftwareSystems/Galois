@@ -1,6 +1,7 @@
 #ifndef CANONICAL_GRAPH_HPP_
 #define CANONICAL_GRAPH_HPP_
-#include "type.h"
+
+#include "embedding.h"
 
 typedef std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> EdgeHeap;
 typedef std::unordered_set<VertexId> VertexSet;

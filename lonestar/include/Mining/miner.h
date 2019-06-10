@@ -2,8 +2,6 @@
 #define MINER_HPP_
 #include "quick_pattern.h"
 #include "canonical_graph.h"
-#include "galois/Bag.h"
-#include "galois/Galois.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/SimpleLock.h"
 
@@ -29,34 +27,7 @@ typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
 typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
 typedef galois::substrate::PerThreadStorage<SimpleMap> LocalSimpleMap;
 typedef galois::substrate::PerThreadStorage<Map3Motif> LocalMap;
-
-// print out the embeddings in the task queue
-template <typename EmbeddingTy>
-class EmbeddingQueue : public galois::InsertBag<EmbeddingTy> {
-public:
-	void printout_embeddings(int level, bool verbose = false) {
-		int num_embeddings = std::distance(this->begin(), this->end());
-		unsigned embedding_size = (level+2)* sizeof(ElementType);
-		std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size = " << embedding_size << " Bytes)" << std::endl;
-		if(verbose) for (auto embedding : *this) printout_embedding(level, embedding);
-	}
-private:
-	void printout_embedding(int level, EmbeddingTy emb) {
-		if(emb.size() == 0) {
-			std::cout << "(empty)";
-			return;
-		}
-		std::cout << "(";
-		for(unsigned index = 0; index < emb.size() - 1; ++index)
-			std::cout << emb.get_vertex(index) << ", ";
-		std::cout << emb.get_vertex(emb.size()-1);
-		std::cout << ")\n";
-	}
-};
-
-typedef EmbeddingQueue<EdgeEmbedding> EdgeEmbeddingQueue;
-typedef EmbeddingQueue<BaseEmbedding> BaseEmbeddingQueue;
-typedef EmbeddingQueue<VertexEmbedding> VertexEmbeddingQueue;
+typedef galois::GAccumulator<unsigned> UintAccu;
 
 class Miner {
 public:
@@ -66,6 +37,37 @@ public:
 		degree_counting();
 	}
 	virtual ~Miner() {};
+	// insert single-edge embeddings into the embedding queue (worklist)
+	inline void init(EmbeddingQueueT &queue) {
+		if (show) printf("\n=============================== Init ================================\n\n");
+		galois::do_all(galois::iterate(graph->begin(), graph->end()),
+			[&](const GNode& src) {
+#ifdef ENABLE_LABEL
+				auto& src_label = graph->getData(src);
+#endif
+				for (auto e : graph->edges(src)) {
+					GNode dst = graph->getEdgeDst(e);
+					if(src < dst) {
+#ifdef ENABLE_LABEL
+						auto& dst_label = graph->getData(dst);
+#endif
+						EmbeddingT new_emb;
+#ifdef ENABLE_LABEL
+						new_emb.push_back(ElementType(src, 0, src_label));
+						new_emb.push_back(ElementType(dst, 0, dst_label));
+#else
+						new_emb.push_back(ElementType(src));
+						new_emb.push_back(ElementType(dst));
+#endif
+						queue.push_back(new_emb);
+					}
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Initialization")
+		);
+	}
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
 	void extend_edge(unsigned max_size, EdgeEmbedding emb, EdgeEmbeddingQueue &queue) {
 		unsigned size = emb.size();
@@ -96,7 +98,7 @@ public:
 					}
 					// number of vertices must be smaller than k.
 					// check if this is automorphism
-					if(num_vertices <= max_size && !is_automorphism(emb, i, id, dst, vertex_existed)) {
+					if(num_vertices <= max_size && !is_edgeInduced_automorphism(emb, i, id, dst, vertex_existed)) {
 						ElementType new_element(dst, (BYTE)num_vertices, edge_label, dst_label, (BYTE)i);
 						// insert the new extended embedding into the queue
 						emb.push_back(new_element);
@@ -108,20 +110,21 @@ public:
 		}
 	}
 	// Given an embedding, extend it with one more vertex. Used for vertex-induced k-motif
-	void extend_vertex_motif(VertexEmbedding emb, VertexEmbeddingQueue &queue) {
+	void extend_vertex_motif(const VertexEmbedding &emb, VertexEmbeddingQueue &queue) {
 		unsigned n = emb.size();
-		//emb.resize_connected();
-		//std::set<VertexId> vertices_set;
-		//vertices_set.reserve(n);
-		//for(unsigned i = 0; i < size; i ++) vertices_set.insert(emb.get_vertex(i));
-		for(unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i); // get the last vertex
-			for(auto e : graph->edges(src)) {
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					emb.push_back(dst);
-					queue.push_back(emb);
-					emb.pop_back();
+					VertexEmbedding new_emb(emb);
+					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+					//if (emb.get_qpid() == 0) accumulators[6] += 1;
+					//else accumulators[7] += 1;
+					new_emb.push_back(dst);
+					new_emb.set_qpid(pid);
+					queue.push_back(new_emb);
+					//emb.pop_back();
 				}
 			}
 		}
@@ -143,19 +146,18 @@ public:
 		}
 	}
 	// Given an embedding, extend it with one more vertex. Used for k-cliques.
-	void extend_vertex_clique(BaseEmbedding emb, BaseEmbeddingQueue &queue, galois::GAccumulator<unsigned> &num, bool need_update = true) {
+	void extend_vertex_clique(BaseEmbedding emb, BaseEmbeddingQueue &queue, UintAccu &num, bool need_update = true) {
 		unsigned n = emb.size();
 		VertexId src = emb.get_vertex(n-1); // toExpand
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
 			if (dst > src) { // toAdd
 				if (is_all_connected(dst, emb)) {
-					num += 1;
 					if (need_update) {
 						emb.push_back(dst);
 						queue.push_back(emb);
 						emb.pop_back();
-					}
+					} else num += 1;
 				}
 			}
 		}
@@ -187,15 +189,17 @@ public:
 		}
 		else sm[emb] = 1;
 	}
-	void aggregate_motif_each(VertexEmbedding emb, Map3Motif& map) {
+	void aggregate_motif_each(const VertexEmbedding &emb, std::vector<UintAccu> &accumulators) {
 		unsigned n = emb.size();
-		if (n == 3) {
-			//if (emb.is_connected(2, 0) && emb.is_connected(2, 1)) {
-			//if (is_connected(emb.get_vertex(2), emb.get_vertex(0)) && is_connected(emb.get_vertex(2), emb.get_vertex(1))) {
-			if (is_connected(emb.get_vertex(0), emb.get_vertex(2)) && is_connected(emb.get_vertex(1), emb.get_vertex(2))) {
-				map[0] += 1; // number of triangles
-			} else map[1] += 1; // number of three-chains
-		} else if (n == 4) {
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+					accumulators[pid] += 1;
+				}
+			}
 		}
 	}
 	void quick_aggregate(EdgeEmbeddingQueue &queue, QpMapFreq &qp_map) {
@@ -409,9 +413,20 @@ public:
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 			std::cout << "{" << it->first << " --> " << it->second << std::endl;
 	}
-	void printout_motifs(Map3Motif map) {
-		std::cout << "triangles --> " << map[0] << std::endl;
-		std::cout << "three-chains --> " << map[1] << std::endl;
+	void printout_motifs(std::vector<UintAccu> &accumulators) {
+		std::cout << std::endl;
+		if (accumulators.size() == 2) {
+			std::cout << "\ttriangles --> " << accumulators[0].reduce() << std::endl;
+			std::cout << "\t3-chains --> " << accumulators[1].reduce() << std::endl;
+		} else {
+			std::cout << "\t4-paths --> " << accumulators[0].reduce() << std::endl;
+			std::cout << "\t3-stars --> " << accumulators[1].reduce() << std::endl;
+			std::cout << "\t4-cycles --> " << accumulators[2].reduce() << std::endl;
+			std::cout << "\ttailed-triangles --> " << accumulators[3].reduce() << std::endl;
+			std::cout << "\tdiamonds --> " << accumulators[4].reduce() << std::endl;
+			std::cout << "\t4-cliques --> " << accumulators[5].reduce() << std::endl;
+		}
+		std::cout << std::endl;
 	}
 	unsigned support_count(const CgMapDomain cg_map, UintMap &support_map) {
 		unsigned count = 0;
@@ -519,54 +534,22 @@ private:
 			galois::loopname("DegreeCounting")
 		);
 	}
-	inline bool is_vertexInduced_automorphism(VertexEmbedding& emb, unsigned idx, VertexId src, VertexId dst) {
+	inline bool is_vertexInduced_automorphism(const VertexEmbedding& emb, unsigned idx, VertexId src, VertexId dst) {
 		unsigned n = emb.size();
 		// the new vertex id should be larger than the first vertex id
 		if (dst <= emb.get_vertex(0)) return true;
 		// the new vertex should not already exist in the embedding
-		///*
-		bool vertex_existed = false;
-		for(unsigned i = 1; i < n; ++i) {
-			if(dst == emb.get_vertex(i)) {
-				vertex_existed = true;
-				break;
-			}
-		}
-		if (vertex_existed) return true;
-		//*/
-		if (idx == 0) {
-			//emb.set_connected(n,0);
-			for(unsigned i = 1; i < n; ++i)
-				if (dst < emb.get_vertex(1)) return true;
-			if (is_connected(emb.get_vertex(1), dst))
-				//emb.set_connected(n,1);
-			return false;
-		}
-		//if (idx == 1 && vertices_set.find(dst) != vertices_set.end()) return true;
-		if (idx == 1) {
-			//emb.set_connected(n,1);
-			if (is_connected(emb.get_vertex(0), dst)) return true;
-			else {
-				for(unsigned i = 2; i < n; ++i)
-					if (dst < emb.get_vertex(1)) return true;
-				return false;
-			}
-		}
-		///*
-		// find the first vertex in the embedding that is connected to the new vertex
-		unsigned first = n - 1;
-		for(unsigned i = 0; i < n; ++i) {
-			if (is_connected(emb.get_vertex(i), dst)) {
-				first = i;
-				break;
-			}
-		}
-		for(unsigned i = first+1; i < n; ++i)
-			if(dst < emb.get_vertex(i)) return true;
-		//*/
+		for (unsigned i = 1; i < n; ++i)
+			if (dst == emb.get_vertex(i)) return true;
+		// the new vertex should not already be expanded by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(emb.get_vertex(i), dst)) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < n; ++i)
+			if (dst < emb.get_vertex(i)) return true;
 		return false;
 	}
-	inline bool is_automorphism(EdgeEmbedding & emb, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
+	inline bool is_edgeInduced_automorphism(const EdgeEmbedding & emb, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
 		//check with the first element
 		if(dst < emb.get_vertex(0)) return true;
 		//check loop edge
@@ -582,7 +565,61 @@ private:
 		}
 		return false;
 	}
-	inline bool edge_existed(EdgeEmbedding & emb, BYTE history, VertexId src, VertexId dst) {
+	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb) {
+		unsigned pid = 0;
+		if (n == 2) { // count 3-motifs
+			pid = 1; // 3-chain
+			if(idx == 0 && is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
+		} else if (n == 3) { // count 4-motifs
+			unsigned num_edges = 1;
+			pid = emb.get_qpid();
+			//std::cout << "Embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+			if (pid == 0) { // expanding a triangle
+				for (unsigned j = 0; j < n; j ++)
+					if (j != idx && is_connected(emb.get_vertex(j), dst)) num_edges ++;
+				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
+				//if (pid == 3) std::cout << "tailed-triangle embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+				//if (pid == 4) std::cout << "diamond embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+				//if (pid == 5) std::cout << "4-clique embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+			} else { // expanding a 3-chain
+				assert(pid == 1);
+				std::vector<bool> connected(3, false);
+				connected[idx] = true;
+				for (unsigned j = 0; j < n; j ++) {
+					if (j != idx && is_connected(emb.get_vertex(j), dst)) {
+						num_edges ++;
+						connected[j] = true;
+					}
+				}
+				if (num_edges == 1) {
+					unsigned center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					if (idx == center) {
+						pid = 1; // p1: 3-star
+						//std::cout << "3-star embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+					} else {
+						pid = 0; // p0: 3-path
+						//std::cout << "3-path embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+					}
+				} else if (num_edges == 2) {
+					unsigned center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					if (connected[center]) {
+						pid = 3; // p3: tailed-triangle
+						//std::cout << "tailed-triangle embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+					} else {
+						pid = 2; // p2: 4-cycle
+						//std::cout << "4-cycle embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+					}
+				} else {
+					pid = 4; // p4: diamond
+					//std::cout << "diamond: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
+				}
+			}
+		} else {
+			std::cout << "5-motif and beyond are not supported for now\n";
+		}
+		return pid;
+	}
+	inline bool edge_existed(const EdgeEmbedding & emb, BYTE history, VertexId src, VertexId dst) {
 		std::pair<VertexId, VertexId> added_edge(src, dst);
 		for(unsigned i = 1; i < emb.size(); ++i) {
 			if(emb.get_vertex(i) == dst && emb.get_vertex(emb.get_history(i)) == src)
@@ -661,7 +698,7 @@ private:
 		}
 		return g;
 	}
-	inline void getEdge(EdgeEmbedding & emb, unsigned index, std::pair<VertexId, VertexId>& edge) {
+	inline void getEdge(const EdgeEmbedding & emb, unsigned index, std::pair<VertexId, VertexId>& edge) {
 		edge.first = emb.get_vertex(emb.get_history(index));
 		edge.second = emb.get_vertex(index);
 		assert(edge.first != edge.second);

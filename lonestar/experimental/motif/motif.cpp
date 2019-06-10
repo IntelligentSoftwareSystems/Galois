@@ -39,43 +39,19 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define CHUNK_SIZE 256
 #include "Mining/element.h"
 typedef StructuralElement ElementType;
-#include "Mining/miner.h"
-#include "Mining/util.h"
-#define CHUNK_SIZE 256
+#include "Mining/embedding.h"
 typedef EdgeEmbedding EmbeddingT;
 typedef EdgeEmbeddingQueue EmbeddingQueueT;
+#include "Mining/miner.h"
+#include "Mining/util.h"
 
-// insert edges into the worklist (task queue)
-void initialization(Graph& graph, EmbeddingQueueT &queue) {
-	printf("\n=============================== Init ================================\n\n");
-	galois::do_all(
-		// for each vertex
-		galois::iterate(graph.begin(), graph.end()),
-		[&](const GNode& src) {
-			// for each edge of this vertex
-			for (auto e : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e);
-				if(src < dst) {
-					// create a new embedding
-					EmbeddingT new_emb;
-					new_emb.push_back(ElementType(src));
-					new_emb.push_back(ElementType(dst));
-					queue.push_back(new_emb);
-				}
-			}
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("Initialization")
-	);
-}
-
-void MotifSolver(Graph& graph, Miner &miner) {
+void MotifSolver(Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2; // task queues. double buffering
-	initialization(graph, queue); // initialize the task queue
+	miner.init(queue); // initialize the task queue
 	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	int queue_size = std::distance(queue.begin(), queue.end());
@@ -87,8 +63,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		std::cout << "\n============================== Level " << level << " ==============================\n";
 		std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
 		// for each embedding in the task queue, do the edge-extension operation
-		galois::for_each(
-			galois::iterate(queue),
+		galois::for_each(galois::iterate(queue),
 			[&](const EmbeddingT& emb, auto& ctx) {
 				miner.extend_edge(k, emb, queue2); // edge extension
 			},
@@ -173,7 +148,7 @@ int main(int argc, char** argv) {
 	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	MotifSolver(graph, miner);
+	MotifSolver(miner);
 	Tcomp.stop();
 	return 0;
 }

@@ -26,6 +26,8 @@
 #include "uintseqhash.hh"
 
 #include "element.h"
+#include "galois/Bag.h"
+#include "galois/Galois.h"
 
 //#ifdef ENABLE_LABEL
 //#define ElementType LabeledElement
@@ -50,8 +52,8 @@ class Embedding {
 public:
 	Embedding() { }
 	~Embedding() {}
-	VertexId get_vertex(unsigned i) { return elements[i].get_vid(); }
-	BYTE get_history(unsigned i) { return elements[i].get_his(); }
+	VertexId get_vertex(unsigned i) const { return elements[i].get_vid(); }
+	BYTE get_history(unsigned i) const { return elements[i].get_his(); }
 	bool empty() const { return elements.empty(); }
 	void push_back(ElementTy ele) { elements.push_back(ele); }
 	void pop_back() { elements.pop_back(); }
@@ -109,15 +111,25 @@ class VertexInducedEmbedding: public BaseEmbedding {
 friend std::ostream & operator<<(std::ostream & strm, const VertexInducedEmbedding& emb);
 public:
 	VertexInducedEmbedding() : BaseEmbedding() { 
-		//num_edges = 1;
+		qp_id = 0;
 		//connected.push_back(true);
+	}
+	VertexInducedEmbedding(const VertexInducedEmbedding &emb) : BaseEmbedding() {
+		elements = emb.get_elements();
+		qp_id = emb.get_qpid();
 	}
 	~VertexInducedEmbedding() {}
 	//unsigned get_num_edges() const { return num_edges; }
 	//void set_num_edges(unsigned i) { num_edges = i; }
 	void set_qpid(unsigned i) { qp_id = i; }
-	unsigned get_qpid() { return qp_id; }
+	unsigned get_qpid() const { return qp_id; }
 	SimpleElement operator[](size_t i) const { return elements[i]; }
+	VertexInducedEmbedding& operator=(const VertexInducedEmbedding& other) {
+		if(this == &other) return *this;
+		elements = other.get_elements();
+		qp_id = other.get_qpid();
+		return *this;
+	}
 	//void resize_connected() { for (size_t i=0; i<size(); i++) connected.push_back(false); }
 	//void set_connected(unsigned i, unsigned j) { connected[i*(i-1)/2+j] = true; }
 	//void unset_connected(unsigned i) { connected[i] = false; }
@@ -144,6 +156,15 @@ std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb) {
 }
 
 std::ostream & operator<<(std::ostream & strm, const VertexEmbedding& emb) {
+	if (emb.empty()) {
+		strm << "(empty)";
+		return strm;
+	}
+	std::cout << "(";
+	for(unsigned index = 0; index < emb.size() - 1; ++index)
+		std::cout << emb.get_vertex(index) << ", ";
+	std::cout << emb.get_vertex(emb.size()-1);
+	std::cout << ") --> " << emb.get_qpid();
 	return strm;
 }
 
@@ -178,5 +199,21 @@ namespace std {
 		}
 	};
 }
+
+// print out the embeddings in the task queue
+template <typename EmbeddingTy>
+class EmbeddingQueue : public galois::InsertBag<EmbeddingTy> {
+public:
+	void printout_embeddings(int level, bool verbose = false) {
+		int num_embeddings = std::distance(this->begin(), this->end());
+		unsigned embedding_size = (level+2)* sizeof(ElementType);
+		std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size = " << embedding_size << " Bytes)" << std::endl;
+		if(verbose) for (auto emb : *this) std::cout << emb << "\n";
+	}
+};
+
+typedef EmbeddingQueue<EdgeEmbedding> EdgeEmbeddingQueue;
+typedef EmbeddingQueue<BaseEmbedding> BaseEmbeddingQueue;
+typedef EmbeddingQueue<VertexEmbedding> VertexEmbeddingQueue;
 
 #endif // TYPE_HPP_

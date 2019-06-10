@@ -45,14 +45,15 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>:
 typedef Graph::GraphNode GNode;
 int total_num = 0;
 
+#define CHUNK_SIZE 256
 #include "Mining/element.h"
 typedef LabeledElement ElementType;
-#include "Mining/miner.h"
-#include "Mining/util.h"
-#define CHUNK_SIZE 256
+#include "Mining/embedding.h"
 typedef EdgeEmbedding EmbeddingT;
 typedef EdgeEmbeddingQueue EmbeddingQueueT;
-
+#include "Mining/miner.h"
+#include "Mining/util.h"
+/*
 // insert single-edge embeddings into the embedding queue
 void init(Graph& graph, EmbeddingQueueT &queue) {
 	printf("\n=============================== Init ================================\n\n");
@@ -74,7 +75,7 @@ void init(Graph& graph, EmbeddingQueueT &queue) {
 		galois::loopname("Initialization")
 	);
 }
-
+*/
 #ifdef USE_DOMAIN
 typedef DomainSupport SupportType;
 typedef QpMapDomain QpMap;
@@ -194,10 +195,10 @@ void filter(Miner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue,
 	//*/
 }
 
-void FsmSolver(Graph &graph, Miner &miner) {
+void FsmSolver(Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueT queue, filtered_queue;
-	init(graph, queue);
+	miner.init(queue);
 	queue.printout_embeddings(0);
 
 	std::cout << "\n---------------------------- Aggregating ----------------------------\n";
@@ -263,7 +264,7 @@ int main(int argc, char** argv) {
 	miner.set_threshold(minsup);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	FsmSolver(graph, miner);
+	FsmSolver(miner);
 	Tcomp.stop();
 	return 0;
 }

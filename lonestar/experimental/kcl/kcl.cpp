@@ -41,37 +41,19 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define CHUNK_SIZE 256
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
-#include "Mining/miner.h"
-#include "Mining/util.h"
-#define CHUNK_SIZE 256
+#include "Mining/embedding.h"
 typedef BaseEmbedding EmbeddingT;
 typedef BaseEmbeddingQueue EmbeddingQueueT;
+#include "Mining/miner.h"
+#include "Mining/util.h"
 
-// insert edges into the worklist (task queue)
-void initialization(Graph& graph, EmbeddingQueueT &queue) {
-	if(show) printf("\n=============================== Init ================================\n");
-	galois::do_all(galois::iterate(graph.begin(), graph.end()),
-		[&](const GNode& src) {
-			for (auto e : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e);
-				if (src < dst) {
-					EmbeddingT new_emb;
-					new_emb.push_back(ElementType(src));
-					new_emb.push_back(ElementType(dst));
-					queue.push_back(new_emb);
-				}
-			}
-		},
-		galois::chunk_size<512>(), galois::steal(), galois::loopname("Initialization")
-	);
-}
-
-void KclSolver(Graph& graph, Miner &miner) {
+void KclSolver(Miner &miner) {
 	if(show) std::cout << "\n=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2;
-	initialization(graph, queue);
+	miner.init(queue);
 	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (level < k-1) {
@@ -91,38 +73,10 @@ void KclSolver(Graph& graph, Miner &miner) {
 
 		if(show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		queue.clear();
-#if 1
 		galois::StatTimer Tagg("Aggregation");
 		Tagg.start();
 		miner.aggregate_clique(queue2, queue); // sequential implementaion
 		Tagg.stop();
-#else
-		// Parallel aggregation
-		LocalSimpleMap lmap;
-		SimpleMap map;
-		galois::for_each(
-			galois::iterate(queue2),
-			[&](EmbeddingT& emb, auto& ctx) {
-				miner.aggregate_clique_each(emb, *(lmap.getLocal()), queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-		for (unsigned i = 0; i < lmap.size(); i++) {
-			SimpleMap sm = *lmap.getLocal(i);
-			for (auto element : sm) {
-				auto it = map.find(element.first);
-				if (it != map.end()) {
-					if(it->second + element.second == it->first.size() - 1) {
-						queue.push_back(it->first);
-						map.erase(it);
-					} else map[element.first] += element.second;
-				} else
-					map[element.first] = element.second;
-			}
-		}
-#endif
 		if(show) queue.printout_embeddings(level);
 		level ++;
 	}
@@ -143,7 +97,7 @@ int main(int argc, char** argv) {
 	Miner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	KclSolver(graph, miner);
+	KclSolver(miner);
 	Tcomp.stop();
 	return 0;
 }

@@ -57,6 +57,7 @@ void TcSolver(Graph& graph) {
 							total_num += 1;
 							break;
 						}
+						if (dst2 > dst_dst) break;
 					}
 				}
 			}
