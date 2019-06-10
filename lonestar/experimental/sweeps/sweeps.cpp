@@ -105,6 +105,18 @@ static llvm::cl::opt<std::string> scattering_outfile{
 void atomic_relaxed_double_increment(std::atomic<double>& base,
                                      double increment) noexcept {
   auto current = base.load(std::memory_order_relaxed);
+  /*decltype(current) previous;
+  while (true) {
+    previous = current;
+    current = base.load(std::memory_order_relaxed);
+    if (previous == current) {
+      if (base.compare_exchange_weak(current, current + increment,
+                                     std::memory_order_relaxed,
+                                     std::memory_order_relaxed)) {
+        break;
+      }
+    }
+  }*/
   while (!base.compare_exchange_weak(current, current + increment,
                                      std::memory_order_relaxed,
                                      std::memory_order_relaxed))
@@ -628,8 +640,10 @@ int main(int argc, char** argv) noexcept {
           auto node_magnitude_idx =
               num_per_element * node + num_per_element_and_direction * dir_idx;
           auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-          assert(("Work item asked to run before it was actually ready.",
-                  !counter.load(std::memory_order_relaxed)));
+          auto counter_check_val = counter.load(std::memory_order_acquire);
+          if (counter_check_val) {
+            GALOIS_DIE("Work item asked to run before it was actually ready.");
+          }
           auto& node_data =
               graph.getData(node, galois::MethodFlag::UNPROTECTED);
           // Re-count incoming edges during this computation.
@@ -642,24 +656,16 @@ int main(int argc, char** argv) noexcept {
           // Partial computation of the coefficient that will divide the
           // previous term later.
           double new_magnitude_denominator = absorption_coef + scattering_coef;
+          std::size_t max_size_t = std::numeric_limits<std::size_t>::max();
+          // Use max size_t value for initialization here mainly to make things segfault as fast
+          // as possible if one of them isn't set in the loop over the neighbors.
+          std::array<std::size_t, 3> downstream_neighbors{max_size_t, max_size_t, max_size_t};
+          std::size_t downstream_index = 0;
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
             auto other_node = graph.getEdgeDst(edge);
-            std::size_t other_magnitude_idx =
-                num_per_element * other_node +
-                num_per_element_and_direction * dir_idx;
             auto& face_normal = graph.getEdgeData(edge);
             if (!is_incoming(direction, face_normal)) {
-              // Don't send anything to a ghost node.
-              if (other_node >= ghost_threshold)
-                continue;
-              auto& other_counter =
-                  radiation_magnitudes[other_magnitude_idx].counter;
-              // Work items are buffered locally until the end of each loop
-              // iteration, so we can send outgoing edges here immediately.
-              if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
-                work_t new_work_item{other_node, dir_idx};
-                ctx.push(new_work_item);
-              }
+              downstream_neighbors[downstream_index++] = other_node;
               continue;
             }
             if (other_node < ghost_threshold)
@@ -673,6 +679,9 @@ int main(int argc, char** argv) noexcept {
             double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
             double term_coef = direction[axis] * sign;
             new_magnitude_denominator += term_coef / grid_spacing[axis];
+            std::size_t other_magnitude_idx =
+                num_per_element * other_node +
+                num_per_element_and_direction * dir_idx;
             for (std::size_t i = 0; i < num_groups; i++) {
               std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
               double& other_magnitude =
@@ -681,6 +690,7 @@ int main(int argc, char** argv) noexcept {
                   term_coef * other_magnitude / grid_spacing[axis];
             }
           }
+          assert(("Wrong number of downstream neighbors.", downstream_index == 3));
           // Finish computing new flux magnitude.
           // Also compute a new scattering amount
           // for use in the next iteration based
@@ -718,6 +728,20 @@ int main(int argc, char** argv) noexcept {
             node_data.previous_accumulated_scattering =
                 node_data.currently_accumulating_scattering.load(std::memory_order_relaxed);
             node_data.currently_accumulating_scattering.store(0., std::memory_order_relaxed);
+          }
+          for (auto other_node : downstream_neighbors) {
+            // Don't send anything to a ghost node.
+            if (other_node >= ghost_threshold)
+              continue;
+            std::size_t other_magnitude_idx =
+              num_per_element * other_node +
+              num_per_element_and_direction * dir_idx;
+            auto& other_counter =
+              radiation_magnitudes[other_magnitude_idx].counter;
+            if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+              work_t new_work_item{other_node, dir_idx};
+              ctx.push(new_work_item);
+            }
           }
         },
         galois::loopname("Sweep"), galois::no_conflicts(),
