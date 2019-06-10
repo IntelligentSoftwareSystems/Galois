@@ -461,7 +461,9 @@ auto generate_directions(std::size_t latitude_divisions,
     // so if this doesn't pass, something is
     // very wrong.
     assert(("Dubious values from direction discretization.",
-            std::abs(totals[j]) < 1E-7));
+            std::abs(totals[j]) < 1E-7) ||
+            latitude_divisions == 1 ||
+            longitude_divisions == 1);
   }
 
   return std::make_tuple(std::move(directions), num_directions);
