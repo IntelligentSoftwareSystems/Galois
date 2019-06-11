@@ -469,13 +469,6 @@ auto generate_directions(std::size_t latitude_divisions,
   return std::make_tuple(std::move(directions), num_directions);
 }
 
-bool is_outgoing(std::array<double, 3> direction,
-                 std::array<double, 3> face_normal) noexcept {
-  return direction[0] * face_normal[0] + direction[1] * face_normal[1] +
-             direction[2] * face_normal[2] >
-         0.;
-}
-
 bool is_incoming(std::array<double, 3> direction,
                  std::array<double, 3> face_normal) noexcept {
   auto inner_prod = direction[0] * face_normal[0] +
