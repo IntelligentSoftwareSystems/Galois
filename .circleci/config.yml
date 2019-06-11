@@ -166,10 +166,12 @@ jobs:
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress make cmake boost-dev zlib-dev eigen openmpi-dev
+          apk add --no-cache --no-progress make cmake boost-dev zlib-dev eigen
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          # Don't test dist here since there's an issue with the alpine openmpi-dev package.
+          # It's good to test that configuration anyway.
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
           make test || :
