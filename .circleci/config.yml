@@ -24,7 +24,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Ubuntu-18.04":
     docker:
@@ -38,7 +38,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Ubuntu-16.04":
     docker:
@@ -55,7 +55,7 @@ jobs:
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
           cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
-          make -j4
+          make -j3
           make test || :
   "CentOS-7-gcc":
     docker:
@@ -89,7 +89,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "CentOS-7-clang":
     # Clang on CentOS 7
@@ -120,7 +120,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "CentOS-7-clang-libc++":
     # Clang on CentOS 7
@@ -144,7 +144,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Arch":
     docker:
@@ -158,7 +158,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Alpine":
     docker:
@@ -188,7 +188,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Fedora-gcc":
     docker:
@@ -201,7 +201,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
   "Fedora-clang":
     docker:
@@ -217,7 +217,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j3
           make test || :
  
 workflows:
