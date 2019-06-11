@@ -68,7 +68,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2 openmpi-devel
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
           sudo yum -y -q install devtoolset-7-toolchain
           # For some reason using scl_source enable this way doesn't work when bash
           # was started with -e, so temporarily disable that, then re-enable it afterward.
@@ -84,7 +84,7 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h12d9a10_4
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
@@ -100,7 +100,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2 openmpi-devel
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
           sudo yum -y -q install devtoolset-7-toolchain llvm-toolset-7
           # For some reason using scl_source enable this way doesn't work when bash
           # was started with -e, so temporarily disable that, then re-enable it afterward.
@@ -115,7 +115,7 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h12d9a10_4
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
@@ -139,12 +139,10 @@ jobs:
           source activate
           # The latest conda-forge libcxx package appears to have some issues with CentOS 6.
           # Work around that by pinning the llvm/clang/libcxx version to 6.
-          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib eigen
+          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib eigen mpich
           mkdir build
           cd build
-          # Not obvious where to get a compatible openmpi binary, so don't test this one with dist.
-          # It's good to have a build run without that enabled to make sure that build case works anyway.
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j4
           make test || :
