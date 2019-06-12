@@ -84,6 +84,8 @@ matrix:
             - cmake3
             - boost1.67
             - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
     - env:
         - GCC_VER=9
         - BUILD_TYPE=Debug
