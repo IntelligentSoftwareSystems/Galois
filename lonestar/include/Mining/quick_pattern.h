@@ -36,7 +36,6 @@ public:
 		}
 		set_hash();
 	}
-	/*
 	QuickPattern(unsigned n, VertexId dst, const VertexEmbedding & emb, std::vector<bool> connected) {
 		cg_id = 0;
 		size = std::count(connected.begin(), connected.end(), 1); // number of edges
@@ -61,7 +60,6 @@ public:
 		}
 		set_hash();
 	}
-	*/
 	~QuickPattern() {}
 	//operator for map
 	bool operator==(const QuickPattern& other) const {

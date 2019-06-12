@@ -46,16 +46,20 @@ typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
 typedef VertexEmbedding EmbeddingT;
 typedef VertexEmbeddingQueue EmbeddingQueueT;
-#include "Mining/miner.h"
+#include "Mining/vertex_miner.h"
 #include "Mining/util.h"
+int num_patterns[3] = {2, 6, 21};
 
-void MotifSolver(Miner &miner) {
+void MotifSolver(VertexMiner &miner) {
 	if (show) std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2; // task queues. double buffering
 	miner.init(queue); // initialize the task queue
-	int num_patterns[3] = {2, 6, 21};
-	std::vector<UintAccu> accumulators(num_patterns[k-3]);
-	for (int i = 0; i < num_patterns[k-3]; i++) accumulators[i].reset();
+	int npatterns = num_patterns[k-3];
+	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
+	std::vector<UintAccu> accumulators(npatterns);
+	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
+	UintMap pattern_map;
+	unsigned pattern_id = 0;
 	if (show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (level < k-2) {
@@ -78,7 +82,7 @@ void MotifSolver(Miner &miner) {
 	if (show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 	galois::for_each(galois::iterate(queue),
 		[&](const EmbeddingT& emb, auto& ctx) {
-			miner.aggregate_motif_each(emb, accumulators);
+			miner.aggregate_motif_each(emb, accumulators, pattern_map, pattern_id);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
@@ -98,7 +102,7 @@ int main(int argc, char** argv) {
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	Miner miner(&graph);
+	VertexMiner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	MotifSolver(miner);

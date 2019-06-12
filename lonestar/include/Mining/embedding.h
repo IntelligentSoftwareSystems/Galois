@@ -75,10 +75,7 @@ private:
 	unsigned qp_id; // quick pattern id
 };
 typedef EdgeInducedEmbedding<ElementType> EdgeEmbedding;
-#ifdef USE_SIMPLE
-typedef EdgeInducedEmbedding<StructuralElement> StrEmbedding;
-typedef EdgeInducedEmbedding<LabeledElement> LabEmbedding;
-#endif
+
 class BaseEmbedding : public Embedding<SimpleElement> {
 friend std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb);
 public:

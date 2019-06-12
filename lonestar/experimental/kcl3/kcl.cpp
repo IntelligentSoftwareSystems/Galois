@@ -47,10 +47,10 @@ typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
 typedef BaseEmbedding EmbeddingT;
 typedef BaseEmbeddingQueue EmbeddingQueueT;
-#include "Mining/miner.h"
+#include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
-void KclSolver(Miner &miner) {
+void KclSolver(VertexMiner &miner) {
 	galois::GAccumulator<unsigned> total_num;
 	total_num.reset();
 	if(show) std::cout << "\n=============================== Start ===============================\n";
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	Miner miner(&graph);
+	VertexMiner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner);

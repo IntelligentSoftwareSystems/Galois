@@ -20,6 +20,11 @@ public:
 		assert(!is_directed);
 		construct_cg(ag);
 	}
+	CanonicalGraph(QuickPattern<EmbeddingTy,ElementTy>& qp, bool is_directed = false) {
+		assert(!is_directed);
+		bliss::AbstractGraph* ag = turn_abstract(qp);
+		construct_cg(ag);
+	}
 	~CanonicalGraph() {}
 	int cmp(const CanonicalGraph& other_cg) const {
 		//compare the numbers of vertices
@@ -155,6 +160,45 @@ private:
 			}
 			set.insert(srcId);
 		}
+	}
+	static void report_aut(void* param, const unsigned n, const unsigned* aut) {
+		assert(param);
+		//fprintf((FILE*) param, "Generator: ");
+		//bliss::print_permutation((FILE*) param, n, aut, 1);
+		//fprintf((FILE*) param, "\n");
+	}
+	bliss::AbstractGraph* turn_abstract(QuickPattern<EmbeddingTy,ElementTy>& qp) {
+		bliss::AbstractGraph* ag = 0;
+		//get the number of vertices
+		std::unordered_map<VertexId, BYTE> vertices;
+		for(unsigned index = 0; index < qp.get_size(); ++index) {
+			auto element = qp.at(index);
+#ifdef ENABLE_LABEL
+			vertices[element.get_vid()] = element.get_vlabel();
+#else
+			vertices[element.get_vid()] = 0;
+#endif
+		}
+		//construct bliss graph
+		const unsigned number_vertices = vertices.size();
+		ag = new bliss::Graph(vertices.size());
+		//set vertices
+		for(unsigned i = 0; i < number_vertices; ++i)
+			ag->change_color(i, (unsigned)vertices[i + 1]);
+		//read edges
+		assert(qp.get_size() > 1);
+		for(unsigned index = 1; index < qp.get_size(); ++index) {
+			auto element = qp.at(index);
+			VertexId from, to;
+			from = qp.at(element.get_his()).get_vid();
+			to = element.get_vid();
+			ag->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.get_his(), index));
+		}
+		bliss::Stats stats;
+		const unsigned * cl = ag->canonical_form(stats, &report_aut, stdout); // canonical labeling. This is expensive.
+		bliss::AbstractGraph* cf = ag->permute(cl); //permute to canonical form
+		delete ag;
+		return cf;
 	}
 };
 

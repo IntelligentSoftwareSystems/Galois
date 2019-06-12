@@ -45,10 +45,10 @@ typedef StructuralElement ElementType;
 #include "Mining/embedding.h"
 typedef EdgeEmbedding EmbeddingT;
 typedef EdgeEmbeddingQueue EmbeddingQueueT;
-#include "Mining/miner.h"
+#include "Mining/edge_miner.h"
 #include "Mining/util.h"
 
-void MotifSolver(Miner &miner) {
+void MotifSolver(EdgeMiner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2; // task queues. double buffering
 	miner.init(queue); // initialize the task queue
@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	// a miner defines the operators (expanding and aggregation)
-	Miner miner(&graph);
+	EdgeMiner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	MotifSolver(miner);

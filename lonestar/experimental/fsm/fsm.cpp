@@ -51,7 +51,7 @@ typedef LabeledElement ElementType;
 #include "Mining/embedding.h"
 typedef EdgeEmbedding EmbeddingT;
 typedef EdgeEmbeddingQueue EmbeddingQueueT;
-#include "Mining/miner.h"
+#include "Mining/edge_miner.h"
 #include "Mining/util.h"
 /*
 // insert single-edge embeddings into the embedding queue
@@ -90,7 +90,7 @@ typedef LocalQpMapFreq LocalQpMap;
 typedef LocalCgMapFreq LocalCgMap;
 #endif
 
-int aggregator(Miner& miner, EmbeddingQueueT& queue, CgMap& cg_map, UintMap& id_map, UintMap& support_map) {
+int aggregator(EdgeMiner& miner, EmbeddingQueueT& queue, CgMap& cg_map, UintMap& id_map, UintMap& support_map) {
 #ifdef USE_DOMAIN
 	unsigned numDomains = miner.get_embedding_size() / sizeof(ElementType);
 #endif
@@ -171,7 +171,7 @@ int aggregator(Miner& miner, EmbeddingQueueT& queue, CgMap& cg_map, UintMap& id_
 	return num_frequent_patterns;
 }
 
-void filter(Miner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMap& cg_map, const UintMap id_map, const UintMap support_map) {
+void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMap& cg_map, const UintMap id_map, const UintMap support_map) {
 	//galois::StatTimer Tfilter("Filter");
 	//Tfilter.start();
 	//miner.filter(in_queue, id_map, support_map, out_queue);
@@ -195,7 +195,7 @@ void filter(Miner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue,
 	//*/
 }
 
-void FsmSolver(Miner &miner) {
+void FsmSolver(EdgeMiner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueT queue, filtered_queue;
 	miner.init(queue);
@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
 	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	Miner miner(&graph);
+	EdgeMiner miner(&graph);
 	miner.set_threshold(minsup);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
