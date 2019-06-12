@@ -30,7 +30,7 @@
 #define USE_SIMPLE
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph using BFS traversal";
+const char* desc = "Counts the K-Cliques in a graph using BFS expansion";
 const char* url  = 0;
 
 namespace cll = llvm::cl;

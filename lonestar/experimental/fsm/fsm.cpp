@@ -32,7 +32,7 @@
 //#define USE_DOMAIN
 
 const char* name = "FSM";
-const char* desc = "Frequent subgraph mining using BFS traversal";
+const char* desc = "Frequent subgraph mining in a graph using BFS expansion";
 const char* url  = 0;
 
 namespace cll = llvm::cl;

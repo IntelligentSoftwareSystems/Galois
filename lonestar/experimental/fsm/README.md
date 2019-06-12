@@ -1,9 +1,8 @@
 DESCRIPTION 
 ===========
 
-This is the framework for efficient and flexible graph mining based 
-on the Galois programming system. It uses the bliss library [1][2] 
-for graph isomorphism check.
+This application does frequent subgraph mining in a graph using BFS 
+expansion. It uses the bliss library [1][2] for graph isomorphism check.
 
 [1] Bliss: A tool for computing automorphism groups and canonical 
 labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
@@ -43,9 +42,6 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./tc <path-to-graph> -t 40`
--`$ ./kcl <path-to-graph> -k=3 -t 40`
--`$ ./motif <path-to-graph> -k=3 -t 40`
 -`$ ./fsm <path-to-graph> -k=3 -minsup=300 -t 40`
 
 PERFORMANCE

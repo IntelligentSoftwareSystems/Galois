@@ -1,9 +1,8 @@
 DESCRIPTION 
 ===========
 
-This is the framework for efficient and flexible graph mining based 
-on the Galois programming system. It uses the bliss library [1][2] 
-for graph isomorphism check.
+This application counts the vertex-induced motifs in a graph using BFS 
+expansion. It uses the bliss library [1][2] for graph isomorphism check.
 
 [1] Bliss: A tool for computing automorphism groups and canonical 
 labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
@@ -27,8 +26,6 @@ The **adj** format takes as input graphs with the following formats:
 ...
 ```
 
-We currently do not support graphs label on edges
-
 Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
 
 BUILD
@@ -43,10 +40,7 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./tc <path-to-graph> -t 40`
--`$ ./kcl <path-to-graph> -k=3 -t 40`
 -`$ ./motif <path-to-graph> -k=3 -t 40`
--`$ ./fsm <path-to-graph> -k=3 -minsup=300 -t 40`
 
 PERFORMANCE
 ===========

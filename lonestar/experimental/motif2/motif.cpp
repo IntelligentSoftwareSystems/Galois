@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 const char* name = "Motif Counting";
-const char* desc = "Counts the vertex-induced motifs in a graph using BFS traversal";
+const char* desc = "Counts the vertex-induced motifs in a graph using BFS expansion";
 const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
