@@ -53,6 +53,7 @@ public:
 	inline void set_hash_value(unsigned int hash) { hash_value = hash; }
 	inline unsigned get_quick_pattern_index(unsigned i) { return qp_idx[i]; }
 	inline unsigned get_id() const { return hash_value; }
+	inline void clean() { embedding.clean(); }
 
 private:
 	EmbeddingTy embedding;
@@ -192,6 +193,7 @@ private:
 			VertexId from, to;
 			from = qp.at(element.get_his()).get_vid();
 			to = element.get_vid();
+			//std::cout << "Adding edge: " << from << " --> " << to << "\n";
 			ag->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.get_his(), index));
 		}
 		bliss::Stats stats;

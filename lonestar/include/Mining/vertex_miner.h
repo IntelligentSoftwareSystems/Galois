@@ -201,9 +201,9 @@ private:
 		} else { // count 5-motif and beyond
 			std::vector<bool> connected;
 			get_connectivity(n, idx, dst, emb, connected);
-			StrQPattern qp(n, dst, emb, connected);
-			//StrCPattern* cp = turn_canonical_graph<EdgeInducedEmbedding<StructuralElement>, StructuralElement>(qp);
-			//pid = cp->get_hash();
+			StrQPattern qp(n+1, connected);
+			StrCPattern cp(qp);
+			pid = cp.get_hash();
 			/*
 			Matrix A(n+1, std::vector<MatType>(n+1, 0));
 			gen_adj_matrix(n+1, connected, A);

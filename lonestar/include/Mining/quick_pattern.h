@@ -36,23 +36,26 @@ public:
 		}
 		set_hash();
 	}
-	QuickPattern(unsigned n, VertexId dst, const VertexEmbedding & emb, std::vector<bool> connected) {
+	QuickPattern(unsigned n, std::vector<bool> connected) {
 		cg_id = 0;
-		size = std::count(connected.begin(), connected.end(), 1); // number of edges
-		size ++; // num_elements = num_edges + 1
+		size = std::count(connected.begin(), connected.end(), true) + 1; // number of edges + 1
 		elements = new ElementTy[size];
+		//std::cout << "num_vertices: " << n << ", num_edges: " << size-1 << "\n";
 		std::vector<unsigned> pos(n, 0);
 		pos[1] = 1; pos[2] = 2;
 		elements[0].set_vertex_id(1);
 		elements[0].set_history_info(0);
 		elements[1].set_vertex_id(2);
 		elements[1].set_history_info(0);
+		//std::cout << "Constructing edge 1: 1 --> 2 \n";
 		int count = 2;
-		for (unsigned i = 2; i < n+1; i++) {
-			if(i<n-1) pos[i+1] = pos[i];
+		int l = 1;
+		for (unsigned i = 2; i < n; i++) {
+			if(i<n-2) pos[i+1] = pos[i];
 			for (unsigned j = 0; j < i; j++) {
-				if (connected[i+j-1]) {
-					if (i<n-1) pos[i+1] ++;
+				if (connected[l++]) {
+					if (i<n-2) pos[i+1] ++;
+					//std::cout << "Constructing edge " << i <<": " << elements[pos[j]].get_vid() << " --> " << i+1 << "\n";
 					elements[count].set_vertex_id(i+1);
 					elements[count++].set_history_info(pos[j]);
 				}

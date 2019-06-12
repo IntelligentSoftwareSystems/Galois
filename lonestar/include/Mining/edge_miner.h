@@ -116,7 +116,7 @@ public:
 			qp.clean();
 			if (cg_map.find(cg) != cg_map.end()) cg_map[cg] += freq;
 			else cg_map[cg] = freq;
-			//delete cg;
+			cg.clean();
 		}
 	}
 	// aggregate quick patterns into canonical patterns.
@@ -128,7 +128,7 @@ public:
 		if (cg_map.find(cg) != cg_map.end()) cg_map[cg] += freq;
 		// otherwise add this pattern into the map, and set the count as 'freq'
 		else cg_map[cg] = freq;
-		//delete cg;
+		cg.clean();
 	}
 	// aggregate quick patterns into canonical patterns. Construct an id_map from quick pattern ID (qp_id) to canonical pattern ID (cg_id)
 	void canonical_aggregate_each(QPattern qp, Frequency freq, CgMapFreq &cg_map, UintMap &id_map) {
@@ -149,12 +149,11 @@ public:
 		} else {
 			cg_map[cg] = freq;
 		}
-		//delete cg;
+		cg.clean();
 	}
 	void canonical_aggregate_each(QPattern qp, DomainSupport domainSets, CgMapDomain& cg_map, UintMap &id_map) {
 		assert(qp.get_size() == domainSets.size());
 		unsigned numDomains = qp.get_size();
-		// turn the quick pattern into its canonical pattern
 		CPattern cg(qp);
 		int qp_id = qp.get_id();
 		int cg_id = cg.get_id();
@@ -173,7 +172,7 @@ public:
 			assert(qp_idx >= 0 && qp_idx < numDomains);
 			cg_map[cg][i].insert(domainSets[qp_idx].begin(), domainSets[qp_idx].end());
 		}
-		//delete cg;
+		cg.clean();
 	}
 	// check if the pattern of each embedding in the queue is frequent
 	void filter(EdgeEmbeddingQueue &in_queue, CgMapFreq &cg_map, EdgeEmbeddingQueue &out_queue) {
@@ -183,7 +182,7 @@ public:
 			qp.clean();
 			assert(cg_map.find(cg) != cg_map.end());
 			if(cg_map[cg] >= threshold) out_queue.push_back(emb);
-			//delete cf;
+			cg.clean();
 		}
 	}
 	// filtering for FSM
@@ -197,7 +196,7 @@ public:
 		// compare the count of this pattern with the threshold
 		// if the pattern is frequent, insert this embedding into the task queue
 		if (cg_map[cg] >= threshold) out_queue.push_back(emb);
-		//delete cf;
+		cg.clean();
 	}
 	void filter(EdgeEmbeddingQueue &in_queue, CgMapDomain &cg_map, EdgeEmbeddingQueue &out_queue) {
 		for (auto emb : in_queue) {
@@ -214,7 +213,7 @@ public:
 				}
 			}
 			if (is_frequent) out_queue.push_back(emb);
-			//delete cf;
+			cg.clean();
 		}
 	}
 	void filter_each(EdgeEmbedding &emb, CgMapDomain &cg_map, EdgeEmbeddingQueue &out_queue) {
@@ -231,7 +230,7 @@ public:
 			}
 		}
 		if (is_frequent) out_queue.push_back(emb);
-		//delete cf;
+		cg.clean();
 	}
 	inline void filter(EdgeEmbeddingQueue &in_queue, const UintMap id_map, const UintMap support_map, EdgeEmbeddingQueue &out_queue) {
 		for (auto emb : in_queue) {
@@ -281,73 +280,10 @@ public:
 		}
 		return count;
 	}
-	// counting the minimal image based support
-	unsigned get_support(HashIntSets domainSets) {
-		unsigned numDomains = domainSets.size();
-		unsigned support = 0xFFFFFFFF;
-		// get the minimal domain size
-		for (unsigned j = 0; j < numDomains; j ++)
-			if (domainSets[j].size() < support)
-				support = domainSets[j].size();
-		return support;
-	}
 
 private:
 	unsigned threshold;
 	galois::substrate::SimpleLock slock;
-/*
-	static void report_aut(void* param, const unsigned n, const unsigned* aut) {
-		assert(param);
-		//fprintf((FILE*) param, "Generator: ");
-		//bliss::print_permutation((FILE*) param, n, aut, 1);
-		//fprintf((FILE*) param, "\n");
-	}
-	template <typename EmbeddingTy = EdgeEmbedding, typename ElementTy = ElementType>
-	CanonicalGraph<EmbeddingTy,ElementTy>* turn_canonical_graph(QuickPattern<EmbeddingTy,ElementTy> & qp, bool is_directed = false) {
-	//CPattern* turn_canonical_graph(QPattern & qp, bool is_directed = false) {
-		assert(!is_directed);
-		//bliss::AbstractGraph* ag = readGraph(qp);
-	//}
-	//bliss::AbstractGraph* readGraph(QPattern & qp) {
-		bliss::AbstractGraph* ag = 0;
-		//get the number of vertices
-		std::unordered_map<VertexId, BYTE> vertices;
-		for(unsigned index = 0; index < qp.get_size(); ++index) {
-			auto element = qp.at(index);
-#ifdef ENABLE_LABEL
-			vertices[element.get_vid()] = element.get_vlabel();
-#else
-			vertices[element.get_vid()] = 0;
-#endif
-		}
-		//construct bliss graph
-		const unsigned number_vertices = vertices.size();
-		ag = new bliss::Graph(vertices.size());
-		//set vertices
-		for(unsigned i = 0; i < number_vertices; ++i)
-			ag->change_color(i, (unsigned)vertices[i + 1]);
-		//read edges
-		assert(qp.get_size() > 1);
-		for(unsigned index = 1; index < qp.get_size(); ++index) {
-			auto element = qp.at(index);
-			//std::cout << "element: " << element << "\n";
-			VertexId from, to;
-			from = qp.at(element.get_his()).get_vid();
-			to = element.get_vid();
-			//std::cout << "add edge (" << from << "," << to << ")\n";
-			ag->add_edge(from - 1, to - 1, std::make_pair((unsigned)element.get_his(), index));
-		}
-		//return ag;
-		bliss::Stats stats;
-		const unsigned * cl = ag->canonical_form(stats, &report_aut, stdout); // canonical labeling. This is expensive.
-		bliss::AbstractGraph* cf = ag->permute(cl); //permute to canonical form
-		delete ag;
-		CanonicalGraph<EmbeddingTy,ElementTy>* cg = new CanonicalGraph<EmbeddingTy,ElementTy>(cf);
-		//CPattern* cg = new CPattern(cf);
-		delete cf;
-		return cg;
-	}
-*/
 	inline bool is_edgeInduced_automorphism(const EdgeEmbedding & emb, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
 		//check with the first element
 		if(dst < emb.get_vertex(0)) return true;
@@ -389,6 +325,16 @@ private:
 		swap(otherEdge);
 		if(oneEdge.first == otherEdge.first) return oneEdge.second - otherEdge.second;
 		else return oneEdge.first - otherEdge.first;
+	}
+	// counting the minimal image based support
+	unsigned get_support(HashIntSets domainSets) {
+		unsigned numDomains = domainSets.size();
+		unsigned support = 0xFFFFFFFF;
+		// get the minimal domain size
+		for (unsigned j = 0; j < numDomains; j ++)
+			if (domainSets[j].size() < support)
+				support = domainSets[j].size();
+		return support;
 	}
 };
 

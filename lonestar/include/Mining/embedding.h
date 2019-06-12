@@ -56,6 +56,7 @@ public:
 	const ElementTy* data() const { return elements.data(); }
 	ElementTy get_element(unsigned i) const { return elements[i]; }
 	std::vector<ElementTy> get_elements() const { return elements; }
+	void clean() { elements.clear(); }
 protected:
 	std::vector<ElementTy> elements;
 };
