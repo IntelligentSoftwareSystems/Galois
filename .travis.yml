@@ -264,7 +264,7 @@ before_script:
 
 script:
   - make input
-  - make || exit 1
+  - make -j2 || exit 1
   - make test || true
 
 notifications:
