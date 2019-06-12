@@ -93,6 +93,7 @@ public:
 		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
 	~LabeledElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
+	inline void set_history_info(BYTE his) { history_info = his; }
 	inline int cmp(const LabeledElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;
@@ -137,6 +138,7 @@ public:
 		vertex_id(_vertex_id), history_info(_history) { }
 	~StructuralElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
+	inline void set_history_info(BYTE his) { history_info = his; }
 	inline int cmp(const StructuralElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;

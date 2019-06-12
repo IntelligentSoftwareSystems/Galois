@@ -19,32 +19,24 @@
 #include <unordered_set>
 
 // bliss headers
-#include "defs.hh"
-#include "graph.hh"
-#include "utils.hh"
-#include "bignum.hh"
-#include "uintseqhash.hh"
+#include "bliss/defs.hh"
+#include "bliss/graph.hh"
+#include "bliss/utils.hh"
+#include "bliss/bignum.hh"
+#include "bliss/uintseqhash.hh"
 
 #include "element.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 
-//#ifdef ENABLE_LABEL
-//#define ElementType LabeledElement
-//#else
-//#ifdef USE_SIMPLE
-//#define ElementType SimpleElement
-//#else
-//#define ElementType StructuralElement
-//#endif
-//#endif
-
+typedef float MatType;
 typedef std::set<int> IntSet;
 typedef std::vector<VertexId> VertexList;
 typedef std::unordered_set<int> HashIntSet;
 typedef std::vector<std::unordered_set<int> > HashIntSets;
 typedef std::unordered_map<unsigned, unsigned> UintHashMap;
 typedef std::map<unsigned, unsigned> UintMap;
+typedef std::vector<std::vector<MatType> > Matrix;
 
 template <typename ElementTy>
 class Embedding {
@@ -77,15 +69,16 @@ friend std::ostream & operator<< <>(std::ostream & strm, const EdgeInducedEmbedd
 public:
 	EdgeInducedEmbedding() { qp_id = 0xFFFFFFFF; }
 	~EdgeInducedEmbedding() {}
-	void set_qpid(unsigned i) { qp_id = i; }
-	unsigned get_qpid() { return qp_id; }
+	void set_qpid(unsigned i) { qp_id = i; } // set the quick pattern id
+	unsigned get_qpid() const { return qp_id; } // get the quick pattern id
 private:
-	unsigned qp_id;
+	unsigned qp_id; // quick pattern id
 };
 typedef EdgeInducedEmbedding<ElementType> EdgeEmbedding;
-typedef EdgeInducedEmbedding<StructuralElement> ESEmbedding;
-typedef EdgeInducedEmbedding<LabeledElement> ELEmbedding;
-
+#ifdef USE_SIMPLE
+typedef EdgeInducedEmbedding<StructuralElement> StrEmbedding;
+typedef EdgeInducedEmbedding<LabeledElement> LabEmbedding;
+#endif
 class BaseEmbedding : public Embedding<SimpleElement> {
 friend std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb);
 public:
@@ -111,33 +104,24 @@ class VertexInducedEmbedding: public BaseEmbedding {
 friend std::ostream & operator<<(std::ostream & strm, const VertexInducedEmbedding& emb);
 public:
 	VertexInducedEmbedding() : BaseEmbedding() { 
-		qp_id = 0;
-		//connected.push_back(true);
+		hash_value = 0;
 	}
 	VertexInducedEmbedding(const VertexInducedEmbedding &emb) : BaseEmbedding() {
 		elements = emb.get_elements();
-		qp_id = emb.get_qpid();
+		hash_value = emb.get_pid();
 	}
 	~VertexInducedEmbedding() {}
-	//unsigned get_num_edges() const { return num_edges; }
-	//void set_num_edges(unsigned i) { num_edges = i; }
-	void set_qpid(unsigned i) { qp_id = i; }
-	unsigned get_qpid() const { return qp_id; }
 	SimpleElement operator[](size_t i) const { return elements[i]; }
 	VertexInducedEmbedding& operator=(const VertexInducedEmbedding& other) {
 		if(this == &other) return *this;
 		elements = other.get_elements();
-		qp_id = other.get_qpid();
+		hash_value = other.get_pid();
 		return *this;
 	}
-	//void resize_connected() { for (size_t i=0; i<size(); i++) connected.push_back(false); }
-	//void set_connected(unsigned i, unsigned j) { connected[i*(i-1)/2+j] = true; }
-	//void unset_connected(unsigned i) { connected[i] = false; }
-	//bool is_connected(unsigned i, unsigned j) { return connected[i*(i-1)/2+j]; }
-	//size_t get_connected_size() { return connected.size(); }
-private:
-	unsigned qp_id;
-	//unsigned num_edges;
+	inline unsigned get_pid() const { return hash_value; } // get the pattern id
+	inline void set_pid(unsigned i) { hash_value = i; } // set the pattern id
+protected:
+	unsigned hash_value;
 	//std::vector<bool> connected;
 };
 typedef VertexInducedEmbedding VertexEmbedding;
@@ -164,7 +148,7 @@ std::ostream & operator<<(std::ostream & strm, const VertexEmbedding& emb) {
 	for(unsigned index = 0; index < emb.size() - 1; ++index)
 		std::cout << emb.get_vertex(index) << ", ";
 	std::cout << emb.get_vertex(emb.size()-1);
-	std::cout << ") --> " << emb.get_qpid();
+	std::cout << ") --> " << emb.get_pid();
 	return strm;
 }
 

@@ -122,7 +122,7 @@ public:
 					//if (emb.get_qpid() == 0) accumulators[6] += 1;
 					//else accumulators[7] += 1;
 					new_emb.push_back(dst);
-					new_emb.set_qpid(pid);
+					new_emb.set_pid(pid);
 					queue.push_back(new_emb);
 					//emb.pop_back();
 				}
@@ -572,7 +572,7 @@ private:
 			if(idx == 0 && is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
 		} else if (n == 3) { // count 4-motifs
 			unsigned num_edges = 1;
-			pid = emb.get_qpid();
+			pid = emb.get_pid();
 			//std::cout << "Embedding: " << emb << ", " << "adding " << dst << " at " << idx << "\n";
 			if (pid == 0) { // expanding a triangle
 				for (unsigned j = 0; j < n; j ++)
