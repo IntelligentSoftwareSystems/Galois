@@ -295,6 +295,7 @@ void addToStat(const Str& region, const Str& category, const T& val,
 
 private:
 void combineAtHost_0_helper(void);
+void receiveAtHost_0_helper(void);
 void combineAtHost_0(void);
 StatTotal::Type findHostTotalTy(const Str& region, const Str& category,
                                 const StatTotal::Type& thrdTotalTy) const;

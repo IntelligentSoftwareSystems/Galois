@@ -24,6 +24,7 @@
  */
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/Serialize.h"
+#include "galois/DTerminationDetector.h"
 
 using namespace galois::runtime;
 
@@ -98,16 +99,19 @@ void DistStatManager::combineAtHost_0_helper(void) {
 
   const auto& hTotalMap = hostTotalTypes.mergedMap();
 
+  size_t syncTypePhase = 0;
   if (!IS_HOST0) {
     for (auto i = hTotalMap.cbegin(), end_i = hTotalMap.cend(); i != end_i;
          ++i) {
-
-      getSystemNetworkInterface().sendSimple(
-          0, StatRecvHelper::recvAtHost_0_hostTotalTy, hTotalMap.region(i),
+      SendBuffer b;
+      gSerialize(b, hTotalMap.region(i),
           hTotalMap.category(i), hTotalMap.stat(i).totalTy());
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+          b, syncTypePhase);
     }
   }
 
+  ++syncTypePhase;
   for (auto i = Base::intBegin(), end_i = Base::intEnd(); i != end_i; ++i) {
     Str ln;
     Str cat;
@@ -121,12 +125,14 @@ void DistStatManager::combineAtHost_0_helper(void) {
       addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
     } else {
-      getSystemNetworkInterface().sendSimple(
-          0, StatRecvHelper::recvAtHost_0_int, ln, cat, thrdTotal, totalTy,
-          thrdVals);
+      SendBuffer b;
+      gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+          b, syncTypePhase);
     }
   }
 
+  ++syncTypePhase;
   for (auto i = Base::fpBegin(), end_i = Base::fpEnd(); i != end_i; ++i) {
     Str ln;
     Str cat;
@@ -140,12 +146,14 @@ void DistStatManager::combineAtHost_0_helper(void) {
       addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
     } else {
-      getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_fp,
-                                             ln, cat, thrdTotal, totalTy,
-                                             thrdVals);
+      SendBuffer b;
+      gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+          b, syncTypePhase);
     }
   }
 
+  ++syncTypePhase;
   for (auto i = Base::paramBegin(), end_i = Base::paramEnd(); i != end_i; ++i) {
     Str ln;
     Str cat;
@@ -159,31 +167,130 @@ void DistStatManager::combineAtHost_0_helper(void) {
       addRecvdParam(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
     } else {
-      getSystemNetworkInterface().sendSimple(
-          0, StatRecvHelper::recvAtHost_0_str, ln, cat, thrdTotal, totalTy,
-          thrdVals);
+      SendBuffer b;
+      gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+          b, syncTypePhase);
     }
   }
 }
 
+void DistStatManager::receiveAtHost_0_helper(void) {
+  size_t syncTypePhase = 0;
+  {
+    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    do {
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+
+      if (p) {
+        uint32_t hostID = p->first;
+        RecvBuffer& b = p->second;
+
+        galois::gstl::Str region;
+        galois::gstl::Str category;
+        StatTotal::Type totalTy;
+        gDeserialize(b, region, category, totalTy);
+
+        StatRecvHelper::recvAtHost_0_hostTotalTy(hostID, region, category, totalTy);
+      }
+    } while (p);
+  }
+
+  ++syncTypePhase;
+  {
+    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    do {
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+
+      if (p) {
+        uint32_t hostID = p->first;
+        RecvBuffer& b = p->second;
+
+        Str ln;
+        Str cat;
+        int64_t thrdTotal;
+        StatTotal::Type totalTy;
+        galois::gstl::Vector<int64_t> thrdVals;
+        gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+
+        StatRecvHelper::recvAtHost_0_int(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+      }
+    } while (p);
+  }
+
+  ++syncTypePhase;
+  {
+    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    do {
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+
+      if (p) {
+        uint32_t hostID = p->first;
+        RecvBuffer& b = p->second;
+
+        Str ln;
+        Str cat;
+        double thrdTotal;
+        StatTotal::Type totalTy;
+        galois::gstl::Vector<double> thrdVals;
+        gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+
+        StatRecvHelper::recvAtHost_0_fp(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+      }
+    } while (p);
+  }
+
+  ++syncTypePhase;
+  {
+    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    do {
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+
+      if (p) {
+        uint32_t hostID = p->first;
+        RecvBuffer& b = p->second;
+
+        Str ln;
+        Str cat;
+        Str thrdTotal;
+        StatTotal::Type totalTy;
+        galois::gstl::Vector<Str> thrdVals;
+        gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
+
+        StatRecvHelper::recvAtHost_0_str(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+      }
+    } while (p);
+  }
+}
+
 void DistStatManager::combineAtHost_0(void) {
+  galois::DGTerminator<unsigned int> td1;
+
   // first host 0 reads stats from Base class
-  // then barrier
-  // then other hosts send stats to host 0
-  // another barrier
   if (getHostID() == 0) {
     combineAtHost_0_helper();
   }
 
-  galois::runtime::getHostFence().wait();
+  // then barrier
+  while (td1.reduce()) {};
 
+  galois::DGTerminator<unsigned int> td2;
+
+  // then other hosts send stats to host 0
   if (getHostID() != 0) {
     combineAtHost_0_helper();
   }
 
   getSystemNetworkInterface().flush();
 
-  galois::runtime::getHostFence().wait();
+  // another barrier
+  while (td2.reduce()) {
+    if (getHostID() == 0) {
+      // receive from other hosts
+      receiveAtHost_0_helper();
+    }
+  };
+  galois::runtime::evilPhase += 2; // because there are 4 syncTypePhases, not 2
 }
 
 bool DistStatManager::printingHostVals(void) {
@@ -257,6 +364,7 @@ void DistStatManager::printHeader(std::ostream& out) const {
 void DistStatManager::printStats(std::ostream& out) {
   mergeStats();
 
+  galois::DGTerminator<unsigned int> td;
   if (getHostID() == 0) {
     printHeader(out);
 
@@ -265,5 +373,5 @@ void DistStatManager::printStats(std::ostream& out) {
     strDistStats.print(out);
   }
   // all hosts must wait for host 0 to finish printing stats
-  galois::runtime::getHostFence().wait();
+  while (td.reduce()) {};
 }
