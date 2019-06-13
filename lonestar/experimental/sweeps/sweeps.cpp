@@ -505,7 +505,7 @@ bool is_incoming(std::array<double, 3> direction,
     if (face_normal[dim_idx] < 0) return true;
     if (face_normal[dim_idx] > 0) return false;
   }
-  assert(("All zero face_normal passed to is_incoming. Can't disambiguate.", false));
+  GALOIS_DIE("All zero face_normal passed to is_incoming. Can't disambiguate.");
 }
 
 // Of the given discrete directions, find the one
