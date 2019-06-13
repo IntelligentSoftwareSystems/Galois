@@ -123,7 +123,7 @@ if __name__ == "__main__":
                       help='sort the generated output files')
   parser.add_argument('-delete', '-d', type=bool, nargs=1, default=False,
                       help='delete the generated output files')
-  parser.add_argument('-mean_tolerance', '-m', type=float, nargs=1, default=0.000001,
+  parser.add_argument('-mean_tolerance', '-m', type=float, nargs=1, default=0.0001,
                       help='tolerance for root mean square error')
 
   arg = sys.argv
