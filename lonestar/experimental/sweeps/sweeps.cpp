@@ -438,6 +438,8 @@ auto generate_directions(std::size_t latitude_divisions,
 
   // Latitude offset is also here to avoid the need to disambiguate
   // cases where a direction is exactly orthogonal to a face.
+  // In this case, tilt the resulting disk of directions.
+  // Don't just offset all the latitudes the same.
   double latitude_offset = latitude_divisions <= 1 ? .25 * pi : 0.;
   for (std::size_t j = 0; j < latitude_divisions; j++) {
     // Since the even spacing is in the sine of the latitude,
@@ -445,11 +447,13 @@ auto generate_directions(std::size_t latitude_divisions,
     // match what the average direction is for that
     // particular piece of the partition.
     // TODO: actually prove that this is the right thing to do.
-    double average_latitude =
-        std::asin(-1 + (j + .5) / (.5 * latitude_divisions)) + latitude_offset;
+    double average_latitude_base =
+        std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
     for (std::size_t k = 0; k < longitude_divisions; k++) {
       std::size_t direction_index = j * longitude_divisions + k;
       double average_longitude    = average_longitudes[k];
+      double average_latitude     = average_latitude_base
+                                    + latitude_offset * std::sin(average_longitude);
       directions[direction_index] = {
           std::cos(average_longitude) * std::cos(average_latitude),
           std::sin(average_longitude) * std::cos(average_latitude),
