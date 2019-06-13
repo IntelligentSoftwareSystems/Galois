@@ -417,6 +417,8 @@ static constexpr double pi =
 // performance proxy for better simulation codes anyway.
 auto generate_directions(std::size_t latitude_divisions,
                          std::size_t longitude_divisions) noexcept {
+  assert(latitude_divisions > 0);
+  assert(longitude_divisions > 0);
   std::size_t num_directions = latitude_divisions * longitude_divisions;
   auto directions = std::make_unique<std::array<double, 3>[]>(num_directions);
   auto average_longitudes = std::make_unique<double[]>(longitude_divisions);
@@ -424,10 +426,19 @@ auto generate_directions(std::size_t latitude_divisions,
   // For floating point precision improvement it may be
   // better to rewrite these things in terms of std::lerp,
   // but that's only available in c++20.
+  // Offset if the number of latitudes is small to avoid running
+  // directly along the axes of the grids.
+  // "is_incoming" now properly handles the case where propagation is
+  // exactly orthogonal to a given face, but this avoids benchmarking
+  // the unusual branches of execution it needs to take there.
+  double longitude_offset = longitude_divisions <=2 ? .25 * pi : 0.;
   for (std::size_t k = 0; k < longitude_divisions; k++) {
-    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi);
+    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi) + longitude_offset;
   }
 
+  // Latitude offset is also here to avoid the need to disambiguate
+  // cases where a direction is exactly orthogonal to a face.
+  double latitude_offset = latitude_divisions <= 1 ? .25 * pi : 0.;
   for (std::size_t j = 0; j < latitude_divisions; j++) {
     // Since the even spacing is in the sine of the latitude,
     // compute the center point in the sine as well to better
@@ -435,7 +446,7 @@ auto generate_directions(std::size_t latitude_divisions,
     // particular piece of the partition.
     // TODO: actually prove that this is the right thing to do.
     double average_latitude =
-        std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
+        std::asin(-1 + (j + .5) / (.5 * latitude_divisions)) + latitude_offset;
     for (std::size_t k = 0; k < longitude_divisions; k++) {
       std::size_t direction_index = j * longitude_divisions + k;
       double average_longitude    = average_longitudes[k];
