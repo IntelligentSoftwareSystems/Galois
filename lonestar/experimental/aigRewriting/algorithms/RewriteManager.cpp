@@ -427,9 +427,7 @@ int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
   }
 
   // compute the AIG size after adding the internal nodes
-  for (int i = decGraph->getLeaveNum();
-       (i < decGraph->getNodeNum()) && ((node = decGraph->getNode(i)), 1);
-       i++) {
+  for (int i = decGraph->getLeaveNum(); (i < decGraph->getNodeNum()) && ((node = decGraph->getNode(i)), 1); i++) {
 
     // get the children of this node
     lhsNode = decGraph->getNode(node->eEdge0.Node);
@@ -690,7 +688,7 @@ aig::GNode RewriteManager::createAndNode(ThreadContextData* threadCtx,
   rhsAndData.nFanout++;
 
   // int faninSize = std::distance( aigGraph.in_edge_begin( newAnd ),
-  // aigGraph.in_edge_begin( newAnd ) ); assert( faninSize == 2 );
+  // aigGraph.in_edge_end( newAnd ) ); assert( faninSize == 2 );
 
   this->aig.getNodes()[id] = newAnd;
   this->aig.insertNodeInFanoutMap(newAnd, lhsAnd, rhsAnd, lhsAndPol, rhsAndPol);

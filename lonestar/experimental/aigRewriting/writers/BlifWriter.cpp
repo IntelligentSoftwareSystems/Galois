@@ -78,22 +78,22 @@ void BlifWriter::writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan
 	for (auto entry : cutMan.getCovering() ) {
 		this->blifFile << ".names";
 
-		if ( Functional32::isConstZero( cutMan.readTruth( entry.second.bestCut ), cutMan.getK() ) ) {
+		if ( Functional32::isConstZero( cutMan.readTruth( entry.second ), cutMan.getK() ) ) {
 			// Output	
 			this->blifFile << " n" << entry.first << std::endl << "0" << std::endl;
 			continue;
 		}
 
-		if ( Functional32::isConstOne( cutMan.readTruth( entry.second.bestCut ), cutMan.getK() ) ) {
+		if ( Functional32::isConstOne( cutMan.readTruth( entry.second ), cutMan.getK() ) ) {
 			// Output	
 			this->blifFile << " n" << entry.first << std::endl << "1" << std::endl;
 			continue;
 		}
 
 		// Inputs
-		for ( int i = 0; i < entry.second.bestCut->nLeaves; i++ ) {
+		for ( int i = 0; i < entry.second->nLeaves; i++ ) {
 
-			leaf = aig.getNodes()[ entry.second.bestCut->leaves[i] ];
+			leaf = aig.getNodes()[ entry.second->leaves[i] ];
 			aig::NodeData& leafData = aigGraph.getData( leaf );
 
 			if ( leafData.type == aig::NodeType::PI ) {
@@ -106,7 +106,7 @@ void BlifWriter::writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan
 		// Output	
 		this->blifFile << " n" << entry.first << std::endl;
 		// Cubes
-		this->blifFile << Functional32::toCubeString( cutMan.readTruth( entry.second.bestCut ), cutMan.getNWords(), entry.second.bestCut->nLeaves );
+		this->blifFile << Functional32::toCubeString( cutMan.readTruth( entry.second ), cutMan.getNWords(), entry.second->nLeaves );
 	}
 
 	// Define PO poloarities	

@@ -574,9 +574,12 @@ unsigned int* CutManager::readTruth(Cut* cut) {
 void CutManager::recycleNodeCuts(int nodeId) {
 
   CutPool* cutPool = this->perThreadCutPool.getLocal();
+  Cut* cut = this->nodeCuts[nodeId];
 
-  for (Cut* cut = this->nodeCuts[nodeId]; cut != nullptr; cut = cut->nextCut) {
+	while ( cut != nullptr ) {
+		Cut* nextCut = cut->nextCut;
     cutPool->giveBackMemory(cut);
+		cut = nextCut;
   }
 
   this->nodeCuts[nodeId] = nullptr;

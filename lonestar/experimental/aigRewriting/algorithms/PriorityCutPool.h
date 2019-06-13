@@ -71,6 +71,8 @@ public:
   int getNumBlocks();
 
   int getBlockSize();
+
+	//void copyCut(PriCut* dest, PriCut* source);
 };
 
 } /* namespace algorithm */
