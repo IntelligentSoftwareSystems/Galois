@@ -29,32 +29,41 @@
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 
-typedef float MatType;
+typedef unsigned IndexTy;
+typedef galois::gstl::Vector<unsigned> IndexList;
+typedef galois::gstl::Vector<VertexId> VertexList;
+typedef galois::gstl::Vector<IndexList> IndexLists;
+typedef galois::gstl::Vector<VertexList> VertexLists;
 typedef std::set<int> IntSet;
-typedef std::vector<VertexId> VertexList;
 typedef std::unordered_set<int> HashIntSet;
 typedef std::vector<std::unordered_set<int> > HashIntSets;
-typedef std::unordered_map<unsigned, unsigned> UintHashMap;
-typedef std::map<unsigned, unsigned> UintMap;
-typedef std::vector<std::vector<MatType> > Matrix;
 
 template <typename ElementTy>
 class Embedding {
 //friend std::ostream & operator<<(std::ostream & strm, const Embedding<ElementTy>& emb);
+//typedef std::vector<ElementTy>::iterator iterator;
+using iterator = typename std::vector<ElementTy>::iterator;
 public:
-	Embedding() { }
-	~Embedding() {}
+	Embedding() {}
+	Embedding(size_t n) { elements.resize(n); }
+	Embedding(const Embedding &emb) { elements = emb.elements; }
+	~Embedding() { elements.clear(); }
 	VertexId get_vertex(unsigned i) const { return elements[i].get_vid(); }
 	BYTE get_history(unsigned i) const { return elements[i].get_his(); }
 	bool empty() const { return elements.empty(); }
+	iterator begin() { return elements.begin(); }
+	iterator end() { return elements.end(); }
+	iterator insert(iterator pos, const ElementTy& value ) { return elements.insert(pos, value); }
 	void push_back(ElementTy ele) { elements.push_back(ele); }
 	void pop_back() { elements.pop_back(); }
 	ElementTy& back() { return elements.back(); }
 	const ElementTy& back() const { return elements.back(); }
 	size_t size() const { return elements.size(); }
+	void resize (size_t n) { elements.resize(n); }
 	ElementTy* data() { return elements.data(); }
 	const ElementTy* data() const { return elements.data(); }
 	ElementTy get_element(unsigned i) const { return elements[i]; }
+	void set_element(unsigned i, ElementTy ele) { elements[i] = ele; }
 	std::vector<ElementTy> get_elements() const { return elements; }
 	void clean() { elements.clear(); }
 protected:
@@ -81,6 +90,7 @@ class BaseEmbedding : public Embedding<SimpleElement> {
 friend std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb);
 public:
 	BaseEmbedding() {}
+	BaseEmbedding(size_t n) : Embedding(n) {}
 	~BaseEmbedding() {}
 	inline unsigned get_hash() const {
 		bliss::UintSeqHash h;
@@ -192,10 +202,57 @@ public:
 		std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size = " << embedding_size << " Bytes)" << std::endl;
 		if(verbose) for (auto emb : *this) std::cout << emb << "\n";
 	}
+	void clean() { for (auto emb : *this) emb.clean(); this->clear(); }
 };
 
 typedef EmbeddingQueue<EdgeEmbedding> EdgeEmbeddingQueue;
 typedef EmbeddingQueue<BaseEmbedding> BaseEmbeddingQueue;
 typedef EmbeddingQueue<VertexEmbedding> VertexEmbeddingQueue;
+
+class EmbeddingList {
+public:
+	EmbeddingList() {}
+	~EmbeddingList() {}
+	void init(unsigned max_size, Graph& graph) {
+		last_level = 1;
+		max_level = max_size;
+		unsigned eid = 0;
+		vid_lists.resize(max_level);
+		idx_lists.resize(max_level);
+		for (auto src : graph) {
+			for (auto e : graph.edges(src)) {
+				GNode dst = graph.getEdgeDst(e);
+				if (src < dst) {
+					vid_lists[0].push_back(src);
+					idx_lists[0].push_back(0);
+					vid_lists[1].push_back(dst);
+					idx_lists[1].push_back(eid++);
+				}
+			}
+		}
+		if (show) printout_embeddings(1);
+	}
+	VertexId get_vid(unsigned level, IndexTy id) const { return vid_lists[level][id]; }
+	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
+	void set_vid(unsigned level, IndexTy id, VertexId vid) { vid_lists[level][id] = vid; }
+	void set_idx(unsigned level, IndexTy id, IndexTy idx) { idx_lists[level][id] = idx; }
+	size_t size() { return vid_lists[last_level].size(); }
+	size_t size(unsigned level) { return vid_lists[level].size(); }
+	void add_level(unsigned size) {
+		last_level ++;
+		assert(last_level < max_level);
+		vid_lists[last_level].resize(size);
+		idx_lists[last_level].resize(size);
+	}
+	void printout_embeddings(int level, bool verbose = false) {
+		std::cout << "Number of embeddings in level " << level << ": " << size() << std::endl;
+		if(verbose) std::cout << "\n";
+	}
+private:
+	IndexLists idx_lists;
+	VertexLists vid_lists;
+	unsigned last_level;
+	unsigned max_level;
+};
 
 #endif // TYPE_HPP_

@@ -8,21 +8,13 @@
 // We provide two types of 'support': frequency and domain support.
 // Frequency is used for counting, e.g. motif counting.
 // Domain support, a.k.a, the minimum image-based support, is used for FSM. It has the anti-monotonic property.
+typedef float MatType;
 typedef unsigned Frequency;
+typedef std::vector<std::vector<MatType> > Matrix;
 typedef galois::GAccumulator<unsigned> UintAccu;
-
-typedef QuickPattern<EdgeEmbedding, ElementType> QPattern;
-typedef CanonicalGraph<EdgeEmbedding, ElementType> CPattern;
-typedef QuickPattern<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrQPattern; // structural quick pattern
-typedef CanonicalGraph<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrCPattern; // structural canonical pattern
-
-typedef std::unordered_map<QPattern, Frequency> QpMapFreq; // mapping quick pattern to its frequency
-typedef std::unordered_map<StrQPattern, Frequency> StrQpMapFreq; // mapping structural quick pattern to its frequency
-typedef std::unordered_map<CPattern, Frequency> CgMapFreq; // mapping canonical pattern to its frequency
-typedef std::unordered_map<StrCPattern, Frequency> StrCgMapFreq; // mapping structural canonical pattern to its frequency
-
-typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
-typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
+//typedef std::map<unsigned, unsigned> UintMap;
+typedef std::unordered_map<unsigned, unsigned> UintMap;
+typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
 class Miner {
 public:
@@ -107,9 +99,10 @@ protected:
 		return connected;
 	}
 	inline void gen_adj_matrix(unsigned n, std::vector<bool> connected, Matrix &a) {
+		unsigned l = 0;
 		for (unsigned i = 1; i < n; i++)
 			for (unsigned j = 0; j < i; j++)
-				if (connected[i+j-1]) a[i][j] = a[j][i] = 1;
+				if (connected[l++]) a[i][j] = a[j][i] = 1;
 	}
 	// calculate the trace of a given n*n matrix
 	inline MatType trace(unsigned n, Matrix matrix) {

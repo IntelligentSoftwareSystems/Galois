@@ -2,8 +2,14 @@
 #define EDGE_MINER_H
 #include "miner.h"
 typedef HashIntSets DomainSupport;
+typedef QuickPattern<EdgeEmbedding, ElementType> QPattern;
+typedef CanonicalGraph<EdgeEmbedding, ElementType> CPattern;
+typedef std::unordered_map<QPattern, Frequency> QpMapFreq; // mapping quick pattern to its frequency
+typedef std::unordered_map<CPattern, Frequency> CgMapFreq; // mapping canonical pattern to its frequency
 typedef std::unordered_map<QPattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
 typedef std::unordered_map<CPattern, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
+typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq;
+typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq;
 typedef galois::substrate::PerThreadStorage<QpMapDomain> LocalQpMapDomain;
 typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
 

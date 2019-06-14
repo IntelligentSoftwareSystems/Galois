@@ -40,6 +40,7 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::typ
 typedef Graph::GraphNode GNode;
 
 #define USE_SIMPLE
+#define USE_BLISS
 #define CHUNK_SIZE 256
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
@@ -48,6 +49,12 @@ typedef VertexEmbedding EmbeddingT;
 typedef VertexEmbeddingQueue EmbeddingQueueT;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
+#ifdef USE_BLISS
+typedef StrQpMapFreq QpMapT;
+typedef StrCgMapFreq CgMapT;
+typedef LocalStrQpMapFreq LocalQpMapT;
+typedef LocalStrCgMapFreq LocalCgMapT;
+#endif
 int num_patterns[3] = {2, 6, 21};
 
 void MotifSolver(VertexMiner &miner) {
@@ -58,8 +65,6 @@ void MotifSolver(VertexMiner &miner) {
 	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
 	std::vector<UintAccu> accumulators(npatterns);
 	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
-	UintMap pattern_map;
-	unsigned pattern_id = 0;
 	if (show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (level < k-2) {
@@ -68,7 +73,7 @@ void MotifSolver(VertexMiner &miner) {
 		// for each embedding in the task queue, do vertex-extension
 		galois::for_each(galois::iterate(queue),
 			[&](const EmbeddingT& emb, auto& ctx) {
-				miner.extend_vertex_motif(emb, queue2); // vertex extension
+				miner.extend_vertex(emb, queue2); // vertex extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -80,14 +85,81 @@ void MotifSolver(VertexMiner &miner) {
 		level ++;
 	}
 	if (show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
-	galois::for_each(galois::iterate(queue),
-		[&](const EmbeddingT& emb, auto& ctx) {
-			miner.aggregate_motif_each(emb, accumulators, pattern_map, pattern_id);
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
-	);
-	miner.printout_motifs(accumulators);
+	if (k < 5) {
+		galois::for_each(galois::iterate(queue),
+			[&](const EmbeddingT& emb, auto& ctx) {
+				miner.aggregate_each(emb, accumulators);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
+		);
+		miner.printout_motifs(accumulators);
+	} else if (k > 6) { // use matrix eigenvalue (characteristic polynomial) to do isomorphism check
+		UintMap p_map; // pattern map: pattern hash value --> pattern frequency
+		LocalUintMap localmap;
+		galois::for_each(
+			galois::iterate(queue),
+			[&](EmbeddingT& emb, auto& ctx) {
+				miner.aggregate_each(emb, *(localmap.getLocal())); // quick pattern aggregation
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Aggregation")
+		);
+		for (unsigned i = 0; i < localmap.size(); i++) {
+			UintMap lmap = *localmap.getLocal(i);
+			for (auto element : lmap) {
+				if (p_map.find(element.first) != p_map.end())
+					p_map[element.first] += element.second;
+				else
+					p_map[element.first] = element.second;
+			}
+		}
+		miner.printout_motifs(p_map);
+	} else { // use bliss library to do isomorphism check
+		QpMapT qp_map; // quick patterns map for counting the frequency
+		LocalQpMapT qp_localmap; // quick patterns local map for each thread
+		galois::for_each(
+			galois::iterate(queue),
+			[&](EmbeddingT& emb, auto& ctx) {
+				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("QuickAggregation")
+		);
+		// merging results sequentially
+		for (unsigned i = 0; i < qp_localmap.size(); i++) {
+			QpMapT qp_lmap = *qp_localmap.getLocal(i);
+			for (auto element : qp_lmap) {
+				if (qp_map.find(element.first) != qp_map.end())
+					qp_map[element.first] += element.second;
+				else
+					qp_map[element.first] = element.second;
+			}
+		}
+		CgMapT cg_map; // canonical graph map for couting the frequency
+		LocalCgMapT cg_localmap; // canonical graph local map for each thread
+		galois::do_all(
+			galois::iterate(qp_map),
+			[&](auto& qp) {
+				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			galois::loopname("CanonicalAggregation")
+		);
+		// merging results sequentially
+		for (unsigned i = 0; i < cg_localmap.size(); i++) {
+			CgMapT cg_lmap = *cg_localmap.getLocal(i);
+			for (auto element : cg_lmap) {
+				if (cg_map.find(element.first) != cg_map.end())
+					cg_map[element.first] += element.second;
+				else
+					cg_map[element.first] = element.second;
+			}
+		}
+		miner.printout_motifs(cg_map);
+	}
 	if (show) std::cout << "\n=============================== Done ===============================\n\n";
 }
 

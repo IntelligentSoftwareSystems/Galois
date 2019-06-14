@@ -75,7 +75,7 @@ void KclSolver(VertexMiner &miner) {
 		queue.clear();
 		galois::StatTimer Tagg("Aggregation");
 		Tagg.start();
-		miner.aggregate_clique(queue2, queue); // sequential implementaion
+		miner.aggregate_all(queue2, queue); // sequential implementaion
 		Tagg.stop();
 		if(show) queue.printout_embeddings(level);
 		level ++;
