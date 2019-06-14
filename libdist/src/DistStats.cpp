@@ -264,27 +264,15 @@ void DistStatManager::receiveAtHost_0_helper(void) {
 }
 
 void DistStatManager::combineAtHost_0(void) {
-  galois::DGTerminator<unsigned int> td1;
+  galois::DGTerminator<unsigned int> td;
 
-  // first host 0 reads stats from Base class
-  if (getHostID() == 0) {
-    combineAtHost_0_helper();
-  }
-
-  // then barrier
-  while (td1.reduce()) {};
-
-  galois::DGTerminator<unsigned int> td2;
-
-  // then other hosts send stats to host 0
-  if (getHostID() != 0) {
-    combineAtHost_0_helper();
-  }
-
+  // host 0 reads stats from Base class
+  // other hosts send stats to host 0
+  combineAtHost_0_helper();
   getSystemNetworkInterface().flush();
 
-  // another barrier
-  while (td2.reduce()) {
+  // barrier
+  while (td.reduce()) {
     if (getHostID() == 0) {
       // receive from other hosts
       receiveAtHost_0_helper();
