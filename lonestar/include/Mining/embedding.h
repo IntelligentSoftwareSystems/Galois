@@ -41,7 +41,6 @@ typedef std::vector<std::unordered_set<int> > HashIntSets;
 template <typename ElementTy>
 class Embedding {
 //friend std::ostream & operator<<(std::ostream & strm, const Embedding<ElementTy>& emb);
-//typedef std::vector<ElementTy>::iterator iterator;
 using iterator = typename std::vector<ElementTy>::iterator;
 public:
 	Embedding() {}

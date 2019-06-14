@@ -55,7 +55,7 @@ public:
 		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding)
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
-			if (dst > src && is_all_connected(dst, emb)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
+			if (dst > src && is_all_connected(dst, emb, n-1)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
 				if (need_update) { // generate a new embedding and add it to the next queue
 					BaseEmbedding new_emb(emb);
 					new_emb.push_back(dst);
@@ -71,9 +71,13 @@ public:
 				for (auto e : graph->edges(src)) {
 					GNode dst = graph->getEdgeDst(e);
 					if(src < dst) {
+						BaseEmbedding emb(2);
+						emb.set_element(0, src);
+						emb.set_element(1, dst);
 						for (auto e1 : graph->edges(dst)) {
 							GNode dst_dst = graph->getEdgeDst(e1);
-							if (dst_dst > dst && is_connected(dst_dst, src))
+							//if (dst_dst > dst && is_connected(dst_dst, src))
+							if (dst_dst > dst && is_all_connected(dst_dst, emb, 1))
 								num += 1;
 						}
 					}
@@ -83,7 +87,7 @@ public:
 			galois::loopname("CliqueCouting")
 		);
 	}
-	*/
+	//*/
 	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, IndexList& num_emb, UintAccu &num, bool need_update = true) {
 		VertexId vid = emb_list.get_vid(level, pos);
 		IndexTy idx = emb_list.get_idx(level, pos);
@@ -96,7 +100,7 @@ public:
 		}
 		for (auto e : graph->edges(vid)) {
 			GNode dst = graph->getEdgeDst(e);
-			if(vid < dst && is_all_connected(dst, emb)) {
+			if(vid < dst && is_all_connected(dst, emb, level)) {
 				if (need_update) num_emb[pos] ++;
 				else num += 1;
 			}
@@ -116,7 +120,7 @@ public:
 		for (auto e : graph->edges(vid)) {
 			GNode dst = graph->getEdgeDst(e);
 			// check if it is a clique
-			if(vid < dst && is_all_connected(dst, emb)) {
+			if(vid < dst && is_all_connected(dst, emb, level)) {
 				emb_list.set_idx(level+1, start, pos);
 				emb_list.set_vid(level+1, start++, dst);
 			}

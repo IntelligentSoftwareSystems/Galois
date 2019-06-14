@@ -16,6 +16,17 @@ typedef galois::GAccumulator<unsigned> UintAccu;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
+inline IndexList parallel_prefix_sum(const IndexList &degrees) {
+	IndexList sums(degrees.size() + 1);
+	int total = 0;
+	for (size_t n = 0; n < degrees.size(); n++) {
+		sums[n] = total;
+		total += degrees[n];
+	}
+	sums[degrees.size()] = total;
+	return sums;
+}
+
 class Miner {
 public:
 	Miner() {}
@@ -65,10 +76,10 @@ protected:
 			galois::loopname("DegreeCounting")
 		);
 	}
-	inline bool is_all_connected(unsigned dst, BaseEmbedding emb) {
-		unsigned n = emb.size();
+	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
+		assert(start >= 0 && end > 0);
 		bool all_connected = true;
-		for(unsigned i = 0; i < n-1; ++i) {
+		for(unsigned i = start; i < end; ++i) {
 			unsigned from = emb.get_vertex(i);
 			if (!is_connected(from, dst)) {
 				all_connected = false;
@@ -86,6 +97,7 @@ protected:
 					connected = true;
 					break;
 				}
+				if (dst > to) break;
 			}
 		} else {
 			for(auto e : graph->edges(to)) {
@@ -94,6 +106,7 @@ protected:
 					connected = true;
 					break;
 				}
+				if (dst > from) break;
 			}
 		}
 		return connected;
