@@ -52,15 +52,15 @@ public:
 	// Given an embedding, extend it with one more vertex. Used for k-cliques. (fast)
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue, UintAccu &num, bool need_update = true) {
 		unsigned n = emb.size();
-		VertexId src = emb.get_vertex(n-1); // toExpand
+		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding)
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
-			if (dst > src && is_all_connected(dst, emb)) { // toAdd
-				if (need_update) { // add to the next queue
+			if (dst > src && is_all_connected(dst, emb)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
+				if (need_update) { // generate a new embedding and add it to the next queue
 					BaseEmbedding new_emb(emb);
 					new_emb.push_back(dst);
 					queue.push_back(new_emb);
-				} else num += 1; // no need to add to the queue, just accumulate
+				} else num += 1; // if size = k, no need to add to the queue, just accumulate
 			}
 		}
 	}
