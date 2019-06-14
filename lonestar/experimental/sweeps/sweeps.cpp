@@ -436,29 +436,39 @@ auto generate_directions(std::size_t latitude_divisions,
     average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi) + longitude_offset;
   }
 
-  // Latitude offset is also here to avoid the need to disambiguate
-  // cases where a direction is exactly orthogonal to a face.
-  // In this case, tilt the resulting disk of directions.
-  // Don't just offset all the latitudes the same.
-  double latitude_offset = latitude_divisions <= 1 ? .25 * pi : 0.;
-  for (std::size_t j = 0; j < latitude_divisions; j++) {
-    // Since the even spacing is in the sine of the latitude,
-    // compute the center point in the sine as well to better
-    // match what the average direction is for that
-    // particular piece of the partition.
-    // TODO: actually prove that this is the right thing to do.
-    double average_latitude_base =
-        std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
-    for (std::size_t k = 0; k < longitude_divisions; k++) {
-      std::size_t direction_index = j * longitude_divisions + k;
-      double average_longitude    = average_longitudes[k];
-      double average_latitude     = average_latitude_base
-                                    + latitude_offset * std::sin(average_longitude);
-      directions[direction_index] = {
-          std::cos(average_longitude) * std::cos(average_latitude),
-          std::sin(average_longitude) * std::cos(average_latitude),
-          std::sin(average_latitude)};
-      // Could renormalize here if really precise computation is desired.
+  // For the latitudes, if there is only one latitude used,
+  // tilt the coordinate axes about the x axis to avoid generating a bunch
+  // of directions that are all orthogonal to the z axis used in the
+  // generated mesh.
+  // Use formula from https://math.stackexchange.com/a/1742758/89171 for
+  // the single latitude case.
+  if (latitude_divisions == 1) {
+    double tilt = .25 * pi;
+    for (std::size_t k = 0; k < latitude_divisions; k++) {
+      double pre_rotated_average_longitude = average_longitudes[k];
+      directions[k] = {
+        std::cos(pre_rotated_average_longitude),
+        std::sin(pre_rotated_average_longitude) * std::cos(tilt),
+        -std::sin(pre_rotated_average_longitude) * std::sin(tilt)};
+    }
+  } else {
+    for (std::size_t j = 0; j < latitude_divisions; j++) {
+      // Since the even spacing is in the sine of the latitude,
+      // compute the center point in the sine as well to better
+      // match what the average direction is for that
+      // particular piece of the partition.
+      // TODO: actually prove that this is the right thing to do.
+      double average_latitude =
+          std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
+      for (std::size_t k = 0; k < longitude_divisions; k++) {
+        std::size_t direction_index = j * longitude_divisions + k;
+        double average_longitude    = average_longitudes[k];
+        directions[direction_index] = {
+            std::cos(average_longitude) * std::cos(average_latitude),
+            std::sin(average_longitude) * std::cos(average_latitude),
+            std::sin(average_latitude)};
+        // Could renormalize here if really precise computation is desired.
+      }
     }
   }
 
