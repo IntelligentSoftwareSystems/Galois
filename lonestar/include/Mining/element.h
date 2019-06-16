@@ -60,18 +60,12 @@ struct LabeledEdge {
 	}
 }__attribute__((__packed__));
 
-/*
- *  Graph mining support. Join on all keys for each vertex tuple.
- *  Each element in the tuple contains 8 bytes, first 4 bytes is vertex id,
- *  second 4 bytes contains edge label(1byte) + vertex label(1byte) + history info(1byte).
- *  History info is used to record subgraph structure.
- *
- *
- *  [ ] [ ] [ ] [ ] || [ ] [ ] [ ] [ ]
- *    vertex id        idx  el  vl info
- *     4 bytes          1   1   1    1
- *
- * */
+//  Each element in the tuple contains 8 bytes, first 4 bytes is vertex id,
+//  second 4 bytes contains edge label(1byte) + vertex label(1byte) + history info(1byte).
+//  History info is used to record subgraph structure.
+//  [ ] [ ] [ ] [ ] || [ ] [ ] [ ] [ ]
+//    vertex id        idx  el  vl info
+//     4 bytes          1   1   1    1
 struct LabeledElement {
 protected:
 	VertexId vertex_id;
@@ -150,6 +144,7 @@ public:
 	}
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return history_info; }
+	BYTE get_key() const { return 0; }
 	friend std::ostream & operator<<(std::ostream & strm, const StructuralElement& element) {
 		strm << "[" << element.get_vid() << ", " << (int)element.get_his() << "]";
 		return strm;
@@ -169,6 +164,7 @@ public:
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return 0; }
+	BYTE get_key() const { return 0; }
 	inline int cmp(const SimpleElement& other) const {
 		if(vertex_id < other.get_vid()) return -1;
 		if(vertex_id > other.get_vid()) return 1;

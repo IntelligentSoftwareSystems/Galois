@@ -34,9 +34,9 @@ typedef galois::gstl::Vector<unsigned> IndexList;
 typedef galois::gstl::Vector<VertexId> VertexList;
 typedef galois::gstl::Vector<IndexList> IndexLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
-typedef std::set<int> IntSet;
-typedef std::unordered_set<int> HashIntSet;
-typedef std::vector<std::unordered_set<int> > HashIntSets;
+//typedef std::set<VertexId> VertexSet;
+typedef galois::gstl::Set<VertexId> VertexSet;
+//typedef std::unordered_set<VertexId> VertexSet;
 
 template <typename ElementTy>
 class Embedding {
@@ -49,6 +49,7 @@ public:
 	~Embedding() { elements.clear(); }
 	VertexId get_vertex(unsigned i) const { return elements[i].get_vid(); }
 	BYTE get_history(unsigned i) const { return elements[i].get_his(); }
+	BYTE get_key(unsigned i) const { return elements[i].get_key(); }
 	bool empty() const { return elements.empty(); }
 	iterator begin() { return elements.begin(); }
 	iterator end() { return elements.end(); }

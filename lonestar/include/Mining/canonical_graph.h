@@ -4,7 +4,6 @@
 #include "embedding.h"
 
 typedef std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> EdgeHeap;
-typedef std::unordered_set<VertexId> VertexSet;
 typedef std::unordered_map<VertexId, BYTE> VertexMap;
 typedef std::vector<bliss::Graph::Vertex> BlissVertexList;
 

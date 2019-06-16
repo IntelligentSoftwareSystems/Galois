@@ -12,7 +12,6 @@ typedef float MatType;
 typedef unsigned Frequency;
 typedef std::vector<std::vector<MatType> > Matrix;
 typedef galois::GAccumulator<unsigned> UintAccu;
-//typedef std::map<unsigned, unsigned> UintMap;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
