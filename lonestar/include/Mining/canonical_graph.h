@@ -20,7 +20,7 @@ public:
 		assert(!is_directed);
 		construct_cg(ag);
 	}
-	CanonicalGraph(QuickPattern<EmbeddingTy,ElementTy>& qp, bool is_directed = false) {
+	CanonicalGraph(const QuickPattern<EmbeddingTy,ElementTy>& qp, bool is_directed = false) {
 		assert(!is_directed);
 		bliss::AbstractGraph* ag = turn_abstract(qp);
 		construct_cg(ag);
@@ -168,7 +168,7 @@ private:
 		//bliss::print_permutation((FILE*) param, n, aut, 1);
 		//fprintf((FILE*) param, "\n");
 	}
-	bliss::AbstractGraph* turn_abstract(QuickPattern<EmbeddingTy,ElementTy>& qp) {
+	bliss::AbstractGraph* turn_abstract(const QuickPattern<EmbeddingTy,ElementTy>& qp) {
 		bliss::AbstractGraph* ag = 0;
 		//get the number of vertices
 		std::unordered_map<VertexId, BYTE> vertices;

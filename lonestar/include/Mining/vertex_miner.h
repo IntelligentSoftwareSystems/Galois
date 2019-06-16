@@ -202,9 +202,9 @@ public:
 			}
 		}
 	}
-	inline void canonical_aggregate_each(StrQPattern qp, Frequency freq, StrCgMapFreq &cg_map) {
+	inline void canonical_aggregate_each(const StrQPattern &qp, Frequency freq, StrCgMapFreq &cg_map) {
 		StrCPattern cg(qp);
-		qp.clean();
+		//qp.clean();
 		if (cg_map.find(cg) != cg_map.end()) cg_map[cg] += freq;
 		else cg_map[cg] = freq;
 		cg.clean();

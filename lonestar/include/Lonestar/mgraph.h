@@ -214,7 +214,7 @@ public:
 				el.push_back(MEdge(src, dst, 1));
 			}
 		}
-		assert(el.size() == g.sizeEdge());
+		assert(el.size() == g.sizeEdges());
 		num_vertices_ = g.size();
 		num_edges_ = el.size();
 		labels_.resize(num_vertices_);

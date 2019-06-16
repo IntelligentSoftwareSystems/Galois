@@ -111,7 +111,7 @@ protected:
 		}
 		return connected;
 	}
-	inline void gen_adj_matrix(unsigned n, std::vector<bool> connected, Matrix &a) {
+	inline void gen_adj_matrix(unsigned n, const std::vector<bool> &connected, Matrix &a) {
 		unsigned l = 0;
 		for (unsigned i = 1; i < n; i++)
 			for (unsigned j = 0; j < i; j++)
@@ -126,7 +126,7 @@ protected:
 		return tr;
 	}
 	// matrix mutiplication, both a and b are n*n matrices
-	Matrix product(unsigned n, Matrix a, Matrix b) {
+	inline Matrix product(unsigned n, const Matrix &a, const Matrix &b) {
 		Matrix c(n, std::vector<MatType>(n));
 		for (unsigned i = 0; i < n; ++i) { 
 			for (unsigned j = 0; j < n; ++j) { 

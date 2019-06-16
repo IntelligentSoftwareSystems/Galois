@@ -94,7 +94,7 @@ void MotifSolver(VertexMiner &miner) {
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
 		);
 		miner.printout_motifs(accumulators);
-	} else if (k > 6) { // use matrix eigenvalue (characteristic polynomial) to do isomorphism check
+	} else if (k > 6 && k < 9) { // use matrix eigenvalue (characteristic polynomial) to do isomorphism check
 		UintMap p_map; // pattern map: pattern hash value --> pattern frequency
 		LocalUintMap localmap;
 		galois::for_each(
@@ -140,8 +140,7 @@ void MotifSolver(VertexMiner &miner) {
 		}
 		CgMapT cg_map; // canonical graph map for couting the frequency
 		LocalCgMapT cg_localmap; // canonical graph local map for each thread
-		galois::do_all(
-			galois::iterate(qp_map),
+		galois::do_all(galois::iterate(qp_map),
 			[&](auto& qp) {
 				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},

@@ -647,7 +647,7 @@ float PriCutManager::cutAreaRef( PriCut * cut ) {
 		aig::GNode leaf = this->aig.getNodes()[ leafId ];
 		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ ); // FIXME lock neigborhood earlier
 
-		assert( leafData.nFnaout >= 0 );
+		assert( leafData.nFanout >= 0 );
 
 		if ( ( leafData.nFanout++ > 0 ) || ( leafData.type != aig::NodeType::AND ) )
 			continue;
