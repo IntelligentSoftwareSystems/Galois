@@ -26,7 +26,6 @@ public:
 		// get the number of distinct vertices in the embedding
 		VertexSet vertices_set;
 		for (unsigned i = 0; i < size; i ++) vertices_set.insert(emb.get_vertex(i));
-		size_t num_vertices = vertices_set.size();
 		// for each vertex in the embedding
 		for (unsigned i = 0; i < size; ++i) {
 			VertexId src = emb.get_vertex(i);
@@ -35,9 +34,9 @@ public:
 				// try edge extension
 				for(auto e : graph->edges(src)) {
 					GNode dst = graph->getEdgeDst(e);
-					BYTE existed = 1;
+					BYTE existed = 0;
 					// check if this is automorphism
-					if(!is_edgeInduced_automorphism(num_vertices, max_size, emb, i, src, dst, vertices_set, existed)) {
+					if(!is_edgeInduced_automorphism(max_size, emb, i, src, dst, vertices_set, existed)) {
 						auto dst_label = 0, edge_label = 0;
 						#ifdef ENABLE_LABEL
 						dst_label = graph->getData(dst);
@@ -77,16 +76,23 @@ public:
 		}
 	}
 	// aggregate embeddings into quick patterns
-	inline void quick_aggregate_each(EdgeEmbedding& emb, QpMapFreq& qp_map) {
+	inline void quick_aggregate_each(const EdgeEmbedding& emb, QpMapFreq& qp_map) {
 		// turn this embedding into its quick pattern
 		QPattern qp(emb);
 		// update frequency for this quick pattern
 		if (qp_map.find(qp) != qp_map.end()) {
 			// if this quick pattern already exists, increase its count
 			qp_map[qp] += 1;
-			emb.set_qpid(qp.get_id());
 			qp.clean();
 		// otherwise add this quick pattern into the map, and set the count as one
+		} else qp_map[qp] = 1;
+	}
+	inline void quick_aggregate_each(EdgeEmbedding& emb, QpMapFreq& qp_map) {
+		QPattern qp(emb);
+		if (qp_map.find(qp) != qp_map.end()) {
+			qp_map[qp] += 1;
+			emb.set_qpid(qp.get_id());
+			qp.clean();
 		} else {
 			qp_map[qp] = 1;
 			emb.set_qpid(qp.get_id());
@@ -175,8 +181,7 @@ public:
 	}
 	inline void merge_qp_map(unsigned num, LocalQpMapFreq &qp_localmap, QpMapFreq &qp_map) {
 		for (unsigned i = 0; i < qp_localmap.size(); i++) {
-			QpMapFreq qp_lmap = *qp_localmap.getLocal(i);
-			for (auto element : qp_lmap) {
+			for (auto element : *qp_localmap.getLocal(i)) {
 				if (qp_map.find(element.first) != qp_map.end())
 					qp_map[element.first] += element.second;
 				else
@@ -186,8 +191,7 @@ public:
 	}
 	inline void merge_qp_map(unsigned num_domains, LocalQpMapDomain &qp_localmap, QpMapDomain &qp_map) {
 		for (unsigned i = 0; i < qp_localmap.size(); i++) {
-			QpMapDomain qp_lmap = *qp_localmap.getLocal(i);
-			for (auto element : qp_lmap) {
+			for (auto element : *qp_localmap.getLocal(i)) {
 				if (qp_map.find(element.first) == qp_map.end())
 					qp_map[element.first].resize(num_domains);
 				for (unsigned i = 0; i < num_domains; i ++)
@@ -197,8 +201,7 @@ public:
 	}
 	inline void merge_cg_map(unsigned num, LocalCgMapFreq &cg_localmap, CgMapFreq &cg_map) {
 		for (unsigned i = 0; i < cg_localmap.size(); i++) {
-			CgMapFreq cg_lmap = *cg_localmap.getLocal(i);
-			for (auto element : cg_lmap) {
+			for (auto element : *cg_localmap.getLocal(i)) {
 				if (cg_map.find(element.first) != cg_map.end())
 					cg_map[element.first] += element.second;
 				else
@@ -208,8 +211,7 @@ public:
 	}
 	inline void merge_cg_map(unsigned num_domains, LocalCgMapDomain &cg_localmap, CgMapDomain &cg_map) {
 		for (unsigned i = 0; i < cg_localmap.size(); i++) {
-			CgMapDomain cg_lmap = *cg_localmap.getLocal(i);
-			for (auto element : cg_lmap) {
+			for (auto element : *cg_localmap.getLocal(i)) {
 				if (cg_map.find(element.first) == cg_map.end())
 					cg_map[element.first].resize(num_domains);
 				for (unsigned i = 0; i < num_domains; i ++)
@@ -326,14 +328,15 @@ public:
 private:
 	unsigned threshold;
 	galois::substrate::SimpleLock slock;
-	bool is_edgeInduced_automorphism(unsigned num_vertices, unsigned max_size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, const VertexSet& vertex_set, BYTE& existed) {
+	bool is_edgeInduced_automorphism(unsigned max_size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, const VertexSet& vertex_set, BYTE& existed) {
 		//check with the first element
 		if (dst <= emb.get_vertex(0)) return true;
 		//check loop edge
 		if (dst == emb.get_vertex(emb.get_history(history))) return true;
-		if (vertex_set.find(dst) == vertex_set.end()) existed = 0;
+		if (history == 0 && dst <= emb.get_vertex(1)) return true;
+		if (vertex_set.find(dst) != vertex_set.end()) existed = 1;
 		// number of vertices must be smaller than k.
-		if (num_vertices + 1 - existed > max_size) return true;
+		if (!existed && vertex_set.size() + 1 > max_size) return true;
 		//check to see if there already exists the vertex added; if so, just allow to add edge which is (smaller id -> bigger id)
 		if (existed && src > dst) return true;
 		std::pair<VertexId, VertexId> added_edge(src, dst);

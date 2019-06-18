@@ -60,8 +60,8 @@ void KclSolver(VertexMiner &miner) {
 	while (1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		if(show) queue.printout_embeddings(0);
-		galois::for_each(galois::iterate(queue),
-			[&](const EmbeddingT& emb, auto& ctx) {
+		galois::do_all(galois::iterate(queue),
+			[&](const EmbeddingT& emb) {
 				miner.extend_vertex(emb, queue2, total_num, (level < k-2)); // expand one more vertex
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),

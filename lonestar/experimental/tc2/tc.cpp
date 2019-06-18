@@ -44,8 +44,7 @@ typedef Graph::GraphNode GNode;
 void TcSolver(Graph& graph) {
 	galois::GAccumulator<unsigned> total_num;
 	total_num.reset();
-	galois::for_each(
-		galois::iterate(graph.begin(), graph.end()),
+	galois::for_each(galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src, auto& ctx) {
 			for (auto e1 : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e1);

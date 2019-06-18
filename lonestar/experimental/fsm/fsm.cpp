@@ -79,7 +79,7 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("QuickAggregation")
 	);
 	galois::StatTimer TmergeQP("MergeQuickPatterns");
@@ -94,7 +94,7 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 			miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()), id_map);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("CanonicalAggregation")
 	);
 	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
@@ -110,19 +110,17 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 	return num_frequent_patterns;
 }
 
-void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMapT& cg_map, const UintMap id_map, const UintMap support_map) {
+inline void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMapT& cg_map, const UintMap& id_map, const UintMap& support_map) {
 	std::cout << "\n----------------------------- Filtering -----------------------------\n";
-	galois::do_all(
-		galois::iterate(in_queue),
-		[&](EmbeddingT &emb) {
-			miner.filter_each(emb, id_map, support_map, out_queue);
-			//unsigned qp_id = emb.get_qpid();
-			//unsigned cg_id = id_map.at(qp_id);
-			//if (support_map.at(cg_id) >= minsup) out_queue.push_back(emb);
-	
+	galois::do_all(galois::iterate(in_queue),
+		[&](const EmbeddingT &emb) {
+			//miner.filter_each(emb, id_map, support_map, out_queue);
+			unsigned qp_id = emb.get_qpid();
+			unsigned cg_id = id_map.at(qp_id);
+			if (support_map.at(cg_id) >= minsup) out_queue.push_back(emb);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-		//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("Filter")
 	);
 }
@@ -151,9 +149,8 @@ void FsmSolver(EdgeMiner &miner) {
 		std::cout << "\n============================== Level " << level << " ==============================\n";
 		std::cout << "\n----------------------------- Expanding -----------------------------\n";
 		queue.clear();
-		galois::for_each(
-			galois::iterate(filtered_queue),
-			[&](const EmbeddingT& emb, auto& ctx) {
+		galois::do_all(galois::iterate(filtered_queue),
+			[&](const EmbeddingT& emb) {
 				miner.extend_edge(k, emb, queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),

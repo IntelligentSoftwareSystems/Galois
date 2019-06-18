@@ -209,7 +209,29 @@ public:
 		else cg_map[cg] = freq;
 		cg.clean();
 	}
-	unsigned get_total_num_cliques() { return num_cliques; }
+	inline void merge_qp_map(LocalStrQpMapFreq &qp_localmap, StrQpMapFreq &qp_map) {
+		for (unsigned i = 0; i < qp_localmap.size(); i++) {
+			StrQpMapFreq qp_lmap = *qp_localmap.getLocal(i);
+			for (auto element : qp_lmap) {
+				if (qp_map.find(element.first) != qp_map.end())
+					qp_map[element.first] += element.second;
+				else
+					qp_map[element.first] = element.second;
+			}
+		}
+	}
+	inline void merge_cg_map(LocalStrCgMapFreq &cg_localmap, StrCgMapFreq &cg_map) {
+		for (unsigned i = 0; i < cg_localmap.size(); i++) {
+			StrCgMapFreq cg_lmap = *cg_localmap.getLocal(i);
+			for (auto element : cg_lmap) {
+				if (cg_map.find(element.first) != cg_map.end())
+					cg_map[element.first] += element.second;
+				else
+					cg_map[element.first] = element.second;
+			}
+		}
+	}
+	inline unsigned get_total_num_cliques() { return num_cliques; }
 	void printout_motifs(std::vector<UintAccu> &accumulators) {
 		std::cout << std::endl;
 		if (accumulators.size() == 2) {
