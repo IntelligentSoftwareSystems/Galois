@@ -539,7 +539,7 @@ public:
   }
 
   /**
-   * Get the node data for a particular node in the graph.
+   * Get the edge data for a particular edge in the graph.
    *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
