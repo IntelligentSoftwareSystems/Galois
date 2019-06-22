@@ -21,10 +21,10 @@ public:
 	inline void extend_vertex(const VertexEmbedding &emb, VertexEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
+			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding)
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) { // toAdd (only add non-automorphisms)
 					VertexEmbedding new_emb(emb);
 					if (n == 2 && k == 4) new_emb.set_pid(find_motif_pattern_id(n, i, dst, emb));
 					new_emb.push_back(dst);
@@ -37,11 +37,11 @@ public:
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
-			VertexId id = emb.get_vertex(i);
-			for(auto e : graph->edges(id)) {
+			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding: slow)
+			for(auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				// extend vertex in ascending order to avoid unnecessary enumeration
-				if(dst > emb.get_vertex(n-1)) {
+				if(dst > emb.get_vertex(n-1)) { // toAdd (only add vertx with larger ID)
 					BaseEmbedding new_emb(emb);
 					new_emb.push_back(dst);
 					queue.push_back(new_emb);
@@ -52,7 +52,7 @@ public:
 	// Given an embedding, extend it with one more vertex. Used for k-cliques. (fast)
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue, UintAccu &num, bool need_update = true) {
 		unsigned n = emb.size();
-		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding)
+		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding: fast)
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
 			if (dst > src && is_all_connected(dst, emb, n-1)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
@@ -120,7 +120,7 @@ public:
 		for (auto e : graph->edges(vid)) {
 			GNode dst = graph->getEdgeDst(e);
 			// check if it is a clique
-			if(vid < dst && is_all_connected(dst, emb, level)) {
+			if (vid < dst && is_all_connected(dst, emb, level)) {
 				emb_list.set_idx(level+1, start, pos);
 				emb_list.set_vid(level+1, start++, dst);
 			}
@@ -130,8 +130,8 @@ public:
 		SimpleMap simple_agg;
 		for (const BaseEmbedding emb : in_queue) {
 			auto it = simple_agg.find(emb);
-			if(it != simple_agg.end()) {
-				if(it->second == it->first.size() - 2) {
+			if (it != simple_agg.end()) {
+				if (it->second == it->first.size() - 2) {
 					out_queue.push_back(emb);
 					simple_agg.erase(it);
 				}

@@ -87,6 +87,7 @@ protected:
 		}
 		return all_connected;
 	}
+	/*
 	inline bool is_connected(unsigned from, unsigned to) {
 		bool connected = false;
 		if (degrees[from] < degrees[to]) {
@@ -109,6 +110,41 @@ protected:
 			}
 		}
 		return connected;
+	}
+	*/
+	// check if vertex a is connected to vertex b in a undirected graph
+	inline bool is_connected(unsigned a, unsigned b) {
+		if (degrees[a] == 0 || degrees[b] == 0) return false;
+		unsigned key = a;
+		unsigned search = b;
+		if (degrees[a] < degrees[b]) {
+			key = b;
+			search = a;
+		} 
+		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
+		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		//return serial_search(key, begin, end);
+		return binary_search(key, begin, end);
+	}
+	inline bool serial_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
+		for (auto offset = begin; offset != end; ++ offset) {
+			unsigned d = graph->getEdgeDst(offset);
+			if (d == key) return true;
+			if (d > key) return false;
+		}
+		return false;
+	}
+	inline bool binary_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
+		Graph::edge_iterator l = begin;
+		Graph::edge_iterator r = end-1;
+		while (r >= l) { 
+			Graph::edge_iterator mid = l + (r - l) / 2; 
+			unsigned value = graph->getEdgeDst(mid);
+			if (value == key) return true;
+			if (value < key) l = mid + 1; 
+			else r = mid - 1; 
+		} 
+		return false;
 	}
 	inline void gen_adj_matrix(unsigned n, const std::vector<bool> &connected, Matrix &a) {
 		unsigned l = 0;

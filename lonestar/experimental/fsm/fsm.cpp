@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #define ENABLE_LABEL
-#define USE_DOMAIN
+//#define USE_DOMAIN
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS expansion";
@@ -56,12 +56,14 @@ typedef EdgeEmbeddingQueue EmbeddingQueueT;
 
 #ifdef USE_DOMAIN
 typedef DomainSupport SupportT;
+typedef DomainMap SupportMap;
 typedef QpMapDomain QpMapT;
 typedef CgMapDomain CgMapT;
 typedef LocalQpMapDomain LocalQpMapT;
 typedef LocalCgMapDomain LocalCgMapT;
 #else
 typedef Frequency SupportT;
+typedef FreqMap SupportMap;
 typedef QpMapFreq QpMapT;
 typedef CgMapFreq CgMapT;
 typedef LocalQpMapFreq LocalQpMapT;
@@ -69,7 +71,7 @@ typedef LocalCgMapFreq LocalCgMapT;
 #endif
 
 // two-level aggregation
-int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT& cg_map, UintMap& id_map, UintMap& support_map) {
+int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT& cg_map, UintMap& id_map, SupportMap& support_map) {
 	std::cout << "\n---------------------------- Aggregating ----------------------------\n";
 	QpMapT qp_map; // quick pattern map
 	// quick aggregation
@@ -110,14 +112,11 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 	return num_frequent_patterns;
 }
 
-inline void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMapT& cg_map, const UintMap& id_map, const UintMap& support_map) {
+inline void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMapT& cg_map, const UintMap& id_map, const SupportMap& support_map) {
 	std::cout << "\n----------------------------- Filtering -----------------------------\n";
 	galois::do_all(galois::iterate(in_queue),
 		[&](const EmbeddingT &emb) {
-			//miner.filter_each(emb, id_map, support_map, out_queue);
-			unsigned qp_id = emb.get_qpid();
-			unsigned cg_id = id_map.at(qp_id);
-			if (support_map.at(cg_id) >= minsup) out_queue.push_back(emb);
+			miner.filter_each(emb, id_map, support_map, out_queue);
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
 		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -133,7 +132,8 @@ void FsmSolver(EdgeMiner &miner) {
 	queue.printout_embeddings(0);
 
 	CgMapT cg_map; // canonical graph map
-	UintMap id_map, support_map;
+	UintMap id_map;
+	SupportMap support_map;
 	int num_freq_patterns = aggregator(level, miner, queue, cg_map, id_map, support_map);
 	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n\n";

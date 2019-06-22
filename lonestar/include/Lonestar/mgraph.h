@@ -5,6 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 #include "core.h"
 #include "common_types.h"
 
@@ -317,7 +318,38 @@ private:
 		free(cd0);
 		free(adj0);
 	}
+	// relabel vertices by descending degree order (do not apply to weighted graphs)
+	void DegreeRanking() {
+		std::cout << " Relabeling vertices by descending degree order\n";
+		typedef std::pair<int, IndexT> degree_node_p;
+		std::vector<degree_node_p> degree_id_pairs(num_vertices_);
+		for (IndexT n = 0; n < num_vertices_; n++)
+			degree_id_pairs[n] = std::make_pair(out_degree(n), n);
+		std::sort(degree_id_pairs.begin(), degree_id_pairs.end(), std::greater<degree_node_p>());
+		std::vector<IndexT> degrees(num_vertices_);
+		std::vector<IndexT> new_ids(num_vertices_);
+		for (IndexT n = 0; n < num_vertices_; n++) {
+			degrees[n] = degree_id_pairs[n].first;
+			new_ids[degree_id_pairs[n].second] = n;
+		}
+		std::vector<IndexT> offsets = PrefixSum(degrees);
+		IndexT *index = new IndexT[num_vertices_+1];
+		IndexT *neighs = new IndexT[num_edges_];
+		for (IndexT i = 0; i < num_vertices_+1; i++) index[i] = offsets[i];
+		for (IndexT u = 0; u < num_vertices_; u++) {
+			for (IndexT offset = get_offset(u); offset < get_offset(u+1); offset++) {
+				IndexT v = get_dest(offset);
+				neighs[offsets[new_ids[u]]++] = new_ids[v];
+			}
+			std::sort(neighs+index[new_ids[u]], neighs+index[new_ids[u]+1]);
+		}
+		delete rowptr_;
+		delete colidx_;
+		rowptr_ = index;
+		colidx_ = neighs;
+	}
 	void RelabelEdges() {
+		std::cout << " Relabeling edges\n";
 		ord_core();
 		//for (int i = 0; i < num_vertices_; i ++)
 		//	std::cout << i << " --> " << rank[i] << "\n";
@@ -415,6 +447,7 @@ private:
 		//MakeCSRFromEL(false);
 		SquishGraph();
 		MakeCSR(false);
+		//if (!need_relabel_edges) DegreeRanking();
 	}
 	static std::vector<int> PrefixSum(const std::vector<int> &degrees) {
 		std::vector<int> sums(degrees.size() + 1);
