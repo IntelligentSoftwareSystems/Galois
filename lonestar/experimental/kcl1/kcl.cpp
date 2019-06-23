@@ -51,7 +51,7 @@ typedef BaseEmbeddingQueue EmbeddingQueueT;
 #include "Mining/util.h"
 
 void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
-	galois::GAccumulator<unsigned> total_num;
+	UlongAccu total_num;
 	total_num.reset();
 	IndexList num_new_emb;
 	if(show) std::cout << "\n=============================== Start ===============================\n";
@@ -60,7 +60,7 @@ void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		num_new_emb.resize(emb_list.size());
 		if(show) emb_list.printout_embeddings(level);
-		std::cout << "Allocating space for new embeddings\n";
+		//std::cout << "Allocating space for new embeddings\n";
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& id) {
 				miner.extend_vertex_each(level, id, emb_list, num_new_emb, total_num, (level < k-2));
@@ -69,10 +69,10 @@ void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 			galois::loopname("Expanding-alloc")
 		);
 		if (level == k-2) break;
-		std::cout << "calculating indices using prefix sum\n";
+		//std::cout << "calculating indices using prefix sum\n";
 		IndexList indices = parallel_prefix_sum(num_new_emb);
 		size_t new_size = indices[indices.size()-1];
-		std::cout << "generating " << new_size << " embeddings\n";
+		//std::cout << "generating " << new_size << " embeddings\n";
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& id) {
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 
 	VertexMiner miner(&graph);
 	EmbeddingList emb_list;
-	emb_list.init(k, graph);
+	emb_list.init(graph, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner, emb_list);

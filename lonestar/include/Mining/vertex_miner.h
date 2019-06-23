@@ -17,8 +17,8 @@ public:
 		degree_counting();
 	}
 	virtual ~VertexMiner() {}
-	// Given an embedding, extend it with one more vertex. Used for vertex-induced k-motif
-	inline void extend_vertex(const VertexEmbedding &emb, VertexEmbeddingQueue &queue) {
+	// Given an embedding, extend it with one more vertex. Used for vertex-induced motif
+	inline void extend_vertex(unsigned max_size, const VertexEmbedding &emb, VertexEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for (unsigned i = 0; i < n; ++i) {
 			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding)
@@ -26,21 +26,20 @@ public:
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) { // toAdd (only add non-automorphisms)
 					VertexEmbedding new_emb(emb);
-					if (n == 2 && k == 4) new_emb.set_pid(find_motif_pattern_id(n, i, dst, emb));
+					if (n == 2 && max_size == 4) new_emb.set_pid(find_motif_pattern_id(n, i, dst, emb));
 					new_emb.push_back(dst);
 					queue.push_back(new_emb);
 				}
 			}
 		}
 	}
-	// Given an embedding, extend it with one more vertex. Used for k-cliques (same as RStream: slow)
+	// Given an embedding, extend it with one more vertex. Used for cliques (same as RStream: slow)
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
 			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding: slow)
 			for(auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
-				// extend vertex in ascending order to avoid unnecessary enumeration
 				if(dst > emb.get_vertex(n-1)) { // toAdd (only add vertx with larger ID)
 					BaseEmbedding new_emb(emb);
 					new_emb.push_back(dst);
@@ -49,46 +48,23 @@ public:
 			}
 		}
 	}
-	// Given an embedding, extend it with one more vertex. Used for k-cliques. (fast)
-	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue, UintAccu &num, bool need_update = true) {
+	// Given an embedding, extend it with one more vertex. Used for cliques. (fast)
+	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue, UlongAccu &num, bool need_update = true) {
 		unsigned n = emb.size();
 		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding: fast)
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
+			// extend vertex in ascending order to avoid unnecessary enumeration
 			if (dst > src && is_all_connected(dst, emb, n-1)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
 				if (need_update) { // generate a new embedding and add it to the next queue
 					BaseEmbedding new_emb(emb);
 					new_emb.push_back(dst);
 					queue.push_back(new_emb);
-				} else num += 1; // if size = k, no need to add to the queue, just accumulate
+				} else num += 1; // if size = max_size, no need to add to the queue, just accumulate
 			}
 		}
 	}
-	/*
-	void extend_vertex_all(UintAccu &num, bool need_update = true) {
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&](const GNode& src) {
-				for (auto e : graph->edges(src)) {
-					GNode dst = graph->getEdgeDst(e);
-					if(src < dst) {
-						BaseEmbedding emb(2);
-						emb.set_element(0, src);
-						emb.set_element(1, dst);
-						for (auto e1 : graph->edges(dst)) {
-							GNode dst_dst = graph->getEdgeDst(e1);
-							//if (dst_dst > dst && is_connected(dst_dst, src))
-							if (dst_dst > dst && is_all_connected(dst_dst, emb, 1))
-								num += 1;
-						}
-					}
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-			galois::loopname("CliqueCouting")
-		);
-	}
-	//*/
-	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, IndexList& num_emb, UintAccu &num, bool need_update = true) {
+	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, IndexList& num_emb, UlongAccu &num, bool need_update = true) {
 		VertexId vid = emb_list.get_vid(level, pos);
 		IndexTy idx = emb_list.get_idx(level, pos);
 		num_emb[pos] = 0;
@@ -153,7 +129,7 @@ public:
 		}
 		else sm[emb] = 1;
 	}
-	inline void aggregate_each(const VertexEmbedding &emb, std::vector<UintAccu> &accumulators) {
+	inline void aggregate_each(const VertexEmbedding &emb, std::vector<UlongAccu> &accumulators) {
 		unsigned n = emb.size();
 		for (unsigned i = 0; i < n; ++i) {
 			VertexId src = emb.get_vertex(i);
@@ -232,7 +208,7 @@ public:
 		}
 	}
 	inline unsigned get_total_num_cliques() { return num_cliques; }
-	void printout_motifs(std::vector<UintAccu> &accumulators) {
+	void printout_motifs(std::vector<UlongAccu> &accumulators) {
 		std::cout << std::endl;
 		if (accumulators.size() == 2) {
 			std::cout << "\ttriangles\t" << accumulators[0].reduce() << std::endl;

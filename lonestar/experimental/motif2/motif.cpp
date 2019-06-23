@@ -63,7 +63,7 @@ void MotifSolver(VertexMiner &miner) {
 	miner.init(queue); // initialize the task queue
 	int npatterns = num_patterns[k-3];
 	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
-	std::vector<UintAccu> accumulators(npatterns);
+	std::vector<UlongAccu> accumulators(npatterns);
 	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
 	if (show) queue.printout_embeddings(0);
 	unsigned level = 1;
@@ -73,7 +73,7 @@ void MotifSolver(VertexMiner &miner) {
 		// for each embedding in the task queue, do vertex-extension
 		galois::do_all(galois::iterate(queue),
 			[&](const EmbeddingT& emb) {
-				miner.extend_vertex(emb, queue2); // vertex extension
+				miner.extend_vertex(k, emb, queue2); // vertex extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -119,6 +119,7 @@ void MotifSolver(VertexMiner &miner) {
 		miner.printout_motifs(p_map);
 //*/
 	} else { // use bliss library to do isomorphism check
+		// TODO: need to use unsigned long for the counters
 		QpMapT qp_map; // quick patterns map for counting the frequency
 		LocalQpMapT qp_localmap; // quick patterns local map for each thread
 		galois::do_all(galois::iterate(queue),

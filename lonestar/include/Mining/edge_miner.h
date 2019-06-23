@@ -383,6 +383,7 @@ private:
 		}
 		return false;
 	}
+	/*
 	inline bool edge_existed(const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst) {
 		std::pair<VertexId, VertexId> added_edge(src, dst);
 		for (unsigned i = 1; i < emb.size(); ++i) {
@@ -391,6 +392,7 @@ private:
 		}
 		return false;
 	}
+	*/
 	inline void getEdge(const EdgeEmbedding & emb, unsigned index, std::pair<VertexId, VertexId>& edge) {
 		edge.first = emb.get_vertex(emb.get_history(index));
 		edge.second = emb.get_vertex(index);

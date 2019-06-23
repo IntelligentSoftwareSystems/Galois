@@ -42,7 +42,7 @@ typedef Graph::GraphNode GNode;
 #include "Mining/util.h"
 
 void TcSolver(Graph& graph) {
-	galois::GAccumulator<unsigned int> total_num;
+	galois::GAccumulator<unsigned> total_num;
 	total_num.reset();
 	galois::for_each(galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src, auto& ctx) {

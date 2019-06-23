@@ -41,24 +41,30 @@ typedef Graph::GraphNode GNode;
 
 #include "Mining/util.h"
 
+inline unsigned intersect(Graph& graph, unsigned src, unsigned dst) {
+	unsigned count = 0;
+	for (auto e : graph.edges(dst)) {
+		GNode dst_dst = graph.getEdgeDst(e);
+		for (auto e1 : graph.edges(src)) {
+			GNode to = graph.getEdgeDst(e1);
+			if (dst_dst == to) {
+				count += 1;
+				break;
+			}
+			if (to > dst_dst) break;
+		}
+	}
+	return count;
+}
+
 void TcSolver(Graph& graph) {
 	galois::GAccumulator<unsigned> total_num;
 	total_num.reset();
 	galois::for_each(galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src, auto& ctx) {
-			for (auto e1 : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e1);
-				for (auto e2 : graph.edges(dst)) {
-					GNode dst_dst = graph.getEdgeDst(e2);
-					for (auto e3 : graph.edges(src)) {
-						GNode dst2 = graph.getEdgeDst(e3);
-						if (dst_dst == dst2) {
-							total_num += 1;
-							break;
-						}
-						if (dst2 > dst_dst) break;
-					}
-				}
+			for (auto e : graph.edges(src)) {
+				GNode dst = graph.getEdgeDst(e);
+				total_num += intersect(graph, src, dst);
 			}
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 

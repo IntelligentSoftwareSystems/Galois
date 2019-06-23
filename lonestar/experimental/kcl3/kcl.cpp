@@ -51,7 +51,7 @@ typedef BaseEmbeddingQueue EmbeddingQueueT;
 #include "Mining/util.h"
 
 void KclSolver(VertexMiner &miner) {
-	galois::GAccumulator<unsigned> total_num;
+	UlongAccu total_num;
 	total_num.reset();
 	if(show) std::cout << "\n=============================== Start ===============================\n";
 	EmbeddingQueueT queue, queue2;

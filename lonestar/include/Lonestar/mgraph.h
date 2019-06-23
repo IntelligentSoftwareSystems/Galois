@@ -28,8 +28,9 @@ typedef std::vector<MEdge> MEdgeList;
 class MGraph {
 public:
 	MEdgeList el;
-	MGraph() : need_relabel_edges(false), symmetrize_(false), directed_(false) {}
-	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), symmetrize_(false), directed_(false) {}
+	MGraph() : need_relabel_edges(false), need_dag(false), symmetrize_(false), directed_(false) {}
+	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), need_dag(false), symmetrize_(false), directed_(false) {}
+	MGraph(bool relabel_edges, bool dag) : need_relabel_edges(relabel_edges), need_dag(dag), symmetrize_(false), directed_(false) {}
 	IndexT * out_rowptr() const { return rowptr_; }
 	IndexT * out_colidx() const { return colidx_; }
 	ValueT * labels() { return labels_.data(); }
@@ -239,6 +240,7 @@ public:
 
 private:
 	bool need_relabel_edges;
+	bool need_dag;
 	bool symmetrize_; // whether to symmetrize a directed graph
 	bool directed_;
 	int num_vertices_;
@@ -348,8 +350,22 @@ private:
 		rowptr_ = index;
 		colidx_ = neighs;
 	}
+	void ConstructDAG() {
+		std::cout << "Constructinging DAG\n";
+		MEdgeList new_el;
+		int count = 0;
+		for (int i = 0; i < num_edges_; i ++) {
+			if (el[i].src < el[i].dst) {
+				new_el.push_back(el[i]);
+				count ++;
+			}
+		}
+		el = new_el;
+		assert(count == el.size());
+		num_edges_ = count;
+	}
 	void RelabelEdges() {
-		std::cout << " Relabeling edges\n";
+		std::cout << "Relabeling edges\n";
 		ord_core();
 		//for (int i = 0; i < num_vertices_; i ++)
 		//	std::cout << i << " --> " << rank[i] << "\n";
@@ -444,6 +460,7 @@ private:
 	}
 	void MakeGraphFromEL() {
 		if (need_relabel_edges) RelabelEdges();
+		if (need_dag) ConstructDAG();
 		//MakeCSRFromEL(false);
 		SquishGraph();
 		MakeCSR(false);

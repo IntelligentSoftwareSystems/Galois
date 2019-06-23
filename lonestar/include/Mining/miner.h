@@ -12,6 +12,7 @@ typedef float MatType;
 typedef unsigned Frequency;
 typedef std::vector<std::vector<MatType> > Matrix;
 typedef galois::GAccumulator<unsigned> UintAccu;
+typedef galois::GAccumulator<unsigned long> UlongAccu;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
@@ -60,6 +61,23 @@ public:
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Initialization")
 		);
+	}
+	inline unsigned intersect(unsigned a, unsigned b) {
+		if (degrees[a] == 0 || degrees[b] == 0) return 0;
+		unsigned count = 0;
+		unsigned lookup = a;
+		unsigned search = b;
+		if (degrees[a] > degrees[b]) {
+			lookup = b;
+			search = a;
+		} 
+		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
+		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		for (auto e : graph->edges(lookup)) {
+			GNode key = graph->getEdgeDst(e);
+			if(binary_search(key, begin, end)) count ++;
+		}
+		return count;
 	}
 
 protected:

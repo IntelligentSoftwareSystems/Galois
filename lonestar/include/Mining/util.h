@@ -30,8 +30,8 @@ void genGraph(MGraph &mg, Graph &g) {
 }
 
 // relabel is needed when we use DAG as input graph, and it is disabled when we use symmetrized graph
-int read_graph(Graph &graph, std::string filetype, std::string filename, bool need_relabel = false) {
-	MGraph mgraph(need_relabel);
+int read_graph(Graph &graph, std::string filetype, std::string filename, bool need_relabel = false, bool need_dag = false) {
+	MGraph mgraph(need_relabel, need_dag);
 	if (filetype == "txt") {
 		printf("Reading .lg file: %s\n", filename.c_str());
 		mgraph.read_txt(filename.c_str());

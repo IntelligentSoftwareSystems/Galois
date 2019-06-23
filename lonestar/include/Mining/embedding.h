@@ -213,7 +213,7 @@ class EmbeddingList {
 public:
 	EmbeddingList() {}
 	~EmbeddingList() {}
-	void init(unsigned max_size, Graph& graph) {
+	void init(Graph& graph, unsigned max_size = 2) {
 		last_level = 1;
 		max_level = max_size;
 		unsigned eid = 0;
