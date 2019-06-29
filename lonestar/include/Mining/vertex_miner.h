@@ -33,6 +33,51 @@ public:
 			}
 		}
 	}
+	inline void extend_vertex(unsigned level, unsigned pos, const EmbeddingList& emb_list, UintList& num_emb) {
+		VertexId vid = emb_list.get_vid(level, pos);
+		IndexTy idx = emb_list.get_idx(level, pos);
+		num_emb[pos] = 0;
+		VertexEmbedding emb(level+1);
+		emb.set_element(level, vid);
+		for (unsigned l = 1; l <= level; l ++) {
+			emb.set_element(level-l, emb_list.get_vid(level-l, idx));
+			idx = emb_list.get_idx(level-l, idx);
+		}
+		unsigned n = emb.size();
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+					num_emb[pos] ++;
+				}
+			}
+		}
+	}
+	inline void extend_vertex(unsigned level, unsigned max_size, unsigned pos, EmbeddingList& emb_list, const UintList& indices) {
+		VertexId vid = emb_list.get_vid(level, pos);
+		IndexTy idx = emb_list.get_idx(level, pos);
+		unsigned start = indices[pos];
+		VertexEmbedding emb;
+		emb.push_back(vid);
+		// backward constructing the embedding
+		for (unsigned i = 1; i <= level; i ++) {
+			emb.insert(emb.begin(), emb_list.get_vid(level-i, idx));
+			idx = emb_list.get_idx(level-i, idx);
+		}
+		unsigned n = emb.size();
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+					if (n == 2 && max_size == 4) emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb));
+					emb_list.set_idx(level+1, start, pos);
+					emb_list.set_vid(level+1, start++, dst);
+				}
+			}
+		}
+	}
 	// Given an embedding, extend it with one more vertex. Used for cliques (same as RStream: slow)
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
@@ -64,7 +109,7 @@ public:
 			}
 		}
 	}
-	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, IndexList& num_emb, UlongAccu &num, bool need_update = true) {
+	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, UintList& num_emb, UlongAccu &num, bool need_update = true) {
 		VertexId vid = emb_list.get_vid(level, pos);
 		IndexTy idx = emb_list.get_idx(level, pos);
 		num_emb[pos] = 0;
@@ -82,7 +127,7 @@ public:
 			}
 		}
 	}
-	inline void extend_vertex_each(unsigned level, unsigned pos, EmbeddingList& emb_list, const IndexList& indices) {
+	inline void extend_vertex_each(unsigned level, unsigned pos, EmbeddingList& emb_list, const UintList& indices) {
 		VertexId vid = emb_list.get_vid(level, pos);
 		IndexTy idx = emb_list.get_idx(level, pos);
 		unsigned start = indices[pos];
@@ -143,6 +188,30 @@ public:
 			}
 		}
 	}
+	inline void aggregate_each(unsigned level, unsigned pos, EmbeddingList& emb_list, std::vector<UlongAccu> &accumulators) {
+		VertexId vid = emb_list.get_vid(level, pos);
+		IndexTy idx = emb_list.get_idx(level, pos);
+		VertexEmbedding emb;
+		emb.push_back(vid);
+		for (unsigned i = 1; i <= level; i ++) {
+			emb.insert(emb.begin(), emb_list.get_vid(level-i, idx));
+			idx = emb_list.get_idx(level-i, idx);
+		}
+		unsigned n = emb.size();
+		if (n == 3) emb.set_pid(emb_list.get_pid(pos));
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+					assert(n < 4);
+					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+					accumulators[pid] += 1;
+				}
+			}
+		}
+	}
+
 	inline void aggregate_each(const VertexEmbedding &emb, UintMap &p_map) {
 		unsigned n = emb.size();
 		assert(n >= 4);
@@ -178,6 +247,35 @@ public:
 			}
 		}
 	}
+	inline void quick_aggregate_each(unsigned level, unsigned pos, EmbeddingList& emb_list, StrQpMapFreq& qp_map) {
+		VertexId vid = emb_list.get_vid(level, pos);
+		IndexTy idx = emb_list.get_idx(level, pos);
+		VertexEmbedding emb;
+		emb.push_back(vid);
+		for (unsigned i = 1; i <= level; i ++) {
+			emb.insert(emb.begin(), emb_list.get_vid(level-i, idx));
+			idx = emb_list.get_idx(level-i, idx);
+		}
+		unsigned n = emb.size();
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId src = emb.get_vertex(i);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+					std::vector<bool> connected;
+					get_connectivity(n, i, dst, emb, connected);
+					StrQPattern qp(n+1, connected);
+					if (qp_map.find(qp) != qp_map.end()) {
+						qp_map[qp] += 1;
+						qp.clean();
+					} else {
+						qp_map[qp] = 1;
+					}
+				}
+			}
+		}
+	}
+
 	inline void canonical_aggregate_each(const StrQPattern &qp, Frequency freq, StrCgMapFreq &cg_map) {
 		StrCPattern cg(qp);
 		//qp.clean();

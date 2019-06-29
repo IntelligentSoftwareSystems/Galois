@@ -16,8 +16,8 @@ typedef galois::GAccumulator<unsigned long> UlongAccu;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
-inline IndexList parallel_prefix_sum(const IndexList &degrees) {
-	IndexList sums(degrees.size() + 1);
+inline UintList parallel_prefix_sum(const UintList &degrees) {
+	UintList sums(degrees.size() + 1);
 	int total = 0;
 	for (size_t n = 0; n < degrees.size(); n++) {
 		sums[n] = total;
@@ -63,6 +63,38 @@ public:
 		);
 	}
 	inline unsigned intersect(unsigned a, unsigned b) {
+		return intersect_merge(a, b);
+	}
+
+protected:
+	Graph *graph;
+	galois::StatTimer Tconnect;
+	std::vector<unsigned> degrees;
+	void degree_counting() {
+		degrees.resize(graph->size());
+		galois::do_all(galois::iterate(graph->begin(), graph->end()),
+			[&] (GNode v) {
+				degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
+			},
+			galois::loopname("DegreeCounting")
+		);
+	}
+	inline unsigned intersect_merge(unsigned src, unsigned dst) {
+		unsigned count = 0;
+		for (auto e : graph->edges(dst)) {
+			GNode dst_dst = graph->getEdgeDst(e);
+			for (auto e1 : graph->edges(src)) {
+				GNode to = graph->getEdgeDst(e1);
+				if (dst_dst == to) {
+					count += 1;
+					break;
+				}
+				if (to > dst_dst) break;
+			}
+		}
+		return count;
+	}
+	inline unsigned intersect_search(unsigned a, unsigned b) {
 		if (degrees[a] == 0 || degrees[b] == 0) return 0;
 		unsigned count = 0;
 		unsigned lookup = a;
@@ -78,20 +110,6 @@ public:
 			if(binary_search(key, begin, end)) count ++;
 		}
 		return count;
-	}
-
-protected:
-	Graph *graph;
-	galois::StatTimer Tconnect;
-	std::vector<unsigned> degrees;
-	void degree_counting() {
-		degrees.resize(graph->size());
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&] (GNode v) {
-				degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
-			},
-			galois::loopname("DegreeCounting")
-		);
 	}
 	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
 		assert(start >= 0 && end > 0);

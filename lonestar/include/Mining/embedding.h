@@ -30,9 +30,9 @@
 #include "galois/Galois.h"
 
 typedef unsigned IndexTy;
-typedef galois::gstl::Vector<unsigned> IndexList;
+typedef galois::gstl::Vector<unsigned> UintList;
 typedef galois::gstl::Vector<VertexId> VertexList;
-typedef galois::gstl::Vector<IndexList> IndexLists;
+typedef galois::gstl::Vector<UintList> IndexLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
 //typedef std::set<VertexId> VertexSet;
 typedef galois::gstl::Set<VertexId> VertexSet;
@@ -111,9 +111,8 @@ public:
 class VertexInducedEmbedding: public BaseEmbedding {
 friend std::ostream & operator<<(std::ostream & strm, const VertexInducedEmbedding& emb);
 public:
-	VertexInducedEmbedding() : BaseEmbedding() { 
-		hash_value = 0;
-	}
+	VertexInducedEmbedding() : BaseEmbedding() { hash_value = 0; }
+	VertexInducedEmbedding(size_t n) : BaseEmbedding(n) { hash_value = 0; }
 	VertexInducedEmbedding(const VertexInducedEmbedding &emb) : BaseEmbedding() {
 		elements = emb.get_elements();
 		hash_value = emb.get_pid();
@@ -234,8 +233,10 @@ public:
 	}
 	VertexId get_vid(unsigned level, IndexTy id) const { return vid_lists[level][id]; }
 	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
+	IndexTy get_pid(IndexTy id) const { return pid_list[id]; }
 	void set_vid(unsigned level, IndexTy id, VertexId vid) { vid_lists[level][id] = vid; }
 	void set_idx(unsigned level, IndexTy id, IndexTy idx) { idx_lists[level][id] = idx; }
+	void set_pid(IndexTy id, IndexTy pid) { pid_list[id] = pid; }
 	size_t size() { return vid_lists[last_level].size(); }
 	size_t size(unsigned level) { return vid_lists[level].size(); }
 	void add_level(unsigned size) {
@@ -243,12 +244,16 @@ public:
 		assert(last_level < max_level);
 		vid_lists[last_level].resize(size);
 		idx_lists[last_level].resize(size);
+		#ifdef USE_PID
+		pid_list.resize(size);
+		#endif
 	}
 	void printout_embeddings(int level, bool verbose = false) {
 		std::cout << "Number of embeddings in level " << level << ": " << size() << std::endl;
 		if(verbose) std::cout << "\n";
 	}
 private:
+	UintList pid_list;
 	IndexLists idx_lists;
 	VertexLists vid_lists;
 	unsigned last_level;

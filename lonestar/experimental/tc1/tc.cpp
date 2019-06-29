@@ -28,6 +28,7 @@
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
 #define CHUNK_SIZE 256
+#define USE_SIMPLE
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
@@ -48,18 +49,15 @@ typedef BaseEmbeddingQueue EmbeddingQueueT;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
-void TcSolver(VertexMiner &miner, Graph &graph) {
-	galois::GAccumulator<unsigned> total_num;
+void TcSolver(VertexMiner &miner, EmbeddingList &emb_list) {
+	UlongAccu total_num;
 	total_num.reset();
-	galois::for_each(galois::iterate(graph.begin(), graph.end()),
-		[&](const GNode& src, auto& ctx) {
-			for (auto e : graph.edges(src)) {
-				GNode dst = graph.getEdgeDst(e);
-				total_num += miner.intersect(src, dst);
-			}
+	galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+		[&](const size_t& id) {
+			total_num += miner.intersect(emb_list.get_vid(0,id), emb_list.get_vid(1,id));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-		galois::loopname("CoutingCSR")
+		galois::loopname("TriangleCouting")
 	);
 	galois::gPrint("\ttotal_num_triangles = ", total_num.reduce(), "\n\n");
 }
@@ -70,14 +68,17 @@ int main(int argc, char** argv) {
 	Graph graph;
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	read_graph(graph, filetype, filename, true);
+	read_graph(graph, filetype, filename, false, true);
+	//read_graph(graph, filetype, filename, true);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
 
 	VertexMiner miner(&graph);
+	EmbeddingList emb_list;
+	emb_list.init(graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	TcSolver(miner, graph);
+	TcSolver(miner, emb_list);
 	Tcomp.stop();
 	return 0;
 }

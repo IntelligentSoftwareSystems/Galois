@@ -53,7 +53,7 @@ typedef BaseEmbeddingQueue EmbeddingQueueT;
 void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 	UlongAccu total_num;
 	total_num.reset();
-	IndexList num_new_emb;
+	UintList num_new_emb;
 	if(show) std::cout << "\n=============================== Start ===============================\n";
 	unsigned level = 1;
 	while (1) {
@@ -70,9 +70,8 @@ void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 		);
 		if (level == k-2) break;
 		//std::cout << "calculating indices using prefix sum\n";
-		IndexList indices = parallel_prefix_sum(num_new_emb);
+		UintList indices = parallel_prefix_sum(num_new_emb);
 		size_t new_size = indices[indices.size()-1];
-		//std::cout << "generating " << new_size << " embeddings\n";
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& id) {

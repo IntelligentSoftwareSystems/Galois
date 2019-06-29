@@ -53,19 +53,28 @@ public:
 					BYTE existed = 0;
 					// check if this is automorphism
 					if(!is_edgeInduced_automorphism(max_size, emb, i, src, dst, vert_set, existed)) {
-						auto dst_label = 0, edge_label = 0;
-						#ifdef ENABLE_LABEL
-						dst_label = graph->getData(dst);
-						//edge_label = graph->getEdgeData(e); // TODO: enable this for FSM
-						#endif
-						ElementType new_element(dst, (BYTE)existed, edge_label, dst_label, (BYTE)i);
-						EdgeEmbedding new_emb(emb);
-						new_emb.push_back(new_element);
-						// insert the new (extended) embedding into the queue
-						queue.push_back(new_emb);
+						if (freq_edge_set.find(std::make_pair(src,dst)) != freq_edge_set.end()) {
+							auto dst_label = 0, edge_label = 0;
+							#ifdef ENABLE_LABEL
+							dst_label = graph->getData(dst);
+							//edge_label = graph->getEdgeData(e); // TODO: enable this for FSM
+							#endif
+							ElementType new_element(dst, (BYTE)existed, edge_label, dst_label, (BYTE)i);
+							EdgeEmbedding new_emb(emb);
+							new_emb.push_back(new_element);
+							// insert the new (extended) embedding into the queue
+							queue.push_back(new_emb);
+						}
 					}
 				}
 			}
+		}
+	}
+	void record_frequent_edges(EdgeEmbeddingQueue &queue) {
+		for (auto emb : queue) {
+			VertexId src = emb.get_vertex(0);
+			VertexId dst = emb.get_vertex(1);
+			freq_edge_set.insert(std::pair<VertexId,VertexId>(src,dst));
 		}
 	}
 /*
@@ -362,6 +371,7 @@ public:
 
 private:
 	unsigned threshold;
+	std::set<std::pair<VertexId,VertexId> > freq_edge_set;
 	galois::substrate::SimpleLock slock;
 	bool is_edgeInduced_automorphism(unsigned max_size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, const VertexSet& vertex_set, BYTE& existed) {
 		//check with the first element
