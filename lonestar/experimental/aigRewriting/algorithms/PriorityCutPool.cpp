@@ -109,4 +109,8 @@ int PriCutPool::getNumBlocks() { return this->blocks.size(); }
 
 int PriCutPool::getBlockSize() { return this->blockSize; }
 
+//void PriCutPool::copyCut(PriCut* dest, PriCut* source) {
+//	memcpy(dest, source, this->entrySize);
+//}
+
 } /* namespace algorithm */

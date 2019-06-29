@@ -181,6 +181,8 @@ public:
 
   /**
    * Check a bit to see if it is currently set.
+   * Using this is recommeneded only if set() and reset() 
+   * are not being used in that parallel section/phase
    *
    * @param index Bit to check to see if set
    * @returns true if index is set
@@ -196,29 +198,40 @@ public:
    * Set a bit in the bitset.
    *
    * @param index Bit to set
+   * @returns the old value 
    */
-  void set(size_t index) {
+  bool set(size_t index) {
     size_t bit_index    = index / bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index % bits_uint64);
-    if ((bitvec[bit_index] & bit_offset) == 0) { // test and set
-      size_t old_val = bitvec[bit_index];
-      while (!bitvec[bit_index].compare_exchange_weak(
-          old_val, old_val | bit_offset, std::memory_order_relaxed))
-        ;
-    }
+    size_t old_val = bitvec[bit_index];
+    // test and set
+    // if old_bit is 0, then atomically set it
+    while (((old_val & bit_offset) == 0) &&
+            !bitvec[bit_index].compare_exchange_weak(
+              old_val, old_val | bit_offset, std::memory_order_relaxed))
+      ;
+    return (old_val & bit_offset);
   }
 
-  void reset(size_t index) {
+  /**
+   * Reset a bit in the bitset.
+   *
+   * @param index Bit to reset
+   * @returns the old value 
+   */
+  bool reset(size_t index) {
     size_t bit_index = index/bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index%bits_uint64);
-    if ((bitvec[bit_index] & bit_offset) != 0) { // test and reset
-      size_t old_val = bitvec[bit_index];
-      while (!bitvec[bit_index].compare_exchange_weak(
-          old_val, old_val & ~bit_offset, std::memory_order_relaxed))
-        ;
-    }
+    size_t old_val = bitvec[bit_index];
+    // test and reset
+    // if old_bit is 1, then atomically reset it
+    while (((old_val & bit_offset) != 0) &&
+            !bitvec[bit_index].compare_exchange_weak(
+              old_val, old_val & ~bit_offset, std::memory_order_relaxed))
+      ;
+    return (old_val & bit_offset);
   }
 
   // assumes bit_vector is not updated (set) in parallel

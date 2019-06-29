@@ -30,7 +30,7 @@ Building Galois
 You can checkout the latest release by typing (in a terminal):
 
 ```Shell
-git clone -b release-4.0 https://github.com/IntelligentSoftwareSystems/Galois
+git clone -b release-5.0 https://github.com/IntelligentSoftwareSystems/Galois
 ```
 
 The master branch will be regularly updated, so you may try out the latest

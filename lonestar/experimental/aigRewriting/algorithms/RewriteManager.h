@@ -68,15 +68,10 @@ typedef struct ThreadContextData_ {
 
 typedef galois::PerIterAllocTy Alloc;
 typedef std::vector<int, galois::PerIterAllocTy::rebind<int>::other> IntVector;
-typedef std::vector<aig::GNode,
-                    galois::PerIterAllocTy::rebind<aig::GNode>::other>
-    GNodeVector;
-typedef std::unordered_set<int, std::hash<int>, std::equal_to<int>,
-                           galois::PerIterAllocTy::rebind<int>::other>
-    IntSet;
+typedef std::vector<aig::GNode, galois::PerIterAllocTy::rebind<aig::GNode>::other> GNodeVector;
+typedef std::unordered_set<int, std::hash<int>, std::equal_to<int>, galois::PerIterAllocTy::rebind<int>::other> IntSet;
 
-typedef galois::substrate::PerThreadStorage<ThreadContextData>
-    PerThreadContextData;
+typedef galois::substrate::PerThreadStorage<ThreadContextData> PerThreadContextData;
 
 class RewriteManager {
 

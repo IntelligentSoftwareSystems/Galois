@@ -13,13 +13,16 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
     galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) { }
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t, uint64_t) const {
-    return getMaster(src);
+    return retrieveMaster(src);
   }
 
-  virtual bool noCommunication() { return true; }
+  bool noCommunication() { return true; }
   bool isVertexCut() const { return false; }
   void serializePartition(boost::archive::binary_oarchive&) { return; }
   void deserializePartition(boost::archive::binary_iarchive&) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +66,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
-    return gridColumnID(getMaster(gid));
+    return gridColumnID(retrieveMaster(gid));
   }
 
  public:
@@ -80,6 +83,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     return _h_offset + i;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
     return true;
@@ -93,7 +97,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -140,7 +144,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
-    return gridColumnID(getMaster(gid));
+    return gridColumnID(retrieveMaster(gid));
   }
 
  public:
@@ -157,6 +161,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     return _h_offset + i;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
     return true;
@@ -172,7 +177,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -189,12 +194,13 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
     if (numEdges > _vCutThreshold) {
-      return getMaster(dst);
+      return retrieveMaster(dst);
     } else {
-      return getMaster(src);
+      return retrieveMaster(src);
     }
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) {
@@ -202,6 +208,9 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
   }
   void deserializePartition(boost::archive::binary_iarchive& ar) {
     return;
+  }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
   }
 };
 
@@ -251,7 +260,7 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
   }
 
   template<typename EdgeTy>
-  uint32_t determineMaster(uint32_t src,
+  uint32_t getMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
@@ -259,7 +268,6 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
       const std::vector<uint64_t>& edgeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
-
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -338,16 +346,20 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
     // note "dst" here is actually the source on the actual graph
     // since we're reading transpose
     if (numEdges > _vCutThreshold) {
-      return getMaster(dst);
+      return retrieveMaster(dst);
     } else {
-      return getMaster(src);
+      return retrieveMaster(src);
     }
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 class FennelP : public galois::graphs::CustomMasterAssignment {
@@ -395,7 +407,7 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
 
 
   template<typename EdgeTy>
-  uint32_t determineMaster(uint32_t src,
+  uint32_t getMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
@@ -403,7 +415,6 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
       const std::vector<uint64_t>& edgeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
-
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -478,13 +489,17 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
 
   // Fennel is an edge cut: all edges on source
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
-    return getMaster(src);
+    return retrieveMaster(src);
   }
 
+  bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return false; }
   void serializePartition(boost::archive::binary_oarchive& ar) { return; }
   void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
 };
 
 class SugarP : public galois::graphs::CustomMasterAssignment {
@@ -527,12 +542,12 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
 
   //! Find the row of a particular node
   unsigned getRowOfNode(uint64_t gid) const {
-    return gridRowID(getMaster(gid));
+    return gridRowID(retrieveMaster(gid));
   }
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
-    return gridColumnID(getMaster(gid));
+    return gridColumnID(retrieveMaster(gid));
   }
 
   /**
@@ -560,7 +575,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
 
  public:
   SugarP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-         uint64_t numEdges) : 
+         uint64_t numEdges) :
       galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
                                              numEdges) {
     _vCutThreshold = 1000;
@@ -572,7 +587,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
   }
 
   template<typename EdgeTy>
-  uint32_t determineMaster(uint32_t src,
+  uint32_t getMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
@@ -662,79 +677,11 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     return blockedRowOffset + cyclicColumnOffset;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
     return true;
   }
-
-  //bool isNotCommunicationPartner(unsigned host, unsigned syncType,
-  //                               WriteLocation writeLocation,
-  //                               ReadLocation readLocation,
-  //                               bool transposed) {
-  //  if (transposed) {
-  //    if (syncType == 0) {
-  //      switch (writeLocation) {
-  //      case writeSource:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case writeDestination:
-  //        return (gridRowID() != gridRowID(host));
-  //      case writeAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    } else { // syncBroadcast
-  //      switch (readLocation) {
-  //      case readSource:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case readDestination:
-  //        return (gridRowID() != gridRowID(host));
-  //      case readAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    }
-  //  } else {
-  //    if (syncType == 0) {
-  //      switch (writeLocation) {
-  //      case writeSource:
-  //        return (gridRowID() != gridRowID(host));
-  //      case writeDestination:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case writeAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    } else { // syncBroadcast, 1
-  //      switch (readLocation) {
-  //      case readSource:
-  //        return (gridRowID() != gridRowID(host));
-  //      case readDestination:
-  //        return (gridColumnID() != gridColumnID(host));
-  //      case readAny:
-  //        assert((gridRowID() == gridRowID(host)) ||
-  //               (gridColumnID() == gridColumnID(host)));
-  //        return ((gridRowID() != gridRowID(host)) &&
-  //                (gridColumnID() != gridColumnID(host))); // false
-  //      default:
-  //        assert(false);
-  //      }
-  //    }
-  //    return false;
-  //  }
-  //  return false;
-  //}
 
   void serializePartition(boost::archive::binary_oarchive& ar) {
     ar << numRowHosts;
@@ -746,7 +693,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
 };
@@ -794,12 +741,12 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
 
   //! Find the row of a particular node
   unsigned getRowOfNode(uint64_t gid) const {
-    return gridRowID(getMaster(gid));
+    return gridRowID(retrieveMaster(gid));
   }
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
-    return gridColumnID(getMaster(gid));
+    return gridColumnID(retrieveMaster(gid));
   }
 
   /**
@@ -839,7 +786,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
   }
 
   template<typename EdgeTy>
-  uint32_t determineMaster(uint32_t src,
+  uint32_t getMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
@@ -928,6 +875,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     return blockedRowOffset + cyclicColumnOffset;
   }
 
+  bool noCommunication() { return false; }
   bool isVertexCut() const {
     if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
     return true;
@@ -941,10 +889,9 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     ar >> numColumnHosts;
   }
 
-  virtual std::pair<unsigned, unsigned> cartesianGrid() {
+  std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(numRowHosts, numColumnHosts);
   }
-
 };
 
 #endif

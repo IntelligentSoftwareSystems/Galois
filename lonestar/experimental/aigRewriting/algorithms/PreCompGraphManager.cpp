@@ -612,8 +612,7 @@ ForestNode* PreCompGraphManager::forestNodeComplement(ForestNode* node) {
   return (ForestNode*)((unsigned long int)(node) ^ 01u);
 }
 
-ForestNode* PreCompGraphManager::forestNodeComplementCond(ForestNode* node,
-                                                          int c) {
+ForestNode* PreCompGraphManager::forestNodeComplementCond(ForestNode* node, int c) {
   return (ForestNode*)((unsigned long int)(node) ^ (c));
 }
 

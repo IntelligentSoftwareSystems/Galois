@@ -64,7 +64,20 @@ matrix:
             - boost1.67
             - libeigen3-dev
     - env:
-        - GCC_VER=8
+        - GCC_VER=9
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-9
+            - g++-9
+            - cmake3
+            - boost1.67
+            - libeigen3-dev
+    - env:
+        - GCC_VER=9
         - BUILD_TYPE=Debug
       addons:
         apt:
@@ -72,8 +85,8 @@ matrix:
             - ubuntu-toolchain-r-test
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - gcc-8
-            - g++-8
+            - gcc-9
+            - g++-9
             - cmake3
             - boost1.67
             - libeigen3-dev

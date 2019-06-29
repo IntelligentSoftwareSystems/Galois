@@ -44,13 +44,17 @@ typedef Graph::GraphNode GNode;
 enum NodeType { AND, PI, PO, LATCH, CONSTZERO, CHOICE };
 
 struct NodeData {
-  int id;
-  int level;
-  int nFanout;
-  short int counter;
-  NodeType type;
+  NodeType type;		// AIG node type acording to the NodeType enum
+  int id;						// AIG node identifier
+  int level;				// AIG node level
+  int counter;			// Counter used for controlling graph traversal
+  int nFanout;			// AIG node fanout counter
+	int nRefs;				// AIG node reference counter for tech mapping
+	float reqTime;		// AIG node required time for tech mapping
+	GNode choiceList; // Pointer to the first choice node, if it exists
+	//bool isCompl;			// Mark is the output is complemented. It is used in choice nodes.
 
-  NodeData() : level(0), nFanout(0), counter(0) {}
+  NodeData() : level(0), counter(0), nFanout(0), nRefs(0), reqTime(std::numeric_limits<float>::max()), choiceList(nullptr) {} //, isCompl(false) {}
 };
 
 class Aig {
@@ -58,25 +62,46 @@ class Aig {
 private:
   Graph graph;
   std::string designName;
-  std::vector<GNode> nodes;
   std::vector<GNode> inputNodes;
   std::vector<GNode> latchNodes;
   std::vector<GNode> outputNodes;
   std::vector<std::string> inputNames;
   std::vector<std::string> latchNames;
   std::vector<std::string> outputNames;
+  std::vector<GNode> nodes;
   std::vector<std::pair<int, int>> nodesTravId;
   std::vector<std::unordered_multimap<unsigned, GNode>> nodesFanoutMap;
+	int idCounter;
+	float expansionRate;
 
-  void topologicalSortAll(GNode node, std::vector<bool>& visited,
-                          std::stack<GNode>& stack);
-  void topologicalSortAnds(GNode node, std::vector<bool>& visited,
-                           std::stack<GNode>& stack);
+
+  void topologicalSortAll(GNode node, std::vector<bool>& visited, std::stack<GNode>& stack);
+  void topologicalSortAnds(GNode node, std::vector<bool>& visited, std::stack<GNode>& stack);
+	void genericTopologicalSortAnds(GNode node, std::vector<bool>& visited, std::vector<GNode>& sortedNodes);
 
 public:
-  Aig();
+  
+	Aig();
+	Aig(float expansionRate);
   virtual ~Aig();
 
+	void resize(int m, int i, int l, int o, int a, bool hasSymbols);
+	void resizeNodeVectors(int size);
+	void expandNodeVectors(int extraSize);
+	int getNextId();
+	GNode createAND(GNode lhsAnd, GNode rhsAnd, bool lhsAndPol, bool rhsAndPol);
+
+	void insertNodeInFanoutMap(GNode andNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
+  void removeNodeInFanoutMap(GNode removedNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
+  GNode lookupNodeInFanoutMap(GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
+  unsigned makeAndHashKey(GNode lhsNode, GNode rhsNode, int lhsId, int rhsId, bool lhsPol, bool rhsPol);
+
+ 	void registerTravId(int nodeId, int threadId, int travId);
+  bool lookupTravId(int nodeId, int threadId, int travId);
+
+	std::vector<std::pair<int, int>>& getNodesTravId();
+  std::unordered_multimap<unsigned, GNode>& getFanoutMap(int nodeId);
+  std::vector<std::unordered_multimap<unsigned, GNode>>& getNodesFanoutMap();
   Graph& getGraph();
   std::vector<GNode>& getNodes();
   std::vector<GNode>& getInputNodes();
@@ -88,29 +113,18 @@ public:
   void setLatchNames(std::vector<std::string> latchNames);
   std::vector<std::string>& getOutputNames();
   void setOutputNames(std::vector<std::string> outputNames);
-  std::vector<std::pair<int, int>>& getNodesTravId();
-  void registerTravId(int nodeId, int threadId, int travId);
-  bool lookupTravId(int nodeId, int threadId, int travId);
-  std::unordered_multimap<unsigned, GNode>& getFanoutMap(int nodeId);
-  std::vector<std::unordered_multimap<unsigned, GNode>>& getNodesFanoutMap();
   GNode getConstZero();
   int getNumInputs();
   int getNumLatches();
   int getNumOutputs();
   int getNumAnds();
   int getDepth();
-
   std::string getDesignName();
   void setDesignName(std::string designName);
 
-  void insertNodeInFanoutMap(GNode andNode, GNode lhsNode, GNode rhsNode,
-                             bool lhsPol, bool rhsPol);
-  void removeNodeInFanoutMap(GNode removedNode, GNode lhsNode, GNode rhsNode,
-                             bool lhsPol, bool rhsPol);
-  GNode lookupNodeInFanoutMap(GNode lhsNode, GNode rhsNode, bool lhsPol,
-                              bool rhsPol);
-  unsigned makeAndHashKey(GNode lhsNode, GNode rhsNode, int lhsId, int rhsId,
-                          bool lhsPol, bool rhsPol);
+	//bool isGNodeComplemented(GNode node);
+	//GNode makeGNodeRegular(GNode node);
+	//GNode makeGNodeComplemented(GNode node);
 
   void resetAndIds();
   void resetAndPIsIds();
@@ -121,6 +135,7 @@ public:
 
   void computeTopologicalSortForAll(std::stack<GNode>& stack);
   void computeTopologicalSortForAnds(std::stack<GNode>& stack);
+	void computeGenericTopologicalSortForAnds(std::vector<GNode>& sortedNodes);
 
   void writeDot(std::string path, std::string dotText);
   std::string toDot();

@@ -178,9 +178,10 @@ void AigParser::resize() {
   // outputNames.resize(o);
   
   int nNodes = m + o + 1;
-  aig.getNodes().resize(nNodes);
-  aig.getNodesTravId().resize(nNodes);
-  aig.getNodesFanoutMap().resize(nNodes);
+	aig.resizeNodeVectors(nNodes);
+  //aig.getNodes().resize(nNodes);
+  //aig.getNodesTravId().resize(nNodes);
+  //aig.getNodesFanoutMap().resize(nNodes);
 }
 
 void AigParser::parseAagHeader() {

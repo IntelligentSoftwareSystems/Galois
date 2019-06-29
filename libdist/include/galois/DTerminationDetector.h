@@ -64,6 +64,7 @@ public:
   DGTerminator() {
     reinitialize();
     initiate_snapshot();
+    reset();
   }
 
   void reinitialize() {

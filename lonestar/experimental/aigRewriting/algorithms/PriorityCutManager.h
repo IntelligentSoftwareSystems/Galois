@@ -34,16 +34,20 @@
 #include "../functional/FunctionHandler32.h"
 #include "galois/Reduction.h"
 #include <unordered_map>
+#include <unordered_set>
 
 namespace algorithm {
 
+typedef std::unordered_map< int, PriCut* > Covering;
+
+// #### THREAD LOCAL #### //
 typedef struct pricutList_ {
 
   PriCut ** array;
 	int 			nCuts;
 
 	pricutList_(int C) {
-		array = new PriCut*[C+1];
+		array = new PriCut*[C+2];
 		nCuts	= 0;
 	}
 
@@ -53,30 +57,33 @@ typedef struct pricutList_ {
 
 } PriCutList;
 
-typedef struct LUT_ {
+typedef galois::PerIterAllocTy::rebind< std::pair<const int, int> >::other MapAlloc;
+typedef std::unordered_map<int, int, std::hash<int>, std::equal_to<int>, MapAlloc> RefMap;
 
-	PriCut* bestCut;
-	int rootId;
-	int level;
-	
-	LUT_() {
-		bestCut = nullptr;
-		rootId = 0;
-		level = 0;
-	}
+typedef struct threadLocalData_ {
 
-} LUT;
+	PriCutPool cutPool;
+	PriCutList cutList;
+	AuxTruth auxTruth;
 
-typedef galois::substrate::PerThreadStorage<PriCutPool> PerThreadPriCutPool;
-typedef galois::substrate::PerThreadStorage<PriCutList> PerThreadPriCutList;
-typedef galois::substrate::PerThreadStorage<AuxTruth> PerThreadAuxTruth;
+	threadLocalData_( int cutPoolSize, int K, bool compTruth, int C, int nWords) :
+									  cutPool( cutPoolSize, K, compTruth ), cutList( C ), auxTruth( nWords ) { } 
 
-typedef std::unordered_map< int, LUT > Covering;
+} ThreadLocalData; 
+
+typedef galois::substrate::PerThreadStorage< ThreadLocalData > PerThreadData;
+
+
+// #### CONTROL TYPES #### //
+enum SortMode { DELAY, DELAY_OLD, AREA };
+enum CostMode { AREA_FLOW, LOCAL_AREA };
+enum RefMode  { STANDARD, MAP };
 
 class PriCutManager {
 
 private:
   aig::Aig& aig;
+	aig::Graph& aigGraph;
   int K;
   int C;
   int nWords;
@@ -84,19 +91,23 @@ private:
   int nThreads;
   long int cutPoolSize;
   bool compTruth;
-	bool fPower;
+	bool deterministic;
+	bool verbose;
+	int passId;
 	int sortMode;
+	int costMode;
+	int refMode;
+	int nLUTs;
+	int nLevels;
+	bool fPower;
 	float fEpsilon;
   long double kcutTime;
 
-  PerThreadPriCutPool perThreadPriCutPool;
-  PerThreadPriCutList perThreadPriCutList;
-  PerThreadAuxTruth perThreadAuxTruth;
-  PriCut** nodePriCuts;
-
+	PerThreadData perThreadData;
+  
+	PriCut** nodePriCuts;
 	Covering covering;
-	int nLUTs;
-	int nLevels;
+	std::vector<aig::GNode> sortedNodes;
 
   // Cuts Statistics //
   galois::GAccumulator<long int> nCuts;
@@ -111,38 +122,67 @@ private:
   galois::GAccumulator<long int> compTime;
   galois::GAccumulator<long int> scheduleTime;
 
-  void computePriCutsRec(aig::GNode node, PriCutPool* cutPool, PriCutList* cutList, AuxTruth* auxTruth);
-  PriCut* mergeCuts(PriCutPool* cutPool, PriCut* lhsCut, PriCut* rhsCut);
-  inline bool cutFilter(PriCutPool* cutPool, PriCutList* cutList, PriCut* resCut);
+  void computePriCutsRec(aig::GNode node, ThreadLocalData* thData, RefMap& refMap);
+
+  PriCut* mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rhsCut);
+  inline bool cutFilter(PriCutPool& cutPool, PriCutList& cutList, PriCut* resCut);
   inline bool checkCutDominance(PriCut* smallerCut, PriCut* largerCut);
-  inline void commitCuts(int nodeId, PriCutList* cutList);
-  void computeTruth(AuxTruth* auxTruth, PriCut* resCut, PriCut* lhsCut, PriCut* rhsCut, bool lhsPolarity, bool rhsPolarity);
+  
+	inline void commitCuts(PriCutPool& cutPool, PriCutList& cutList, int nodeId);
+
+  inline void recycleNodeCuts(PriCutPool& cutPool, int nodeId);
+	inline void cleanupCutList(PriCutPool& cutPool, PriCutList& cutList);
+
+  void computeTruth(AuxTruth& auxTruth, PriCut* resCut, PriCut* lhsCut, PriCut* rhsCut, bool lhsPolarity, bool rhsPolarity);
   inline unsigned truthPhase(PriCut* resCut, PriCut* inCut);
-	float cutAreaRef( PriCut * cut );
-	float cutAreaDeref( PriCut * cut );
-	void cutSort(PriCutPool * cutPool, PriCutList * cutList, PriCut * resCut);
-	int sortCompare(PriCut * lhsCut, PriCut * rhsCut);
-	float cutAreaFlow( PriCut * cut );
-	float cutAreaDerefed( PriCut * cut );
-	float cutDelay( PriCut * cut );
-	float cutEdgeFlow( PriCut * cut );
+	
+	void cutSort(PriCutPool& cutPool, PriCutList& cutList, PriCut* resCut);
+	int sortCompare(PriCut* lhsCut, PriCut* rhsCut);
+
+	void increaseCutReferences(PriCut* cut);
+	void decreaseCutReferences(PriCut* cut);
+
+	// ################### Start of the NewCuts Cost Functions ###################### //	
+	inline float cutDelay(PriCut* cut);
+	// STANDARD VERSIONS
+	void cutFlowCosts(PriCut* cut);
+	void cutDerefedCosts(PriCut* cut);
+	void cutRefCosts(PriCut* cut, float& area, float& edge);
+	void cutDerefCosts(PriCut* cut, float& area, float& edge);
+	// REFMAP RERSIONS
+	void cutDerefedCosts(PriCut* cut, RefMap& refMap);
+	void cutRefCosts(PriCut* cut, float& area, float& edge, RefMap& refMap);
+	void cutDerefCosts(PriCut* cut, float& area, float& edge, RefMap& refMap);
+	// ################### End of the NewCuts Cost Functions ###################### //
+
+	inline void copyCut(PriCut* dest, PriCut* source);
+
 public:
 
-  PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool compTruth);
+  PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool compTruth, bool deterministic, bool verbose);
 
   ~PriCutManager();
 
-  void computePriCuts(PriCutPool* cutPool, PriCutList* cutList, AuxTruth* auxTruth,
-                   int nodeId, int lhsId, int rhsId, bool lhsPolarity,
-                   bool rhsPolarity);
+  void computePriCuts(ThreadLocalData* thData, RefMap& refMap, aig::NodeData& nodeData, int lhsId, int rhsId, bool lhsPolarity, bool rhsPolarity);
 
-  void computePriCutsRecursively(aig::GNode node);
+	void mapChoices(ThreadLocalData* thData, RefMap& refMap, aig::NodeData & nodeData);
+
+  void computePriCutsRecursively(aig::GNode node, RefMap& refMap);
 
   unsigned int* readTruth(PriCut* cut);
-  void recycleNodeCuts(int nodeId);
-	PriCut * getBestCut( int nodeId );
+	inline void switchToFirstDelayMode();
+	inline void switchToSecondDelayMode();
+	inline void switchToAreaFlowMode();
+	inline void switchToLocalAreaMode();
+
+	void resetNodeCountersFanout();
+	void resetNodeCountersZero();
+	void resetNodeCountersOnly();
+	void computeReferenceCounters();
+	void computeCoveringReferenceCounters();
+	void computeRequiredTimes();
 	void computeCovering();
-	int computeCoveringRec( aig::Graph & aigGraph, aig::GNode node );
+
 	void printCovering();
   void printNodeCuts(int nodeId, long int& counter);
   void printAllCuts();
@@ -151,27 +191,30 @@ public:
   void printCutStatistics();
   void printRuntimes();
 
-  aig::Aig& getAig();
 	int getNumLUTs();
 	int getNumLevels();
   int getK();
   int getC();
   int getNWords();
   int getNThreads();
+	bool isDeterministic();
   bool getCompTruthFlag();
+  bool getVerboseFlag();
   long double getKcutTime();
   void setKcutTime(long double time);
-  PerThreadPriCutPool& getPerThreadPriCutPool();
-  PerThreadPriCutList& getPerThreadPriCutList();
-  PerThreadAuxTruth& getPerThreadAuxTruth();
+
+  inline aig::Aig& getAig();
+	inline PriCut* getBestCut( int nodeId );
   PriCut** getNodePriCuts();
 	Covering & getCovering();
+
+  PerThreadData& getPerThreadData();
 };
 
-// Function that runs the KCut operator define in the end of file CutManager.cpp
-// //
+// Function that runs the KCut operator define in the end of file CutManager.cpp //
 void runKPriCutOperator(PriCutManager& cutMan);
 
 } /* namespace algorithm */
 
 #endif /* PRIORITYCUTMANAGERC_H_ */
+

@@ -105,6 +105,18 @@ static llvm::cl::opt<std::string> scattering_outfile{
 void atomic_relaxed_double_increment(std::atomic<double>& base,
                                      double increment) noexcept {
   auto current = base.load(std::memory_order_relaxed);
+  /*decltype(current) previous;
+  while (true) {
+    previous = current;
+    current = base.load(std::memory_order_relaxed);
+    if (previous == current) {
+      if (base.compare_exchange_weak(current, current + increment,
+                                     std::memory_order_relaxed,
+                                     std::memory_order_relaxed)) {
+        break;
+      }
+    }
+  }*/
   while (!base.compare_exchange_weak(current, current + increment,
                                      std::memory_order_relaxed,
                                      std::memory_order_relaxed))
@@ -542,14 +554,18 @@ int main(int argc, char** argv) noexcept {
               radiation_magnitudes[num_per_element * node +
                                    num_per_element_and_direction * dir_idx]
                   .counter;
-          // TODO: relax consistency model here.
+          std::size_t local_counter = 0;
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
             if (graph.getEdgeDst(edge) >= ghost_threshold)
               continue;
-            counter +=
-                is_incoming(directions[dir_idx], graph.getEdgeData(edge));
+            local_counter += is_incoming(directions[dir_idx], graph.getEdgeData(edge));
           }
-          if (counter == 0) {
+          // TODO: This stage is embarassingly parallel,
+          // but writing the value as a size_t and then
+          // later using it as an atomic is undefined behavior,
+          // so, is there some way around this?
+          counter.store(local_counter, std::memory_order_relaxed);
+          if (!local_counter) {
             work_t work_item{node, dir_idx};
             starting_nodes.emplace(work_item);
           }
@@ -557,8 +573,8 @@ int main(int argc, char** argv) noexcept {
         // Also set the counter for how many directions are remaining
         // on the current node.
         auto& node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
-        // TODO: relax consistency model here.
-        node_data.scatter_use_counter = num_directions;
+        // TODO: Can this be done without atomics as well?
+        node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
       },
       galois::loopname("Initialize counters"));
 
@@ -570,7 +586,7 @@ int main(int argc, char** argv) noexcept {
     for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
       std::size_t local_counter = 0;
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)))
+        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) && graph.getEdgeDst(edge) < ghost_threshold)
           local_counter++;
       }
       assert(("Dependency counter not set propertly.",
@@ -582,13 +598,12 @@ int main(int argc, char** argv) noexcept {
   }
 #endif // !defined(NDEBUG)
 
-  // Approximate priority used to improve performance of main loop.
-  // Currently just a placeholder for a more intelligent priority.
-  // Various sweeps papers mention heuristics for this.
-  typedef galois::worklists::PerSocketChunkFIFO<32> PSchunk;
-  auto indexer = [](const work_t& n) { return 1; };
-  typedef galois::worklists::OrderedByIntegerMetric<decltype(indexer), PSchunk>
-      OBIM;
+  // Various sweeps papers mention that using topological depth as a
+  // heuristic to make sure that parallelism opens up quickly is an important
+  // optimization, but that isn't true with this implementation. Perhaps it'll
+  // matter more in distributed settings or when using GPUs.
+  // For shared memory though, a simple chunked FIFO queue is better.
+  typedef galois::worklists::PerSocketChunkFIFO<64> PSchunk;
 
   // Set up separate buffers for accumulating the per-group fluxes.
   // This is just to hold temporaries inside the main parallel loop,
@@ -625,8 +640,10 @@ int main(int argc, char** argv) noexcept {
           auto node_magnitude_idx =
               num_per_element * node + num_per_element_and_direction * dir_idx;
           auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-          assert(("Work item asked to run before it was actually ready.",
-                  !counter));
+          auto counter_check_val = counter.load(std::memory_order_acquire);
+          if (counter_check_val) {
+            GALOIS_DIE("Work item asked to run before it was actually ready.");
+          }
           auto& node_data =
               graph.getData(node, galois::MethodFlag::UNPROTECTED);
           // Re-count incoming edges during this computation.
@@ -639,25 +656,16 @@ int main(int argc, char** argv) noexcept {
           // Partial computation of the coefficient that will divide the
           // previous term later.
           double new_magnitude_denominator = absorption_coef + scattering_coef;
+          std::size_t max_size_t = std::numeric_limits<std::size_t>::max();
+          // Use max size_t value for initialization here mainly to make things segfault as fast
+          // as possible if one of them isn't set in the loop over the neighbors.
+          std::array<std::size_t, 3> downstream_neighbors{max_size_t, max_size_t, max_size_t};
+          std::size_t downstream_index = 0;
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
             auto other_node = graph.getEdgeDst(edge);
-            std::size_t other_magnitude_idx =
-                num_per_element * other_node +
-                num_per_element_and_direction * dir_idx;
             auto& face_normal = graph.getEdgeData(edge);
             if (!is_incoming(direction, face_normal)) {
-              // Don't send anything to a ghost node.
-              if (other_node >= ghost_threshold)
-                continue;
-              auto& other_counter =
-                  radiation_magnitudes[other_magnitude_idx].counter;
-              // Work items are buffered locally until the end of each loop
-              // iteration, so we can send outgoing edges here immediately.
-              // TODO: Relax atomic consistency here.
-              if (--other_counter == 0) {
-                work_t new_work_item{other_node, dir_idx};
-                ctx.push(new_work_item);
-              }
+              downstream_neighbors[downstream_index++] = other_node;
               continue;
             }
             if (other_node < ghost_threshold)
@@ -671,6 +679,9 @@ int main(int argc, char** argv) noexcept {
             double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
             double term_coef = direction[axis] * sign;
             new_magnitude_denominator += term_coef / grid_spacing[axis];
+            std::size_t other_magnitude_idx =
+                num_per_element * other_node +
+                num_per_element_and_direction * dir_idx;
             for (std::size_t i = 0; i < num_groups; i++) {
               std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
               double& other_magnitude =
@@ -679,6 +690,7 @@ int main(int argc, char** argv) noexcept {
                   term_coef * other_magnitude / grid_spacing[axis];
             }
           }
+          assert(("Wrong number of downstream neighbors.", downstream_index == 3));
           // Finish computing new flux magnitude.
           // Also compute a new scattering amount
           // for use in the next iteration based
@@ -696,19 +708,17 @@ int main(int argc, char** argv) noexcept {
                 scattering_contribution_coef * node_magnitude;
           }
           // Reset dependency counter for next pass.
-          counter = incoming_edges;
+          counter.store(incoming_edges, std::memory_order_relaxed);
           // Update scattering source for use in next step.
           auto& scattering_atomic = node_data.currently_accumulating_scattering;
           atomic_relaxed_double_increment(scattering_atomic,
                                           scattering_contribution);
 
-          // TODO: Relax memory consistency requirements here.
-          // NOT MUCH THOUGH.
-          if (--node_data.scatter_use_counter == 0) {
+          if (!(node_data.scatter_use_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
             // Reset counter for next time step.
-            node_data.scatter_use_counter = num_directions;
+            node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
             double abs_change =
-                std::abs(node_data.currently_accumulating_scattering -
+                std::abs(node_data.currently_accumulating_scattering.load(std::memory_order_relaxed) -
                          node_data.previous_accumulated_scattering);
             atomic_relaxed_double_max(global_abs_change, abs_change);
             // Move currently_accumulating_scattering value into
@@ -716,12 +726,26 @@ int main(int argc, char** argv) noexcept {
             // and then zero currently_accumulating_scattering for the next
             // iteration.
             node_data.previous_accumulated_scattering =
-                node_data.currently_accumulating_scattering;
-            node_data.currently_accumulating_scattering = 0.;
+                node_data.currently_accumulating_scattering.load(std::memory_order_relaxed);
+            node_data.currently_accumulating_scattering.store(0., std::memory_order_relaxed);
+          }
+          for (auto other_node : downstream_neighbors) {
+            // Don't send anything to a ghost node.
+            if (other_node >= ghost_threshold)
+              continue;
+            std::size_t other_magnitude_idx =
+              num_per_element * other_node +
+              num_per_element_and_direction * dir_idx;
+            auto& other_counter =
+              radiation_magnitudes[other_magnitude_idx].counter;
+            if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+              work_t new_work_item{other_node, dir_idx};
+              ctx.push(new_work_item);
+            }
           }
         },
         galois::loopname("Sweep"), galois::no_conflicts(),
-        galois::wl<OBIM>(indexer));
+        galois::wl<PSchunk>());
     if (print_convergence)
       std::cout << global_abs_change << std::endl;
 
