@@ -601,10 +601,7 @@ inline void gSerializeObj(SerializeBuffer& buf,
 template <typename T>
 inline void gSerializeObj(SerializeBuffer& buf,
                           const galois::PODResizeableArray<T>& data) {
-  if (is_memory_copyable<T>::value)
-    gSerializeLinearSeq(buf, data);
-  else
-    gSerializeSeq(buf, data);
+  gSerializeLinearSeq(buf, data);
 }
 
 /**
@@ -961,10 +958,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
  */
 template <typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, galois::PODResizeableArray<T>& data) {
-  if (is_memory_copyable<T>::value)
-    gDeserializeLinearSeq(buf, data);
-  else
-    gDeserializeSeq(buf, data);
+  gDeserializeLinearSeq(buf, data);
 }
 
 /**
