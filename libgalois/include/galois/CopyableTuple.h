@@ -28,6 +28,30 @@
 namespace galois {
 
 /**
+ * Struct that contains 2 elements. Used over std::pair as std::pair memory
+ * layout isn't guaranteed.
+ *
+ * @tparam T1 type of first element
+ * @tparam T2 type of second element
+ */
+template <typename T1, typename T2>
+struct Pair {
+  //! first element
+  T1 first;
+  //! second element
+  T2 second;
+
+  //! empty constructor
+  Pair() {}
+
+  //! Constructor that initializes 2 fields
+  Pair(T1 one, T2 two) {
+    first  = one;
+    second = two;
+  }
+};
+
+/**
  * Struct that contains 3 elements. Used over std::tuple as std::tuple memory
  * layout isn't guaranteed.
  *

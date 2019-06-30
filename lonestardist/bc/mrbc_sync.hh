@@ -129,7 +129,7 @@ struct APSPReduce {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct DependencyReduce {
-  using ValTy = std::pair<uint32_t, float>;
+  using ValTy = galois::Pair<uint32_t, float>;
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
