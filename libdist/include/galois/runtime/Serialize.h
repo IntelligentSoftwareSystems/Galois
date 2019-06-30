@@ -492,6 +492,25 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
 }
 
 /**
+ * Serialize a pair. Either memcpys entire struct or serializes
+ * each element individually.
+ *
+ * @param [in,out] buf Serialize buffer to serialize into
+ * @param [in] data Pair to serialize
+ */
+template <typename T1, typename T2>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::Pair<T1, T2>& data) {
+  if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value) {
+    // do memcpy
+    buf.insert((uint8_t*)&data, sizeof(data));
+  } else {
+    // serialize each individually
+    gSerialize(buf, data.first, data.second);
+  }
+}
+
+/**
  * Serialize a tuple of 3. Either memcpys entire struct or serializes
  * each element individually.
  *
@@ -790,6 +809,25 @@ void gDeserializeObj(
 template <typename T1, typename T2>
 void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
   gDeserialize(buf, data.first, data.second);
+}
+
+/**
+ * Deserialize into a pair. Either memcpys from buffer or deserializes
+ * each element individually.
+ *
+ * @param [in,out] buf Buffer to deserialize from
+ * @param [in] data Pair to deserialize into
+ */
+template <typename T1, typename T2>
+inline void gDeserializeObj(DeSerializeBuffer& buf,
+                          galois::Pair<T1, T2>& data) {
+  if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value) {
+    // do memcpy
+    buf.extract((uint8_t*)&data, sizeof(data));
+  } else {
+    // deserialize each individually
+    gDeserialize(buf, data.first, data.second);
+  }
 }
 
 /**
