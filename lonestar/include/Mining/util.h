@@ -70,23 +70,3 @@ int read_graph(Graph &graph, std::string filetype, std::string filename, bool ne
 	return core;
 }
 
-/*
-// construct the edge-list for later use. May not be necessary if Galois has this support
-void construct_edgelist(Graph& graph, std::vector<LabeledEdge> &edgelist) {
-	for (Graph::iterator it = graph.begin(); it != graph.end(); it ++) {
-		// for each vertex
-		GNode src = *it;
-		auto& src_label = graph.getData(src);
-		Graph::edge_iterator first = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-		Graph::edge_iterator last = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-		// foe each edge of this vertex
-		for (auto e = first; e != last; ++ e) {
-			GNode dst = graph.getEdgeDst(e);
-			auto& dst_label = graph.getData(dst);
-			LabeledEdge edge(src, dst, src_label, dst_label);
-			edgelist.push_back(edge);
-		}
-	}
-	assert(edgelist.size() == graph.sizeEdges());
-}
-*/

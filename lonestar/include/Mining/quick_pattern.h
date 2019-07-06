@@ -2,6 +2,7 @@
 #define QUICK_PATTERN_HPP_
 
 #include "embedding.h"
+#include "equivalence.h"
 
 template <typename EmbeddingTy, typename ElementTy> class QuickPattern;
 template <typename EmbeddingTy, typename ElementTy> std::ostream& operator<<(std::ostream& strm, const QuickPattern<EmbeddingTy, ElementTy>& qp);
@@ -64,6 +65,12 @@ public:
 		set_hash();
 	}
 	~QuickPattern() {}
+	void get_equivalences(VertexPositionEquivalences& equ) {
+		equ.set_size(size);
+		for (unsigned i = 0; i < size; ++i) equ.add_equivalence(i, i);
+		findAutomorphisms(equ);
+		//equ.propagateEquivalences();
+	}
 	//operator for map
 	bool operator==(const QuickPattern& other) const {
 		//compare edges
@@ -117,6 +124,31 @@ private:
 	ElementTy* elements;
 	unsigned hash_value; // quick pattern ID
 	unsigned cg_id; // ID of the canonical pattern that this quick pattern belongs to
+
+	void findAutomorphisms(VertexPositionEquivalences &eq_sets) {
+		if (size == 2) { // single-edge
+			if (at(0).get_vlabel() == at(1).get_vlabel()) {
+				eq_sets.add_equivalence(0, 1);
+				eq_sets.add_equivalence(1, 0);
+			}
+		} else if (size == 3) { // two-edge chain
+			if (at(2).get_his() == 0) {
+				if (at(1).get_vlabel() == at(2).get_vlabel()) {
+					eq_sets.add_equivalence(1, 2);
+					eq_sets.add_equivalence(2, 1);
+				}
+			} else if (at(2).get_his() == 1) {
+				if (at(0).get_vlabel() == at(2).get_vlabel()) {
+					eq_sets.add_equivalence(0, 2);
+					eq_sets.add_equivalence(2, 0);
+				}
+			} else {
+				std::cout << "Error\n";
+			}
+		} else { // three-edge and beyond
+			std::cout << "Currently not supported\n";
+		}
+	}
 };
 
 template <typename EmbeddingTy, typename ElementTy>

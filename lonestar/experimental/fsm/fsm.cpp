@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #define ENABLE_LABEL
-//#define USE_DOMAIN
+#define USE_DOMAIN
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS expansion";
@@ -40,7 +40,8 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
-static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
+static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
+static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 int total_num = 0;
@@ -71,8 +72,10 @@ typedef LocalCgMapFreq LocalCgMapT;
 #endif
 
 // two-level aggregation
-int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT& cg_map, UintMap& id_map, SupportMap& support_map) {
-	std::cout << "\n---------------------------- Aggregating ----------------------------\n";
+int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT& cg_map) {
+	if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
+	cg_map.clear();
+
 	QpMapT qp_map; // quick pattern map
 	// quick aggregation
 	LocalQpMapT qp_localmap; // quick pattern local map for each thread
@@ -92,8 +95,8 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 	// canonical aggregation
 	LocalCgMapT cg_localmap; // canonical pattern local map for each thread
 	galois::do_all(galois::iterate(qp_map),
-		[&](std::pair<QPattern,SupportT> qp) {
-			miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal()), id_map);
+		[&](std::pair<QPattern, DomainSupport> element) {
+			miner.canonical_aggregate_each(element.first, element.second, *(cg_localmap.getLocal()));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -105,73 +108,50 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 	TmergeCG.stop();
 
 	int num_frequent_patterns = 0;
-	num_frequent_patterns = miner.support_count(cg_map, support_map);
-	total_num += num_frequent_patterns;
-	std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
+	num_frequent_patterns = miner.support_count(cg_map);
+	if (show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
 		<< " frequent patterns: " << num_frequent_patterns << "\n";
 	return num_frequent_patterns;
 }
 
-inline void filter(EdgeMiner& miner, EmbeddingQueueT& in_queue, EmbeddingQueueT& out_queue, CgMapT& cg_map, const UintMap& id_map, const SupportMap& support_map) {
-	std::cout << "\n----------------------------- Filtering -----------------------------\n";
-	galois::do_all(galois::iterate(in_queue),
-		[&](const EmbeddingT &emb) {
-			miner.filter_each(emb, id_map, support_map, out_queue);
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("Filter")
-	);
-}
-
 void FsmSolver(EdgeMiner &miner) {
-	std::cout << "\n=============================== Start ===============================\n";
-	EmbeddingQueueT queue, filtered_queue;
-	miner.init(queue);
 	unsigned level = 0;
-	queue.printout_embeddings(0);
+	if (show) std::cout << "\n=============================== Start ===============================\n";
+	EmbeddingQueueT queue, filtered_queue;
 
 	CgMapT cg_map; // canonical graph map
-	UintMap id_map;
-	SupportMap support_map;
-	int num_freq_patterns = aggregator(level, miner, queue, cg_map, id_map, support_map);
+	int num_freq_patterns = miner.init_aggregator();
+	total_num += num_freq_patterns;
 	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n\n";
 		return;
 	}
-	if(show) miner.printout_agg(cg_map);
+	std::cout << "Number of frequent single-edge patterns: " << num_freq_patterns << "\n";
+	if (debug) miner.printout_agg(cg_map);
 
-	filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
-	filtered_queue.printout_embeddings(0);
+	miner.init_filter(filtered_queue);
+	if (show) filtered_queue.printout_embeddings(0);
 	level ++;
 
 	while (level < k) {
-		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n----------------------------- Expanding -----------------------------\n";
+		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		queue.clear();
-		galois::do_all(galois::iterate(filtered_queue),
-			[&](const EmbeddingT& emb) {
-				miner.extend_edge(k, emb, queue);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Expanding")
-		);
-		queue.printout_embeddings(level);
+		miner.expand_edge(k, filtered_queue, queue);
+		if (show) queue.printout_embeddings(level, debug);
 
-		cg_map.clear();
-		id_map.clear();
-		support_map.clear();
-		num_freq_patterns = aggregator(level, miner, queue, cg_map, id_map, support_map);
-		if(show) miner.printout_agg(cg_map);
-		if(num_freq_patterns == 0) break;
+		num_freq_patterns = aggregator(level, miner, queue, cg_map);
+		total_num += num_freq_patterns;
+		if (debug) miner.printout_agg(cg_map);
+		if (num_freq_patterns == 0) break;
+		if (level == k-1) break;
 
 		filtered_queue.clear();
-		filter(miner, queue, filtered_queue, cg_map, id_map, support_map);
-		filtered_queue.printout_embeddings(level);
+		miner.filter(queue, filtered_queue);
+		if (show) filtered_queue.printout_embeddings(level);
 		level ++;
 	}
-	std::cout << "\n=============================== Done ================================\n\n";
-	std::cout << "Number of frequent subgraphs (minsup=" << minsup << "): " << total_num << "\n\n";
+	if (show) std::cout << "\n=============================== Done ================================\n";
+	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }
 
 int main(int argc, char** argv) {

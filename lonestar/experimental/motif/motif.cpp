@@ -49,42 +49,30 @@ typedef EdgeEmbeddingQueue EmbeddingQueueT;
 #include "Mining/util.h"
 
 void MotifSolver(EdgeMiner &miner) {
-	std::cout << "=============================== Start ===============================\n";
-	EmbeddingQueueT queue, queue2; // task queues. double buffering
-	miner.init(queue); // initialize the task queue
-	if(show) queue.printout_embeddings(0);
+	if (show) std::cout << "=============================== Start ===============================\n";
+	EmbeddingQueueT in_queue, out_queue; // in&out worklist. double buffering
+	miner.init(in_queue); // initialize the worklist
+	if(show) in_queue.printout_embeddings(0);
 	unsigned level = 1;
-	int queue_size = std::distance(queue.begin(), queue.end());
-	unsigned max_num_edges = k * (k - 1) / 2; // maximum number of edges in k-motif (i.e. k-clique)
 
 	// a level-by-level approach for Apriori search space (breadth first seach)
-	//while (level < k) { // to get the same output as RStream (which is not complete)
-	while (queue_size > 0 && level < max_num_edges) { // to get the complete (correct) k-motif output
-		std::cout << "\n============================== Level " << level << " ==============================\n";
-		std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
-		// for each embedding in the task queue, do the edge-extension operation
-		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingT& emb) {
-				miner.extend_edge(k, emb, queue2); // edge extension
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding")
-		);
-		queue.swap(queue2);
-		queue2.clear();
-		if(show) queue.printout_embeddings(level);
+	while (level < k) { // to get the same output as RStream (which is not complete)
+		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
+		miner.expand_edge(k, in_queue, out_queue); // edge expansion
+		in_queue.swap(out_queue);
+		out_queue.clear();
+		if (show) in_queue.printout_embeddings(level);
 
-		std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
+		if (show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
 		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
-		galois::do_all(galois::iterate(queue),
+		galois::do_all(galois::iterate(in_queue),
 			[&](const EmbeddingT& emb) {
 				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("QuickAggregation")
 		);
 		miner.merge_qp_map(0, qp_localmap, qp_map);
@@ -93,8 +81,8 @@ void MotifSolver(EdgeMiner &miner) {
 		CgMapFreq cg_map; // canonical graph map for couting the frequency
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(galois::iterate(qp_map),
-			[&](std::pair<QPattern, Frequency> qp) {
-				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
+			[&](std::pair<QPattern, Frequency> element) {
+				miner.canonical_aggregate_each(element, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -102,12 +90,11 @@ void MotifSolver(EdgeMiner &miner) {
 		);
 		miner.merge_cg_map(0, cg_localmap, cg_map);
 		miner.printout_agg(cg_map);
-		queue_size = std::distance(queue.begin(), queue.end());
-		if(show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
-					<< " num_embeddings: " << queue_size << "\n";
+		//queue_size = std::distance(in_queue.begin(), in_queue.end());
+		//if (show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size() << " num_embeddings: " << queue_size << "\n";
 		level ++;
 	}
-	std::cout << "\n=============================== Done ===============================\n\n";
+	if (show) std::cout << "\n=============================== Done ===============================\n\n";
 }
 
 int main(int argc, char** argv) {
@@ -120,7 +107,6 @@ int main(int argc, char** argv) {
 	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	// a miner defines the operators (expanding and aggregation)
 	EdgeMiner miner(&graph);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();

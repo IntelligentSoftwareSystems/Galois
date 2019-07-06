@@ -111,18 +111,18 @@ private:
 		embedding.push_back(ElementTy(first + 1, (BYTE)0, (BYTE)vertices[first].color, (BYTE)0));
 	}
 	void push_element(Edge& edge, VertexMap& map, BlissVertexList& vertices){
-		assert(edge.src < edge.target);
+		assert(edge.src < edge.dst);
 		if(map.find(edge.src) != map.end()) {
-			embedding.push_back(ElementTy(edge.target + 1, (BYTE)0, (BYTE)vertices[edge.target].color, (BYTE)map[edge.src]));
+			embedding.push_back(ElementTy(edge.dst + 1, (BYTE)0, (BYTE)vertices[edge.dst].color, (BYTE)map[edge.src]));
 #ifdef USE_DOMAIN
-			qp_idx.push_back(edge.target_domain);
+			qp_idx.push_back(edge.dst_domain);
 #endif
-			if(map.find(edge.target) == map.end()) {
+			if(map.find(edge.dst) == map.end()) {
 				int s = embedding.size() - 1;
-				map[edge.target] = s;
+				map[edge.dst] = s;
 			}
-		} else if(map.find(edge.target) != map.end()) {
-			embedding.push_back(ElementTy(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.target]));
+		} else if(map.find(edge.dst) != map.end()) {
+			embedding.push_back(ElementTy(edge.src + 1, (BYTE)0, (BYTE)vertices[edge.src].color, (BYTE)map[edge.dst]));
 #ifdef USE_DOMAIN
 			qp_idx.push_back(edge.src_domain);
 #endif
@@ -138,21 +138,21 @@ private:
 	}
 	void add_neighbours(Edge& edge, EdgeHeap& min_heap, BlissVertexList& vertices, VertexSet& set) {
 		add_neighbours(edge.src, min_heap, vertices, set);
-		add_neighbours(edge.target, min_heap, vertices, set);
+		add_neighbours(edge.dst, min_heap, vertices, set);
 	}
 	void add_neighbours(VertexId srcId, EdgeHeap& min_heap, BlissVertexList& vertices, VertexSet& set) {
 		if(set.find(srcId) == set.end()){
 			for(auto v: vertices[srcId].edges) {
 #ifdef USE_DOMAIN
-				VertexId target = v.first;
+				VertexId dst = v.first;
 #else
-				VertexId target = v;
+				VertexId dst = v;
 #endif
-				if(set.find(target) == set.end()) {
+				if(set.find(dst) == set.end()) {
 #ifdef USE_DOMAIN
-					Edge edge(srcId, target, v.second.first, v.second.second);
+					Edge edge(srcId, dst, v.second.first, v.second.second);
 #else
-					Edge edge(srcId, target);
+					Edge edge(srcId, dst);
 #endif
 					edge.swap();
 					min_heap.push(edge);

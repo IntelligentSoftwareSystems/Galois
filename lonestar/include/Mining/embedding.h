@@ -1,5 +1,5 @@
-#ifndef TYPE_HPP_
-#define TYPE_HPP_
+#ifndef EMBEDDING_HPP_
+#define EMBEDDING_HPP_
 #include <map>
 #include <set>
 #include <queue>
@@ -34,7 +34,6 @@ typedef galois::gstl::Vector<unsigned> UintList;
 typedef galois::gstl::Vector<VertexId> VertexList;
 typedef galois::gstl::Vector<UintList> IndexLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
-//typedef std::set<VertexId> VertexSet;
 typedef galois::gstl::Set<VertexId> VertexSet;
 //typedef std::unordered_set<VertexId> VertexSet;
 
@@ -139,9 +138,9 @@ std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb) {
 		return strm;
 	}
 	strm << "(";
-	for (auto it = emb.get_elements().begin(); it != emb.get_elements().end() - 1; ++ it)
-		strm << (*it) << ", ";
-	strm << emb.back();
+	for(unsigned index = 0; index < emb.size() - 1; ++index)
+		std::cout << emb.get_vertex(index) << ", ";
+	std::cout << emb.get_vertex(emb.size()-1);
 	strm << ")";
 	return strm;
 }
@@ -166,9 +165,12 @@ std::ostream & operator<<(std::ostream & strm, const EdgeInducedEmbedding<Elemen
 		return strm;
 	}
 	strm << "(";
-	for (auto it = emb.get_elements().begin(); it != emb.get_elements().end() - 1; ++ it)
-		strm << (*it) << ", ";
-	strm << emb.back();
+	for(unsigned index = 0; index < emb.size() - 1; ++index)
+		std::cout << emb.get_element(index) << ", ";
+	std::cout << emb.get_element(emb.size()-1);
+	//for (auto it = emb.get_elements().begin(); it != emb.get_elements().end() - 1; ++ it)
+	//	strm << (*it) << ", ";
+	//strm << emb.back();
 	strm << ")";
 	return strm;
 }
@@ -260,4 +262,4 @@ private:
 	unsigned max_level;
 };
 
-#endif // TYPE_HPP_
+#endif // EMBEDDING_HPP_

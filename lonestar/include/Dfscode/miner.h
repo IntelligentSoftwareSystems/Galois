@@ -12,7 +12,7 @@ public:
 	Miner(Graph *g, unsigned k, unsigned minsup, int num_threads, bool show = false) {
 		this->graph = g;
 		minimal_support = minsup;
-		max_size = k;
+		max_level = k;
 		nthreads = num_threads;
 		show_output = show;
 		for(int i = 0; i < nthreads; i++) {
@@ -278,6 +278,7 @@ public:
 			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
 			for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
+		if (dfs_level == max_level) return;
 		const RMPath &rmpath = status.DFS_CODE.buildRMPath(); // build the right-most path of this pattern
 		LabelT minlabel = status.DFS_CODE[0].fromlabel; 
 		VeridT maxtoc = status.DFS_CODE[rmpath[0]].to; // right-most vertex
@@ -298,7 +299,7 @@ public:
 			// pure forward
 			if (get_forward_pure(*graph, edge_list, history[rmpath[0]], minlabel, history, edges)) {
 				for (EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
-					if (emb_size + 1 <= max_size)
+					//if (emb_size + 1 <= max_size)
 						new_fwd_root[maxtoc][(*it)->elabel][graph->getData((*it)->to)].push(emb_size+1, *it, cur);
 				}
 			}
@@ -306,7 +307,7 @@ public:
 			for(size_t i = 0; i < rmpath.size(); ++i) {
 				if(get_forward_rmpath(*graph, edge_list, history[rmpath[i]], minlabel, history, edges)) {
 					for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
-						if (emb_size + 1 <= max_size)
+						//if (emb_size + 1 <= max_size)
 							new_fwd_root[status.DFS_CODE[rmpath[i]].from][(*it)->elabel][graph->getData((*it)->to)].push(emb_size+1, *it, cur);
 					} // for it
 				} // if
@@ -372,7 +373,7 @@ public:
 					EdgeList edges;
 					if(get_forward(*graph, edge_list, status.DFS_CODE, history, edges)) {
 						for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it)
-							if (emb_size + 1 <= max_size)
+							//if (emb_size + 1 <= max_size)
 								new_root.push(emb_size+1, *it, cur);
 					}
 				}
@@ -388,7 +389,7 @@ protected:
 	Graph *graph;
 	int nthreads;
 	unsigned minimal_support;
-	unsigned max_size;
+	unsigned max_level;
 	bool show_output;
 	std::vector<int> frequent_patterns_count;
 	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread

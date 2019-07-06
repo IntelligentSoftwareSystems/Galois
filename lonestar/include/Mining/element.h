@@ -11,27 +11,27 @@ typedef unsigned char BYTE;
 
 struct Edge {
 	VertexId src;
-	VertexId target;
+	VertexId dst;
 #ifdef USE_DOMAIN
 	unsigned src_domain;
-	unsigned target_domain;
-	Edge(VertexId _src, VertexId _target, unsigned _src_domain, unsigned _target_domain) : src(_src), target(_target), src_domain(_src_domain), target_domain(_target_domain) {}
+	unsigned dst_domain;
+	Edge(VertexId _src, VertexId _dst, unsigned _src_domain, unsigned _dst_domain) : src(_src), dst(_dst), src_domain(_src_domain), dst_domain(_dst_domain) {}
 #endif
-	Edge(VertexId _src, VertexId _target) : src(_src), target(_target) {}
-	Edge() : src(0), target(0) {}
+	Edge(VertexId _src, VertexId _dst) : src(_src), dst(_dst) {}
+	Edge() : src(0), dst(0) {}
 	~Edge() {}
 	std::string toString() {
-		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
+		return "(" + std::to_string(src) + ", " + std::to_string(dst) + ")";
 	}
 	void swap() {
-		if (src > target) {
+		if (src > dst) {
 			VertexId tmp = src;
-			src = target;
-			target = tmp;
+			src = dst;
+			dst = tmp;
 #ifdef USE_DOMAIN
 			unsigned domain = src_domain;
-			src_domain = target_domain;
-			target_domain = domain;
+			src_domain = dst_domain;
+			dst_domain = domain;
 #endif
 		}
 	}
@@ -41,24 +41,14 @@ class EdgeComparator {
 public:
 	int operator()(const Edge& oneEdge, const Edge& otherEdge) {
 		if(oneEdge.src == otherEdge.src) {
-			return oneEdge.target > otherEdge.target;
+			return oneEdge.dst > otherEdge.dst;
 		} else {
 			return oneEdge.src > otherEdge.src;
 		}
 	}
 };
 
-struct LabeledEdge {
-	VertexId src;
-	VertexId target;
-	BYTE src_label;
-	BYTE target_label;
-	LabeledEdge(VertexId _src, VertexId _target, BYTE _src_label, BYTE _target_label) : src(_src), target(_target), src_label(_src_label), target_label(_target_label) {}
-	LabeledEdge() : src(0), target(0), src_label(0), target_label(0) {}
-	std::string toString() {
-		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
-	}
-}__attribute__((__packed__));
+typedef std::pair<VertexId, VertexId> OrderedEdge;
 
 //  Each element in the tuple contains 8 bytes, first 4 bytes is vertex id,
 //  second 4 bytes contains edge label(1byte) + vertex label(1byte) + history info(1byte).
@@ -112,7 +102,7 @@ public:
 	BYTE get_vlabel() const { return vertex_label; }
 	BYTE get_his() const { return history_info; }
 	friend std::ostream & operator<<(std::ostream & strm, const LabeledElement& element) {
-		strm << "[" << element.get_vid() << ", " << (int)element.get_key() << ", " << (int)element.get_elabel() << ", "
+		strm << "[" << element.get_vid() << ", " //<< (int)element.get_key() << ", " << (int)element.get_elabel() << ", "
 			<< (int)element.get_vlabel() << ", " << (int)element.get_his() << "]";
 		return strm;
 	}
@@ -144,6 +134,7 @@ public:
 	}
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return history_info; }
+	BYTE get_vlabel() const { return 0; }
 	BYTE get_key() const { return 0; }
 	friend std::ostream & operator<<(std::ostream & strm, const StructuralElement& element) {
 		strm << "[" << element.get_vid() << ", " << (int)element.get_his() << "]";
