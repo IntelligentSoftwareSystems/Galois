@@ -40,12 +40,12 @@ public:
 	EdgeMiner(Graph *g) { graph = g; construct_edgemap(); }
 	virtual ~EdgeMiner() {}
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
-	void expand_edge(unsigned max_size, EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
-		//if (show) std::cout << "\n----------------------------- Expanding -----------------------------\n";
-		if (show) std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
+	void extend_edge(EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
+		//if (show) std::cout << "\n----------------------------- Extending -----------------------------\n";
+		if (show) std::cout << "\n------------------------- Step 1: Extending -------------------------\n";
 		// for each embedding in the worklist, do the edge-extension operation
 		galois::do_all(galois::iterate(in_queue),
-			[&](const EmbeddingT& emb) {
+			[&](const EmbeddingType& emb) {
 				unsigned n = emb.size();
 				// get the number of distinct vertices in the embedding
 				VertexSet vert_set;
@@ -54,7 +54,7 @@ public:
 				// for each vertex in the embedding
 				for (unsigned i = 0; i < n; ++i) {
 					VertexId src = emb.get_vertex(i);
-					// make sure each distinct vertex is expanded only once
+					// make sure each distinct vertex is extended only once
 					if (emb.get_key(i) == 0) {
 						// try edge extension
 						for (auto e : graph->edges(src)) {
@@ -64,7 +64,7 @@ public:
 							if (is_frequent_edge[*e])
 							#endif
 								// check if this is automorphism
-								if (!is_edge_automorphism(n, max_size, emb, i, src, dst, existed, vert_set)) {
+								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set)) {
 									auto dst_label = 0, edge_label = 0;
 									#ifdef ENABLE_LABEL
 									dst_label = graph->getData(dst);
@@ -82,7 +82,83 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding")
+			galois::loopname("Extending")
+		);
+	}
+	void extend_edge(unsigned level, const EmbeddingList& emb_list, UintList& num_emb) {
+		if (show) std::cout << "\n------------------------- Step 1: Extending -------------------------\n";
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				VertexId vid = emb_list.get_vid(level, pos);
+				IndexTy idx = emb_list.get_idx(level, pos);
+				num_emb[pos] = 0;
+				EdgeEmbedding emb(level+1);
+				emb.set_element(level, ElementType(vid, 0, graph->getData(vid), level-1));
+				for (unsigned l = 1; l <= level; l ++) {
+					vid = emb_list.get_vid(level-l, idx);
+					emb.set_element(level-l, ElementType(vid, 0, graph->getData(vid), level-l-1));
+					idx = emb_list.get_idx(level-l, idx);
+				}
+				unsigned n = emb.size();
+				VertexSet vert_set;
+				if (n > 3)
+					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					if (emb.get_key(i) == 0) {
+						for (auto e : graph->edges(src)) {
+							GNode dst = graph->getEdgeDst(e);
+							BYTE existed = 0;
+							if (is_frequent_edge[*e])
+								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set))
+									num_emb[pos] ++;
+						}
+					}
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Extending-alloc")
+		);
+	}
+	inline void extend_edge(unsigned level, EmbeddingList& emb_list, const UintList& indices) {
+		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
+			[&](const size_t& pos) {
+				VertexId vid = emb_list.get_vid(level, pos);
+				IndexTy idx = emb_list.get_idx(level, pos);
+				unsigned start = indices[pos];
+				EdgeEmbedding emb(level+1);
+				emb.set_element(level, ElementType(vid, 0, graph->getData(vid), level-1));
+				for (unsigned l = 1; l <= level; l ++) {
+					vid = emb_list.get_vid(level-l, idx);
+					emb.set_element(level-l, ElementType(vid, 0, graph->getData(vid), level-l-1));
+					idx = emb_list.get_idx(level-l, idx);
+				}
+				unsigned n = emb.size();
+				VertexSet vert_set;
+				if (n > 3)
+					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					if (emb.get_key(i) == 0) {
+						for (auto e : graph->edges(src)) {
+							GNode dst = graph->getEdgeDst(e);
+							BYTE existed = 0;
+							#ifdef ENABLE_LABEL
+							if (is_frequent_edge[*e])
+							#endif
+								// check if this is automorphism
+								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set)) {
+									emb_list.set_idx(level+1, start, pos);
+									emb_list.set_vid(level+1, start++, dst);
+								}
+						}
+					}
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Extending")
 		);
 	}
 	inline unsigned init_aggregator() {
@@ -141,7 +217,7 @@ public:
 /*
 	inline void quick_aggregate(EdgeEmbeddingQueue& queue, QpMapFreq& qp_map) {
 		galois::do_all(galois::iterate(queue),
-			[&](const EdgeEmbedding &emb) {
+			[&](const EmbeddingType &emb) {
 				QPattern qp(emb);
 				if (qp_map.find(qp) != qp_map.end()) {
 					qp_map[qp] += 1;
@@ -188,9 +264,9 @@ public:
 		}
 	}
 /*
-	inline void quick_aggregate(EdgeEmbeddingQueue& queue, QpMapDomain& qp_map) {
+	inline void quick_aggregate(EmbeddingQueueType& queue, QpMapDomain& qp_map) {
 		galois::do_all(galois::iterate(queue),
-			[&](EdgeEmbedding &emb) {
+			[&](EmbeddingType &emb) {
 				unsigned n = emb.size();
 				QPattern qp(emb);
 				bool qp_existed = false;
@@ -508,6 +584,62 @@ public:
 		);
 		std::cout << "Number of frequent edges: " << count(is_frequent_edge.begin(), is_frequent_edge.end(), true) << "\n";
 	}
+	inline void init_filter(EmbeddingList& emb_list) {
+		UintList is_frequent_emb(emb_list.size(), 0);
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				VertexId src = emb_list.get_vid(0, pos);
+				VertexId dst = emb_list.get_vid(1, pos);
+				auto& src_label = graph->getData(src);
+				auto& dst_label = graph->getData(dst);
+				InitPattern key = get_init_pattern(src_label, dst_label);
+				if (get_support(init_map[key])) is_frequent_emb[pos] = 1;
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("InitFilter")
+		);
+
+		assert(emb_list.size()*2 == graph->sizeEdges()); // symmetric graph
+		is_frequent_edge.resize(graph->sizeEdges());
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				if (is_frequent_emb[pos]) {
+					VertexId src = emb_list.get_vid(0, pos);
+					VertexId dst = emb_list.get_vid(1, pos);
+					unsigned eid0 = edge_map[OrderedEdge(src,dst)];
+					unsigned eid1 = edge_map[OrderedEdge(dst,src)];
+					slock.lock();
+					is_frequent_edge[eid0] = 1;
+					is_frequent_edge[eid1] = 1;
+					slock.unlock();
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("InitFrquentEdges")
+		);
+		std::cout << "Number of frequent edges: " << count(is_frequent_edge.begin(), is_frequent_edge.end(), true) << "\n";
+	
+		UintList indices = parallel_prefix_sum(is_frequent_emb);
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				if (is_frequent_emb[pos]) {
+					VertexId src = emb_list.get_vid(0, pos);
+					VertexId dst = emb_list.get_vid(1, pos);
+					unsigned start = indices[pos];
+					emb_list.set_vid(0, start, src);
+					emb_list.set_idx(0, start, 0);
+					emb_list.set_vid(1, start, dst);
+					emb_list.set_idx(1, start, start);
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("InitEmbeddingList")
+		);
+	}
+
 #endif
 	// Check if the pattern of a given embedding is frequent, if yes, insert it to the queue
 	inline void filter(EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
@@ -522,6 +654,45 @@ public:
 			galois::loopname("Filter")
 		);
 	}
+	inline void filter(unsigned level, EmbeddingList &emb_list) {
+		UintList is_frequent_emb(emb_list.size(), 0);
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				VertexId vid = emb_list.get_vid(level, pos);
+				IndexTy idx = emb_list.get_idx(level, pos);
+				EdgeEmbedding emb(level+1);
+				emb.set_element(level, ElementType(vid, 0, graph->getData(vid), level-1));
+				for (unsigned l = 1; l <= level; l ++) {
+					vid = emb_list.get_vid(level-l, idx);
+					emb.set_element(level-l, ElementType(vid, 0, graph->getData(vid), level-l-1));
+					idx = emb_list.get_idx(level-l, idx);
+				}
+				unsigned qp_id = emb.get_qpid();
+				unsigned cg_id = id_map.at(qp_id);
+				if (domain_support_map.at(cg_id))
+					is_frequent_emb[pos] = 1;
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Filter-alloc")
+		);
+		UintList indices = parallel_prefix_sum(is_frequent_emb);
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& pos) {
+				if (is_frequent_emb[pos]) {
+					unsigned start = indices[pos];
+					VertexId vid = emb_list.get_vid(level, pos);
+					IndexTy idx = emb_list.get_idx(level, pos);
+					emb_list.set_idx(level, start, idx);
+					emb_list.set_vid(level, start, vid);
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::loopname("Filter-write")
+		);
+	}
+
 /*
 	// This is the filter used in RStream, slow
 	void filter_each(const EdgeEmbedding &emb, const CgMapFreq &cg_map, EdgeEmbeddingQueue &out_queue) {
@@ -618,7 +789,7 @@ private:
 		if (src_label <= dst_label) return std::make_pair(src_label, dst_label);
 		else return std::make_pair(dst_label, src_label);
 	}
-	bool is_quick_automorphism(unsigned size, unsigned max_size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed) {
+	bool is_quick_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed) {
 		if (dst <= emb.get_vertex(0)) return true;
 		if (dst == emb.get_vertex(1)) return true;
 		if (history == 0 && dst < emb.get_vertex(1)) return true;
@@ -634,8 +805,8 @@ private:
 		}
 		return false;
 	}
-	bool is_edge_automorphism(unsigned size, unsigned max_size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
-		if (size < 3) return is_quick_automorphism(size, max_size, emb, history, src, dst, existed);
+	bool is_edge_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
+		if (size < 3) return is_quick_automorphism(size, emb, history, src, dst, existed);
 		//check with the first element
 		if (dst <= emb.get_vertex(0)) return true;
 		if (history == 0 && dst <= emb.get_vertex(1)) return true;

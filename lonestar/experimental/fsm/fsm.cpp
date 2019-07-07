@@ -32,7 +32,7 @@
 #define USE_DOMAIN
 
 const char* name = "FSM";
-const char* desc = "Frequent subgraph mining in a graph using BFS expansion";
+const char* desc = "Frequent subgraph mining in a graph using BFS extension";
 const char* url  = 0;
 
 namespace cll = llvm::cl;
@@ -50,8 +50,8 @@ int total_num = 0;
 #include "Mining/element.h"
 typedef LabeledElement ElementType;
 #include "Mining/embedding.h"
-typedef EdgeEmbedding EmbeddingT;
-typedef EdgeEmbeddingQueue EmbeddingQueueT;
+typedef EdgeEmbedding EmbeddingType;
+typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
 
@@ -72,7 +72,7 @@ typedef LocalCgMapFreq LocalCgMapT;
 #endif
 
 // two-level aggregation
-int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT& cg_map) {
+int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueType& queue, CgMapT& cg_map) {
 	if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
 	cg_map.clear();
 
@@ -80,7 +80,7 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 	// quick aggregation
 	LocalQpMapT qp_localmap; // quick pattern local map for each thread
 	galois::do_all(galois::iterate(queue),
-		[&](EmbeddingT &emb) {
+		[&](EmbeddingType &emb) {
 			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
@@ -117,7 +117,7 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueT& queue, CgMapT&
 void FsmSolver(EdgeMiner &miner) {
 	unsigned level = 0;
 	if (show) std::cout << "\n=============================== Start ===============================\n";
-	EmbeddingQueueT queue, filtered_queue;
+	EmbeddingQueueType queue, filtered_queue;
 
 	CgMapT cg_map; // canonical graph map
 	int num_freq_patterns = miner.init_aggregator();
@@ -136,7 +136,7 @@ void FsmSolver(EdgeMiner &miner) {
 	while (level < k) {
 		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		queue.clear();
-		miner.expand_edge(k, filtered_queue, queue);
+		miner.extend_edge(filtered_queue, queue);
 		if (show) queue.printout_embeddings(level, debug);
 
 		num_freq_patterns = aggregator(level, miner, queue, cg_map);

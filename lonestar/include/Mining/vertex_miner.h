@@ -21,7 +21,7 @@ public:
 	inline void extend_vertex(unsigned max_size, const VertexEmbedding &emb, VertexEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding)
+			VertexId src = emb.get_vertex(i); // toExtend (extend every vertex in the embedding)
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) { // toAdd (only add non-automorphisms)
@@ -82,7 +82,7 @@ public:
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue) {
 		unsigned n = emb.size();
 		for(unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i); // toExpand (expand every vertex in the embedding: slow)
+			VertexId src = emb.get_vertex(i); // toExtend (extend every vertex in the embedding: slow)
 			for(auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				if(dst > emb.get_vertex(n-1)) { // toAdd (only add vertx with larger ID)
@@ -96,7 +96,7 @@ public:
 	// Given an embedding, extend it with one more vertex. Used for cliques. (fast)
 	inline void extend_vertex(const BaseEmbedding &emb, BaseEmbeddingQueue &queue, UlongAccu &num, bool need_update = true) {
 		unsigned n = emb.size();
-		VertexId src = emb.get_vertex(n-1); // toExpand (only expand the last vertex in the embedding: fast)
+		VertexId src = emb.get_vertex(n-1); // toExtend (only extend the last vertex in the embedding: fast)
 		for (auto e : graph->edges(src)) {
 			GNode dst = graph->getEdgeDst(e);
 			// extend vertex in ascending order to avoid unnecessary enumeration
@@ -347,7 +347,7 @@ private:
 		// the new vertex should not already exist in the embedding
 		for (unsigned i = 1; i < n; ++i)
 			if (dst == emb.get_vertex(i)) return true;
-		// the new vertex should not already be expanded by any previous vertex in the embedding
+		// the new vertex should not already be extended by any previous vertex in the embedding
 		for (unsigned i = 0; i < idx; ++i)
 			if (is_connected(emb.get_vertex(i), dst)) return true;
 		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
@@ -363,11 +363,11 @@ private:
 		} else if (n == 3) { // count 4-motifs
 			unsigned num_edges = 1;
 			pid = emb.get_pid();
-			if (pid == 0) { // expanding a triangle
+			if (pid == 0) { // extending a triangle
 				for (unsigned j = 0; j < n; j ++)
 					if (j != idx && is_connected(emb.get_vertex(j), dst)) num_edges ++;
 				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
-			} else { // expanding a 3-chain
+			} else { // extending a 3-chain
 				assert(pid == 1);
 				std::vector<bool> connected(3, false);
 				connected[idx] = true;

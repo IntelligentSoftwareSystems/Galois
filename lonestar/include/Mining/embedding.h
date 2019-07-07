@@ -77,6 +77,7 @@ class EdgeInducedEmbedding : public Embedding<ElementTy> {
 friend std::ostream & operator<< <>(std::ostream & strm, const EdgeInducedEmbedding<ElementTy>& emb);
 public:
 	EdgeInducedEmbedding() { qp_id = 0xFFFFFFFF; }
+	EdgeInducedEmbedding(size_t n) : Embedding<ElementTy>(n) {}
 	~EdgeInducedEmbedding() {}
 	void set_qpid(unsigned i) { qp_id = i; } // set the quick pattern id
 	unsigned get_qpid() const { return qp_id; } // get the quick pattern id
@@ -239,8 +240,8 @@ public:
 	void set_vid(unsigned level, IndexTy id, VertexId vid) { vid_lists[level][id] = vid; }
 	void set_idx(unsigned level, IndexTy id, IndexTy idx) { idx_lists[level][id] = idx; }
 	void set_pid(IndexTy id, IndexTy pid) { pid_list[id] = pid; }
-	size_t size() { return vid_lists[last_level].size(); }
-	size_t size(unsigned level) { return vid_lists[level].size(); }
+	size_t size() const { return vid_lists[last_level].size(); }
+	size_t size(unsigned level) const { return vid_lists[level].size(); }
 	void add_level(unsigned size) {
 		last_level ++;
 		assert(last_level < max_level);

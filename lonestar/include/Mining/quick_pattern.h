@@ -142,10 +142,76 @@ private:
 					eq_sets.add_equivalence(0, 2);
 					eq_sets.add_equivalence(2, 0);
 				}
-			} else {
-				std::cout << "Error\n";
-			}
-		} else { // three-edge and beyond
+			} else std::cout << "Error\n";
+		} else if (size == 4) { // three-edge chain or star
+			if (at(2).get_his() == 0) {
+				if (at(3).get_his() == 0) {
+					if (at(1).get_vlabel() == at(2).get_vlabel()) {
+						eq_sets.add_equivalence(1, 2);
+						eq_sets.add_equivalence(2, 1);
+					}
+					if (at(1).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(1, 3);
+						eq_sets.add_equivalence(3, 1);
+					}
+					if (at(2).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(2, 3);
+						eq_sets.add_equivalence(3, 2);
+					}
+				} else if (at(3).get_his() == 1) {
+					if (at(2).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(2, 3);
+						eq_sets.add_equivalence(3, 2);
+					}
+					if (at(0).get_vlabel() == at(1).get_vlabel()) {
+						eq_sets.add_equivalence(0, 1);
+						eq_sets.add_equivalence(1, 0);
+					}
+				} else if (at(3).get_his() == 2) {
+					if (at(1).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(1, 3);
+						eq_sets.add_equivalence(3, 1);
+					}
+					if (at(0).get_vlabel() == at(2).get_vlabel()) {
+						eq_sets.add_equivalence(0, 2);
+						eq_sets.add_equivalence(2, 0);
+					}
+				} else std::cout << "Error\n";
+			} else if (at(2).get_his() == 1) {
+				if (at(3).get_his() == 0) {
+					if (at(2).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(2, 3);
+						eq_sets.add_equivalence(3, 2);
+					}
+					if (at(0).get_vlabel() == at(1).get_vlabel()) {
+						eq_sets.add_equivalence(0, 1);
+						eq_sets.add_equivalence(1, 0);
+					}
+				} else if (at(3).get_his() == 1) {
+					if (at(0).get_vlabel() == at(2).get_vlabel()) {
+						eq_sets.add_equivalence(0, 2);
+						eq_sets.add_equivalence(2, 0);
+					}
+					if (at(0).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(0, 3);
+						eq_sets.add_equivalence(3, 0);
+					}
+					if (at(2).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(2, 3);
+						eq_sets.add_equivalence(3, 2);
+					}
+				} else if (at(3).get_his() == 2) {
+					if (at(0).get_vlabel() == at(3).get_vlabel()) {
+						eq_sets.add_equivalence(0, 3);
+						eq_sets.add_equivalence(3, 0);
+					}
+					if (at(1).get_vlabel() == at(2).get_vlabel()) {
+						eq_sets.add_equivalence(1, 2);
+						eq_sets.add_equivalence(2, 1);
+					}
+				} else std::cout << "Error\n";
+			} else std::cout << "Error\n";
+		} else { // four-edge and beyond
 			std::cout << "Currently not supported\n";
 		}
 	}

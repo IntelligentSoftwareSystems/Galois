@@ -1,1 +1,1 @@
-app(kcl2 kcl2.cpp)
+app(kcl2 kcl.cpp)

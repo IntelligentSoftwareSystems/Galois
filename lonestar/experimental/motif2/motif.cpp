@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 const char* name = "Motif Counting";
-const char* desc = "Counts the vertex-induced motifs in a graph using BFS expansion";
+const char* desc = "Counts the vertex-induced motifs in a graph using BFS extension";
 const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
@@ -45,8 +45,8 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
-typedef VertexEmbedding EmbeddingT;
-typedef VertexEmbeddingQueue EmbeddingQueueT;
+typedef VertexEmbedding EmbeddingType;
+typedef VertexEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 #ifdef USE_BLISS
@@ -58,7 +58,7 @@ typedef LocalStrCgMapFreq LocalCgMapT;
 int num_patterns[3] = {2, 6, 21};
 
 void MotifSolver(VertexMiner &miner) {
-	EmbeddingQueueT queue, queue2; // task queues. double buffering
+	EmbeddingQueueType queue, queue2; // task queues. double buffering
 	miner.init(queue); // initialize the task queue
 	int npatterns = num_patterns[k-3];
 	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
@@ -69,12 +69,12 @@ void MotifSolver(VertexMiner &miner) {
 	while (level < k-2) {
 		// for each embedding in the task queue, do vertex-extension
 		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingT& emb) {
+			[&](const EmbeddingType& emb) {
 				miner.extend_vertex(k, emb, queue2); // vertex extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding")
+			galois::loopname("Extending")
 		);
 		queue.swap(queue2);
 		queue2.clear();
@@ -83,7 +83,7 @@ void MotifSolver(VertexMiner &miner) {
 	}
 	if (k < 5) {
 		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingT& emb) {
+			[&](const EmbeddingType& emb) {
 				miner.aggregate_each(emb, accumulators);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -96,7 +96,7 @@ void MotifSolver(VertexMiner &miner) {
 		LocalUintMap localmap;
 		galois::for_each(
 			galois::iterate(queue),
-			[&](EmbeddingT& emb, auto& ctx) {
+			[&](EmbeddingType& emb, auto& ctx) {
 				miner.aggregate_each(emb, *(localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -119,7 +119,7 @@ void MotifSolver(VertexMiner &miner) {
 		QpMapT qp_map; // quick patterns map for counting the frequency
 		LocalQpMapT qp_localmap; // quick patterns local map for each thread
 		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingT& emb) {
+			[&](const EmbeddingType& emb) {
 				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),

@@ -30,7 +30,7 @@
 #define USE_SIMPLE
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph using BFS expansion";
+const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
 
 namespace cll = llvm::cl;
@@ -45,8 +45,8 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingT;
-typedef BaseEmbeddingQueue EmbeddingQueueT;
+typedef BaseEmbedding EmbeddingType;
+typedef BaseEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
@@ -54,19 +54,19 @@ void KclSolver(VertexMiner &miner) {
 	UlongAccu total_num;
 	total_num.reset();
 	if(show) std::cout << "\n=============================== Start ===============================\n";
-	EmbeddingQueueT queue, queue2;
+	EmbeddingQueueType queue, queue2;
 	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
 	unsigned level = 1;
 	while (1) {
 		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		if(show) queue.printout_embeddings(0);
 		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingT& emb) {
-				miner.extend_vertex(emb, queue2, total_num, (level < k-2)); // expand one more vertex
+			[&](const EmbeddingType& emb) {
+				miner.extend_vertex(emb, queue2, total_num, (level < k-2)); // extend one more vertex
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding")
+			galois::loopname("Extending")
 		);
 		if (level == k-2) break; // if embedding size = k, done
 		queue.swap(queue2);

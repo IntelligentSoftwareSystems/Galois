@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 const char* name = "Motif Counting";
-const char* desc = "Counts the vertex-induced motifs in a graph using BFS expansion";
+const char* desc = "Counts the vertex-induced motifs in a graph using BFS extension";
 const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
@@ -46,8 +46,8 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
-typedef VertexEmbedding EmbeddingT;
-typedef VertexEmbeddingQueue EmbeddingQueueT;
+typedef VertexEmbedding EmbeddingType;
+typedef VertexEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 #ifdef USE_BLISS
@@ -75,12 +75,12 @@ void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding-alloc")
+			galois::loopname("Extending-alloc")
 		);
-		std::cout << "calculating indices using prefix sum\n";
+		//std::cout << "calculating indices using prefix sum\n";
 		UintList indices = parallel_prefix_sum(num_new_emb);
 		size_t new_size = indices[indices.size()-1];
-		std::cout << "generating " << new_size << " embeddings\n";
+		//std::cout << "generating " << new_size << " embeddings\n";
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& id) {
@@ -88,7 +88,7 @@ void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Expanding-insert")
+			galois::loopname("Extending-insert")
 		);
 		level ++;
 	}
@@ -140,9 +140,9 @@ int main(int argc, char** argv) {
 	Tinit.start();
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
+	assert(k > 2);
 	VertexMiner miner(&graph);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k);

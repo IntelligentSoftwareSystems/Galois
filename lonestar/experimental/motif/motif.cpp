@@ -29,7 +29,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 const char* name = "Motif Counting";
-const char* desc = "Counts the edge-induced motifs in a graph using BFS expansion";
+const char* desc = "Counts the edge-induced motifs in a graph using BFS extension";
 const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
@@ -43,14 +43,14 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef StructuralElement ElementType;
 #include "Mining/embedding.h"
-typedef EdgeEmbedding EmbeddingT;
-typedef EdgeEmbeddingQueue EmbeddingQueueT;
+typedef EdgeEmbedding EmbeddingType;
+typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
 
 void MotifSolver(EdgeMiner &miner) {
 	if (show) std::cout << "=============================== Start ===============================\n";
-	EmbeddingQueueT in_queue, out_queue; // in&out worklist. double buffering
+	EmbeddingQueueType in_queue, out_queue; // in&out worklist. double buffering
 	miner.init(in_queue); // initialize the worklist
 	if(show) in_queue.printout_embeddings(0);
 	unsigned level = 1;
@@ -58,7 +58,7 @@ void MotifSolver(EdgeMiner &miner) {
 	// a level-by-level approach for Apriori search space (breadth first seach)
 	while (level < k) { // to get the same output as RStream (which is not complete)
 		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		miner.expand_edge(k, in_queue, out_queue); // edge expansion
+		miner.extend_edge(in_queue, out_queue); // edge extension
 		in_queue.swap(out_queue);
 		out_queue.clear();
 		if (show) in_queue.printout_embeddings(level);
@@ -68,7 +68,7 @@ void MotifSolver(EdgeMiner &miner) {
 		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
 		galois::do_all(galois::iterate(in_queue),
-			[&](const EmbeddingT& emb) {
+			[&](const EmbeddingType& emb) {
 				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),

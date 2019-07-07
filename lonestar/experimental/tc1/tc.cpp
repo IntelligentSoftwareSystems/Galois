@@ -44,8 +44,8 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingT;
-typedef BaseEmbeddingQueue EmbeddingQueueT;
+typedef BaseEmbedding EmbeddingType;
+typedef BaseEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 

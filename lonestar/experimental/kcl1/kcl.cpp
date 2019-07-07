@@ -30,7 +30,7 @@
 #define USE_SIMPLE
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph using BFS expansion";
+const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
 
 namespace cll = llvm::cl;
@@ -45,8 +45,8 @@ typedef Graph::GraphNode GNode;
 #include "Mining/element.h"
 typedef SimpleElement ElementType;
 #include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingT;
-typedef BaseEmbeddingQueue EmbeddingQueueT;
+typedef BaseEmbedding EmbeddingType;
+typedef BaseEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
@@ -66,7 +66,7 @@ void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 				miner.extend_vertex_each(level, id, emb_list, num_new_emb, total_num, (level < k-2));
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Expanding-alloc")
+			galois::loopname("Extending-alloc")
 		);
 		if (level == k-2) break;
 		//std::cout << "calculating indices using prefix sum\n";
@@ -78,7 +78,7 @@ void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 				miner.extend_vertex_each(level, id, emb_list, indices);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Expanding-insert")
+			galois::loopname("Extending-insert")
 		);
 		level ++;
 	}

@@ -32,7 +32,7 @@ public:
 	Miner() {}
 	virtual ~Miner() {}
 	// insert single-edge embeddings into the embedding queue (worklist)
-	inline void init(EmbeddingQueueT &queue) {
+	inline void init(EmbeddingQueueType &queue) {
 		if (show) printf("\n=============================== Init ================================\n\n");
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),
 			[&](const GNode& src) {
@@ -45,7 +45,7 @@ public:
 						#ifdef ENABLE_LABEL
 						auto& dst_label = graph->getData(dst);
 						#endif
-						EmbeddingT new_emb;
+						EmbeddingType new_emb;
 						#ifdef ENABLE_LABEL
 						new_emb.push_back(ElementType(src, 0, src_label));
 						new_emb.push_back(ElementType(dst, 0, dst_label));
