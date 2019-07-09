@@ -41,14 +41,12 @@ public:
 		cg_id = 0;
 		size = std::count(connected.begin(), connected.end(), true) + 1; // number of edges + 1
 		elements = new ElementTy[size];
-		//std::cout << "num_vertices: " << n << ", num_edges: " << size-1 << "\n";
 		std::vector<unsigned> pos(n, 0);
 		pos[1] = 1; pos[2] = 2;
 		elements[0].set_vertex_id(1);
 		elements[0].set_history_info(0);
 		elements[1].set_vertex_id(2);
 		elements[1].set_history_info(0);
-		//std::cout << "Constructing edge 1: 1 --> 2 \n";
 		int count = 2;
 		int l = 1;
 		for (unsigned i = 2; i < n; i++) {
@@ -56,7 +54,6 @@ public:
 			for (unsigned j = 0; j < i; j++) {
 				if (connected[l++]) {
 					if (i<n-2) pos[i+1] ++;
-					//std::cout << "Constructing edge " << i <<": " << elements[pos[j]].get_vid() << " --> " << i+1 << "\n";
 					elements[count].set_vertex_id(i+1);
 					elements[count++].set_history_info(pos[j]);
 				}
@@ -69,7 +66,6 @@ public:
 		equ.set_size(size);
 		for (unsigned i = 0; i < size; ++i) equ.add_equivalence(i, i);
 		findAutomorphisms(equ);
-		//equ.propagateEquivalences();
 	}
 	//operator for map
 	bool operator==(const QuickPattern& other) const {
@@ -113,7 +109,6 @@ public:
 	}
 	ElementTy& at(unsigned index) const { return elements[index]; }
 	inline unsigned get_size() const { return size; }
-	inline ElementTy* get_elements() { return elements; }
 	inline void clean() { delete[] elements; }
 	inline unsigned get_id() const { return hash_value; }
 	inline unsigned get_cgid() const { return cg_id; }

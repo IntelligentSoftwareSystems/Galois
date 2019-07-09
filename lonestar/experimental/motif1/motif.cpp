@@ -94,7 +94,7 @@ void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 	}
 	if (k < 5) {
 		if(show) emb_list.printout_embeddings(level);
-		std::cout << "aggregating ...\n";
+		//std::cout << "aggregating ...\n";
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& id) {
 				miner.aggregate_each(level, id, emb_list, accumulators);

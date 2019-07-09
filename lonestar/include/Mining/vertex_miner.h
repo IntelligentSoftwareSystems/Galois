@@ -38,9 +38,13 @@ public:
 		IndexTy idx = emb_list.get_idx(level, pos);
 		num_emb[pos] = 0;
 		VertexEmbedding emb(level+1);
-		emb.set_element(level, vid);
+		//emb.set_element(level, vid);
+		ElementType ele(vid);
+		emb.set_element(level, ele);
 		for (unsigned l = 1; l <= level; l ++) {
-			emb.set_element(level-l, emb_list.get_vid(level-l, idx));
+			VertexId u = emb_list.get_vid(level-l, idx);
+			ElementType ele(u);
+			emb.set_element(level-l, ele);
 			idx = emb_list.get_idx(level-l, idx);
 		}
 		unsigned n = emb.size();
@@ -114,9 +118,13 @@ public:
 		IndexTy idx = emb_list.get_idx(level, pos);
 		num_emb[pos] = 0;
 		BaseEmbedding emb(level+1);
-		emb.set_element(level, vid);
+		//emb.set_element(level, vid);
+		ElementType ele(vid);
+		emb.set_element(level, ele);
 		for (unsigned l = 1; l <= level; l ++) {
-			emb.set_element(level-l, emb_list.get_vid(level-l, idx));
+			VertexId u = emb_list.get_vid(level-l, idx);
+			ElementType ele(u);
+			emb.set_element(level-l, ele);
 			idx = emb_list.get_idx(level-l, idx);
 		}
 		for (auto e : graph->edges(vid)) {

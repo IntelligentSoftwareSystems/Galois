@@ -30,6 +30,7 @@
 
 #define ENABLE_LABEL
 #define USE_DOMAIN
+#define USE_PID
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS extension";
@@ -38,8 +39,8 @@ const char* url  = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
-static cll::opt<unsigned> minsup("ms", cll::desc("minimum suuport (default value 0)"), cll::init(0));
+static cll::opt<unsigned> k("k", cll::desc("max number of vertices in FSM (default value 2)"), cll::init(2));
+static cll::opt<unsigned> minsup("ms", cll::desc("minimum support (default value 5000)"), cll::init(5000));
 static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
@@ -72,28 +73,32 @@ typedef LocalCgMapFreq LocalCgMapT;
 #endif
 
 // two-level aggregation
-int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueType& queue, CgMapT& cg_map) {
+int aggregator(unsigned level, EdgeMiner& miner, EmbeddingList& emb_list, CgMapT& cg_map) {
 	if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
-	cg_map.clear();
-
 	QpMapT qp_map; // quick pattern map
 	// quick aggregation
+	std::cout << "Quick aggregating " << emb_list.size() << " embeddings\n";
 	LocalQpMapT qp_localmap; // quick pattern local map for each thread
-	galois::do_all(galois::iterate(queue),
-		[&](EmbeddingType &emb) {
-			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
+	/*
+	galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+		[&](const size_t& pos) {
+			miner.quick_aggregate_each(level, pos, emb_list, *(qp_localmap.getLocal()));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("QuickAggregation")
 	);
+	*/
+	miner.quick_aggregate(level, emb_list, qp_localmap);
 	galois::StatTimer TmergeQP("MergeQuickPatterns");
 	TmergeQP.start();
-	miner.merge_qp_map(level+2, qp_localmap, qp_map);
+	miner.merge_qp_map(level+1, qp_localmap, qp_map);
 	TmergeQP.stop();
 
 	// canonical aggregation
+	cg_map.clear();
 	LocalCgMapT cg_localmap; // canonical pattern local map for each thread
+	/*
 	galois::do_all(galois::iterate(qp_map),
 		[&](std::pair<QPattern, DomainSupport> element) {
 			miner.canonical_aggregate_each(element.first, element.second, *(cg_localmap.getLocal()));
@@ -102,9 +107,11 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueType& queue, CgMa
 		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 		galois::loopname("CanonicalAggregation")
 	);
+	*/
+	miner.canonical_aggregate(qp_map, cg_localmap);
 	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
 	TmergeCG.start();
-	miner.merge_cg_map(level+2, cg_localmap, cg_map);
+	miner.merge_cg_map(level+1, cg_localmap, cg_map);
 	TmergeCG.stop();
 
 	int num_frequent_patterns = 0;
@@ -114,43 +121,33 @@ int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueType& queue, CgMa
 	return num_frequent_patterns;
 }
 
-void FsmSolver(EdgeMiner &miner) {
-	unsigned level = 0;
-	if (show) std::cout << "\n=============================== Start ===============================\n";
-	EmbeddingQueueType queue, filtered_queue;
-
+void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
+	unsigned level = 1;
 	CgMapT cg_map; // canonical graph map
+	galois::StatTimer TinitAgg("InitAggregation");
+	TinitAgg.start();
 	int num_freq_patterns = miner.init_aggregator();
+	TinitAgg.stop();
 	total_num += num_freq_patterns;
 	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n\n";
 		return;
 	}
 	std::cout << "Number of frequent single-edge patterns: " << num_freq_patterns << "\n";
-	if (debug) miner.printout_agg(cg_map);
+	miner.init_filter(emb_list);
+	if(show) emb_list.printout_embeddings(level);
 
-	miner.init_filter(filtered_queue);
-	if (show) filtered_queue.printout_embeddings(0);
-	level ++;
-
-	while (level < k) {
-		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		queue.clear();
-		miner.extend_edge(filtered_queue, queue);
-		if (show) queue.printout_embeddings(level, debug);
-
-		num_freq_patterns = aggregator(level, miner, queue, cg_map);
+	while (1) {
+		miner.extend_edge(level, emb_list);
+		level ++;
+		if(show) emb_list.printout_embeddings(level);
+		num_freq_patterns = aggregator(level, miner, emb_list, cg_map);
 		total_num += num_freq_patterns;
 		if (debug) miner.printout_agg(cg_map);
 		if (num_freq_patterns == 0) break;
-		if (level == k-1) break;
-
-		filtered_queue.clear();
-		miner.filter(queue, filtered_queue);
-		if (show) filtered_queue.printout_embeddings(level);
-		level ++;
+		if (level == k) break;
+		miner.filter(level, emb_list);
 	}
-	if (show) std::cout << "\n=============================== Done ================================\n";
 	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }
 
@@ -163,12 +160,19 @@ int main(int argc, char** argv) {
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+	std::cout << "max_size = " << k << std::endl;
+	std::cout << "min_support = " << minsup << std::endl;
+	std::cout << "num_threads = " << numThreads << std::endl;
 
+	assert(k > 1);
 	EdgeMiner miner(&graph);
 	miner.set_threshold(minsup);
+	EmbeddingList emb_list;
+	emb_list.init(graph, k+1);
+	if (show) emb_list.printout_embeddings(1);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	FsmSolver(miner);
+	FsmSolver(miner, emb_list);
 	Tcomp.stop();
 	return 0;
 }

@@ -30,9 +30,11 @@
 #include "galois/Galois.h"
 
 typedef unsigned IndexTy;
+typedef galois::gstl::Vector<BYTE> ByteList;
 typedef galois::gstl::Vector<unsigned> UintList;
 typedef galois::gstl::Vector<VertexId> VertexList;
 typedef galois::gstl::Vector<UintList> IndexLists;
+typedef galois::gstl::Vector<ByteList> ByteLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
 typedef galois::gstl::Set<VertexId> VertexSet;
 //typedef std::unordered_set<VertexId> VertexSet;
@@ -62,7 +64,7 @@ public:
 	ElementTy* data() { return elements.data(); }
 	const ElementTy* data() const { return elements.data(); }
 	ElementTy get_element(unsigned i) const { return elements[i]; }
-	void set_element(unsigned i, ElementTy ele) { elements[i] = ele; }
+	void set_element(unsigned i, ElementTy &ele) { elements[i] = ele; }
 	std::vector<ElementTy> get_elements() const { return elements; }
 	void clean() { elements.clear(); }
 protected:
@@ -169,9 +171,6 @@ std::ostream & operator<<(std::ostream & strm, const EdgeInducedEmbedding<Elemen
 	for(unsigned index = 0; index < emb.size() - 1; ++index)
 		std::cout << emb.get_element(index) << ", ";
 	std::cout << emb.get_element(emb.size()-1);
-	//for (auto it = emb.get_elements().begin(); it != emb.get_elements().end() - 1; ++ it)
-	//	strm << (*it) << ", ";
-	//strm << emb.back();
 	strm << ")";
 	return strm;
 }
@@ -221,6 +220,10 @@ public:
 		unsigned eid = 0;
 		vid_lists.resize(max_level);
 		idx_lists.resize(max_level);
+		#ifdef ENABLE_LABEL
+		//lab_lists.resize(max_level);
+		his_lists.resize(max_level);
+		#endif
 		for (auto src : graph) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
@@ -229,24 +232,45 @@ public:
 					idx_lists[0].push_back(0);
 					vid_lists[1].push_back(dst);
 					idx_lists[1].push_back(eid++);
+					#ifdef ENABLE_LABEL
+					//lab_lists[0].push_back(graph.getData(src));
+					//lab_lists[1].push_back(graph.getData(dst));
+					his_lists[0].push_back(0);
+					his_lists[1].push_back(0);
+					#endif
 				}
 			}
 		}
-		if (show) printout_embeddings(1);
 	}
 	VertexId get_vid(unsigned level, IndexTy id) const { return vid_lists[level][id]; }
 	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
+	//BYTE get_lab(unsigned level, IndexTy id) const { return lab_lists[level][id]; }
+	BYTE get_his(unsigned level, IndexTy id) const { return his_lists[level][id]; }
 	IndexTy get_pid(IndexTy id) const { return pid_list[id]; }
 	void set_vid(unsigned level, IndexTy id, VertexId vid) { vid_lists[level][id] = vid; }
 	void set_idx(unsigned level, IndexTy id, IndexTy idx) { idx_lists[level][id] = idx; }
+	//void set_lab(unsigned level, IndexTy id, BYTE lab) { lab_lists[level][id] = lab; }
+	void set_his(unsigned level, IndexTy id, BYTE lab) { his_lists[level][id] = lab; }
 	void set_pid(IndexTy id, IndexTy pid) { pid_list[id] = pid; }
 	size_t size() const { return vid_lists[last_level].size(); }
 	size_t size(unsigned level) const { return vid_lists[level].size(); }
+	VertexList get_vid_list(unsigned level) { return vid_lists[level]; }
+	void remove_tail(unsigned idx) {
+		vid_lists[last_level].erase(vid_lists[last_level].begin()+idx, vid_lists[last_level].end());
+		#ifdef ENABLE_LABEL
+		his_lists[last_level].erase(his_lists[last_level].begin()+idx, his_lists[last_level].end());
+		//lab_lists[last_level].erase(lab_lists[last_level].begin()+idx, lab_lists[last_level].end());
+		#endif
+	}
 	void add_level(unsigned size) {
 		last_level ++;
 		assert(last_level < max_level);
 		vid_lists[last_level].resize(size);
 		idx_lists[last_level].resize(size);
+		#ifdef ENABLE_LABEL
+		//lab_lists[last_level].resize(size);
+		his_lists[last_level].resize(size);
+		#endif
 		#ifdef USE_PID
 		pid_list.resize(size);
 		#endif
@@ -257,6 +281,8 @@ public:
 	}
 private:
 	UintList pid_list;
+	//ByteLists lab_lists;
+	ByteLists his_lists;
 	IndexLists idx_lists;
 	VertexLists vid_lists;
 	unsigned last_level;
