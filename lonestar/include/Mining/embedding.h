@@ -50,6 +50,7 @@ public:
 	~Embedding() { elements.clear(); }
 	VertexId get_vertex(unsigned i) const { return elements[i].get_vid(); }
 	BYTE get_history(unsigned i) const { return elements[i].get_his(); }
+	BYTE get_label(unsigned i) const { return elements[i].get_vlabel(); }
 	BYTE get_key(unsigned i) const { return elements[i].get_key(); }
 	bool empty() const { return elements.empty(); }
 	iterator begin() { return elements.begin(); }
@@ -65,6 +66,7 @@ public:
 	const ElementTy* data() const { return elements.data(); }
 	ElementTy get_element(unsigned i) const { return elements[i]; }
 	void set_element(unsigned i, ElementTy &ele) { elements[i] = ele; }
+	void set_vertex(unsigned i, VertexId vid) { elements[i].set_vertex_id(vid); }
 	std::vector<ElementTy> get_elements() const { return elements; }
 	void clean() { elements.clear(); }
 protected:

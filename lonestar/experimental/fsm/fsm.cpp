@@ -55,71 +55,9 @@ typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
 
-#ifdef USE_DOMAIN
-typedef DomainSupport SupportT;
-typedef DomainMap SupportMap;
-typedef QpMapDomain QpMapT;
-typedef CgMapDomain CgMapT;
-typedef LocalQpMapDomain LocalQpMapT;
-typedef LocalCgMapDomain LocalCgMapT;
-#else
-typedef Frequency SupportT;
-typedef FreqMap SupportMap;
-typedef QpMapFreq QpMapT;
-typedef CgMapFreq CgMapT;
-typedef LocalQpMapFreq LocalQpMapT;
-typedef LocalCgMapFreq LocalCgMapT;
-#endif
-
-// two-level aggregation
-int aggregator(unsigned level, EdgeMiner& miner, EmbeddingQueueType& queue, CgMapT& cg_map) {
-	if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
-	cg_map.clear();
-
-	QpMapT qp_map; // quick pattern map
-	// quick aggregation
-	LocalQpMapT qp_localmap; // quick pattern local map for each thread
-	galois::do_all(galois::iterate(queue),
-		[&](EmbeddingType &emb) {
-			miner.quick_aggregate_each(emb, *(qp_localmap.getLocal()));
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("QuickAggregation")
-	);
-	galois::StatTimer TmergeQP("MergeQuickPatterns");
-	TmergeQP.start();
-	miner.merge_qp_map(level+2, qp_localmap, qp_map);
-	TmergeQP.stop();
-
-	// canonical aggregation
-	LocalCgMapT cg_localmap; // canonical pattern local map for each thread
-	galois::do_all(galois::iterate(qp_map),
-		[&](std::pair<QPattern, DomainSupport> element) {
-			miner.canonical_aggregate_each(element.first, element.second, *(cg_localmap.getLocal()));
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-		galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("CanonicalAggregation")
-	);
-	galois::StatTimer TmergeCG("MergeCanonicalPatterns");
-	TmergeCG.start();
-	miner.merge_cg_map(level+2, cg_localmap, cg_map);
-	TmergeCG.stop();
-
-	int num_frequent_patterns = 0;
-	num_frequent_patterns = miner.support_count(cg_map);
-	if (show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
-		<< " frequent patterns: " << num_frequent_patterns << "\n";
-	return num_frequent_patterns;
-}
-
 void FsmSolver(EdgeMiner &miner) {
-	unsigned level = 0;
-	if (show) std::cout << "\n=============================== Start ===============================\n";
+	unsigned level = 1;
 	EmbeddingQueueType queue, filtered_queue;
-
-	CgMapT cg_map; // canonical graph map
 	int num_freq_patterns = miner.init_aggregator();
 	total_num += num_freq_patterns;
 	if(num_freq_patterns == 0) {
@@ -127,30 +65,32 @@ void FsmSolver(EdgeMiner &miner) {
 		return;
 	}
 	std::cout << "Number of frequent single-edge patterns: " << num_freq_patterns << "\n";
-	if (debug) miner.printout_agg(cg_map);
-
+	if (debug) miner.printout_agg();
 	miner.init_filter(filtered_queue);
-	if (show) filtered_queue.printout_embeddings(0);
-	level ++;
 
-	while (level < k) {
-		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
+	// a level-by-level approach for Apriori search space (breadth first seach)
+	while (1) {
+		level ++;
 		queue.clear();
 		miner.extend_edge(filtered_queue, queue);
-		if (show) queue.printout_embeddings(level, debug);
 
-		num_freq_patterns = aggregator(level, miner, queue, cg_map);
+		if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
+		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
+		miner.quick_aggregate(queue);
+		miner.merge_qp_map(level+1);
+		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
+		miner.canonical_aggregate();
+		miner.merge_cg_map(level+1);
+
+		num_freq_patterns = miner.support_count();
 		total_num += num_freq_patterns;
-		if (debug) miner.printout_agg(cg_map);
+		if (debug) miner.printout_agg();
 		if (num_freq_patterns == 0) break;
-		if (level == k-1) break;
+		if (level == k) break;
 
 		filtered_queue.clear();
 		miner.filter(queue, filtered_queue);
-		if (show) filtered_queue.printout_embeddings(level);
-		level ++;
 	}
-	if (show) std::cout << "\n=============================== Done ================================\n";
 	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }
 

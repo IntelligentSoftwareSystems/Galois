@@ -24,8 +24,8 @@ public:
 		unsigned bytes = size * sizeof(ElementTy);
 		elements = new ElementTy[size];
 		std::memcpy(elements, emb.data(), bytes);
-		std::unordered_map<VertexId, VertexId> map;
 		VertexId new_id = 1;
+		std::unordered_map<VertexId, VertexId> map;
 		for(unsigned i = 0; i < size; i++) {
 			auto& element = elements[i];
 			VertexId old_id = element.get_vid();
@@ -35,6 +35,66 @@ public:
 				map[old_id] = new_id++;
 			} else element.set_vertex_id(iterator->second);
 		}
+		set_hash();
+	}
+	QuickPattern(EmbeddingTy & emb) {
+		cg_id = 0;
+		size = emb.size();
+		unsigned bytes = size * sizeof(ElementTy);
+		elements = new ElementTy[size];
+		std::memcpy(elements, emb.data(), bytes);
+		VertexId new_id = 1;
+#ifdef ENABLE_LABEL
+		if (size == 3) {
+			BYTE l1 = emb.get_label(1);
+			BYTE l2 = emb.get_label(2);
+			BYTE h2 = emb.get_history(2);
+			elements[0].set_vertex_id(1);
+			elements[1].set_vertex_id(2);
+			elements[2].set_vertex_id(3);
+			if (h2 == 0) {
+				if (l1 < l2) {
+					elements[1].set_vertex_label(l2);
+					elements[2].set_vertex_label(l1);
+					VertexId v1 = emb.get_vertex(1);
+					VertexId v2 = emb.get_vertex(2);
+					emb.set_vertex(1, v2);
+					emb.set_vertex(2, v1);
+				}
+			} else {
+				assert(h2 == 1);
+				elements[0].set_vertex_label(l1);
+				elements[2].set_history_info(0);
+				BYTE l0 = emb.get_label(0);
+				VertexId v0 = emb.get_vertex(0);
+				VertexId v1 = emb.get_vertex(1);
+				VertexId v2 = emb.get_vertex(2);
+				if (l0 < l2) {
+					elements[1].set_vertex_label(l2);
+					elements[2].set_vertex_label(l0);
+					emb.set_vertex(1, v2);
+					emb.set_vertex(2, v0);
+				} else {
+					elements[1].set_vertex_label(l0);
+					emb.set_vertex(1, v0);
+				}
+				emb.set_vertex(0, v1);
+			}
+		} else {
+#endif
+		std::unordered_map<VertexId, VertexId> map;
+		for(unsigned i = 0; i < size; i++) {
+			auto& element = elements[i];
+			VertexId old_id = element.get_vid();
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				element.set_vertex_id(new_id);
+				map[old_id] = new_id++;
+			} else element.set_vertex_id(iterator->second);
+		}
+#ifdef ENABLE_LABEL
+		}
+#endif
 		set_hash();
 	}
 	QuickPattern(unsigned n, std::vector<bool> connected) {

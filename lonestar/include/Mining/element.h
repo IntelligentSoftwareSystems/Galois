@@ -78,6 +78,7 @@ public:
 	~LabeledElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { history_info = his; }
+	inline void set_vertex_label(BYTE lab) { vertex_label = lab; }
 	inline int cmp(const LabeledElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;
@@ -123,6 +124,7 @@ public:
 	~StructuralElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { history_info = his; }
+	inline void set_vertex_label(BYTE lab) { }
 	inline int cmp(const StructuralElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;
@@ -153,6 +155,8 @@ public:
 	SimpleElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) { }
 	~SimpleElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
+	inline void set_history_info(BYTE his) { }
+	inline void set_vertex_label(BYTE lab) { }
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return 0; }
 	BYTE get_key() const { return 0; }

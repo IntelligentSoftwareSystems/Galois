@@ -49,22 +49,17 @@ typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/util.h"
 
 void MotifSolver(EdgeMiner &miner) {
-	if (show) std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueueType in_queue, out_queue; // in&out worklist. double buffering
 	miner.init(in_queue); // initialize the worklist
-	if(show) in_queue.printout_embeddings(0);
 	unsigned level = 1;
+	galois::gPrint("\n");
 
-	// a level-by-level approach for Apriori search space (breadth first seach)
 	while (level < k) { // to get the same output as RStream (which is not complete)
-		if (show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		miner.extend_edge(in_queue, out_queue); // edge extension
 		in_queue.swap(out_queue);
 		out_queue.clear();
-		if (show) in_queue.printout_embeddings(level);
 
 		if (show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
-		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
 		QpMapFreq qp_map; // quick patterns map for counting the frequency
 		LocalQpMapFreq qp_localmap; // quick patterns local map for each thread
 		galois::do_all(galois::iterate(in_queue),
@@ -75,9 +70,8 @@ void MotifSolver(EdgeMiner &miner) {
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("QuickAggregation")
 		);
-		miner.merge_qp_map(0, qp_localmap, qp_map);
+		miner.merge_qp_map(qp_localmap, qp_map);
 
-		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
 		CgMapFreq cg_map; // canonical graph map for couting the frequency
 		LocalCgMapFreq cg_localmap; // canonical graph local map for each thread
 		galois::do_all(galois::iterate(qp_map),
@@ -88,13 +82,11 @@ void MotifSolver(EdgeMiner &miner) {
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalAggregation")
 		);
-		miner.merge_cg_map(0, cg_localmap, cg_map);
+		miner.merge_cg_map(cg_localmap, cg_map);
 		miner.printout_agg(cg_map);
-		//queue_size = std::distance(in_queue.begin(), in_queue.end());
-		//if (show) std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size() << " num_embeddings: " << queue_size << "\n";
+		galois::gPrint("\n");
 		level ++;
 	}
-	if (show) std::cout << "\n=============================== Done ===============================\n\n";
 }
 
 int main(int argc, char** argv) {
