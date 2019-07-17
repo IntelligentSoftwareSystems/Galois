@@ -1,5 +1,6 @@
 #ifndef __MGRAPH_HPP__
 #define __MGRAPH_HPP__
+#include <set>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -84,6 +85,8 @@ public:
 		}
 		is.close();
 		num_vertices_ = labels_.size();
+		int num_labels = count_unique_labels();
+		std::cout << "Number of unique vertex label values: " << num_labels << std::endl;
 		num_edges_ = el.size();
 		if (!directed_) symmetrize_ = false; // no need to symmetrize undirected graph
 		MakeGraphFromEL();
@@ -129,6 +132,8 @@ public:
 		}
 		is.close();
 		num_vertices_ = labels_.size();
+		int num_labels = count_unique_labels();
+		std::cout << "Number of unique vertex label values: " << num_labels << std::endl;
 		num_edges_ = el.size();
 		if (!directed_) symmetrize_ = false; // no need to symmetrize undirected graph
 		MakeGraphFromEL();
@@ -255,6 +260,17 @@ private:
 	std::vector<ValueT> labels_;
 	std::vector<std::vector<MEdge> > vertices;
 
+	int count_unique_labels() {
+		std::set<int> s;
+		int res = 0;
+		for (size_t i = 0; i < labels_.size(); i++) {
+			if (s.find(labels_[i]) == s.end()) {
+				s.insert(labels_[i]);
+				res++;
+			}
+		}
+		return res;
+	}
 	std::vector<int> CountDegrees(const MEdgeList &el, bool transpose) {
 		std::vector<int> degrees(num_vertices_, 0);
 		for (auto it = el.begin(); it < el.end(); it++) {

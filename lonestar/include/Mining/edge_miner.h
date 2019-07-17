@@ -2,14 +2,14 @@
 #define EDGE_MINER_H
 #include "miner.h"
 
-typedef std::set<int> IntSet;
-typedef std::vector<bool> BoolVec;
-typedef std::vector<IntSet> IntSets;
+//typedef std::set<int> IntSet;
+//typedef std::vector<bool> BoolVec;
+//typedef std::vector<IntSet> IntSets;
+typedef galois::gstl::Set<int> IntSet;
+typedef galois::gstl::Vector<bool> BoolVec;
+typedef galois::gstl::Vector<IntSet> IntSets;
 typedef std::pair<BoolVec,IntSets> DomainSupport;
 typedef std::pair<unsigned, unsigned> InitPattern;
-//typedef galois::gstl::Set<int> IntSet;
-//typedef galois::gstl::Vector<bool> BoolVec;
-//typedef galois::gstl::Vector<IntSet> IntSets;
 typedef QuickPattern<EdgeEmbedding, ElementType> QPattern;
 typedef CanonicalGraph<EdgeEmbedding, ElementType> CPattern;
 ///*
@@ -25,10 +25,10 @@ typedef std::unordered_map<unsigned, bool> DomainMap;
 typedef galois::gstl::Map<InitPattern, DomainSupport> InitMap;
 //typedef galois::gstl::Map<QPattern, Frequency> QpMapFreq; // mapping quick pattern to its frequency
 //typedef galois::gstl::Map<CPattern, Frequency> CgMapFreq; // mapping canonical pattern to its frequency
-typedef galois::gstl::Map<QPattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
-typedef galois::gstl::Map<CPattern, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
+typedef galois::gstl::UnorderedMap<QPattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
+typedef galois::gstl::UnorderedMap<CPattern, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
 //typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
-typedef galois::gstl::Map<unsigned, bool> DomainMap;
+typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
 //*/
 typedef galois::substrate::PerThreadStorage<InitMap> LocalInitMap;
 typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq; // PerThreadStorage: thread-local quick pattern map
@@ -391,16 +391,16 @@ public:
 				BYTE his = emb_list.get_his(level, pos);
 				BYTE lab = graph->getData(vid);
 				EdgeEmbedding emb(level+1);
-				//emb.set_element(level, ElementType(vid, 0, lab, his));
 				ElementType ele(vid, 0, lab, his);
 				emb.set_element(level, ele);
+				//emb.set_element(level, ElementType(vid, 0, lab, his));
 				for (unsigned l = 1; l <= level; l ++) {
 					vid = emb_list.get_vid(level-l, idx);
 					his = emb_list.get_his(level-l, idx);
 					lab = graph->getData(vid);
-					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
 					ElementType ele(vid, 0, lab, his);
 					emb.set_element(level-l, ele);
+					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
 					idx = emb_list.get_idx(level-l, idx);
 				}
 				unsigned n = emb.size();
@@ -679,13 +679,23 @@ public:
 		qp_map = *(qp_localmaps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
 			const QpMapDomain *lmap = qp_localmaps.getLocal(i);
+			/*
+			for (auto element : *lmap)
+				if (qp_map.find(element.first) == qp_map.end()) {
+					qp_map[element.first].first.resize(num_domains);
+					std::fill(qp_map[element.first].first.begin(), qp_map[element.first].first.end(), 0);
+					qp_map[element.first].second.resize(num_domains);
+				}
+			*/
+			#if 1
 			galois::do_all(galois::iterate(*lmap),
 				[&](std::pair<QPattern, DomainSupport> element) {
+					///*
 					if (qp_map.find(element.first) == qp_map.end()) {
 						slock.lock();
 						qp_map[element.first] = element.second;
 						slock.unlock();
-					} else {
+					} else {//*/
 						for (unsigned i = 0; i < num_domains; i ++) {
 							if (qp_map[element.first].first[i] == 0) { // haven't reach threshold yet
 								if (element.second.first[i]) {
@@ -706,6 +716,29 @@ public:
 				galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 				galois::loopname("MergeQuickPatterns")
 			);
+			#else
+			for (auto element : *lmap)
+					if (qp_map.find(element.first) == qp_map.end()) {
+						slock.lock();
+						qp_map[element.first] = element.second;
+						slock.unlock();
+					} else {
+						for (unsigned i = 0; i < num_domains; i ++) {
+							if (qp_map[element.first].first[i] == 0) { // haven't reach threshold yet
+								if (element.second.first[i]) {
+									qp_map[element.first].first[i] = 1;
+									//qp_map[element.first].second[i].clear();
+								} else {
+									qp_map[element.first].second[i].insert(element.second.second[i].begin(), element.second.second[i].end());
+									if (qp_map[element.first].second[i].size() >= threshold) {
+										qp_map[element.first].first[i] = 1;
+										//qp_map[element.first].second[i].clear();
+									}
+								}
+							}
+						}
+					}
+			#endif
 		}
 	}
 	inline void merge_cg_map(unsigned num_domains) {
