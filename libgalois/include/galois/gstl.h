@@ -65,7 +65,7 @@ using Map = std::map<K, V, C, FixedSizeAlloc<std::pair<const K, V>>>;
 
 template <typename K, typename V, typename Hash = std::hash<K>,
           typename KeyEqual = std::equal_to<K>>
-using UnorderedMap = std::unordered_map<K, V, C, Hash, KeyEqual,
+using UnorderedMap = std::unordered_map<K, V, Hash, KeyEqual,
                                         FixedSizeAlloc<std::pair<const K, V>>>;
 
 template <typename T, typename C = std::less<T>>
