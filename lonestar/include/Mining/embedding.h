@@ -3,8 +3,8 @@
 #include <map>
 #include <set>
 #include <queue>
-#include <cassert>
 #include <vector>
+#include <cassert>
 #include <cstdint>
 #include <cstdlib>
 #include <sstream>
