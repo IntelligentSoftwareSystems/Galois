@@ -29,11 +29,10 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include "Lonestar/common_types.h"
 
-#define ENABLE_LABEL
-
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
 const char* url  = 0;
+
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<file type>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<file name>"), cll::Required);
@@ -44,6 +43,7 @@ static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns 
 typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define ENABLE_LABEL
 #include "Dfscode/miner.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 4

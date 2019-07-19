@@ -37,12 +37,11 @@ typedef galois::gstl::Vector<UintList> IndexLists;
 typedef galois::gstl::Vector<ByteList> ByteLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
 typedef galois::gstl::Set<VertexId> VertexSet;
-//typedef std::unordered_set<VertexId> VertexSet;
 
 template <typename ElementTy>
 class Embedding {
-//friend std::ostream & operator<<(std::ostream & strm, const Embedding<ElementTy>& emb);
-using iterator = typename std::vector<ElementTy>::iterator;
+//using iterator = typename std::vector<ElementTy>::iterator;
+using iterator = typename galois::gstl::Vector<ElementTy>::iterator;
 public:
 	Embedding() {}
 	Embedding(size_t n) { elements.resize(n); }
@@ -67,10 +66,12 @@ public:
 	ElementTy get_element(unsigned i) const { return elements[i]; }
 	void set_element(unsigned i, ElementTy &ele) { elements[i] = ele; }
 	void set_vertex(unsigned i, VertexId vid) { elements[i].set_vertex_id(vid); }
-	std::vector<ElementTy> get_elements() const { return elements; }
+	//std::vector<ElementTy> get_elements() const { return elements; }
+	galois::gstl::Vector<ElementTy> get_elements() const { return elements; }
 	void clean() { elements.clear(); }
 protected:
-	std::vector<ElementTy> elements;
+	//std::vector<ElementTy> elements;
+	galois::gstl::Vector<ElementTy> elements;
 };
 
 template <typename ElementTy> class EdgeInducedEmbedding;
@@ -133,7 +134,6 @@ public:
 	inline void set_pid(unsigned i) { hash_value = i; } // set the pattern id
 protected:
 	unsigned hash_value;
-	//std::vector<bool> connected;
 };
 typedef VertexInducedEmbedding VertexEmbedding;
 
@@ -291,4 +291,16 @@ private:
 	unsigned max_level;
 };
 
+#ifdef USE_BASE_TYPES
+typedef BaseEmbedding EmbeddingType;
+typedef BaseEmbeddingQueue EmbeddingQueueType;
+#endif
+#ifdef VERTEX_INDUCED
+typedef VertexEmbedding EmbeddingType;
+typedef VertexEmbeddingQueue EmbeddingQueueType;
+#endif
+#ifdef EDGE_INDUCED
+typedef EdgeEmbedding EmbeddingType;
+typedef EdgeEmbeddingQueue EmbeddingQueueType;
+#endif
 #endif // EMBEDDING_HPP_

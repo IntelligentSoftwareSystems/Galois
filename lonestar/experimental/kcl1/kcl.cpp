@@ -27,7 +27,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define USE_SIMPLE
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
@@ -41,48 +40,22 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_SIMPLE
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingType;
-typedef BaseEmbeddingQueue EmbeddingQueueType;
+#define USE_BASE_TYPES
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
 void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 	UlongAccu total_num;
 	total_num.reset();
-	UintList num_new_emb;
-	if(show) std::cout << "\n=============================== Start ===============================\n";
 	unsigned level = 1;
 	while (1) {
-		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		num_new_emb.resize(emb_list.size());
-		if(show) emb_list.printout_embeddings(level);
-		//std::cout << "Allocating space for new embeddings\n";
-		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
-			[&](const size_t& id) {
-				miner.extend_vertex_each(level, id, emb_list, num_new_emb, total_num, (level < k-2));
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Extending-alloc")
-		);
-		if (level == k-2) break;
-		//std::cout << "calculating indices using prefix sum\n";
-		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
-		emb_list.add_level(new_size);
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				miner.extend_vertex_each(level, id, emb_list, indices);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Extending-insert")
-		);
+		if (show) emb_list.printout_embeddings(level);
+		miner.extend_vertex(level, emb_list, total_num);
+		if (level == k-2) break; 
 		level ++;
 	}
-	if(show) std::cout << "\n=============================== Done ================================\n";
 	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
 }
 
@@ -97,7 +70,7 @@ int main(int argc, char** argv) {
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	VertexMiner miner(&graph);
+	VertexMiner miner(&graph, k);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k);
 	galois::StatTimer Tcomp("Compute");

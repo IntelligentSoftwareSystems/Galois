@@ -27,9 +27,8 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define USE_SIMPLE
 
-const char* name = "Kcl";
+const char* name = "KCL";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
 
@@ -41,12 +40,9 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_SIMPLE
+#define USE_BASE_TYPES
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingType;
-typedef BaseEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
@@ -63,7 +59,7 @@ void KclSolver(VertexMiner &miner) {
 		galois::for_each(
 			galois::iterate(queue),
 			[&](const EmbeddingType& emb, auto& ctx) {
-				miner.extend_vertex(emb, queue2);
+				miner.extend_vertex_each(emb, queue2);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -94,7 +90,7 @@ int main(int argc, char** argv) {
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	VertexMiner miner(&graph);
+	VertexMiner miner(&graph, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner);

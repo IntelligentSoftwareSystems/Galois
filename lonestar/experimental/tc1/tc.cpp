@@ -27,8 +27,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define CHUNK_SIZE 256
-#define USE_SIMPLE
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
@@ -41,11 +39,9 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingType;
-typedef BaseEmbeddingQueue EmbeddingQueueType;
+#define USE_SIMPLE
+#define USE_BASE_TYPES
+#define CHUNK_SIZE 256
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 

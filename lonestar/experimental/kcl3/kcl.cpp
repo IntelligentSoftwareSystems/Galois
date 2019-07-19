@@ -27,7 +27,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define USE_SIMPLE
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
@@ -41,28 +40,23 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_SIMPLE
+#define USE_BASE_TYPES
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef BaseEmbedding EmbeddingType;
-typedef BaseEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
 void KclSolver(VertexMiner &miner) {
 	UlongAccu total_num;
 	total_num.reset();
-	if(show) std::cout << "\n=============================== Start ===============================\n";
 	EmbeddingQueueType queue, queue2;
 	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
 	unsigned level = 1;
 	while (1) {
-		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
 		if(show) queue.printout_embeddings(0);
 		galois::do_all(galois::iterate(queue),
 			[&](const EmbeddingType& emb) {
-				miner.extend_vertex(emb, queue2, total_num, (level < k-2)); // extend one more vertex
+				miner.extend_vertex_each(level, emb, queue2, total_num); // extend one more vertex
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -73,7 +67,6 @@ void KclSolver(VertexMiner &miner) {
 		queue2.clean();
 		level ++;
 	}
-	if(show) std::cout << "\n=============================== Done ================================\n";
 	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
 }
 
@@ -88,7 +81,7 @@ int main(int argc, char** argv) {
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	VertexMiner miner(&graph);
+	VertexMiner miner(&graph, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner);

@@ -39,23 +39,12 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#define USE_SIMPLE
-#define USE_BLISS
 #define USE_PID
+#define USE_SIMPLE
+#define VERTEX_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef VertexEmbedding EmbeddingType;
-typedef VertexEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
-#ifdef USE_BLISS
-typedef StrQpMapFreq QpMapT;
-typedef StrCgMapFreq CgMapT;
-typedef LocalStrQpMapFreq LocalQpMapT;
-typedef LocalStrCgMapFreq LocalCgMapT;
-#endif
 int num_patterns[3] = {2, 6, 21};
 
 void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
@@ -63,72 +52,23 @@ void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
 	std::vector<UlongAccu> accumulators(npatterns);
 	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
-	UintList num_new_emb;
 	unsigned level = 1;
 	while (level < k-2) {
-		num_new_emb.resize(emb_list.size());
 		if(show) emb_list.printout_embeddings(level);
-		// for each embedding, do vertex-extension
-		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
-			[&](const size_t& id) {
-				miner.extend_vertex(level, id, emb_list, num_new_emb);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Extending-alloc")
-		);
-		//std::cout << "calculating indices using prefix sum\n";
-		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
-		//std::cout << "generating " << new_size << " embeddings\n";
-		emb_list.add_level(new_size);
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				miner.extend_vertex(level, k, id, emb_list, indices);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Extending-insert")
-		);
+		miner.extend_vertex(level, emb_list);
 		level ++;
 	}
 	if (k < 5) {
 		if(show) emb_list.printout_embeddings(level);
-		//std::cout << "aggregating ...\n";
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				miner.aggregate_each(level, id, emb_list, accumulators);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Reduce")
-		);
+		miner.aggregate(level, emb_list, accumulators);
 		miner.printout_motifs(accumulators);
 	} else { // use bliss library to do isomorphism check
 		// TODO: need to use unsigned long for the counters
-		QpMapT qp_map; // quick patterns map for counting the frequency
-		LocalQpMapT qp_localmap; // quick patterns local map for each thread
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				miner.quick_aggregate_each(level, id, emb_list, *(qp_localmap.getLocal()));
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("QuickAggregation")
-		);
-		miner.merge_qp_map(qp_localmap, qp_map);
-		CgMapT cg_map; // canonical graph map for couting the frequency
-		LocalCgMapT cg_localmap; // canonical graph local map for each thread
-		galois::do_all(galois::iterate(qp_map),
-			[&](auto& qp) {
-				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("CanonicalAggregation")
-		);
-		miner.merge_cg_map(cg_localmap, cg_map);
-		miner.printout_motifs(cg_map);
+		miner.quick_aggregate(level, emb_list);
+		miner.merge_qp_map();
+		miner.canonical_aggregate();
+		miner.merge_cg_map();
+		miner.printout_motifs();
 	}
 }
 
@@ -143,7 +83,7 @@ int main(int argc, char** argv) {
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	assert(k > 2);
-	VertexMiner miner(&graph);
+	VertexMiner miner(&graph, k);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k);
 	galois::StatTimer Tcomp("Compute");

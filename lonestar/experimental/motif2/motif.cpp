@@ -39,22 +39,12 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-#define USE_SIMPLE
 #define USE_BLISS
+#define USE_SIMPLE
+#define VERTEX_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef SimpleElement ElementType;
-#include "Mining/embedding.h"
-typedef VertexEmbedding EmbeddingType;
-typedef VertexEmbeddingQueue EmbeddingQueueType;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
-#ifdef USE_BLISS
-typedef StrQpMapFreq QpMapT;
-typedef StrCgMapFreq CgMapT;
-typedef LocalStrQpMapFreq LocalQpMapT;
-typedef LocalStrCgMapFreq LocalCgMapT;
-#endif
 int num_patterns[3] = {2, 6, 21};
 
 void MotifSolver(VertexMiner &miner) {
@@ -70,7 +60,7 @@ void MotifSolver(VertexMiner &miner) {
 		// for each embedding in the task queue, do vertex-extension
 		galois::do_all(galois::iterate(queue),
 			[&](const EmbeddingType& emb) {
-				miner.extend_vertex(k, emb, queue2); // vertex extension
+				miner.extend_vertex_each(emb, queue2); // vertex extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -116,29 +106,11 @@ void MotifSolver(VertexMiner &miner) {
 //*/
 	} else { // use bliss library to do isomorphism check
 		// TODO: need to use unsigned long for the counters
-		QpMapT qp_map; // quick patterns map for counting the frequency
-		LocalQpMapT qp_localmap; // quick patterns local map for each thread
-		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingType& emb) {
-				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("QuickAggregation")
-		);
-		miner.merge_qp_map(qp_localmap, qp_map);
-		CgMapT cg_map; // canonical graph map for couting the frequency
-		LocalCgMapT cg_localmap; // canonical graph local map for each thread
-		galois::do_all(galois::iterate(qp_map),
-			[&](auto& qp) {
-				miner.canonical_aggregate_each(qp.first, qp.second, *(cg_localmap.getLocal())); // canonical pattern aggregation
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("CanonicalAggregation")
-		);
-		miner.merge_cg_map(cg_localmap, cg_map);
-		miner.printout_motifs(cg_map);
+		miner.quick_aggregate(queue);
+		miner.merge_qp_map();
+		miner.canonical_aggregate();
+		miner.merge_cg_map();
+		miner.printout_motifs();
 	}
 	if (show) std::cout << "\n=============================== Done ===============================\n\n";
 }
@@ -154,7 +126,7 @@ int main(int argc, char** argv) {
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
-	VertexMiner miner(&graph);
+	VertexMiner miner(&graph, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	MotifSolver(miner);

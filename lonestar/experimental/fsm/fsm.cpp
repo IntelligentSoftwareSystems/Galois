@@ -28,9 +28,6 @@
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
 
-#define ENABLE_LABEL
-#define USE_DOMAIN
-
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS extension";
 const char* url  = 0;
@@ -44,14 +41,12 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
-int total_num = 0;
 
+int total_num = 0;
+#define USE_DOMAIN
+#define ENABLE_LABEL
+#define EDGE_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef LabeledElement ElementType;
-#include "Mining/embedding.h"
-typedef EdgeEmbedding EmbeddingType;
-typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
 

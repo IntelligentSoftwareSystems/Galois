@@ -174,4 +174,13 @@ public:
 	}
 };
 
+#ifdef USE_SIMPLE
+typedef SimpleElement ElementType;
+#endif
+#ifdef USE_STRUCTURAL
+typedef StructuralElement ElementType;
+#endif
+#ifdef ENABLE_LABEL
+typedef LabeledElement ElementType;
+#endif
 #endif

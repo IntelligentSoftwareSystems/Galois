@@ -112,28 +112,19 @@ protected:
 		return all_connected;
 	}
 	/*
-	inline bool is_connected(unsigned from, unsigned to) {
-		bool connected = false;
-		if (degrees[from] < degrees[to]) {
-			for(auto e : graph->edges(from)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (dst == to) {
-					connected = true;
-					break;
-				}
-				if (dst > to) break;
-			}
-		} else {
-			for(auto e : graph->edges(to)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (dst == from) {
-					connected = true;
-					break;
-				}
-				if (dst > from) break;
+	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
+		assert(start >= 0 && end > 0);
+		bool all_connected = true;
+		int offset = 0;
+		for(unsigned i = start; i < end; ++i) {
+			unsigned from = emb.get_vertex(i);
+			offset = is_connected(from, dst, offset);
+			if (offset == -1) {
+				all_connected = false;
+				break;
 			}
 		}
-		return connected;
+		return all_connected;
 	}
 	*/
 	// check if vertex a is connected to vertex b in a undirected graph
@@ -149,6 +140,13 @@ protected:
 		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
 		//return serial_search(key, begin, end);
 		return binary_search(key, begin, end);
+	}
+	inline int is_connected(unsigned key, unsigned search, unsigned offset) {
+		if (degrees[key] == 0 || degrees[search] == 0) return false;
+		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
+		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		int pos = binary_search(key, begin+offset, end-begin-offset);
+		return pos;
 	}
 	inline bool serial_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
 		for (auto offset = begin; offset != end; ++ offset) {
@@ -169,6 +167,19 @@ protected:
 			else r = mid - 1; 
 		} 
 		return false;
+	}
+	inline int binary_search(unsigned key, Graph::edge_iterator begin, int length) {
+		if (length < 1) return -1;
+		int l = 0;
+		int r = length-1;
+		while (r >= l) { 
+			int mid = l + (r - l) / 2; 
+			unsigned value = graph->getEdgeDst(begin+mid);
+			if (value == key) return mid;
+			if (value < key) l = mid + 1; 
+			else r = mid - 1; 
+		} 
+		return -1;
 	}
 	inline void gen_adj_matrix(unsigned n, const std::vector<bool> &connected, Matrix &a) {
 		unsigned l = 0;

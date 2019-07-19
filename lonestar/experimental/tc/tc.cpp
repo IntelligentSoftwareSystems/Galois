@@ -27,7 +27,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
-#define CHUNK_SIZE 256
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (only works for undirected neighbor-sorted graphs)";
@@ -39,6 +38,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: sym
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define CHUNK_SIZE 256
 #include "Mining/util.h"
 
 void TcSolver(Graph& graph) {

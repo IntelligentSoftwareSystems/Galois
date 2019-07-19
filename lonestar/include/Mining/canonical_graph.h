@@ -56,7 +56,7 @@ public:
 
 private:
 	EmbeddingTy embedding;
-	std::vector<int> qp_idx;
+	std::vector<int> qp_idx; // TODO: try gstl::Vector
 	int number_of_vertices;
 	unsigned hash_value;
 	unsigned support;

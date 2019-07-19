@@ -39,12 +39,9 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_STRUCTURAL
+#define EDGE_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/element.h"
-typedef StructuralElement ElementType;
-#include "Mining/embedding.h"
-typedef EdgeEmbedding EmbeddingType;
-typedef EdgeEmbeddingQueue EmbeddingQueueType;
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
 
