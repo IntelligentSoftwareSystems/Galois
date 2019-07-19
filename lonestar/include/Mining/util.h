@@ -46,7 +46,7 @@ int read_graph(Graph &graph, std::string filetype, std::string filename, bool ne
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
 		printf("Reading .gr file: %s\n", filename.c_str());
-		if(need_relabel) {
+		if(need_relabel || need_dag) {
 			Graph g_temp;
 			galois::graphs::readGraph(g_temp, filename);
 			for (GNode n : g_temp) g_temp.getData(n) = 1;

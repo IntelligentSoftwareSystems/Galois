@@ -50,7 +50,7 @@ void TcSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 	total_num.reset();
 	galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 		[&](const size_t& id) {
-			total_num += miner.intersect(emb_list.get_vid(0,id), emb_list.get_vid(1,id));
+			total_num += miner.intersect_dag(emb_list.get_vid(0,id), emb_list.get_vid(1,id));
 		},
 		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
 		galois::loopname("TriangleCouting")
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 
 	VertexMiner miner(&graph);
 	EmbeddingList emb_list;
-	emb_list.init(graph);
+	emb_list.init(graph, 2, true);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	TcSolver(miner, emb_list);

@@ -53,6 +53,9 @@ public:
 	inline unsigned intersect(unsigned a, unsigned b) {
 		return intersect_merge(a, b);
 	}
+	inline unsigned intersect_dag(unsigned a, unsigned b) {
+		return intersect_dag_merge(a, b);
+	}
 
 protected:
 	Graph *graph;
@@ -79,6 +82,26 @@ protected:
 				}
 				if (to > dst_dst) break;
 			}
+		}
+		return count;
+	}
+	inline unsigned intersect_dag_merge(unsigned p, unsigned q) {
+		unsigned count = 0;
+		auto p_start = graph->edge_begin(p);
+		auto p_end = graph->edge_end(p);
+		auto q_start = graph->edge_begin(q);
+		auto q_end = graph->edge_end(q);
+		auto p_it = p_start;
+		auto q_it = q_start;
+		int a;
+		int b;
+		while (p_it < p_end && q_it < q_end) {
+			a = graph->getEdgeDst(p_it);
+			b = graph->getEdgeDst(q_it);
+			int d = a - b;
+			if (d <= 0) p_it ++;
+			if (d >= 0) q_it ++;
+			if (d == 0) count ++;
 		}
 		return count;
 	}

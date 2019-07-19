@@ -216,7 +216,7 @@ class EmbeddingList {
 public:
 	EmbeddingList() {}
 	~EmbeddingList() {}
-	void init(Graph& graph, unsigned max_size = 2) {
+	void init(Graph& graph, unsigned max_size = 2, bool is_dag = false) {
 		last_level = 1;
 		max_level = max_size;
 		unsigned eid = 0;
@@ -229,7 +229,7 @@ public:
 		for (auto src : graph) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
-				if (src < dst) {
+				if (is_dag || src < dst) {
 					vid_lists[0].push_back(src);
 					idx_lists[0].push_back(0);
 					vid_lists[1].push_back(dst);

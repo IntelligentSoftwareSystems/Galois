@@ -14,7 +14,6 @@ struct MEdge {
 	IndexT src;
 	IndexT dst;
 	ValueT elabel;
-	//IndexT id;
 	MEdge() : src(0), dst(0), elabel(0) {}
 	MEdge(IndexT from, IndexT to, ValueT el) :
 		src(from), dst(to), elabel(el) {}
@@ -214,15 +213,19 @@ public:
 		MakeGraphFromEL();
 	}
 	void read_gr(Graph& g) {
+		num_vertices_ = g.size();
+		//degrees.resize(num_vertices_);
+		//std::fill(degrees.begin(), degrees.end(), 0);
+		//std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
 		for (auto it = g.begin(); it != g.end(); it ++) {
 			GNode src = *it;
 			for (auto e : g.edges(src)) {
 				GNode dst = g.getEdgeDst(e);
 				el.push_back(MEdge(src, dst, 1));
+				//degrees[src] ++;
 			}
 		}
 		assert(el.size() == g.sizeEdges());
-		num_vertices_ = g.size();
 		num_edges_ = el.size();
 		labels_.resize(num_vertices_);
 		for (int i = 0; i < num_vertices_; i ++) { labels_[i] = g.getData(i); }
@@ -257,6 +260,7 @@ private:
 	//int *in_rowptr_;
 	//int *in_colidx_;
 	std::vector<int> rank;
+	std::vector<IndexT> degrees;
 	std::vector<ValueT> labels_;
 	std::vector<std::vector<MEdge> > vertices;
 
@@ -271,19 +275,17 @@ private:
 		}
 		return res;
 	}
-	std::vector<int> CountDegrees(const MEdgeList &el, bool transpose) {
-		std::vector<int> degrees(num_vertices_, 0);
+	void CountDegrees(const MEdgeList &el) {
+		degrees.resize(num_vertices_);
+		std::fill(degrees.begin(), degrees.end(), 0);
 		for (auto it = el.begin(); it < el.end(); it++) {
 			MEdge e = *it;
-			if (symmetrize_ || (!symmetrize_ && !transpose))
-				degrees[e.src] ++;
-			if (symmetrize_ || (!symmetrize_ && transpose))
-				degrees[e.dst] ++;
+			degrees[e.src] ++;
+			if (symmetrize_) degrees[e.dst] ++;
 		}
-		return degrees;
 	}
-	void MakeCSRFromEL(bool transpose) {
-		std::vector<int> degrees = CountDegrees(el, transpose);
+	void MakeCSRFromEL() {
+		CountDegrees(el);
 		core = *(std::max_element(degrees.begin(), degrees.end()));
 		std::vector<int> offsets = PrefixSum(degrees);
 		num_edges_ = offsets[num_vertices_];
@@ -293,11 +295,9 @@ private:
 		for (int i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
 		for (auto it = el.begin(); it < el.end(); it++) {
 			MEdge e = *it;
-			if (symmetrize_ || (!symmetrize_ && !transpose)) {
-				weight_[offsets[e.src]] = e.elabel;
-				colidx_[offsets[e.src]++] = e.dst;
-			}
-			if (symmetrize_ || (!symmetrize_ && transpose)) {
+			weight_[offsets[e.src]] = e.elabel;
+			colidx_[offsets[e.src]++] = e.dst;
+			if (symmetrize_) {
 				weight_[offsets[e.dst]] = e.elabel;
 				colidx_[offsets[e.dst]++] = e.src;
 			}
@@ -344,7 +344,8 @@ private:
 		for (IndexT n = 0; n < num_vertices_; n++)
 			degree_id_pairs[n] = std::make_pair(out_degree(n), n);
 		std::sort(degree_id_pairs.begin(), degree_id_pairs.end(), std::greater<degree_node_p>());
-		std::vector<IndexT> degrees(num_vertices_);
+		degrees.resize(num_vertices_);
+		std::fill(degrees.begin(), degrees.end(), 0);
 		std::vector<IndexT> new_ids(num_vertices_);
 		for (IndexT n = 0; n < num_vertices_; n++) {
 			degrees[n] = degree_id_pairs[n].first;
@@ -367,11 +368,13 @@ private:
 		colidx_ = neighs;
 	}
 	void ConstructDAG() {
-		std::cout << "Constructinging DAG\n";
+		std::cout << "Constructing DAG\n";
 		MEdgeList new_el;
 		int count = 0;
 		for (int i = 0; i < num_edges_; i ++) {
-			if (el[i].src < el[i].dst) {
+			IndexT from = el[i].src;
+			IndexT to = el[i].dst;
+			if (degrees[from] < degrees[to] || (degrees[from] == degrees[to] && from < to)) {
 				new_el.push_back(el[i]);
 				count ++;
 			}
@@ -403,11 +406,12 @@ private:
 			labels_[i] = new_labels[i];
 	}
 	void MakeCSR(bool transpose) {
-		std::vector<int> degrees(num_vertices_);
+		degrees.resize(num_vertices_);
+		std::fill(degrees.begin(), degrees.end(), 0);
 		for (int i = 0; i < num_vertices_; i ++)
 			degrees[i] = vertices[i].size();
 		core = *(std::max_element(degrees.begin(), degrees.end()));
-		printf("core value (max truncated degree) = %u\n", core);
+		//printf("core value (max truncated degree) = %u\n", core);
 		std::vector<int> offsets = PrefixSum(degrees);
 		assert(num_edges_ == offsets[num_vertices_]);
 		weight_ = new ValueT[num_edges_];
@@ -473,23 +477,42 @@ private:
 			printf(" %d redundent edges are removed\n", num_redundents);
 			num_edges_ -= num_redundents;
 		}
+		if(need_dag) {
+			int num_dag = 0;
+			std::cout << "Constructing DAG...";
+			degrees.resize(num_vertices_);
+			for (int i = 0; i < num_vertices_; i ++)
+				degrees[i] = vertices[i].size();
+			for (int i = 0; i < num_vertices_; i ++) {
+				for (unsigned j = 0; j < vertices[i].size(); j ++) {
+					int to = vertices[i][j].dst;
+					if (degrees[to] < degrees[i] || (degrees[to] == degrees[i] && to < i)) {
+						vertices[i].erase(vertices[i].begin()+j);
+						num_dag ++;
+						j --;
+					}
+				}
+			}
+			printf(" %d dag edges are removed\n", num_dag);
+			num_edges_ -= num_dag;
+		}
 	}
 	void MakeGraphFromEL() {
 		if (need_relabel_edges) RelabelEdges();
-		if (need_dag) ConstructDAG();
-		//MakeCSRFromEL(false);
+		//if (need_dag) ConstructDAG();
+		//MakeCSRFromEL();
 		SquishGraph();
 		MakeCSR(false);
 		//if (!need_relabel_edges) DegreeRanking();
 	}
-	static std::vector<int> PrefixSum(const std::vector<int> &degrees) {
-		std::vector<int> sums(degrees.size() + 1);
+	static std::vector<int> PrefixSum(const std::vector<int> &vec) {
+		std::vector<int> sums(vec.size() + 1);
 		int total = 0;
-		for (size_t n=0; n < degrees.size(); n++) {
+		for (size_t n=0; n < vec.size(); n++) {
 			sums[n] = total;
-			total += degrees[n];
+			total += vec[n];
 		}
-		sums[degrees.size()] = total;
+		sums[vec.size()] = total;
 		return sums;
 	}
 	inline void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ") {
