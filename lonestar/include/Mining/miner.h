@@ -134,22 +134,18 @@ protected:
 		}
 		return all_connected;
 	}
-	/*
-	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
+	inline bool is_all_connected_dag(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
 		assert(start >= 0 && end > 0);
 		bool all_connected = true;
-		int offset = 0;
 		for(unsigned i = start; i < end; ++i) {
 			unsigned from = emb.get_vertex(i);
-			offset = is_connected(from, dst, offset);
-			if (offset == -1) {
+			if (!is_connected_dag(dst, from)) {
 				all_connected = false;
 				break;
 			}
 		}
 		return all_connected;
 	}
-	*/
 	// check if vertex a is connected to vertex b in a undirected graph
 	inline bool is_connected(unsigned a, unsigned b) {
 		if (degrees[a] == 0 || degrees[b] == 0) return false;
@@ -159,17 +155,16 @@ protected:
 			key = b;
 			search = a;
 		} 
-		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
-		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		auto begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
+		auto end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
 		//return serial_search(key, begin, end);
 		return binary_search(key, begin, end);
 	}
-	inline int is_connected(unsigned key, unsigned search, unsigned offset) {
-		if (degrees[key] == 0 || degrees[search] == 0) return false;
-		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
-		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
-		int pos = binary_search(key, begin+offset, end-begin-offset);
-		return pos;
+	inline int is_connected_dag(unsigned key, unsigned search) {
+		if (degrees[search] == 0) return false;
+		auto begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
+		auto end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		return binary_search(key, begin, end);
 	}
 	inline bool serial_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
 		for (auto offset = begin; offset != end; ++ offset) {

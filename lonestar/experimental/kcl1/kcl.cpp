@@ -65,14 +65,15 @@ int main(int argc, char** argv) {
 	Graph graph;
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	read_graph(graph, filetype, filename);
+	//read_graph(graph, filetype, filename);
+	read_graph(graph, filetype, filename, false, true);
 	Tinitial.stop();
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	VertexMiner miner(&graph, k);
 	EmbeddingList emb_list;
-	emb_list.init(graph, k);
+	emb_list.init(graph, k, true);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner, emb_list);

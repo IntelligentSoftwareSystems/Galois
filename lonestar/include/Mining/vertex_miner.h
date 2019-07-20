@@ -127,7 +127,8 @@ public:
 		num_emb[pos] = 0;
 		for (auto e : graph->edges(vid)) {
 			GNode dst = graph->getEdgeDst(e);
-			if(vid < dst && is_all_connected(dst, emb, level)) {
+			//if (vid < dst && is_all_connected(dst, emb, level)) {
+			if (is_all_connected_dag(dst, emb, level)) {
 				if (level < max_size-2) num_emb[pos] ++;
 				else num += 1;
 			}
@@ -141,7 +142,8 @@ public:
 		for (auto e : graph->edges(vid)) {
 			GNode dst = graph->getEdgeDst(e);
 			// check if it is a clique
-			if (vid < dst && is_all_connected(dst, emb, level)) {
+			//if (vid < dst && is_all_connected(dst, emb, level)) {
+			if (is_all_connected_dag(dst, emb, level)) {
 				emb_list.set_idx(level+1, start, pos);
 				emb_list.set_vid(level+1, start++, dst);
 			}
