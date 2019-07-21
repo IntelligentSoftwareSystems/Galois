@@ -40,6 +40,7 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::typ
 typedef Graph::GraphNode GNode;
 
 #define USE_PID
+#define USE_WEDGE
 #define USE_SIMPLE
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256

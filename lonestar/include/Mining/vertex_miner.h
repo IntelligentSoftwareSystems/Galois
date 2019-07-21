@@ -89,7 +89,8 @@ public:
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					if (n == 2 && max_size == 4) emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb));
+					if (n == 2 && max_size == 4)
+						emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb, start));
 					emb_list.set_idx(level+1, start, pos);
 					emb_list.set_vid(level+1, start++, dst);
 				}
@@ -111,6 +112,12 @@ public:
 		UintList indices = parallel_prefix_sum(num_new_emb);
 		size_t new_size = indices[indices.size()-1];
 		emb_list.add_level(new_size);
+		#ifdef USE_WEDGE
+		if (level == 1 && max_size == 4) {
+			is_wedge.resize(emb_list.size());
+			std::fill(is_wedge.begin(), is_wedge.end(), 0);
+		}
+		#endif
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& id) {
 				extend_vertex_each_motif(level, id, emb_list, indices);
@@ -224,7 +231,7 @@ public:
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
 					assert(n < 4);
-					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+					unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
 					accumulators[pid] += 1;
 				}
 			}
@@ -243,7 +250,7 @@ public:
 						GNode dst = graph->getEdgeDst(e);
 						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
 							assert(n < 4);
-							unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+							unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
 							accumulators[pid] += 1;
 						}
 					}
@@ -443,42 +450,51 @@ private:
 			if (dst < emb.get_vertex(i)) return true;
 		return false;
 	}
-	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb) {
+	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
 		unsigned pid = 0;
 		if (n == 2) { // count 3-motifs
 			pid = 1; // 3-chain
-			if(idx == 0 && is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
+			if (idx == 0) {
+				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
+				#ifdef USE_WEDGE
+				else if (max_size == 4) is_wedge[pos] = 1; // wedge; used for 4-motif
+				#endif
+			}
 		} else if (n == 3) { // count 4-motifs
 			unsigned num_edges = 1;
 			pid = emb.get_pid();
 			if (pid == 0) { // extending a triangle
-				for (unsigned j = 0; j < n; j ++)
-					if (j != idx && is_connected(emb.get_vertex(j), dst)) num_edges ++;
+				for (unsigned j = idx+1; j < n; j ++)
+					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
 				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
 			} else { // extending a 3-chain
 				assert(pid == 1);
 				std::vector<bool> connected(3, false);
 				connected[idx] = true;
-				for (unsigned j = 0; j < n; j ++) {
-					if (j != idx && is_connected(emb.get_vertex(j), dst)) {
+				for (unsigned j = idx+1; j < n; j ++) {
+					if (is_connected(emb.get_vertex(j), dst)) {
 						num_edges ++;
 						connected[j] = true;
 					}
 				}
 				if (num_edges == 1) {
-					unsigned center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					if (idx == center) {
-						pid = 1; // p1: 3-star
-					} else {
-						pid = 0; // p0: 3-path
-					}
+					pid = 0; // p0: 3-path
+					unsigned center = 1;
+					#ifdef USE_WEDGE
+					if (is_wedge[pos]) center = 0;
+					#else
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					#endif
+					if (idx == center) pid = 1; // p1: 3-star
 				} else if (num_edges == 2) {
-					unsigned center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					if (connected[center]) {
-						pid = 3; // p3: tailed-triangle
-					} else {
-						pid = 2; // p2: 4-cycle
-					}
+					pid = 2; // p2: 4-cycle
+					unsigned center = 1;
+					#ifdef USE_WEDGE
+					if (is_wedge[pos]) center = 0;
+					#else
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					#endif
+					if (connected[center]) pid = 3; // p3: tailed-triangle
 				} else {
 					pid = 4; // p4: diamond
 				}
