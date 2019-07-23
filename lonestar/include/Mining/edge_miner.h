@@ -112,9 +112,11 @@ public:
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-alloc")
 		);
+		Ulong new_size = std::accumulate(num_new_emb.begin(), num_new_emb.end(), (Ulong)0);
+		if (show) std::cout << "new_size = " << new_size << "\n";
+		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
 		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
-		//std::cout << "new_size = " << new_size << "\n";
+		new_size = indices[indices.size()-1];
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
@@ -251,23 +253,24 @@ public:
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				QpMapDomain *lmap = qp_localmaps.getLocal();
+				EdgeEmbedding emb(level+1);
+				get_embedding(level, pos, emb_list, emb);
+				/*
 				VertexId vid = emb_list.get_vid(level, pos);
 				IndexTy idx = emb_list.get_idx(level, pos);
 				BYTE his = emb_list.get_his(level, pos);
 				BYTE lab = graph->getData(vid);
-				EdgeEmbedding emb(level+1);
 				ElementType ele(vid, 0, lab, his);
 				emb.set_element(level, ele);
-				//emb.set_element(level, ElementType(vid, 0, lab, his));
 				for (unsigned l = 1; l <= level; l ++) {
 					vid = emb_list.get_vid(level-l, idx);
 					his = emb_list.get_his(level-l, idx);
 					lab = graph->getData(vid);
 					ElementType ele(vid, 0, lab, his);
 					emb.set_element(level-l, ele);
-					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
 					idx = emb_list.get_idx(level-l, idx);
 				}
+				*/
 				unsigned n = emb.size();
 				QPattern qp(emb);
 				bool qp_existed = false;
@@ -291,44 +294,6 @@ public:
 			galois::loopname("QuickAggregation")
 		);
 	}
-/*
-	inline void quick_aggregate_each(unsigned level, unsigned pos, EmbeddingList& emb_list, QpMapDomain& qp_map) {
-		VertexId vid = emb_list.get_vid(level, pos);
-		IndexTy idx = emb_list.get_idx(level, pos);
-		BYTE his = emb_list.get_his(level, pos);
-		BYTE lab = graph->getData(vid);
-		EdgeEmbedding emb(level+1);
-		//emb.set_element(level, ElementType(vid, 0, lab, his));
-		ElementType ele(vid, 0, lab, his);
-		emb.set_element(level, ele);
-		for (unsigned l = 1; l <= level; l ++) {
-			vid = emb_list.get_vid(level-l, idx);
-			his = emb_list.get_his(level-l, idx);
-			lab = graph->getData(vid);
-			//emb.set_element(level-l, ElementType(vid, 0, lab, his));
-			ElementType ele(vid, 0, lab, his);
-			emb.set_element(level-l, ele);
-			idx = emb_list.get_idx(level-l, idx);
-		}
-		unsigned n = emb.size();
-		QPattern qp(emb);
-		bool qp_existed = false;
-		auto it = qp_map.find(qp);
-		if (it == qp_map.end()) {
-			qp_map[qp] = new DomainSupport(n);
-			qp_map[qp]->set_threshold(threshold);
-			emb_list.set_pid(pos, qp.get_id());
-		} else {
-			qp_existed = true;
-			emb_list.set_pid(pos, (it->first).get_id());
-		}
-		for (unsigned i = 0; i < n; i ++) {
-			if (qp_map[qp]->has_domain_reached_support(i) == false)
-				qp_map[qp]->add_vertex(i, emb.get_vertex(i));
-		}
-		if (qp_existed) qp.clean();
-	}
-*/
 	inline void canonical_aggregate_each(std::pair<QPattern, Frequency> element, CgMapFreq &cg_map) {
 		// turn the quick pattern into its canonical pattern
 		CPattern cg(element.first);
@@ -347,7 +312,7 @@ public:
 		galois::do_all(galois::iterate(qp_map),
 			[&](std::pair<QPattern, DomainSupport*> element) {
 				CgMapDomain *lmap = cg_localmaps.getLocal();
-				unsigned numDomains = element.first.get_size();
+				unsigned num_domains = element.first.get_size();
 				CPattern cg(element.first);
 				int qp_id = element.first.get_id();
 				int cg_id = cg.get_id();
@@ -356,7 +321,7 @@ public:
 				slock.unlock();
 				auto it = lmap->find(cg);
 				if (it == lmap->end()) {
-					(*lmap)[cg] = new DomainSupport(numDomains);
+					(*lmap)[cg] = new DomainSupport(num_domains);
 					(*lmap)[cg]->set_threshold(threshold);
 					element.first.set_cgid(cg.get_id());
 				} else {
@@ -364,10 +329,10 @@ public:
 				}
 				VertexPositionEquivalences equivalences;
 				element.first.get_equivalences(equivalences);
-				for (unsigned i = 0; i < numDomains; i ++) {
+				for (unsigned i = 0; i < num_domains; i ++) {
 					if ((*lmap)[cg]->has_domain_reached_support(i) == false) {
 						unsigned qp_idx = cg.get_quick_pattern_index(i);
-						assert(qp_idx >= 0 && qp_idx < numDomains);
+						assert(qp_idx >= 0 && qp_idx < num_domains);
 						UintSet equ_set = equivalences.get_equivalent_set(qp_idx);
 						for (unsigned idx : equ_set) {
 							DomainSupport *support = element.second;
@@ -430,9 +395,10 @@ public:
 		qp_map = *(qp_localmaps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
 			const QpMapDomain *lmap = qp_localmaps.getLocal(i);
-			for (auto element : *lmap)
+			for (auto element : *lmap) {
 				if (qp_map.find(element.first) == qp_map.end())
 					qp_map[element.first] = element.second;
+			}
 			galois::do_all(galois::iterate(*lmap),
 				[&](std::pair<QPattern, DomainSupport*> element) {
 					DomainSupport *support = element.second;
@@ -455,20 +421,18 @@ public:
 		cg_map = *(cg_localmaps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
 			const CgMapDomain *lmap = cg_localmaps.getLocal(i);
+			for (auto element : *lmap) {
+				if (cg_map.find(element.first) == cg_map.end())
+					cg_map[element.first] = element.second;
+			}
 			galois::do_all(galois::iterate(*lmap),
 				[&](std::pair<CPattern, DomainSupport*> element) {
 					DomainSupport *support = element.second;
-					if (cg_map.find(element.first) == cg_map.end()) {
-						slock.lock();
-						cg_map[element.first] = support;
-						slock.unlock();
-					} else {
-						for (unsigned i = 0; i < num_domains; i ++) {
-							if (!cg_map[element.first]->has_domain_reached_support(i)) {
-								if (support->has_domain_reached_support(i))
-									cg_map[element.first]->set_domain_frequent(i);
-								else cg_map[element.first]->add_vertices(i, support->domain_sets[i]);
-							}
+					for (unsigned i = 0; i < num_domains; i ++) {
+						if (!cg_map[element.first]->has_domain_reached_support(i) && cg_map[element.first] != support) {
+							if (support->has_domain_reached_support(i))
+								cg_map[element.first]->set_domain_frequent(i);
+							else cg_map[element.first]->add_vertices(i, support->domain_sets[i]);
 						}
 					}
 				},

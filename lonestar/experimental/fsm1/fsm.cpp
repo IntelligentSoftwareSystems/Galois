@@ -65,7 +65,6 @@ void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
 	if (show) emb_list.printout_embeddings(level);
 
 	while (1) {
-		if (debug) emb_list.printout_embeddings(level);
 		miner.extend_edge(level, emb_list);
 		level ++;
 		if (show) emb_list.printout_embeddings(level);
