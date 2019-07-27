@@ -127,7 +127,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "9 -> 10;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "10 -> 11;
     if (pop)
     {
