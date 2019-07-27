@@ -88,23 +88,8 @@ public:
 		UintList num_new_emb(emb_list.size());
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
-				VertexId vid = emb_list.get_vid(level, pos);
-				IndexTy idx = emb_list.get_idx(level, pos);
-				BYTE his = emb_list.get_his(level, pos);
-				BYTE lab = graph->getData(vid);
 				EdgeEmbedding emb(level+1);
-				//emb.set_element(level, ElementType(vid, 0, lab, his));
-				ElementType ele(vid, 0, lab, his);
-				emb.set_element(level, ele);
-				for (unsigned l = 1; l <= level; l ++) {
-					vid = emb_list.get_vid(level-l, idx);
-					his = emb_list.get_his(level-l, idx);
-					lab = graph->getData(vid);
-					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
-					ElementType ele(vid, 0, lab, his);
-					emb.set_element(level-l, ele);
-					idx = emb_list.get_idx(level-l, idx);
-				}
+				get_embedding(level, pos, emb_list, emb);
 				num_new_emb[pos] = 0;
 				unsigned n = emb.size();
 				VertexSet vert_set;
@@ -112,7 +97,7 @@ public:
 					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
 				for (unsigned i = 0; i < n; ++i) {
 					VertexId src = emb.get_vertex(i);
-					if (emb.get_key(i) == 0) {
+					if (emb.get_key(i) == 0) { // TODO: need to fix this
 						for (auto e : graph->edges(src)) {
 							GNode dst = graph->getEdgeDst(e);
 							BYTE existed = 0;
@@ -127,31 +112,16 @@ public:
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-alloc")
 		);
+		Ulong new_size = std::accumulate(num_new_emb.begin(), num_new_emb.end(), (Ulong)0);
+		if (show) std::cout << "new_size = " << new_size << "\n";
+		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
 		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
-		//std::cout << "new_size = " << new_size << "\n";
+		new_size = indices[indices.size()-1];
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
-				VertexId vid = emb_list.get_vid(level, pos);
-				IndexTy idx = emb_list.get_idx(level, pos);
-				BYTE his = emb_list.get_his(level, pos);
-				BYTE lab = graph->getData(vid);
-				//BYTE lab = emb_list.get_lab(level, pos);
 				EdgeEmbedding emb(level+1);
-				//emb.set_element(level, ElementType(vid, 0, lab, his));
-				ElementType ele(vid, 0, lab, his);
-				emb.set_element(level, ele);
-				for (unsigned l = 1; l <= level; l ++) {
-					vid = emb_list.get_vid(level-l, idx);
-					his = emb_list.get_his(level-l, idx);
-					//lab = emb_list.get_lab(level-l, idx);
-					lab = graph->getData(vid);
-					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
-					ElementType ele(vid, 0, lab, his);
-					emb.set_element(level-l, ele);
-					idx = emb_list.get_idx(level-l, idx);
-				}
+				get_embedding(level, pos, emb_list, emb);
 				unsigned start = indices[pos];
 				unsigned n = emb.size();
 				VertexSet vert_set;
@@ -233,17 +203,6 @@ public:
 			if (it->second->get_support()) count ++;
 		return count; // return number of frequent single-edge patterns
 	}
-/*
-	inline void quick_aggregate(EdgeEmbeddingQueue &queue, QpMapFreq &qp_map) {
-		for (auto emb : queue) {
-			QPattern qp(emb);
-			if (qp_map.find(qp) != qp_map.end()) {
-				qp_map[qp] += 1;
-				qp.clean();
-			} else qp_map[qp] = 1;
-		}
-	}
-*/
 	// aggregate embeddings into quick patterns
 	inline void quick_aggregate_each(const EdgeEmbedding& emb, QpMapFreq& qp_map) {
 		// turn this embedding into its quick pattern
@@ -257,6 +216,8 @@ public:
 		} else qp_map[qp] = 1;
 	}
 	inline void quick_aggregate(EdgeEmbeddingQueue& queue) {
+		//if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
+		if (show) std::cout << "\n------------------------ Step 2: Aggregating ------------------------\n";
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate(queue),
 			[&](EmbeddingType &emb) {
@@ -286,27 +247,30 @@ public:
 		);
 	}
 	inline void quick_aggregate(unsigned level, EmbeddingList& emb_list) {
+		//if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
+		if (show) std::cout << "\n------------------------ Step 2: Aggregating ------------------------\n";
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				QpMapDomain *lmap = qp_localmaps.getLocal();
+				EdgeEmbedding emb(level+1);
+				get_embedding(level, pos, emb_list, emb);
+				/*
 				VertexId vid = emb_list.get_vid(level, pos);
 				IndexTy idx = emb_list.get_idx(level, pos);
 				BYTE his = emb_list.get_his(level, pos);
 				BYTE lab = graph->getData(vid);
-				EdgeEmbedding emb(level+1);
 				ElementType ele(vid, 0, lab, his);
 				emb.set_element(level, ele);
-				//emb.set_element(level, ElementType(vid, 0, lab, his));
 				for (unsigned l = 1; l <= level; l ++) {
 					vid = emb_list.get_vid(level-l, idx);
 					his = emb_list.get_his(level-l, idx);
 					lab = graph->getData(vid);
 					ElementType ele(vid, 0, lab, his);
 					emb.set_element(level-l, ele);
-					//emb.set_element(level-l, ElementType(vid, 0, lab, his));
 					idx = emb_list.get_idx(level-l, idx);
 				}
+				*/
 				unsigned n = emb.size();
 				QPattern qp(emb);
 				bool qp_existed = false;
@@ -330,44 +294,6 @@ public:
 			galois::loopname("QuickAggregation")
 		);
 	}
-/*
-	inline void quick_aggregate_each(unsigned level, unsigned pos, EmbeddingList& emb_list, QpMapDomain& qp_map) {
-		VertexId vid = emb_list.get_vid(level, pos);
-		IndexTy idx = emb_list.get_idx(level, pos);
-		BYTE his = emb_list.get_his(level, pos);
-		BYTE lab = graph->getData(vid);
-		EdgeEmbedding emb(level+1);
-		//emb.set_element(level, ElementType(vid, 0, lab, his));
-		ElementType ele(vid, 0, lab, his);
-		emb.set_element(level, ele);
-		for (unsigned l = 1; l <= level; l ++) {
-			vid = emb_list.get_vid(level-l, idx);
-			his = emb_list.get_his(level-l, idx);
-			lab = graph->getData(vid);
-			//emb.set_element(level-l, ElementType(vid, 0, lab, his));
-			ElementType ele(vid, 0, lab, his);
-			emb.set_element(level-l, ele);
-			idx = emb_list.get_idx(level-l, idx);
-		}
-		unsigned n = emb.size();
-		QPattern qp(emb);
-		bool qp_existed = false;
-		auto it = qp_map.find(qp);
-		if (it == qp_map.end()) {
-			qp_map[qp] = new DomainSupport(n);
-			qp_map[qp]->set_threshold(threshold);
-			emb_list.set_pid(pos, qp.get_id());
-		} else {
-			qp_existed = true;
-			emb_list.set_pid(pos, (it->first).get_id());
-		}
-		for (unsigned i = 0; i < n; i ++) {
-			if (qp_map[qp]->has_domain_reached_support(i) == false)
-				qp_map[qp]->add_vertex(i, emb.get_vertex(i));
-		}
-		if (qp_existed) qp.clean();
-	}
-*/
 	inline void canonical_aggregate_each(std::pair<QPattern, Frequency> element, CgMapFreq &cg_map) {
 		// turn the quick pattern into its canonical pattern
 		CPattern cg(element.first);
@@ -386,7 +312,7 @@ public:
 		galois::do_all(galois::iterate(qp_map),
 			[&](std::pair<QPattern, DomainSupport*> element) {
 				CgMapDomain *lmap = cg_localmaps.getLocal();
-				unsigned numDomains = element.first.get_size();
+				unsigned num_domains = element.first.get_size();
 				CPattern cg(element.first);
 				int qp_id = element.first.get_id();
 				int cg_id = cg.get_id();
@@ -395,7 +321,7 @@ public:
 				slock.unlock();
 				auto it = lmap->find(cg);
 				if (it == lmap->end()) {
-					(*lmap)[cg] = new DomainSupport(numDomains);
+					(*lmap)[cg] = new DomainSupport(num_domains);
 					(*lmap)[cg]->set_threshold(threshold);
 					element.first.set_cgid(cg.get_id());
 				} else {
@@ -403,10 +329,10 @@ public:
 				}
 				VertexPositionEquivalences equivalences;
 				element.first.get_equivalences(equivalences);
-				for (unsigned i = 0; i < numDomains; i ++) {
+				for (unsigned i = 0; i < num_domains; i ++) {
 					if ((*lmap)[cg]->has_domain_reached_support(i) == false) {
 						unsigned qp_idx = cg.get_quick_pattern_index(i);
-						assert(qp_idx >= 0 && qp_idx < numDomains);
+						assert(qp_idx >= 0 && qp_idx < num_domains);
 						UintSet equ_set = equivalences.get_equivalent_set(qp_idx);
 						for (unsigned idx : equ_set) {
 							DomainSupport *support = element.second;
@@ -469,9 +395,10 @@ public:
 		qp_map = *(qp_localmaps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
 			const QpMapDomain *lmap = qp_localmaps.getLocal(i);
-			for (auto element : *lmap)
+			for (auto element : *lmap) {
 				if (qp_map.find(element.first) == qp_map.end())
 					qp_map[element.first] = element.second;
+			}
 			galois::do_all(galois::iterate(*lmap),
 				[&](std::pair<QPattern, DomainSupport*> element) {
 					DomainSupport *support = element.second;
@@ -494,20 +421,18 @@ public:
 		cg_map = *(cg_localmaps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
 			const CgMapDomain *lmap = cg_localmaps.getLocal(i);
+			for (auto element : *lmap) {
+				if (cg_map.find(element.first) == cg_map.end())
+					cg_map[element.first] = element.second;
+			}
 			galois::do_all(galois::iterate(*lmap),
 				[&](std::pair<CPattern, DomainSupport*> element) {
 					DomainSupport *support = element.second;
-					if (cg_map.find(element.first) == cg_map.end()) {
-						slock.lock();
-						cg_map[element.first] = support;
-						slock.unlock();
-					} else {
-						for (unsigned i = 0; i < num_domains; i ++) {
-							if (!cg_map[element.first]->has_domain_reached_support(i)) {
-								if (support->has_domain_reached_support(i))
-									cg_map[element.first]->set_domain_frequent(i);
-								else cg_map[element.first]->add_vertices(i, support->domain_sets[i]);
-							}
+					for (unsigned i = 0; i < num_domains; i ++) {
+						if (!cg_map[element.first]->has_domain_reached_support(i) && cg_map[element.first] != support) {
+							if (support->has_domain_reached_support(i))
+								cg_map[element.first]->set_domain_frequent(i);
+							else cg_map[element.first]->add_vertices(i, support->domain_sets[i]);
 						}
 					}
 				},
@@ -606,10 +531,10 @@ public:
 		);
 		emb_list.remove_tail(indices.back());
 	}
-
 #endif
 	// Check if the pattern of a given embedding is frequent, if yes, insert it to the queue
 	inline void filter(EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
+		if (show) std::cout << "\n-------------------------- Step 3: Filter ---------------------------\n";
 		galois::do_all(galois::iterate(in_queue),
 			[&](const EdgeEmbedding &emb) {
 				unsigned qp_id = emb.get_qpid();
@@ -636,13 +561,16 @@ public:
 			galois::loopname("Filter-alloc")
 		);
 		UintList indices = parallel_prefix_sum(is_frequent_emb);
+		VertexList vid_list = emb_list.get_vid_list(level);
+		UintList idx_list = emb_list.get_idx_list(level);
+		ByteList his_list = emb_list.get_his_list(level);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				if (is_frequent_emb[pos]) {
 					unsigned start = indices[pos];
-					VertexId vid = emb_list.get_vid(level, pos);
-					IndexTy idx = emb_list.get_idx(level, pos);
-					BYTE his = emb_list.get_his(level, pos);
+					VertexId vid = vid_list[pos];
+					IndexTy idx = idx_list[pos];
+					BYTE his = his_list[pos];
 					emb_list.set_idx(level, start, idx);
 					emb_list.set_vid(level, start, vid);
 					emb_list.set_his(level, start, his);
@@ -652,40 +580,8 @@ public:
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Filter-write")
 		);
+		emb_list.remove_tail(indices.back());
 	}
-
-/*
-	// This is the filter used in RStream, slow
-	void filter_each(const EdgeEmbedding &emb, const CgMapFreq &cg_map, EdgeEmbeddingQueue &out_queue) {
-		// find the quick pattern of this embedding
-		QPattern qp(emb);
-		// find the pattern (canonical graph) of this embedding
-		CPattern cg(qp);
-		qp.clean();
-		// compare the count of this pattern with the threshold
-		// if the pattern is frequent, insert this embedding into the task queue
-		if (cg_map.at(cg) >= threshold) out_queue.push_back(emb);
-		cg.clean();
-	}
-	inline void filter_each(const EdgeEmbedding &emb, const CgMapDomain &cg_map, EdgeEmbeddingQueue &out_queue) {
-		QPattern qp(emb);
-		CPattern cg(qp);
-		qp.clean();
-		bool is_frequent = std::all_of(cg_map.at(cg).first.begin(), cg_map.at(cg).first.end(), [](bool v) { return v; });
-		if (is_frequent) out_queue.push_back(emb);
-		cg.clean();
-	}
-	inline void filter_each(const EdgeEmbedding &emb, const UintMap &id_map, const FreqMap &support_map, EdgeEmbeddingQueue &out_queue) {
-		unsigned qp_id = emb.get_qpid();
-		unsigned cg_id = id_map.at(qp_id);
-		if (support_map.at(cg_id) >= threshold) out_queue.push_back(emb);
-	}
-	inline void filter_each(const EdgeEmbedding &emb, const UintMap &id_map, const DomainMap &support_map, EdgeEmbeddingQueue &out_queue) {
-		unsigned qp_id = emb.get_qpid();
-		unsigned cg_id = id_map.at(qp_id);
-		if (support_map.at(cg_id)) out_queue.push_back(emb);
-	}
-//*/
 	inline void set_threshold(const unsigned minsup) { threshold = minsup; }
 	inline void printout_agg(const CgMapFreq &cg_map) {
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
@@ -745,6 +641,24 @@ private:
 	inline InitPattern get_init_pattern(BYTE src_label, BYTE dst_label) {
 		if (src_label <= dst_label) return std::make_pair(src_label, dst_label);
 		else return std::make_pair(dst_label, src_label);
+	}
+	inline void get_embedding(unsigned level, unsigned pos, const EmbeddingList& emb_list, EdgeEmbedding &emb) {
+		VertexId vid = emb_list.get_vid(level, pos);
+		IndexTy idx = emb_list.get_idx(level, pos);
+		BYTE his = emb_list.get_his(level, pos);
+		BYTE lab = graph->getData(vid);
+		//emb.set_element(level, ElementType(vid, 0, lab, his));
+		ElementType ele(vid, 0, lab, his);
+		emb.set_element(level, ele);
+		for (unsigned l = 1; l <= level; l ++) {
+			vid = emb_list.get_vid(level-l, idx);
+			his = emb_list.get_his(level-l, idx);
+			lab = graph->getData(vid);
+			//emb.set_element(level-l, ElementType(vid, 0, lab, his));
+			ElementType ele(vid, 0, lab, his);
+			emb.set_element(level-l, ele);
+			idx = emb_list.get_idx(level-l, idx);
+		}
 	}
 	bool is_quick_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed) {
 		if (dst <= emb.get_vertex(0)) return true;

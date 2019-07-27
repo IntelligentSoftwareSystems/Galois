@@ -4,9 +4,10 @@
 #include "canonical_graph.h"
 #include "types.h"
 
-inline UintList parallel_prefix_sum(const UintList &degrees) {
-	UintList sums(degrees.size() + 1);
-	int total = 0;
+template <typename T>
+inline galois::gstl::Vector<T> parallel_prefix_sum(const galois::gstl::Vector<T> &degrees) {
+	galois::gstl::Vector<T> sums(degrees.size() + 1);
+	T total = 0;
 	for (size_t n = 0; n < degrees.size(); n++) {
 		sums[n] = total;
 		total += degrees[n];

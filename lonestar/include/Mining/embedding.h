@@ -30,8 +30,10 @@
 #include "galois/Galois.h"
 
 typedef unsigned IndexTy;
+typedef unsigned long Ulong;
 typedef galois::gstl::Vector<BYTE> ByteList;
 typedef galois::gstl::Vector<unsigned> UintList;
+typedef galois::gstl::Vector<Ulong> UlongList;
 typedef galois::gstl::Vector<VertexId> VertexList;
 typedef galois::gstl::Vector<UintList> IndexLists;
 typedef galois::gstl::Vector<ByteList> ByteLists;
@@ -201,8 +203,8 @@ class EmbeddingQueue : public galois::InsertBag<EmbeddingTy> {
 public:
 	void printout_embeddings(int level, bool verbose = false) {
 		int num_embeddings = std::distance(this->begin(), this->end());
-		unsigned embedding_size = (level+2)* sizeof(ElementType);
-		std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size = " << embedding_size << " Bytes)" << std::endl;
+		//unsigned embedding_size = (level+1)* sizeof(ElementType);
+		std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << std::endl;
 		if(verbose) for (auto emb : *this) std::cout << emb << "\n";
 	}
 	void clean() { for (auto emb : *this) emb.clean(); this->clear(); }
@@ -257,6 +259,8 @@ public:
 	size_t size() const { return vid_lists[last_level].size(); }
 	size_t size(unsigned level) const { return vid_lists[level].size(); }
 	VertexList get_vid_list(unsigned level) { return vid_lists[level]; }
+	UintList get_idx_list(unsigned level) { return idx_lists[level]; }
+	ByteList get_his_list(unsigned level) { return his_lists[level]; }
 	void remove_tail(unsigned idx) {
 		vid_lists[last_level].erase(vid_lists[last_level].begin()+idx, vid_lists[last_level].end());
 		#ifdef ENABLE_LABEL
@@ -264,7 +268,7 @@ public:
 		//lab_lists[last_level].erase(lab_lists[last_level].begin()+idx, lab_lists[last_level].end());
 		#endif
 	}
-	void add_level(unsigned size) {
+	void add_level(unsigned size) { // TODO: this size could be larger than 2^32, when running LiveJournal and even larger graphs
 		last_level ++;
 		assert(last_level < max_level);
 		vid_lists[last_level].resize(size);

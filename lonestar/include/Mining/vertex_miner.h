@@ -64,53 +64,34 @@ public:
 			}
 		}
 	}
-	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list) {
-		VertexEmbedding emb(level+1);
-		get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-		num_new_emb[pos] = 0;
-		unsigned n = emb.size();
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					num_new_emb[pos] ++;
-				}
-			}
-		}
-	}
-	inline void extend_vertex_each_motif(unsigned level, unsigned pos, EmbeddingList& emb_list, const UintList& indices) {
-		VertexEmbedding emb(level+1);
-		get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-		unsigned start = indices[pos];
-		unsigned n = emb.size();
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					if (n == 2 && max_size == 4)
-						emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb, start));
-					emb_list.set_idx(level+1, start, pos);
-					emb_list.set_vid(level+1, start++, dst);
-				}
-			}
-		}
-	}
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list) {
-		num_new_emb.clear();
-		num_new_emb.resize(emb_list.size());
+		UintList num_new_emb(emb_list.size());
+		//UlongList num_new_emb(emb_list.size());
 		// for each embedding, do vertex-extension
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
-			[&](const size_t& id) {
-				extend_vertex_each(level, id, emb_list);
+			[&](const size_t& pos) {
+				VertexEmbedding emb(level+1);
+				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
+				num_new_emb[pos] = 0;
+				unsigned n = emb.size();
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					for (auto e : graph->edges(src)) {
+						GNode dst = graph->getEdgeDst(e);
+						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+							num_new_emb[pos] ++;
+						}
+					}
+				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-alloc")
 		);
-		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
+		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
+		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		auto new_size = indices.back();
+		std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
 		#ifdef USE_WEDGE
 		if (level == 1 && max_size == 4) {
@@ -119,61 +100,70 @@ public:
 		}
 		#endif
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				extend_vertex_each_motif(level, id, emb_list, indices);
+			[&](const size_t& pos) {
+				VertexEmbedding emb(level+1);
+				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
+				auto start = indices[pos];
+				auto n = emb.size();
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					for (auto e : graph->edges(src)) {
+						GNode dst = graph->getEdgeDst(e);
+						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+							assert(start < indices.back());
+							if (n == 2 && max_size == 4)
+								emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb, start));
+							emb_list.set_idx(level+1, start, pos);
+							emb_list.set_vid(level+1, start++, dst);
+						}
+					}
+				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-insert")
 		);
 	}
-	inline void extend_vertex_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, UintList& num_emb, UlongAccu &num) {
-		BaseEmbedding emb(level+1);
-		get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
-		VertexId vid = emb_list.get_vid(level, pos);
-		num_emb[pos] = 0;
-		for (auto e : graph->edges(vid)) {
-			GNode dst = graph->getEdgeDst(e);
-			//if (vid < dst && is_all_connected(dst, emb, level)) {
-			if (is_all_connected_dag(dst, emb, level)) {
-				if (level < max_size-2) num_emb[pos] ++;
-				else num += 1;
-			}
-		}
-	}
-	inline void extend_vertex_each(unsigned level, unsigned pos, EmbeddingList& emb_list, const UintList& indices) {
-		BaseEmbedding emb(level+1);
-		get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
-		VertexId vid = emb_list.get_vid(level, pos);
-		unsigned start = indices[pos];
-		for (auto e : graph->edges(vid)) {
-			GNode dst = graph->getEdgeDst(e);
-			// check if it is a clique
-			//if (vid < dst && is_all_connected(dst, emb, level)) {
-			if (is_all_connected_dag(dst, emb, level)) {
-				emb_list.set_idx(level+1, start, pos);
-				emb_list.set_vid(level+1, start++, dst);
-			}
-		}
-	}
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list, UlongAccu &num) {
-		//UintList num_new_emb;
-		num_new_emb.clear();
-		num_new_emb.resize(emb_list.size());
+		UintList num_new_emb(emb_list.size());
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
-			[&](const size_t& id) {
-				extend_vertex_each(level, id, emb_list, num_new_emb, num);
+			[&](const size_t& pos) {
+				BaseEmbedding emb(level+1);
+				get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
+				VertexId vid = emb_list.get_vid(level, pos);
+				num_new_emb[pos] = 0;
+				for (auto e : graph->edges(vid)) {
+					GNode dst = graph->getEdgeDst(e);
+					//if (vid < dst && is_all_connected(dst, emb, level)) {
+					if (is_all_connected_dag(dst, emb, level)) {
+						if (level < max_size-2) num_new_emb[pos] ++;
+						else num += 1;
+					}
+				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("Extending-alloc")
 		);
 		if (level == max_size-2) return;
-		UintList indices = parallel_prefix_sum(num_new_emb);
-		size_t new_size = indices[indices.size()-1];
+		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
+		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		auto new_size = indices.back();
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				extend_vertex_each(level, id, emb_list, indices);
+			[&](const size_t& pos) {
+				BaseEmbedding emb(level+1);
+				get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
+				VertexId vid = emb_list.get_vid(level, pos);
+				unsigned start = indices[pos];
+				for (auto e : graph->edges(vid)) {
+					GNode dst = graph->getEdgeDst(e);
+					// check if it is a clique
+					//if (vid < dst && is_all_connected(dst, emb, level)) {
+					if (is_all_connected_dag(dst, emb, level)) {
+						emb_list.set_idx(level+1, start, pos);
+						emb_list.set_vid(level+1, start++, dst);
+					}
+				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("Extending-insert")
@@ -414,7 +404,6 @@ private:
 	//unsigned num_cliques;
 	unsigned max_size;
 	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
-	UintList num_new_emb;
 	StrQpMapFreq qp_map; // quick patterns map for counting the frequency
 	StrCgMapFreq cg_map; // canonical graph map for couting the frequency
 	LocalStrQpMapFreq qp_localmaps; // quick patterns local map for each thread

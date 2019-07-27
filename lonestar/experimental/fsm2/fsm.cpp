@@ -37,7 +37,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<file type>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<file name>"), cll::Required);
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
-static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
+static cll::opt<unsigned> minsup("ms", cll::desc("minimum suuport (default value 0)"), cll::init(0));
 static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
 typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
