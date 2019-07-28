@@ -23,7 +23,7 @@ CXX_FLAGS="-g -Wall -gcc-toolchain $GCC_BIN/.. -fopenmp -fcolor-diagnostics -O3 
 
 GGC_FLAGS=" --cuda-worklist basic --cuda-graph basic --opt parcomb "
 if [[ $1 == *"bfs"* || $1 == *"sssp"* || $1 == *"cc"* || $1 == *"pagerank_pull"* || $1 == *"kcore"*  ]]; then
-	GGC_FLAGS+=" --opt np --npf 8 --opt tb_lb --cuda_graph basic"
+	GGC_FLAGS+=" --opt np --npf 8 --opt dyn_lb --cuda_graph basic"
 else
 	GGC_FLAGS+=" --opt np --npf 8 --cuda_graph basic"
 fi

@@ -7,7 +7,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=False $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 bool enable_lb = false;
 #include "kernels/reduce.cuh"
 #include "pagerank_push_cuda.cuh"
@@ -127,7 +127,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "9 -> 10;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "10 -> 11;
     if (pop)
     {

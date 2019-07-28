@@ -7,7 +7,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=True $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 struct ThreadWork t_work;
 bool enable_lb = true;
 #include "kernels/reduce.cuh"
@@ -179,44 +179,7 @@ __global__ void KCore_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int _
   }
   // FP: "45 -> 46;
 }
-__global__ void Inspect_KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, DynamicBitset& bitset_trim, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  index_type src_end;
-  // FP: "1 -> 2;
-  src_end = __end;
-  for (index_type src = __begin + tid; src < src_end; src += nthreads)
-  {
-    int index;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
-    if (pop)
-    {
-      if (p_flag[src])
-      {
-      }
-      else
-      {
-        pop = false;
-      }
-    }
-    if (!pop)
-    {
-      continue;
-    }
-    if (pop)
-    {
-      index = thread_work_wl.in_wl().push_range(1) ;
-      thread_src_wl.in_wl().push_range(1);
-      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
-      thread_src_wl.in_wl().dwl[index] = src;
-    }
-  }
-  // FP: "16 -> 17;
-}
-__global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, DynamicBitset& bitset_trim, bool enable_lb)
+__global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, DynamicBitset& bitset_trim, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -243,10 +206,11 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
+    int index;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
@@ -260,49 +224,61 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
     }
     // FP: "12 -> 13;
     // FP: "15 -> 16;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
     // FP: "16 -> 17;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    int threshold = TOTAL_THREADS_1D;
     // FP: "17 -> 18;
+    if (pop && (graph).getOutDegree(src) >= threshold)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+      pop = false;
+    }
+    // FP: "20 -> 21;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "21 -> 22;
+    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    // FP: "22 -> 23;
     _np_closure[threadIdx.x].src = src;
-    // FP: "18 -> 19;
+    // FP: "23 -> 24;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "21 -> 22;
-    // FP: "22 -> 23;
+    // FP: "26 -> 27;
+    // FP: "27 -> 28;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "23 -> 24;
+    // FP: "28 -> 29;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "24 -> 25;
+    // FP: "29 -> 30;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "27 -> 28;
+    // FP: "32 -> 33;
     __syncthreads();
-    // FP: "28 -> 29;
+    // FP: "33 -> 34;
     while (true)
     {
-      // FP: "29 -> 30;
+      // FP: "34 -> 35;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "32 -> 33;
+      // FP: "37 -> 38;
       __syncthreads();
-      // FP: "33 -> 34;
+      // FP: "38 -> 39;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "34 -> 35;
+        // FP: "39 -> 40;
         __syncthreads();
-        // FP: "35 -> 36;
+        // FP: "40 -> 41;
         break;
       }
-      // FP: "37 -> 38;
+      // FP: "42 -> 43;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -311,20 +287,20 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "40 -> 41;
+      // FP: "45 -> 46;
       __syncthreads();
-      // FP: "41 -> 42;
+      // FP: "46 -> 47;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "42 -> 43;
+      // FP: "47 -> 48;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "45 -> 46;
+      // FP: "50 -> 51;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "46 -> 47;
+      // FP: "51 -> 52;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type current_edge;
@@ -339,17 +315,17 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
           }
         }
       }
-      // FP: "56 -> 57;
+      // FP: "61 -> 62;
       __syncthreads();
     }
-    // FP: "58 -> 59;
+    // FP: "63 -> 64;
 
-    // FP: "59 -> 60;
+    // FP: "64 -> 65;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "60 -> 61;
+      // FP: "65 -> 66;
       const int _np_laneid = cub::LaneId();
-      // FP: "61 -> 62;
+      // FP: "66 -> 67;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -383,28 +359,28 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
           }
         }
       }
-      // FP: "81 -> 82;
+      // FP: "86 -> 87;
       __syncthreads();
-      // FP: "82 -> 83;
+      // FP: "87 -> 88;
     }
 
-    // FP: "83 -> 84;
+    // FP: "88 -> 89;
     __syncthreads();
-    // FP: "84 -> 85;
+    // FP: "89 -> 90;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "85 -> 86;
+    // FP: "90 -> 91;
     while (_np.work())
     {
-      // FP: "86 -> 87;
+      // FP: "91 -> 92;
       int _np_i =0;
-      // FP: "87 -> 88;
+      // FP: "92 -> 93;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "88 -> 89;
+      // FP: "93 -> 94;
       __syncthreads();
-      // FP: "89 -> 90;
+      // FP: "94 -> 95;
 
-      // FP: "90 -> 91;
+      // FP: "95 -> 96;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type current_edge;
@@ -421,16 +397,16 @@ __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, 
           }
         }
       }
-      // FP: "101 -> 102;
+      // FP: "106 -> 107;
       _np.execute_round_done(ITSIZE);
-      // FP: "102 -> 103;
+      // FP: "107 -> 108;
       __syncthreads();
     }
-    // FP: "104 -> 105;
+    // FP: "109 -> 110;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "106 -> 107;
+  // FP: "111 -> 112;
 }
 __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, HGAccumulator<uint64_t> active_vertices)
 {
@@ -579,11 +555,10 @@ void KCore_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
+  KCore <<<blocks, __tb_KCore>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->trim.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+  cudaDeviceSynchronize();
   if (enable_lb)
   {
-    t_work.reset_thread_work();
-    Inspect_KCore <<<blocks, __tb_KCore>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->trim.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
-    cudaDeviceSynchronize();
     int num_items = t_work.thread_work_wl.in_wl().nitems();
     if (num_items != 0)
     {
@@ -591,10 +566,9 @@ void KCore_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*
       cudaDeviceSynchronize();
       KCore_TB_LB <<<blocks, __tb_KCore>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->trim.is_updated.gpu_rd_ptr()), t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
       cudaDeviceSynchronize();
+      t_work.reset_thread_work();
     }
   }
-  KCore <<<blocks, __tb_KCore>>>(ctx->gg, __begin, __end, ctx->flag.data.gpu_wr_ptr(), ctx->pull_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->trim.is_updated.gpu_rd_ptr()), enable_lb);
-  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

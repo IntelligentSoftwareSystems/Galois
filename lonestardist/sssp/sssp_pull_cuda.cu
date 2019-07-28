@@ -7,7 +7,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=True $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 struct ThreadWork t_work;
 bool enable_lb = true;
 #include "kernels/reduce.cuh"
@@ -115,43 +115,7 @@ __global__ void SSSP_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __
   }
   // FP: "49 -> 50;
 }
-__global__ void Inspect_SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
-  index_type src_end;
-  // FP: "1 -> 2;
-  // FP: "2 -> 3;
-  active_vertices.thread_entry();
-  // FP: "3 -> 4;
-  src_end = __end;
-  for (index_type src = __begin + tid; src < src_end; src += nthreads)
-  {
-    int index;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
-    if (pop)
-    {
-    }
-    if (!pop)
-    {
-      continue;
-    }
-    if (pop)
-    {
-      index = thread_work_wl.in_wl().push_range(1) ;
-      thread_src_wl.in_wl().push_range(1);
-      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
-      thread_src_wl.in_wl().dwl[index] = src;
-    }
-  }
-  // FP: "15 -> 16;
-  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
-  // FP: "16 -> 17;
-}
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices, bool enable_lb)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -182,59 +146,72 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
+    int index;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "8 -> 9;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "9 -> 10;
     if (pop)
     {
     }
     // FP: "11 -> 12;
     // FP: "14 -> 15;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
     // FP: "15 -> 16;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    int threshold = TOTAL_THREADS_1D;
     // FP: "16 -> 17;
+    if (pop && (graph).getOutDegree(src) >= threshold)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+      pop = false;
+    }
+    // FP: "19 -> 20;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "20 -> 21;
+    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    // FP: "21 -> 22;
     _np_closure[threadIdx.x].src = src;
-    // FP: "17 -> 18;
+    // FP: "22 -> 23;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "20 -> 21;
-    // FP: "21 -> 22;
+    // FP: "25 -> 26;
+    // FP: "26 -> 27;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "22 -> 23;
+    // FP: "27 -> 28;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "23 -> 24;
+    // FP: "28 -> 29;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "26 -> 27;
+    // FP: "31 -> 32;
     __syncthreads();
-    // FP: "27 -> 28;
+    // FP: "32 -> 33;
     while (true)
     {
-      // FP: "28 -> 29;
+      // FP: "33 -> 34;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "31 -> 32;
+      // FP: "36 -> 37;
       __syncthreads();
-      // FP: "32 -> 33;
+      // FP: "37 -> 38;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "33 -> 34;
+        // FP: "38 -> 39;
         __syncthreads();
-        // FP: "34 -> 35;
+        // FP: "39 -> 40;
         break;
       }
-      // FP: "36 -> 37;
+      // FP: "41 -> 42;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -243,20 +220,20 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "39 -> 40;
+      // FP: "44 -> 45;
       __syncthreads();
-      // FP: "40 -> 41;
+      // FP: "45 -> 46;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "41 -> 42;
+      // FP: "46 -> 47;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "44 -> 45;
+      // FP: "49 -> 50;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "45 -> 46;
+      // FP: "50 -> 51;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -275,17 +252,17 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           }
         }
       }
-      // FP: "59 -> 60;
+      // FP: "64 -> 65;
       __syncthreads();
     }
-    // FP: "61 -> 62;
+    // FP: "66 -> 67;
 
-    // FP: "62 -> 63;
+    // FP: "67 -> 68;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "63 -> 64;
+      // FP: "68 -> 69;
       const int _np_laneid = cub::LaneId();
-      // FP: "64 -> 65;
+      // FP: "69 -> 70;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -323,28 +300,28 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           }
         }
       }
-      // FP: "88 -> 89;
+      // FP: "93 -> 94;
       __syncthreads();
-      // FP: "89 -> 90;
+      // FP: "94 -> 95;
     }
 
-    // FP: "90 -> 91;
+    // FP: "95 -> 96;
     __syncthreads();
-    // FP: "91 -> 92;
+    // FP: "96 -> 97;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "92 -> 93;
+    // FP: "97 -> 98;
     while (_np.work())
     {
-      // FP: "93 -> 94;
+      // FP: "98 -> 99;
       int _np_i =0;
-      // FP: "94 -> 95;
+      // FP: "99 -> 100;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "95 -> 96;
+      // FP: "100 -> 101;
       __syncthreads();
-      // FP: "96 -> 97;
+      // FP: "101 -> 102;
 
-      // FP: "97 -> 98;
+      // FP: "102 -> 103;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -365,18 +342,18 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           }
         }
       }
-      // FP: "112 -> 113;
+      // FP: "117 -> 118;
       _np.execute_round_done(ITSIZE);
-      // FP: "113 -> 114;
+      // FP: "118 -> 119;
       __syncthreads();
     }
-    // FP: "115 -> 116;
+    // FP: "120 -> 121;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "117 -> 118;
+  // FP: "122 -> 123;
   active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
-  // FP: "118 -> 119;
+  // FP: "123 -> 124;
 }
 __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGAccumulator<uint64_t> dg_avg, HGReduceMax<uint32_t> DGMax)
 {
@@ -471,11 +448,10 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active
   // FP: "7 -> 8;
   _active_vertices.rv = active_verticesval.gpu_wr_ptr();
   // FP: "8 -> 9;
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+  cudaDeviceSynchronize();
   if (enable_lb)
   {
-    t_work.reset_thread_work();
-    Inspect_SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
-    cudaDeviceSynchronize();
     int num_items = t_work.thread_work_wl.in_wl().nitems();
     if (num_items != 0)
     {
@@ -483,10 +459,9 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active
       cudaDeviceSynchronize();
       SSSP_TB_LB <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
       cudaDeviceSynchronize();
+      t_work.reset_thread_work();
     }
   }
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, enable_lb);
-  cudaDeviceSynchronize();
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
