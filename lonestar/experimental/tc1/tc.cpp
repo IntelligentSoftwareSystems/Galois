@@ -69,6 +69,9 @@ int main(int argc, char** argv) {
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
 
+	ResourceManager rm;
+	//galois::preAlloc(600);
+	galois::reportPageAlloc("MemInfoPre");
 	VertexMiner miner(&graph);
 	EmbeddingList emb_list;
 	emb_list.init(graph, 2, true);
@@ -76,5 +79,7 @@ int main(int argc, char** argv) {
 	Tcomp.start();
 	TcSolver(miner, emb_list);
 	Tcomp.stop();
+	galois::reportPageAlloc("MemInfoPost");
+	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

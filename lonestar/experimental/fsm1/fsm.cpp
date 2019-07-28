@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
 	//std::cout << "num_threads = " << numThreads << std::endl;
 
 	assert(k > 1);
+	ResourceManager rm;
 	EdgeMiner miner(&graph);
 	miner.set_threshold(minsup);
 	EmbeddingList emb_list;
@@ -108,5 +109,6 @@ int main(int argc, char** argv) {
 	Tcomp.start();
 	FsmSolver(miner, emb_list);
 	Tcomp.stop();
+	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

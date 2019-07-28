@@ -31,6 +31,16 @@ public:
 	MGraph() : need_relabel_edges(false), need_dag(false), symmetrize_(false), directed_(false) {}
 	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), need_dag(false), symmetrize_(false), directed_(false) {}
 	MGraph(bool relabel_edges, bool dag) : need_relabel_edges(relabel_edges), need_dag(dag), symmetrize_(false), directed_(false) {}
+	void clean() {
+		el.clear();
+		delete[] rowptr_;
+		delete[] colidx_;
+		delete[] weight_;
+		rank.clear();
+		degrees.clear();
+		labels_.clear();
+		vertices.clear();
+	}
 	IndexT * out_rowptr() const { return rowptr_; }
 	IndexT * out_colidx() const { return colidx_; }
 	ValueT * labels() { return labels_.data(); }

@@ -72,13 +72,7 @@ void MotifSolver(VertexMiner &miner) {
 		level ++;
 	}
 	if (k < 5) {
-		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingType& emb) {
-				miner.aggregate_each(emb, accumulators);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
-		);
+		miner.aggregate(queue, accumulators);
 		miner.printout_motifs(accumulators);
 /*
 	} else if (k > 6 && k < 9) { // use matrix eigenvalue (characteristic polynomial) to do isomorphism check

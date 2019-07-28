@@ -64,6 +64,7 @@ public:
 			}
 		}
 	}
+	// extension for vertex-induced motif
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list) {
 		UintList num_new_emb(emb_list.size());
 		//UlongList num_new_emb(emb_list.size());
@@ -90,6 +91,7 @@ public:
 		);
 		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
 		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		num_new_emb.clear();
 		auto new_size = indices.back();
 		std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
@@ -123,7 +125,9 @@ public:
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-insert")
 		);
+		indices.clear();
 	}
+	// extension for vertex-induced clique
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list, UlongAccu &num) {
 		UintList num_new_emb(emb_list.size());
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
@@ -147,6 +151,7 @@ public:
 		if (level == max_size-2) return;
 		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
 		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		num_new_emb.clear();
 		auto new_size = indices.back();
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
@@ -168,7 +173,10 @@ public:
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("Extending-insert")
 		);
+		indices.clear();
 	}
+
+	// Step 2: Reduction (aggregation)
 	inline void aggregate_all(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
 		SimpleMap simple_agg;
 		for (const BaseEmbedding emb : in_queue) {
@@ -196,37 +204,43 @@ public:
 		}
 		else sm[emb] = 1;
 	}
-	inline void aggregate_each(const VertexEmbedding &emb, std::vector<UlongAccu> &accumulators) {
+	inline void aggregate(VertexEmbeddingQueue &queue, std::vector<UlongAccu> &accumulators) {
+		galois::do_all(galois::iterate(queue),
+			[&](const VertexEmbedding& emb) {
+				unsigned n = emb.size();
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					for (auto e : graph->edges(src)) {
+						GNode dst = graph->getEdgeDst(e);
+						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+							assert(n < 4);
+							unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+							accumulators[pid] += 1;
+						}
+					}
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
+		);
+	}
+	/*
+	inline void aggregate_each(const VertexEmbedding &emb, UintMap &p_map) {
 		unsigned n = emb.size();
+		assert(n >= 4);
 		for (unsigned i = 0; i < n; ++i) {
 			VertexId src = emb.get_vertex(i);
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					assert(n < 4);
 					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
-					accumulators[pid] += 1;
+					if (p_map.find(pid) != p_map.end()) p_map[pid] += 1;
+					else p_map[pid] = 1;
 				}
 			}
 		}
 	}
-	inline void aggregate_each(unsigned level, unsigned pos, EmbeddingList& emb_list, std::vector<UlongAccu> &accumulators) {
-		VertexEmbedding emb(level+1);
-		get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-		unsigned n = emb.size();
-		if (n == 3) emb.set_pid(emb_list.get_pid(pos));
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					assert(n < 4);
-					unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
-					accumulators[pid] += 1;
-				}
-			}
-		}
-	}
+	//*/
 	inline void aggregate(unsigned level, EmbeddingList& emb_list, std::vector<UlongAccu> &accumulators) {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
@@ -245,78 +259,35 @@ public:
 						}
 					}
 				}
+				emb.clean();
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Reduce")
 		);
 	}
-	inline void aggregate_each(const VertexEmbedding &emb, UintMap &p_map) {
-		unsigned n = emb.size();
-		assert(n >= 4);
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					unsigned pid = find_motif_pattern_id(n, i, dst, emb);
-					if (p_map.find(pid) != p_map.end()) p_map[pid] += 1;
-					else p_map[pid] = 1;
-				}
-			}
-		}
-	}
-	inline void quick_aggregate_each(const VertexEmbedding& emb, StrQpMapFreq& qp_map) {
-		unsigned n = emb.size();
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					std::vector<bool> connected;
-					get_connectivity(n, i, dst, emb, connected);
-					StrQPattern qp(n+1, connected);
-					if (qp_map.find(qp) != qp_map.end()) {
-						qp_map[qp] += 1;
-						qp.clean();
-					} else qp_map[qp] = 1;
-				}
-			}
-		}
-	}
-	inline void quick_aggregate_each(unsigned level, unsigned pos, const EmbeddingList& emb_list, StrQpMapFreq& qp_map) {
-		VertexEmbedding emb(level+1);
-		get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-		unsigned n = emb.size();
-		for (unsigned i = 0; i < n; ++i) {
-			VertexId src = emb.get_vertex(i);
-			for (auto e : graph->edges(src)) {
-				GNode dst = graph->getEdgeDst(e);
-				if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
-					std::vector<bool> connected;
-					get_connectivity(n, i, dst, emb, connected);
-					StrQPattern qp(n+1, connected);
-					if (qp_map.find(qp) != qp_map.end()) {
-						qp_map[qp] += 1;
-						qp.clean();
-					} else qp_map[qp] = 1;
-				}
-			}
-		}
-	}
-	inline void canonical_aggregate_each(const StrQPattern &qp, Frequency freq, StrCgMapFreq &cg_map) {
-		StrCPattern cg(qp);
-		//qp.clean();
-		if (cg_map.find(cg) != cg_map.end()) cg_map[cg] += freq;
-		else cg_map[cg] = freq;
-		cg.clean();
-	}
 	// quick pattern aggregation
 	inline void quick_aggregate(VertexEmbeddingQueue &queue) {
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
-				quick_aggregate_each(emb, *(qp_localmaps.getLocal())); // quick pattern aggregation
+				StrQpMapFreq *qp_map = qp_localmaps.getLocal();
+				unsigned n = emb.size();
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					for (auto e : graph->edges(src)) {
+						GNode dst = graph->getEdgeDst(e);
+						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+							std::vector<bool> connected;
+							get_connectivity(n, i, dst, emb, connected);
+							StrQPattern qp(n+1, connected);
+							if (qp_map->find(qp) != qp_map->end()) {
+								(*qp_map)[qp] += 1;
+								qp.clean();
+							} else (*qp_map)[qp] = 1;
+						}
+					}
+				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -326,8 +297,27 @@ public:
 	inline void quick_aggregate(unsigned level, const EmbeddingList& emb_list) {
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& id) {
-				quick_aggregate_each(level, id, emb_list, *(qp_localmaps.getLocal()));
+			[&](const size_t& pos) {
+				StrQpMapFreq* qp_map = qp_localmaps.getLocal();
+				VertexEmbedding emb(level+1);
+				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
+				unsigned n = emb.size();
+				for (unsigned i = 0; i < n; ++i) {
+					VertexId src = emb.get_vertex(i);
+					for (auto e : graph->edges(src)) {
+						GNode dst = graph->getEdgeDst(e);
+						if (!is_vertexInduced_automorphism(emb, i, src, dst)) {
+							std::vector<bool> connected;
+							get_connectivity(n, i, dst, emb, connected);
+							StrQPattern qp(n+1, connected);
+							if (qp_map->find(qp) != qp_map->end()) {
+								(*qp_map)[qp] += 1;
+								qp.clean();
+							} else (*qp_map)[qp] = 1;
+						}
+					}
+				}
+				emb.clean();
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -338,13 +328,19 @@ public:
 	inline void canonical_aggregate() {
 		for (auto i = 0; i < numThreads; i++) cg_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate(qp_map),
-			[&](auto& qp) {
-				canonical_aggregate_each(qp.first, qp.second, *(cg_localmaps.getLocal()));
+			[&](auto& element) {
+				StrCgMapFreq* cg_map = cg_localmaps.getLocal();
+				StrCPattern cg(element.first);
+				if (cg_map->find(cg) != cg_map->end()) (*cg_map)[cg] += element.second;
+				else (*cg_map)[cg] = element.second;
+				cg.clean();
+
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalAggregation")
 		);
+		qp_map.clear();
 	}
 	inline void merge_qp_map() {
 		qp_map.clear();
@@ -368,6 +364,8 @@ public:
 			}
 		}
 	}
+
+	// Utilities
 	//inline unsigned get_total_num_cliques() { return num_cliques; }
 	void printout_motifs(std::vector<UlongAccu> &accumulators) {
 		std::cout << std::endl;

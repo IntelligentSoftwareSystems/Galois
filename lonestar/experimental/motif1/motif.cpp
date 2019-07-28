@@ -84,6 +84,7 @@ int main(int argc, char** argv) {
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	assert(k > 2);
+	ResourceManager rm;
 	VertexMiner miner(&graph, k);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k);
@@ -91,5 +92,6 @@ int main(int argc, char** argv) {
 	Tcomp.start();
 	MotifSolver(miner, emb_list);
 	Tcomp.stop();
+	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }
