@@ -40,6 +40,7 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_DAG
 #define USE_SIMPLE
 #define CHUNK_SIZE 256
 #define USE_BASE_TYPES
@@ -63,10 +64,14 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
+	bool need_dag = false;
+	#ifdef USE_DAG
+	galois::gPrint("Orientation enabled, using DAG\n");
+	need_dag = true;
+	#endif
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	//read_graph(graph, filetype, filename);
-	read_graph(graph, filetype, filename, false, true);
+	read_graph(graph, filetype, filename, false, need_dag);
 	Tinitial.stop();
 	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
@@ -74,7 +79,10 @@ int main(int argc, char** argv) {
 	ResourceManager rm;
 	VertexMiner miner(&graph, k);
 	EmbeddingList emb_list;
-	emb_list.init(graph, k, true);
+	galois::StatTimer Tinitemb("EmbListInitTime");
+	Tinitemb.start();
+	emb_list.init(graph, k, need_dag);
+	Tinitemb.stop();
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	KclSolver(miner, emb_list);

@@ -68,7 +68,7 @@ void FsmSolver(EdgeMiner &miner) {
 		level ++;
 		queue.clear();
 		miner.extend_edge(filtered_queue, queue);
-		if (debug) queue.printout_embeddings(level);
+		if (show) queue.printout_embeddings(level, debug);
 
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
 		miner.quick_aggregate(queue);
@@ -85,7 +85,7 @@ void FsmSolver(EdgeMiner &miner) {
 
 		filtered_queue.clear();
 		miner.filter(queue, filtered_queue);
-		if (show) filtered_queue.printout_embeddings(level);
+		if (show) filtered_queue.printout_embeddings(level, debug);
 	}
 	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }

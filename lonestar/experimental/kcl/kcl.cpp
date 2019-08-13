@@ -28,7 +28,7 @@
 #include "galois/runtime/Profile.h"
 #include <boost/iterator/transform_iterator.hpp>
 
-const char* name = "KCL";
+const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
 
@@ -47,37 +47,21 @@ typedef Graph::GraphNode GNode;
 #include "Mining/util.h"
 
 void KclSolver(VertexMiner &miner) {
-	if(show) std::cout << "\n=============================== Start ===============================\n";
+	UlongAccu total_num;
+	total_num.reset();
 	EmbeddingQueueType queue, queue2;
-	miner.init(queue);
+	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
 	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
-	while (level < k-1) {
-		if(show) std::cout << "\n============================== Level " << level << " ==============================\n";
-		if(show) std::cout << "\n------------------------- Step 1: Expanding -------------------------\n";
-		queue2.clear();
-		galois::for_each(
-			galois::iterate(queue),
-			[&](const EmbeddingType& emb, auto& ctx) {
-				miner.extend_vertex_each(emb, queue2);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("ExtendVertex")
-		);
-		if(show) queue.printout_embeddings(level);
-
-		if(show) std::cout << "\n------------------------ Step 2: Aggregation ------------------------\n";
-		queue.clear();
-		galois::StatTimer Tagg("Aggregation");
-		Tagg.start();
-		miner.aggregate_all(queue2, queue); // sequential implementaion
-		Tagg.stop();
-		if(show) queue.printout_embeddings(level);
+	while (1) {
+		miner.extend_vertex_base(level, queue, queue2, total_num);
+		if (level == k-2) break; // if embedding size = k, done
+		if (show) queue.printout_embeddings(level);
+		queue.swap(queue2);
+		queue2.clean();
 		level ++;
 	}
-	if(show) std::cout << "\n=============================== Done ================================\n";
-	galois::gPrint("\n\ttotal_num_cliques = ", std::distance(queue.begin(), queue.end()), "\n\n");
+	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
 }
 
 int main(int argc, char** argv) {
@@ -88,6 +72,7 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	read_graph(graph, filetype, filename);
 	Tinitial.stop();
+	assert(k > 2);
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 
 	VertexMiner miner(&graph, k);

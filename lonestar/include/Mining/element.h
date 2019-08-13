@@ -151,8 +151,8 @@ protected:
 public:
 	SimpleElement() : vertex_id(0) { }
 	SimpleElement(VertexId _vertex_id) : vertex_id(_vertex_id) { }
-	SimpleElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) { }
-	SimpleElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) { }
+	SimpleElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
+	SimpleElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
 	~SimpleElement() { }
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { }

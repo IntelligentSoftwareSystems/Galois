@@ -27,7 +27,7 @@ typedef std::vector<MEdge> MEdgeList;
 
 class MGraph {
 public:
-	MEdgeList el;
+	//MEdgeList el;
 	MGraph() : need_relabel_edges(false), need_dag(false), symmetrize_(false), directed_(false) {}
 	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), need_dag(false), symmetrize_(false), directed_(false) {}
 	MGraph(bool relabel_edges, bool dag) : need_relabel_edges(relabel_edges), need_dag(dag), symmetrize_(false), directed_(false) {}
@@ -257,6 +257,7 @@ public:
 	}
 
 private:
+	MEdgeList el;
 	bool need_relabel_edges;
 	bool need_dag;
 	bool symmetrize_; // whether to symmetrize a directed graph
@@ -451,6 +452,7 @@ private:
 		//assert(num_edges_ == el.size());
 		for (int i = 0; i < num_edges_; i ++)
 			vertices[el[i].src].push_back(el[i]);
+		el.clear();
 		printf("Sorting the neighbor lists...");
 		for (int i = 0; i < num_vertices_; i ++)
 			std::sort(vertices[i].begin(), vertices[i].end(), compare_id);

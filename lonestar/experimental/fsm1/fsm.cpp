@@ -42,14 +42,15 @@ static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-int total_num = 0;
 #define USE_PID
+#define USE_GSTL
 #define USE_DOMAIN
 #define ENABLE_LABEL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 256
 #include "Mining/edge_miner.h"
 #include "Mining/util.h"
+int total_num = 0;
 
 void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
 	unsigned level = 1;
@@ -67,7 +68,7 @@ void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
 	while (1) {
 		miner.extend_edge(level, emb_list);
 		level ++;
-		if (show) emb_list.printout_embeddings(level);
+		if (show) emb_list.printout_embeddings(level, debug);
 		miner.quick_aggregate(level, emb_list);
 		miner.merge_qp_map(level+1);
 		miner.canonical_aggregate();
@@ -81,7 +82,7 @@ void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
 		if (num_freq_patterns == 0) break;
 		if (level == k) break;
 		miner.filter(level, emb_list);
-		if (show) emb_list.printout_embeddings(level);
+		if (show) emb_list.printout_embeddings(level, debug);
 	}
 	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }

@@ -123,6 +123,19 @@ protected:
 		}
 		return count;
 	}
+	inline bool is_all_connected_except(unsigned dst, unsigned pos, const BaseEmbedding &emb) {
+		unsigned n = emb.size();
+		bool all_connected = true;
+		for(unsigned i = 0; i < n; ++i) {
+			if (i == pos) continue;
+			unsigned from = emb.get_vertex(i);
+			if (!is_connected(from, dst)) {
+				all_connected = false;
+				break;
+			}
+		}
+		return all_connected;
+	}
 	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
 		assert(start >= 0 && end > 0);
 		bool all_connected = true;

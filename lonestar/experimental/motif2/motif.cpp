@@ -39,6 +39,7 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
+#define USE_PID
 #define USE_BLISS
 #define USE_SIMPLE
 #define VERTEX_INDUCED
@@ -57,15 +58,7 @@ void MotifSolver(VertexMiner &miner) {
 	if (show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (level < k-2) {
-		// for each embedding in the task queue, do vertex-extension
-		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingType& emb) {
-				miner.extend_vertex_each(emb, queue2); // vertex extension
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Extending")
-		);
+		miner.extend_vertex(queue, queue2); // vertex extension
 		queue.swap(queue2);
 		queue2.clear();
 		if (show) queue.printout_embeddings(level);

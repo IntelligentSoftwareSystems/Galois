@@ -51,18 +51,12 @@ void KclSolver(VertexMiner &miner) {
 	total_num.reset();
 	EmbeddingQueueType queue, queue2;
 	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
+	if(show) queue.printout_embeddings(0);
 	unsigned level = 1;
 	while (1) {
-		if(show) queue.printout_embeddings(0);
-		galois::do_all(galois::iterate(queue),
-			[&](const EmbeddingType& emb) {
-				miner.extend_vertex_each(level, emb, queue2, total_num); // extend one more vertex
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Extending")
-		);
+		miner.extend_vertex(level, queue, queue2, total_num); // extend one more vertex
 		if (level == k-2) break; // if embedding size = k, done
+		if (show) queue.printout_embeddings(level);
 		queue.swap(queue2);
 		queue2.clean();
 		level ++;
