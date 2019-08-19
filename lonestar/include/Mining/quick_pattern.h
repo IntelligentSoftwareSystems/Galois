@@ -37,7 +37,7 @@ public:
 		}
 		set_hash();
 	}
-	QuickPattern(EmbeddingTy & emb) {
+	QuickPattern(EmbeddingTy & emb, bool need_permute) {
 		cg_id = 0;
 		size = emb.size();
 		unsigned bytes = size * sizeof(ElementTy);

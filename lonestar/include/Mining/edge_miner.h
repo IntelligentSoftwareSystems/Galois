@@ -107,6 +107,7 @@ public:
 						}
 					}
 				}
+				emb.clean();
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -255,24 +256,8 @@ public:
 				QpMapDomain *lmap = qp_localmaps.getLocal();
 				EdgeEmbedding emb(level+1);
 				get_embedding(level, pos, emb_list, emb);
-				/*
-				VertexId vid = emb_list.get_vid(level, pos);
-				IndexTy idx = emb_list.get_idx(level, pos);
-				BYTE his = emb_list.get_his(level, pos);
-				BYTE lab = graph->getData(vid);
-				ElementType ele(vid, 0, lab, his);
-				emb.set_element(level, ele);
-				for (unsigned l = 1; l <= level; l ++) {
-					vid = emb_list.get_vid(level-l, idx);
-					his = emb_list.get_his(level-l, idx);
-					lab = graph->getData(vid);
-					ElementType ele(vid, 0, lab, his);
-					emb.set_element(level-l, ele);
-					idx = emb_list.get_idx(level-l, idx);
-				}
-				*/
 				unsigned n = emb.size();
-				QPattern qp(emb);
+				QPattern qp(emb, true);
 				bool qp_existed = false;
 				auto it = lmap->find(qp);
 				if (it == lmap->end()) {
@@ -479,7 +464,7 @@ public:
 		UintList is_frequent_emb(emb_list.size(), 0);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
-				VertexId src = emb_list.get_vid(0, pos);
+				VertexId src = emb_list.get_idx(1, pos);
 				VertexId dst = emb_list.get_vid(1, pos);
 				auto& src_label = graph->getData(src);
 				auto& dst_label = graph->getData(dst);
@@ -497,7 +482,7 @@ public:
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				if (is_frequent_emb[pos]) {
-					VertexId src = emb_list.get_vid(0, pos);
+					VertexId src = emb_list.get_idx(1, pos);
 					VertexId dst = emb_list.get_vid(1, pos);
 					unsigned eid0 = edge_map[OrderedEdge(src,dst)];
 					unsigned eid1 = edge_map[OrderedEdge(dst,src)];
@@ -512,7 +497,8 @@ public:
 		std::cout << "Number of frequent edges: " << count(is_frequent_edge.begin(), is_frequent_edge.end(), 1) << "\n";
 	
 		UintList indices = parallel_prefix_sum(is_frequent_emb);
-		VertexList vid_list0 = emb_list.get_vid_list(0);
+		//VertexList vid_list0 = emb_list.get_vid_list(0);
+		VertexList vid_list0 = emb_list.get_idx_list(1);
 		VertexList vid_list1 = emb_list.get_vid_list(1);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
@@ -520,9 +506,10 @@ public:
 					VertexId src = vid_list0[pos];
 					VertexId dst = vid_list1[pos];
 					unsigned start = indices[pos];
-					emb_list.set_vid(0, start, src);
+					//emb_list.set_vid(0, start, src);
 					emb_list.set_vid(1, start, dst);
-					emb_list.set_idx(1, start, start);
+					//emb_list.set_idx(1, start, start);
+					emb_list.set_idx(1, start, src);
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -650,7 +637,7 @@ private:
 		//emb.set_element(level, ElementType(vid, 0, lab, his));
 		ElementType ele(vid, 0, lab, his);
 		emb.set_element(level, ele);
-		for (unsigned l = 1; l <= level; l ++) {
+		for (unsigned l = 1; l < level; l ++) {
 			vid = emb_list.get_vid(level-l, idx);
 			his = emb_list.get_his(level-l, idx);
 			lab = graph->getData(vid);
@@ -659,6 +646,9 @@ private:
 			emb.set_element(level-l, ele);
 			idx = emb_list.get_idx(level-l, idx);
 		}
+		lab = graph->getData(idx);
+		ElementType ele0(idx, 0, lab, 0);
+		emb.set_element(0, ele0);
 	}
 	bool is_quick_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed) {
 		if (dst <= emb.get_vertex(0)) return true;

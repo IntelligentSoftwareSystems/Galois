@@ -42,6 +42,7 @@ typedef Graph::GraphNode GNode;
 #define USE_PID
 #define USE_WEDGE
 #define USE_SIMPLE
+#define USE_CUSTOM
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "Mining/vertex_miner.h"
@@ -59,11 +60,14 @@ void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
 		miner.extend_vertex(level, emb_list);
 		level ++;
 	}
+#ifdef USE_CUSTOM
 	if (k < 5) {
 		if(show) emb_list.printout_embeddings(level);
 		miner.aggregate(level, emb_list, accumulators);
 		miner.printout_motifs(accumulators);
-	} else { // use bliss library to do isomorphism check
+	} else
+#endif
+	{ // use bliss library to do isomorphism check
 		// TODO: need to use unsigned long for the counters
 		miner.quick_aggregate(level, emb_list);
 		miner.merge_qp_map();
