@@ -91,6 +91,39 @@ struct CSRGraph {
     return edge_data[abs_edge];
   };
 
+	void init_from_mgraph(int m, int nnz, index_type *h_row_offsets, index_type *h_column_indices, node_data_type *h_labels) {
+		nnodes = m;
+		nedges = nnz;
+		check_cuda(cudaMalloc((void **)&row_start, (m + 1) * sizeof(index_type)));
+		check_cuda(cudaMalloc((void **)&edge_dst, nnz * sizeof(index_type)));
+		check_cuda(cudaMemcpy(row_start, h_row_offsets, (m + 1) * sizeof(index_type), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(edge_dst, h_column_indices, nnz * sizeof(index_type), cudaMemcpyHostToDevice));
+		#ifdef ENABLE_LABEL
+		check_cuda(cudaMalloc((void **)&node_data, m * sizeof(node_data_type)));
+		check_cuda(cudaMemcpy(node_data, h_labels, m * sizeof(node_data_type), cudaMemcpyHostToDevice));
+		#endif
+		//int *h_degrees = (int *)malloc(m * sizeof(int));
+		//for (int i = 0; i < m; i++) h_degrees[i] = h_row_offsets[i + 1] - h_row_offsets[i];
+		//check_cuda(cudaMalloc((void **)&d_degrees, m * sizeof(int)));
+		//check_cuda(cudaMemcpy(d_degrees, h_degrees, m * sizeof(int), cudaMemcpyHostToDevice));
+	}
+
+	inline __device__ __host__ index_type getEdgeDst(unsigned edge) {
+		assert(edge < nedges);
+		return edge_dst[edge];
+	};
+	inline __device__ __host__ node_data_type getData(unsigned vid) {
+		return node_data[vid];
+	}
+	inline __device__ __host__ index_type edge_begin(unsigned src) {
+		assert(src <= nnodes);
+		return row_start[src];
+	};
+	inline __device__ __host__ index_type edge_end(unsigned src) {
+		assert(src <= nnodes);
+		return row_start[src+1];
+	};
+
   index_type nnodes, nedges;
   index_type* row_start; // row_start[node] points into edge_dst, node starts at
                          // 0, row_start[nnodes] = nedges

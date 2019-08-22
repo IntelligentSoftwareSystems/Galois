@@ -2,6 +2,7 @@
 # target_link_libraries() does not work with cuda_add_library() 
 # (in old versions of CMake)
 include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
+include_directories(${CMAKE_SOURCE_DIR}/lonestardist/include)
 
 add_library(distbench STATIC src/DistBenchStart.cpp src/DistributedGraphLoader.cpp)
 target_include_directories(distbench PUBLIC
@@ -148,5 +149,6 @@ add_subdirectory(kcore)
 add_subdirectory(pagerank)
 add_subdirectory(sgd)
 add_subdirectory(sssp)
+add_subdirectory(kclique)
 
 add_subdirectory(partition)
