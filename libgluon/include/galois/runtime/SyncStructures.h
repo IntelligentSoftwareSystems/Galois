@@ -152,6 +152,208 @@ public:
 } // end namespace galois
 
 ////////////////////////////////////////////////////////////////////////////////
+// Reduce Add, Edges
+////////////////////////////////////////////////////////////////////////////////
+#ifdef __GALOIS_HET_CUDA__
+#define GALOIS_SYNC_STRUCTURE_ADD_EDGES(fieldtype) struct EdgeAddReduce {\
+  using ValTy = fieldtype;\
+\
+  static ValTy extract(uint64_t edgeID, ValTy& edgeData) {\
+    if (personality == GPU_CUDA) return get_edge_cuda(cuda_ctx, edgeID);\
+    assert(personality == CPU);\
+    return edgeData;\
+  }\
+\
+  static bool extract_batch(unsigned from_id, uint8_t* y, size_t* s,\
+                            DataCommMode* data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_edge_cuda(cuda_ctx, from_id, y, s, data_mode);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_batch(unsigned from_id, uint8_t* y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_edge_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, uint8_t* y, size_t* s,\
+                                  DataCommMode* data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_reset_edge_cuda(cuda_ctx, from_id, y, s, data_mode, (ValTy)0);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, uint8_t* y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_reset_edge_cuda(cuda_ctx, from_id, y, (ValTy)0);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce(uint64_t edgeID, ValTy& edgeData, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      add_edge_cuda(cuda_ctx, edgeID, y);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    edgeData += y;\
+    return true;\
+  }\
+\
+  static bool reduce_batch(unsigned from_id, uint8_t* y, DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_add_edge_cuda(cuda_ctx, from_id, y, data_mode);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce_mirror_batch(unsigned from_id, uint8_t* y,\
+                                  DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_add_mirror_edge_cuda(cuda_ctx, from_id, y, data_mode);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset(uint64_t edgeID, ValTy& edgeData) {\
+    if (personality == GPU_CUDA) {\
+      set_edge_cuda(cuda_ctx, edgeID, (ValTy)0);\
+    }\
+    assert(personality == CPU);\
+    edgeData = 0;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    if (personality == GPU_CUDA) {\
+      batch_reset_edge_cuda(cuda_ctx, begin, end, (ValTy)0);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+\
+  static void setVal(uint64_t edgeID, ValTy& edgeData, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      set_edge_cuda(cuda_ctx, edgeID, (ValTy)0);\
+    }\
+    assert(personality == CPU);\
+    edgeData = y;\
+  }\
+\
+  static bool setVal_batch(unsigned from_id, uint8_t* y, DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_set_mirror_edge_cuda(cuda_ctx, from_id, y, data_mode);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    return false;\
+  }\
+};
+#else
+#define GALOIS_SYNC_STRUCTURE_ADD_EDGES(fieldtype) struct EdgeAddReduce {\
+  using ValTy = fieldtype;\
+\
+  static ValTy extract(uint64_t edgeID, ValTy& edgeData) {\
+    return edgeData;\
+  }\
+\
+  static bool extract_batch(unsigned, uint8_t*, size_t*,\
+                            DataCommMode*) { return false; }\
+\
+  static bool extract_batch(unsigned, uint8_t*) { return false; }\
+\
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,\
+                                  DataCommMode*) { return false; }\
+\
+  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }\
+\
+  static bool reduce(uint64_t edgeID, ValTy& edgeData, ValTy y) {\
+    edgeData += y;\
+    return true;\
+  }\
+\
+  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }\
+\
+  static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) { return false; }\
+\
+  static void reset(uint64_t edgeID, ValTy& edgeData) {\
+    edgeData = 0;\
+  }\
+\
+  static void setVal(uint64_t edgeID, ValTy& edgeData, ValTy y) {\
+    edgeData = y;\
+  }\
+\
+  static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }\
+};
+#endif
+
+/**
+ * Sync structure for dynamic bitsets, edges.
+ *
+ * Bitsets are expected to have the following naming scheme:
+ * bitset_edges
+ *
+ * In addition, you will have to declare and appropriately resize the bitset
+ * in your main program as well as set the bitset appropriately (i.e. when you
+ * do a write to a particular node).
+ */
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_BITSET_EDGES                                     \
+  struct Bitset_edges {                                                        \
+    static constexpr bool is_vector_bitset() { return false; }                 \
+    static bool is_valid() { return true; }                                    \
+                                                                               \
+    static galois::DynamicBitSet& get() {                                      \
+      if (personality == GPU_CUDA)                                             \
+        get_bitset_edge_cuda(                                                 \
+            cuda_ctx, (uint64_t*)bitset_edges.get_vec().data());               \
+      return bitset_edges;                                                     \
+    }                                                                          \
+                                                                               \
+    static void reset_range(size_t begin, size_t end) {                        \
+      if (personality == GPU_CUDA) {                                           \
+        bitset_edge_reset_cuda(cuda_ctx, begin, end);                         \
+      } else {                                                                 \
+        assert(personality == CPU);                                            \
+        bitset_edges.reset(begin, end);                                        \
+      }                                                                        \
+    }                                                                          \
+  }
+#else
+// no GPU code
+#define GALOIS_SYNC_STRUCTURE_BITSET_EDGES                                     \
+  struct Bitset_edges {                                                        \
+    static constexpr bool is_vector_bitset() { return false; }                 \
+                                                                               \
+    static constexpr bool is_valid() { return true; }                          \
+                                                                               \
+    static galois::DynamicBitSet& get() { return bitset_edges; }               \
+                                                                               \
+    static void reset_range(size_t begin, size_t end) {                        \
+      bitset_edges.reset(begin, end);                                          \
+    }                                                                          \
+  }
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // Reduce Add
 ////////////////////////////////////////////////////////////////////////////////
 
