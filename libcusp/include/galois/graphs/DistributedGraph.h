@@ -177,6 +177,52 @@ protected:
     }
   }
 
+  //! used to sort edges in the sort edges function
+  template <typename GraphNode, typename ET>
+  struct IdLess {
+    bool
+    operator()(const galois::graphs::EdgeSortValue<GraphNode, ET>& e1,
+               const galois::graphs::EdgeSortValue<GraphNode, ET>& e2) const {
+      return e1.dst < e2.dst;
+    }
+  };
+
+  /**
+   * Print edges of the graph (in parallel)
+   */
+  void printEdges() {
+    using GN = typename GraphTy::GraphNode;
+    galois::do_all(
+      galois::iterate(graph),
+      [&] (GN n) {
+        for (auto e : edges(n)) {
+          galois::gPrint("[", id, "] ", n, " ", getEdgeDst(e), "\n");
+        }
+      },
+      galois::no_stats(),
+      galois::loopname("CSREdgePrint"),
+      galois::steal()
+    );
+  }
+
+
+  /**
+   * Sort the underlying LC_CSR_Graph by ID (destinations)
+   */
+  void sortEdges() {
+    galois::gPrint("[", id, "] Sorting edges\n");
+    using GN = typename GraphTy::GraphNode;
+    galois::do_all(
+      galois::iterate(graph),
+      [&] (GN n) {
+        graph.sortEdges(n, IdLess<GN, EdgeTy>());
+      },
+      galois::no_stats(),
+      galois::loopname("CSREdgeSort"),
+      galois::steal()
+    );
+  }
+
 private:
   /**
    * Given an OfflineGraph, compute the masters for each node by
