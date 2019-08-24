@@ -8,6 +8,7 @@
 #include <string.h>
 #include <iostream>
 #include <algorithm>
+#include <boost/iterator/counting_iterator.hpp>
 #include "types.h"
 
 struct MEdge {
@@ -24,6 +25,7 @@ struct MEdge {
 	}
 };
 typedef std::vector<MEdge> MEdgeList;
+using iterator = boost::counting_iterator<IndexT>;
 
 class MGraph {
 public:
@@ -51,9 +53,13 @@ public:
 	bool directed() const { return directed_; }
 	int num_vertices() const { return num_vertices_; }
 	int num_edges() const { return num_edges_; }
+	int size() const { return num_vertices_; }
+	int sizeEdges() const { return num_edges_; }
 	IndexT edge_begin(IndexT n) { return rowptr_[n]; }
 	IndexT edge_end(IndexT n) { return rowptr_[n+1]; }
 	IndexT getEdgeDst(IndexT n) { return colidx_[n]; }
+	iterator begin() const { return iterator(0); }
+	iterator end() const { return iterator(num_vertices_); }
 
 	void read_txt(const char *filename, bool symmetrize = true) {
 		std::ifstream is;

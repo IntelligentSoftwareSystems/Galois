@@ -25,6 +25,24 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 
 #include "util.h"
 
+#ifndef __GALOIS_HET_CUDA__
+#define CHUNK_SIZE 256
+typedef MGraph Graph;
+#include "cpu_mining/vertex_miner.h"
+
+void KclSolverCPU(VertexMiner &miner, EmbeddingList &emb_list, AccType & total) {
+	UlongAccu total_num;
+	total_num.reset();
+	unsigned level = 1;
+	while (1) {
+		miner.extend_vertex(level, emb_list, total_num);
+		if (level == k-2) break; 
+		level ++;
+	}
+	total = total_num.reduce();
+}
+#endif
+
 int main(int argc, char** argv) {
 	galois::DistMemSys G;
 	DistBenchStart(argc, argv, name, desc, url);
@@ -46,10 +64,20 @@ int main(int argc, char** argv) {
 	
 	AccType total = 0;
 	//ResourceManager rm;
-	KclInit(graph, k);
+#ifdef __GALOIS_HET_CUDA__
+	KclInitGPU(graph, k);
+#else
+	VertexMiner miner(&graph, k);
+	EmbeddingList emb_list;
+	emb_list.init(graph, k, need_dag);
+#endif
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	KclSolver(k, total);
+#ifdef __GALOIS_HET_CUDA__
+	KclSolverGPU(k, total);
+#else
+	KclSolverCPU(miner, emb_list, total);
+#endif
 	Tcomp.stop();
 	std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
 	//std::cout << "\t" << rm.get_peak_memory() << "\n\n";

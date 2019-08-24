@@ -1,6 +1,6 @@
 #ifndef CUTIL_SUBSET_H
 #define CUTIL_SUBSET_H
-
+/*
 #  define CUDA_SAFE_CALL_NO_SYNC( call) {                                      \
     cudaError err = call;                                                      \
     if( cudaSuccess != err) {                                                  \
@@ -17,7 +17,7 @@
         fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",          \
                 __FILE__, __LINE__, cudaGetErrorString( err) );                \
     } }
-
+*/
 static unsigned CudaTest(const char *msg) {
 	cudaError_t e;
 	//cudaThreadSynchronize();

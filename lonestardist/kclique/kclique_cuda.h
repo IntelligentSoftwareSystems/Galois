@@ -20,5 +20,5 @@ kcl_base: one thread per vertex using CUDA
 kcl_warp: one warp per vertex using CUDA
 */
 typedef unsigned long long AccType; // Accumulator type
-void KclInit(MGraph &g, unsigned k);
-void KclSolver(unsigned k, AccType &total);
+void KclInitGPU(MGraph &g, unsigned k);
+void KclSolverGPU(unsigned k, AccType &total);

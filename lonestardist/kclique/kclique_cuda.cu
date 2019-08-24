@@ -82,7 +82,7 @@ __global__ void extend_insert(unsigned m, unsigned level, CSRGraph graph, Embedd
 }
 
 CUDA_Context_Mining cuda_ctx;
-void KclInit(MGraph &g, unsigned k) {
+void KclInitGPU(MGraph &g, unsigned k) {
 	print_device_info(0);
 	int m = g.num_vertices();
 	int nnz = g.num_edges();
@@ -96,7 +96,7 @@ void KclInit(MGraph &g, unsigned k) {
 	check_cuda(cudaDeviceSynchronize());
 }
 
-void KclSolver(unsigned k, AccType &total) {
+void KclSolverGPU(unsigned k, AccType &total) {
 	assert(k <= MAX_SIZE);
 	AccType h_total = 0, *d_total;
 	AccType zero = 0;

@@ -5,4 +5,9 @@
 #define DIVIDE_INTO(x,y) ((x + y - 1)/y)
 typedef unsigned IndexT;
 typedef int ValueT;
+typedef unsigned EdgeIdx;
+typedef unsigned VertexId;
+typedef float Weight;
+typedef unsigned char BYTE;
+
 #endif
