@@ -3,7 +3,9 @@ DESCRIPTION
 
 This is the framework for efficient and flexible graph mining based 
 on the Galois programming system. It uses the bliss library [1][2] 
-for graph isomorphism check.
+for graph isomorphism check. The license for this library is in the
+bliss directory: note that **it does not use the same license as
+the rest of Galois**.
 
 [1] Bliss: A tool for computing automorphism groups and canonical 
 labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
