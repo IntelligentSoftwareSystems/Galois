@@ -28,10 +28,6 @@ function(distApp name)
   endif()
 endfunction()
 
-distApp(bfs_push_lb)
-distApp(cc_push_lb)
-distApp(sssp_push_lb)
-
 #distAppNoGPU(bfs_do)
 #distApp(bfs_push_wl)
 #distApp(sssp_push_wl)
