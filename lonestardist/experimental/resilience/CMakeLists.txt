@@ -27,7 +27,6 @@ function(distApp name)
   #endif()
 endfunction()
 
-
 distApp(bfs_push)
 distApp(sssp_push)
 distApp(pagerank_pull)
@@ -35,5 +34,4 @@ distApp(sgd_pull)
 distApp(kcore_push)
 distApp(cc_push)
 distApp(pagerank_pull_topo)
-
 distApp(bc_level)
