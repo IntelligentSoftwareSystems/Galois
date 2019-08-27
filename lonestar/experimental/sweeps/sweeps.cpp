@@ -571,7 +571,7 @@ int main(int argc, char** argv) noexcept {
   radiation_magnitudes[boundary_pulse_index + 1].magnitude = pulse_strength;
 
   // Constants used in the differencing scheme at each cell/direction.
-  std::array<double, 3> grid_spacing{1. / nx, 1. / ny, 1. / nz};
+  std::array<double, 3> grid_spacing_inverses{static_cast<double>(nx), static_cast<double>(ny), static_cast<double>(nz)};
 
   // For the regular grid, this will just be the corners
   // (one work item for each direction that lies in the octant opposite
@@ -717,7 +717,7 @@ int main(int argc, char** argv) noexcept {
                 face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
             double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
             double term_coef = direction[axis] * sign;
-            new_magnitude_denominator += term_coef / grid_spacing[axis];
+            new_magnitude_denominator += term_coef * grid_spacing_inverses[axis];
             std::size_t other_magnitude_idx =
                 num_per_element * other_node +
                 num_per_element_and_direction * dir_idx;
@@ -726,7 +726,7 @@ int main(int argc, char** argv) noexcept {
               double& other_magnitude =
                   radiation_magnitudes[other_mag_and_group_idx].magnitude;
               new_magnitude_numerators[i] +=
-                  term_coef * other_magnitude / grid_spacing[axis];
+                  term_coef * other_magnitude * grid_spacing_inverses[axis];
             }
           }
           assert(("Wrong number of downstream neighbors.", downstream_index == 3));
