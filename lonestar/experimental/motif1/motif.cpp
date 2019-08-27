@@ -40,40 +40,39 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::typ
 typedef Graph::GraphNode GNode;
 
 #define USE_PID
+#define USE_MAP
 #define USE_WEDGE
 #define USE_SIMPLE
 #define USE_CUSTOM
+#define USE_EMB_LIST
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 int num_patterns[3] = {2, 6, 21};
+///*
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	~AppMiner() {}
+	void print_output() { printout_motifs(); }
+};
 
-void MotifSolver(VertexMiner &miner, EmbeddingList &emb_list) {
-	int npatterns = num_patterns[k-3];
-	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
-	std::vector<UlongAccu> accumulators(npatterns);
-	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
+#include "Mining/engine.h"
+//*/
+/*
+void solver(VertexMiner &miner, EmbeddingList &emb_list) {
 	unsigned level = 1;
-	while (level < k-2) {
+	while (1) {
 		if(show) emb_list.printout_embeddings(level);
 		miner.extend_vertex(level, emb_list);
+		if (level == k-2) break; // if embedding size = k, done
 		level ++;
 	}
-#ifdef USE_CUSTOM
-	if (k < 5) {
-		if(show) emb_list.printout_embeddings(level);
-		miner.aggregate(level, emb_list, accumulators);
-		miner.printout_motifs(accumulators);
-	} else
-#endif
-	{ // use bliss library to do isomorphism check
-		// TODO: need to use unsigned long for the counters
-		miner.quick_aggregate(level, emb_list);
+	if (k >= 5) {
 		miner.merge_qp_map();
 		miner.canonical_aggregate();
 		miner.merge_cg_map();
-		miner.printout_motifs();
 	}
 }
 
@@ -89,13 +88,17 @@ int main(int argc, char** argv) {
 
 	assert(k > 2);
 	ResourceManager rm;
-	VertexMiner miner(&graph, k);
+	int npatterns = num_patterns[k-3];
+	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
+	VertexMiner miner(&graph, k, npatterns);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	MotifSolver(miner, emb_list);
+	solver(miner, emb_list);
 	Tcomp.stop();
+	miner.printout_motifs();
 	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }
+//*/

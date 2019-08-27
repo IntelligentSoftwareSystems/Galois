@@ -13,36 +13,73 @@ typedef galois::gstl::Vector<VertexEmbedding> VertexEmbeddingBuffer;
 
 class VertexMiner : public Miner {
 public:
-	VertexMiner(Graph *g, unsigned size = 3) {
+	VertexMiner(Graph *g, unsigned size = 3, int np = 1) {
 		graph = g;
 		max_size = size;
 		degree_counting();
+		npatterns = np;
+		if (npatterns == 1)
+			total_num.reset();
+		else {
+			accumulators.resize(npatterns);
+			for (int i = 0; i < npatterns; i++) accumulators[i].reset();
+			std::cout << max_size << "-motif has " << npatterns << " patterns in total\n";
+			#ifdef USE_MAP
+			for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
+			#endif
+		}
 	}
 	virtual ~VertexMiner() {}
-	// Given an embedding, extend it with one more vertex. Used for cliques (slow)
-	inline void extend_vertex_base(unsigned level, BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue, UlongAccu &num) {
+
+	// Pangolin APIs
+	// toExtend
+	virtual bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+		return true;
+	}
+	// toAdd (only add non-automorphisms)
+	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		VertexId src = emb.get_vertex(pos);
+		return !is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst);
+	}
+	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
+		return true;
+	}
+	// toAdd (only add non-automorphisms)
+	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
+		VertexId src = emb.get_vertex(pos);
+		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
+	}
+	virtual void print_output() {
+	}
+
+	// Given an embedding, extend it with one more vertex. Used for cliques. (fast)
+	inline void extend_vertex(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
+		//galois::runtime::profileVtune([&] () {
 		galois::do_all(galois::iterate(in_queue),
 			[&](const BaseEmbedding& emb) {
 				unsigned n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i); // toExtend (extend every vertex in the embedding: slow)
+					if(!toExtend(n, emb, i)) continue;
+					VertexId src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
-						if (dst > src && !is_vertexInduced_automorphism<BaseEmbedding>(n, emb, i, src, dst) && is_all_connected_except(dst, i, emb)) {
-							if (level < max_size-2) {
+						if (toAdd(n, emb, dst, i)) {
+							if (n < max_size-1) { // generate a new embedding and add it to the next queue
 								BaseEmbedding new_emb(emb);
 								new_emb.push_back(dst);
 								out_queue.push_back(new_emb);
-							} else num += 1;
+							} else total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
 						}
 					}
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("ExtendVertex")
+			galois::loopname("Extending")
 		);
+		//}, "ExtendingVtune");
 	}
-	inline void extend_vertex_lazy(unsigned level, BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue, UlongAccu &num) {
+	/*
+	inline void extend_vertex_lazy(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
 		std::cout << "lazy extension\n";
 		galois::do_all(galois::iterate(in_queue),
 			[&](const BaseEmbedding& emb) {
@@ -54,12 +91,12 @@ public:
 					buffer.push_back(dst);
 				}
 				for (auto dst : buffer) {
-					if (dst > src && is_all_connected(dst, emb, n-1)) {
-						if (level < max_size-2) {
+					if (toAdd(n, emb, dst, n-1)) {
+						if (n < max_size-1) {
 							BaseEmbedding new_emb(emb);
 							new_emb.push_back(dst);
 							out_queue.push_back(new_emb);
-						} else num += 1;
+						} else total_num += 1;
 					}
 				}
 			},
@@ -67,30 +104,7 @@ public:
 			galois::loopname("Extending")
 		);
 	}
-	// Given an embedding, extend it with one more vertex. Used for cliques. (fast)
-	inline void extend_vertex(unsigned level, BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue, UlongAccu &num) {
-		//galois::runtime::profileVtune([&] () {
-		galois::do_all(galois::iterate(in_queue),
-			[&](const BaseEmbedding& emb) {
-				unsigned n = emb.size();
-				VertexId src = emb.get_vertex(n-1); // toExtend (only extend the last vertex in the embedding: fast)
-				for (auto e : graph->edges(src)) {
-					GNode dst = graph->getEdgeDst(e);
-					// extend vertex in ascending order to avoid unnecessary enumeration
-					if (dst > src && is_all_connected(dst, emb, n-1)) { // toAdd (only add vertex that is connected to all the vertices in the embedding)
-						if (level < max_size-2) { // generate a new embedding and add it to the next queue
-							BaseEmbedding new_emb(emb);
-							new_emb.push_back(dst);
-							out_queue.push_back(new_emb);
-						} else num += 1; // if size = max_size, no need to add to the queue, just accumulate
-					}
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Extending")
-		);
-		//}, "ExtendingVtune");
-	}
+	//*/
 	// Given an embedding, extend it with one more vertex. Used for vertex-induced motif
 	inline void extend_vertex(VertexEmbeddingQueue &in_queue, VertexEmbeddingQueue &out_queue) {
 		//galois::runtime::profilePapi([&] () {
@@ -98,15 +112,39 @@ public:
 		galois::do_all(galois::iterate(in_queue),
 			[&](const VertexEmbedding& emb) {
 				unsigned n = emb.size();
+				#ifdef USE_MAP
+				StrQpMapFreq *qp_lmap;
+				if (n >= 4) qp_lmap = qp_localmaps.getLocal();
+				#endif
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i); // toExtend (extend every vertex in the embedding)
+					if(!toExtend(n, emb, i)) continue;
+					VertexId src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) { // toAdd (only add non-automorphisms)
-							VertexEmbedding new_emb(emb);
-							if (n == 2 && max_size == 4) new_emb.set_pid(find_motif_pattern_id(n, i, dst, emb));
-							new_emb.push_back(dst);
-							out_queue.push_back(new_emb);
+						if (toAdd(n, emb, dst, i)) {
+							if (n < max_size-1) {
+								VertexEmbedding new_emb(emb);
+								#ifdef USE_PID
+								if (n == 2 && max_size == 4) new_emb.set_pid(find_motif_pattern_id(n, i, dst, emb));
+								#endif
+								new_emb.push_back(dst);
+								out_queue.push_back(new_emb);
+							} else {
+								if (n < 4) {
+									unsigned pid = find_motif_pattern_id(n, i, dst, emb);
+									accumulators[pid] += 1;
+								} else {
+									#ifdef USE_MAP
+									std::vector<bool> connected;
+									get_connectivity(n, i, dst, emb, connected);
+									StrQPattern qp(n+1, connected);
+									if (qp_lmap->find(qp) != qp_lmap->end()) {
+										(*qp_lmap)[qp] += 1;
+										qp.clean();
+									} else (*qp_lmap)[qp] = 1;
+									#endif
+								}
+							}
 						}
 					}
 				}
@@ -120,20 +158,44 @@ public:
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list) {
 		UintList num_new_emb(emb_list.size());
 		//UlongList num_new_emb(emb_list.size());
-		// for each embedding, do vertex-extension
 		//galois::runtime::profilePapi([&] () {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
-				VertexEmbedding emb(level+1);
+				unsigned n = level+1;
+				#ifdef USE_MAP
+				StrQpMapFreq *qp_lmap;
+				if (n >= 4) qp_lmap = qp_localmaps.getLocal();
+				#endif
+				VertexEmbedding emb(n);
 				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-				num_new_emb[pos] = 0;
-				unsigned n = emb.size();
+				if (n < max_size-1) num_new_emb[pos] = 0;
+				if (n == 3 && max_size == 4) emb.set_pid(emb_list.get_pid(pos));
 				for (unsigned i = 0; i < n; ++i) {
 					VertexId src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
-							num_new_emb[pos] ++;
+						if (toAdd(n, emb, dst, i)) {
+							if (n < max_size-1) {
+								num_new_emb[pos] ++;
+							} else {
+								#ifdef USE_CUSTOM
+								if (n < 4) {
+									unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
+									accumulators[pid] += 1;
+								} else
+								#endif
+								{
+									#ifdef USE_MAP
+									std::vector<bool> connected;
+									get_connectivity(n, i, dst, emb, connected);
+									StrQPattern qp(n+1, connected);
+									if (qp_lmap->find(qp) != qp_lmap->end()) {
+										(*qp_lmap)[qp] += 1;
+										qp.clean();
+									} else (*qp_lmap)[qp] = 1;
+									#endif
+								}
+							}
 						}
 					}
 				}
@@ -142,6 +204,7 @@ public:
 			galois::loopname("Extending-alloc")
 		);
 		//}, "ExtendingAllocPapi");
+		if (level == max_size-2) return;
 		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
 		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
 		num_new_emb.clear();
@@ -166,7 +229,8 @@ public:
 					VertexId src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
+						//if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
+						if (toAdd(n, emb, dst, i)) {
 							assert(start < indices.back());
 							if (n == 2 && max_size == 4)
 								emb_list.set_pid(start, find_motif_pattern_id(n, i, dst, emb, start));
@@ -183,7 +247,7 @@ public:
 		indices.clear();
 	}
 	// extension for vertex-induced clique
-	inline void extend_vertex(unsigned level, EmbeddingList& emb_list, UlongAccu &num) {
+	inline void extend_vertex_kcl(unsigned level, EmbeddingList& emb_list) {
 		auto cur_size = emb_list.size();
 		std::cout << "number of current embeddings: " << cur_size << "\n";
 		UintList num_new_emb(cur_size);
@@ -196,13 +260,9 @@ public:
 				num_new_emb[pos] = 0;
 				for (auto e : graph->edges(vid)) {
 					GNode dst = graph->getEdgeDst(e);
-					#ifdef USE_DAG
-					if (is_all_connected_dag(dst, emb, level)) {
-					#else
-					if (vid < dst && is_all_connected(dst, emb, level)) {
-					#endif
+					if (toAdd(level+1, emb, dst, level)) {
 						if (level < max_size-2) num_new_emb[pos] ++;
-						else num += 1;
+						else total_num += 1;
 					}
 				}
 			},
@@ -227,12 +287,7 @@ public:
 				unsigned start = indices[pos];
 				for (auto e : graph->edges(vid)) {
 					GNode dst = graph->getEdgeDst(e);
-					// check if it is a clique
-					#ifdef USE_DAG
-					if (is_all_connected_dag(dst, emb, level)) {
-					#else
-					if (vid < dst && is_all_connected(dst, emb, level)) {
-					#endif
+					if (toAdd(level+1, emb, dst, level)) {
 						emb_list.set_idx(level+1, start, pos);
 						emb_list.set_vid(level+1, start++, dst);
 					}
@@ -244,7 +299,8 @@ public:
 		//}, "ExtendingInsertPapi");
 		indices.clear();
 	}
-	inline void aggregate(VertexEmbeddingQueue &queue, std::vector<UlongAccu> &accumulators) {
+	/*
+	inline void aggregate(VertexEmbeddingQueue &queue) {
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
 				unsigned n = emb.size();
@@ -264,7 +320,9 @@ public:
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
 		);
 	}
-	inline void aggregate_lazy(VertexEmbeddingQueue &queue, std::vector<UlongAccu> &accumulators) {
+	*/
+	/*
+	inline void aggregate_lazy(VertexEmbeddingQueue &queue) {
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
 				unsigned n = emb.size();
@@ -301,7 +359,9 @@ public:
 			galois::loopname("Reduce")
 		);
 	}
-	inline void aggregate(unsigned level, EmbeddingList& emb_list, std::vector<UlongAccu> &accumulators) {
+	//*/
+	/*
+	inline void aggregate(unsigned level, EmbeddingList& emb_list) {
 		//galois::runtime::profileVtune([&] () {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
@@ -386,6 +446,7 @@ public:
 			galois::loopname("QuickAggregation")
 		);
 	}
+	//*/
 	// canonical pattern aggregation
 	inline void canonical_aggregate() {
 		for (auto i = 0; i < numThreads; i++) cg_localmaps.getLocal(i)->clear();
@@ -429,7 +490,8 @@ public:
 
 	// Utilities
 	//inline unsigned get_total_num_cliques() { return num_cliques; }
-	void printout_motifs(std::vector<UlongAccu> &accumulators) {
+	Ulong get_total_count() { return total_num.reduce(); }
+	void printout_motifs() {
 		std::cout << std::endl;
 		if (accumulators.size() == 2) {
 			std::cout << "\ttriangles\t" << accumulators[0].reduce() << std::endl;
@@ -442,27 +504,42 @@ public:
 			std::cout << "\tdiamonds --> " << accumulators[4].reduce() << std::endl;
 			std::cout << "\t4-cliques --> " << accumulators[5].reduce() << std::endl;
 		} else {
-			std::cout << "\ttoo many patterns to show\n";
+			if (max_size < 9) {
+				std::cout << std::endl;
+				//for (auto it = p_map.begin(); it != p_map.end(); ++it)
+				//	std::cout << "{" << it->first << "} --> " << it->second << std::endl;
+			} else {
+				std::cout << std::endl;
+				for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
+					std::cout << it->first << " --> " << it->second << std::endl;
+			}
 		}
 		std::cout << std::endl;
 	}
-	void printout_motifs(UintMap &p_map) {
-		assert(p_map.size() == 21);
-		std::cout << std::endl;
-		for (auto it = p_map.begin(); it != p_map.end(); ++it)
-			std::cout << "{" << it->first << "} --> " << it->second << std::endl;
-		std::cout << std::endl;
-	}
-	void printout_motifs() {
-		std::cout << std::endl;
-		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
-			std::cout << it->first << " --> " << it->second << std::endl;
-		std::cout << std::endl;
+
+protected:
+	template <typename EmbeddingTy = VertexEmbedding>
+	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
+		//unsigned n = emb.size();
+		// the new vertex id should be larger than the first vertex id
+		if (dst <= emb.get_vertex(0)) return true;
+		// the new vertex should not already exist in the embedding
+		for (unsigned i = 1; i < n; ++i)
+			if (dst == emb.get_vertex(i)) return true;
+		// the new vertex should not already be extended by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(emb.get_vertex(i), dst)) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < n; ++i)
+			if (dst < emb.get_vertex(i)) return true;
+		return false;
 	}
 
 private:
-	//unsigned num_cliques;
+	int npatterns;
 	unsigned max_size;
+	UlongAccu total_num;
+	std::vector<UlongAccu> accumulators;
 	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
 	StrQpMapFreq qp_map; // quick patterns map for counting the frequency
 	StrCgMapFreq cg_map; // canonical graph map for couting the frequency
@@ -485,22 +562,6 @@ private:
 		}
 		ElementType ele0(idx);
 		emb.set_element(0, ele0);
-	}
-	template <typename EmbeddingTy = VertexEmbedding>
-	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
-		//unsigned n = emb.size();
-		// the new vertex id should be larger than the first vertex id
-		if (dst <= emb.get_vertex(0)) return true;
-		// the new vertex should not already exist in the embedding
-		for (unsigned i = 1; i < n; ++i)
-			if (dst == emb.get_vertex(i)) return true;
-		// the new vertex should not already be extended by any previous vertex in the embedding
-		for (unsigned i = 0; i < idx; ++i)
-			if (is_connected(emb.get_vertex(i), dst)) return true;
-		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
-		for (unsigned i = idx+1; i < n; ++i)
-			if (dst < emb.get_vertex(i)) return true;
-		return false;
 	}
 	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
 		unsigned pid = 0;

@@ -42,51 +42,33 @@ typedef Graph::GraphNode GNode;
 
 #define USE_DAG
 #define USE_SIMPLE
+#define USE_EMB_LIST
 #define CHUNK_SIZE 256
 #define USE_BASE_TYPES
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
-void KclSolver(VertexMiner &miner, EmbeddingList &emb_list) {
-	UlongAccu total_num;
-	total_num.reset();
-	unsigned level = 1;
-	while (1) {
-		if (show) emb_list.printout_embeddings(level);
-		miner.extend_vertex(level, emb_list, total_num);
-		if (level == k-2) break; 
-		level ++;
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	~AppMiner() {}
+	// toExtend (only extend the last vertex in the embedding: fast)
+	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
+		return pos == n-1;
 	}
-	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
-}
+	// toAdd (only add vertex that is connected to all the vertices in the embedding)
+	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		#ifdef USE_DAG
+		return is_all_connected_dag(dst, emb, n-1);
+		#else
+		VertexId src = emb.get_vertex(pos);
+		return (src < dst) && is_all_connected(dst, emb, n-1);
+		#endif
+	}
+	void print_output() {
+		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
+	}
+};
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	bool need_dag = false;
-	#ifdef USE_DAG
-	galois::gPrint("Orientation enabled, using DAG\n");
-	need_dag = true;
-	#endif
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
-	read_graph(graph, filetype, filename, false, need_dag);
-	Tinitial.stop();
-	assert(k > 2);
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+#include "Mining/engine.h"
 
-	ResourceManager rm;
-	VertexMiner miner(&graph, k);
-	EmbeddingList emb_list;
-	galois::StatTimer Tinitemb("EmbListInitTime");
-	Tinitemb.start();
-	emb_list.init(graph, k, need_dag);
-	Tinitemb.stop();
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	KclSolver(miner, emb_list);
-	Tcomp.stop();
-	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
-	return 0;
-}

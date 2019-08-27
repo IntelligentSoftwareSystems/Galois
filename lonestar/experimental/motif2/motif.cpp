@@ -40,83 +40,21 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::typ
 typedef Graph::GraphNode GNode;
 
 #define USE_PID
-#define USE_BLISS
+#define USE_MAP
 #define USE_SIMPLE
+#define USE_CUSTOM
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 int num_patterns[3] = {2, 6, 21};
 
-void MotifSolver(VertexMiner &miner) {
-	EmbeddingQueueType queue, queue2; // task queues. double buffering
-	miner.init(queue); // initialize the task queue
-	int npatterns = num_patterns[k-3];
-	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
-	std::vector<UlongAccu> accumulators(npatterns);
-	for (int i = 0; i < npatterns; i++) accumulators[i].reset();
-	if (show) queue.printout_embeddings(0);
-	unsigned level = 1;
-	while (level < k-2) {
-		miner.extend_vertex(queue, queue2); // vertex extension
-		queue.swap(queue2);
-		queue2.clear();
-		if (show) queue.printout_embeddings(level);
-		level ++;
-	}
-	if (k < 5) {
-		miner.aggregate(queue, accumulators);
-		miner.printout_motifs(accumulators);
-/*
-	} else if (k > 6 && k < 9) { // use matrix eigenvalue (characteristic polynomial) to do isomorphism check
-		UintMap p_map; // pattern map: pattern hash value --> pattern frequency
-		LocalUintMap localmap;
-		galois::for_each(
-			galois::iterate(queue),
-			[&](EmbeddingType& emb, auto& ctx) {
-				miner.aggregate_each(emb, *(localmap.getLocal())); // quick pattern aggregation
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Aggregation")
-		);
-		for (unsigned i = 0; i < localmap.size(); i++) {
-			UintMap lmap = *localmap.getLocal(i);
-			for (auto element : lmap) {
-				if (p_map.find(element.first) != p_map.end())
-					p_map[element.first] += element.second;
-				else
-					p_map[element.first] = element.second;
-			}
-		}
-		miner.printout_motifs(p_map);
-//*/
-	} else { // use bliss library to do isomorphism check
-		// TODO: need to use unsigned long for the counters
-		miner.quick_aggregate(queue);
-		miner.merge_qp_map();
-		miner.canonical_aggregate();
-		miner.merge_cg_map();
-		miner.printout_motifs();
-	}
-	if (show) std::cout << "\n=============================== Done ===============================\n\n";
-}
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	~AppMiner() {}
+	void print_output() { printout_motifs(); }
+};
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	galois::StatTimer Tinit("GraphReadingTime");
-	Tinit.start();
-	read_graph(graph, filetype, filename);
-	Tinit.stop();
-	assert(k > 2);
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+#include "Mining/engine.h"
 
-	VertexMiner miner(&graph, k);
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	MotifSolver(miner);
-	Tcomp.stop();
-	return 0;
-}

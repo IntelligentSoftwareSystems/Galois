@@ -46,39 +46,24 @@ typedef Graph::GraphNode GNode;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
-void KclSolver(VertexMiner &miner) {
-	UlongAccu total_num;
-	total_num.reset();
-	EmbeddingQueueType queue, queue2;
-	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
-	if(show) queue.printout_embeddings(0);
-	unsigned level = 1;
-	while (1) {
-		miner.extend_vertex_base(level, queue, queue2, total_num);
-		if (level == k-2) break; // if embedding size = k, done
-		if (show) queue.printout_embeddings(level);
-		queue.swap(queue2);
-		queue2.clean();
-		level ++;
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	~AppMiner() {}
+	// toExtend (extend every vertex in the embedding: slow)
+	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		return true;
 	}
-	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
-}
+	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		VertexId src = emb.get_vertex(pos);
+		if (dst <= src) return false;
+		if (is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst)) return false;
+		return is_all_connected_except(dst, pos, emb);
+	}
+	void print_output() {
+		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
+	}
+};
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
-	read_graph(graph, filetype, filename);
-	Tinitial.stop();
-	assert(k > 2);
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+#include "Mining/engine.h"
 
-	VertexMiner miner(&graph, k);
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	KclSolver(miner);
-	Tcomp.stop();
-	return 0;
-}

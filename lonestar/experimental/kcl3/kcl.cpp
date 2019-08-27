@@ -46,39 +46,25 @@ typedef Graph::GraphNode GNode;
 #include "Mining/vertex_miner.h"
 #include "Mining/util.h"
 
-void KclSolver(VertexMiner &miner) {
-	UlongAccu total_num;
-	total_num.reset();
-	EmbeddingQueueType queue, queue2;
-	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
-	if(show) queue.printout_embeddings(0);
-	unsigned level = 1;
-	while (1) {
-		miner.extend_vertex(level, queue, queue2, total_num); // extend one more vertex
-		if (level == k-2) break; // if embedding size = k, done
-		if (show) queue.printout_embeddings(level);
-		queue.swap(queue2);
-		queue2.clean();
-		level ++;
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	~AppMiner() {}
+	// toExtend (only extend the last vertex in the embedding: fast)
+	bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+		// extend the last vertex in the embedding
+		return pos == n-1;
 	}
-	galois::gPrint("\n\ttotal_num_cliques = ", total_num.reduce(), "\n\n");
-}
+	// toAdd (only add vertex that is connected to all the vertices in the embedding)
+	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		VertexId src = emb.get_vertex(pos);
+		// extend vertex in ascending order to avoid unnecessary enumeration
+		return (src < dst) && is_all_connected(dst, emb, n-1);
+	}
+	void print_output() {
+		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
+	}
+};
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
-	read_graph(graph, filetype, filename);
-	Tinitial.stop();
-	assert(k > 2);
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+#include "Mining/engine.h"
 
-	VertexMiner miner(&graph, k);
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	KclSolver(miner);
-	Tcomp.stop();
-	return 0;
-}
