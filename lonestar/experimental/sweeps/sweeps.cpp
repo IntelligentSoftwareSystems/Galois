@@ -538,8 +538,10 @@ int main(int argc, char** argv) noexcept {
   // node id at least as large as num_cells
   // indicates a ghost cell.
   auto ghost_threshold = num_cells;
-  auto [directions, num_directions] =
+  auto [directions_owner, num_directions_binding] =
       generate_directions(num_vert_directions, num_horiz_directions);
+  auto &directions = directions_owner;
+  auto num_directions = num_directions_binding;
   auto approx_x_direction_index =
       find_x_direction(directions.get(), num_directions);
 
