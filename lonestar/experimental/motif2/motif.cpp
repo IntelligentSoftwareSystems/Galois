@@ -53,6 +53,13 @@ class AppMiner : public VertexMiner {
 public:
 	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
 	~AppMiner() {}
+	#ifdef USE_CUSTOM
+	// customized pattern classification method
+	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 
+		if (n < 4) return find_motif_pattern_id(n, i, dst, emb, pos);
+		return 0;
+	}
+	#endif
 	void print_output() { printout_motifs(); }
 };
 

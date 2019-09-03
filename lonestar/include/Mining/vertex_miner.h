@@ -49,6 +49,9 @@ public:
 		VertexId src = emb.get_vertex(pos);
 		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
 	}
+	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
+		return 0;
+	}
 	virtual void print_output() {
 	}
 
@@ -154,6 +157,15 @@ public:
 		);
 		//}, "ExtendingPapi");
 	}
+	inline void quick_reduce(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, StrQpMapFreq *qp_lmap) {
+		std::vector<bool> connected;
+		get_connectivity(n, i, dst, emb, connected);
+		StrQPattern qp(n+1, connected);
+		if (qp_lmap->find(qp) != qp_lmap->end()) {
+			(*qp_lmap)[qp] += 1;
+			qp.clean();
+		} else (*qp_lmap)[qp] = 1;
+	}
 	// extension for vertex-induced motif
 	inline void extend_vertex(unsigned level, EmbeddingList& emb_list) {
 		UintList num_new_emb(emb_list.size());
@@ -178,6 +190,8 @@ public:
 							if (n < max_size-1) {
 								num_new_emb[pos] ++;
 							} else {
+								#ifdef USE_MAP
+								//unsigned pid  = getPattern(n, i, dst, emb, pos);
 								#ifdef USE_CUSTOM
 								if (n < 4) {
 									unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
@@ -185,16 +199,9 @@ public:
 								} else
 								#endif
 								{
-									#ifdef USE_MAP
-									std::vector<bool> connected;
-									get_connectivity(n, i, dst, emb, connected);
-									StrQPattern qp(n+1, connected);
-									if (qp_lmap->find(qp) != qp_lmap->end()) {
-										(*qp_lmap)[qp] += 1;
-										qp.clean();
-									} else (*qp_lmap)[qp] = 1;
-									#endif
+									quick_reduce(n, i, dst, emb, qp_lmap);
 								}
+								#endif
 							}
 						}
 					}
@@ -300,7 +307,7 @@ public:
 		indices.clear();
 	}
 	/*
-	inline void aggregate(VertexEmbeddingQueue &queue) {
+	inline void reduce(VertexEmbeddingQueue &queue) {
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
 				unsigned n = emb.size();
@@ -322,7 +329,7 @@ public:
 	}
 	*/
 	/*
-	inline void aggregate_lazy(VertexEmbeddingQueue &queue) {
+	inline void reduce_lazy(VertexEmbeddingQueue &queue) {
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
 				unsigned n = emb.size();
@@ -361,7 +368,7 @@ public:
 	}
 	//*/
 	/*
-	inline void aggregate(unsigned level, EmbeddingList& emb_list) {
+	inline void reduce(unsigned level, EmbeddingList& emb_list) {
 		//galois::runtime::profileVtune([&] () {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
@@ -388,8 +395,8 @@ public:
 		);
 		//}, "ReduceVtune");
 	}
-	// quick pattern aggregation
-	inline void quick_aggregate(VertexEmbeddingQueue &queue) {
+	// quick pattern reduction 
+	inline void quick_reduce(VertexEmbeddingQueue &queue) {
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
@@ -413,10 +420,10 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("QuickAggregation")
+			galois::loopname("QuickReduction")
 		);
 	}
-	inline void quick_aggregate(unsigned level, const EmbeddingList& emb_list) {
+	inline void quick_reduce(unsigned level, const EmbeddingList& emb_list) {
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
@@ -443,12 +450,12 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("QuickAggregation")
+			galois::loopname("QuickReduction")
 		);
 	}
 	//*/
-	// canonical pattern aggregation
-	inline void canonical_aggregate() {
+	// canonical pattern reduction
+	inline void canonical_reduce() {
 		for (auto i = 0; i < numThreads; i++) cg_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate(qp_map),
 			[&](auto& element) {
@@ -461,7 +468,7 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("CanonicalAggregation")
+			galois::loopname("CanonicalReduction")
 		);
 		qp_map.clear();
 	}
@@ -517,24 +524,6 @@ public:
 		std::cout << std::endl;
 	}
 
-protected:
-	template <typename EmbeddingTy = VertexEmbedding>
-	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
-		//unsigned n = emb.size();
-		// the new vertex id should be larger than the first vertex id
-		if (dst <= emb.get_vertex(0)) return true;
-		// the new vertex should not already exist in the embedding
-		for (unsigned i = 1; i < n; ++i)
-			if (dst == emb.get_vertex(i)) return true;
-		// the new vertex should not already be extended by any previous vertex in the embedding
-		for (unsigned i = 0; i < idx; ++i)
-			if (is_connected(emb.get_vertex(i), dst)) return true;
-		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
-		for (unsigned i = idx+1; i < n; ++i)
-			if (dst < emb.get_vertex(i)) return true;
-		return false;
-	}
-
 private:
 	int npatterns;
 	unsigned max_size;
@@ -563,6 +552,25 @@ private:
 		ElementType ele0(idx);
 		emb.set_element(0, ele0);
 	}
+
+protected:
+	template <typename EmbeddingTy = VertexEmbedding>
+	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
+		//unsigned n = emb.size();
+		// the new vertex id should be larger than the first vertex id
+		if (dst <= emb.get_vertex(0)) return true;
+		// the new vertex should not already exist in the embedding
+		for (unsigned i = 1; i < n; ++i)
+			if (dst == emb.get_vertex(i)) return true;
+		// the new vertex should not already be extended by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(emb.get_vertex(i), dst)) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < n; ++i)
+			if (dst < emb.get_vertex(i)) return true;
+		return false;
+	}
+
 	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
 		unsigned pid = 0;
 		if (n == 2) { // count 3-motifs

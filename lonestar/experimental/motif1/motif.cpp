@@ -55,50 +55,15 @@ class AppMiner : public VertexMiner {
 public:
 	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
 	~AppMiner() {}
+	#ifdef USE_CUSTOM
+	// customized pattern classification method
+	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 
+		if (n < 4) return find_motif_pattern_id(n, i, dst, emb, pos);
+		return 0;
+	}
+	#endif
 	void print_output() { printout_motifs(); }
 };
 
 #include "Mining/engine.h"
-//*/
-/*
-void solver(VertexMiner &miner, EmbeddingList &emb_list) {
-	unsigned level = 1;
-	while (1) {
-		if(show) emb_list.printout_embeddings(level);
-		miner.extend_vertex(level, emb_list);
-		if (level == k-2) break; // if embedding size = k, done
-		level ++;
-	}
-	if (k >= 5) {
-		miner.merge_qp_map();
-		miner.canonical_aggregate();
-		miner.merge_cg_map();
-	}
-}
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	galois::StatTimer Tinit("GraphReadingTime");
-	Tinit.start();
-	read_graph(graph, filetype, filename);
-	Tinit.stop();
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-
-	assert(k > 2);
-	ResourceManager rm;
-	int npatterns = num_patterns[k-3];
-	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
-	VertexMiner miner(&graph, k, npatterns);
-	EmbeddingList emb_list;
-	emb_list.init(graph, k);
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	solver(miner, emb_list);
-	Tcomp.stop();
-	miner.printout_motifs();
-	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
-	return 0;
-}
-//*/

@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
 	if (k >= 5) {
 		// TODO: need to use unsigned long for the counters
 		miner.merge_qp_map();
-		miner.canonical_aggregate();
+		miner.canonical_reduce();
 		miner.merge_cg_map();
 	}
 	#endif
