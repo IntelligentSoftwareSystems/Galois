@@ -76,7 +76,11 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::chunk_size<CHUNK_SIZE>(), 
+			#ifdef ENABLE_STEAL
+			galois::steal(), 
+			#endif
+			//galois::no_conflicts(),
 			galois::loopname("Extending")
 		);
 		//}, "ExtendingVtune");
@@ -103,7 +107,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::chunk_size<CHUNK_SIZE>(), 
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("Extending")
 		);
 	}
@@ -152,7 +159,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("Extending")
 		);
 		//}, "ExtendingPapi");
@@ -207,7 +217,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("Extending-alloc")
 		);
 		//}, "ExtendingAllocPapi");
@@ -247,7 +260,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("Extending-insert")
 		);
 		//}, "ExtendingInsertPapi");
@@ -273,7 +289,11 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::chunk_size<CHUNK_SIZE>(), 
+			#ifdef ENABLE_STEAL
+			galois::steal(), 
+			#endif
+			//galois::no_conflicts(),
 			galois::loopname("Extending-alloc")
 		);
 		//}, "ExtendingAllocPapi");
@@ -300,7 +320,11 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
+			//galois::no_conflicts(),
 			galois::loopname("Extending-insert")
 		);
 		//}, "ExtendingInsertPapi");
@@ -323,8 +347,11 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(), galois::loopname("Reduce")
+			galois::chunk_size<CHUNK_SIZE>(), 
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
+			galois::loopname("Reduce")
 		);
 	}
 	*/
@@ -362,7 +389,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("Reduce")
 		);
 	}
@@ -389,8 +419,10 @@ public:
 				}
 				emb.clean();
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), 
+			#ifdef ENABLE_STEAL
+			galois::steal(), 
+			#endif
 			galois::loopname("Reduce")
 		);
 		//}, "ReduceVtune");
@@ -418,8 +450,10 @@ public:
 					}
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("QuickReduction")
 		);
 	}
@@ -448,8 +482,10 @@ public:
 				}
 				emb.clean();
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
 			galois::loopname("QuickReduction")
 		);
 	}
@@ -466,8 +502,11 @@ public:
 				cg.clean();
 
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(),
+			#ifdef ENABLE_STEAL
+			galois::steal(),
+			#endif
+			//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalReduction")
 		);
 		qp_map.clear();

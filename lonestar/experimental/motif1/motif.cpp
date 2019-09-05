@@ -44,6 +44,7 @@ typedef Graph::GraphNode GNode;
 #define USE_WEDGE
 #define USE_SIMPLE
 #define USE_CUSTOM
+#define ENABLE_STEAL
 #define USE_EMB_LIST
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256

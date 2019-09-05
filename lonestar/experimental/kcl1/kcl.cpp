@@ -42,6 +42,7 @@ typedef Graph::GraphNode GNode;
 
 #define USE_DAG
 #define USE_SIMPLE
+#define ENABLE_STEAL
 #define USE_EMB_LIST
 #define CHUNK_SIZE 256
 #define USE_BASE_TYPES

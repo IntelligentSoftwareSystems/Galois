@@ -30,16 +30,13 @@ static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::ini
 typedef MGraph Graph;
 #include "cpu_mining/vertex_miner.h"
 
-void KclSolverCPU(VertexMiner &miner, EmbeddingList &emb_list, AccType & total) {
-	UlongAccu total_num;
-	total_num.reset();
+void KclSolverCPU(VertexMiner &miner, EmbeddingList &emb_list) {
 	unsigned level = 1;
 	while (1) {
-		miner.extend_vertex(level, emb_list, total_num);
+		miner.extend_vertex_clique(level, emb_list);
 		if (level == k-2) break; 
 		level ++;
 	}
-	total = total_num.reduce();
 }
 #endif
 
@@ -76,7 +73,8 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
 	KclSolverGPU(k, total);
 #else
-	KclSolverCPU(miner, emb_list, total);
+	KclSolverCPU(miner, emb_list);
+	total = miner.get_total_count();
 #endif
 	Tcomp.stop();
 	std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
