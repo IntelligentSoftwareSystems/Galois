@@ -66,8 +66,7 @@ int read_graph(Graph &graph, std::string filetype, std::string filename, bool ne
 		}
 	} else { printf("Unkown file format\n"); exit(1); }
 	//print_graph(graph);
-	int core = 0;
-	if (need_relabel) core = mgraph.get_core();
+	int core = mgraph.get_core();
 	mgraph.clean();
 	return core;
 }

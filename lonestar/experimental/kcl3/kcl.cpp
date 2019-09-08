@@ -17,12 +17,10 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "pangolin.h"
 #define USE_SIMPLE
 #define USE_BASE_TYPES
 #define CHUNK_SIZE 256
-#include "Mining/vertex_miner.h"
-#include "Mining/util.h"
+#include "pangolin.h"
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in an undirected graph using BFS extension";
