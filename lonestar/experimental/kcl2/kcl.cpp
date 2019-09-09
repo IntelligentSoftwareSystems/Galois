@@ -19,6 +19,7 @@
 
 #define USE_DAG
 #define USE_DFS
+//#define ALGO_EDGE
 #define CHUNK_SIZE 256
 #include "pangolin.h"
 
@@ -50,7 +51,11 @@ int main(int argc, char** argv) {
 	DfsMiner miner(&graph, core, k);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	miner.process();
+	#ifdef ALGO_EDGE
+	miner.edge_process();
+	#else
+	miner.vertex_process();
+	#endif
 	Tcomp.stop();
 	miner.print_output();
 	return 0;
