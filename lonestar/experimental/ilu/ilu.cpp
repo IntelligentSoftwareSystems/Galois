@@ -110,4 +110,10 @@ int main(int argc, char** argv) noexcept {
   typename galois::graphs::LC_CSR_Graph<std::atomic<std::size_t>, double>::with_no_lockable<true>::type graph;
 
   generate_matrix(graph, n);
+  galois::do_all(
+    galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) noexcept {
+      graph.sortEdgesByDst(node, galois::MethodFlag::UNPROTECTED);
+    },
+    galois::loopname("EdgeSort"));
 }
