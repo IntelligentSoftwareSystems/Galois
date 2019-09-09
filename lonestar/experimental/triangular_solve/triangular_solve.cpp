@@ -17,6 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 
@@ -96,7 +97,49 @@ int main(int argc, char** argv) noexcept {
   galois::SharedMemSys galois_system;
   LonestarStart(argc, argv, name, desc, url);
 
-  typename galois::graphs::LC_CSR_Graph<std::atomic<std::size_t>, double>::with_no_lockable<true>::type graph;
+  graph_t graph;
 
   generate_matrix(graph, n);
+
+  // Initialize the right hand side with filler data for now.
+  galois::LargeArray<double> rhs;
+  rhs.create(n);
+  std::fill(rhs.begin(), rhs.end(), 1.);
+
+  // Initialize counters for dependency tracking.
+  // TODO: optimize the initialization phase at some point.
+  // First set them all to 0.
+  galois::do_all(
+    galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) {
+      graph.getData(node, galois::MethodFlag::UNPROTECTED).store(0, std::memory_order_relaxed);
+    },
+    galois::loopname("zero_counters"));
+  // Initialize the atomic counters.
+  galois::do_all(
+    galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) {
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        auto neighbor = graph.getEdgeDst(edge);
+        if (neighbor == node) continue;
+        graph.getData(node, galois::MethodFlag::UNPROTECTED).fetch_add(1, std::memory_order_relaxed);
+      }
+    },
+    galois::loopname("initialize_counters"));
+
+  // Now find the ones that start as ready.
+  // This could potentially be done as a part of the iterator for the starting set instead.
+  galois::InsertBag<graph_t::GraphNode> starting_nodes;
+
+  galois::do_all(
+    galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) {
+      if (!graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed)) {
+        starting_nodes.emplace(node);
+      }
+    },
+    galois::loopname("find_starts"));
+
+  // Now actually do the triangular solve.
+  //galois::for_each(
 }
