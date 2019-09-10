@@ -36,9 +36,19 @@
 #include "Lonestar/BoilerPlate.h"
 
 static char const* name = "Triangular Solve";
+// NOTE: left solve works how you'd want for CSR
+// Right solve works how you'd want for CSC.
+// You need a push style operator, otherwise the dependency tracking
+// requires a graph transpose, and those are the only two "triangular solve"
+// variants that permit that.
+// In particular, right solve with CSR and left solve with CSC require a transpose.
+// Upper/lower triangular will need slightly different loop bounds,
+// but will have similar dependency tracking needs.
+// Note: To use ILU efficiently, this will eventually need an option for
+// a triangular solve with ones along the diagonal.
 static char const* desc =
-    "Back substitution to solve Ax=b for sparse "
-    "lower triangular matrix A and vector b.";
+    "Back substitution to solve x.T A = b.T for sparse "
+    "upper triangular matrix A and vector b.";
 static char const* url = "triangular_solve";
 
 static llvm::cl::opt<unsigned long long> n{
@@ -64,10 +74,10 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
   temp_graph.phase1();
   for (std::size_t i = 0; i < n; i++) {
     temp_graph.incrementDegree(i);
-    if (i > 0) {
+    if (i + 1 < n) {
       temp_graph.incrementDegree(i);
     }
-    if (i >= offset) {
+    if (i < n - offset) {
       temp_graph.incrementDegree(i);
     }
   }
@@ -75,11 +85,11 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
 
   for (std::size_t i = 0; i < n; i++) {
     edge_data.set(temp_graph.addNeighbor(i, i), 4.);
-    if (i > 0) {
-      edge_data.set(temp_graph.addNeighbor(i, i - 1), -1.);
+    if (i + 1 < n) {
+      edge_data.set(temp_graph.addNeighbor(i, i + 1), -1.);
     }
-    if (i >= offset) {
-      edge_data.set(temp_graph.addNeighbor(i, i - offset), -1.);
+    if (i < n - offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i + offset), -1.);
     }
   }
 
@@ -122,7 +132,7 @@ int main(int argc, char** argv) noexcept {
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
         auto neighbor = graph.getEdgeDst(edge);
         if (neighbor == node) continue;
-        graph.getData(node, galois::MethodFlag::UNPROTECTED).fetch_add(1, std::memory_order_relaxed);
+        graph.getData(neighbor, galois::MethodFlag::UNPROTECTED).fetch_add(1, std::memory_order_relaxed);
       }
     },
     galois::loopname("initialize_counters"));
@@ -141,5 +151,30 @@ int main(int argc, char** argv) noexcept {
     galois::loopname("find_starts"));
 
   // Now actually do the triangular solve.
-  //galois::for_each(
+  galois::for_each(
+    galois::iterate(starting_nodes.begin(), starting_nodes.end()),
+    [&](auto node, auto &context) noexcept {
+      auto counter_check_val = graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_acquire);
+      if (counter_check_val) {
+        GALOIS_DIE("Work item asked to run before it was actually ready.");
+      }
+      auto edge_iterator = graph.edge_begin(node, galois::MethodFlag::UNPROTECTED);
+      auto edge_end = graph.edge_end(node, galois::MethodFlag::UNPROTECTED);
+      assert(graph.getEdgeDst(*edge_iterator) == node);
+      rhs[node] /= graph.getEdgeData(*edge_iterator);
+      ++edge_iterator;
+      while (edge_iterator < edge_end) {
+        auto neighbor = graph.getEdgeDst(*edge_iterator);
+        assert(neighbor > node);
+        rhs[neighbor] -= rhs[node] * graph.getEdgeData(*edge_iterator);
+        auto &other_counter = graph.getData(neighbor, galois::MethodFlag::UNPROTECTED);
+        if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+          context.push(neighbor);
+        }
+        ++edge_iterator;
+      }
+    },
+    galois::loopname("back_substitution"),
+    galois::no_conflicts(),
+    galois::wl<galois::worklists::PerSocketChunkFIFO<64>>());
 }
