@@ -176,5 +176,5 @@ int main(int argc, char** argv) noexcept {
     },
     galois::loopname("back_substitution"),
     galois::no_conflicts(),
-    galois::wl<galois::worklists::PerSocketChunkFIFO<64>>());
+    galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
 }
