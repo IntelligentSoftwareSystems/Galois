@@ -562,6 +562,28 @@ public:
 		}
 		//std::cout << std::endl;
 	}
+	void tc_solver() {
+		galois::do_all(galois::iterate(graph->begin(), graph->end()),
+			[&](const GNode& src) {
+				for (auto e : graph->edges(src)) {
+					GNode dst = graph->getEdgeDst(e);
+					total_num += intersect(src, dst);
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+			galois::loopname("TriangleCouting")
+		);
+	}
+
+	void tc_solver(EmbeddingList& emb_list) {
+		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
+			[&](const size_t& id) {
+				total_num += intersect_dag(emb_list.get_idx(1,id), emb_list.get_vid(1,id));
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
+			galois::loopname("TriangleCouting")
+		);
+	}
 
 private:
 	int npatterns;

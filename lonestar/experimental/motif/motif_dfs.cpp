@@ -17,33 +17,47 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#define USE_DAG
-#define TRIANGLE
-#define USE_SIMPLE
-#define USE_EMB_LIST
-#define USE_BASE_TYPES
+//#define USE_DAG
+#define USE_DFS
+#define USE_MAP
+#define ALGO_EDGE
 #define CHUNK_SIZE 256
 #include "pangolin.h"
-const char* name = "TC";
-const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
+
+// This is a implementation of the WWW'18 paper:
+// Danisch et al., Listing k-cliques in Sparse Real-World Graphs, WWW 2018
+const char* name = "Motif";
+const char* desc = "Counts motifs in a graph using DFS traversal";
 const char* url  = 0;
+int num_patterns[3] = {2, 6, 21};
 
-class AppMiner : public VertexMiner {
-public:
-	AppMiner(Graph *g) : VertexMiner(g) {}
-	~AppMiner() {}
-	// toExtend (only extend the last vertex in the embedding: fast)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
-		return pos == n-1;
-	}
-	// toAdd (only add vertex that is connected to all the vertices in the embedding)
-	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		return false;
-	}
-	void print_output() {
-		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
-	}
-};
+int main(int argc, char** argv) {
+	galois::SharedMemSys G;
+	LonestarStart(argc, argv, name, desc, url);
+	Graph graph;
+	bool need_dag = false;
+	#ifdef USE_DAG
+	galois::gPrint("Orientation enabled, using DAG\n");
+	need_dag = true;
+	#endif
+	galois::StatTimer Tinitial("GraphReadingTime");
+	Tinitial.start();
+	int core = read_graph(graph, filetype, filename, false, need_dag);
+	Tinitial.stop();
+	assert(k > 2);
+	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
+	//std::cout << "core = " << core << "\n";
+	//print_graph(graph);
 
-#include "Mining/engine.h"
-
+	int npatterns = 1;
+	#ifdef USE_MAP
+	npatterns = num_patterns[k-3];
+	#endif
+	DfsMiner miner(&graph, core, k, need_dag, npatterns);
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
+	miner.edge_process_base();
+	Tcomp.stop();
+	miner.print_output();
+	return 0;
+}

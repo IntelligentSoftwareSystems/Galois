@@ -17,48 +17,36 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Bag.h"
-#include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/runtime/Profile.h"
-#include <boost/iterator/transform_iterator.hpp>
-
+#define USE_DAG
+#define TRIANGLE
+#define USE_SIMPLE
+#define USE_EMB_LIST
+#define USE_BASE_TYPES
+#define CHUNK_SIZE 256
+#include "pangolin.h"
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
 const char* url  = 0;
 
-namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
-static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g) : VertexMiner(g) {}
+	~AppMiner() {}
+	// toExtend (only extend the last vertex in the embedding: fast)
+	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
+		return pos == n-1;
+	}
+	// toAdd (only add vertex that is connected to all the vertices in the embedding)
+	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		return false;
+	}
+	void print_output() {
+		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
+	}
+};
 
-#define USE_DAG
-#define USE_SIMPLE
-#define USE_BASE_TYPES
-#define CHUNK_SIZE 256
-#include "Mining/vertex_miner.h"
-#include "Mining/util.h"
-
-void TcSolver(VertexMiner &miner, EmbeddingList &emb_list) {
-	UlongAccu total_num;
-	total_num.reset();
-	galois::do_all(galois::iterate((size_t)0, emb_list.size()),
-		[&](const size_t& id) {
-			total_num += miner.intersect_dag(emb_list.get_idx(1,id), emb_list.get_vid(1,id));
-		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-		galois::loopname("TriangleCouting")
-	);
-	galois::gPrint("\ttotal_num_triangles = ", total_num.reduce(), "\n\n");
-}
-
+#include "Mining/engine.h"
+/*
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
@@ -72,10 +60,10 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	read_graph(graph, filetype, filename, false, need_dag);
 	Tinitial.stop();
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n\n");
+	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 
 	ResourceManager rm;
-	VertexMiner miner(&graph);
+	AppMiner miner(&graph);
 	EmbeddingList emb_list;
 	galois::StatTimer Tinitemb("EmbListInitTime");
 	Tinitemb.start();
@@ -83,8 +71,10 @@ int main(int argc, char** argv) {
 	Tinitemb.stop();
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	TcSolver(miner, emb_list);
+	miner.tc_solver(emb_list);
 	Tcomp.stop();
+	miner.print_output();
 	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }
+*/

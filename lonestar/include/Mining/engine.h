@@ -1,3 +1,4 @@
+#ifndef TRIANGLE
 void solver(AppMiner &miner, EmbeddingList &emb_list) {
 	unsigned level = 1;
 	while (1) {
@@ -11,7 +12,7 @@ void solver(AppMiner &miner, EmbeddingList &emb_list) {
 		level ++;
 	}
 }
-
+#endif
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
@@ -29,11 +30,26 @@ int main(int argc, char** argv) {
 	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 
 	ResourceManager rm;
+
+	#ifdef TRIANGLE
+	AppMiner miner(&graph);
+	#else
 	int npatterns = 1;
 	#ifdef USE_MAP
 	npatterns = num_patterns[k-3];
 	#endif
 	AppMiner miner(&graph, k, npatterns);
+	#endif
+
+	#ifdef TRIANGLE
+	#ifdef USE_EMB_LIST
+	EmbeddingList emb_list;
+	galois::StatTimer Tinitemb("EmbListInitTime");
+	Tinitemb.start();
+	emb_list.init(graph, 2, need_dag);
+	Tinitemb.stop();
+	#endif
+	#else
 	#ifdef USE_EMB_LIST
 	EmbeddingList emb_list;
 	galois::StatTimer Tinitemb("EmbListInitTime");
@@ -45,9 +61,18 @@ int main(int argc, char** argv) {
 	miner.init(queue); // insert single-edge (two-vertex) embeddings into the queue
 	if(show) queue.printout_embeddings(0);
 	#endif
+	#endif
 
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
+
+	#ifdef TRIANGLE
+	#ifdef USE_EMB_LIST
+	miner.tc_solver(emb_list);
+	#else
+	miner.tc_solver();
+	#endif // USE_EMB_LIST
+	#else
 	#ifdef USE_EMB_LIST
 	solver(miner, emb_list);
 	#else
@@ -60,7 +85,8 @@ int main(int argc, char** argv) {
 		queue2.clean();
 		level ++;
 	}
-	#endif
+	#endif // USE_EMB_LIST
+	#endif // TRIANGLE
 	#ifdef USE_MAP
 	if (k >= 5) {
 		// TODO: need to use unsigned long for the counters

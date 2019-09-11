@@ -17,32 +17,31 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#define USE_DAG
-#define TRIANGLE
+#define USE_PID
+#define USE_MAP
 #define USE_SIMPLE
-#define USE_EMB_LIST
-#define USE_BASE_TYPES
+#define USE_CUSTOM
+#define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
-const char* name = "TC";
-const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
+
+const char* name = "Motif Counting";
+const char* desc = "Counts the vertex-induced motifs in a graph using BFS extension";
 const char* url  = 0;
+int num_patterns[3] = {2, 6, 21};
 
 class AppMiner : public VertexMiner {
 public:
-	AppMiner(Graph *g) : VertexMiner(g) {}
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
 	~AppMiner() {}
-	// toExtend (only extend the last vertex in the embedding: fast)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
-		return pos == n-1;
+	#ifdef USE_CUSTOM
+	// customized pattern classification method
+	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 
+		if (n < 4) return find_motif_pattern_id(n, i, dst, emb, pos);
+		return 0;
 	}
-	// toAdd (only add vertex that is connected to all the vertices in the embedding)
-	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		return false;
-	}
-	void print_output() {
-		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
-	}
+	#endif
+	void print_output() { printout_motifs(); }
 };
 
 #include "Mining/engine.h"

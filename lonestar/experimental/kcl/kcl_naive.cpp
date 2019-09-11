@@ -16,32 +16,31 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
-#define USE_DAG
-#define TRIANGLE
 #define USE_SIMPLE
-#define USE_EMB_LIST
 #define USE_BASE_TYPES
 #define CHUNK_SIZE 256
 #include "pangolin.h"
-const char* name = "TC";
-const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
+
+const char* name = "Kcl";
+const char* desc = "Counts the K-Cliques in an undirected graph using BFS extension";
 const char* url  = 0;
 
 class AppMiner : public VertexMiner {
 public:
-	AppMiner(Graph *g) : VertexMiner(g) {}
+	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
 	~AppMiner() {}
-	// toExtend (only extend the last vertex in the embedding: fast)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
-		return pos == n-1;
+	// toExtend (extend every vertex in the embedding: slow)
+	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		return true;
 	}
-	// toAdd (only add vertex that is connected to all the vertices in the embedding)
 	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		return false;
+		VertexId src = emb.get_vertex(pos);
+		if (dst <= src) return false;
+		if (is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst)) return false;
+		return is_all_connected_except(dst, pos, emb);
 	}
 	void print_output() {
-		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
+		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
 	}
 };
 

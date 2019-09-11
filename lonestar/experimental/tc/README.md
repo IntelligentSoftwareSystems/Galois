@@ -1,19 +1,10 @@
 DESCRIPTION 
 ===========
 
-This application counts the motifs in a graph using BFS 
-expansion. It uses the bliss library [1][2] for graph isomorphism test.
-
-motif: BFS vertex extension using SoA embedding list.
-motif_queue: BFS vertex extension using AoS embedding queue.
-motif_dfs: DFS vertex extension.
-motif_edge_induced: edge-induced motif counting as RStream.
-
-[1] Bliss: A tool for computing automorphism groups and canonical 
-labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
-[2] Tommi Junttila and Petteri Kaski. 2007. Engineering an efficient 
-canonical labeling tool for large and sparse graphs. In Proceedings 
-of the Meeting on Algorithm Engineering & Expermiments, 135-149.
+This application counts the triangles in the input graph.
+tc: extension from edge list, DAG enabled.
+tc_vertex: extension from each vertex, DAG enabled.
+tc_naive: naive implementation using undirected graph.
 
 INPUT
 ===========
@@ -38,14 +29,14 @@ BUILD
 
 1. Run cmake at BUILD directory `cd build; cmake -DUSE_EXP=1 ../`
 
-2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
+2. Run `cd <BUILD>/lonestar/experimental/tc; make -j`
 
 RUN
 ===========
 
 The following are a few example command lines.
 
--`$ ./motif <path-to-graph> -k=3 -t 28
+-`$ ./tc <path-to-graph> -k=3 -t 40`
 
 PERFORMANCE
 ===========

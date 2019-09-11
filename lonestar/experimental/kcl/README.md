@@ -1,7 +1,10 @@
 DESCRIPTION 
 ===========
 
-This application counts the K-Cliques in a graph using BFS expansion.
+This application counts the k-Cliques in a graph 
+kcl: BFS vertex extension using SoA embedding list.
+kcl_queue: BFS vertex extension using AoS embedding queue.
+kcl_dfs: DFS vertex extension.
 
 INPUT
 ===========
