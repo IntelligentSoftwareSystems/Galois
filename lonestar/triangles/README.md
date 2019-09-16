@@ -7,6 +7,8 @@ implement both node-iterator and edge-iterator algorithms from the following:
 Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
 Thesis. Universitat Karlsruhe. 2007.
 
+We also have an ordered count algorithm that sorts the nodes by degree before
+execution: this has been found to give good performance.
 
 INPUT
 ===========
@@ -29,14 +31,15 @@ The following are a few example command lines.
 
 -`$ ./triangles <path-symmetric-graph> -algo edgeiterator -t 40`
 -`$ ./triangles <path-symmetric-graph> -t 20 -algo nodeiterator`
+-`$ ./triangles <path-symmetric-graph> -t 20 -algo orderedCount`
 
 
 PERFORMANCE
 ===========
 
-- In our experience, edgeiterator algorithm gives the best performance.
+- In our experience, orderedCount algorithm gives the best performance.
 
-- The performance of both algorithms depend on an optimal choice of the compile 
+- The performance of algorithms depend on an optimal choice of the compile 
 time constant, CHUNK_SIZE, the granularity of stolen work when work stealing is 
 enabled (via galois::steal()). The optimal value of the constant might depend on 
 the architecture, so you might want to evaluate the performance over a range of 
