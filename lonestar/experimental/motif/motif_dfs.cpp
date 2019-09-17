@@ -49,6 +49,7 @@ int main(int argc, char** argv) {
 	//std::cout << "core = " << core << "\n";
 	//print_graph(graph);
 
+	ResourceManager rm;
 	int npatterns = 1;
 	#ifdef USE_MAP
 	npatterns = num_patterns[k-3];
@@ -59,5 +60,6 @@ int main(int argc, char** argv) {
 	miner.edge_process_base();
 	Tcomp.stop();
 	miner.print_output();
+	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

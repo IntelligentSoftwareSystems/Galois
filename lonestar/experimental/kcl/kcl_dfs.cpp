@@ -20,6 +20,7 @@
 #define USE_DAG
 #define USE_DFS
 //#define ALGO_EDGE
+#define USE_EGONET
 #define CHUNK_SIZE 256
 #include "pangolin.h"
 
@@ -48,6 +49,7 @@ int main(int argc, char** argv) {
 	std::cout << "core = " << core << "\n";
 	//print_graph(graph);
 
+	ResourceManager rm;
 	int npatterns = 1;
 	#ifdef USE_MAP
 	npatterns = num_patterns[k-3];
@@ -62,5 +64,6 @@ int main(int argc, char** argv) {
 	#endif
 	Tcomp.stop();
 	miner.print_output();
+	std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

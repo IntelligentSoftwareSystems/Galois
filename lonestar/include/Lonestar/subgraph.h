@@ -177,7 +177,9 @@ public:
 		max_size = size;
 		is_dag = use_dag;
 		for (int i = 0; i < numThreads; i++) {
+			#ifdef USE_EGONET
 			egonets.getLocal(i)->allocate(core, size);
+			#endif
 			emb_lists.getLocal(i)->allocate(core, size);
 		}
 		npatterns = np;
@@ -258,6 +260,7 @@ public:
 			if(debug) printf("init: v[%d] = %d\n", new_size, dst);
 			new_size ++;
 		}
+		/*
 		if (max_size > 3) {
 			if (max_size == 4) {
 			} else {
@@ -279,6 +282,7 @@ public:
 				}
 			}
 		}
+		*/
 		for (auto e : graph->edges(v)) {
 			auto dst = graph->getEdgeDst(e);
 			ids[dst] = (unsigned)-1;
@@ -513,7 +517,11 @@ public:
 			//[&](const size_t &u, auto &ctx) {
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),
 			[&](const size_t &u) {
+				#ifdef USE_EGONET
 				Egonet *egonet = egonets.getLocal();
+				#else
+				Egonet *egonet = NULL;
+				#endif
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				UintList *id_list = id_lists.getLocal();
 				UintList *old_id_list = old_id_lists.getLocal();
@@ -530,7 +538,11 @@ public:
 		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
 		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
 			[&](const Edge &edge) {
+				#ifdef USE_EGONET
 				Egonet *egonet = egonets.getLocal();
+				#else
+				Egonet *egonet = NULL;
+				#endif
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				UintList *id_list = id_lists.getLocal();
 				UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
@@ -551,7 +563,11 @@ public:
 			//[&](const Edge &edge, auto &ctx) {
 		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
 			[&](const Edge &edge) {
+				#ifdef USE_EGONET
 				Egonet *egonet = egonets.getLocal();
+				#else
+				Egonet *egonet = NULL;
+				#endif
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				UintList *id_list = id_lists.getLocal();
 				UintList *old_id_list = old_id_lists.getLocal();
