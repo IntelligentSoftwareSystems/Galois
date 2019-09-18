@@ -17,49 +17,53 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#define USE_PID
-#define USE_GSTL
 #define USE_DOMAIN
 #define ENABLE_LABEL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
+
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS extension";
 const char* url  = 0;
 int total_num = 0;
 
-void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
+void FsmSolver(EdgeMiner &miner) {
 	unsigned level = 1;
-	if (debug) emb_list.printout_embeddings(1);
+	EmbeddingQueueType queue, filtered_queue;
 	int num_freq_patterns = miner.init_aggregator();
 	total_num += num_freq_patterns;
-	if (num_freq_patterns == 0) {
+	if(num_freq_patterns == 0) {
 		std::cout << "No frequent pattern found\n\n";
 		return;
 	}
 	std::cout << "Number of frequent single-edge patterns: " << num_freq_patterns << "\n";
-	miner.init_filter(emb_list);
-	if (show) emb_list.printout_embeddings(level);
+	if (debug) miner.printout_agg();
+	miner.init_filter(filtered_queue);
 
+	// a level-by-level approach for Apriori search space (breadth first seach)
 	while (1) {
-		miner.extend_edge(level, emb_list);
 		level ++;
-		if (show) emb_list.printout_embeddings(level, debug);
-		miner.quick_aggregate(level, emb_list);
+		queue.clear();
+		miner.extend_edge(filtered_queue, queue);
+		if (show) queue.printout_embeddings(level, debug);
+
+		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
+		miner.quick_aggregate(queue);
 		miner.merge_qp_map(level+1);
+		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
 		miner.canonical_aggregate();
 		miner.merge_cg_map(level+1);
 
 		num_freq_patterns = miner.support_count();
-		if (show) std::cout << "num_frequent_patterns: " << num_freq_patterns << "\n";
-		if (debug) miner.printout_agg();
-
 		total_num += num_freq_patterns;
+		if (debug) miner.printout_agg();
 		if (num_freq_patterns == 0) break;
 		if (level == k) break;
-		miner.filter(level, emb_list);
-		if (show) emb_list.printout_embeddings(level, debug);
+
+		filtered_queue.clear();
+		miner.filter(queue, filtered_queue);
+		if (show) filtered_queue.printout_embeddings(level, debug);
 	}
 	std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n\n";
 }
@@ -73,20 +77,12 @@ int main(int argc, char** argv) {
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
-	//std::cout << "max_size = " << k << std::endl;
-	//std::cout << "min_support = " << minsup << std::endl;
-	//std::cout << "num_threads = " << numThreads << std::endl;
 
-	assert(k > 1);
-	ResourceManager rm;
 	EdgeMiner miner(&graph);
 	miner.set_threshold(minsup);
-	EmbeddingList emb_list;
-	emb_list.init(graph, k+1);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	FsmSolver(miner, emb_list);
+	FsmSolver(miner);
 	Tcomp.stop();
-	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

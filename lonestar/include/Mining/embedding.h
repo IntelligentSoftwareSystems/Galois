@@ -240,7 +240,7 @@ public:
 		#ifdef ENABLE_LABEL
 		his_lists.resize(max_level);
 		his_lists[1].resize(num_emb);
-		for (size_t i = 0; i< num_emb; i ++)
+		//for (size_t i = 0; i< num_emb; i ++)
 		galois::do_all(galois::iterate((size_t)0, num_emb),
 			[&](const size_t& pos) {
 				his_lists[1][pos] = 0;

@@ -17,39 +17,16 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Bag.h"
-#include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/runtime/Profile.h"
-#include <boost/iterator/transform_iterator.hpp>
-
-const char* name = "FSM";
-const char* desc = "Frequent subgraph mining in a graph using BFS extension";
-const char* url  = 0;
-
-namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-static cll::opt<unsigned> k("k", cll::desc("max number of vertices in FSM (default value 2)"), cll::init(2));
-static cll::opt<unsigned> minsup("ms", cll::desc("minimum support (default value 5000)"), cll::init(5000));
-static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
-static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
-typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
-
 #define USE_PID
 #define USE_GSTL
 #define USE_DOMAIN
 #define ENABLE_LABEL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/edge_miner.h"
-#include "Mining/util.h"
+#include "pangolin.h"
+const char* name = "FSM";
+const char* desc = "Frequent subgraph mining in a graph using BFS extension";
+const char* url  = 0;
 int total_num = 0;
 
 void FsmSolver(EdgeMiner &miner, EmbeddingList& emb_list) {
