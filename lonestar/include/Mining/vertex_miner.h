@@ -11,6 +11,28 @@ typedef galois::substrate::PerThreadStorage<StrCgMapFreq> LocalStrCgMapFreq;
 typedef galois::gstl::Vector<BaseEmbedding> BaseEmbeddingBuffer;
 typedef galois::gstl::Vector<VertexEmbedding> VertexEmbeddingBuffer;
 
+#define UNVISITED 0
+#define VISITED 1
+
+class Status {
+protected:
+	std::vector<uint8_t> visited;
+public:
+	Status() {}
+	~Status() {}
+	void init(unsigned size) {
+		visited.resize(size);
+		reset();
+	}
+	void reset() {
+		std::fill(visited.begin(), visited.end(), UNVISITED);
+	}
+	void set(VertexId pos, uint8_t value) { visited[pos] = value; }
+	uint8_t get(VertexId pos) { return visited[pos]; }
+};
+
+typedef galois::substrate::PerThreadStorage<Status> StatusMT; // multi-threaded
+
 class VertexMiner : public Miner {
 public:
 	VertexMiner(Graph *g, unsigned size = 3, int np = 1) {
@@ -586,17 +608,12 @@ public:
 	}
 
 private:
-	int npatterns;
-	unsigned max_size;
-	UlongAccu total_num;
-	std::vector<UlongAccu> accumulators;
 	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
 	StrQpMapFreq qp_map; // quick patterns map for counting the frequency
 	StrCgMapFreq cg_map; // canonical graph map for couting the frequency
 	LocalStrQpMapFreq qp_localmaps; // quick patterns local map for each thread
 	LocalStrCgMapFreq cg_localmaps; // canonical graph local map for each thread
 	galois::substrate::SimpleLock slock;
-
 	template <typename EmbeddingTy>
 	inline void get_embedding(unsigned level, unsigned pos, const EmbeddingList& emb_list, EmbeddingTy &emb) {
 		VertexId vid = emb_list.get_vid(level, pos);
@@ -615,6 +632,43 @@ private:
 	}
 
 protected:
+	int npatterns;
+	unsigned max_size;
+	UlongAccu total_num;
+	std::vector<UlongAccu> accumulators;
+	#ifdef USE_QUERY_GRAPH
+	std::vector<VertexId> matching_order;
+	std::vector<VertexId> matching_order_map;
+	std::vector<VertexId> automorph_group_id;
+	StatusMT mt_status;
+	// Read the preset file to hardcode the presets
+	void read_presets() {
+		std::ifstream ifile;
+		ifile.open(preset_filename);
+		if (!ifile) printf("Error in reading file\n");
+		VertexId x;
+		for (size_t i = 0; i< max_size; ++i) {
+			ifile >> x;
+			matching_order[i] = x;
+			//std::cout << "matching_order[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			matching_order_map[i] = x;
+			//std::cout << "matching_map[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			automorph_group_id[i] = x;
+			//std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
+		}
+		ifile.close();
+	}
+	#endif
+	unsigned get_degree(Graph *g, VertexId vid) {
+		return std::distance(g->edge_begin(vid), g->edge_end(vid));
+	}
+
 	template <typename EmbeddingTy = VertexEmbedding>
 	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
 		//unsigned n = emb.size();

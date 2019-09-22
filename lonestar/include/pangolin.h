@@ -14,6 +14,10 @@
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
+#ifdef USE_QUERY_GRAPH
+static cll::opt<std::string> query_graph_filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
+static cll::opt<std::string> preset_filename("pf", cll::desc("<filename: preset matching order>"), cll::init("default"));
+#endif
 #ifndef TRIANGLE
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 #endif
