@@ -1,4 +1,4 @@
-#include "Lonestar/mgraph.h"
+#include "mgraph.h"
 #include "res_man.h"
 
 void print_graph(Graph &graph) {

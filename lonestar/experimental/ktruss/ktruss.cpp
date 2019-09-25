@@ -43,7 +43,7 @@ typedef std::pair<GNode, GNode> NodePair;
 typedef galois::InsertBag<NodePair> EdgeVec;
 
 #define CHUNK_SIZE 256
-#include "Mining/util.h"
+#include "util.h"
 
 static const uint32_t valid   = 0x0;
 static const uint32_t removed = 0x1;

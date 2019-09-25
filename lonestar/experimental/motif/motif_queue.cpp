@@ -44,5 +44,5 @@ public:
 	void print_output() { printout_motifs(); }
 };
 
-#include "Mining/engine.h"
+#include "BfsMining/engine.h"
 

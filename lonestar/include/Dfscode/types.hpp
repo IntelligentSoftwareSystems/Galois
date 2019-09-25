@@ -13,7 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
-#include "../Lonestar/common_types.h"
+#include "../common_types.h"
 
 typedef std::vector<VeridT> RMPath;
 //typedef int edge_label_t;

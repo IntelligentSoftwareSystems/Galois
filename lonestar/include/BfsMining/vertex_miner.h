@@ -93,7 +93,14 @@ public:
 								BaseEmbedding new_emb(emb);
 								new_emb.push_back(dst);
 								out_queue.push_back(new_emb);
-							} else total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+							} else {
+								if (debug) {
+									BaseEmbedding new_emb(emb);
+									new_emb.push_back(dst);
+									std::cout << new_emb << "\n";
+								}
+								total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+							}
 						}
 					}
 				}
@@ -645,22 +652,22 @@ protected:
 	void read_presets() {
 		std::ifstream ifile;
 		ifile.open(preset_filename);
-		if (!ifile) printf("Error in reading file\n");
+		if (!ifile) printf("Error in reading file %s\n", preset_filename.c_str());
 		VertexId x;
 		for (size_t i = 0; i< max_size; ++i) {
 			ifile >> x;
 			matching_order[i] = x;
-			//std::cout << "matching_order[" << i << "] = " << x << "\n";
+			if(debug) std::cout << "matching_order[" << i << "] = " << x << "\n";
 		}
 		for (size_t i = 0; i < max_size; ++i) {
 			ifile >> x;
 			matching_order_map[i] = x;
-			//std::cout << "matching_map[" << i << "] = " << x << "\n";
+			if(debug) std::cout << "matching_map[" << i << "] = " << x << "\n";
 		}
 		for (size_t i = 0; i < max_size; ++i) {
 			ifile >> x;
 			automorph_group_id[i] = x;
-			//std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
+			if(debug) std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
 		}
 		ifile.close();
 	}

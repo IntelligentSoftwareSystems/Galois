@@ -45,5 +45,5 @@ public:
 	}
 };
 
-#include "Mining/engine.h"
+#include "BfsMining/engine.h"
 

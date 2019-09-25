@@ -17,29 +17,15 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Bag.h"
-#include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/runtime/Profile.h"
-#include <boost/iterator/transform_iterator.hpp>
+#define TRIANGLE
+#define USE_SIMPLE
+#define USE_BASE_TYPES
+#define CHUNK_SIZE 256
+#include "pangolin.h"
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (only works for undirected neighbor-sorted graphs)";
 const char* url  = 0;
-
-namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: symmetrized graph>"), cll::Required);
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
-
-#define CHUNK_SIZE 256
-#include "Mining/util.h"
 
 void TcSolver(Graph& graph) {
 	galois::GAccumulator<unsigned> total_num;

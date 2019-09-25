@@ -26,12 +26,14 @@ public:
 		matching_order.resize(max_size);
 		matching_order_map.resize(max_size);
 		automorph_group_id.resize(max_size);
-		//read_presets();
+		read_presets();
+		/*
 		for (size_t i = 0; i < max_size; ++i) {
 			matching_order[i] = i;
 			matching_order_map[i] = i;
 			automorph_group_id[i] = 0;
 		}
+		//*/
 		for(int tid = 0; tid < numThreads; ++tid){
 			Status *status = mt_status.getLocal();
 			status->init(max_size);
@@ -40,29 +42,89 @@ public:
 	~AppMiner() {}
 	// toExtend (only extend the last vertex in the embedding: fast)
 	bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
-		return true;//pos == n-1;
+		return true;
+		//return pos == n-1;
 	}
 	// toAdd (only add vertex that is connected to all the vertices in the embedding)
 	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		VertexId src = emb.get_vertex(pos);
-		//std::cout << "\t n = " << n << ", src = " << src << ", dst = " << dst << ", pos = " << pos << "\n";
+		VertexId next_qnode = get_query_vertex(n); // using matching order to get query vertex id
+		if (debug) {
+			VertexId src = emb.get_vertex(pos);
+			std::cout << "\t n = " << n << ", pos = " << pos << ", src = " << src << ", dst = " << dst << "\n";
+		}
 		//std::cout << ", deg(d) = " << get_degree(graph, dst) << ", deg(q) = " << get_degree(query_graph, pos+1);
-		if (get_degree(graph, dst) < get_degree(query_graph, n)) return false;
-		if (is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst)) return false;
-		//std::cout << "\tthis is canonical";
+		//
+		// if the degree is smaller than that of its corresponding query vertex
+		if (get_degree(graph, dst) < get_degree(query_graph, next_qnode)) return false;
+		// if this vertex already exists in the embedding
+		for (unsigned i = 0; i < n; ++i) if (dst == emb.get_vertex(i)) return false;
+		///*
 		// check the connectivity with previous vertices in the embedding
-		for (auto e : query_graph->edges(n)) {
-			VertexId query_prime = query_graph->getEdgeDst(e);
-			//if (src == 2 && dst == 6) std::cout << "\t query_prime = " << query_prime;
-			if (query_prime < n) {
-				VertexId data_prime = emb.get_vertex(query_prime);
-				//if (src == 2 && dst == 6) std::cout << "\t data_prime = " << data_prime;
-				if (!is_connected(dst, data_prime)) return false;
+		for (auto e : query_graph->edges(next_qnode)) {
+			VertexId q_dst = query_graph->getEdgeDst(e);
+			unsigned q_order = matching_order_map[q_dst];
+			if (q_order < n && q_order != pos) {
+				VertexId d_vertex = emb.get_vertex(q_order);
+				//if (debug && n == 3 && pos == 1 && emb.get_vertex(pos) == 3 && dst == 5) std:: cout << "\t\t d_vedrtex = " << d_vertex << "\n";
+				if (!is_connected(dst, d_vertex)) return false;
 			}
 		}
-		//std::cout << "\t extending with vertex " << dst << "\n";
+		//*/
+		// if it is a redundant candidate (a neighbor of previous vertex)
+		//for (unsigned i = 0; i < pos; ++i)
+		//	if (is_connected(emb.get_vertex(i), dst)) return false;
+		// if it is not the canonical automorphism
+		for (unsigned i = 0; i < n; ++i) {
+			VertexId q_neighbor = get_query_vertex(i);
+			if (automorph_group_id[q_neighbor] == automorph_group_id[next_qnode]) {
+				VertexId dnode = emb.get_vertex(i);
+				if ((q_neighbor < next_qnode && dnode > dst) ||
+					(q_neighbor > next_qnode && dnode < dst))
+					return false;
+			}
+		}
+		if (debug) std::cout << "\t extending with vertex " << dst << "\n";
 		return true;
 	}
+	inline void extend_vertex(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
+		galois::do_all(galois::iterate(in_queue),
+			[&](const BaseEmbedding& emb) {
+				unsigned n = emb.size();
+				if (debug) std::cout << "current embedding: " << emb << "\n";
+				//for (unsigned i = 0; i < n; ++i) {
+					//if(!toExtend(n, emb, i)) continue;
+					//VertexId src = emb.get_vertex(i);
+				// get next query vertex
+				VertexId next_qnode = get_query_vertex(n); // using matching order to get query vertex id
+				// for each neighbor of the next query vertex in the query graph
+				for (auto q_edge : query_graph->edges(next_qnode)) {
+					VertexId q_dst = query_graph->getEdgeDst(q_edge);
+					unsigned q_order = matching_order_map[q_dst]; // using query vertex id to get its matching order
+					// if the neighbor is aready visited
+					if (q_order < n) {
+						// get the matched data vertex
+						VertexId d_vertex = emb.get_vertex(q_order);
+						// each neighbor of d_vertex is a candidate
+						for (auto d_edge : graph->edges(d_vertex)) {
+							GNode d_dst = graph->getEdgeDst(d_edge);
+							if (toAdd(n, emb, d_dst, q_order)) {
+								if (n < max_size-1) { // generate a new embedding and add it to the next queue
+									BaseEmbedding new_emb(emb);
+									new_emb.push_back(d_dst);
+									out_queue.push_back(new_emb);
+								} else total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+							}
+						}
+						break;
+					}
+				}
+			},
+			galois::chunk_size<CHUNK_SIZE>(), 
+			galois::steal(), 
+			galois::loopname("Extending")
+		);
+	}
+	VertexId get_query_vertex(unsigned id) { return matching_order[id]; }
 	void print_output() {
 		std::cout << "\n\ttotal_num_subgraphs = " << get_total_count() << "\n";
 	}
@@ -92,16 +154,17 @@ int main(int argc, char** argv) {
 
 	ResourceManager rm;
 	AppMiner miner(&data_graph, &query_graph, query_graph.size(), 1);
+	VertexId curr_qnode = miner.get_query_vertex(0);
 	EmbeddingQueueType queue, queue2;
 	for (size_t i = 0; i < data_graph.size(); ++i) {
-		if(get_degree(data_graph, i) < get_degree(query_graph, 0)) continue;
+		if(get_degree(data_graph, i) < get_degree(query_graph, curr_qnode)) continue;
 		EmbeddingType emb;
 		emb.push_back(i);
 		queue.push_back(emb);
 	}
 	unsigned level = 1;
 	while(1) {
-		if (show) queue.printout_embeddings(level);
+		if (show) queue.printout_embeddings(level, debug);
 		miner.extend_vertex(queue, queue2);
 		if (level == query_graph.size()-1) break; // if embedding size = k, done
 		queue.swap(queue2);

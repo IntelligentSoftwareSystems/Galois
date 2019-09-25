@@ -42,8 +42,8 @@ typedef Graph::GraphNode GNode;
 #define USE_STRUCTURAL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 256
-#include "Mining/edge_miner.h"
-#include "Mining/util.h"
+#include "BfsMining/edge_miner.h"
+#include "util.h"
 
 void MotifSolver(EdgeMiner &miner) {
 	EmbeddingQueueType in_queue, out_queue; // in&out worklist. double buffering
