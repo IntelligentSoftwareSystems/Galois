@@ -1,8 +1,6 @@
 #ifndef MINER_HPP_
 #define MINER_HPP_
-#include "quick_pattern.h"
-#include "canonical_graph.h"
-#include "types.h"
+#include "embedding.h"
 
 template <typename T>
 inline galois::gstl::Vector<T> parallel_prefix_sum(const galois::gstl::Vector<T> &degrees) {
@@ -60,7 +58,6 @@ public:
 
 protected:
 	Graph *graph;
-	galois::StatTimer Tconnect;
 	std::vector<unsigned> degrees;
 	void degree_counting() {
 		degrees.resize(graph->size());

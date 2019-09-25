@@ -1,6 +1,10 @@
 #ifndef VERTEX_MINER_H
 #define VERTEX_MINER_H
 #include "miner.h"
+#include "embedding_list.h"
+#include "quick_pattern.h"
+#include "canonical_graph.h"
+
 typedef std::unordered_map<BaseEmbedding, Frequency> SimpleMap;
 typedef QuickPattern<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrQPattern; // structural quick pattern
 typedef CanonicalGraph<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrCPattern; // structural canonical pattern

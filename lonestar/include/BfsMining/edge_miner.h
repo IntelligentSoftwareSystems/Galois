@@ -1,6 +1,9 @@
 #ifndef EDGE_MINER_H
 #define EDGE_MINER_H
 #include "miner.h"
+#include "embedding_list.h"
+#include "quick_pattern.h"
+#include "canonical_graph.h"
 #include "domain_support.h"
 
 typedef std::pair<unsigned, unsigned> InitPattern;

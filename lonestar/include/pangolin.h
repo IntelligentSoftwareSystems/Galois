@@ -36,7 +36,7 @@ typedef Graph::GraphNode GNode;
 #include "common_types.h"
 #include "Dfscode/miner.h"
 #else
-#include "DfsMining/subgraph.h"
+#include "DfsMining/vertex_miner.h"
 #endif
 #else
 #ifdef EDGE_INDUCED

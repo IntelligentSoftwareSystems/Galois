@@ -1,32 +1,6 @@
 #ifndef EDGELIST_H_
 #define EDGELIST_H_
-
 #include "types.h"
-typedef unsigned IndexTy;
-typedef unsigned VertexId;
-typedef unsigned char BYTE;
-typedef unsigned long Ulong;
-typedef galois::gstl::Vector<BYTE> ByteList;
-typedef galois::gstl::Vector<unsigned> UintList;
-typedef galois::gstl::Vector<Ulong> UlongList;
-typedef galois::gstl::Vector<VertexId> VertexList;
-typedef galois::gstl::Vector<UintList> IndexLists;
-typedef galois::gstl::Vector<ByteList> ByteLists;
-typedef galois::gstl::Vector<VertexList> VertexLists;
-typedef galois::gstl::Set<VertexId> VertexSet;
-typedef galois::substrate::PerThreadStorage<UintList> Lists;
-
-struct Edge {
-	IndexTy src;
-	IndexTy dst;
-	Edge() : src(0), dst(0) {}
-	Edge(IndexTy from, IndexTy to) : src(from), dst(to) {}
-	std::string to_string() const {
-		std::stringstream ss;
-		ss << "e(" << src << "," << dst << ")";
-		return ss.str();
-	}
-};
 
 class EdgeList {
 using iterator = typename galois::gstl::Vector<Edge>::iterator;
@@ -36,15 +10,16 @@ public:
 		init(graph, is_dag);
 	}
 	~EdgeList() {}
-	bool empty() const { return edgelist.empty(); }
-	iterator begin() { return edgelist.begin(); }
-	iterator end() { return edgelist.end(); }
-	size_t size() const { return edgelist.size(); }
-	void resize (size_t n) { edgelist.resize(n); }
+	bool empty() const { return edges.empty(); }
+	iterator begin() { return edges.begin(); }
+	iterator end() { return edges.end(); }
+	size_t size() const { return edges.size(); }
+	void resize (size_t n) { edges.resize(n); }
+	Edge & get_edge(unsigned i) { return edges[i]; }
 	void init(Graph& graph, bool is_dag = false) {
 		size_t num_edges = graph.sizeEdges();
 		if (!is_dag) num_edges = num_edges / 2;
-		edgelist.resize(num_edges);
+		edges.resize(num_edges);
 		if(is_dag) {
 			galois::do_all(galois::iterate(graph.begin(), graph.end()),
 				[&](const GNode& src) {
@@ -94,10 +69,9 @@ public:
 		}
 	}
 private:
-	//std::vector<Edge> edgelist;
-	galois::gstl::Vector<Edge> edgelist;
+	galois::gstl::Vector<Edge> edges;
 	void add_edge(unsigned pos, IndexTy src, IndexTy dst) {
-		edgelist[pos] = Edge(src, dst);
+		edges[pos] = Edge(src, dst);
 	}
 };
 #endif

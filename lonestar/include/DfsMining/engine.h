@@ -1,19 +1,4 @@
 
-	void edge_process() {
-		std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
-		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-			[&](const Edge &edge) {
-				EmbeddingList *emb_list = emb_lists.getLocal();
-				UintList *id_list = id_lists.getLocal();
-				UintList *old_id_list = old_id_lists.getLocal();
-				build_egonet_from_edge(edge, *egonet, *emb_list, *id_list, *old_id_list);
-				if (max_size > 3) dfs_extend(max_size-2, *egonet, *emb_list);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("KclSolver")
-		);
-	}
-
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
@@ -38,11 +23,15 @@ int main(int argc, char** argv) {
 	#ifdef USE_MAP
 	npatterns = num_patterns[k-3];
 	#endif
-	DfsMiner miner(&graph, core, k);
+	AppMiner miner(&graph, k, need_dag, npatterns, core);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	#ifdef ALGO_EDGE
+	#ifdef USE_EGONET
 	miner.edge_process();
+	#else
+	miner.edge_process_naive();
+	#endif
 	#else
 	miner.vertex_process();
 	#endif

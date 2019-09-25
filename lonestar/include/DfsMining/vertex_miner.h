@@ -1,94 +1,30 @@
-#ifndef EGONET_H_
-#define EGONET_H_
+#ifndef MINER_H_
+#define MINER_H_
+#include "miner.h"
+#include "egonet.h"
 #include "edgelist.h"
-#ifdef ALGO_EDGE
-#define BOTTOM 1
-#else
-#define BOTTOM 2
-#endif
+#include "embedding_list.h"
 
-class EmbeddingList {
+class VertexMiner : public Miner {
 public:
-	EmbeddingList() {}
-	EmbeddingList(int core, unsigned k) {
-		allocate(core, k);
-	}
-	void allocate(int core, unsigned k) {
-		max_level = k;
-		cur_level = k-1;
-		sizes.resize(k);
-		label.resize(core);
-		for (unsigned i = 0; i < k; i ++) sizes[i] = 0;
-		vid_lists.resize(k);
-		for (unsigned i = BOTTOM; i < k; i ++) vid_lists[i].resize(core);
-	}
-	~EmbeddingList() {}
-	size_t size() const { return sizes[cur_level]; }
-	size_t size(unsigned level) { return sizes[level]; }
-	unsigned get_vertex(unsigned level, unsigned i) { return vid_lists[level][i]; }
-	BYTE get_label(unsigned vid) { return label[vid]; }
-	unsigned get_level() { return cur_level; }
-	void set_size(unsigned level, unsigned size) { sizes[level] = size; }
-	void set_vertex(unsigned level, unsigned i, unsigned value) { vid_lists[level][i] = value; }
-	void set_label(unsigned vid, BYTE value) { label[vid] = value; }
-	void set_level(unsigned level) { cur_level = level; }
-protected:
-	VertexLists vid_lists;
-	UintList sizes; //sizes[level]: no. of embeddings (i.e. no. of vertices in the the current level)
-	ByteList label;//label[i] is the label of each vertex i that shows its current level
-	unsigned max_level;
-	unsigned cur_level;
-};
-typedef galois::substrate::PerThreadStorage<EmbeddingList> EmbeddingLists;
-
-class Egonet {
-public:
-	Egonet() {}
-	Egonet(unsigned c, unsigned k) {
-		allocate(c, k);
-	}
-	~Egonet() {}
-	void allocate(int core, unsigned k) {
-		max_size = k;
-		degrees.resize(k);
-		for (unsigned i = BOTTOM; i < k; i ++) degrees[i].resize(core);
-		adj.resize(core*core);
-		//emb_list.allocate(core, k);
-	}
-	unsigned get_adj(unsigned vid) { return adj[vid]; }
-	unsigned get_degree(unsigned level, unsigned i) { return degrees[level][i]; }
-	void set_adj(unsigned vid, unsigned value) { adj[vid] = value; }
-	void set_degree(unsigned level, unsigned i, unsigned degree) { degrees[level][i] = degree; }
-	void inc_degree(unsigned level, unsigned i) { degrees[level][i] ++; }
-	//unsigned get_vertex(unsigned level, unsigned i) { return emb_list.get_vertex(level, i); }
-	//void set_vertex(unsigned level, unsigned i, unsigned value) { emb_list.set_vertex(level, i, value); }
-protected:
-	unsigned max_size;
-	UintList adj;//truncated list of neighbors
-	IndexLists degrees;//degrees[level]: degrees of the vertices in the egonet
-	//EmbeddingList emb_list;
-};
-typedef galois::substrate::PerThreadStorage<Egonet> Egonets;
-
-class DfsMiner {
-public:
-	DfsMiner(Graph *g, unsigned c, unsigned size = 3, bool use_dag = true, int np = 1) {
+	VertexMiner(Graph *g, unsigned size = 3, bool use_dag = true, int np = 1, unsigned c = 0) {
 		graph = g;
 		core = c;
 		max_size = size;
 		is_dag = use_dag;
-		for (int i = 0; i < numThreads; i++) {
-			#ifdef USE_EGONET
-			egonets.getLocal(i)->allocate(core, size);
-			#endif
-			emb_lists.getLocal(i)->allocate(core, size);
-		}
+		degree_counting();
 		npatterns = np;
 		if (npatterns == 1) total_num.reset();
 		else {
 			accumulators.resize(npatterns);
 			for (int i = 0; i < npatterns; i++) accumulators[i].reset();
 			std::cout << max_size << "-motif has " << npatterns << " patterns in total\n";
+		}
+		for (int i = 0; i < numThreads; i++) {
+			#ifdef USE_EGONET
+			egonets.getLocal(i)->allocate(core, size);
+			#endif
+			emb_lists.getLocal(i)->allocate(core, size);
 		}
 		edge_list.init(*g, is_dag);
 		// connected k=3 motifs
@@ -102,7 +38,60 @@ public:
 		total_3_star = 0;
 		total_4_path = 0;
 	}
-	virtual ~DfsMiner() {}
+	virtual ~VertexMiner() {}
+
+	// Pangolin APIs
+	// toExtend
+	virtual bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+		return true;
+	}
+	// toAdd (only add non-automorphisms)
+	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+		return true;
+	}
+	virtual void print_output() {
+	}
+
+	void dfs_from_edge_naive(unsigned level, unsigned pos, EmbeddingList &emb_list) {
+		unsigned n = level + 1;
+		BaseEmbedding emb(n);
+		emb_list.get_embedding<BaseEmbedding>(level, pos, emb);
+		if (debug) printf("debug: level = %d\n", level);
+		if (level == max_size-2) {
+			for (unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
+				unsigned vid = emb_list.get_vertex(level, i);
+				auto begin = graph->edge_begin(vid);
+				auto end = graph->edge_end(vid);
+				for (auto e = begin; e != end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (toAdd(n, emb, dst, level))
+						total_num += 1;
+				}
+			}
+			return;
+		}
+		for(unsigned i = 0; i < emb_list.size(level); i ++) {
+			unsigned vid = emb_list.get_vertex(level, i);
+			auto begin = graph->edge_begin(vid);
+			auto end = graph->edge_end(vid);
+			emb_list.set_size(level+1, 0);
+			if(debug) printf("debug: vid = %d\n", vid);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if(debug) printf("\tdebug: dst = %d\n", dst);
+				if (toAdd(n, emb, dst, level)) {
+					unsigned start = emb_list.size(level+1);
+					assert(level < max_size-1);
+					assert(start < core);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_idx(level+1, start, i);
+					emb_list.set_size(level+1, start+1);
+				}
+			}
+			dfs_from_edge_naive(level+1, i, emb_list);
+		}
+	}
+
 	// construct the subgraph induced by edge (u, v)'s neighbors
 	void dfs_from_edge(const Edge &edge, Egonet &egonet, EmbeddingList &emb_list, UintList &ids, UintList &T_vu, UintList &W_u) {
 		unsigned num_vertices = graph->size();
@@ -435,7 +424,26 @@ public:
 		);
 	}
 
-	void edge_process_base() {
+	void edge_process_naive() {
+		unsigned level = 1;
+		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
+		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+		//	[&](const Edge &edge) {
+		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
+			[&](const size_t& pos) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				emb_list->init(edge_list.get_edge(pos));
+				dfs_from_edge_naive(level, pos, *emb_list);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("DfsEdgeNaiveSolver")
+		);
+		#ifdef USE_MAP
+		motif_count();
+		#endif
+	}
+
+	void edge_process_adhoc() {
 		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
 		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
 			[&](const Edge &edge) {
@@ -528,12 +536,6 @@ public:
 		std::cout << std::endl;
 	}
 	Ulong get_total_count() { return total_num.reduce(); }
-	void print_output() {
-		if (npatterns == 1)
-			std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n\n";
-		else printout_motifs();
-	}
-
 	inline void solve_graphlet_equations(unsigned deg_v, unsigned deg_u, Ulong tri_count, Ulong w_local_count) {
 		Ulong star3_count = deg_v - tri_count - 1;
 		star3_count = star3_count + deg_u - tri_count - 1;
@@ -613,9 +615,9 @@ protected:
 	Graph *graph;
 	UintList degrees;
 	int core;
-	unsigned max_size;
 	bool is_dag;
 	int npatterns;
+	unsigned max_size;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
 	Lists Tri_vids;
@@ -638,6 +640,22 @@ protected:
 		for (size_t i = 0; i < graph->size(); i++) {
 			degrees[i] = graph->edge_end(i) - graph->edge_begin(i);
 		}
+	}
+
+	template <typename EmbeddingTy = BaseEmbedding>
+	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
+		// the new vertex id should be larger than the first vertex id
+		if (dst <= emb.get_vertex(0)) return true;
+		// the new vertex should not already exist in the embedding
+		for (unsigned i = 1; i < n; ++i)
+			if (dst == emb.get_vertex(i)) return true;
+		// the new vertex should not already be extended by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(emb.get_vertex(i), dst)) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < n; ++i)
+			if (dst < emb.get_vertex(i)) return true;
+		return false;
 	}
 };
 

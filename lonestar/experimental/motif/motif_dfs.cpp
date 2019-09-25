@@ -20,46 +20,36 @@
 //#define USE_DAG
 #define USE_DFS
 #define USE_MAP
+#define USE_PID
+#define USE_WEDGE
 #define ALGO_EDGE
+#define USE_SIMPLE
+#define USE_CUSTOM
+#define ENABLE_STEAL
+#define USE_EMB_LIST
+#define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
 
-// This is a implementation of the WWW'18 paper:
-// Danisch et al., Listing k-cliques in Sparse Real-World Graphs, WWW 2018
+// This is a implementation of the ICDM'15 paper:
+// Nesreen K. Ahmed et al., Efficient Graphlet Counting for Large Networks, ICDM 2015
 const char* name = "Motif";
 const char* desc = "Counts motifs in a graph using DFS traversal";
 const char* url  = 0;
 int num_patterns[3] = {2, 6, 21};
 
-int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
-	Graph graph;
-	bool need_dag = false;
-	#ifdef USE_DAG
-	galois::gPrint("Orientation enabled, using DAG\n");
-	need_dag = true;
+class AppMiner : public VertexMiner {
+public:
+	AppMiner(Graph *g, unsigned size, int np, bool use_dag, unsigned c) : VertexMiner(g, size, np, use_dag, c) {}
+	~AppMiner() {}
+	#ifdef USE_CUSTOM
+	// customized pattern classification method
+	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 
+		//if (n < 4) return find_motif_pattern_id(n, i, dst, emb, pos);
+		return 0;
+	}
 	#endif
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
-	int core = read_graph(graph, filetype, filename, false, need_dag);
-	Tinitial.stop();
-	assert(k > 2);
-	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
-	//std::cout << "core = " << core << "\n";
-	//print_graph(graph);
+	void print_output() { printout_motifs(); }
+};
 
-	ResourceManager rm;
-	int npatterns = 1;
-	#ifdef USE_MAP
-	npatterns = num_patterns[k-3];
-	#endif
-	DfsMiner miner(&graph, core, k, need_dag, npatterns);
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	miner.edge_process_base();
-	Tcomp.stop();
-	miner.print_output();
-	std::cout << "\t" << rm.get_peak_memory() << "\n\n";
-	return 0;
-}
+#include "DfsMining/engine.h"
