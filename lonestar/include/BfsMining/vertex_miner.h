@@ -619,7 +619,6 @@ public:
 	}
 
 private:
-	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
 	StrQpMapFreq qp_map; // quick patterns map for counting the frequency
 	StrCgMapFreq cg_map; // canonical graph map for couting the frequency
 	LocalStrQpMapFreq qp_localmaps; // quick patterns local map for each thread
@@ -644,9 +643,9 @@ private:
 
 protected:
 	int npatterns;
-	unsigned max_size;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
+	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
 	#ifdef USE_QUERY_GRAPH
 	std::vector<VertexId> matching_order;
 	std::vector<VertexId> matching_order_map;
@@ -696,7 +695,6 @@ protected:
 			if (dst < emb.get_vertex(i)) return true;
 		return false;
 	}
-
 	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
 		unsigned pid = 0;
 		if (n == 2) { // count 3-motifs
@@ -747,16 +745,7 @@ protected:
 				}
 			}
 		} else { // count 5-motif and beyond
-			std::vector<bool> connected;
-			get_connectivity(n, idx, dst, emb, connected);
-			Matrix A(n+1, std::vector<MatType>(n+1, 0));
-			gen_adj_matrix(n+1, connected, A);
-			std::vector<MatType> c(n+1, 0);
-			char_polynomial(n+1, A, c);
-			bliss::UintSeqHash h;
-			for (unsigned i = 0; i < n+1; ++i)
-				h.update((unsigned)c[i]);
-			pid = h.get_value();
+			pid = find_motif_pattern_id_eigen(n, idx, dst, emb);
 		}
 		return pid;
 	}

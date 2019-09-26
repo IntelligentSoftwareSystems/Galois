@@ -10,17 +10,17 @@ public:
 	}
 	~EmbeddingList() {}
 	void init(Edge e) {
-		for (unsigned i = 2; i < k; i ++) sizes[i] = 0;
+		//std::cout << "Insert edge: " << e.toString() << "\n";
+		last_level = 1;
 		sizes[1] = 1;
 		vid_lists[1].resize(1);
 		idx_lists[1].resize(1);
-		vid_lists[1][0] = e.src;
-		idx_lists[1][0] = e.dst;
+		vid_lists[1][0] = e.dst;
+		idx_lists[1][0] = e.src;
 	}
 	void allocate(int core, unsigned k) {
 		max_level = k;
 		cur_level = k-1;
-		last_level = 1;
 		sizes.resize(k);
 		label.resize(core);
 		for (unsigned i = 0; i < k; i ++) sizes[i] = 0;
@@ -31,6 +31,7 @@ public:
 	}
 	template <typename EmbeddingTy>
 	inline void get_embedding(unsigned level, unsigned pos, EmbeddingTy &emb) {
+		//std::cout << ", get_embedding: level = " << level << ", pos = " << pos;
 		VertexId vid = get_vid(level, pos);
 		IndexTy idx = get_idx(level, pos);
 		ElementType ele(vid);

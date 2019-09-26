@@ -7,19 +7,19 @@
 
 class VertexMiner : public Miner {
 public:
-	VertexMiner(Graph *g, unsigned size = 3, bool use_dag = true, int np = 1, unsigned c = 0) {
+	VertexMiner(Graph *g, unsigned size = 3, int np = 1, bool use_dag = true, unsigned c = 0) {
 		graph = g;
-		core = c;
 		max_size = size;
-		is_dag = use_dag;
-		degree_counting();
 		npatterns = np;
+		is_dag = use_dag;
+		core = c;
 		if (npatterns == 1) total_num.reset();
 		else {
 			accumulators.resize(npatterns);
 			for (int i = 0; i < npatterns; i++) accumulators[i].reset();
 			std::cout << max_size << "-motif has " << npatterns << " patterns in total\n";
 		}
+		degree_counting();
 		for (int i = 0; i < numThreads; i++) {
 			#ifdef USE_EGONET
 			egonets.getLocal(i)->allocate(core, size);
@@ -49,46 +49,169 @@ public:
 	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
 		return true;
 	}
+	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
+		return true;
+	}
+	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
+		VertexId src = emb.get_vertex(pos);
+		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
+	}
+	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
+		return 0;
+	}
+	virtual void reduction(unsigned pid) {
+		#ifdef USE_MAP
+		accumulators[pid] += 1;
+		#else
+		total_num += 1;
+		#endif
+	}
 	virtual void print_output() {
 	}
-
-	void dfs_from_edge_naive(unsigned level, unsigned pos, EmbeddingList &emb_list) {
+	// naive DFS extension for k-cliques
+	void dfs_extend_naive(unsigned level, unsigned pos, EmbeddingList &emb_list) {
 		unsigned n = level + 1;
 		BaseEmbedding emb(n);
 		emb_list.get_embedding<BaseEmbedding>(level, pos, emb);
-		if (debug) printf("debug: level = %d\n", level);
 		if (level == max_size-2) {
-			for (unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
-				unsigned vid = emb_list.get_vertex(level, i);
+			//for (unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
+				//unsigned vid = emb_list.get_vertex(level, i);
+				unsigned vid = emb_list.get_vertex(level, pos);
 				auto begin = graph->edge_begin(vid);
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e != end; e ++) {
 					auto dst = graph->getEdgeDst(e);
-					if (toAdd(n, emb, dst, level))
-						total_num += 1;
+					if (toAdd(n, emb, dst, n-1))
+						//total_num += 1;
+						reduction(0);
+				}
+			//}
+			return;
+		}
+		//for(unsigned i = 0; i < emb_list.size(level); i ++) {
+			//unsigned vid = emb_list.get_vertex(level, i);
+			unsigned vid = emb_list.get_vertex(level, pos);
+			auto begin = graph->edge_begin(vid);
+			auto end = graph->edge_end(vid);
+			emb_list.set_size(level+1, 0);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (toAdd(n, emb, dst, n-1)) {
+					unsigned start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					//emb_list.set_idx(level+1, start, i);
+					emb_list.set_idx(level+1, start, pos);
+					emb_list.set_size(level+1, start+1);
+					dfs_extend_naive(level+1, start, emb_list);
+				}
+			//}
+			//dfs_extend_naive(level+1, i, emb_list);
+		}
+	}
+	// each task extends from a vertex, level starts from k-1 and decreases until bottom level
+	void dfs_extend(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
+		if (level == 2) {
+			for(unsigned local_id = 0; local_id < emb_list.size(level); local_id ++) { //list all edges
+				unsigned vid = emb_list.get_vertex(level, local_id);
+				unsigned begin = egonet.edge_begin(vid);
+				unsigned end = begin + egonet.get_degree(level, vid);
+				for (unsigned e = begin; e < end; e ++)
+					total_num += 1;
+			}
+			return;
+		}
+		// compute the subgraphs induced on the neighbors of each node in current level,
+		// and then recurse on such a subgraph
+		for(unsigned local_id = 0; local_id < emb_list.size(level); local_id ++) {
+			// for each vertex in current level
+			// a new induced subgraph G[∆G(u)] is built
+			unsigned vid = emb_list.get_vertex(level, local_id);
+			emb_list.set_size(level-1, 0);
+			unsigned begin = egonet.edge_begin(vid);
+			unsigned end = begin + egonet.get_degree(level, vid);
+			// extend one vertex v which is a neighbor of u
+			for (unsigned edge = begin; edge < end; edge ++) {
+				// for each out-neighbor v of node u in G, set its label to level-1
+				// if the label was equal to level. We thus have that if a label of a
+				// node v is equal to level-1 it means that node v is in the new subgraph
+				unsigned dst = egonet.getEdgeDst(edge);
+				// relabeling vertices and forming U'.
+				if (emb_list.get_label(dst) == level) {
+					unsigned pos = emb_list.size(level-1);
+					emb_list.set_vertex(level-1, pos, dst);
+					emb_list.set_size(level-1, pos+1);
+					emb_list.set_label(dst, level-1);
+					egonet.set_degree(level-1, dst, 0);//new degrees
+				}
+			}
+			// for each out-neighbor v of u
+			// reodering adjacency list and computing new degrees
+			unsigned new_size = emb_list.size(level-1);
+			if(debug) printf("debug: vid = %d, new_size = %d\n", vid, new_size);
+			for (unsigned j = 0; j < new_size; j ++) {
+				unsigned v = emb_list.get_vertex(level-1, j);
+				begin = v * core;
+				end = begin + egonet.get_degree(level, v);
+				// move all the out-neighbors of v with label equal to level − 1 
+				// in the first part of ∆(v) (by swapping nodes),
+				// and compute the out-degree of node v in the new subgraph
+				// updating degrees(v). The first degrees(v) nodes in ∆(v) are
+				// thus the out-neighbors of v in the new subgraph.
+				for (unsigned k = begin; k < end; k ++) {
+					unsigned dst = egonet.getEdgeDst(k);
+					if (emb_list.get_label(dst) == level-1)
+						egonet.inc_degree(level-1, v);
+					else {
+						egonet.set_adj(k--, egonet.getEdgeDst(--end));
+						egonet.set_adj(end, dst);
+					}
+				}
+			}
+			dfs_extend(level-1, egonet, emb_list);
+			for (unsigned j = 0; j < emb_list.size(level-1); j ++) {//restoring labels
+				unsigned v = emb_list.get_vertex(level-1, j);
+				emb_list.set_label(v, level);
+			}
+		}
+	}
+	void dfs_extend_naive_motif(unsigned level, unsigned pos, EmbeddingList &emb_list, unsigned previous_pid) {
+		unsigned n = level + 1;
+		VertexEmbedding emb(n);
+		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
+		if (level == max_size-2) {
+			// extending every vertex in the embedding
+			for (unsigned element_id = 0; element_id < n; ++ element_id) {
+				if(!toExtend(n, emb, element_id)) continue;
+				VertexId src = emb.get_vertex(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto e = begin; e != end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (toAdd(n, emb, dst, element_id))
+						reduction(getPattern(n, element_id, dst, emb, previous_pid));
 				}
 			}
 			return;
 		}
-		for(unsigned i = 0; i < emb_list.size(level); i ++) {
-			unsigned vid = emb_list.get_vertex(level, i);
-			auto begin = graph->edge_begin(vid);
-			auto end = graph->edge_end(vid);
+		// extending every vertex in the embedding
+		for (unsigned element_id = 0; element_id < n; ++ element_id) {
+			if(!toExtend(n, emb, element_id)) continue;
+			VertexId src = emb.get_vertex(element_id);
+			auto begin = graph->edge_begin(src);
+			auto end = graph->edge_end(src);
 			emb_list.set_size(level+1, 0);
-			if(debug) printf("debug: vid = %d\n", vid);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = graph->getEdgeDst(e);
-				if(debug) printf("\tdebug: dst = %d\n", dst);
-				if (toAdd(n, emb, dst, level)) {
+				if (toAdd(n, emb, dst, element_id)) {
 					unsigned start = emb_list.size(level+1);
-					assert(level < max_size-1);
-					assert(start < core);
 					emb_list.set_vid(level+1, start, dst);
-					emb_list.set_idx(level+1, start, i);
+					emb_list.set_idx(level+1, start, pos);
 					emb_list.set_size(level+1, start+1);
+					//if (n == 2 && max_size == 4)
+					unsigned pid = find_motif_pattern_id_dfs(n, element_id, dst, emb, start);
+					dfs_extend_naive_motif(level+1, start, emb_list, pid);
 				}
 			}
-			dfs_from_edge_naive(level+1, i, emb_list);
 		}
 	}
 
@@ -289,9 +412,8 @@ public:
 		}
 	}
 
-	// each task extends from a vertex, level starts from k-1 and decreases until bottom level
+	// each task extends from a vertex for motif, level starts from k-1 and decreases until bottom level
 	void dfs_extend_base(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
-		if(debug) printf("debug: level = %d\n", level);
 		if (level == 2) {
 			for(unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
 				unsigned u = emb_list.get_vertex(level, i);
@@ -306,13 +428,11 @@ public:
 		}
 		for(unsigned i = 0; i < emb_list.size(level); i ++) {
 			unsigned u = emb_list.get_vertex(level, i);
-			if(debug) printf("debug: u = %d\n", u);
 			emb_list.set_size(level-1, 0);
 			auto begin = graph->edge_begin(u);
 			auto end = graph->edge_end(u);
 			for (auto edge = begin; edge < end; edge ++) {
 				auto v = graph->getEdgeDst(edge);
-				if(debug) printf("\tdebug: v = %d, label = %d\n", v, emb_list.get_label(v));
 				if (emb_list.get_label(v) == level) {
 					unsigned pos = emb_list.size(level-1);
 					emb_list.set_vertex(level-1, pos, v);
@@ -328,85 +448,12 @@ public:
 		}
 	}
 
-	// each task extends from a vertex, level starts from k-1 and decreases until bottom level
-	void dfs_extend(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
-		//emb_list.set_level(level);
-		if(debug) printf("debug: level = %d\n", level);
-		if (level == 2) {
-			for(unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
-				unsigned u = emb_list.get_vertex(level, i);
-				unsigned begin = u * core;
-				unsigned end = begin + egonet.get_degree(level, u);
-				for (unsigned j = begin; j < end; j ++) {
-					total_num += 1; //listing here!!!
-				}
-			}
-			return;
-		}
-		// compute the subgraphs induced on the neighbors of each node in current level,
-		// and then recurse on such a subgraph
-		for(unsigned i = 0; i < emb_list.size(level); i ++) {
-			// for each vertex u in current level
-			// a new induced subgraph G[∆G(u)] is built
-			unsigned u = emb_list.get_vertex(level, i);
-			if(debug) printf("debug: u = %d\n", u);
-			emb_list.set_size(level-1, 0);
-			unsigned begin = u * core;
-			unsigned end = begin + egonet.get_degree(level, u);
-			// extend one vertex v which is a neighbor of u
-			for (unsigned edge = begin; edge < end; edge ++) {
-				// for each out-neighbor v of node u in G, set its label to level-1
-				// if the label was equal to level. We thus have that if a label of a
-				// node v is equal to level-1 it means that node v is in the new subgraph
-				unsigned v = egonet.get_adj(edge);
-				// update info of v
-				// relabeling vertices and forming U'.
-				if(debug) printf("\tdebug: v = %d, label = %d\n", v, emb_list.get_label(v));
-				if (emb_list.get_label(v) == level) {
-					unsigned pos = emb_list.size(level-1);
-					emb_list.set_vertex(level-1, pos, v);
-					emb_list.set_size(level-1, pos+1);
-					emb_list.set_label(v, level-1);
-					egonet.set_degree(level-1, v, 0);//new degrees
-				}
-			}
-			// for each out-neighbor v of u
-			// reodering adjacency list and computing new degrees
-			unsigned new_size = emb_list.size(level-1);
-			if(debug) printf("debug: u = %d, new_size = %d\n", u, new_size);
-			for (unsigned j = 0; j < new_size; j ++) {
-				unsigned v = emb_list.get_vertex(level-1, j);
-				begin = v * core;
-				end = begin + egonet.get_degree(level, v);
-				// move all the out-neighbors of v with label equal to level − 1 
-				// in the first part of ∆(v) (by swapping nodes),
-				// and compute the out-degree of node v in the new subgraph
-				// updating degrees(v). The first degrees(v) nodes in ∆(v) are
-				// thus the out-neighbors of v in the new subgraph.
-				for (unsigned k = begin; k < end; k ++) {
-					unsigned dst = egonet.get_adj(k);
-					if (emb_list.get_label(dst) == level-1)
-						egonet.inc_degree(level-1, v);
-					else {
-						egonet.set_adj(k--, egonet.get_adj(--end));
-						egonet.set_adj(end, dst);
-					}
-				}
-			}
-			dfs_extend(level-1, egonet, emb_list);
-			for (unsigned j = 0; j < emb_list.size(level-1); j ++) {//restoring labels
-				unsigned v = emb_list.get_vertex(level-1, j);
-				emb_list.set_label(v, level);
-			}
-		}
-	}
-
 	void vertex_process() {
 		//galois::do_all(galois::iterate((size_t)0, graph->size()),
-		//galois::for_each(galois::iterate(graph->begin(), graph->end()),
-			//[&](const size_t &u, auto &ctx) {
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&](const size_t &u) {
+		galois::for_each(galois::iterate(graph->begin(), graph->end()),
+			[&](const size_t &u, auto &ctx) {
+		//galois::do_all(galois::iterate(graph->begin(), graph->end()),
+		//	[&](const size_t &u) {
 				#ifdef USE_EGONET
 				Egonet *egonet = egonets.getLocal();
 				#else
@@ -425,33 +472,50 @@ public:
 	}
 
 	void edge_process_naive() {
-		unsigned level = 1;
-		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
 		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
 		//	[&](const Edge &edge) {
 		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
 			[&](const size_t& pos) {
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				emb_list->init(edge_list.get_edge(pos));
-				dfs_from_edge_naive(level, pos, *emb_list);
+				#ifdef USE_MAP
+				dfs_extend_naive_motif(1, 0, *emb_list, 0);
+				#else
+				dfs_extend_naive(1, 0, *emb_list);
+				#endif
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("DfsEdgeNaiveSolver")
+			galois::loopname("KclDfsEdgeNaiveSolver")
 		);
 		#ifdef USE_MAP
 		motif_count();
 		#endif
 	}
 
+	void edge_process() {
+		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
+		//galois::do_all(galois::iterate((size_t)0, graph->size()),
+		//galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
+			//[&](const Edge &edge, auto &ctx) {
+		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+			[&](const Edge &edge) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				UintList *id_list = id_lists.getLocal();
+				UintList *old_id_list = old_id_lists.getLocal();
+				Egonet *egonet = egonets.getLocal();
+				build_egonet_from_edge(edge, *egonet, *emb_list, *id_list, *old_id_list);
+				if (max_size > 3) dfs_extend(max_size-2, *egonet, *emb_list);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("KclDfsEdgeSolver")
+		);
+	}
+
 	void edge_process_adhoc() {
 		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
 		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
 			[&](const Edge &edge) {
-				#ifdef USE_EGONET
 				Egonet *egonet = egonets.getLocal();
-				#else
-				Egonet *egonet = NULL;
-				#endif
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				UintList *id_list = id_lists.getLocal();
 				UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
@@ -460,37 +524,16 @@ public:
 				//if (max_size > 3) dfs_extend_base(max_size-2, *egonet, *emb_list);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("DfsEdgeSolver")
+			galois::loopname("MotifDfsEdgeSolver")
 		);
 		motif_count();
 	}
 
-	void edge_process() {
-		std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
-		//galois::do_all(galois::iterate((size_t)0, graph->size()),
-		//galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
-			//[&](const Edge &edge, auto &ctx) {
-		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-			[&](const Edge &edge) {
-				#ifdef USE_EGONET
-				Egonet *egonet = egonets.getLocal();
-				#else
-				Egonet *egonet = NULL;
-				#endif
-				EmbeddingList *emb_list = emb_lists.getLocal();
-				UintList *id_list = id_lists.getLocal();
-				UintList *old_id_list = old_id_lists.getLocal();
-				build_egonet_from_edge(edge, *egonet, *emb_list, *id_list, *old_id_list);
-				if (max_size > 3) dfs_extend(max_size-2, *egonet, *emb_list);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("KclSolver")
-		);
-	}
 	void motif_count() {
 		//std::cout << "[cxh debug] accumulators[0] = " << accumulators[0].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[3] = " << accumulators[3].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[1] = " << accumulators[1].reduce() << "\n";
+		#ifdef USE_EGONET
 		if (accumulators.size() == 2) {
 			if (is_dag) {
 				total_3_tris = accumulators[0].reduce();
@@ -516,13 +559,26 @@ public:
 				total_3_star = (accumulators[1].reduce() - total_4_tailed_tris) / 3;
 			}
 		}
+		#else
+		if (accumulators.size() == 2) {
+			total_3_tris = accumulators[0].reduce();
+			total_3_path = accumulators[1].reduce();
+		} else {
+			total_4_clique = accumulators[5].reduce();
+			total_4_diamond = accumulators[4].reduce();
+			total_4_cycle = accumulators[2].reduce();
+			total_4_path = accumulators[0].reduce();
+			total_4_tailed_tris = accumulators[3].reduce();
+			total_3_star = accumulators[1].reduce();
+		} 
+		#endif
 	}
 
 	void printout_motifs() {
 		std::cout << std::endl;
 		if (accumulators.size() == 2) {
 			std::cout << "\ttriangles\t" << total_3_tris << std::endl;
-			std::cout << "\t3-paths\t" << total_3_path << std::endl;
+			std::cout << "\t3-paths\t\t" << total_3_path << std::endl;
 		} else if (accumulators.size() == 6) {
 			std::cout << "\t4-paths --> " << total_4_path << std::endl;
 			std::cout << "\t3-stars --> " << total_3_star << std::endl;
@@ -612,12 +668,9 @@ public:
 	}
 
 protected:
-	Graph *graph;
-	UintList degrees;
-	int core;
-	bool is_dag;
 	int npatterns;
-	unsigned max_size;
+	bool is_dag;
+	unsigned core;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
 	Lists Tri_vids;
@@ -635,12 +688,6 @@ protected:
 	Ulong total_4_cycle;
 	Ulong total_3_star;
 	Ulong total_4_path;
-	void count_degrees() {
-		degrees.resize(graph->size());
-		for (size_t i = 0; i < graph->size(); i++) {
-			degrees[i] = graph->edge_end(i) - graph->edge_begin(i);
-		}
-	}
 
 	template <typename EmbeddingTy = BaseEmbedding>
 	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
@@ -656,6 +703,48 @@ protected:
 		for (unsigned i = idx+1; i < n; ++i)
 			if (dst < emb.get_vertex(i)) return true;
 		return false;
+	}
+	inline unsigned find_motif_pattern_id_dfs(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned previous_pid) {
+		unsigned pid = 0;
+		if (n == 2) { // count 3-motifs
+			pid = 1; // 3-chain
+			if (idx == 0) {
+				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
+			}
+		} else if (n == 3) { // count 4-motifs
+			unsigned num_edges = 1;
+			if (previous_pid == 0) { // extending a triangle
+				for (unsigned j = idx+1; j < n; j ++)
+					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
+				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
+			} else { // extending a 3-chain
+				assert(previous_pid == 1);
+				std::vector<bool> connected(3, false);
+				connected[idx] = true;
+				for (unsigned j = idx+1; j < n; j ++) {
+					if (is_connected(emb.get_vertex(j), dst)) {
+						num_edges ++;
+						connected[j] = true;
+					}
+				}
+				if (num_edges == 1) {
+					pid = 0; // p0: 3-path
+					unsigned center = 1;
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					if (idx == center) pid = 1; // p1: 3-star
+				} else if (num_edges == 2) {
+					pid = 2; // p2: 4-cycle
+					unsigned center = 1;
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					if (connected[center]) pid = 3; // p3: tailed-triangle
+				} else {
+					pid = 4; // p4: diamond
+				}
+			}
+		} else { // count 5-motif and beyond
+			find_motif_pattern_id_eigen(n, idx, dst, emb);
+		}
+		return pid;
 	}
 };
 

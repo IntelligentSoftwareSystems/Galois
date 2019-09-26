@@ -58,7 +58,9 @@ public:
 
 protected:
 	Graph *graph;
+	unsigned max_size;
 	std::vector<unsigned> degrees;
+
 	void degree_counting() {
 		degrees.resize(graph->size());
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),
@@ -265,6 +267,19 @@ protected:
 				connected.push_back(true);
 			else connected.push_back(false);
 		}
+	}
+	// eigenvalue based approach to find the pattern id for a given embedding
+	inline unsigned find_motif_pattern_id_eigen(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb) {
+		std::vector<bool> connected;
+		get_connectivity(n, idx, dst, emb, connected);
+		Matrix A(n+1, std::vector<MatType>(n+1, 0));
+		gen_adj_matrix(n+1, connected, A);
+		std::vector<MatType> c(n+1, 0);
+		char_polynomial(n+1, A, c);
+		bliss::UintSeqHash h;
+		for (unsigned i = 0; i < n+1; ++i)
+			h.update((unsigned)c[i]);
+		return h.get_value();
 	}
 };
 

@@ -20,13 +20,13 @@
 //#define USE_DAG
 #define USE_DFS
 #define USE_MAP
-#define USE_PID
-#define USE_WEDGE
+//#define USE_PID
+//#define USE_WEDGE
 #define ALGO_EDGE
+//#define USE_EGONET
 #define USE_SIMPLE
-#define USE_CUSTOM
-#define ENABLE_STEAL
-#define USE_EMB_LIST
+//#define USE_CUSTOM
+//#define USE_EMB_LIST
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
@@ -42,14 +42,13 @@ class AppMiner : public VertexMiner {
 public:
 	AppMiner(Graph *g, unsigned size, int np, bool use_dag, unsigned c) : VertexMiner(g, size, np, use_dag, c) {}
 	~AppMiner() {}
-	#ifdef USE_CUSTOM
 	// customized pattern classification method
-	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 
-		//if (n < 4) return find_motif_pattern_id(n, i, dst, emb, pos);
+	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned previous_pid) { 
+		if (n < 4) return find_motif_pattern_id_dfs(n, i, dst, emb, previous_pid);
 		return 0;
 	}
-	#endif
 	void print_output() { printout_motifs(); }
 };
 
 #include "DfsMining/engine.h"
+

@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
 	Tinitial.stop();
 	assert(k > 2);
 	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
-	std::cout << "core = " << core << "\n";
+	if (show) std::cout << "k = " << k << "\n";
+	if (show) std::cout << "core = " << core << "\n";
 	//print_graph(graph);
 
 	ResourceManager rm;
@@ -23,7 +24,7 @@ int main(int argc, char** argv) {
 	#ifdef USE_MAP
 	npatterns = num_patterns[k-3];
 	#endif
-	AppMiner miner(&graph, k, need_dag, npatterns, core);
+	AppMiner miner(&graph, k, npatterns, need_dag, core);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	#ifdef ALGO_EDGE

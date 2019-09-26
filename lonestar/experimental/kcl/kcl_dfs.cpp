@@ -41,11 +41,11 @@ public:
 		return pos == n-1;
 	}
 	// toAdd (only add vertex that is connected to all the vertices in the embedding)
-	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
+	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned element_id) {
 		#ifdef USE_DAG
 		return is_all_connected_dag(dst, emb, n-1);
 		#else
-		VertexId src = emb.get_vertex(pos);
+		VertexId src = emb.get_vertex(element_id);
 		return (src < dst) && is_all_connected(dst, emb, n-1);
 		#endif
 	}
