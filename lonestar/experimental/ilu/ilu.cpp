@@ -61,14 +61,14 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
   edge_data.create(num_edges);
   temp_graph.phase1();
   for (std::size_t i = 0; i < n; i++) {
-    temp_graph.incrementDegree(i);
-    if (i > 0) {
-      temp_graph.incrementDegree(i);
-    }
-    if (i + 1 < n) {
-      temp_graph.incrementDegree(i);
-    }
     if (i >= offset) {
+      temp_graph.incrementDegree(i);
+    }
+    if (i > 0 && i % offset) {
+      temp_graph.incrementDegree(i);
+    }
+    temp_graph.incrementDegree(i);
+    if (i + 1 < n && (i + 1) % offset) {
       temp_graph.incrementDegree(i);
     }
     if (i < n - offset) {
@@ -78,15 +78,15 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
   temp_graph.phase2();
 
   for (std::size_t i = 0; i < n; i++) {
-    edge_data.set(temp_graph.addNeighbor(i, i), 4.);
-    if (i > 0) {
-      edge_data.set(temp_graph.addNeighbor(i, i - 1), -1.);
-    }
-    if (i + 1 < n) {
-      edge_data.set(temp_graph.addNeighbor(i, i + 1), -1.);
-    }
     if (i >= offset) {
       edge_data.set(temp_graph.addNeighbor(i, i - offset), -1.);
+    }
+    if (i > 0 && i % offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i - 1), -1.);
+    }
+    edge_data.set(temp_graph.addNeighbor(i, i), 4.);
+    if (i + 1 < n && (i + 1) % offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i + 1), -1.);
     }
     if (i < n - offset) {
       edge_data.set(temp_graph.addNeighbor(i, i + offset), -1.);
