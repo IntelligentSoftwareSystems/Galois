@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
 	Tinit.start();
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 	//std::cout << "max_size = " << k << std::endl;
 	//std::cout << "min_support = " << minsup << std::endl;
 	//std::cout << "num_threads = " << numThreads << std::endl;
