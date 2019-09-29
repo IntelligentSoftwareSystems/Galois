@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 
 	ResourceManager rm;
 	#ifdef EDGE_INDUCED
-	AppMiner miner(&graph);
+	AppMiner miner(&graph, k);
 	#else
 	int npatterns = 1;
 	#ifdef USE_MAP

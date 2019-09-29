@@ -45,8 +45,6 @@ public:
 	void set_domain_frequent(int i) {
 		domains_reached_support[i] = 1;
 		domain_sets[i].clear();
-		//first[i] = 1;
-		//second[i].clear();
 	}
 	void add_vertex(int i, VertexId vid) {
 		domain_sets[i].insert(vid);
@@ -54,7 +52,6 @@ public:
 			set_domain_frequent(i);
 	}
 	bool add_vertices(int i, IntSet &vertices) {
-		//first[i] = 0;
 		domains_reached_support[i] = 0;
 		domain_sets[i].insert(vertices.begin(), vertices.end());
 		if (domain_sets[i].size() >= minimum_support) {
@@ -74,7 +71,9 @@ public:
 	bool enough_support;
 	BoolVec domains_reached_support;
 	IntSets domain_sets;
-	//BoolVec first;
-	//IntSets second;
 };
+
+//typedef galois::gstl::Map<InitPattern, DomainSupport> InitMap;
+typedef std::map<InitPattern, DomainSupport*> InitMap;
+typedef galois::substrate::PerThreadStorage<InitMap> InitMaps;
 #endif

@@ -8,7 +8,8 @@
 #include <iostream>
 #include <algorithm>
 #include "core.h"
-#include "common_types.h"
+typedef int IndexT;
+typedef int ValueT;
 
 struct MEdge {
 	IndexT src;

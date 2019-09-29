@@ -6,30 +6,20 @@
 #include "canonical_graph.h"
 #include "domain_support.h"
 
-typedef std::pair<unsigned, unsigned> InitPattern;
 typedef QuickPattern<EdgeEmbedding, ElementType> QPattern;
 typedef CanonicalGraph<EdgeEmbedding, ElementType> CPattern;
 ///*
 typedef std::unordered_map<QPattern, Frequency> QpMapFreq; // quick pattern map (mapping quick pattern to its frequency)
 typedef std::unordered_map<CPattern, Frequency> CgMapFreq; // canonical pattern map (mapping canonical pattern to its frequency)
-
-typedef std::map<InitPattern, DomainSupport*> InitMap;
 typedef std::unordered_map<QPattern, DomainSupport*> QpMapDomain; // quick pattern map (mapping quick pattern to its domain support)
 typedef std::unordered_map<CPattern, DomainSupport*> CgMapDomain; // canonical pattern map (mapping canonical pattern to its domain support)
-
-typedef std::unordered_map<unsigned, unsigned> FreqMap;
-typedef std::unordered_map<unsigned, bool> DomainMap;
 //*/
 /*
-typedef galois::gstl::Map<InitPattern, DomainSupport> InitMap;
 //typedef galois::gstl::Map<QPattern, Frequency> QpMapFreq; // mapping quick pattern to its frequency
 //typedef galois::gstl::Map<CPattern, Frequency> CgMapFreq; // mapping canonical pattern to its frequency
 typedef galois::gstl::UnorderedMap<QPattern, DomainSupport> QpMapDomain; // mapping quick pattern to its domain support
 typedef galois::gstl::UnorderedMap<CPattern, DomainSupport> CgMapDomain; // mapping canonical pattern to its domain support
-//typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
-typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
 //*/
-typedef galois::substrate::PerThreadStorage<InitMap> LocalInitMap;
 typedef galois::substrate::PerThreadStorage<QpMapFreq> LocalQpMapFreq; // PerThreadStorage: thread-local quick pattern map
 typedef galois::substrate::PerThreadStorage<CgMapFreq> LocalCgMapFreq; // PerThreadStorage: thread-local canonical pattern map
 typedef galois::substrate::PerThreadStorage<QpMapDomain> LocalQpMapDomain;
@@ -37,7 +27,11 @@ typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
 
 class EdgeMiner : public Miner {
 public:
-	EdgeMiner(Graph *g) { graph = g; construct_edgemap(); }
+	EdgeMiner(Graph *g, unsigned size) {
+		graph = g;
+		max_size = size;
+		construct_edgemap();
+	}
 	virtual ~EdgeMiner() {}
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
 	void extend_edge(EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
@@ -180,7 +174,7 @@ public:
 		}*/
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),
 			[&](const GNode& src) {
-				InitMap *lmap = init_localmaps.getLocal();
+				InitMap *lmap = init_pattern_maps.getLocal();
 				auto& src_label = graph->getData(src);
 				for (auto e : graph->edges(src)) {
 					GNode dst = graph->getEdgeDst(e);
@@ -360,9 +354,9 @@ public:
 		}
 	}
 	inline void merge_init_map() {
-		init_map = *(init_localmaps.getLocal(0));
+		init_map = *(init_pattern_maps.getLocal(0));
 		for (auto i = 1; i < numThreads; i++) {
-			for (auto element : *init_localmaps.getLocal(i)) {
+			for (auto element : *init_pattern_maps.getLocal(i)) {
 				DomainSupport *support = element.second;
 				if (init_map.find(element.first) == init_map.end()) {
 					init_map[element.first] = support;
@@ -621,7 +615,7 @@ private:
 	galois::gstl::Map<OrderedEdge, unsigned> edge_map;
 	std::set<std::pair<VertexId,VertexId> > freq_edge_set;
 	std::vector<unsigned> is_frequent_edge;
-	LocalInitMap init_localmaps; // initialization map, only used for once, no need to clear
+	InitMaps init_pattern_maps; // initialization map, only used for once, no need to clear
 	LocalQpMapDomain qp_localmaps; // quick pattern local map for each thread
 	LocalCgMapDomain cg_localmaps; // canonical pattern local map for each thread
 	QpMapDomain qp_map; // quick pattern map

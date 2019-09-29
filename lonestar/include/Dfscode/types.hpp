@@ -13,8 +13,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
-#include "../common_types.h"
-
+typedef int VeridT;
+typedef int LabelT;
 typedef std::vector<VeridT> RMPath;
 //typedef int edge_label_t;
 //typedef int vertex_label_t;

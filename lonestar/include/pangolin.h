@@ -33,8 +33,11 @@ typedef Graph::GraphNode GNode;
 
 #ifdef USE_DFS
 #ifdef EDGE_INDUCED
-#include "common_types.h"
+#ifdef USE_DFSCODE
 #include "Dfscode/miner.h"
+#else
+#include "DfsMining/edge_miner.h"
+#endif
 #else
 #include "DfsMining/vertex_miner.h"
 #endif

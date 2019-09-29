@@ -12,10 +12,10 @@ typedef galois::substrate::PerThreadStorage<LocalStatus> Status;
 class Miner {
 public:
 	std::vector<LabEdge> edge_list;
-	Miner(Graph *g) {
+	Miner(Graph *g, unsigned size) {
 		this->graph = g;
 		minimal_support = minsup;
-		max_level = k;
+		max_level = size;
 		nthreads = numThreads;
 		show_output = show;
 		for(int i = 0; i < nthreads; i++) {
@@ -54,15 +54,9 @@ public:
 	void construct_edgelist() {
 		unsigned eid = 0;
 		for (auto src : *graph) {
-			//auto& src_label = graph->getData(src);
-			//auto first = graph->edge_begin(src);
-			//auto last = graph->edge_end(src);
-			// foe each edge of this vertex
-			//for (auto e = first; e != last; ++ e) {
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				auto& elabel = graph->getEdgeData(e);
-				//auto& dst_label = graph->getData(dst);
 				LabEdge edge(src, dst, elabel, eid);
 				edge_list.push_back(edge);
 				eid ++;
@@ -73,11 +67,8 @@ public:
 	void init_dfscode() {
 		int single_edge_dfscodes = 0;
 		int num_embeddings = 0;
-		// classify each edge into its single-edge pattern accodding to its (src_label, edge_label, dst_label)
 		for (auto src : *graph) {
 			auto& src_label = graph->getData(src);
-			//auto begin = graph->edge_begin(src);
-			//auto end = graph->edge_end(src);
 			for (auto e : graph->edges(src)) {
 				GNode dst = graph->getEdgeDst(e);
 				auto elabel = graph->getEdgeData(e);
@@ -110,6 +101,7 @@ public:
 		init_dfscode(); // insert single-edge patterns into the queue
 		galois::do_all(galois::iterate(task_queue),
 			[&](const DFS& dfs) {
+				int tid = galois::substrate::ThreadPool::getTID();
 				LocalStatus *ls = status.getLocal();
 				ls->current_dfs_level = 0;
 				std::deque<DFS> tmp;
@@ -123,7 +115,7 @@ public:
 					bool succeed = miner.try_task_stealing(ls);
 					if (succeed) {
 						ls->embeddings_regeneration_level = 0;
-						miner.set_regen_level(ls->thread_id, 0);
+						miner.set_regen_level(tid, 0);
 					}
 				}
 				#endif

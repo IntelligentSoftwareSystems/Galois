@@ -1,4 +1,5 @@
 #define USE_DFS
+#define USE_DFSCODE
 #define ENABLE_LABEL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 4
@@ -10,7 +11,7 @@ const char* url  = 0;
  
 class AppMiner : public Miner {
 public:
-	AppMiner(Graph *g) : Miner(g) {}
+	AppMiner(Graph *g, unsigned size) : Miner(g, size) {}
 	~AppMiner() {}
 };
 

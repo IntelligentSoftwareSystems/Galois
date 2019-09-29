@@ -32,6 +32,12 @@ typedef galois::GAccumulator<unsigned long> UlongAccu;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
+typedef std::pair<unsigned, unsigned> InitPattern;
+typedef std::unordered_map<unsigned, unsigned> FreqMap;
+typedef std::unordered_map<unsigned, bool> DomainMap;
+//typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
+//typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
+
 struct Edge {
 	VertexId src;
 	VertexId dst;

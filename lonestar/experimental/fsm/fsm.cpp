@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
 
 	assert(k > 1);
 	ResourceManager rm;
-	EdgeMiner miner(&graph);
+	EdgeMiner miner(&graph, k);
 	miner.set_threshold(minsup);
 	EmbeddingList emb_list;
 	emb_list.init(graph, k+1);

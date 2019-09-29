@@ -76,9 +76,9 @@ int main(int argc, char** argv) {
 	Tinit.start();
 	read_graph(graph, filetype, filename);
 	Tinit.stop();
-	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 
-	EdgeMiner miner(&graph);
+	EdgeMiner miner(&graph, k);
 	miner.set_threshold(minsup);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
