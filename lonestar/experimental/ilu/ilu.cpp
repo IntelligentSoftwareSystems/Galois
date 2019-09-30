@@ -261,5 +261,5 @@ int main(int argc, char** argv) noexcept {
     },
     galois::loopname("ilu"),
     galois::no_conflicts(),
-    galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
+    galois::wl<galois::worklists::PerSocketChunkFIFO<64>>());
 }
