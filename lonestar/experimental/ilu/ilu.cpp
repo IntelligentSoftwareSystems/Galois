@@ -183,6 +183,7 @@ int main(int argc, char** argv) noexcept {
   generate_matrix(graph, n);
 
   // Sort edges and zero counters.
+  // In the symmetric case it is sufficient to make j depend on k if A[k,j] != 0.
   galois::do_all(
     galois::iterate(graph.begin(), graph.end()),
     [&](auto node) noexcept {
