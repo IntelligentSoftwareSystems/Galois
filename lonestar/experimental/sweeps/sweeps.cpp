@@ -679,10 +679,11 @@ int main(int argc, char** argv) noexcept {
           auto node_magnitude_idx =
               num_per_element * node + num_per_element_and_direction * dir_idx;
           auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-          auto counter_check_val = counter.load(std::memory_order_acquire);
-          if (counter_check_val) {
-            GALOIS_DIE("Work item asked to run before it was actually ready.");
-          }
+          // Don't have to do acquire/release with the counters by hand.
+          // The Galois work lists do the acquire/release whenever migrating
+          // work away from the thread that created it.
+          assert(("Work item asked to run before it was actually ready.",
+                  counter.load(std::memory_order_relaxed)));
           auto& node_data =
               graph.getData(node, galois::MethodFlag::UNPROTECTED);
           // Re-count incoming edges during this computation.
@@ -777,7 +778,7 @@ int main(int argc, char** argv) noexcept {
               num_per_element_and_direction * dir_idx;
             auto& other_counter =
               radiation_magnitudes[other_magnitude_idx].counter;
-            if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+            if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
               work_t new_work_item{other_node, dir_idx};
               ctx.push(new_work_item);
             }
