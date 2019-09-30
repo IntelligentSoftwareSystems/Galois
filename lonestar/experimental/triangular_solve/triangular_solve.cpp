@@ -205,10 +205,10 @@ int main(int argc, char** argv) noexcept {
   galois::for_each(
     galois::iterate(starting_nodes.begin(), starting_nodes.end()),
     [&](auto node, auto &context) noexcept {
-      auto counter_check_val = graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_acquire);
-      if (counter_check_val) {
-        GALOIS_DIE("Work item asked to run before it was actually ready.");
-      }
+      // Can use memory order relaxed all through here because the work list
+      // does the atomic acquire/release when a work item (or chunk of work items)
+      // is stolen from the thread that created it.
+      assert(graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed));
       auto edge_iterator = graph.edge_begin(node, galois::MethodFlag::UNPROTECTED);
       auto edge_end = graph.edge_end(node, galois::MethodFlag::UNPROTECTED);
       assert(graph.getEdgeDst(*edge_iterator) == node);
@@ -219,7 +219,7 @@ int main(int argc, char** argv) noexcept {
         assert(neighbor > node);
         rhs[neighbor] -= rhs[node] * graph.getEdgeData(*edge_iterator);
         auto &other_counter = graph.getData(neighbor, galois::MethodFlag::UNPROTECTED);
-        if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+        if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
           context.push(neighbor);
         }
         ++edge_iterator;
