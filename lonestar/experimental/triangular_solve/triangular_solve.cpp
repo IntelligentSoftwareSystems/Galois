@@ -64,7 +64,7 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
   // an ILU(0) factorization of a system resulting from
   // a 2d regular grid (similar to what's done for autogenerating
   // the matrix used in the ILU(0) app).
-  std::size_t offset = std::sqrt(n);
+  std::size_t offset = std::round(std::sqrt(n));
   temp_graph.setNumNodes(n);
   std::size_t num_edges = 3 * n - 1 - 2 * offset;
   temp_graph.setNumEdges(num_edges);
@@ -84,12 +84,12 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
   temp_graph.phase2();
 
   for (std::size_t i = 0; i < n; i++) {
-    edge_data.set(temp_graph.addNeighbor(i, i), 4.);
+    edge_data.set(temp_graph.addNeighbor(i, i), -4.);
     if (i + 1 < n && (i + 1) % offset) {
-      edge_data.set(temp_graph.addNeighbor(i, i + 1), -1.);
+      edge_data.set(temp_graph.addNeighbor(i, i + 1), 1.);
     }
     if (i < n - offset) {
-      edge_data.set(temp_graph.addNeighbor(i, i + offset), -1.);
+      edge_data.set(temp_graph.addNeighbor(i, i + offset), 1.);
     }
   }
 
@@ -100,6 +100,57 @@ auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
                           std::make_move_iterator(edge_data.end()),
                           rawEdgeData);
 
+  galois::graphs::readGraph(built_graph, temp_graph);
+}
+
+void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
+  galois::graphs::FileGraphWriter temp_graph;
+  std::size_t inner_offset = std::round(std::cbrt(n));
+  std::size_t outer_offset = inner_offset * inner_offset;
+  temp_graph.setNumNodes(n);
+  std::size_t num_edges = n;
+  num_edges += (n - 1 - (n - 1) / inner_offset);
+  std::size_t num_whole_diagonal_blocks = n / outer_offset;
+  std::size_t last_block_partial = n % outer_offset;
+  num_edges += num_whole_diagonal_blocks * (inner_offset - 1) * inner_offset;
+  if (last_block_partial > inner_offset) {
+    num_edges += last_block_partial - inner_offset;
+  }
+  num_edges += n - outer_offset;
+  temp_graph.setNumEdges(num_edges);
+  temp_graph.setSizeofEdgeData(sizeof(double));
+  galois::LargeArray<graph_t::edge_data_type> edge_data;
+  edge_data.create(num_edges);
+  temp_graph.phase1();
+  for (std::size_t i = 0; i < n; i++) {
+    temp_graph.incrementDegree(i);
+    if (i + 1 < n && (i + 1) % inner_offset) {
+      temp_graph.incrementDegree(i);
+    }
+    if (i < n - inner_offset && ((i + inner_offset) / inner_offset) % inner_offset) {
+      temp_graph.incrementDegree(i);
+    }
+    if (i < n - outer_offset) {
+      temp_graph.incrementDegree(i);
+    }
+  }
+  temp_graph.phase2();
+  for (std::size_t i = 0; i < n; i++) {
+    edge_data.set(temp_graph.addNeighbor(i, i), -6.);
+    if (i + 1 < n && (i + 1) % inner_offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i + 1), 1.);
+    }
+    if (i < n - inner_offset && ((i + inner_offset) / inner_offset) % inner_offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i + inner_offset), 1.);
+    }
+    if (i < n - outer_offset) {
+      edge_data.set(temp_graph.addNeighbor(i, i + outer_offset), 1.);
+    }
+  }
+  auto* rawEdgeData = temp_graph.finish<graph_t::edge_data_type>();
+  std::uninitialized_copy(std::make_move_iterator(edge_data.begin()),
+                          std::make_move_iterator(edge_data.end()),
+                          rawEdgeData);
   galois::graphs::readGraph(built_graph, temp_graph);
 }
 
