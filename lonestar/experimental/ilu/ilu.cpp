@@ -190,11 +190,32 @@ int main(int argc, char** argv) noexcept {
     },
     galois::loopname("sort_edges_and_zero_counters"));
 
-  /*galois::do_all(
+  // Initialize the atomic counters.
+  galois::do_all(
     galois::iterate(graph.begin(), graph.end()),
-    [&](auto node) noexcept {
-      ;
+    [&](auto node) {
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        auto neighbor = graph.getEdgeDst(edge);
+        // TODO: binary search for starting point here.
+        // Doing this directly is probably faster for nodes with
+        // extremely small degree though.
+        if (neighbor <= node) continue;
+        graph.getData(neighbor, galois::MethodFlag::UNPROTECTED).fetch_add(1, std::memory_order_relaxed);
+      }
     },
-    galois::loopname("initialize_counters."));
-  */
+    galois::loopname("initialize_counters"));
+
+  // Now find the ones that start as ready.
+  // This could potentially be done as a part of the iterator for the starting set instead.
+  galois::InsertBag<graph_t::GraphNode> starting_nodes;
+
+  galois::do_all(
+    galois::iterate(graph.begin(), graph.end()),
+    [&](auto node) {
+      if (!graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed)) {
+        starting_nodes.emplace(node);
+      }
+    },
+    galois::loopname("find_starts"));
+
 }
