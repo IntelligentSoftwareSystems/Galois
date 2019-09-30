@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <limits>
 
 // Silence erroneous warnings from within Boost headers
 // that show up with gcc 8.1.
@@ -218,4 +219,46 @@ int main(int argc, char** argv) noexcept {
     },
     galois::loopname("find_starts"));
 
+  // Now actually compute the ilu factorization.
+  galois::for_each(
+    galois::iterate(starting_nodes.begin(), starting_nodes.end()),
+    [&](auto node, auto &context) noexcept {
+      // Can use memory order relaxed all through here because the work list
+      // does the atomic acquire/release when a work item (or chunk of work items)
+      // is stolen from the thread that created it.
+      assert(graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed));
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        auto neighbor = graph.getEdgeDst(edge);
+        // Initialize to NaN in case it's ever used before being initialized.
+        double diag_val = std::numeric_limits<double>::quiet_NaN();
+        if (neighbor < node) {
+          for (auto neighbor_edge : graph.edges(neighbor, galois::MethodFlag::UNPROTECTED)) {
+            auto neighbor_of_neighbor = graph.getEdgeDst(neighbor_edge);
+            // TODO: binary search to find starting position here?
+            // Again, direct iteration will probably be faster for
+            // really low degree nodes.
+            if (neighbor_of_neighbor <= neighbor) {
+              continue;
+            }
+            // TODO: Again, do binary search for this?
+            for (auto potential_back_edge : graph.edges(neighbor_of_neighbor, galois::MethodFlag::UNPROTECTED)) {
+              auto third_neighbor = graph.getEdgeDst(potential_back_edge);
+              if (third_neighbor == node) {
+                graph.getEdgeData(potential_back_edge) -= graph.getEdgeData(neighbor_edge) * graph.getEdgeData(edge);
+              }
+            }
+          }
+        } else if (neighbor == node) {
+          diag_val = graph.getEdgeData(edge);
+        } else {
+          graph.getEdgeData(edge) /= diag_val;
+          if (!(graph.getData(neighbor, galois::MethodFlag::UNPROTECTED).fetch_sub(1, std::memory_order_relaxed) - 1)) {
+            context.push(neighbor);
+          }
+        }
+      }
+    },
+    galois::loopname("ilu"),
+    galois::no_conflicts(),
+    galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
 }
