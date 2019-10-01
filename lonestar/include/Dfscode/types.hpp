@@ -13,13 +13,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
-typedef int VeridT;
-typedef int LabelT;
+typedef unsigned VeridT;
+typedef unsigned LabelT;
 typedef std::vector<VeridT> RMPath;
-//typedef int edge_label_t;
-//typedef int vertex_label_t;
-//typedef std::set<edge_label_t> edge_label_set_t;
-//typedef std::set<vertex_label_t> vertex_label_set_t;
 
 // Labelled Edge
 struct LabEdge {

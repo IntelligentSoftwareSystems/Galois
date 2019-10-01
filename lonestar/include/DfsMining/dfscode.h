@@ -1,7 +1,7 @@
 #ifndef __DFSCODE_H__
 #define __DFSCODE_H__
-typedef int VeridT;
-typedef int LabelT;
+typedef unsigned VeridT;
+typedef unsigned LabelT;
 typedef std::vector<VeridT> RMPath;
 
 struct LabEdge {
@@ -70,10 +70,10 @@ public:
 		for(VeridT from = 0; from < (VeridT)size(); ++from) {
 			for(Vertex::edge_iterator it = (*this)[from].edge.begin();
 					it != (*this)[from].edge.end(); ++it) {
-				if(directed || from <= it->to)
-					std::sprintf(buf, "%d %d %d", from, it->to, it->elabel);
-				else
-					std::sprintf(buf, "%d %d %d", it->to, from, it->elabel);
+				//if(directed || from <= it->to)
+				//	std::sprintf(buf, "%d %d %d", from, it->to, it->elabel);
+				//else
+				//	std::sprintf(buf, "%d %d %d", it->to, from, it->elabel);
 				// Assign unique id's for the edges.
 				if(tmp.find(buf) == tmp.end()) {
 					it->id = id;
@@ -233,5 +233,105 @@ std::ostream &operator<<(std::ostream &out, const DFSCode &code) {
 	out << code.to_string();
 	return out;
 }
+
+// An embedding consists of an edge (pointer) 
+// and an embedding pointer to its parent embedding
+struct LabEdgeEmbedding {
+	unsigned num_vertices;
+	Edge *edge;
+	LabEdgeEmbedding *prev;
+	LabEdgeEmbedding() : num_vertices(0), edge(0), prev(0) {};
+	std::string to_string() const {
+		std::stringstream ss;
+		ss << "[" << edge->to_string() << "]";
+		return ss.str();
+	}
+	std::string to_string_all() {
+		std::vector<Edge> ev;
+		ev.push_back(*edge);
+		for(LabEdgeEmbedding *p = prev; p; p = p->prev) {
+			ev.push_back(*(p->edge));
+		}
+		std::reverse(ev.begin(), ev.end());
+		std::stringstream ss;
+		for(size_t i = 0; i < ev.size(); i++) {
+			ss << ev[i].to_string() << "; ";
+		}
+		return ss.str();
+	}
+};
+
+// Embedding list
+class LabEdgeEmbeddingList : public std::vector<LabEdgeEmbedding> {
+public:
+	void push(int n, Edge *edge, LabEdgeEmbedding *prev) {
+		LabEdgeEmbedding d;
+		d.num_vertices = n;
+		d.edge = edge;
+		d.prev = prev;
+		push_back(d);
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		for(size_t i = 0; i < size(); i++)
+			ss << (*this)[i].to_string() << "; ";
+		return ss.str();
+	}
+};
+
+typedef std::map<int, std::map <int, std::map <int, LabEdgeEmbeddingList> > > EmbeddingLists3D;
+typedef std::map<int, std::map <int, LabEdgeEmbeddingList> >                  EmbeddingLists2D;
+typedef std::map<int, LabEdgeEmbeddingList>                                   EmbeddingLists1D;
+
+// Stores information of edges/nodes that were already visited in the
+// current DFS branch of the search.
+// TODO: change type 'Edge' to 'LabEdge' to enable edge label
+class History : public std::vector<Edge*> {
+private:
+	std::set<int> edge;
+	std::set<int> vertex;
+public:
+	bool hasEdge(unsigned id) { return (bool)edge.count(id); }
+	bool hasEdge(Edge e) {
+		for(std::vector<Edge*>::iterator it = this->begin(); it != this->end(); ++it) {
+			//if((*it)->from == e.from && (*it)->to == e.to && (*it)->elabel == e.elabel)
+			if((*it)->src == e.src && (*it)->dst == e.dst)
+				return true;
+			//else if((*it)->from == e.to && (*it)->to == e.from && (*it)->elabel == e.elabel)
+			else if((*it)->src == e.dst && (*it)->dst == e.src)
+				return true;
+		}
+		return false;
+	}
+	bool hasVertex(unsigned id) { return (bool)vertex.count(id); }
+	History() {}
+	History(LabEdgeEmbedding *p) { build(p); }
+	void build(LabEdgeEmbedding *e) {
+		if(e) {
+			push_back(e->edge);
+			//edge.insert(e->edge->id);
+			//vertex.insert(e->edge->from);
+			//vertex.insert(e->edge->to);
+			vertex.insert(e->edge->src);
+			vertex.insert(e->edge->dst);
+			for(LabEdgeEmbedding *p = e->prev; p; p = p->prev) {
+				push_back(p->edge);       // this line eats 8% of overall instructions(!)
+				//edge.insert(p->edge->id);
+				//vertex.insert(p->edge->from);
+				//vertex.insert(p->edge->to);
+				vertex.insert(p->edge->src);
+				vertex.insert(p->edge->dst);
+			}
+			std::reverse(begin(), end());
+		}
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		for(size_t i = 0; i < size(); i++) {
+			ss << at(i)->to_string() << "; ";
+		}
+		return ss.str();
+	}
+};
 
 #endif

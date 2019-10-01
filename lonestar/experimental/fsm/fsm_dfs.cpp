@@ -12,6 +12,9 @@ class AppMiner : public EdgeMiner {
 public:
 	AppMiner(Graph *g, unsigned size) : EdgeMiner(g, size) {}
 	~AppMiner() {}
+	void print_output() {
+		std::cout << "\n\ttotal_num_frquent_patterns = " << get_total_count() << "\n";
+	}
 };
 
 #include "DfsMining/engine.h"

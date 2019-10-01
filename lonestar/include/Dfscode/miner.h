@@ -101,7 +101,6 @@ public:
 		init_dfscode(); // insert single-edge patterns into the queue
 		galois::do_all(galois::iterate(task_queue),
 			[&](const DFS& dfs) {
-				int tid = galois::substrate::ThreadPool::getTID();
 				LocalStatus *ls = status.getLocal();
 				ls->current_dfs_level = 0;
 				std::deque<DFS> tmp;
@@ -111,6 +110,7 @@ public:
 				grow(pattern_map[dfs.fromlabel][dfs.elabel][dfs.tolabel], 1, *ls);
 				ls->DFS_CODE.pop();
 				#ifdef ENABLE_LB
+				int tid = galois::substrate::ThreadPool::getTID();
 				if(ls->dfs_task_queue[0].size() == 0 && !miner.all_threads_idle()) {
 					bool succeed = miner.try_task_stealing(ls);
 					if (succeed) {
@@ -346,7 +346,7 @@ public:
 		if (is_min(status) == false) return; // check if this pattern is canonical: minimal DFSCode
 		status.frequent_patterns_count ++;
 		// list frequent patterns here!!!
-		if(show_output) {
+		if (show_output) {
 			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
 			for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
@@ -359,12 +359,12 @@ public:
 		EdgeList edges;
 		status.current_dfs_level = dfs_level;
 		// take each embedding in the embedding list, do backward and forward extension
-		for(size_t n = 0; n < emb_list.size(); ++n) {
+		for (size_t n = 0; n < emb_list.size(); ++n) {
 			Embedding *cur = &emb_list[n];
 			unsigned emb_size = cur->num_vertices;
 			History history(cur);
 			// backward
-			for(size_t i = rmpath.size() - 1; i >= 1; --i) {
+			for (size_t i = rmpath.size() - 1; i >= 1; --i) {
 				LabEdge *e = get_backward(*graph, edge_list, history[rmpath[i]], history[rmpath[0]], history);
 				if(e) new_bck_root[status.DFS_CODE[rmpath[i]].from][e->elabel].push(emb_size, e, cur);
 			}
@@ -376,9 +376,9 @@ public:
 				}
 			}
 			// backtracked forward
-			for(size_t i = 0; i < rmpath.size(); ++i) {
-				if(get_forward_rmpath(*graph, edge_list, history[rmpath[i]], minlabel, history, edges)) {
-					for(EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
+			for (size_t i = 0; i < rmpath.size(); ++i) {
+				if (get_forward_rmpath(*graph, edge_list, history[rmpath[i]], minlabel, history, edges)) {
+					for (EdgeList::iterator it = edges.begin(); it != edges.end(); ++it) {
 						//if (emb_size + 1 <= max_size)
 							new_fwd_root[status.DFS_CODE[rmpath[i]].from][(*it)->elabel][graph->getData((*it)->to)].push(emb_size+1, *it, cur);
 					} // for it
@@ -386,36 +386,36 @@ public:
 			} // for i
 		} // for n
 		std::deque<DFS> tmp;
-		if(status.dfs_task_queue.size() <= dfs_level) {
+		if (status.dfs_task_queue.size() <= dfs_level) {
 			status.dfs_task_queue.push_back(tmp);
 		}
 		// insert all extended subgraphs into the task queue
 		// backward
-		for(EmbeddingList_iterator2 to = new_bck_root.begin(); to != new_bck_root.end(); ++to) {
-			for(EmbeddingList_iterator1 elabel = to->second.begin(); elabel != to->second.end(); ++elabel) {
+		for (EmbeddingList_iterator2 to = new_bck_root.begin(); to != new_bck_root.end(); ++to) {
+			for (EmbeddingList_iterator1 elabel = to->second.begin(); elabel != to->second.end(); ++elabel) {
 				DFS dfs(maxtoc, to->first, (LabelT)-1, elabel->first, (LabelT)-1);
 				status.dfs_task_queue[dfs_level].push_back(dfs);
 			}
 		}
 		// forward
-		for(EmbeddingList_riterator3 from = new_fwd_root.rbegin(); from != new_fwd_root.rend(); ++from) {
-			for(EmbeddingList_iterator2 elabel = from->second.begin(); elabel != from->second.end(); ++elabel) {
-				for(EmbeddingList_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
+		for (EmbeddingList_riterator3 from = new_fwd_root.rbegin(); from != new_fwd_root.rend(); ++from) {
+			for (EmbeddingList_iterator2 elabel = from->second.begin(); elabel != from->second.end(); ++elabel) {
+				for (EmbeddingList_iterator1 tolabel = elabel->second.begin(); tolabel != elabel->second.end(); ++tolabel) {
 					DFS dfs(from->first, maxtoc + 1, (LabelT)-1, elabel->first, tolabel->first);
 					status.dfs_task_queue[dfs_level].push_back(dfs);
 				}
 			}
 		}
 		// grow to the next level
-		while(status.dfs_task_queue[dfs_level].size() > 0) {
+		while (status.dfs_task_queue[dfs_level].size() > 0) {
 			#ifdef ENABLE_LB
-			if(nthreads > 1) threads_load_balance(status);
+			if (nthreads > 1) threads_load_balance(status);
 			#endif
 			DFS dfs = status.dfs_task_queue[dfs_level].front();
 			status.dfs_task_queue[dfs_level].pop_front();
 			status.current_dfs_level = dfs_level;
 			status.DFS_CODE.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel);
-			if(dfs.is_backward())
+			if (dfs.is_backward())
 				grow(new_bck_root[dfs.to][dfs.elabel], dfs_level + 1, status);
 			else
 				grow(new_fwd_root[dfs.from][dfs.elabel][dfs.tolabel], dfs_level + 1, status);

@@ -52,6 +52,11 @@ struct Edge {
 	std::string toString() {
 		return "(" + std::to_string(src) + ", " + std::to_string(dst) + ")";
 	}
+	std::string to_string() const {
+		std::stringstream ss;
+		ss << "e(" << src << "," << dst << "," << ")";
+		return ss.str();
+	}
 	void swap() {
 		if (src > dst) {
 			VertexId tmp = src;

@@ -126,12 +126,12 @@ bool get_forward_rmpath(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	assert(e->from >= 0 && e->from < graph.size());
-	LabelT tolabel = graph.getData(e->to);
+	auto tolabel = graph.getData(e->to);
 	//Graph::edge_iterator first = graph.edge_begin(e->from, galois::MethodFlag::UNPROTECTED);
 	//Graph::edge_iterator last = graph.edge_end(e->from, galois::MethodFlag::UNPROTECTED);
 	//for (auto it = first; it != last; ++ it) {
 	for (auto it : graph.edges(e->from)) {
-		GNode dst = graph.getEdgeDst(it);
+		auto dst = graph.getEdgeDst(it);
 		auto elabel = graph.getEdgeData(it);
 		auto& dst_label = graph.getData(dst);
 		if(e->to == dst || minlabel > dst_label || history.hasVertex(dst)) continue;
@@ -154,7 +154,7 @@ bool get_forward_pure(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge *e,
 	//Graph::edge_iterator last = graph.edge_end(e->to);
 	//for (auto it = first; it != last; ++ it) {
 	for (auto it : graph.edges(e->to)) {
-		GNode dst = graph.getEdgeDst(it);
+		auto dst = graph.getEdgeDst(it);
 		assert(dst >= 0 && dst < graph.size());
 		//auto elabel = graph.getEdgeData(it);
 		auto& dst_label = graph.getData(dst);
@@ -187,7 +187,6 @@ bool get_forward_root(Graph &graph, std::vector<LabEdge>& edge_list, const Verid
 }
 //*/
 
-// get_backward (graph, e1, e2, history);
 //   e1 (from1, elabel1, to1)
 //   e2 (from2, elabel2, to2)
 //   to2 -> from1
@@ -199,14 +198,10 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1
 	assert(e1->from >= 0 && e1->from < graph.size());
 	assert(e1->to >= 0 && e1->to < graph.size());
 	assert(e2->to >= 0 && e2->to < graph.size());
-	VeridT src = e2->to;
-	//Graph::edge_iterator first = graph.edge_begin(src);
-	//Graph::edge_iterator last = graph.edge_end(src);
-	//for (auto it = first; it != last; ++ it) {
+	auto src = e2->to;
 	for (auto it : graph.edges(src)) {
-		GNode dst = graph.getEdgeDst(it);
+		auto dst = graph.getEdgeDst(it);
 		auto elabel = graph.getEdgeData(it);
-		//if(history.hasEdge(LabEdge(src, dst, elabel, *it))) continue;
 		if (history.hasEdge(*it)) continue;
 		if ((dst == e1->from) && ((e1->elabel < elabel) || ((e1->elabel == elabel) && (graph.getData(e1->to) <= graph.getData(e2->to))))) {
 			return &(edge_list[*it]);
@@ -221,7 +216,7 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, LabEdge* e1
 bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &DFS_CODE, History& history, EdgeList &result) {
 	result.clear();
 	//forward extenstion from dfs_from <=> from
-	VeridT dfs_from = DFS_CODE.back().from;
+	auto dfs_from = DFS_CODE.back().from;
 	VeridT from  = (VeridT)-1;
 	//skip the last one in dfs code
 	// get the "from" vertex id from the history
@@ -238,7 +233,7 @@ bool get_forward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCode &D
 	assert (from != (VeridT)-1);
 	DFS dfs = DFS_CODE.back();
 	for (auto it : graph.edges(from)) {
-		GNode dst = graph.getEdgeDst(it);
+		auto dst = graph.getEdgeDst(it);
 		auto elabel = graph.getEdgeData(it);
 		if( elabel == dfs.elabel && graph.getData(dst) == dfs.tolabel &&  !history.hasVertex(dst) )
 			result.push_back(&(edge_list[*it]));
@@ -255,10 +250,10 @@ LabEdge *get_backward(Graph &graph, std::vector<LabEdge>& edge_list, const DFSCo
 			vertex_id_map[DFS_CODE[i].to]   = history[i]->to;
 	}
 	//now add the backward edge using the last entry of the DFS code
-	VeridT from = vertex_id_map[DFS_CODE.back().from];
-	VeridT to   = vertex_id_map[DFS_CODE.back().to];
+	auto from = vertex_id_map[DFS_CODE.back().from];
+	auto to   = vertex_id_map[DFS_CODE.back().to];
 	for (auto it : graph.edges(from)) {
-		GNode dst = graph.getEdgeDst(it);
+		auto dst = graph.getEdgeDst(it);
 		if(dst == to) return &(edge_list[*it]);
 	}
 	return 0;
@@ -271,9 +266,9 @@ bool get_forward_rmpath(CGraph &graph, LabEdge *e, LabelT minlabel, History& his
 	result.clear();
 	assert(e->to >= 0 && e->to < graph.size());
 	assert(e->from >= 0 && e->from < graph.size());
-	LabelT tolabel = graph[e->to].label;
+	auto tolabel = graph[e->to].label;
 	for(Vertex::const_edge_iterator it = graph[e->from].edge.begin(); it != graph[e->from].edge.end(); ++it) {
-		LabelT tolabel2 = graph[it->to].label;
+		auto tolabel2 = graph[it->to].label;
 		if(e->to == it->to || minlabel > tolabel2 || history.hasVertex(it->to))
 			continue;
 		if(e->elabel < it->elabel || (e->elabel == it->elabel && tolabel <= tolabel2))
