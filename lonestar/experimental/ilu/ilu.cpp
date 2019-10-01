@@ -127,7 +127,7 @@ void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
     if (i >= outer_offset) {
       temp_graph.incrementDegree(i);
     }
-    if (i > inner_offset && (i / inner_offset) % inner_offset) {
+    if (i >= inner_offset && (i / inner_offset) % inner_offset) {
       temp_graph.incrementDegree(i);
     }
     if (i && i % inner_offset) {
