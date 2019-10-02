@@ -1,7 +1,5 @@
 #ifndef __GRAPH_TYPES_HPP__
 #define __GRAPH_TYPES_HPP__
-#include "types.hpp"
-#include "cgraph.hpp"
 #include "dfs_code.hpp"
 
 struct LocalStatus {
