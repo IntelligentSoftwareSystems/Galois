@@ -3,7 +3,8 @@
 #include "types.h"
 
 class EdgeList {
-using iterator = typename galois::gstl::Vector<Edge>::iterator;
+//using iterator = typename galois::gstl::Vector<Edge>::iterator;
+using iterator = typename std::vector<Edge>::iterator;
 public:
 	EdgeList() {}
 	EdgeList(Graph& graph, bool is_dag = false) {
@@ -15,7 +16,9 @@ public:
 	iterator end() { return edges.end(); }
 	size_t size() const { return edges.size(); }
 	void resize (size_t n) { edges.resize(n); }
-	Edge & get_edge(unsigned i) { return edges[i]; }
+	void push_back(Edge e) { edges.push_back(e); }
+	Edge& get_edge(unsigned i) { return edges[i]; }
+	Edge* get_edge_ptr(unsigned i) { return &(edges[i]); }
 	void init(Graph& graph, bool is_dag = false) {
 		size_t num_edges = graph.sizeEdges();
 		if (!is_dag) num_edges = num_edges / 2;
@@ -69,7 +72,8 @@ public:
 		}
 	}
 private:
-	galois::gstl::Vector<Edge> edges;
+	//galois::gstl::Vector<Edge> edges;
+	std::vector<Edge> edges;
 	void add_edge(unsigned pos, IndexTy src, IndexTy dst) {
 		edges[pos] = Edge(src, dst);
 	}

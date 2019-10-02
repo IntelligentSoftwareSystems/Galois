@@ -35,6 +35,7 @@ typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 typedef std::pair<unsigned, unsigned> InitPattern;
 typedef std::unordered_map<unsigned, unsigned> FreqMap;
 typedef std::unordered_map<unsigned, bool> DomainMap;
+typedef std::map<unsigned, std::map<unsigned, unsigned> > Map2D;
 //typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
 //typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
 
@@ -54,7 +55,7 @@ struct Edge {
 	}
 	std::string to_string() const {
 		std::stringstream ss;
-		ss << "e(" << src << "," << dst << "," << ")";
+		ss << "e(" << src << "," << dst << ")";
 		return ss.str();
 	}
 	void swap() {

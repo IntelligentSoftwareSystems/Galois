@@ -17,11 +17,10 @@ public:
 		minimal_support = minsup;
 		max_level = size;
 		nthreads = numThreads;
-		show_output = show;
 		for(int i = 0; i < nthreads; i++) {
 			frequent_patterns_count.push_back(0);
 			std::vector<std::deque<DFS> > tmp;
-			dfs_task_queue.push_back(tmp);
+			//dfs_task_queue.push_back(tmp);
 		}
 		construct_edgelist();
 		#ifdef ENABLE_LB
@@ -346,9 +345,9 @@ public:
 		if (is_min(status) == false) return; // check if this pattern is canonical: minimal DFSCode
 		status.frequent_patterns_count ++;
 		// list frequent patterns here!!!
-		if (show_output) {
+		if (debug) {
 			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
-			for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
+			//for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
 		if (dfs_level == max_level) return;
 		const RMPath &rmpath = status.DFS_CODE.buildRMPath(); // build the right-most path of this pattern
@@ -463,11 +462,10 @@ protected:
 	Status status;
 	unsigned minimal_support;
 	unsigned max_level;
-	bool show_output;
 	PatternMap3D pattern_map; // mapping patterns to their embedding list
 	PatternQueue task_queue; // task queue holding the DFScodes of patterns
 	std::vector<int> frequent_patterns_count;
-	std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread
+	//std::vector<std::vector<std::deque<DFS> > > dfs_task_queue;       //keep the sibling extensions for each level and for each thread
 #ifdef ENABLE_LB
 	typedef enum {WORK_REQUEST = 0, WORK_RESPONSE = 1} REQUEST_TYPE;
 	galois::substrate::SimpleLock simple_lock;
@@ -508,6 +506,19 @@ protected:
 	// check whether a DFSCode is minimal or not, i.e. canonical check (minimal DFSCode is canonical)
 	bool is_min(LocalStatus &status) {
 		if(status.DFS_CODE.size() == 1) return true;
+		/*
+		if (status.DFS_CODE.size() == 2) {
+			if (status.DFS_CODE[1].from == 1) {
+				if (status.DFS_CODE[0].fromlabel <= status.DFS_CODE[1].tolabel) return true;
+			} else {
+				assert(status.DFS_CODE[1].from == 0);
+				if (status.DFS_CODE[0].fromlabel == status.DFS_CODE[0].tolabel) return false;
+				if (status.DFS_CODE[0].tolabel == status.DFS_CODE[1].tolabel && status.DFS_CODE[0].fromlabel < status.DFS_CODE[1].tolabel) return true;
+				if (status.DFS_CODE[0].tolabel <  status.DFS_CODE[1].tolabel) return true;
+			}
+			return false;
+		}
+		*/
 		status.DFS_CODE.toGraph(status.GRAPH_IS_MIN);
 		status.DFS_CODE_IS_MIN.clear();
 		PatternMap3D root;

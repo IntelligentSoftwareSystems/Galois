@@ -1,4 +1,6 @@
 #define USE_DFS
+#define USE_CUSTOM
+//#define PRECOMPUTE
 #define ENABLE_LABEL
 #define EDGE_INDUCED
 #define CHUNK_SIZE 4

@@ -5,16 +5,16 @@ typedef unsigned LabelT;
 typedef std::vector<VeridT> RMPath;
 
 struct LabEdge {
-	VeridT from;
-	VeridT to;
+	VeridT src;
+	VeridT dst;
 	LabelT elabel;
-	unsigned id;
-	LabEdge() : from(0), to(0), elabel(0), id(0) {}
-	LabEdge(VeridT src, VeridT dst, LabelT el, unsigned eid) :
-		from(src), to(dst), elabel(el), id(eid) {}
+	unsigned eid;
+	LabEdge() : src(0), dst(0), elabel(0), eid(0) {}
+	LabEdge(VeridT src_, VeridT dst_, LabelT elabel_, unsigned eid_) :
+		src(src_), dst(dst_), elabel(elabel_), eid(eid_) {}
 	std::string to_string() const {
 		std::stringstream ss;
-		ss << "e(" << from << "," << to << "," << elabel << ")";
+		ss << "e(" << src << "," << dst << "," << elabel << ")";
 		return ss.str();
 	}
 };
@@ -23,28 +23,30 @@ typedef std::vector<LabEdge *> LabEdgeList;
 // Used for construct canonical graph
 class Vertex {
 public:
-	typedef std::vector<LabEdge>::iterator edge_iterator;
-	typedef std::vector<LabEdge>::const_iterator const_edge_iterator;
 	LabelT label;
-	VeridT global_vid, vertex_part_id, orig_part_id;
-	bool is_boundary_vertex;
-	std::vector<LabEdge> edge; //neighbor list
-	void push(VeridT from, VeridT to, LabelT elabel) {
+	std::vector<Edge> edge; //neighbor list
+	void push(VeridT src_, VeridT dst_, LabelT elabel_ = 0) {
 		edge.resize(edge.size() + 1);
-		edge[edge.size() - 1].from = from;
-		edge[edge.size() - 1].to = to;
-		edge[edge.size() - 1].elabel = elabel;
+		edge[edge.size() - 1].src = src_;
+		edge[edge.size() - 1].dst = dst_;
+		//edge[edge.size() - 1].elabel = elabel_;
 		return;
 	}
-	bool find(VeridT from, VeridT to, LabEdge &result) const {
+	bool find(VeridT src_, VeridT dst_, Edge &result) const {
 		for(size_t i = 0; i < edge.size(); i++) {
-			if(edge[i].from == from && edge[i].to == to) {
+			if(edge[i].src == src_ && edge[i].dst == dst_) {
 				result = edge[i];
 				return true;
 			}
-		} // for i
+		}
 		return false;
-	} // find
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		ss << "vlabel: " << label << ", ";
+		for (auto e : edge) ss << e.to_string() << " ";
+		return ss.str();
+	}
 };
 
 // Canonical graph used for canonical check.
@@ -52,39 +54,42 @@ public:
 // to perform a canonical check (minimal DFSCode)
 class CGraph : public std::vector<Vertex> {
 private:
-	unsigned edge_size_;
+	unsigned num_edges;
+	bool directed;
 public:
 	typedef std::vector<Vertex>::iterator vertex_iterator;
-	std::map<int,int> global_local_id_map;
-	int max_local_vid;
-	bool has_ext_neighbor;
-	CGraph() : edge_size_(0), directed(false) {}
+	CGraph() : num_edges(0), directed(false) {}
 	CGraph(bool _directed) { directed = _directed; }
-	bool directed;
-	unsigned edge_size() const { return edge_size_; }
+	unsigned edge_size() const { return num_edges; }
 	unsigned vertex_size() const { return (unsigned)size(); } // wrapper
+	bool is_directed() const { return directed; }
 	void buildEdge() {
-		char buf[512];
-		std::map <std::string, unsigned> tmp;
+		std::pair<unsigned,unsigned> new_edge;
+		std::map <std::pair<unsigned,unsigned>, unsigned> edge_map;
 		unsigned id = 0;
-		for(VeridT from = 0; from < (VeridT)size(); ++from) {
-			for(Vertex::edge_iterator it = (*this)[from].edge.begin();
-					it != (*this)[from].edge.end(); ++it) {
-				//if(directed || from <= it->to)
-				//	std::sprintf(buf, "%d %d %d", from, it->to, it->elabel);
-				//else
-				//	std::sprintf(buf, "%d %d %d", it->to, from, it->elabel);
+		for(size_t src = 0; src < size(); ++ src) {
+			for(auto it = (*this)[src].edge.begin(); it != (*this)[src].edge.end(); ++it) {
+				auto dst = it->dst;
+				if(directed || src <= dst) new_edge = std::make_pair(src, dst);
+				else new_edge = std::make_pair(dst, src);
 				// Assign unique id's for the edges.
-				if(tmp.find(buf) == tmp.end()) {
-					it->id = id;
-					tmp[buf] = id;
+				if(edge_map.find(new_edge) == edge_map.end()) {
+					//it->id = id;
+					edge_map[new_edge] = id;
 					++id;
 				} else {
-					it->id = tmp[buf];
+					//it->id = edge_map[new_edge];
 				}
 			}
 		}
-		edge_size_ = id;
+		num_edges = id;
+		if (debug) std::cout << "num_edges = " << num_edges << "\n";
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		for(size_t vid = 0; vid < size(); ++ vid)
+			ss << vid << ": " << (*this)[vid].to_string() << "\n";
+		return ss.str();
 	}
 };
 
@@ -164,14 +169,14 @@ public:
 	// Convert current DFS code into a canonical graph.
 	bool toGraph(CGraph &g) const {
 		g.clear();
-		for(DFSCode::const_iterator it = begin(); it != end(); ++it) {
+		for(auto it = begin(); it != end(); ++it) {
 			g.resize(std::max(it->from, it->to) + 1);
 			if(it->fromlabel != (LabelT)-1)
 				g[it->from].label = it->fromlabel;
 			if(it->tolabel != (LabelT)-1)
 				g[it->to].label = it->tolabel;
 			g[it->from].push(it->from, it->to, it->elabel);
-			if(g.directed == false)
+			if(g.is_directed() == false)
 				g[it->to].push(it->to, it->from, it->elabel);
 		}
 		g.buildEdge();
@@ -236,11 +241,11 @@ std::ostream &operator<<(std::ostream &out, const DFSCode &code) {
 
 // An embedding consists of an edge (pointer) 
 // and an embedding pointer to its parent embedding
-struct LabEdgeEmbedding {
+struct BaseEdgeEmbedding {
 	unsigned num_vertices;
 	Edge *edge;
-	LabEdgeEmbedding *prev;
-	LabEdgeEmbedding() : num_vertices(0), edge(0), prev(0) {};
+	BaseEdgeEmbedding *prev;
+	BaseEdgeEmbedding() : num_vertices(0), edge(0), prev(0) {};
 	std::string to_string() const {
 		std::stringstream ss;
 		ss << "[" << edge->to_string() << "]";
@@ -249,12 +254,37 @@ struct LabEdgeEmbedding {
 	std::string to_string_all() {
 		std::vector<Edge> ev;
 		ev.push_back(*edge);
-		for(LabEdgeEmbedding *p = prev; p; p = p->prev) {
+		for (BaseEdgeEmbedding *p = prev; p; p = p->prev) {
 			ev.push_back(*(p->edge));
 		}
 		std::reverse(ev.begin(), ev.end());
 		std::stringstream ss;
-		for(size_t i = 0; i < ev.size(); i++) {
+		for (size_t i = 0; i < ev.size(); i++) {
+			ss << ev[i].to_string() << "; ";
+		}
+		return ss.str();
+	}
+};
+
+struct LabEdgeEmbedding {
+	unsigned num_vertices;
+	LabEdge *edge;
+	LabEdgeEmbedding *prev;
+	LabEdgeEmbedding() : num_vertices(0), edge(0), prev(0) {};
+	std::string to_string() const {
+		std::stringstream ss;
+		ss << "[" << edge->to_string() << "]";
+		return ss.str();
+	}
+	std::string to_string_all() {
+		std::vector<LabEdge> ev;
+		ev.push_back(*edge);
+		for (LabEdgeEmbedding *p = prev; p; p = p->prev) {
+			ev.push_back(*(p->edge));
+		}
+		std::reverse(ev.begin(), ev.end());
+		std::stringstream ss;
+		for (size_t i = 0; i < ev.size(); i++) {
 			ss << ev[i].to_string() << "; ";
 		}
 		return ss.str();
@@ -262,9 +292,26 @@ struct LabEdgeEmbedding {
 };
 
 // Embedding list
+class BaseEdgeEmbeddingList : public std::vector<BaseEdgeEmbedding> {
+public:
+	void push(int n, Edge *edge, BaseEdgeEmbedding *prev) {
+		BaseEdgeEmbedding d;
+		d.num_vertices = n;
+		d.edge = edge;
+		d.prev = prev;
+		push_back(d);
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		for(size_t i = 0; i < size(); i++)
+			ss << (*this)[i].to_string() << "; ";
+		return ss.str();
+	}
+};
+
 class LabEdgeEmbeddingList : public std::vector<LabEdgeEmbedding> {
 public:
-	void push(int n, Edge *edge, LabEdgeEmbedding *prev) {
+	void push(int n, LabEdge *edge, LabEdgeEmbedding *prev) {
 		LabEdgeEmbedding d;
 		d.num_vertices = n;
 		d.edge = edge;
@@ -279,9 +326,11 @@ public:
 	}
 };
 
-typedef std::map<int, std::map <int, std::map <int, LabEdgeEmbeddingList> > > EmbeddingLists3D;
-typedef std::map<int, std::map <int, LabEdgeEmbeddingList> >                  EmbeddingLists2D;
-typedef std::map<int, LabEdgeEmbeddingList>                                   EmbeddingLists1D;
+typedef std::map<int, std::map <int, BaseEdgeEmbeddingList> >                 EmbeddingLists2D;
+typedef std::map<int, BaseEdgeEmbeddingList>                                  EmbeddingLists1D;
+typedef std::map<int, std::map <int, std::map <int, LabEdgeEmbeddingList> > > LabEmbeddingLists3D;
+typedef std::map<int, std::map <int, LabEdgeEmbeddingList> >                  LabEmbeddingLists2D;
+typedef std::map<int, LabEdgeEmbeddingList>                                   LabEmbeddingLists1D;
 
 // Stores information of edges/nodes that were already visited in the
 // current DFS branch of the search.
@@ -293,32 +342,75 @@ private:
 public:
 	bool hasEdge(unsigned id) { return (bool)edge.count(id); }
 	bool hasEdge(Edge e) {
-		for(std::vector<Edge*>::iterator it = this->begin(); it != this->end(); ++it) {
-			//if((*it)->from == e.from && (*it)->to == e.to && (*it)->elabel == e.elabel)
+		for(auto it = this->begin(); it != this->end(); ++it) {
 			if((*it)->src == e.src && (*it)->dst == e.dst)
 				return true;
-			//else if((*it)->from == e.to && (*it)->to == e.from && (*it)->elabel == e.elabel)
+			else if((*it)->src == e.dst && (*it)->dst == e.src)
+				return true;
+		}
+		return false;
+	}
+	bool hasEdge(unsigned src, unsigned dst) {
+		for(auto it = this->begin(); it != this->end(); ++it) {
+			if((*it)->src == src && (*it)->dst == dst) return true;
+			else if((*it)->src == dst && (*it)->dst == src) return true;
+		}
+		return false;
+	}
+	bool hasVertex(unsigned id) { return (bool)vertex.count(id); }
+	History() {}
+	History(BaseEdgeEmbedding *p) { build(p); }
+	void build(BaseEdgeEmbedding *e) {
+		if(e) {
+			push_back(e->edge);
+			vertex.insert(e->edge->src);
+			vertex.insert(e->edge->dst);
+			for(BaseEdgeEmbedding *p = e->prev; p; p = p->prev) {
+				push_back(p->edge);       // this line eats 8% of overall instructions(!)
+				vertex.insert(p->edge->src);
+				vertex.insert(p->edge->dst);
+			}
+			std::reverse(begin(), end());
+		}
+	}
+	std::string to_string() const {
+		std::stringstream ss;
+		for(size_t i = 0; i < size(); i++) {
+			ss << at(i)->to_string() << "; ";
+		}
+		return ss.str();
+	}
+};
+
+class LabHistory : public std::vector<LabEdge*> {
+private:
+	std::set<int> edge;
+	std::set<int> vertex;
+public:
+	bool hasEdge(unsigned id) { return (bool)edge.count(id); }
+	bool hasLabEdge(LabEdge e) {
+		for(auto it = this->begin(); it != this->end(); ++it) {
+			//if((*it)->src == e.src && (*it)->dst == e.dst && (*it)->elabel == e.elabel)
+			if((*it)->src == e.src && (*it)->dst == e.dst)
+				return true;
+			//else if((*it)->src == e.dst && (*it)->dst == e.src && (*it)->elabel == e.elabel)
 			else if((*it)->src == e.dst && (*it)->dst == e.src)
 				return true;
 		}
 		return false;
 	}
 	bool hasVertex(unsigned id) { return (bool)vertex.count(id); }
-	History() {}
-	History(LabEdgeEmbedding *p) { build(p); }
+	LabHistory() {}
+	LabHistory(LabEdgeEmbedding *p) { build(p); }
 	void build(LabEdgeEmbedding *e) {
 		if(e) {
 			push_back(e->edge);
-			//edge.insert(e->edge->id);
-			//vertex.insert(e->edge->from);
-			//vertex.insert(e->edge->to);
+			edge.insert(e->edge->eid);
 			vertex.insert(e->edge->src);
 			vertex.insert(e->edge->dst);
 			for(LabEdgeEmbedding *p = e->prev; p; p = p->prev) {
 				push_back(p->edge);       // this line eats 8% of overall instructions(!)
-				//edge.insert(p->edge->id);
-				//vertex.insert(p->edge->from);
-				//vertex.insert(p->edge->to);
+				edge.insert(p->edge->eid);
 				vertex.insert(p->edge->src);
 				vertex.insert(p->edge->dst);
 			}
