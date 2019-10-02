@@ -175,24 +175,24 @@ public:
 		);
 	}
 	void dfs_extend_naive(unsigned level, BaseEdgeEmbeddingList &emb_list, Status &status) {
+		//if (debug) std::cout << "\nDFSCode: " << status.DFS_CODE << "\n";
 		unsigned sup = support(emb_list, status);
+		//if (debug) std::cout << "level: " << level << "  support: " << sup << "\n";
 		if (sup < threshold) return;
-		if (debug) std::cout << "\nDFSCode: " << status.DFS_CODE << "\n";
-		//if (debug) std::cout << "Number of embeddings: " << emb_list.size() << "\n";
 		//if (debug) {
 		//	for(size_t i = 0; i < emb_list.size(); i++)
 		//	std::cout << "EmbeddingList (num_vertices=" << emb_list[i].num_vertices << "): " << emb_list[i].to_string_all() << "\n";
 		//}
-		if (debug) std::cout << "level: " << level << "  support: " << sup << "\n";
 		// check if this pattern is canonical: minimal DFSCode
 		if (is_min(status) == false) {
-			if (debug) std::cout << "Not minimal dfscode: pruned\n";
+			//if (debug) std::cout << "Not minimal dfscode: pruned\n";
 			return;
 		}
 		total_num += 1;
 		// list frequent patterns here!!!
 		if (debug) {
-			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
+			std::cout << status.DFS_CODE.to_string(false) << ": sup = " << sup;
+			std::cout << ", num_embeddings = " << emb_list.size() << "\n";
 			//for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
 		if (level == max_size) return;
@@ -225,12 +225,14 @@ public:
 			// backward extension
 			for (size_t i = rmpath.size() - 1; i >= 1; --i) {
 				auto e1 = history[rmpath[i]];
-				if(e1 == e2) continue;
-				auto src = e2->src;
+				if (e1 == e2) continue;
+				auto src = e2->dst;
+				//std::cout << "[backward] emb = " << cur->to_string_all() << ", src = " << src << ", i = " << i << ", e1 = " << e1->to_string() << ", e2 = " << e2->to_string() << ", history = " << history.to_string() << "\n";
 				for (auto e : graph->edges(src)) {
 					auto dst = graph->getEdgeDst(e);
+					//std::cout << "\t dst = " << dst << "\n";
 					if (history.hasEdge(src, dst)) continue;
-					if (graph->getData(e1->dst) <= graph->getData(src)) {
+					if (dst == e1->src && graph->getData(e1->dst) <= graph->getData(src)) {
 						emb_lists_bck[status.DFS_CODE[rmpath[i]].from].push(emb_size, edge_list.get_edge_ptr(*e), cur);
 						break;
 					}
@@ -240,7 +242,7 @@ public:
 			for (auto e : graph->edges(e2->dst)) {
 				auto dst = graph->getEdgeDst(e);
 				auto& dst_label = graph->getData(dst);
-				if(minlabel > dst_label || history.hasVertex(dst)) continue;
+				if (minlabel > dst_label || history.hasVertex(dst)) continue;
 				emb_lists_fwd[maxtoc][graph->getData(edge_list.get_edge(*e).dst)].push(emb_size+1, edge_list.get_edge_ptr(*e), cur);
 			}
 			// backtracked forward extension
@@ -316,7 +318,7 @@ protected:
 		}
 		#endif
 		status.DFS_CODE.toGraph(status.GRAPH_IS_MIN);
-		if (debug) std::cout << status.GRAPH_IS_MIN.to_string();
+		//if (debug) std::cout << status.GRAPH_IS_MIN.to_string();
 		status.DFS_CODE_IS_MIN.clear();
 		EmbeddingLists2D emb_lists;
 		for (size_t vid = 0; vid < status.GRAPH_IS_MIN.size(); ++ vid) {
@@ -336,13 +338,13 @@ protected:
 		const RMPath& rmpath = status.DFS_CODE_IS_MIN.buildRMPath();
 		auto minlabel        = status.DFS_CODE_IS_MIN[0].fromlabel;
 		auto maxtoc          = status.DFS_CODE_IS_MIN[rmpath[0]].to;
-		if (debug) std::cout << "\t[IS_MIN] DFSCode: " << status.DFS_CODE_IS_MIN << "\n";
-		if (debug) std::cout << "\t[IS_MIN] Number of embeddings: " << emb_list.size() << "\n";
-		if (debug) {
-			for(size_t i = 0; i < emb_list.size(); i++)
-			std::cout << "\t[IS_MIN] EmbeddingList (num_vertices=" << emb_list[i].num_vertices << "): " << emb_list[i].to_string_all() << "\n";
-		}
-		if (debug) std::cout << "\t[IS_MIN] minlabel: " << minlabel << "  maxtoc: " << maxtoc << "\n";
+		//if (debug) std::cout << "\t[IS_MIN] DFSCode: " << status.DFS_CODE_IS_MIN << "\n";
+		//if (debug) std::cout << "\t[IS_MIN] Number of embeddings: " << emb_list.size() << "\n";
+		//if (debug) {
+		//	for(size_t i = 0; i < emb_list.size(); i++)
+		//	std::cout << "\t[IS_MIN] EmbeddingList (num_vertices=" << emb_list[i].num_vertices << "): " << emb_list[i].to_string_all() << "\n";
+		//}
+		//if (debug) std::cout << "\t[IS_MIN] minlabel: " << minlabel << "  maxtoc: " << maxtoc << "\n";
 	
 		// backward
 		bool found = false;

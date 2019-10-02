@@ -83,7 +83,7 @@ public:
 			}
 		}
 		num_edges = id;
-		if (debug) std::cout << "num_edges = " << num_edges << "\n";
+		//if (debug) std::cout << "num_edges = " << num_edges << "\n";
 	}
 	std::string to_string() const {
 		std::stringstream ss;

@@ -346,7 +346,8 @@ public:
 		status.frequent_patterns_count ++;
 		// list frequent patterns here!!!
 		if (debug) {
-			std::cout << status.DFS_CODE.to_string(false) << ": " << sup << std::endl;
+			std::cout << status.DFS_CODE.to_string(false) << ": sup = " << sup;
+			std::cout << ", num_embeddings = " << emb_list.size() << "\n";
 			//for (auto it = emb_list.begin(); it != emb_list.end(); it++) std::cout << "\t" << it->to_string_all() << std::endl;
 		}
 		if (dfs_level == max_level) return;
