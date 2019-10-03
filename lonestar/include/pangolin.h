@@ -36,6 +36,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: uns
 #ifdef USE_QUERY_GRAPH
 static cll::opt<std::string> query_graph_filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
 static cll::opt<std::string> preset_filename("pf", cll::desc("<filename: preset matching order>"), cll::init("default"));
+static cll::opt<unsigned> fv("fv", cll::desc("first vertex is special"), cll::init(0));
 #endif
 #ifndef TRIANGLE
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));

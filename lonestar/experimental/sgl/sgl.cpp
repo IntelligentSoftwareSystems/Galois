@@ -53,7 +53,9 @@ public:
 			std::cout << "\t n = " << n << ", pos = " << pos << ", src = " << src << ", dst = " << dst << "\n";
 		}
 		//std::cout << ", deg(d) = " << get_degree(graph, dst) << ", deg(q) = " << get_degree(query_graph, pos+1);
-		//
+
+		// the first vertex should always has the smallest id (if it is not special)
+		if (!fv && dst <= emb.get_vertex(0)) return false;
 		// if the degree is smaller than that of its corresponding query vertex
 		if (get_degree(graph, dst) < get_degree(query_graph, next_qnode)) return false;
 		// if this vertex already exists in the embedding
@@ -112,7 +114,14 @@ public:
 									BaseEmbedding new_emb(emb);
 									new_emb.push_back(d_dst);
 									out_queue.push_back(new_emb);
-								} else total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+								} else {
+									if (show) {
+										BaseEmbedding new_emb(emb);
+										new_emb.push_back(d_dst);
+										std::cout << "Found embedding: " << new_emb << "\n";
+									}
+									total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+								}
 							}
 						}
 						break;
@@ -154,6 +163,9 @@ int main(int argc, char** argv) {
 
 	ResourceManager rm;
 	AppMiner miner(&data_graph, &query_graph, query_graph.size(), 1);
+
+	galois::StatTimer Tcomp("Compute");
+	Tcomp.start();
 	VertexId curr_qnode = miner.get_query_vertex(0);
 	EmbeddingQueueType queue, queue2;
 	for (size_t i = 0; i < data_graph.size(); ++i) {
@@ -171,6 +183,7 @@ int main(int argc, char** argv) {
 		queue2.clear();
 		level ++;
 	}
+	Tcomp.stop();
 	miner.print_output();
 	std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
 }
