@@ -174,6 +174,46 @@ public:
 			}
 		}
 	}
+
+	void edge_process_naive() {
+		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+		//	[&](const Edge &edge) {
+		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
+			[&](const size_t& pos) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				emb_list->init(edge_list.get_edge(pos));
+				#ifdef USE_MAP
+				dfs_extend_naive_motif(1, 0, *emb_list, 0);
+				#else
+				dfs_extend_naive(1, 0, *emb_list);
+				#endif
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("DfsEdgeNaiveSolver")
+		);
+		#ifdef USE_MAP
+		motif_count();
+		#endif
+	}
+
+	void edge_process_adhoc() {
+		std::cout << "Starting Ad-Hoc Motif Solver\n";
+		if (max_size > 4) {
+			std::cout << "not supported yet\n";
+			return;
+		}
+		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
+			[&](const size_t& pos) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				emb_list->init(edge_list.get_edge(pos));
+				dfs_from_edge_adhoc(1, 0, *emb_list);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("DfsAdhocSolver")
+		);
+		motif_count();
+	}
+
 	void dfs_extend_naive_motif(unsigned level, unsigned pos, EmbeddingList &emb_list, unsigned previous_pid) {
 		unsigned n = level + 1;
 		VertexEmbedding emb(n);
@@ -216,89 +256,132 @@ public:
 	}
 
 	// construct the subgraph induced by edge (u, v)'s neighbors
-	void dfs_from_edge(const Edge &edge, Egonet &egonet, EmbeddingList &emb_list, UintList &ids, UintList &T_vu, UintList &W_u) {
-		unsigned num_vertices = graph->size();
-		unsigned u = edge.src, v = edge.dst;
-		if (ids.empty()) {
-			ids.resize(num_vertices);
-			//for (unsigned i = 0; i < num_vertices; i ++) ids[i] = (unsigned)-1;
-			for (unsigned i = 0; i < num_vertices; i ++) ids[i] = 0;
+	void dfs_from_edge_adhoc(unsigned level, unsigned pos, EmbeddingList &emb_list) {
+		unsigned n = level + 1;
+		VertexEmbedding emb(n);
+		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
+		unsigned u = emb.get_vertex(0), v = emb.get_vertex(1);
+		//std::cout << "Edge: " << u << " --> " << v << "\n";
+		UintList *ids = id_lists.getLocal();
+		if (ids->empty()) {
+			ids->resize(graph->size());
+			std::fill(ids->begin(), ids->end(), 0);
 		}
-		if (W_u.empty()) {
-			T_vu.resize(core+1);
-			W_u.resize(core+1);
-			std::fill(T_vu.begin(), T_vu.end(), 0);
-			std::fill(W_u.begin(), W_u.end(), 0);
+
+		UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
+		UintList *W_u = Wed_vids.getLocal(); //  to record the third vertex in each wedge
+		if (W_u->empty()) {
+			T_vu->resize(core+1); // hold the vertices that form a triangle with u and v
+			W_u->resize(core+1); // hold the vertices that form a wedge with u and v
+			std::fill(T_vu->begin(), T_vu->end(), 0);
+			std::fill(W_u->begin(), W_u->end(), 0);
 		}
-		if (max_size == 4) {
-			unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
-			unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
-			Ulong w_local_count = 0, tri_count = 0, clique4_count = 0, cycle4_count = 0;
-			mark_neighbors(v, u, ids);
-			triangles_and_wedges(v, u, T_vu, tri_count, W_u, w_local_count, ids);
-			solve_graphlet_equations(deg_v, deg_u, tri_count, w_local_count);
-			cycle(w_local_count, W_u, cycle4_count, ids);
-			clique(tri_count, T_vu, clique4_count, ids);
+
+		Ulong wedge_count = 0, tri_count = 0;
+		mark_neighbors(v, u, *ids);
+		unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
+		if (max_size == 3) {
+			auto begin = graph->edge_begin(u);
+			auto end = graph->edge_end(u);
+			for (auto e = begin; e < end; e ++) {
+				auto w = graph->getEdgeDst(e);
+				if (w == v) continue;
+				if ((*ids)[w] == 1) tri_count++;
+			}
+			accumulators[0] += tri_count;
+			accumulators[1] += deg_v - tri_count - 1 + deg_u - tri_count - 1;
+		} else if (max_size == 4) {
+			triangles_and_wedges(v, u, *T_vu, tri_count, *W_u, wedge_count, *ids);
+			Ulong clique4_count = 0, cycle4_count = 0;
+			solve_graphlet_equations(deg_v, deg_u, tri_count, wedge_count);
+			cycle(wedge_count, *W_u, cycle4_count, *ids);
+			clique(tri_count, *T_vu, clique4_count, *ids);
 			accumulators[5] += clique4_count;
 			accumulators[2] += cycle4_count;
-			reset_perfect_hash(v, ids);
+		} else {
+		}
+		reset_perfect_hash(v, *ids);
+	}
+
+	void dfs_extend_motif(unsigned level, unsigned pos, EmbeddingList &emb_list, unsigned previous_pid) {
+		unsigned n = level + 1;
+		VertexEmbedding emb(n);
+		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
+		UintList *ids = id_lists.getLocal();
+		if (ids->empty()) {
+			ids->resize(graph->size());
+			std::fill(ids->begin(), ids->end(), 0);
+		}
+
+			/*
+		if (level == max_size-2) {
+			if (max_size == 4) {
+				Ulong clique4_count = 0, cycle4_count = 0;
+				cycle(wedge_count, *W_u, cycle4_count, *ids);
+				clique(tri_count, *T_vu, clique4_count, *ids);
+				accumulators[5] += clique4_count;
+				accumulators[2] += cycle4_count;
+				reset_perfect_hash(v, *ids);
+				return;
+			}
+			// extending every vertex in the embedding
+			for (unsigned element_id = 0; element_id < n; ++ element_id) {
+				if(!toExtend(n, emb, element_id)) continue;
+				VertexId src = emb.get_vertex(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto e = begin; e != end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (toAdd(n, emb, dst, element_id))
+						reduction(getPattern(n, element_id, dst, emb, previous_pid));
+				}
+			}
 			return;
 		}
-		unsigned level = max_size-1;
-		if(debug) printf("\n\n=======================\ninit: u = %d, v = %d, level = %d\n", u, v, level);
-		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
-		for (auto e : graph->edges(v)) {
-			auto dst = graph->getEdgeDst(e);
-			if (dst == u) continue;
-			ids[dst] = (unsigned)-2;
-			if (max_size == 3) accumulators[1] += 1;
-		}
-		unsigned new_size = 0;
-		for (auto e : graph->edges(u)) {
-			auto dst = graph->getEdgeDst(e);
-			if (dst == v) continue;
-			if (max_size == 3) {
-				if (ids[dst] == (unsigned)-2) {
-					accumulators[0] += 1; // triangle
-					accumulators[1] -= 1;
-				} else accumulators[1] += 1; // 3-path
-			} else {
-				ids[dst] = new_size;
-				if (ids[dst] == (unsigned)-2)
-					emb_list.set_label(new_size, 2); // triangle
-				else
-					emb_list.set_label(new_size, 3); // 3-path
-				emb_list.set_vertex(max_size-2, new_size, new_size);
+			*/
+
+		unsigned v0 = emb.get_vertex(0), v1 = emb.get_vertex(1);
+		UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
+		UintList *W_u = Wed_vids.getLocal(); //  to record the third vertex in each wedge
+		if (max_size == 4) {
+			if (W_u->empty()) {
+				T_vu->resize(core+1); // hold the vertices that form a triangle with u and v
+				W_u->resize(core+1); // hold the vertices that form a wedge with u and v
+				std::fill(T_vu->begin(), T_vu->end(), 0);
+				std::fill(W_u->begin(), W_u->end(), 0);
 			}
-			if(debug) printf("init: v[%d] = %d\n", new_size, dst);
-			new_size ++;
 		}
-		/*
-		if (max_size > 3) {
-			if (max_size == 4) {
-			} else {
-				emb_list.set_size(max_size-2, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
-				if(debug) printf("init: num_neighbors = %d\n", new_size);
-				unsigned i = 0;
-				for (auto e0 : graph->edges(u)) {
-					auto x = graph->getEdgeDst(e0);
-					for (auto e : graph->edges(x)) {
-						auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
-						unsigned new_id = ids[dst];
-						if (new_id < (unsigned)-2) { // if dst is also a neighbor of u
-							unsigned degree = egonet.get_degree(max_size-2, i);
-							egonet.set_adj(core * i + degree, new_id); // relabel
-							egonet.set_degree(max_size-2, i, degree+1);
-						}
-					}
-					i ++;
+		Ulong wedge_count = 0, tri_count = 0;
+		mark_neighbors(v0, v1, *ids);
+		triangles_and_wedges(v0, v1, *T_vu, tri_count, *W_u, wedge_count, *ids);
+/*
+		// extending every vertex in the embedding
+		for (unsigned element_id = 0; element_id < n; ++ element_id) {
+			//if (!toExtend(n, emb, element_id)) continue;
+			if (element_id != n-1) continue;
+			VertexId src = emb.get_vertex(element_id);
+			auto begin = graph->edge_begin(src);
+			auto end = graph->edge_end(src);
+			emb_list.set_size(level+1, 2*core);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (toAdd(n, emb, dst, element_id)) {
+					unsigned pid = find_motif_pattern_id_dfs(n, element_id, dst, emb, start);
+					if (n == 2 && max_size == 4)
+					unsigned start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_idx(level+1, start, pos);
+					//emb_list.set_size(level+1, start+1);
+					dfs_extend_naive_motif(level+1, start, emb_list, pid);
 				}
 			}
 		}
 		*/
-		for (auto e : graph->edges(v)) {
-			auto dst = graph->getEdgeDst(e);
-			ids[dst] = (unsigned)-1;
+		if (n == 2 && max_size == 4) {
+			unsigned deg_v1 = std::distance(graph->edge_begin(v1), graph->edge_end(v1));
+			unsigned deg_v0 = std::distance(graph->edge_begin(v0), graph->edge_end(v0));
+			solve_graphlet_equations(deg_v1, deg_v0, tri_count, wedge_count);
 		}
 	}
 
@@ -471,27 +554,6 @@ public:
 		);
 	}
 
-	void edge_process_naive() {
-		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-		//	[&](const Edge &edge) {
-		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
-			[&](const size_t& pos) {
-				EmbeddingList *emb_list = emb_lists.getLocal();
-				emb_list->init(edge_list.get_edge(pos));
-				#ifdef USE_MAP
-				dfs_extend_naive_motif(1, 0, *emb_list, 0);
-				#else
-				dfs_extend_naive(1, 0, *emb_list);
-				#endif
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("KclDfsEdgeNaiveSolver")
-		);
-		#ifdef USE_MAP
-		motif_count();
-		#endif
-	}
-
 	void edge_process() {
 		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
 		//galois::do_all(galois::iterate((size_t)0, graph->size()),
@@ -511,29 +573,11 @@ public:
 		);
 	}
 
-	void edge_process_adhoc() {
-		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
-		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-			[&](const Edge &edge) {
-				Egonet *egonet = egonets.getLocal();
-				EmbeddingList *emb_list = emb_lists.getLocal();
-				UintList *id_list = id_lists.getLocal();
-				UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
-				UintList *W_u = Wed_vids.getLocal(); //  to record the third vertex in each wedge
-				dfs_from_edge(edge, *egonet, *emb_list, *id_list, *T_vu, *W_u);
-				//if (max_size > 3) dfs_extend_base(max_size-2, *egonet, *emb_list);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("MotifDfsEdgeSolver")
-		);
-		motif_count();
-	}
-
 	void motif_count() {
 		//std::cout << "[cxh debug] accumulators[0] = " << accumulators[0].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[3] = " << accumulators[3].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[1] = " << accumulators[1].reduce() << "\n";
-		#ifdef USE_EGONET
+		#ifdef USE_ADHOC
 		if (accumulators.size() == 2) {
 			if (is_dag) {
 				total_3_tris = accumulators[0].reduce();
@@ -545,11 +589,11 @@ public:
 		} else {
 			if (is_dag) {
 				total_4_clique = accumulators[5].reduce();
-				total_4_diamond = accumulators[4].reduce();
+				total_4_diamond = accumulators[4].reduce() - total_4_clique;
 				total_4_cycle = accumulators[2].reduce();
-				total_4_path = accumulators[0].reduce();
-				total_4_tailed_tris = accumulators[3].reduce();
-				total_3_star = accumulators[1].reduce();
+				total_4_path = accumulators[0].reduce() - total_4_cycle;
+				total_4_tailed_tris = accumulators[3].reduce() - 2*total_4_diamond;
+				total_3_star = accumulators[1].reduce() - total_4_tailed_tris;
 			} else {
 				total_4_clique = accumulators[5].reduce() / 6;
 				total_4_diamond = accumulators[4].reduce() - (6*total_4_clique);
@@ -589,83 +633,9 @@ public:
 		} else {
 			std::cout << "Currently not supported!\n";
 		}
-		std::cout << std::endl;
+		//std::cout << std::endl;
 	}
 	Ulong get_total_count() { return total_num.reduce(); }
-	inline void solve_graphlet_equations(unsigned deg_v, unsigned deg_u, Ulong tri_count, Ulong w_local_count) {
-		Ulong star3_count = deg_v - tri_count - 1;
-		star3_count = star3_count + deg_u - tri_count - 1;
-		accumulators[4] += (tri_count * (tri_count - 1) / 2); // diamond
-		accumulators[0] += tri_count * star3_count; // tailed_triangles
-		accumulators[3] += (deg_v - tri_count - 1) * (deg_u - tri_count - 1); // 4-path
-		accumulators[1] += (deg_v - tri_count - 1) * (deg_v - tri_count - 2) / 2; // 3-star
-		accumulators[1] += (deg_u - tri_count - 1) * (deg_u - tri_count - 2) / 2;
-	}
-	inline void cycle(Ulong w_local_count, UintList &W_u, Ulong &cycle4_count, UintList &ind) {
-		for (Ulong j = 0; j < w_local_count; j++) {
-			auto src = W_u[j];
-			auto begin = graph->edge_begin(src);
-			auto end = graph->edge_end(src);
-			for (auto e = begin; e < end; e ++) {
-				auto dst = graph->getEdgeDst(e);
-				if (ind[dst] == 1) cycle4_count++;
-			}
-			W_u[j] = 0;
-		}
-	}
-	/*
-	* @param tri_count is the total triangles centered at (v,u)
-	* @param T_vu is an array containing all the third vertex of each triangle
-	* @param ind is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
-	*/
-	inline void clique(Ulong tri_count, UintList &T_vu, Ulong &clique4_count, UintList &ind) {
-		for (Ulong tr_i = 0; tr_i < tri_count; tr_i++) {
-			auto src = T_vu[tr_i];
-			auto begin = graph->edge_begin(src);
-			auto end = graph->edge_end(src);
-			for (auto e = begin; e < end; e ++) {
-				auto dst = graph->getEdgeDst(e);
-				if (ind[dst] == 3) clique4_count++;
-			}
-			ind[src] = 0;
-			T_vu[tr_i] = 0;
-		}
-	}
-	inline void reset_perfect_hash(VertexId src, UintList &ind) {
-		auto begin = graph->edge_begin(src);
-		auto end = graph->edge_end(src);
-		for (auto e = begin; e < end; e ++) {
-			auto dst = graph->getEdgeDst(e);
-			ind[dst] = 0;
-		}
-	}
-	inline void mark_neighbors(VertexId &v, VertexId &u, UintList &ind) {
-		auto begin = graph->edge_begin(v);
-		auto end = graph->edge_end(v);
-		for (auto e = begin; e < end; e ++) {
-			auto w = graph->getEdgeDst(e);
-			if (u == w) continue;
-			ind[w] = 1;
-		}
-	}
-	inline void triangles_and_wedges(VertexId &v, VertexId &u, UintList &T_vu, Ulong &tri_count, UintList &W_u, Ulong &w_local_count, UintList &ind) {
-		auto begin = graph->edge_begin(u);
-		auto end = graph->edge_end(u);
-		for (auto e = begin; e < end; e ++) {
-			auto w = graph->getEdgeDst(e);
-			if (w == v) continue;
-			if (ind[w] == 1) {
-				ind[w] = 3;
-				T_vu[tri_count] = w;
-				tri_count++;
-			}
-			else {
-				W_u[w_local_count] = w;
-				w_local_count++;
-				ind[w] = 2;
-			}
-		}
-	}
 
 protected:
 	int npatterns;
@@ -745,6 +715,80 @@ protected:
 			find_motif_pattern_id_eigen(n, idx, dst, emb);
 		}
 		return pid;
+	}
+	inline void solve_graphlet_equations(unsigned deg_v, unsigned deg_u, Ulong tri_count, Ulong w_local_count) {
+		Ulong star3_count = deg_v - tri_count - 1;
+		star3_count = star3_count + deg_u - tri_count - 1;
+		accumulators[4] += (tri_count * (tri_count - 1) / 2); // diamond
+		accumulators[0] += tri_count * star3_count; // tailed_triangles
+		accumulators[3] += (deg_v - tri_count - 1) * (deg_u - tri_count - 1); // 4-path
+		accumulators[1] += (deg_v - tri_count - 1) * (deg_v - tri_count - 2) / 2; // 3-star
+		accumulators[1] += (deg_u - tri_count - 1) * (deg_u - tri_count - 2) / 2;
+	}
+	inline void cycle(Ulong w_local_count, UintList &W_u, Ulong &cycle4_count, UintList &ind) {
+		for (Ulong j = 0; j < w_local_count; j++) {
+			auto src = W_u[j];
+			auto begin = graph->edge_begin(src);
+			auto end = graph->edge_end(src);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (ind[dst] == 1) cycle4_count++;
+			}
+			W_u[j] = 0;
+		}
+	}
+	/*
+	* @param tri_count is the total triangles centered at (v,u)
+	* @param T_vu is an array containing all the third vertex of each triangle
+	* @param ind is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
+	*/
+	inline void clique(Ulong tri_count, UintList &T_vu, Ulong &clique4_count, UintList &ind) {
+		for (Ulong tr_i = 0; tr_i < tri_count; tr_i++) {
+			auto src = T_vu[tr_i];
+			auto begin = graph->edge_begin(src);
+			auto end = graph->edge_end(src);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (ind[dst] == 3) clique4_count++;
+			}
+			ind[src] = 0;
+			T_vu[tr_i] = 0;
+		}
+	}
+	inline void mark_neighbors(VertexId &v, VertexId &u, UintList &ind) {
+		auto begin = graph->edge_begin(v);
+		auto end = graph->edge_end(v);
+		for (auto e = begin; e < end; e ++) {
+			auto w = graph->getEdgeDst(e);
+			if (u == w) continue;
+			ind[w] = 1;
+		}
+	}
+	inline void triangles_and_wedges(VertexId &v, VertexId &u, UintList &T_vu, Ulong &tri_count, UintList &W_u, Ulong &w_local_count, UintList &ind) {
+		auto begin = graph->edge_begin(u);
+		auto end = graph->edge_end(u);
+		for (auto e = begin; e < end; e ++) {
+			auto w = graph->getEdgeDst(e);
+			if (w == v) continue;
+			if (ind[w] == 1) {
+				ind[w] = 3;
+				T_vu[tri_count] = w;
+				tri_count++;
+			}
+			else {
+				W_u[w_local_count] = w;
+				w_local_count++;
+				ind[w] = 2;
+			}
+		}
+	}
+	inline void reset_perfect_hash(VertexId src, UintList &ind) {
+		auto begin = graph->edge_begin(src);
+		auto end = graph->edge_end(src);
+		for (auto e = begin; e < end; e ++) {
+			auto dst = graph->getEdgeDst(e);
+			ind[dst] = 0;
+		}
 	}
 };
 

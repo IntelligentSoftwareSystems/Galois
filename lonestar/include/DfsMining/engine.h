@@ -33,21 +33,26 @@ int main(int argc, char** argv) {
 	#endif
 	AppMiner miner(&graph, k, npatterns, need_dag, core);
 	#endif
+
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	#ifdef EDGE_INDUCED
 	miner.process();
 	#else
 	#ifdef ALGO_EDGE
+	#ifdef USE_ADHOC
+	miner.edge_process_adhoc();
+	#else
 	#ifdef USE_EGONET
 	miner.edge_process();
 	#else
 	miner.edge_process_naive();
-	#endif
+	#endif // USE_EGONET
+	#endif // USE_ADHOC
 	#else
 	miner.vertex_process();
-	#endif
-	#endif
+	#endif // ALGO_EDGE
+	#endif // EDGE_INDUCED
 	Tcomp.stop();
 	miner.print_output();
 	std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
