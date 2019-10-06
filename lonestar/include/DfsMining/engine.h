@@ -44,7 +44,8 @@ int main(int argc, char** argv) {
 	miner.edge_process_adhoc();
 	#else
 	#ifdef USE_EGONET
-	miner.edge_process();
+	//miner.edge_process();
+	miner.edge_process_ego();
 	#else
 	miner.edge_process_naive();
 	#endif // USE_EGONET

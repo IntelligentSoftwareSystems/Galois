@@ -49,6 +49,9 @@ public:
 	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
 		return true;
 	}
+	virtual bool toAdd(unsigned level, VertexId dst, const Egonet &egonet) {
+		return true;
+	}
 	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
 		return true;
 	}
@@ -74,23 +77,54 @@ public:
 		BaseEmbedding emb(n);
 		emb_list.get_embedding<BaseEmbedding>(level, pos, emb);
 		if (level == max_size-2) {
-			//for (unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
-				//unsigned vid = emb_list.get_vertex(level, i);
-				unsigned vid = emb_list.get_vertex(level, pos);
+			unsigned vid = emb_list.get_vertex(level, pos);
+			auto begin = graph->edge_begin(vid);
+			auto end = graph->edge_end(vid);
+			for (auto e = begin; e != end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (toAdd(n, emb, dst, n-1))
+					//total_num += 1;
+					reduction(0);
+			}
+			return;
+		}
+		unsigned vid = emb_list.get_vertex(level, pos);
+		auto begin = graph->edge_begin(vid);
+		auto end = graph->edge_end(vid);
+		emb_list.set_size(level+1, 0);
+		for (auto e = begin; e < end; e ++) {
+			auto dst = graph->getEdgeDst(e);
+			if (toAdd(n, emb, dst, n-1)) {
+				unsigned start = emb_list.size(level+1);
+				emb_list.set_vid(level+1, start, dst);
+				emb_list.set_idx(level+1, start, pos);
+				emb_list.set_size(level+1, start+1);
+				dfs_extend_naive(level+1, start, emb_list);
+			}
+		}
+	}
+	// baseline DFS extension for k-cliques
+	void dfs_extend_base(unsigned level, EmbeddingList &emb_list) {
+		unsigned n = level+1;
+		if (level == max_size-2) {
+			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+				BaseEmbedding emb(n);
+				emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
+				unsigned vid = emb_list.get_vertex(level, emb_id);
 				auto begin = graph->edge_begin(vid);
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e != end; e ++) {
 					auto dst = graph->getEdgeDst(e);
 					if (toAdd(n, emb, dst, n-1))
-						//total_num += 1;
 						reduction(0);
 				}
-			//}
+			}
 			return;
 		}
-		//for(unsigned i = 0; i < emb_list.size(level); i ++) {
-			//unsigned vid = emb_list.get_vertex(level, i);
-			unsigned vid = emb_list.get_vertex(level, pos);
+		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			BaseEmbedding emb(n);
+			emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
+			unsigned vid = emb_list.get_vertex(level, emb_id);
 			auto begin = graph->edge_begin(vid);
 			auto end = graph->edge_end(vid);
 			emb_list.set_size(level+1, 0);
@@ -99,20 +133,60 @@ public:
 				if (toAdd(n, emb, dst, n-1)) {
 					unsigned start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
-					//emb_list.set_idx(level+1, start, i);
-					emb_list.set_idx(level+1, start, pos);
+					//emb_list.set_idx(level+1, start, emb_id);
 					emb_list.set_size(level+1, start+1);
-					dfs_extend_naive(level+1, start, emb_list);
 				}
-			//}
-			//dfs_extend_naive(level+1, i, emb_list);
+			}
+			dfs_extend_base(level+1, emb_list);
+		}
+	}
+	// DFS extension for k-cliques using egonet
+	void dfs_extend_ego(unsigned level, EmbeddingList &emb_list, Egonet &egonet) {
+		//assert(level <= max_size-2); // if k = 3, shouldn't be here
+		egonet.set_cur_level(level);
+		if (level == max_size-2) {
+			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+				unsigned vid = emb_list.get_vertex(level, emb_id);
+				auto begin = egonet.edge_begin(vid);
+				auto end = egonet.edge_end(vid);
+				for (auto e = begin; e != end; e ++)
+					reduction(0);
+			}
+			return;
+		}
+		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			unsigned vid = emb_list.get_vertex(level, emb_id);
+			auto begin = egonet.edge_begin(vid);
+			auto end = egonet.edge_end(vid);
+			//auto end = begin + egonet.get_degree(level, vid);
+			emb_list.set_size(level+1, 0);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = egonet.getEdgeDst(e);
+				if (toAdd(level, dst, egonet)) {
+					unsigned start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+					egonet.set_label(dst, level+1);
+					egonet.set_degree(level+1, dst, 0);
+				}
+			}
+			for (unsigned emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {
+				unsigned src = emb_list.get_vertex(level+1, emb_id);
+				egonet.update(level+1, src);
+			}
+			dfs_extend_ego(level+1, emb_list, egonet);
+			egonet.set_cur_level(level);
+			for (unsigned emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {//restoring labels
+				unsigned vid = emb_list.get_vertex(level+1, emb_id);
+				egonet.set_label(vid, level);
+			}
 		}
 	}
 	// each task extends from a vertex, level starts from k-1 and decreases until bottom level
 	void dfs_extend(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
 		if (level == 2) {
-			for(unsigned local_id = 0; local_id < emb_list.size(level); local_id ++) { //list all edges
-				unsigned vid = emb_list.get_vertex(level, local_id);
+			for(unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) { //list all edges
+				unsigned vid = emb_list.get_vertex(level, emb_id);
 				unsigned begin = egonet.edge_begin(vid);
 				unsigned end = begin + egonet.get_degree(level, vid);
 				for (unsigned e = begin; e < end; e ++)
@@ -122,10 +196,10 @@ public:
 		}
 		// compute the subgraphs induced on the neighbors of each node in current level,
 		// and then recurse on such a subgraph
-		for(unsigned local_id = 0; local_id < emb_list.size(level); local_id ++) {
+		for(unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			// for each vertex in current level
 			// a new induced subgraph G[∆G(u)] is built
-			unsigned vid = emb_list.get_vertex(level, local_id);
+			unsigned vid = emb_list.get_vertex(level, emb_id);
 			emb_list.set_size(level-1, 0);
 			unsigned begin = egonet.edge_begin(vid);
 			unsigned end = begin + egonet.get_degree(level, vid);
@@ -176,8 +250,6 @@ public:
 	}
 
 	void edge_process_naive() {
-		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-		//	[&](const Edge &edge) {
 		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
 			[&](const size_t& pos) {
 				EmbeddingList *emb_list = emb_lists.getLocal();
@@ -185,7 +257,8 @@ public:
 				#ifdef USE_MAP
 				dfs_extend_naive_motif(1, 0, *emb_list, 0);
 				#else
-				dfs_extend_naive(1, 0, *emb_list);
+				//dfs_extend_naive(1, 0, *emb_list);
+				dfs_extend_base(1, *emb_list);
 				#endif
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -194,6 +267,38 @@ public:
 		#ifdef USE_MAP
 		motif_count();
 		#endif
+	}
+
+	void edge_process_ego() {
+		galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
+			[&](const Edge &edge, auto &ctx) {
+		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+		//	[&](const Edge &edge) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				Egonet *egonet = egonets.getLocal();
+				init_egonet(1, edge, *egonet, *emb_list);
+				if (max_size > 3) dfs_extend_ego(2, *emb_list, *egonet);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("KclDfsEdgeEgonetSolver")
+		);
+	}
+
+	void edge_process() {
+		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
+		//galois::do_all(galois::iterate((size_t)0, graph->size()),
+		//galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
+			//[&](const Edge &edge, auto &ctx) {
+		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+			[&](const Edge &edge) {
+				EmbeddingList *emb_list = emb_lists.getLocal();
+				Egonet *egonet = egonets.getLocal();
+				build_egonet_from_edge(edge, *egonet, *emb_list);
+				if (max_size > 3) dfs_extend(max_size-2, *egonet, *emb_list);
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("KclDfsEdgeSolver")
+		);
 	}
 
 	void edge_process_adhoc() {
@@ -386,112 +491,58 @@ public:
 	}
 
 	// construct the subgraph induced by vertex u's neighbors
-	void build_egonet_from_vertex(const GNode &u, Egonet &egonet, EmbeddingList &emb_list, UintList &ids, UintList &old_id) {
-		if (ids.empty()) {
-			ids.resize(graph->size());
-			//old_id.resize(core);
-			for (unsigned i = 0; i < graph->size(); i ++) ids[i] = (unsigned)-1;
+	void init_egonet(unsigned level, const Edge &edge, Egonet &egonet, EmbeddingList &emb_list) {
+		UintList *ids = id_lists.getLocal(); // hold the local vertex ID (new ID)
+		//UintList *old_ids = old_id_lists.getLocal(); // hold the global vertex ID (old ID)
+		if (ids->empty()) {
+			ids->resize(graph->size());
+			//old_ids->resize(core);
+			std::fill(ids->begin(), ids->end(), (unsigned)-1);
 		}
-		//UintList ids(graph->size(), (unsigned)-1);
-		//ids.resize(graph->size());
-		//for (unsigned i = 0; i < ids.size(); i ++) ids[i] = (unsigned)-1;
-		unsigned level = max_size-1;
-		if(debug) printf("\n\n=======================\ninit: u = %d, level = %d\n", u, level);
-		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
-		unsigned new_size = 0;
-		for (auto e : graph->edges(u)) {
-			auto v = graph->getEdgeDst(e);
-			ids[v] = new_size;
-			//old_id[new_size] = v;
-			emb_list.set_label(new_size, level);
-			emb_list.set_vertex(level, new_size, new_size);
-			egonet.set_degree(level, new_size, 0);//new degrees
-			if(debug) printf("init: v[%d] = %d\n", new_size, v);
-			new_size ++;
+		for (auto e : graph->edges(edge.dst)) {
+			auto dst = graph->getEdgeDst(e);
+			(*ids)[dst] = (unsigned)-2; // mark the neighbors of edge.dst
 		}
-		if(debug) printf("init: num_neighbors = %d\n", new_size);
-		emb_list.set_size(level, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
-		//reodering adjacency list and computing new degrees
-		unsigned i = 0;
-		for (auto e0 : graph->edges(u)) {
-			auto v = graph->getEdgeDst(e0);
-		//for (unsigned i = 0; i < emb_list.size(level); i ++) {
-		//	unsigned v = old_id[i];
-			// intersection of two neighbor lists
-			for (auto e : graph->edges(v)) {
-				auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
-				unsigned new_id = ids[dst];
-				if (new_id != (unsigned)-1) { // if dst is also a neighbor of u
-					//if (max_size == 3) total_num += 1; //listing here!!!
-					//else {
-						unsigned degree = egonet.get_degree(level, i);
-						egonet.set_adj(core * i + degree, new_id); // relabel
-						egonet.set_degree(level, i, degree+1);
-					//}
-				}
-			}
-			if(debug) printf("vertex %d, number of common neighbors: %d\n", v, egonet.get_degree(level, i));
-			i ++;
-		}
-		for (auto e : graph->edges(u)) {
-			auto v = graph->getEdgeDst(e);
-			ids[v] = (unsigned)-1;
-		}
-	}
 
-	// construct the subgraph induced by vertex u's neighbors
-	void build_egonet_from_edge(const Edge &edge, Egonet &egonet, EmbeddingList &emb_list, UintList &ids, UintList &old_id) {
-		unsigned u = edge.src, v = edge.dst;
-		if (old_id.empty()) {
-			ids.resize(graph->size());
-			old_id.resize(core);
-			for (unsigned i = 0; i < graph->size(); i ++) ids[i] = (unsigned)-1;
-		}
-		unsigned level = max_size-1;
-		if(debug) printf("\n\n=======================\ninit: u = %d, v = %d, level = %d\n", u, v, level);
-		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
-		for (auto e : graph->edges(v)) {
+		unsigned new_id = 0;
+		for (auto e : graph->edges(edge.src)) {
 			auto dst = graph->getEdgeDst(e);
-			ids[dst] = (unsigned)-2;
-		}
-		unsigned new_size = 0;
-		for (auto e : graph->edges(u)) {
-			auto dst = graph->getEdgeDst(e);
-			if (ids[dst] == (unsigned)-2) {
+			// intersection of two neighbor lists: 
+			// if dst (a neighbor of edge.src) is also connected to edge.dst
+			if ((*ids)[dst] == (unsigned)-2) {
 				if (max_size == 3) total_num += 1;
 				else {
-					ids[dst] = new_size;
-					old_id[new_size] = dst;
-					emb_list.set_label(new_size, max_size-2);
-					emb_list.set_vertex(max_size-2, new_size, new_size);
-					egonet.set_degree(max_size-2, new_size, 0);//new degrees
+					(*ids)[dst] = new_id;
+					//(*old_ids)[new_id] = dst;
+					emb_list.set_vertex(level, new_id, dst);
+					emb_list.set_vertex(level+1, new_id, new_id);
+					//emb_list.set_label(new_id, level+1);
+					egonet.set_label(new_id, level+1); // this vertex survives for the next level
+					egonet.set_degree(level+1, new_id, 0);//new degrees
 				}
-				if(debug) printf("init: v[%d] = %d\n", new_size, dst);
-				new_size ++;
+				new_id ++;
 			}
 		}
 		if (max_size > 3) {
-			emb_list.set_size(max_size-2, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
-			if(debug) printf("init: num_neighbors = %d\n", new_size);
-			for (unsigned i = 0; i < emb_list.size(max_size-2); i ++) {
-				unsigned x = old_id[i];
-				// intersection of two neighbor lists
-				for (auto e : graph->edges(x)) {
+			unsigned new_size = new_id;
+			emb_list.set_size(level+1, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
+			//egonet.set_size(level, new_size);
+			for (unsigned i = 0; i < emb_list.size(level+1); i ++) {
+				unsigned src = emb_list.get_vertex(level, i); // get the global vertex ID
+				for (auto e : graph->edges(src)) {
 					auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
-					unsigned new_id = ids[dst];
-					if (new_id < (unsigned)-2) { // if dst is also a neighbor of u
-						unsigned degree = egonet.get_degree(max_size-2, i);
-						egonet.set_adj(core * i + degree, new_id); // relabel
-						egonet.set_degree(max_size-2, i, degree+1);
+					unsigned local_vid = (*ids)[dst]; // get the local vertex ID
+					if (local_vid < (unsigned)-2) {
+						unsigned degree = egonet.get_degree(level+1, i);
+						egonet.set_adj(core * i + degree, local_vid);
+						egonet.set_degree(level+1, i, degree+1);
 					}
 				}
-				if(debug) printf("vertex %d, number of common neighbors: %d\n", v, egonet.get_degree(level, i));
-				//i ++;
 			}
 		}
-		for (auto e : graph->edges(v)) {
+		for (auto e : graph->edges(edge.dst)) {
 			auto dst = graph->getEdgeDst(e);
-			ids[dst] = (unsigned)-1;
+			(*ids)[dst] = (unsigned)-1;
 		}
 	}
 
@@ -551,25 +602,6 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("DfsVertexSolver")
-		);
-	}
-
-	void edge_process() {
-		//std::cout << "num_edges in edge_list = " << edge_list.size() << "\n\n";
-		//galois::do_all(galois::iterate((size_t)0, graph->size()),
-		//galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
-			//[&](const Edge &edge, auto &ctx) {
-		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-			[&](const Edge &edge) {
-				EmbeddingList *emb_list = emb_lists.getLocal();
-				UintList *id_list = id_lists.getLocal();
-				UintList *old_id_list = old_id_lists.getLocal();
-				Egonet *egonet = egonets.getLocal();
-				build_egonet_from_edge(edge, *egonet, *emb_list, *id_list, *old_id_list);
-				if (max_size > 3) dfs_extend(max_size-2, *egonet, *emb_list);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("KclDfsEdgeSolver")
 		);
 	}
 
@@ -788,6 +820,117 @@ protected:
 		for (auto e = begin; e < end; e ++) {
 			auto dst = graph->getEdgeDst(e);
 			ind[dst] = 0;
+		}
+	}
+
+	// construct the subgraph induced by vertex u's neighbors
+	void build_egonet_from_vertex(const GNode &u, Egonet &egonet, EmbeddingList &emb_list, UintList &ids, UintList &old_id) {
+		if (ids.empty()) {
+			ids.resize(graph->size());
+			//old_id.resize(core);
+			for (unsigned i = 0; i < graph->size(); i ++) ids[i] = (unsigned)-1;
+		}
+		//UintList ids(graph->size(), (unsigned)-1);
+		//ids.resize(graph->size());
+		//for (unsigned i = 0; i < ids.size(); i ++) ids[i] = (unsigned)-1;
+		unsigned level = max_size-1;
+		if(debug) printf("\n\n=======================\ninit: u = %d, level = %d\n", u, level);
+		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
+		unsigned new_size = 0;
+		for (auto e : graph->edges(u)) {
+			auto v = graph->getEdgeDst(e);
+			ids[v] = new_size;
+			//old_id[new_size] = v;
+			emb_list.set_label(new_size, level);
+			emb_list.set_vertex(level, new_size, new_size);
+			egonet.set_degree(level, new_size, 0);//new degrees
+			if(debug) printf("init: v[%d] = %d\n", new_size, v);
+			new_size ++;
+		}
+		if(debug) printf("init: num_neighbors = %d\n", new_size);
+		emb_list.set_size(level, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
+		//reodering adjacency list and computing new degrees
+		unsigned i = 0;
+		for (auto e0 : graph->edges(u)) {
+			auto v = graph->getEdgeDst(e0);
+		//for (unsigned i = 0; i < emb_list.size(level); i ++) {
+		//	unsigned v = old_id[i];
+			// intersection of two neighbor lists
+			for (auto e : graph->edges(v)) {
+				auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
+				unsigned new_id = ids[dst];
+				if (new_id != (unsigned)-1) { // if dst is also a neighbor of u
+					//if (max_size == 3) total_num += 1; //listing here!!!
+					//else {
+						unsigned degree = egonet.get_degree(level, i);
+						egonet.set_adj(core * i + degree, new_id); // relabel
+						egonet.set_degree(level, i, degree+1);
+					//}
+				}
+			}
+			if(debug) printf("vertex %d, number of common neighbors: %d\n", v, egonet.get_degree(level, i));
+			i ++;
+		}
+		for (auto e : graph->edges(u)) {
+			auto v = graph->getEdgeDst(e);
+			ids[v] = (unsigned)-1;
+		}
+	}
+	// construct the subgraph induced by vertex u's neighbors
+	void build_egonet_from_edge(const Edge &edge, Egonet &egonet, EmbeddingList &emb_list) {
+		UintList *ids = id_lists.getLocal();
+		UintList *old_ids = old_id_lists.getLocal();
+
+		unsigned u = edge.src, v = edge.dst;
+		if (old_ids->empty()) {
+			ids->resize(graph->size());
+			old_ids->resize(core);
+			std::fill(ids->begin(), ids->end(), (unsigned)-1);
+		}
+		unsigned level = max_size-1;
+		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
+		for (auto e : graph->edges(v)) {
+			auto dst = graph->getEdgeDst(e);
+			(*ids)[dst] = (unsigned)-2;
+		}
+		unsigned new_size = 0;
+		for (auto e : graph->edges(u)) {
+			auto dst = graph->getEdgeDst(e);
+			if ((*ids)[dst] == (unsigned)-2) {
+				if (max_size == 3) total_num += 1;
+				else {
+					(*ids)[dst] = new_size;
+					(*old_ids)[new_size] = dst;
+					emb_list.set_label(new_size, max_size-2);
+					emb_list.set_vertex(max_size-2, new_size, new_size);
+					egonet.set_degree(max_size-2, new_size, 0);//new degrees
+				}
+				if(debug) printf("init: v[%d] = %d\n", new_size, dst);
+				new_size ++;
+			}
+		}
+		if (max_size > 3) {
+			emb_list.set_size(max_size-2, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
+			if(debug) printf("init: num_neighbors = %d\n", new_size);
+			for (unsigned i = 0; i < emb_list.size(max_size-2); i ++) {
+				unsigned x = (*old_ids)[i];
+				// intersection of two neighbor lists
+				for (auto e : graph->edges(x)) {
+					auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
+					unsigned new_id = (*ids)[dst];
+					if (new_id < (unsigned)-2) { // if dst is also a neighbor of u
+						unsigned degree = egonet.get_degree(max_size-2, i);
+						egonet.set_adj(core * i + degree, new_id); // relabel
+						egonet.set_degree(max_size-2, i, degree+1);
+					}
+				}
+				if(debug) printf("vertex %d, number of common neighbors: %d\n", v, egonet.get_degree(level, i));
+				//i ++;
+			}
+		}
+		for (auto e : graph->edges(v)) {
+			auto dst = graph->getEdgeDst(e);
+			(*ids)[dst] = (unsigned)-1;
 		}
 	}
 };
