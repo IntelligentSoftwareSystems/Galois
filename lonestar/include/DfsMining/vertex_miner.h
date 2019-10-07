@@ -270,18 +270,27 @@ public:
 	}
 
 	void edge_process_ego() {
-		galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
-			[&](const Edge &edge, auto &ctx) {
-		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
-		//	[&](const Edge &edge) {
+		//galois::for_each(galois::iterate(edge_list.begin(), edge_list.end()),
+		//	[&](const Edge &edge, auto &ctx) {
+		galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()),
+			[&](const Edge &edge) {
 				EmbeddingList *emb_list = emb_lists.getLocal();
+				#ifdef USE_MAP
+				emb_list->init(edge);
+				init_egonet_motif(edge);
+				dfs_extend_base_motif(1, *emb_list);
+				#else
 				Egonet *egonet = egonets.getLocal();
 				init_egonet(1, edge, *egonet, *emb_list);
 				if (max_size > 3) dfs_extend_ego(2, *emb_list, *egonet);
+				#endif
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("KclDfsEdgeEgonetSolver")
 		);
+		#ifdef USE_MAP
+		motif_count();
+		#endif
 	}
 
 	void edge_process() {
@@ -359,6 +368,109 @@ public:
 			}
 		}
 	}
+	void init_egonet_motif(const Edge &edge) {
+		UintList *ids = id_lists.getLocal();
+		if (ids->empty()) {
+			ids->resize(graph->size());
+			std::fill(ids->begin(), ids->end(), 0);
+		}
+		/*
+		UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
+		UintList *W_u = Wed_vids.getLocal(); //  to record the third vertex in each wedge
+		if (W_u->empty()) {
+			T_vu->resize(core+1); // hold the vertices that form a triangle with u and v
+			W_u->resize(core+1); // hold the vertices that form a wedge with u and v
+			std::fill(T_vu->begin(), T_vu->end(), 0);
+			std::fill(W_u->begin(), W_u->end(), 0);
+		}
+		//*/
+		unsigned *trian_count = Tri_counts.getLocal();
+		unsigned *wedge_count = Wed_counts.getLocal();
+		*wedge_count = 0, *trian_count = 0;
+		mark_neighbors(edge.src, edge.dst, *ids);
+		unsigned *v0 = src_ids.getLocal();
+		unsigned *v1 = dst_ids.getLocal();
+		*v0 = edge.src;
+		*v1 = edge.dst;
+	}
+	void dfs_extend_base_motif(unsigned level, EmbeddingList &emb_list) {
+		unsigned n = level + 1;
+		UintList *ids = id_lists.getLocal();
+		unsigned *trian_count = Tri_counts.getLocal();
+		unsigned *wedge_count = Wed_counts.getLocal();
+		unsigned *v0 = src_ids.getLocal();
+		unsigned *v1 = dst_ids.getLocal();
+		if (level == max_size-2) {
+			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+				VertexEmbedding emb(n);
+				emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
+				for (unsigned element_id = 0; element_id < n; ++ element_id) {
+					//if (!toExtend(n, emb, element_id)) continue;
+					if (element_id != n-1) continue;
+					VertexId src = emb.get_vertex(element_id);
+					auto begin = graph->edge_begin(src);
+					auto end = graph->edge_end(src);
+					for (auto e = begin; e != end; e ++) {
+						auto dst = graph->getEdgeDst(e);
+						//if (toAdd(n, emb, dst, element_id)) {
+						if (dst != emb.get_vertex(0)) {
+							if (max_size == 3 && (*ids)[dst] == 1) {
+								//if (max_size == 4) previous_pid = emb.get_pid();
+								//reduction(0); // count triangles
+								(*trian_count) += 1;
+							}
+							else if (max_size == 4) {
+								//unsigned previous_pid = emb.get_pid();
+								unsigned previous_pid = emb_list.get_pid(level, emb_id);
+								if (dst > src && previous_pid == 0 && (*ids)[dst] == 3) { // clique
+									accumulators[5] += 1;
+								} else if (previous_pid == 1 && (*ids)[dst] == 1) { // 4-cycle
+									accumulators[2] += 1;
+								}
+							}
+						}
+					}
+				}
+			}
+			solve_motif_equations(*v0, *v1, *trian_count, *wedge_count);
+			return;
+		}
+		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			VertexEmbedding emb(n);
+			emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
+			for (unsigned element_id = 0; element_id < n; ++ element_id) {
+				//if(!toExtend(n, emb, element_id)) continue;
+				if (element_id != n-1) continue;
+				VertexId src = emb.get_vertex(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				emb_list.set_size(level+1, 0);
+				for (auto e = begin; e < end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					//if (toAdd(n, emb, dst, element_id)) {
+					if (dst != emb.get_vertex(0)) {
+						unsigned start = emb_list.size(level+1);
+						emb_list.set_vid(level+1, start, dst);
+						emb_list.set_idx(level+1, start, emb_id);
+						unsigned pid = 0;
+						if ((*ids)[dst] == 1) {
+							(*ids)[dst] = 3;
+							(*trian_count) += 1;
+						} else {
+							(*ids)[dst] = 2;
+							(*wedge_count) += 1;
+							pid = 1;
+						}
+						emb_list.set_pid(level+1, start, pid);
+						emb_list.set_size(level+1, start+1);
+					}
+				}
+			}
+		}
+		dfs_extend_base_motif(level+1, emb_list);
+		reset_perfect_hash(*v0, *ids);
+		reset_perfect_hash(*v1, *ids);
+	}
 
 	// construct the subgraph induced by edge (u, v)'s neighbors
 	void dfs_from_edge_adhoc(unsigned level, unsigned pos, EmbeddingList &emb_list) {
@@ -367,6 +479,7 @@ public:
 		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
 		unsigned u = emb.get_vertex(0), v = emb.get_vertex(1);
 		//std::cout << "Edge: " << u << " --> " << v << "\n";
+
 		UintList *ids = id_lists.getLocal();
 		if (ids->empty()) {
 			ids->resize(graph->size());
@@ -384,8 +497,6 @@ public:
 
 		Ulong wedge_count = 0, tri_count = 0;
 		mark_neighbors(v, u, *ids);
-		unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
-		unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
 		if (max_size == 3) {
 			auto begin = graph->edge_begin(u);
 			auto end = graph->edge_end(u);
@@ -394,42 +505,24 @@ public:
 				if (w == v) continue;
 				if ((*ids)[w] == 1) tri_count++;
 			}
-			accumulators[0] += tri_count;
-			accumulators[1] += deg_v - tri_count - 1 + deg_u - tri_count - 1;
+			//solve_3motif_equations(v, u, tri_count, wedge_count);
 		} else if (max_size == 4) {
 			triangles_and_wedges(v, u, *T_vu, tri_count, *W_u, wedge_count, *ids);
+			//solve_4motif_equations(v, u, tri_count, wedge_count);
 			Ulong clique4_count = 0, cycle4_count = 0;
-			solve_graphlet_equations(deg_v, deg_u, tri_count, wedge_count);
 			cycle(wedge_count, *W_u, cycle4_count, *ids);
 			clique(tri_count, *T_vu, clique4_count, *ids);
 			accumulators[5] += clique4_count;
 			accumulators[2] += cycle4_count;
 		} else {
 		}
+		solve_motif_equations(v, u, tri_count, wedge_count);
 		reset_perfect_hash(v, *ids);
 	}
 
-	void dfs_extend_motif(unsigned level, unsigned pos, EmbeddingList &emb_list, unsigned previous_pid) {
-		unsigned n = level + 1;
-		VertexEmbedding emb(n);
-		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
-		UintList *ids = id_lists.getLocal();
-		if (ids->empty()) {
-			ids->resize(graph->size());
-			std::fill(ids->begin(), ids->end(), 0);
-		}
-
-			/*
+	void dfs_extend_motif(unsigned level, EmbeddingList &emb_list, unsigned previous_pid) {
+		/*
 		if (level == max_size-2) {
-			if (max_size == 4) {
-				Ulong clique4_count = 0, cycle4_count = 0;
-				cycle(wedge_count, *W_u, cycle4_count, *ids);
-				clique(tri_count, *T_vu, clique4_count, *ids);
-				accumulators[5] += clique4_count;
-				accumulators[2] += cycle4_count;
-				reset_perfect_hash(v, *ids);
-				return;
-			}
 			// extending every vertex in the embedding
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
 				if(!toExtend(n, emb, element_id)) continue;
@@ -444,23 +537,6 @@ public:
 			}
 			return;
 		}
-			*/
-
-		unsigned v0 = emb.get_vertex(0), v1 = emb.get_vertex(1);
-		UintList *T_vu = Tri_vids.getLocal(); // to record the third vertex in each triangle
-		UintList *W_u = Wed_vids.getLocal(); //  to record the third vertex in each wedge
-		if (max_size == 4) {
-			if (W_u->empty()) {
-				T_vu->resize(core+1); // hold the vertices that form a triangle with u and v
-				W_u->resize(core+1); // hold the vertices that form a wedge with u and v
-				std::fill(T_vu->begin(), T_vu->end(), 0);
-				std::fill(W_u->begin(), W_u->end(), 0);
-			}
-		}
-		Ulong wedge_count = 0, tri_count = 0;
-		mark_neighbors(v0, v1, *ids);
-		triangles_and_wedges(v0, v1, *T_vu, tri_count, *W_u, wedge_count, *ids);
-/*
 		// extending every vertex in the embedding
 		for (unsigned element_id = 0; element_id < n; ++ element_id) {
 			//if (!toExtend(n, emb, element_id)) continue;
@@ -478,16 +554,12 @@ public:
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_idx(level+1, start, pos);
 					//emb_list.set_size(level+1, start+1);
-					dfs_extend_naive_motif(level+1, start, emb_list, pid);
+					dfs_extend_motif(level+1, start, emb_list, pid);
 				}
 			}
 		}
+		solve_4motif_equations(v1, v0, tri_count, wedge_count);
 		*/
-		if (n == 2 && max_size == 4) {
-			unsigned deg_v1 = std::distance(graph->edge_begin(v1), graph->edge_end(v1));
-			unsigned deg_v0 = std::distance(graph->edge_begin(v0), graph->edge_end(v0));
-			solve_graphlet_equations(deg_v1, deg_v0, tri_count, wedge_count);
-		}
 	}
 
 	// construct the subgraph induced by vertex u's neighbors
@@ -609,7 +681,7 @@ public:
 		//std::cout << "[cxh debug] accumulators[0] = " << accumulators[0].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[3] = " << accumulators[3].reduce() << "\n";
 		//std::cout << "[cxh debug] accumulators[1] = " << accumulators[1].reduce() << "\n";
-		#ifdef USE_ADHOC
+		#if defined(USE_EGONET) || defined(USE_ADHOC)
 		if (accumulators.size() == 2) {
 			if (is_dag) {
 				total_3_tris = accumulators[0].reduce();
@@ -677,6 +749,10 @@ protected:
 	std::vector<UlongAccu> accumulators;
 	Lists Tri_vids;
 	Lists Wed_vids;
+	Counts src_ids;
+	Counts dst_ids;
+	Counts Tri_counts;
+	Counts Wed_counts;
 	EmbeddingLists emb_lists;
 	Egonets egonets;
 	Lists id_lists;
@@ -748,7 +824,32 @@ protected:
 		}
 		return pid;
 	}
-	inline void solve_graphlet_equations(unsigned deg_v, unsigned deg_u, Ulong tri_count, Ulong w_local_count) {
+	inline void solve_motif_equations(unsigned v, unsigned u, Ulong tri_count, Ulong w_local_count) {
+		assert(max_size < 5);
+		unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
+		if (max_size == 3) {
+			accumulators[0] += tri_count;
+			accumulators[1] += deg_v - tri_count - 1 + deg_u - tri_count - 1;
+		} else {
+			Ulong star3_count = (deg_v - tri_count - 1) + (deg_u - tri_count - 1);
+			accumulators[4] += (tri_count * (tri_count - 1) / 2); // diamond
+			accumulators[0] += tri_count * star3_count; // tailed_triangles
+			accumulators[3] += (deg_v - tri_count - 1) * (deg_u - tri_count - 1); // 4-path
+			accumulators[1] += (deg_v - tri_count - 1) * (deg_v - tri_count - 2) / 2; // 3-star
+			accumulators[1] += (deg_u - tri_count - 1) * (deg_u - tri_count - 2) / 2;
+		}
+	}
+
+	inline void solve_3motif_equations(unsigned v, unsigned u, Ulong tri_count, Ulong w_local_count) {
+		unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
+		accumulators[0] += tri_count;
+		accumulators[1] += deg_v - tri_count - 1 + deg_u - tri_count - 1;
+	}
+	inline void solve_4motif_equations(unsigned v, unsigned u, Ulong tri_count, Ulong w_local_count) {
+		unsigned deg_v = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		unsigned deg_u = std::distance(graph->edge_begin(u), graph->edge_end(u));
 		Ulong star3_count = deg_v - tri_count - 1;
 		star3_count = star3_count + deg_u - tri_count - 1;
 		accumulators[4] += (tri_count * (tri_count - 1) / 2); // diamond
@@ -787,7 +888,7 @@ protected:
 			T_vu[tr_i] = 0;
 		}
 	}
-	inline void mark_neighbors(VertexId &v, VertexId &u, UintList &ind) {
+	inline void mark_neighbors(const VertexId v, const VertexId u, UintList &ind) {
 		auto begin = graph->edge_begin(v);
 		auto end = graph->edge_end(v);
 		for (auto e = begin; e < end; e ++) {

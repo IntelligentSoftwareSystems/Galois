@@ -20,6 +20,7 @@ typedef galois::gstl::Vector<ByteList> ByteLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;
 typedef galois::gstl::Set<VertexId> VertexSet;
 typedef galois::substrate::PerThreadStorage<UintList> Lists;
+typedef galois::substrate::PerThreadStorage<unsigned> Counts;
 
 // We provide two types of 'support': frequency and domain support.
 // Frequency is used for counting, e.g. motif counting.
