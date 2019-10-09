@@ -487,20 +487,18 @@ protected:
     }
     increment_evilPhase();
 
-    #ifndef NDEBUG
     // sanity checking assignment
     for (unsigned h = 0; h < numHosts; h++) {
       if (h == 0) {
-        assert(gid2host[h].first == 0);
+        GALOIS_ASSERT(gid2host[h].first == 0);
       } else if (h == numHosts - 1) {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == g.size());
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == g.size());
       } else {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == gid2host[h + 1].first);
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == gid2host[h + 1].first);
       }
     }
-    #endif
   }
 
   uint32_t G2L(uint64_t gid) const {
