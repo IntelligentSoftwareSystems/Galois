@@ -146,7 +146,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case OEC:
   case IEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose,
+      mastersFile
     );
   case HOVC:
   case HIVC:
@@ -214,12 +215,14 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose,
+      mastersFile
     );
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose,
+        mastersFile
       );
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "
@@ -341,12 +344,14 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose,
+      mastersFile
     );
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose,
+        mastersFile
       );
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "
