@@ -112,6 +112,8 @@ extern cll::opt<bool> readFromFile;
 extern cll::opt<std::string> localGraphFileName;
 //! if true, the local graph structure will be saved to disk after partitioning
 extern cll::opt<bool> saveLocalGraph;
+//! file specifying blocking of masters
+extern cll::opt<std::string> mastersFile;
 
 // @todo command line argument for read balancing across hosts
 
