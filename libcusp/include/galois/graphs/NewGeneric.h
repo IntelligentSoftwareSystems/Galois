@@ -179,7 +179,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::numGlobalEdges = g.sizeEdges();
     std::vector<unsigned> dummy;
     // not actually getting masters, but getting assigned readers for nodes
-    base_DistGraph::computeMasters(md, g, dummy, nodeWeight, edgeWeight);
+    if (masterBlockFile == "") {
+      base_DistGraph::computeMasters(md, g, dummy, nodeWeight, edgeWeight);
+    } else {
+      galois::gInfo("Getting reader assignment from file");
+      base_DistGraph::readersFromFile(g, masterBlockFile);
+    }
 
     graphPartitioner = new Partitioner(host, _numHosts,
                                        base_DistGraph::numGlobalNodes,
