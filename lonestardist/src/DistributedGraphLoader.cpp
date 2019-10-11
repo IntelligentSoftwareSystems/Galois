@@ -81,3 +81,7 @@ cll::opt<std::string>
 cll::opt<bool> saveLocalGraph("saveLocalGraph",
                               cll::desc("Set to save the local CSR graph"),
                               cll::init(false), cll::Hidden);
+
+cll::opt<std::string> mastersFile("mastersFile",
+                                  cll::desc("File specifying masters blocking"),
+                                  cll::init(""), cll::Hidden);
