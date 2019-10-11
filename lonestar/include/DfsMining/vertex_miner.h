@@ -69,6 +69,10 @@ public:
 		total_num += 1;
 		#endif
 	}
+	virtual void reduction(unsigned level, const VertexEmbedding &emb, const EmbeddingList &emb_list, unsigned src, unsigned dst, unsigned pos) {
+	}
+	virtual void update(unsigned level, unsigned dst, unsigned pos, EmbeddingList &emb_list) {
+	}
 	virtual void print_output() {
 	}
 	// naive DFS extension for k-cliques
@@ -393,55 +397,48 @@ public:
 		*v0 = edge.src;
 		*v1 = edge.dst;
 	}
-	void dfs_extend_base_motif(unsigned level, EmbeddingList &emb_list) {
-		unsigned n = level + 1;
+	void post_processing(unsigned level) {
+		unsigned *v0 = src_ids.getLocal();
+		unsigned *v1 = dst_ids.getLocal();
 		UintList *ids = id_lists.getLocal();
 		unsigned *trian_count = Tri_counts.getLocal();
 		unsigned *wedge_count = Wed_counts.getLocal();
-		unsigned *v0 = src_ids.getLocal();
-		unsigned *v1 = dst_ids.getLocal();
+		if (level == max_size-2) {
+			solve_motif_equations(*v0, *v1, *trian_count, *wedge_count);
+			reset_perfect_hash(*v0, *ids);
+		} else {
+			reset_perfect_hash(*v0, *ids);
+			reset_perfect_hash(*v1, *ids);
+		}
+	}
+	void dfs_extend_base_motif(unsigned level, EmbeddingList &emb_list) {
+		unsigned n = level + 1;
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				VertexEmbedding emb(n);
 				emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
 				for (unsigned element_id = 0; element_id < n; ++ element_id) {
-					//if (!toExtend(n, emb, element_id)) continue;
-					if (element_id != n-1) continue;
+					if (!toExtend(n, emb, element_id)) continue;
+					//if (element_id != n-1) continue;
 					auto src = emb.get_vertex(element_id);
 					auto begin = graph->edge_begin(src);
 					auto end = graph->edge_end(src);
 					for (auto e = begin; e != end; e ++) {
 						auto dst = graph->getEdgeDst(e);
 						//if (toAdd(n, emb, dst, element_id)) {
-						if (dst != emb.get_vertex(0)) {
-							if (max_size == 3 && (*ids)[dst] == 1) {
-								//if (max_size == 4) previous_pid = emb.get_pid();
-								//reduction(0); // count triangles
-								(*trian_count) += 1;
-							}
-							else if (max_size == 4) {
-								//unsigned previous_pid = emb.get_pid();
-								auto previous_pid = emb_list.get_pid(level, emb_id);
-								if (dst > src && previous_pid == 0 && (*ids)[dst] == 3) { // clique
-									accumulators[5] += 1;
-								} else if (previous_pid == 1 && (*ids)[dst] == 1) { // 4-cycle
-									accumulators[2] += 1;
-								}
-							}
-						}
+						reduction(level, emb, emb_list, src, dst, emb_id);
 					}
 				}
 			}
-			solve_motif_equations(*v0, *v1, *trian_count, *wedge_count);
-			reset_perfect_hash(*v0, *ids);
+			post_processing(level);
 			return;
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			VertexEmbedding emb(n);
 			emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
-				//if(!toExtend(n, emb, element_id)) continue;
-				if (element_id != n-1) continue;
+				if(!toExtend(n, emb, element_id)) continue;
+				//if (element_id != n-1) continue;
 				auto src = emb.get_vertex(element_id);
 				auto begin = graph->edge_begin(src);
 				auto end = graph->edge_end(src);
@@ -453,24 +450,14 @@ public:
 						auto start = emb_list.size(level+1);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_idx(level+1, start, emb_id);
-						unsigned pid = 0;
-						if ((*ids)[dst] == 1) {
-							(*ids)[dst] = 3;
-							(*trian_count) += 1;
-						} else {
-							(*ids)[dst] = 2;
-							(*wedge_count) += 1;
-							pid = 1;
-						}
-						emb_list.set_pid(level+1, start, pid);
 						emb_list.set_size(level+1, start+1);
+						update(level, dst, start, emb_list);
 					}
 				}
 			}
 		}
 		dfs_extend_base_motif(level+1, emb_list);
-		reset_perfect_hash(*v0, *ids);
-		reset_perfect_hash(*v1, *ids);
+		post_processing(level);
 	}
 
 	// construct the subgraph induced by edge (u, v)'s neighbors
@@ -519,48 +506,6 @@ public:
 		}
 		solve_motif_equations(v, u, tri_count, wedge_count);
 		reset_perfect_hash(v, *ids);
-	}
-
-	void dfs_extend_motif(unsigned level, EmbeddingList &emb_list, unsigned previous_pid) {
-		/*
-		if (level == max_size-2) {
-			// extending every vertex in the embedding
-			for (unsigned element_id = 0; element_id < n; ++ element_id) {
-				if(!toExtend(n, emb, element_id)) continue;
-				auto src = emb.get_vertex(element_id);
-				auto begin = graph->edge_begin(src);
-				auto end = graph->edge_end(src);
-				for (auto e = begin; e != end; e ++) {
-					auto dst = graph->getEdgeDst(e);
-					if (toAdd(n, emb, dst, element_id))
-						reduction(getPattern(n, element_id, dst, emb, previous_pid));
-				}
-			}
-			return;
-		}
-		// extending every vertex in the embedding
-		for (unsigned element_id = 0; element_id < n; ++ element_id) {
-			//if (!toExtend(n, emb, element_id)) continue;
-			if (element_id != n-1) continue;
-			auto src = emb.get_vertex(element_id);
-			auto begin = graph->edge_begin(src);
-			auto end = graph->edge_end(src);
-			emb_list.set_size(level+1, 2*core);
-			for (auto e = begin; e < end; e ++) {
-				auto dst = graph->getEdgeDst(e);
-				if (toAdd(n, emb, dst, element_id)) {
-					unsigned pid = find_motif_pattern_id_dfs(n, element_id, dst, emb, start);
-					if (n == 2 && max_size == 4)
-					auto start = emb_list.size(level+1);
-					emb_list.set_vid(level+1, start, dst);
-					emb_list.set_idx(level+1, start, pos);
-					//emb_list.set_size(level+1, start+1);
-					dfs_extend_motif(level+1, start, emb_list, pid);
-				}
-			}
-		}
-		solve_4motif_equations(v1, v0, tri_count, wedge_count);
-		*/
 	}
 
 	// construct the subgraph induced by vertex u's neighbors

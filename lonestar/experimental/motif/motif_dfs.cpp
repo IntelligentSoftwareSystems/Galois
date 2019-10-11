@@ -4,9 +4,8 @@
 #define USE_PID
 #define ALGO_EDGE
 //#define USE_ADHOC
-//#define USE_EGONET
+#define USE_EGONET
 #define USE_SIMPLE
-//#define USE_EMB_LIST
 #define VERTEX_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
@@ -28,6 +27,43 @@ public:
 		return 0;
 	}
 	void print_output() { printout_motifs(); }
+	#ifdef USE_EGONET
+	bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
+		return pos == n-1;
+	}
+	void reduction(unsigned level, const VertexEmbedding &emb, const EmbeddingList &emb_list, unsigned src, unsigned dst, unsigned emb_id) {
+		UintList *ids = id_lists.getLocal();
+		unsigned *trian_count = Tri_counts.getLocal();
+		if (dst != emb.get_vertex(0)) {
+			if (max_size == 3 && (*ids)[dst] == 1) {
+				(*trian_count) += 1;
+			}
+			else if (max_size == 4) {
+				auto previous_pid = emb_list.get_pid(level, emb_id);
+				if (dst > src && previous_pid == 0 && (*ids)[dst] == 3) { // clique
+					accumulators[5] += 1;
+				} else if (previous_pid == 1 && (*ids)[dst] == 1) { // 4-cycle
+					accumulators[2] += 1;
+				}
+			}
+		}
+	}
+	void update(unsigned level, unsigned dst, unsigned start, EmbeddingList &emb_list) {
+		UintList *ids = id_lists.getLocal();
+		unsigned *trian_count = Tri_counts.getLocal();
+		unsigned *wedge_count = Wed_counts.getLocal();
+		unsigned pid = 0;
+		if ((*ids)[dst] == 1) {
+			(*ids)[dst] = 3;
+			(*trian_count) += 1;
+		} else {
+			(*ids)[dst] = 2;
+			(*wedge_count) += 1;
+			pid = 1;
+		}
+		emb_list.set_pid(level+1, start, pid);
+	}
+	#endif
 };
 
 #include "DfsMining/engine.h"

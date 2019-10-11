@@ -66,13 +66,13 @@ public:
 		emb.set_element(0, ele0);
 	}
 	size_t size() const { return sizes[cur_level]; }
-	size_t size(unsigned level) { return sizes[level]; }
-	VertexId get_vertex(unsigned level, size_t i) { return vid_lists[level][i]; }
-	VertexId get_vid(unsigned level, size_t i) { return vid_lists[level][i]; }
+	size_t size(unsigned level) const { return sizes[level]; }
+	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
+	VertexId get_vid(unsigned level, size_t i) const { return vid_lists[level][i]; }
 	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
-	BYTE get_pid(unsigned level, size_t i) { return pid_lists[level][i]; }
-	BYTE get_label(unsigned vid) { return label[vid]; }
-	unsigned get_level() { return cur_level; }
+	BYTE get_pid(unsigned level, size_t i) const { return pid_lists[level][i]; }
+	BYTE get_label(unsigned vid) const { return label[vid]; }
+	unsigned get_level() const { return cur_level; }
 	void set_size(unsigned level, size_t size) { sizes[level] = size; }
 	void set_vertex(unsigned level, size_t i, VertexId vid) { vid_lists[level][i] = vid; }
 	void set_vid(unsigned level, size_t id, VertexId vid) { vid_lists[level][id] = vid; }
