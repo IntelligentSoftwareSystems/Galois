@@ -1,5 +1,6 @@
 #define USE_DAG
 #define USE_SIMPLE
+#define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 #define ENABLE_STEAL
 #define USE_EMB_LIST
 #define CHUNK_SIZE 256

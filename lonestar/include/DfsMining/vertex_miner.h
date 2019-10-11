@@ -56,7 +56,7 @@ public:
 		return true;
 	}
 	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
-		VertexId src = emb.get_vertex(pos);
+		auto src = emb.get_vertex(pos);
 		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
 	}
 	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
@@ -77,7 +77,7 @@ public:
 		BaseEmbedding emb(n);
 		emb_list.get_embedding<BaseEmbedding>(level, pos, emb);
 		if (level == max_size-2) {
-			unsigned vid = emb_list.get_vertex(level, pos);
+			auto vid = emb_list.get_vertex(level, pos);
 			auto begin = graph->edge_begin(vid);
 			auto end = graph->edge_end(vid);
 			for (auto e = begin; e != end; e ++) {
@@ -88,14 +88,14 @@ public:
 			}
 			return;
 		}
-		unsigned vid = emb_list.get_vertex(level, pos);
+		auto vid = emb_list.get_vertex(level, pos);
 		auto begin = graph->edge_begin(vid);
 		auto end = graph->edge_end(vid);
 		emb_list.set_size(level+1, 0);
 		for (auto e = begin; e < end; e ++) {
 			auto dst = graph->getEdgeDst(e);
 			if (toAdd(n, emb, dst, n-1)) {
-				unsigned start = emb_list.size(level+1);
+				auto start = emb_list.size(level+1);
 				emb_list.set_vid(level+1, start, dst);
 				emb_list.set_idx(level+1, start, pos);
 				emb_list.set_size(level+1, start+1);
@@ -107,10 +107,10 @@ public:
 	void dfs_extend_base(unsigned level, EmbeddingList &emb_list) {
 		unsigned n = level+1;
 		if (level == max_size-2) {
-			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				BaseEmbedding emb(n);
 				emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
-				unsigned vid = emb_list.get_vertex(level, emb_id);
+				auto vid = emb_list.get_vertex(level, emb_id);
 				auto begin = graph->edge_begin(vid);
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e != end; e ++) {
@@ -121,17 +121,17 @@ public:
 			}
 			return;
 		}
-		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			BaseEmbedding emb(n);
 			emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
-			unsigned vid = emb_list.get_vertex(level, emb_id);
+			auto vid = emb_list.get_vertex(level, emb_id);
 			auto begin = graph->edge_begin(vid);
 			auto end = graph->edge_end(vid);
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = graph->getEdgeDst(e);
 				if (toAdd(n, emb, dst, n-1)) {
-					unsigned start = emb_list.size(level+1);
+					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					//emb_list.set_idx(level+1, start, emb_id);
 					emb_list.set_size(level+1, start+1);
@@ -145,8 +145,8 @@ public:
 		//assert(level <= max_size-2); // if k = 3, shouldn't be here
 		egonet.set_cur_level(level);
 		if (level == max_size-2) {
-			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-				unsigned vid = emb_list.get_vertex(level, emb_id);
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+				auto vid = emb_list.get_vertex(level, emb_id);
 				auto begin = egonet.edge_begin(vid);
 				auto end = egonet.edge_end(vid);
 				for (auto e = begin; e != end; e ++)
@@ -154,8 +154,8 @@ public:
 			}
 			return;
 		}
-		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-			unsigned vid = emb_list.get_vertex(level, emb_id);
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			auto vid = emb_list.get_vertex(level, emb_id);
 			auto begin = egonet.edge_begin(vid);
 			auto end = egonet.edge_end(vid);
 			//auto end = begin + egonet.get_degree(level, vid);
@@ -163,21 +163,21 @@ public:
 			for (auto e = begin; e < end; e ++) {
 				auto dst = egonet.getEdgeDst(e);
 				if (toAdd(level, dst, egonet)) {
-					unsigned start = emb_list.size(level+1);
+					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_size(level+1, start+1);
 					egonet.set_label(dst, level+1);
 					egonet.set_degree(level+1, dst, 0);
 				}
 			}
-			for (unsigned emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {
-				unsigned src = emb_list.get_vertex(level+1, emb_id);
+			for (size_t emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {
+				auto src = emb_list.get_vertex(level+1, emb_id);
 				egonet.update(level+1, src);
 			}
 			dfs_extend_ego(level+1, emb_list, egonet);
 			egonet.set_cur_level(level);
-			for (unsigned emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {//restoring labels
-				unsigned vid = emb_list.get_vertex(level+1, emb_id);
+			for (size_t emb_id = 0; emb_id < emb_list.size(level+1); emb_id ++) {//restoring labels
+				auto vid = emb_list.get_vertex(level+1, emb_id);
 				egonet.set_label(vid, level);
 			}
 		}
@@ -185,10 +185,10 @@ public:
 	// each task extends from a vertex, level starts from k-1 and decreases until bottom level
 	void dfs_extend(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
 		if (level == 2) {
-			for(unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) { //list all edges
-				unsigned vid = emb_list.get_vertex(level, emb_id);
-				unsigned begin = egonet.edge_begin(vid);
-				unsigned end = begin + egonet.get_degree(level, vid);
+			for(size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) { //list all edges
+				auto vid = emb_list.get_vertex(level, emb_id);
+				auto begin = egonet.edge_begin(vid);
+				auto end = begin + egonet.get_degree(level, vid);
 				for (unsigned e = begin; e < end; e ++)
 					total_num += 1;
 			}
@@ -196,22 +196,22 @@ public:
 		}
 		// compute the subgraphs induced on the neighbors of each node in current level,
 		// and then recurse on such a subgraph
-		for(unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+		for(size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			// for each vertex in current level
 			// a new induced subgraph G[∆G(u)] is built
-			unsigned vid = emb_list.get_vertex(level, emb_id);
+			auto vid = emb_list.get_vertex(level, emb_id);
 			emb_list.set_size(level-1, 0);
-			unsigned begin = egonet.edge_begin(vid);
-			unsigned end = begin + egonet.get_degree(level, vid);
+			auto begin = egonet.edge_begin(vid);
+			auto end = begin + egonet.get_degree(level, vid);
 			// extend one vertex v which is a neighbor of u
 			for (unsigned edge = begin; edge < end; edge ++) {
 				// for each out-neighbor v of node u in G, set its label to level-1
 				// if the label was equal to level. We thus have that if a label of a
 				// node v is equal to level-1 it means that node v is in the new subgraph
-				unsigned dst = egonet.getEdgeDst(edge);
+				auto dst = egonet.getEdgeDst(edge);
 				// relabeling vertices and forming U'.
 				if (emb_list.get_label(dst) == level) {
-					unsigned pos = emb_list.size(level-1);
+					auto pos = emb_list.size(level-1);
 					emb_list.set_vertex(level-1, pos, dst);
 					emb_list.set_size(level-1, pos+1);
 					emb_list.set_label(dst, level-1);
@@ -220,10 +220,10 @@ public:
 			}
 			// for each out-neighbor v of u
 			// reodering adjacency list and computing new degrees
-			unsigned new_size = emb_list.size(level-1);
-			if(debug) printf("debug: vid = %d, new_size = %d\n", vid, new_size);
+			auto new_size = emb_list.size(level-1);
+			if(debug) printf("debug: vid = %d, new_size = %lu\n", vid, new_size);
 			for (unsigned j = 0; j < new_size; j ++) {
-				unsigned v = emb_list.get_vertex(level-1, j);
+				auto v = emb_list.get_vertex(level-1, j);
 				begin = v * core;
 				end = begin + egonet.get_degree(level, v);
 				// move all the out-neighbors of v with label equal to level − 1 
@@ -243,7 +243,7 @@ public:
 			}
 			dfs_extend(level-1, egonet, emb_list);
 			for (unsigned j = 0; j < emb_list.size(level-1); j ++) {//restoring labels
-				unsigned v = emb_list.get_vertex(level-1, j);
+				auto v = emb_list.get_vertex(level-1, j);
 				emb_list.set_label(v, level);
 			}
 		}
@@ -336,7 +336,7 @@ public:
 			// extending every vertex in the embedding
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
 				if(!toExtend(n, emb, element_id)) continue;
-				VertexId src = emb.get_vertex(element_id);
+				auto src = emb.get_vertex(element_id);
 				auto begin = graph->edge_begin(src);
 				auto end = graph->edge_end(src);
 				for (auto e = begin; e != end; e ++) {
@@ -350,14 +350,14 @@ public:
 		// extending every vertex in the embedding
 		for (unsigned element_id = 0; element_id < n; ++ element_id) {
 			if(!toExtend(n, emb, element_id)) continue;
-			VertexId src = emb.get_vertex(element_id);
+			auto src = emb.get_vertex(element_id);
 			auto begin = graph->edge_begin(src);
 			auto end = graph->edge_end(src);
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = graph->getEdgeDst(e);
 				if (toAdd(n, emb, dst, element_id)) {
-					unsigned start = emb_list.size(level+1);
+					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_idx(level+1, start, pos);
 					emb_list.set_size(level+1, start+1);
@@ -401,13 +401,13 @@ public:
 		unsigned *v0 = src_ids.getLocal();
 		unsigned *v1 = dst_ids.getLocal();
 		if (level == max_size-2) {
-			for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				VertexEmbedding emb(n);
 				emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
 				for (unsigned element_id = 0; element_id < n; ++ element_id) {
 					//if (!toExtend(n, emb, element_id)) continue;
 					if (element_id != n-1) continue;
-					VertexId src = emb.get_vertex(element_id);
+					auto src = emb.get_vertex(element_id);
 					auto begin = graph->edge_begin(src);
 					auto end = graph->edge_end(src);
 					for (auto e = begin; e != end; e ++) {
@@ -421,7 +421,7 @@ public:
 							}
 							else if (max_size == 4) {
 								//unsigned previous_pid = emb.get_pid();
-								unsigned previous_pid = emb_list.get_pid(level, emb_id);
+								auto previous_pid = emb_list.get_pid(level, emb_id);
 								if (dst > src && previous_pid == 0 && (*ids)[dst] == 3) { // clique
 									accumulators[5] += 1;
 								} else if (previous_pid == 1 && (*ids)[dst] == 1) { // 4-cycle
@@ -433,15 +433,16 @@ public:
 				}
 			}
 			solve_motif_equations(*v0, *v1, *trian_count, *wedge_count);
+			reset_perfect_hash(*v0, *ids);
 			return;
 		}
-		for (unsigned emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			VertexEmbedding emb(n);
 			emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
 				//if(!toExtend(n, emb, element_id)) continue;
 				if (element_id != n-1) continue;
-				VertexId src = emb.get_vertex(element_id);
+				auto src = emb.get_vertex(element_id);
 				auto begin = graph->edge_begin(src);
 				auto end = graph->edge_end(src);
 				emb_list.set_size(level+1, 0);
@@ -449,7 +450,7 @@ public:
 					auto dst = graph->getEdgeDst(e);
 					//if (toAdd(n, emb, dst, element_id)) {
 					if (dst != emb.get_vertex(0)) {
-						unsigned start = emb_list.size(level+1);
+						auto start = emb_list.size(level+1);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_idx(level+1, start, emb_id);
 						unsigned pid = 0;
@@ -477,7 +478,7 @@ public:
 		unsigned n = level + 1;
 		VertexEmbedding emb(n);
 		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
-		unsigned u = emb.get_vertex(0), v = emb.get_vertex(1);
+		auto u = emb.get_vertex(0), v = emb.get_vertex(1);
 		//std::cout << "Edge: " << u << " --> " << v << "\n";
 
 		UintList *ids = id_lists.getLocal();
@@ -526,7 +527,7 @@ public:
 			// extending every vertex in the embedding
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
 				if(!toExtend(n, emb, element_id)) continue;
-				VertexId src = emb.get_vertex(element_id);
+				auto src = emb.get_vertex(element_id);
 				auto begin = graph->edge_begin(src);
 				auto end = graph->edge_end(src);
 				for (auto e = begin; e != end; e ++) {
@@ -541,7 +542,7 @@ public:
 		for (unsigned element_id = 0; element_id < n; ++ element_id) {
 			//if (!toExtend(n, emb, element_id)) continue;
 			if (element_id != n-1) continue;
-			VertexId src = emb.get_vertex(element_id);
+			auto src = emb.get_vertex(element_id);
 			auto begin = graph->edge_begin(src);
 			auto end = graph->edge_end(src);
 			emb_list.set_size(level+1, 2*core);
@@ -550,7 +551,7 @@ public:
 				if (toAdd(n, emb, dst, element_id)) {
 					unsigned pid = find_motif_pattern_id_dfs(n, element_id, dst, emb, start);
 					if (n == 2 && max_size == 4)
-					unsigned start = emb_list.size(level+1);
+					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_idx(level+1, start, pos);
 					//emb_list.set_size(level+1, start+1);
@@ -596,16 +597,16 @@ public:
 			}
 		}
 		if (max_size > 3) {
-			unsigned new_size = new_id;
+			size_t new_size = (size_t)new_id;
 			emb_list.set_size(level+1, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
 			//egonet.set_size(level, new_size);
 			for (unsigned i = 0; i < emb_list.size(level+1); i ++) {
-				unsigned src = emb_list.get_vertex(level, i); // get the global vertex ID
+				auto src = emb_list.get_vertex(level, i); // get the global vertex ID
 				for (auto e : graph->edges(src)) {
 					auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
 					unsigned local_vid = (*ids)[dst]; // get the local vertex ID
 					if (local_vid < (unsigned)-2) {
-						unsigned degree = egonet.get_degree(level+1, i);
+						auto degree = egonet.get_degree(level+1, i);
 						egonet.set_adj(core * i + degree, local_vid);
 						egonet.set_degree(level+1, i, degree+1);
 					}
@@ -621,9 +622,9 @@ public:
 	// each task extends from a vertex for motif, level starts from k-1 and decreases until bottom level
 	void dfs_extend_base(unsigned level, Egonet &egonet, EmbeddingList &emb_list) {
 		if (level == 2) {
-			for(unsigned i = 0; i < emb_list.size(level); i++) { //list all edges
-				unsigned u = emb_list.get_vertex(level, i);
-				unsigned label = emb_list.get_label(i);
+			for(size_t i = 0; i < emb_list.size(level); i++) { //list all edges
+				auto u = emb_list.get_vertex(level, i);
+				auto label = emb_list.get_label(i);
 				auto begin = graph->edge_begin(u);
 				auto end = graph->edge_end(u);
 				for (auto j = begin; j != end; j ++) {
@@ -632,23 +633,23 @@ public:
 			}
 			return;
 		}
-		for(unsigned i = 0; i < emb_list.size(level); i ++) {
-			unsigned u = emb_list.get_vertex(level, i);
+		for(size_t i = 0; i < emb_list.size(level); i ++) {
+			auto u = emb_list.get_vertex(level, i);
 			emb_list.set_size(level-1, 0);
 			auto begin = graph->edge_begin(u);
 			auto end = graph->edge_end(u);
 			for (auto edge = begin; edge < end; edge ++) {
 				auto v = graph->getEdgeDst(edge);
 				if (emb_list.get_label(v) == level) {
-					unsigned pos = emb_list.size(level-1);
+					auto pos = emb_list.size(level-1);
 					emb_list.set_vertex(level-1, pos, v);
 					emb_list.set_size(level-1, pos+1);
 					emb_list.set_label(v, level-1);
 				}
 			}
 			dfs_extend_base(level-1, egonet, emb_list);
-			for (unsigned j = 0; j < emb_list.size(level-1); j ++) {//restoring labels
-				unsigned v = emb_list.get_vertex(level-1, j);
+			for (size_t j = 0; j < emb_list.size(level-1); j ++) {//restoring labels
+				auto v = emb_list.get_vertex(level-1, j);
 				emb_list.set_label(v, level);
 			}
 		}
@@ -936,8 +937,8 @@ protected:
 		//for (unsigned i = 0; i < ids.size(); i ++) ids[i] = (unsigned)-1;
 		unsigned level = max_size-1;
 		if(debug) printf("\n\n=======================\ninit: u = %d, level = %d\n", u, level);
-		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
-		unsigned new_size = 0;
+		for (size_t i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
+		size_t new_size = 0;
 		for (auto e : graph->edges(u)) {
 			auto v = graph->getEdgeDst(e);
 			ids[v] = new_size;
@@ -945,10 +946,9 @@ protected:
 			emb_list.set_label(new_size, level);
 			emb_list.set_vertex(level, new_size, new_size);
 			egonet.set_degree(level, new_size, 0);//new degrees
-			if(debug) printf("init: v[%d] = %d\n", new_size, v);
 			new_size ++;
 		}
-		if(debug) printf("init: num_neighbors = %d\n", new_size);
+		if(debug) std::cout << "init: num_neighbors = " << new_size << "\n";
 		emb_list.set_size(level, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
 		//reodering adjacency list and computing new degrees
 		unsigned i = 0;
@@ -989,12 +989,12 @@ protected:
 			std::fill(ids->begin(), ids->end(), (unsigned)-1);
 		}
 		unsigned level = max_size-1;
-		for (unsigned i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
+		for (size_t i = 0; i < emb_list.size(level); i ++) emb_list.set_label(i, 0);
 		for (auto e : graph->edges(v)) {
 			auto dst = graph->getEdgeDst(e);
 			(*ids)[dst] = (unsigned)-2;
 		}
-		unsigned new_size = 0;
+		size_t new_size = 0;
 		for (auto e : graph->edges(u)) {
 			auto dst = graph->getEdgeDst(e);
 			if ((*ids)[dst] == (unsigned)-2) {
@@ -1006,13 +1006,11 @@ protected:
 					emb_list.set_vertex(max_size-2, new_size, new_size);
 					egonet.set_degree(max_size-2, new_size, 0);//new degrees
 				}
-				if(debug) printf("init: v[%d] = %d\n", new_size, dst);
 				new_size ++;
 			}
 		}
 		if (max_size > 3) {
 			emb_list.set_size(max_size-2, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
-			if(debug) printf("init: num_neighbors = %d\n", new_size);
 			for (unsigned i = 0; i < emb_list.size(max_size-2); i ++) {
 				unsigned x = (*old_ids)[i];
 				// intersection of two neighbor lists
@@ -1020,13 +1018,11 @@ protected:
 					auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
 					unsigned new_id = (*ids)[dst];
 					if (new_id < (unsigned)-2) { // if dst is also a neighbor of u
-						unsigned degree = egonet.get_degree(max_size-2, i);
+						auto degree = egonet.get_degree(max_size-2, i);
 						egonet.set_adj(core * i + degree, new_id); // relabel
 						egonet.set_degree(max_size-2, i, degree+1);
 					}
 				}
-				if(debug) printf("vertex %d, number of common neighbors: %d\n", v, egonet.get_degree(level, i));
-				//i ++;
 			}
 		}
 		for (auto e : graph->edges(v)) {

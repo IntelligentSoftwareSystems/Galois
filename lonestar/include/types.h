@@ -7,14 +7,22 @@
 #include "galois/substrate/SimpleLock.h"
 
 typedef float Weight;
-typedef unsigned IndexTy;
 typedef unsigned VertexId;
 typedef unsigned char BYTE;
 typedef unsigned long Ulong;
+#ifdef LARGE_SIZE
+typedef size_t IndexTy;
+typedef std::vector<BYTE> ByteList;
+typedef std::vector<unsigned> UintList;
+typedef std::vector<Ulong> UlongList;
+typedef std::vector<VertexId> VertexList;
+#else
+typedef unsigned IndexTy;
 typedef galois::gstl::Vector<BYTE> ByteList;
 typedef galois::gstl::Vector<unsigned> UintList;
 typedef galois::gstl::Vector<Ulong> UlongList;
 typedef galois::gstl::Vector<VertexId> VertexList;
+#endif
 typedef galois::gstl::Vector<UintList> IndexLists;
 typedef galois::gstl::Vector<ByteList> ByteLists;
 typedef galois::gstl::Vector<VertexList> VertexLists;

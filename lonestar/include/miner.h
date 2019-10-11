@@ -2,17 +2,31 @@
 #define MINER_HPP_
 #include "embedding.h"
 
-template <typename T>
-inline galois::gstl::Vector<T> parallel_prefix_sum(const galois::gstl::Vector<T> &degrees) {
-	galois::gstl::Vector<T> sums(degrees.size() + 1);
-	T total = 0;
-	for (size_t n = 0; n < degrees.size(); n++) {
+#ifdef LARGE_SIZE
+template <typename InTy = unsigned, typename OutTy = unsigned>
+inline std::vector<OutTy> parallel_prefix_sum(const std::vector<InTy> &in) {
+	std::vector<OutTy> sums(in.size() + 1);
+	OutTy total = 0;
+	for (size_t n = 0; n < in.size(); n++) {
 		sums[n] = total;
-		total += degrees[n];
+		total += (OutTy)in[n];
 	}
-	sums[degrees.size()] = total;
+	sums[in.size()] = total;
 	return sums;
 }
+#else
+template <typename InTy = unsigned, typename OutTy = unsigned>
+inline galois::gstl::Vector<OutTy> parallel_prefix_sum(const galois::gstl::Vector<InTy> &in) {
+	galois::gstl::Vector<OutTy> sums(in.size() + 1);
+	OutTy total = 0;
+	for (size_t n = 0; n < in.size(); n++) {
+		sums[n] = total;
+		total += (OutTy)in[n];
+	}
+	sums[in.size()] = total;
+	return sums;
+} 
+#endif
 
 class Miner {
 public:
@@ -60,7 +74,37 @@ protected:
 	Graph *graph;
 	unsigned max_size;
 	std::vector<unsigned> degrees;
-
+	#ifdef USE_QUERY_GRAPH
+	std::vector<VertexId> matching_order;
+	std::vector<VertexId> matching_order_map;
+	std::vector<VertexId> automorph_group_id;
+	// Read the preset file to hardcode the presets
+	void read_presets() {
+		std::ifstream ifile;
+		ifile.open(preset_filename);
+		if (!ifile) printf("Error in reading file %s\n", preset_filename.c_str());
+		VertexId x;
+		for (size_t i = 0; i< max_size; ++i) {
+			ifile >> x;
+			matching_order[i] = x;
+			if(debug) std::cout << "matching_order[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			matching_order_map[i] = x;
+			if(debug) std::cout << "matching_map[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			automorph_group_id[i] = x;
+			if(debug) std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
+		}
+		ifile.close();
+	}
+	#endif
+	unsigned get_degree(Graph *g, VertexId vid) {
+		return std::distance(g->edge_begin(vid), g->edge_end(vid));
+	}
 	void degree_counting() {
 		degrees.resize(graph->size());
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),

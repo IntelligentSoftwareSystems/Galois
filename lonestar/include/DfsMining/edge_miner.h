@@ -208,7 +208,7 @@ public:
 			//EdgeEmbedding emb(n);
 			//emb_list.get_embedding<EdgeEmbedding>(level, emb_id, emb);
 			//for (unsigned element_id = 0; element_id < n; ++ element_id) {
-			//	VertexId src = emb.get_vertex(element_id);
+			//	auto src = emb.get_vertex(element_id);
 			//	if (!toExtend(n, emb, element_id)) continue;
 			//	for (auto e : graph->edges(src)) {
 			//		GNode dst = graph->getEdgeDst(e);
@@ -485,7 +485,7 @@ protected:
 	}
 	inline void swap(std::pair<VertexId, VertexId>& pair) {
 		if (pair.first > pair.second) {
-			VertexId tmp = pair.first;
+			auto tmp = pair.first;
 			pair.first = pair.second;
 			pair.second = tmp;
 		}

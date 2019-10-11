@@ -17,8 +17,8 @@ public:
 	size_t size() const { return edges.size(); }
 	void resize (size_t n) { edges.resize(n); }
 	void push_back(Edge e) { edges.push_back(e); }
-	Edge& get_edge(unsigned i) { return edges[i]; }
-	Edge* get_edge_ptr(unsigned i) { return &(edges[i]); }
+	Edge& get_edge(size_t i) { return edges[i]; }
+	Edge* get_edge_ptr(size_t i) { return &(edges[i]); }
 	void init(Graph& graph, bool is_dag = false) {
 		size_t num_edges = graph.sizeEdges();
 		if (!is_dag) num_edges = num_edges / 2;
@@ -27,7 +27,7 @@ public:
 			galois::do_all(galois::iterate(graph.begin(), graph.end()),
 				[&](const GNode& src) {
 					for (auto e : graph.edges(src)) {
-						GNode dst = graph.getEdgeDst(e);
+						auto dst = graph.getEdgeDst(e);
 						add_edge(*e, src, dst);
 					}
 				},
@@ -41,7 +41,7 @@ public:
 				[&](const GNode& src) {
 					num_init_emb[src] = 0;
 					for (auto e : graph.edges(src)) {
-						GNode dst = graph.getEdgeDst(e);
+						auto dst = graph.getEdgeDst(e);
 						if (src < dst) num_init_emb[src] ++;
 					}
 				},
@@ -57,9 +57,9 @@ public:
 			indices[num_vertices] = total;
 			galois::do_all(galois::iterate(graph.begin(), graph.end()),
 				[&](const GNode& src) {
-					IndexTy start = indices[src];
+					auto start = indices[src];
 					for (auto e : graph.edges(src)) {
-						GNode dst = graph.getEdgeDst(e);
+						auto dst = graph.getEdgeDst(e);
 						if (src < dst) {
 							add_edge(start, src, dst);
 							start ++;
@@ -74,7 +74,7 @@ public:
 private:
 	//galois::gstl::Vector<Edge> edges;
 	std::vector<Edge> edges;
-	void add_edge(unsigned pos, IndexTy src, IndexTy dst) {
+	void add_edge(size_t pos, VertexId src, VertexId dst) {
 		edges[pos] = Edge(src, dst);
 	}
 };

@@ -63,7 +63,7 @@ public:
 			indices[num_vertices] = total;
 			galois::do_all(galois::iterate(graph.begin(), graph.end()),
 				[&](const GNode& src) {
-					IndexTy start = indices[src];
+					auto start = indices[src];
 					for (auto e : graph.edges(src)) {
 						GNode dst = graph.getEdgeDst(e);
 						if (src < dst) { // TODO: this may be incorrect for FSM, which maybe causes the 4-FSM bug
@@ -78,26 +78,26 @@ public:
 			);
 		}
 	}
-	VertexId get_vid(unsigned level, IndexTy id) const { return vid_lists[level][id]; }
-	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
-	BYTE get_his(unsigned level, IndexTy id) const { return his_lists[level][id]; }
-	IndexTy get_pid(IndexTy id) const { return pid_list[id]; }
-	void set_vid(unsigned level, IndexTy id, VertexId vid) { vid_lists[level][id] = vid; }
-	void set_idx(unsigned level, IndexTy id, IndexTy idx) { idx_lists[level][id] = idx; }
-	void set_his(unsigned level, IndexTy id, BYTE lab) { his_lists[level][id] = lab; }
-	void set_pid(IndexTy id, IndexTy pid) { pid_list[id] = pid; }
+	VertexId get_vid(unsigned level, size_t id) const { return vid_lists[level][id]; }
+	IndexTy get_idx(unsigned level, size_t id) const { return idx_lists[level][id]; }
+	BYTE get_his(unsigned level, size_t id) const { return his_lists[level][id]; }
+	unsigned get_pid(size_t id) const { return pid_list[id]; }
+	void set_vid(unsigned level, size_t id, VertexId vid) { vid_lists[level][id] = vid; }
+	void set_idx(unsigned level, size_t id, IndexTy idx) { idx_lists[level][id] = idx; }
+	void set_his(unsigned level, size_t id, BYTE lab) { his_lists[level][id] = lab; }
+	void set_pid(size_t id, unsigned pid) { pid_list[id] = pid; }
 	size_t size() const { return vid_lists[last_level].size(); }
 	size_t size(unsigned level) const { return vid_lists[level].size(); }
 	VertexList get_vid_list(unsigned level) { return vid_lists[level]; }
 	UintList get_idx_list(unsigned level) { return idx_lists[level]; }
 	ByteList get_his_list(unsigned level) { return his_lists[level]; }
-	void remove_tail(unsigned idx) {
+	void remove_tail(size_t idx) {
 		vid_lists[last_level].erase(vid_lists[last_level].begin()+idx, vid_lists[last_level].end());
 		#ifdef ENABLE_LABEL
 		his_lists[last_level].erase(his_lists[last_level].begin()+idx, his_lists[last_level].end());
 		#endif
 	}
-	void add_level(unsigned size) { // TODO: this size could be larger than 2^32, when running LiveJournal and even larger graphs
+	void add_level(Ulong size) { // TODO: this size could be larger than 2^32, when running LiveJournal and even larger graphs
 		last_level ++;
 		assert(last_level < max_level);
 		vid_lists[last_level].resize(size);
@@ -126,8 +126,8 @@ private:
 	VertexLists vid_lists;
 	unsigned last_level;
 	unsigned max_level;
-	void get_embedding(unsigned level, unsigned pos, EmbeddingType &emb) {
-		VertexId vid = get_vid(level, pos);
+	void get_embedding(unsigned level, size_t pos, EmbeddingType &emb) {
+		auto vid = get_vid(level, pos);
 		IndexTy idx = get_idx(level, pos);
 		BYTE his = 0;
 		#ifdef ENABLE_LABEL

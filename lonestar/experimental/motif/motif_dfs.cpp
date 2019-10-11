@@ -4,7 +4,7 @@
 #define USE_PID
 #define ALGO_EDGE
 //#define USE_ADHOC
-#define USE_EGONET
+//#define USE_EGONET
 #define USE_SIMPLE
 //#define USE_EMB_LIST
 #define VERTEX_INDUCED

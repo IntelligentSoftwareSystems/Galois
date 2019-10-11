@@ -47,7 +47,7 @@ public:
 					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
 				// for each vertex in the embedding
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					// make sure each distinct vertex is extended only once
 					if (emb.get_key(i) == 0) {
 						// try edge extension
@@ -75,13 +75,11 @@ public:
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending")
 		);
 	}
 	void extend_edge(unsigned level, EmbeddingList& emb_list) {
-		if (show) std::cout << "\n----------------------------- Extending -----------------------------\n";
-		//if (show) std::cout << "\n------------------------- Step 1: Extending -------------------------\n";
 		UintList num_new_emb(emb_list.size());
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
@@ -93,7 +91,7 @@ public:
 				if (n > 3)
 					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					if (emb.get_key(i) == 0) { // TODO: need to fix this
 						for (auto e : graph->edges(src)) {
 							GNode dst = graph->getEdgeDst(e);
@@ -107,13 +105,14 @@ public:
 				emb.clean();
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-alloc")
 		);
 		Ulong new_size = std::accumulate(num_new_emb.begin(), num_new_emb.end(), (Ulong)0);
 		if (show) std::cout << "new_size = " << new_size << "\n";
-		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
-		UintList indices = parallel_prefix_sum(num_new_emb);
+		//assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
+		//UintList indices = parallel_prefix_sum(num_new_emb);
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
 		new_size = indices[indices.size()-1];
 		emb_list.add_level(new_size);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
@@ -126,7 +125,7 @@ public:
 				if (n > 3)
 					for (unsigned i = 0; i < n; i ++) vert_set.insert(emb.get_vertex(i));
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					if (emb.get_key(i) == 0) {
 						for (auto e : graph->edges(src)) {
 							GNode dst = graph->getEdgeDst(e);
@@ -142,7 +141,7 @@ public:
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Extending-write")
 		);
 	}
@@ -191,7 +190,7 @@ public:
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("InitAggregation")
 		);
 		merge_init_map();
@@ -239,14 +238,12 @@ public:
 				}
 				if (qp_existed) qp.clean();
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("QuickAggregation")
 		);
 	}
 	inline void quick_aggregate(unsigned level, EmbeddingList& emb_list) {
-		//if (show) std::cout << "\n---------------------------- Aggregating ----------------------------\n";
-		if (show) std::cout << "\n------------------------ Step 2: Aggregating ------------------------\n";
 		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
@@ -271,8 +268,8 @@ public:
 				}
 				if (qp_existed) qp.clean();
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("QuickAggregation")
 		);
 	}
@@ -330,8 +327,8 @@ public:
 				}
 				cg.clean();
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalAggregation")
 		);
 	}
@@ -392,8 +389,8 @@ public:
 						}
 					}
 				},
-				galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-				galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+				galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+				//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 				galois::loopname("MergeQuickPatterns")
 			);
 		}
@@ -418,8 +415,8 @@ public:
 						}
 					}
 				},
-				galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-				galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+				galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+				//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 				galois::loopname("MergeCanonicalPatterns")
 			);
 		}
@@ -452,7 +449,7 @@ public:
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("InitFilter")
 		);
 		std::cout << "Number of frequent edges: " << count(is_frequent_edge.begin(), is_frequent_edge.end(), 1) << "\n";
@@ -461,15 +458,15 @@ public:
 		UintList is_frequent_emb(emb_list.size(), 0);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
-				VertexId src = emb_list.get_idx(1, pos);
-				VertexId dst = emb_list.get_vid(1, pos);
+				auto src = emb_list.get_idx(1, pos);
+				auto dst = emb_list.get_vid(1, pos);
 				auto& src_label = graph->getData(src);
 				auto& dst_label = graph->getData(dst);
 				InitPattern key = get_init_pattern(src_label, dst_label);
 				if (init_map[key]->get_support()) is_frequent_emb[pos] = 1;
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("InitFilter")
 		);
 
@@ -479,30 +476,29 @@ public:
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				if (is_frequent_emb[pos]) {
-					VertexId src = emb_list.get_idx(1, pos);
-					VertexId dst = emb_list.get_vid(1, pos);
-					unsigned eid0 = edge_map[OrderedEdge(src,dst)];
-					unsigned eid1 = edge_map[OrderedEdge(dst,src)];
+					auto src = emb_list.get_idx(1, pos);
+					auto dst = emb_list.get_vid(1, pos);
+					auto eid0 = edge_map[OrderedEdge(src,dst)];
+					auto eid1 = edge_map[OrderedEdge(dst,src)];
 					__sync_bool_compare_and_swap(&is_frequent_edge[eid0], 0, 1);
 					__sync_bool_compare_and_swap(&is_frequent_edge[eid1], 0, 1);
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("InitFrquentEdges")
 		);
 		std::cout << "Number of frequent edges: " << count(is_frequent_edge.begin(), is_frequent_edge.end(), 1) << "\n";
 	
 		UintList indices = parallel_prefix_sum(is_frequent_emb);
-		//VertexList vid_list0 = emb_list.get_vid_list(0);
 		VertexList vid_list0 = emb_list.get_idx_list(1);
 		VertexList vid_list1 = emb_list.get_vid_list(1);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				if (is_frequent_emb[pos]) {
-					VertexId src = vid_list0[pos];
-					VertexId dst = vid_list1[pos];
-					unsigned start = indices[pos];
+					auto src = vid_list0[pos];
+					auto dst = vid_list1[pos];
+					auto start = indices[pos];
 					//emb_list.set_vid(0, start, src);
 					emb_list.set_vid(1, start, dst);
 					//emb_list.set_idx(1, start, start);
@@ -510,7 +506,7 @@ public:
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("InitEmbeddingList")
 		);
 		emb_list.remove_tail(indices.back());
@@ -525,8 +521,8 @@ public:
 				unsigned cg_id = id_map.at(qp_id);
 				if (domain_support_map.at(cg_id)) out_queue.push_back(emb);
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Filter")
 		);
 	}
@@ -540,28 +536,29 @@ public:
 				if (domain_support_map.at(cg_id))
 					is_frequent_emb[pos] = 1;
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Filter-alloc")
 		);
-		UintList indices = parallel_prefix_sum(is_frequent_emb);
+		//UintList indices = parallel_prefix_sum(is_frequent_emb);
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(is_frequent_emb);
 		VertexList vid_list = emb_list.get_vid_list(level);
 		UintList idx_list = emb_list.get_idx_list(level);
 		ByteList his_list = emb_list.get_his_list(level);
 		galois::do_all(galois::iterate((size_t)0, emb_list.size()),
 			[&](const size_t& pos) {
 				if (is_frequent_emb[pos]) {
-					unsigned start = indices[pos];
-					VertexId vid = vid_list[pos];
-					IndexTy idx = idx_list[pos];
-					BYTE his = his_list[pos];
+					auto start = indices[pos];
+					auto vid = vid_list[pos];
+					auto idx = idx_list[pos];
+					auto his = his_list[pos];
 					emb_list.set_idx(level, start, idx);
 					emb_list.set_vid(level, start, vid);
 					emb_list.set_his(level, start, his);
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), 
-			galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(), 
+			//galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("Filter-write")
 		);
 		emb_list.remove_tail(indices.back());
@@ -627,10 +624,10 @@ private:
 		else return std::make_pair(dst_label, src_label);
 	}
 	inline void get_embedding(unsigned level, unsigned pos, const EmbeddingList& emb_list, EdgeEmbedding &emb) {
-		VertexId vid = emb_list.get_vid(level, pos);
-		IndexTy idx = emb_list.get_idx(level, pos);
-		BYTE his = emb_list.get_his(level, pos);
-		BYTE lab = graph->getData(vid);
+		auto vid = emb_list.get_vid(level, pos);
+		auto idx = emb_list.get_idx(level, pos);
+		auto his = emb_list.get_his(level, pos);
+		auto lab = graph->getData(vid);
 		//emb.set_element(level, ElementType(vid, 0, lab, his));
 		ElementType ele(vid, 0, lab, his);
 		emb.set_element(level, ele);
@@ -687,7 +684,7 @@ private:
 	}
 	inline void swap(std::pair<VertexId, VertexId>& pair) {
 		if (pair.first > pair.second) {
-			VertexId tmp = pair.first;
+			auto tmp = pair.first;
 			pair.first = pair.second;
 			pair.second = tmp;
 		}

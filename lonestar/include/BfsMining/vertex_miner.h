@@ -64,7 +64,7 @@ public:
 	}
 	// toAdd (only add non-automorphisms)
 	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		VertexId src = emb.get_vertex(pos);
+		auto src = emb.get_vertex(pos);
 		return !is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst);
 	}
 	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
@@ -72,7 +72,7 @@ public:
 	}
 	// toAdd (only add non-automorphisms)
 	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
-		VertexId src = emb.get_vertex(pos);
+		auto src = emb.get_vertex(pos);
 		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
 	}
 	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
@@ -89,7 +89,7 @@ public:
 				unsigned n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
 					if(!toExtend(n, emb, i)) continue;
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						if (toAdd(n, emb, dst, i)) {
@@ -124,10 +124,10 @@ public:
 		galois::do_all(galois::iterate(in_queue),
 			[&](const BaseEmbedding& emb) {
 				unsigned n = emb.size();
-				VertexId src = emb.get_vertex(n-1);
+				auto src = emb.get_vertex(n-1);
 				UintList buffer; 
 				for (auto e : graph->edges(src)) {
-					GNode dst = graph->getEdgeDst(e);
+					auto dst = graph->getEdgeDst(e);
 					buffer.push_back(dst);
 				}
 				for (auto dst : buffer) {
@@ -161,9 +161,9 @@ public:
 				#endif
 				for (unsigned i = 0; i < n; ++i) {
 					if(!toExtend(n, emb, i)) continue;
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
+						auto dst = graph->getEdgeDst(e);
 						if (toAdd(n, emb, dst, i)) {
 							if (n < max_size-1) {
 								VertexEmbedding new_emb(emb);
@@ -226,7 +226,7 @@ public:
 				if (n < max_size-1) num_new_emb[pos] = 0;
 				if (n == 3 && max_size == 4) emb.set_pid(emb_list.get_pid(pos));
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						if (toAdd(n, emb, dst, i)) {
@@ -258,11 +258,10 @@ public:
 		);
 		//}, "ExtendingAllocPapi");
 		if (level == max_size-2) return;
-		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
-		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		//UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
 		num_new_emb.clear();
-		auto new_size = indices.back();
-		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
+		Ulong new_size = indices.back();
 		std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
 		#ifdef USE_WEDGE
@@ -279,7 +278,7 @@ public:
 				auto start = indices[pos];
 				auto n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						//if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
@@ -312,7 +311,7 @@ public:
 			[&](const size_t& pos) {
 				BaseEmbedding emb(level+1);
 				get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
-				VertexId vid = emb_list.get_vid(level, pos);
+				auto vid = emb_list.get_vid(level, pos);
 				num_new_emb[pos] = 0;
 				for (auto e : graph->edges(vid)) {
 					GNode dst = graph->getEdgeDst(e);
@@ -331,19 +330,18 @@ public:
 		);
 		//}, "ExtendingAllocPapi");
 		if (level == max_size-2) return;
-		UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
-		//UlongList indices = parallel_prefix_sum<Ulong>(num_new_emb);
+		//UintList indices = parallel_prefix_sum<unsigned>(num_new_emb);
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
 		num_new_emb.clear();
-		auto new_size = indices.back();
+		Ulong new_size = indices.back();
 		std::cout << "number of new embeddings: " << new_size << "\n";
-		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
 		emb_list.add_level(new_size);
 		//galois::runtime::profilePapi([&] () {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
 			[&](const size_t& pos) {
 				BaseEmbedding emb(level+1);
 				get_embedding<BaseEmbedding>(level, pos, emb_list, emb);
-				VertexId vid = emb_list.get_vid(level, pos);
+				auto vid = emb_list.get_vid(level, pos);
 				unsigned start = indices[pos];
 				for (auto e : graph->edges(vid)) {
 					GNode dst = graph->getEdgeDst(e);
@@ -367,11 +365,11 @@ public:
 	inline void reduce(VertexEmbeddingQueue &queue) {
 		galois::do_all(galois::iterate(queue),
 			[&](const VertexEmbedding& emb) {
-				unsigned n = emb.size();
+				auto n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
+						auto dst = graph->getEdgeDst(e);
 						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
 							assert(n < 4);
 							unsigned pid = find_motif_pattern_id(n, i, dst, emb);
@@ -398,7 +396,7 @@ public:
 				UintList dst_buffer;
 				UintList pos_buffer;
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						//src_buffer.push_back(src);
@@ -410,11 +408,11 @@ public:
 					}
 				}
 				for (size_t i = 0; i < pos_buffer.size(); i++) {
-					//VertexId src = src_buffer[i];
-					VertexId dst = dst_buffer[i];
-					VertexId pos = pos_buffer[i];
-					VertexId src = emb.get_vertex(pos);
-					//VertexId dst = emb_buffer[i].get_vertex(n);
+					//auto src = src_buffer[i];
+					auto dst = dst_buffer[i];
+					auto pos = pos_buffer[i];
+					auto src = emb.get_vertex(pos);
+					//auto dst = emb_buffer[i].get_vertex(n);
 					if (!is_vertexInduced_automorphism(n, emb, pos, src, dst)) {
 						assert(n < 4);
 						unsigned pid = find_motif_pattern_id(n, pos, dst, emb);
@@ -437,10 +435,10 @@ public:
 			[&](const size_t& pos) {
 				VertexEmbedding emb(level+1);
 				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-				unsigned n = emb.size();
+				auto n = emb.size();
 				if (n == 3) emb.set_pid(emb_list.get_pid(pos));
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
@@ -468,7 +466,7 @@ public:
 				StrQpMapFreq *qp_map = qp_localmaps.getLocal();
 				unsigned n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
@@ -499,7 +497,7 @@ public:
 				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
 				unsigned n = emb.size();
 				for (unsigned i = 0; i < n; ++i) {
-					VertexId src = emb.get_vertex(i);
+					auto src = emb.get_vertex(i);
 					for (auto e : graph->edges(src)) {
 						GNode dst = graph->getEdgeDst(e);
 						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
@@ -626,13 +624,13 @@ private:
 	galois::substrate::SimpleLock slock;
 	template <typename EmbeddingTy>
 	inline void get_embedding(unsigned level, unsigned pos, const EmbeddingList& emb_list, EmbeddingTy &emb) {
-		VertexId vid = emb_list.get_vid(level, pos);
-		IndexTy idx = emb_list.get_idx(level, pos);
+		auto vid = emb_list.get_vid(level, pos);
+		auto idx = emb_list.get_idx(level, pos);
 		ElementType ele(vid);
 		emb.set_element(level, ele);
 		// backward constructing the embedding
 		for (unsigned l = 1; l < level; l ++) {
-			VertexId u = emb_list.get_vid(level-l, idx);
+			auto u = emb_list.get_vid(level-l, idx);
 			ElementType ele(u);
 			emb.set_element(level-l, ele);
 			idx = emb_list.get_idx(level-l, idx);
@@ -646,38 +644,6 @@ protected:
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
 	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
-	#ifdef USE_QUERY_GRAPH
-	std::vector<VertexId> matching_order;
-	std::vector<VertexId> matching_order_map;
-	std::vector<VertexId> automorph_group_id;
-	StatusMT mt_status;
-	// Read the preset file to hardcode the presets
-	void read_presets() {
-		std::ifstream ifile;
-		ifile.open(preset_filename);
-		if (!ifile) printf("Error in reading file %s\n", preset_filename.c_str());
-		VertexId x;
-		for (size_t i = 0; i< max_size; ++i) {
-			ifile >> x;
-			matching_order[i] = x;
-			if(debug) std::cout << "matching_order[" << i << "] = " << x << "\n";
-		}
-		for (size_t i = 0; i < max_size; ++i) {
-			ifile >> x;
-			matching_order_map[i] = x;
-			if(debug) std::cout << "matching_map[" << i << "] = " << x << "\n";
-		}
-		for (size_t i = 0; i < max_size; ++i) {
-			ifile >> x;
-			automorph_group_id[i] = x;
-			if(debug) std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
-		}
-		ifile.close();
-	}
-	#endif
-	unsigned get_degree(Graph *g, VertexId vid) {
-		return std::distance(g->edge_begin(vid), g->edge_end(vid));
-	}
 
 	template <typename EmbeddingTy = VertexEmbedding>
 	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
