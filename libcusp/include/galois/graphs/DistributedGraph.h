@@ -492,11 +492,15 @@ protected:
       if (h == 0) {
         GALOIS_ASSERT(gid2host[h].first == 0);
       } else if (h == numHosts - 1) {
-        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second);
-        GALOIS_ASSERT(gid2host[h].second == g.size());
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
+                      gid2host[h].first, " ", gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == g.size(),
+                      gid2host[h].second, " ", g.size());
       } else {
-        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second);
-        GALOIS_ASSERT(gid2host[h].second == gid2host[h + 1].first);
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
+                      gid2host[h].first, " ", gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == gid2host[h + 1].first,
+                      gid2host[h].second, " ", gid2host[h + 1].first);
       }
     }
   }
