@@ -21,11 +21,10 @@ public:
 	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
 		return pos == n-1;
 	}
-	#ifdef USE_EGONET
-	bool toAdd(unsigned level, VertexId dst, const Egonet &egonet) {
-		return egonet.get_label(dst) == level;
+	void print_output() {
+		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
 	}
-	#else
+	#ifndef USE_EGONET
 	// only add vertex that is connected to all the vertices in the embedding
 	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned element_id) {
 		#ifdef USE_DAG
@@ -35,10 +34,62 @@ public:
 		return (src < dst) && is_all_connected(dst, emb, n-1);
 		#endif
 	}
-	#endif
-	void print_output() {
-		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
+	#else
+	bool toAdd(unsigned level, VertexId dst, const Egonet &egonet) {
+		return egonet.get_label(dst) == level;
 	}
+	void init_egonet_from_edge(const Edge &edge, Egonet &egonet, EmbeddingList &emb_list) {
+		UintList *ids = id_lists.getLocal(); // hold the local vertex ID (new ID)
+		if (ids->empty()) {
+			ids->resize(graph->size());
+			std::fill(ids->begin(), ids->end(), (unsigned)-1);
+		}
+		for (auto e : graph->edges(edge.dst)) {
+			auto dst = graph->getEdgeDst(e);
+			(*ids)[dst] = (unsigned)-2; // mark the neighbors of edge.dst
+		}
+		unsigned level = 1;
+		unsigned new_id = 0;
+		for (auto e : graph->edges(edge.src)) {
+			auto dst = graph->getEdgeDst(e);
+			// intersection of two neighbor lists: 
+			// if dst (a neighbor of edge.src) is also connected to edge.dst
+			if ((*ids)[dst] == (unsigned)-2) {
+				if (max_size == 3) total_num += 1;
+				else {
+					(*ids)[dst] = new_id;
+					emb_list.set_vertex(level, new_id, dst);
+					emb_list.set_vertex(level+1, new_id, new_id);
+					//emb_list.set_label(new_id, level+1);
+					egonet.set_label(new_id, level+1); // this vertex survives for the next level
+					egonet.set_degree(level+1, new_id, 0);//new degrees
+				}
+				new_id ++;
+			}
+		}
+		if (max_size > 3) {
+			size_t new_size = (size_t)new_id;
+			emb_list.set_size(level+1, new_size); // number of neighbors of u. Since u is in level k, u's neighbors are in level k-1
+			//egonet.set_size(level, new_size);
+			for (unsigned i = 0; i < emb_list.size(level+1); i ++) {
+				auto src = emb_list.get_vertex(level, i); // get the global vertex ID
+				for (auto e : graph->edges(src)) {
+					auto dst = graph->getEdgeDst(e); // dst is the neighbor's neighbor
+					unsigned local_vid = (*ids)[dst]; // get the local vertex ID
+					if (local_vid < (unsigned)-2) {
+						auto degree = egonet.get_degree(level+1, i);
+						egonet.set_adj(core * i + degree, local_vid);
+						egonet.set_degree(level+1, i, degree+1);
+					}
+				}
+			}
+		}
+		for (auto e : graph->edges(edge.dst)) {
+			auto dst = graph->getEdgeDst(e);
+			(*ids)[dst] = (unsigned)-1;
+		}
+	}
+	#endif
 };
 
 #include "DfsMining/engine.h"

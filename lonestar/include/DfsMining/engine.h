@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 	#endif // USE_EGONET
 	#endif // USE_ADHOC
 	#else
-	miner.vertex_process();
+	miner.vertex_process_adhoc();
 	#endif // ALGO_EDGE
 	#endif // EDGE_INDUCED
 	Tcomp.stop();

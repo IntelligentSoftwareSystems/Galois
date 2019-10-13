@@ -1,11 +1,6 @@
 #ifndef EGONET_H
 #define EGONET_H
 #include "types.h"
-#ifdef ALGO_EDGE
-#define BOTTOM 1
-#else
-#define BOTTOM 2
-#endif
 
 class Egonet {
 public:
@@ -15,21 +10,27 @@ public:
 	}
 	~Egonet() {}
 	void allocate(unsigned c, unsigned k) {
+		//std::cout << "Allocating memory for egonet...\n";
 		core = c;
 		max_level = k;
-		cur_level = BOTTOM;
+		cur_level = 1;
 		degrees.resize(k);
 		sizes.resize(k);
 		labels.resize(core);
 		std::fill(sizes.begin(), sizes.end(), 0);
 		std::fill(labels.begin(), labels.end(), 0);
-		for (unsigned i = BOTTOM; i < k; i ++) degrees[i].resize(core);
+		for (unsigned i = 1; i < k; i ++) degrees[i].resize(core);
 		adj.resize(core*core);
 	}
 	void update(unsigned level, unsigned src) {
 		unsigned begin = edge_begin(src);
 		unsigned end = begin + get_degree(level-1, src);
 		//unsigned end = egonet.edge_end(src);
+		// move all the out-neighbors of src with label equal to level − 1 
+		// in the first part of ∆(src) (by swapping nodes),
+		// and compute the out-degree of src in the new subgraph
+		// updating degrees(src). The first degrees(src) nodes in ∆(src)
+		// are thus the out-neighbors of src in the new subgraph.
 		for (unsigned e = begin; e < end; e ++) {
 			unsigned dst = getEdgeDst(e);
 			if (get_label(dst) == level)

@@ -33,6 +33,7 @@ public:
 		idx_lists[1][0] = e.src;
 	}
 	void allocate(int core, unsigned k) {
+		//std::cout << "Allocating memory for embedding list...\n";
 		max_level = k;
 		cur_level = k-1;
 		sizes.resize(k);
@@ -41,9 +42,9 @@ public:
 		vid_lists.resize(k);
 		idx_lists.resize(k);
 		pid_lists.resize(k);
-		for (unsigned i = BOTTOM; i < k; i ++) vid_lists[i].resize(core);
-		for (unsigned i = BOTTOM; i < k; i ++) idx_lists[i].resize(core);
-		for (unsigned i = BOTTOM; i < k; i ++) pid_lists[i].resize(core);
+		for (unsigned i = 1; i < k; i ++) vid_lists[i].resize(core);
+		for (unsigned i = 1; i < k; i ++) idx_lists[i].resize(core);
+		for (unsigned i = 1; i < k; i ++) pid_lists[i].resize(core);
 	}
 	template <typename EmbeddingTy>
 	inline void get_embedding(unsigned level, unsigned pos, EmbeddingTy &emb) {
