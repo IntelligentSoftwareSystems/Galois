@@ -23,7 +23,9 @@ std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
                                             uint64_t nodeOffset,
                                             uint64_t numToRead) {
   MPI_File mb;
-  MPICheck(MPI_File_open(MPI_COMM_WORLD, nodeMapBinary.c_str(), MPI_MODE_RDONLY,
+  std::vector<char> fName(nodeMapBinary.begin(), nodeMapBinary.end());
+  fName.push_back('\0');
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, fName.data(), MPI_MODE_RDONLY,
                          MPI_INFO_NULL, &mb));
 
   uint64_t readPosition = nodeOffset * sizeof(uint32_t);
@@ -60,7 +62,9 @@ void MPICheck(int errcode) {
 
 Uint64Pair readV1GrHeader(const std::string& grFile, bool isVoid) {
   MPI_File gr;
-  MPICheck(MPI_File_open(MPI_COMM_WORLD, grFile.c_str(), MPI_MODE_RDONLY,
+  std::vector<char> fName(grFile.begin(), grFile.end());
+  fName.push_back('\0');
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, fName.data(), MPI_MODE_RDONLY,
                          MPI_INFO_NULL, &gr));
   uint64_t grHeader[4];
   MPICheck(
@@ -785,7 +789,10 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
 
   printf("[%lu] Beginning write to file\n", hostID);
   MPI_File newGR;
-  MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(),
+
+  std::vector<char> fName(outputFile.begin(), outputFile.end());
+  fName.push_back('\0');
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, fName.data(),
                          MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL,
                          &newGR));
 
@@ -850,7 +857,9 @@ void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
 
   printf("[%lu] Beginning write to file\n", hostID);
   MPI_File newGR;
-  MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(),
+  std::vector<char> fName(outputFile.begin(), outputFile.end());
+  fName.push_back('\0');
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, fName.data(),
                          MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL,
                          &newGR));
 
