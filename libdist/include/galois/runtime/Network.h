@@ -87,6 +87,9 @@ protected:
   //! Initialize the MPI system. Should only be called once per process.
   void initializeMPI();
 
+  //! Finalize the MPI system. Should only be called once per process.
+  void finalizeMPI();
+
   //! Memory usage tracker
   MemUsageTracker memUsageTracker;
 

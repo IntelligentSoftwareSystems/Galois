@@ -55,6 +55,16 @@ void NetworkInterface::initializeMPI() {
   }
 }
 
+void NetworkInterface::finalizeMPI() {
+  int finalizeSuccess = MPI_Finalize();
+
+  if (finalizeSuccess != MPI_SUCCESS) {
+    MPI_Abort(MPI_COMM_WORLD, finalizeSuccess);
+  }
+
+  galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
+}
+
 NetworkInterface::NetworkInterface() {}
 
 NetworkInterface::~NetworkInterface() {}
