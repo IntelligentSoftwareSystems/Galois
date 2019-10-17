@@ -63,25 +63,25 @@ class DGAccumulator {
    */
   inline void reduce_mpi() {
     if (typeid(Ty) == typeid(int32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_INT, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(int64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED_LONG, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(float)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_FLOAT, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_DOUBLE, MPI_SUM,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(long double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG_DOUBLE, MPI_SUM,
                     MPI_COMM_WORLD);
     } else {
       static_assert(true,
@@ -218,25 +218,25 @@ class DGReduceMax {
    */
   inline void reduce_mpi() {
     if (typeid(Ty) == typeid(int32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_INT, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(int64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED_LONG, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(float)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_FLOAT, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_DOUBLE, MPI_MAX,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(long double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_MAX,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG_DOUBLE, MPI_MAX,
                     MPI_COMM_WORLD);
     } else {
       static_assert(true, "Type of DGReduceMax not supported for MPI "
@@ -353,25 +353,25 @@ class DGReduceMin {
    */
   inline void reduce_mpi() {
     if (typeid(Ty) == typeid(int32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_INT, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(int64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint32_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(uint64_t)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_UNSIGNED_LONG, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(float)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_FLOAT, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_DOUBLE, MPI_MIN,
                     MPI_COMM_WORLD);
     } else if (typeid(Ty) == typeid(long double)) {
-      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_MIN,
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI_LONG_DOUBLE, MPI_MIN,
                     MPI_COMM_WORLD);
     } else {
       static_assert(true, "Type of DGReduceMin not supported for MPI "

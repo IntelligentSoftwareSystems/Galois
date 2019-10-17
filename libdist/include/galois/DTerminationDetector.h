@@ -142,7 +142,7 @@ public:
     lc_ialreduce(&snapshot, &global_snapshot, sizeof(Ty),
                  &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep, &snapshot_request);
 #else
-    MPI_Iallreduce(&snapshot, &global_snapshot, 1, MPI::UNSIGNED_LONG, MPI_MAX,
+    MPI_Iallreduce(&snapshot, &global_snapshot, 1, MPI_UNSIGNED_LONG, MPI_MAX,
                   MPI_COMM_WORLD, &snapshot_request);
 #endif
   }
