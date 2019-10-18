@@ -575,14 +575,14 @@ void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & 
   Shared<float> min_residualval  = Shared<float>(1);
   // FP: "25 -> 26;
   // FP: "26 -> 27;
-  *(min_residualval.cpu_wr_ptr()) = 0;
+  *(min_residualval.cpu_wr_ptr()) = 1073741823;
   // FP: "27 -> 28;
   _min_residual.rv = min_residualval.gpu_wr_ptr();
   // FP: "28 -> 29;
   Shared<float> min_valueval  = Shared<float>(1);
   // FP: "29 -> 30;
   // FP: "30 -> 31;
-  *(min_valueval.cpu_wr_ptr()) = 0;
+  *(min_valueval.cpu_wr_ptr()) = 1073741823;
   // FP: "31 -> 32;
   _min_value.rv = min_valueval.gpu_wr_ptr();
   // FP: "32 -> 33;

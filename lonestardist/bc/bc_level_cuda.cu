@@ -497,7 +497,7 @@ void Sanity_cuda(unsigned int  __begin, unsigned int  __end, float & DGAccumulat
   Shared<float> DGAccumulator_minval  = Shared<float>(1);
   // FP: "13 -> 14;
   // FP: "14 -> 15;
-  *(DGAccumulator_minval.cpu_wr_ptr()) = 0;
+  *(DGAccumulator_minval.cpu_wr_ptr()) = 1073741823;
   // FP: "15 -> 16;
   _DGAccumulator_min.rv = DGAccumulator_minval.gpu_wr_ptr();
   // FP: "16 -> 17;
