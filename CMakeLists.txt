@@ -215,14 +215,14 @@ if(ENABLE_DIST_GALOIS)
     string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
     string(REPLACE "," ";" GENCODES ${GENCODES})
     foreach(GENCODE ${GENCODES})
-      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
+      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --expt-extended-lambda -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
     endforeach()
 
     cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
 
     # MGPU v1.1
-    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu") # only required headers
-    cuda_include_directories("${MGPU_ROOT}/include")
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
+    cuda_include_directories("${MGPU_ROOT}/src")
 
     # CUB v1.6.4
     set(CUB_ROOT "${CMAKE_SOURCE_DIR}/libgpu/cub") # only required headers

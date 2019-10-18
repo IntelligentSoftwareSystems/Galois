@@ -27,7 +27,6 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 unsigned int * P_CURRENT_DEGREE;
 uint8_t * P_FLAG;
 unsigned int * P_TRIM;
-#include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_KCoreStep1 = TB_SIZE;
 static const int __tb_InitializeGraph2 = TB_SIZE;

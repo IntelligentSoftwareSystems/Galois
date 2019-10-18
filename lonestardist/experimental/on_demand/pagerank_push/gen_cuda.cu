@@ -27,7 +27,6 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 uint32_t * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
-#include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;

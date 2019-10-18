@@ -14,7 +14,7 @@
 #include "cub/cub.cuh"
 #include "cutil_subset.h"
 #include "bmk2.h"
-#include <kernels/mergesort.cuh>
+#include <moderngpu/kernel_mergesort.hxx>
 
 struct AppendOnlyList {
   int* dl;
@@ -43,7 +43,7 @@ struct AppendOnlyList {
   }
 
   void sort() {
-    MergesortKeys(list.gpu_wr_ptr(), nitems(), mgpu::less<int>(), *mgc);
+    mergesort(list.gpu_wr_ptr(), nitems(), mgpu::less_t<int>(), *mgc);
   }
 
   void update_cpu() { list.cpu_rd_ptr(); }

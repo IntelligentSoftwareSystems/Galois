@@ -17,7 +17,7 @@
 #include "cutil_subset.h"
 #include "bmk2.h"
 #include "instr.h"
-#include <kernels/mergesort.cuh>
+#include <moderngpu/kernel_mergesort.hxx>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,7 +25,7 @@
 
 static int zero = 0;
 
-extern mgpu::ContextPtr mgc;
+extern mgpu::context_t* mgc;
 
 static __global__ void reset_wl(volatile int* dindex) { *dindex = 0; }
 
@@ -136,10 +136,10 @@ struct Worklist {
 
   void will_write() { f_will_write = true; }
 
-  void sort() { MergesortKeys(dwl, nitems(), mgpu::less<int>(), *mgc); }
+  void sort() { mergesort(dwl, nitems(), mgpu::less_t<int>(), *mgc); }
 
   void sort_prio() {
-    MergesortPairs(dprio, dwl, nitems(), mgpu::less<int>(), *mgc);
+    mergesort(dprio, dwl, nitems(), mgpu::less_t<int>(), *mgc);
   }
 
   void update_gpu(int nsize) {
