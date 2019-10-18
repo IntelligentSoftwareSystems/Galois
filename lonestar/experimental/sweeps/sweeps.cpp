@@ -417,6 +417,8 @@ static constexpr double pi =
 // performance proxy for better simulation codes anyway.
 auto generate_directions(std::size_t latitude_divisions,
                          std::size_t longitude_divisions) noexcept {
+  assert(latitude_divisions > 0);
+  assert(longitude_divisions > 0);
   std::size_t num_directions = latitude_divisions * longitude_divisions;
   auto directions = std::make_unique<std::array<double, 3>[]>(num_directions);
   auto average_longitudes = std::make_unique<double[]>(longitude_divisions);
@@ -424,26 +426,49 @@ auto generate_directions(std::size_t latitude_divisions,
   // For floating point precision improvement it may be
   // better to rewrite these things in terms of std::lerp,
   // but that's only available in c++20.
+  // Offset if the number of latitudes is small to avoid running
+  // directly along the axes of the grids.
+  // "is_incoming" now properly handles the case where propagation is
+  // exactly orthogonal to a given face, but this avoids benchmarking
+  // the unusual branches of execution it needs to take there.
+  double longitude_offset = longitude_divisions <=2 ? .25 * pi : 0.;
   for (std::size_t k = 0; k < longitude_divisions; k++) {
-    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi);
+    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi) + longitude_offset;
   }
 
-  for (std::size_t j = 0; j < latitude_divisions; j++) {
-    // Since the even spacing is in the sine of the latitude,
-    // compute the center point in the sine as well to better
-    // match what the average direction is for that
-    // particular piece of the partition.
-    // TODO: actually prove that this is the right thing to do.
-    double average_latitude =
-        std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
-    for (std::size_t k = 0; k < longitude_divisions; k++) {
-      std::size_t direction_index = j * longitude_divisions + k;
-      double average_longitude    = average_longitudes[k];
-      directions[direction_index] = {
-          std::cos(average_longitude) * std::cos(average_latitude),
-          std::sin(average_longitude) * std::cos(average_latitude),
-          std::sin(average_latitude)};
-      // Could renormalize here if really precise computation is desired.
+  // For the latitudes, if there is only one latitude used,
+  // tilt the coordinate axes about the x axis to avoid generating a bunch
+  // of directions that are all orthogonal to the z axis used in the
+  // generated mesh.
+  // Use formula from https://math.stackexchange.com/a/1742758/89171 for
+  // the single latitude case.
+  if (latitude_divisions == 1) {
+    double tilt = .25 * pi;
+    for (std::size_t k = 0; k < latitude_divisions; k++) {
+      double pre_rotated_average_longitude = average_longitudes[k];
+      directions[k] = {
+        std::cos(pre_rotated_average_longitude),
+        std::sin(pre_rotated_average_longitude) * std::cos(tilt),
+        -std::sin(pre_rotated_average_longitude) * std::sin(tilt)};
+    }
+  } else {
+    for (std::size_t j = 0; j < latitude_divisions; j++) {
+      // Since the even spacing is in the sine of the latitude,
+      // compute the center point in the sine as well to better
+      // match what the average direction is for that
+      // particular piece of the partition.
+      // TODO: actually prove that this is the right thing to do.
+      double average_latitude =
+          std::asin(-1 + (j + .5) / (.5 * latitude_divisions));
+      for (std::size_t k = 0; k < longitude_divisions; k++) {
+        std::size_t direction_index = j * longitude_divisions + k;
+        double average_longitude    = average_longitudes[k];
+        directions[direction_index] = {
+            std::cos(average_longitude) * std::cos(average_latitude),
+            std::sin(average_longitude) * std::cos(average_latitude),
+            std::sin(average_latitude)};
+        // Could renormalize here if really precise computation is desired.
+      }
     }
   }
 
@@ -461,24 +486,36 @@ auto generate_directions(std::size_t latitude_divisions,
     // so if this doesn't pass, something is
     // very wrong.
     assert(("Dubious values from direction discretization.",
-            std::abs(totals[j]) < 1E-7));
+            std::abs(totals[j]) < 1E-7) ||
+            latitude_divisions == 1 ||
+            longitude_divisions == 1);
   }
 
   return std::make_tuple(std::move(directions), num_directions);
 }
 
-bool is_outgoing(std::array<double, 3> direction,
-                 std::array<double, 3> face_normal) noexcept {
-  return direction[0] * face_normal[0] + direction[1] * face_normal[1] +
-             direction[2] * face_normal[2] >
-         0.;
-}
-
 bool is_incoming(std::array<double, 3> direction,
                  std::array<double, 3> face_normal) noexcept {
-  return direction[0] * face_normal[0] + direction[1] * face_normal[1] +
-             direction[2] * face_normal[2] <
-         0.;
+  auto inner_prod = direction[0] * face_normal[0] +
+                    direction[1] * face_normal[1] +
+                    direction[2] * face_normal[2];
+  if (inner_prod < 0) {
+    return true;
+  } else if (inner_prod > 0) {
+    return false;
+  }
+  // TODO: It may be better not to disambiguate at all and let
+  // cells not have as many incoming edges.
+  // That's fine from the point of view of the numerical method,
+  // but some more restructuring would be needed to handle that
+  // gracefully.
+  // If they are exactly orthogonal, break ties by only using
+  // the normal. Say negative sign indicates incoming.
+  for (std::size_t dim_idx = 0; dim_idx < 3; dim_idx++) {
+    if (face_normal[dim_idx] < 0) return true;
+    if (face_normal[dim_idx] > 0) return false;
+  }
+  GALOIS_DIE("All zero face_normal passed to is_incoming. Can't disambiguate.");
 }
 
 // Of the given discrete directions, find the one
@@ -501,8 +538,10 @@ int main(int argc, char** argv) noexcept {
   // node id at least as large as num_cells
   // indicates a ghost cell.
   auto ghost_threshold = num_cells;
-  auto [directions, num_directions] =
+  auto [directions_owner, num_directions_binding] =
       generate_directions(num_vert_directions, num_horiz_directions);
+  auto &directions = directions_owner;
+  auto num_directions = num_directions_binding;
   auto approx_x_direction_index =
       find_x_direction(directions.get(), num_directions);
 
@@ -532,7 +571,7 @@ int main(int argc, char** argv) noexcept {
   radiation_magnitudes[boundary_pulse_index + 1].magnitude = pulse_strength;
 
   // Constants used in the differencing scheme at each cell/direction.
-  std::array<double, 3> grid_spacing{1. / nx, 1. / ny, 1. / nz};
+  std::array<double, 3> grid_spacing_inverses{static_cast<double>(nx), static_cast<double>(ny), static_cast<double>(nz)};
 
   // For the regular grid, this will just be the corners
   // (one work item for each direction that lies in the octant opposite
@@ -640,10 +679,11 @@ int main(int argc, char** argv) noexcept {
           auto node_magnitude_idx =
               num_per_element * node + num_per_element_and_direction * dir_idx;
           auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-          auto counter_check_val = counter.load(std::memory_order_acquire);
-          if (counter_check_val) {
-            GALOIS_DIE("Work item asked to run before it was actually ready.");
-          }
+          // Don't have to do acquire/release with the counters by hand.
+          // The Galois work lists do the acquire/release whenever migrating
+          // work away from the thread that created it.
+          assert(("Work item asked to run before it was actually ready.",
+                  counter.load(std::memory_order_relaxed)));
           auto& node_data =
               graph.getData(node, galois::MethodFlag::UNPROTECTED);
           // Re-count incoming edges during this computation.
@@ -678,7 +718,7 @@ int main(int argc, char** argv) noexcept {
                 face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
             double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
             double term_coef = direction[axis] * sign;
-            new_magnitude_denominator += term_coef / grid_spacing[axis];
+            new_magnitude_denominator += term_coef * grid_spacing_inverses[axis];
             std::size_t other_magnitude_idx =
                 num_per_element * other_node +
                 num_per_element_and_direction * dir_idx;
@@ -687,7 +727,7 @@ int main(int argc, char** argv) noexcept {
               double& other_magnitude =
                   radiation_magnitudes[other_mag_and_group_idx].magnitude;
               new_magnitude_numerators[i] +=
-                  term_coef * other_magnitude / grid_spacing[axis];
+                  term_coef * other_magnitude * grid_spacing_inverses[axis];
             }
           }
           assert(("Wrong number of downstream neighbors.", downstream_index == 3));
@@ -738,7 +778,7 @@ int main(int argc, char** argv) noexcept {
               num_per_element_and_direction * dir_idx;
             auto& other_counter =
               radiation_magnitudes[other_magnitude_idx].counter;
-            if (!(other_counter.fetch_sub(1, std::memory_order_release) - 1)) {
+            if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
               work_t new_work_item{other_node, dir_idx};
               ctx.push(new_work_item);
             }

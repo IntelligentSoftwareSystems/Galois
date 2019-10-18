@@ -351,7 +351,7 @@ struct Gr2CGr : public Conversion {
     std::vector<uint32_t> localEdges = loadCleanEdgesFromBufferedGraph(
         inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges);
     uint64_t cleanEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
-    GALOIS_ASSERT(cleanEdgeCount < totalNumEdges,
+    GALOIS_ASSERT(cleanEdgeCount <= totalNumEdges,
                   "clean should not increase edge count");
 
     if (hostID == 0) {

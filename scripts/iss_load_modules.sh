@@ -10,12 +10,8 @@ module purge
 
 module use /opt/apps/ossw/modulefiles/
 
-if [ $(lsb_release -si) == "CentOS" ] ; then
-    module load c7
-    module load serf
-else
-    module load sl6
-fi
+module load c7
+module load serf
 
 module use /net/faraday/workspace/local/modules/modulefiles
 module use /org/centers/cdgc/modules

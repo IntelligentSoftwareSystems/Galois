@@ -370,7 +370,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   std::vector<sendBuffer> sendData;
 
   void workerThread() {
-// Initialize LWCI or MPI depending on what was defined in CMake
     initializeMPI();
     int rank;
     int hostSize;
@@ -421,6 +420,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         }
       }
     }
+    finalizeMPI();
   }
 
   std::thread worker;
@@ -447,17 +447,6 @@ public:
   virtual ~NetworkInterfaceBuffered() {
     ready = 3;
     worker.join();
-
-// disable MPI if LWCI wasn't used
-#ifndef GALOIS_USE_LWCI
-    int finalizeSuccess = MPI_Finalize();
-
-    if (finalizeSuccess != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, finalizeSuccess);
-    }
-
-    galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
-#endif
   }
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;

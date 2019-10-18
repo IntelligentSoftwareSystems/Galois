@@ -145,39 +145,17 @@ public:
   }
 };
 
-template <typename _UNUSED = void>
-struct StatTotalImpl {
+namespace {
+  static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
+                                                   "TSUM", "TAVG"};
+}
+
+struct StatTotal {
 
   enum Type { SINGLE = 0, TMIN, TMAX, TSUM, TAVG };
 
-  // TODO: remove
-  // static constexpr bool isValidInt(int v) {
-  // return (v >= SINGLE && v <= TAVG);
-  // }
-  //
-  // static constexpr Type fromInt(int v) {
-  // assert(isValidInt(v) && "Invalid int value for enum Type");
-  //
-  // switch(v) {
-  // case 0: return SINGLE;
-  // case 1: return TMIN;
-  // case 2: return TMAX;
-  // case 3: return TSUM;
-  // case 4: return TAVG;
-  // default: std::abort(); return SINGLE;
-  // }
-  // }
-
-  static constexpr const char* NAMES[] = {"SINGLE", "TMIN", "TMAX", "TSUM",
-                                          "TAVG"};
-
-  static const char* str(const Type& t) { return NAMES[t]; }
+  static const char* str(const Type& t) { return StatTotalNames[t]; }
 };
-
-template <typename _UNUSED>
-constexpr const char* StatTotalImpl<_UNUSED>::NAMES[];
-
-using StatTotal = StatTotalImpl<>;
 
 namespace internal {
 

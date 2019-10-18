@@ -59,7 +59,7 @@ Here are the dependencies for the optional features:
 - Linux HUGE_PAGES support (please see [www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)). Performance will most likely degrade without HUGE_PAGES
   enabled. Galois uses 2MB huge page size and relies on the kernel configuration to set aside a large amount of 2MB pages. For example, our performance testing machine (4x14 cores, 192GB RAM) is configured to support up to 65536 2MB pages:
   ```Shell
-  cat /proc/mem_info | fgrep Huge
+  cat /proc/meminfo | fgrep Huge
   AnonHugePages:    104448 kB
   HugePages_Total:   65536
   HugePages_Free:    65536
@@ -70,7 +70,7 @@ Here are the dependencies for the optional features:
    
 - libnuma support. Performance may degrade without it. Please install
   libnuma-dev on Debian like systems, and numactl-dev on Red Hat like systems. 
-- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
+- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files 
 - PAPI (>= 5.2.0.0 ) for profiling sections of code
 - Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
@@ -156,7 +156,7 @@ You can build graph-convert as follows:
 ```Shell
 cd $BUILD_DIR
 make graph-convert
-./tools/graph-convert --help
+./tools/graph-convert/graph-convert --help
 ```
 
 Other applications, such as Delaunay Mesh Refinement may read special file formats
