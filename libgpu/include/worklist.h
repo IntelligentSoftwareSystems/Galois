@@ -342,7 +342,7 @@ struct Worklist {
       // counting density makes no sense -- it is always 1
     }
 
-    lindex = cub::ShuffleIndex(lindex, first);
+    lindex = cub::ShuffleIndex<32>(lindex, first, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, first); // CUB > 1.3.1
 
     return lindex + offset;
@@ -363,7 +363,7 @@ struct Worklist {
 #endif
     }
 
-    lindex = cub::ShuffleIndex(lindex, first);
+    lindex = cub::ShuffleIndex<32>(lindex, first, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, first); // CUB > 1.3.1
 
     return lindex + offset;
@@ -383,7 +383,7 @@ struct Worklist {
 #endif
     }
 
-    lindex = cub::ShuffleIndex(lindex, 0);
+    lindex = cub::ShuffleIndex<32>(lindex, 0, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, 0); // CUB > 1.3.1
 
     return lindex + offset;
@@ -681,7 +681,7 @@ struct Worklist2Light {
       // counting density makes no sense -- it is always 1
     }
 
-    lindex = cub::ShuffleIndex(lindex, first);
+    lindex = cub::ShuffleIndex<32>(lindex, first, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, first); // CUB > 1.3.1
 
     return lindex + offset;

@@ -7,3 +7,6 @@
 [submodule "moderngpu"]
 	path = moderngpu
 	url = https://github.com/moderngpu/moderngpu.git
+[submodule "cub"]
+	path = cub
+	url = https://github.com/NVlabs/cub.git

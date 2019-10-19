@@ -114,7 +114,7 @@ struct AppendOnlyList {
       assert(lindex <= size);
     }
 
-    lindex = cub::ShuffleIndex(lindex, first);
+    lindex = cub::ShuffleIndex<32>(lindex, first, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, first); // CUB > 1.3.1
     return lindex + offset;
   }

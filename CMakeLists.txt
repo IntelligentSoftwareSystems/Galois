@@ -225,7 +225,7 @@ if(ENABLE_DIST_GALOIS)
     cuda_include_directories("${MGPU_ROOT}/src")
 
     # CUB v1.6.4
-    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/libgpu/cub") # only required headers
+    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
     cuda_include_directories("${CUB_ROOT}")
 
     #find_package(OpenCL REQUIRED)
