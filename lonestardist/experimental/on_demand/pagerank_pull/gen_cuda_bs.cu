@@ -170,7 +170,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
       // FP: "55 -> 56;
       const int _np_laneid = cub::LaneId();
       // FP: "56 -> 57;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -404,7 +404,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
       // FP: "57 -> 58;
       const int _np_laneid = cub::LaneId();
       // FP: "58 -> 59;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

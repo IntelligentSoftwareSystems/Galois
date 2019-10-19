@@ -247,7 +247,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
       // FP: "64 -> 65;
       const int _np_laneid = cub::LaneId();
       // FP: "65 -> 66;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

@@ -224,7 +224,7 @@ __global__ void InitializeGraph2(CSRGraph graph, unsigned int __begin, unsigned 
       // FP: "60 -> 61;
       const int _np_laneid = cub::LaneId();
       // FP: "61 -> 62;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -575,7 +575,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __
       // FP: "68 -> 69;
       const int _np_laneid = cub::LaneId();
       // FP: "69 -> 70;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

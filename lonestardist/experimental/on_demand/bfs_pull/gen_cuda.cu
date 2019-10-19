@@ -151,7 +151,7 @@ __global__ void BFS(CSRGraph graph, unsigned int __nowned, unsigned int __begin,
     {
       const int warpid = threadIdx.x / 32;
       const int _np_laneid = cub::LaneId();
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

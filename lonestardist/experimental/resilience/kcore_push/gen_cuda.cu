@@ -150,7 +150,7 @@ __global__ void InitializeGraph2(CSRGraph graph,
       // FP: "54 -> 55;
       const int _np_laneid = cub::LaneId();
       // FP: "55 -> 56;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -388,7 +388,7 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
     {
       const int warpid = threadIdx.x / 32;
       const int _np_laneid = cub::LaneId();
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

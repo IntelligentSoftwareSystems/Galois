@@ -177,7 +177,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, uns
       // FP: "61 -> 62;
       const int _np_laneid = cub::LaneId();
       // FP: "62 -> 63;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -407,7 +407,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
       // FP: "66 -> 67;
       const int _np_laneid = cub::LaneId();
       // FP: "67 -> 68;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

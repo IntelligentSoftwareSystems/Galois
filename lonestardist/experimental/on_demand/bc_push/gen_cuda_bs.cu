@@ -225,7 +225,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
       // FP: "60 -> 61;
       const int _np_laneid = cub::LaneId();
       // FP: "61 -> 62;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -462,7 +462,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
       // FP: "69 -> 70;
       const int _np_laneid = cub::LaneId();
       // FP: "70 -> 71;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -704,7 +704,7 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
       // FP: "65 -> 66;
       const int _np_laneid = cub::LaneId();
       // FP: "66 -> 67;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -991,7 +991,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
       // FP: "72 -> 73;
       const int _np_laneid = cub::LaneId();
       // FP: "73 -> 74;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -1336,7 +1336,7 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
       // FP: "81 -> 82;
       const int _np_laneid = cub::LaneId();
       // FP: "82 -> 83;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
