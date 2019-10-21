@@ -7,8 +7,8 @@ class EdgeList {
 using iterator = typename std::vector<Edge>::iterator;
 public:
 	EdgeList() {}
-	EdgeList(Graph& graph, bool is_dag = false) {
-		init(graph, is_dag);
+	EdgeList(Graph& graph, bool directed = false) {
+		init(graph, directed);
 	}
 	~EdgeList() {}
 	bool empty() const { return edges.empty(); }
@@ -19,11 +19,11 @@ public:
 	void push_back(Edge e) { edges.push_back(e); }
 	Edge& get_edge(size_t i) { return edges[i]; }
 	Edge* get_edge_ptr(size_t i) { return &(edges[i]); }
-	void init(Graph& graph, bool is_dag = false) {
+	void init(Graph& graph, bool directed = false, bool symmetrize = false) {
 		size_t num_edges = graph.sizeEdges();
-		if (!is_dag) num_edges = num_edges / 2;
+		if (!directed && !symmetrize) num_edges = num_edges / 2;
 		edges.resize(num_edges);
-		if(is_dag) {
+		if (directed || symmetrize) {
 			galois::do_all(galois::iterate(graph.begin(), graph.end()),
 				[&](const GNode& src) {
 					for (auto e : graph.edges(src)) {

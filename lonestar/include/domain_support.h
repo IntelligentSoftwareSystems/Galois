@@ -37,6 +37,7 @@ public:
 		domain_sets.resize(n);
 	}
 	bool is_frequent() { return enough_support; }
+	void set_frequent() { if (get_support()) enough_support = true; }
 	bool has_domain_reached_support(int i) {
 		assert(i < num_domains);
 		return domains_reached_support[i];

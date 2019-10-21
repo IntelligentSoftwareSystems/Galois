@@ -43,15 +43,17 @@ public:
 		//return emb.get_key(pos) == 0;
 		return true;
 	}
-	virtual bool toAdd(unsigned n, const EdgeEmbedding &emb, VertexId src, VertexId dst, unsigned pos, BYTE &existed, VertexSet vertex_set) {
+	virtual bool toAdd(BaseEdgeEmbeddingList &emb_list, DFSCode &pattern) {
 		//return !is_edge_automorphism(n, emb, pos, src, dst, existed, vertex_set);
+		//return (support(emb_list, pattern) >= threshold && is_min(pattern));
+		//return (is_frequent(emb_list, pattern) && is_min(pattern));
 		return true;
 	}
 	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const EdgeEmbedding &emb, unsigned pos) {
 		return 0;
 	}
 	virtual void reduction(unsigned pid) {
-		//total_num += 1;
+		total_num += 1;
 	}
 	virtual void print_output() { }
 
@@ -154,6 +156,99 @@ public:
 	}
 	void process() {
 		init_dfs();
+		//galois::do_all(galois::iterate(init_pattern_queue),
+		galois::do_all(galois::iterate(init_freq_pattern_queue),
+			[&](const DFS& dfs) {
+				DFSCode pattern;
+				pattern.push(0, 1, dfs.fromlabel, dfs.elabel, dfs.tolabel); // current pattern
+				dfs_extend_naive(1, init_emb_lists[dfs.fromlabel][dfs.tolabel], pattern);
+				pattern.pop();
+			},
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::loopname("ParallelDfsFSM")
+		);
+	}
+	void dfs_extend_naive(unsigned level, BaseEdgeEmbeddingList &emb_list, DFSCode &pattern) {
+		reduction(0); // list frequent patterns here!!!
+		if (level == max_size) return;
+		const RMPath &rmpath = pattern.buildRMPath(); // build the right-most path of this pattern
+		auto minlabel = pattern[0].fromlabel; 
+		auto maxtoc = pattern[rmpath[0]].to; // right-most vertex
+		EmbeddingLists2D emb_lists_fwd;
+		EmbeddingLists1D emb_lists_bck;
+		for (size_t emb_id = 0; emb_id < emb_list.size(); ++ emb_id) {
+			BaseEdgeEmbedding *cur = &emb_list[emb_id];
+			unsigned emb_size = cur->num_vertices;
+			History history(cur);
+			auto e2 = history[rmpath[0]];
+			// backward extension
+			for (size_t i = rmpath.size() - 1; i >= 1; --i) {
+				auto e1 = history[rmpath[i]];
+				if (e1 == e2) continue;
+				auto src = e2->dst;
+				for (auto e : graph->edges(src)) {
+					auto dst = graph->getEdgeDst(e);
+					if (history.hasEdge(src, dst)) continue;
+					if (dst == e1->src && graph->getData(e1->dst) <= graph->getData(src)) {
+						emb_lists_bck[pattern[rmpath[i]].from].push(emb_size, edge_list.get_edge_ptr(*e), cur);
+						break;
+					}
+				}
+			}
+			// pure forward extension
+			for (auto e : graph->edges(e2->dst)) {
+				auto dst = graph->getEdgeDst(e);
+				auto& dst_label = graph->getData(dst);
+				if (minlabel > dst_label || history.hasVertex(dst)) continue;
+				emb_lists_fwd[maxtoc][graph->getData(edge_list.get_edge(*e).dst)].push(emb_size+1, edge_list.get_edge_ptr(*e), cur);
+			}
+			// backtracked forward extension
+			for (size_t i = 0; i < rmpath.size(); ++i) {
+				auto e1 = history[rmpath[i]];
+				auto tolabel = graph->getData(e1->dst);
+				for (auto e : graph->edges(e1->src)) {
+					auto dst = graph->getEdgeDst(e);
+					auto& dst_label = graph->getData(dst);
+					if (e1->dst == dst || minlabel > dst_label || history.hasVertex(dst)) continue;
+					if (tolabel <= dst_label) {
+						emb_lists_fwd[pattern[rmpath[i]].from][graph->getData(edge_list.get_edge(*e).dst)].push(emb_size+1, edge_list.get_edge_ptr(*e), cur);
+					}
+				}
+			}
+		}
+		std::vector<DFS> pattern_list;
+		for (auto to = emb_lists_bck.begin(); to != emb_lists_bck.end(); ++to) {
+			DFS dfs(maxtoc, to->first, (LabelT)-1, 0, (LabelT)-1);
+			DFSCode new_pattern = pattern;
+			new_pattern.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel);
+			//if (support(emb_lists_bck[dfs.to], new_pattern) >= threshold && is_min(new_pattern)) {
+			if (toAdd(emb_lists_bck[dfs.to], new_pattern)) {
+				pattern_list.push_back(dfs);
+			}
+		}
+		for (auto from = emb_lists_fwd.rbegin(); from != emb_lists_fwd.rend(); ++from) {
+			for (auto tolabel = from->second.begin(); tolabel != from->second.end(); ++tolabel) {
+				DFS dfs(from->first, maxtoc + 1, (LabelT)-1, 0, tolabel->first);
+				DFSCode new_pattern = pattern;
+				new_pattern.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel);
+				//if (support(emb_lists_fwd[dfs.from][dfs.tolabel], new_pattern) >= threshold && is_min(new_pattern)) {
+				if (toAdd(emb_lists_fwd[dfs.from][dfs.tolabel], new_pattern)) {
+					pattern_list.push_back(dfs);
+				}
+			}
+		}
+		for (auto dfs : pattern_list) {
+			pattern.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel); // update the pattern
+			if (dfs.is_backward())
+				dfs_extend_naive(level+1, emb_lists_bck[dfs.to], pattern);
+			else
+				dfs_extend_naive(level+1, emb_lists_fwd[dfs.from][dfs.tolabel], pattern);
+			pattern.pop();
+		}
+	}
+/*
+	void process_dfscode() {
+		init_dfs();
 		if (show) std::cout << "Init done!\n";
 		#ifdef PRECOMPUTE
 		galois::do_all(galois::iterate(init_freq_pattern_queue),
@@ -167,28 +262,29 @@ public:
 				local_status->dfs_task_queue.push_back(tmp);
 				local_status->dfs_task_queue[0].push_back(dfs);
 				local_status->DFS_CODE.push(0, 1, dfs.fromlabel, dfs.elabel, dfs.tolabel);
-				dfs_extend_naive(1, init_emb_lists[dfs.fromlabel][dfs.tolabel], *local_status);
+				dfs_extend_dfscode(1, init_emb_lists[dfs.fromlabel][dfs.tolabel], *local_status);
 				local_status->DFS_CODE.pop();
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::loopname("ParallelDfsFSM")
 		);
 	}
-	void dfs_extend_naive(unsigned level, BaseEdgeEmbeddingList &emb_list, Status &status) {
+	void dfs_extend_dfscode(unsigned level, BaseEdgeEmbeddingList &emb_list, Status &status) {
 		//if (debug) std::cout << "\nDFSCode: " << status.DFS_CODE << "\n";
 		unsigned sup = support(emb_list, status);
-		//if (debug) std::cout << "level: " << level << "  support: " << sup << "\n";
+		#ifdef PRECOMPUTE
+		if (level > 1 && sup < threshold) return;
+		#else
 		if (sup < threshold) return;
+		#endif
 		//if (debug) {
 		//	for(size_t i = 0; i < emb_list.size(); i++)
 		//	std::cout << "EmbeddingList (num_vertices=" << emb_list[i].num_vertices << "): " << emb_list[i].to_string_all() << "\n";
 		//}
 		// check if this pattern is canonical: minimal DFSCode
-		if (is_min(status) == false) {
-			//if (debug) std::cout << "Not minimal dfscode: pruned\n";
-			return;
-		}
+		if (is_min(status) == false) return;
 		total_num += 1;
+		//reduction(0);
 		// list frequent patterns here!!!
 		if (debug) {
 			std::cout << status.DFS_CODE.to_string(false) << ": sup = " << sup;
@@ -205,19 +301,6 @@ public:
 		EmbeddingLists2D emb_lists_fwd;
 		EmbeddingLists1D emb_lists_bck;
 		for (size_t emb_id = 0; emb_id < emb_list.size(); ++ emb_id) {
-			//EdgeEmbedding emb(n);
-			//emb_list.get_embedding<EdgeEmbedding>(level, emb_id, emb);
-			//for (unsigned element_id = 0; element_id < n; ++ element_id) {
-			//	auto src = emb.get_vertex(element_id);
-			//	if (!toExtend(n, emb, element_id)) continue;
-			//	for (auto e : graph->edges(src)) {
-			//		GNode dst = graph->getEdgeDst(e);
-			//		if (toAdd(n, emb, src, dst, element_id, existed, vert_set)) {
-			//			auto dst_label = 0, edge_label = 0;
-			//			dst_label = graph->getData(dst);
-			//		}
-			//	}
-			//}
 			BaseEdgeEmbedding *cur = &emb_list[emb_id];
 			unsigned emb_size = cur->num_vertices;
 			History history(cur);
@@ -283,12 +366,13 @@ public:
 			status.current_dfs_level = level; // ready to go to the next level
 			status.DFS_CODE.push(dfs.from, dfs.to, dfs.fromlabel, dfs.elabel, dfs.tolabel); // update the pattern
 			if (dfs.is_backward())
-				dfs_extend_naive(level+1, emb_lists_bck[dfs.to], status);
+				dfs_extend_dfscode(level+1, emb_lists_bck[dfs.to], status);
 			else
-				dfs_extend_naive(level+1, emb_lists_fwd[dfs.from][dfs.tolabel], status);
+				dfs_extend_dfscode(level+1, emb_lists_fwd[dfs.from][dfs.tolabel], status);
 			status.DFS_CODE.pop();
 		}
 	}
+//*/
 	Ulong get_total_count() { return total_num.reduce(); }
 
 protected:
@@ -302,6 +386,118 @@ protected:
 	EmbeddingLists2D init_emb_lists;
 	MtStatus mt_status;
 
+	bool is_canonical(DFSCode &pattern) {
+		if (pattern.size() == 1) return true;
+		#ifdef USE_CUSTOM
+		if (pattern.size() == 2) {
+			if (pattern[1].from == 1) {
+				if (pattern[0].fromlabel <= pattern[1].tolabel) return true;
+			} else {
+				assert(pattern[1].from == 0);
+				if (pattern[0].fromlabel == pattern[0].tolabel) return false;
+				if (pattern[0].tolabel == pattern[1].tolabel && pattern[0].fromlabel < pattern[1].tolabel) return true;
+				if (pattern[0].tolabel <  pattern[1].tolabel) return true;
+			}
+			return false;
+		}
+		#endif
+		CGraph graph_is_min; // canonical graph
+		pattern.toGraph(graph_is_min);
+		DFSCode dfscode_is_min;
+		//dfscode_is_min.clear();
+		EmbeddingLists2D emb_lists;
+		for (size_t vid = 0; vid < graph_is_min.size(); ++ vid) {
+			auto vlabel = graph_is_min[vid].label;
+			for (auto e = graph_is_min[vid].edge.begin(); e != graph_is_min[vid].edge.end(); ++ e) {
+				auto ulabel = graph_is_min[e->dst].label;
+				if (vlabel <= ulabel)
+					emb_lists[vlabel][ulabel].push(2, &(*e), 0);
+			}
+		}
+		auto fromlabel = emb_lists.begin();
+		auto tolabel = fromlabel->second.begin();
+		dfscode_is_min.push(0, 1, fromlabel->first, 0, tolabel->first);
+		return subgraph_is_min(pattern, dfscode_is_min, graph_is_min, tolabel->second);
+	}
+	bool subgraph_is_min(DFSCode &orig_pattern, DFSCode &pattern, CGraph &cgraph, BaseEdgeEmbeddingList &emb_list) {
+		const RMPath& rmpath = pattern.buildRMPath();
+		auto minlabel        = pattern[0].fromlabel;
+		auto maxtoc          = pattern[rmpath[0]].to;
+		// backward
+		bool found = false;
+		VeridT newto = 0;
+		BaseEdgeEmbeddingList emb_list_bck;
+		for(size_t i = rmpath.size()-1; i >= 1; -- i) {
+			for(size_t j = 0; j < emb_list.size(); ++ j) {
+				BaseEdgeEmbedding *cur = &emb_list[j];
+				History history(cur);
+				auto e1 = history[rmpath[i]];
+				auto e2 = history[rmpath[0]];
+				if (e1 == e2) continue;
+				for (auto e = cgraph[e2->dst].edge.begin(); e != cgraph[e2->dst].edge.end(); ++ e) {
+					if (history.hasEdge(e->src, e->dst)) continue;
+					if ((e->dst == e1->src) && (cgraph[e1->dst].label <= cgraph[e2->dst].label)) {
+						emb_list_bck.push(2, &(*e), cur);
+						newto = pattern[rmpath[i]].from;
+						found = true;
+						break;
+					}
+				}
+			}
+		}
+		if(found) {
+			pattern.push(maxtoc, newto, (LabelT)-1, 0, (LabelT)-1);
+			auto size = pattern.size() - 1;
+			if (orig_pattern[size] != pattern[size]) return false;
+			return subgraph_is_min(orig_pattern, pattern, cgraph, emb_list_bck);
+		}
+
+		// forward
+		bool flg = false;
+		VeridT newfrom = 0;
+		EmbeddingLists1D emb_lists_fwd;
+		for (size_t n = 0; n < emb_list.size(); ++n) {
+			BaseEdgeEmbedding *cur = &emb_list[n];
+			History history(cur);
+			auto e2 = history[rmpath[0]];
+			for (auto e = cgraph[e2->dst].edge.begin(); e != cgraph[e2->dst].edge.end(); ++ e) {
+				if (minlabel > cgraph[e->dst].label || history.hasVertex(e->dst)) continue;
+				if (flg == false) {
+					flg = true;
+					newfrom = maxtoc;
+				}
+				emb_lists_fwd[cgraph[e->dst].label].push(2, &(*e), cur);
+			}
+		}
+		for (size_t i = 0; !flg && i < rmpath.size(); ++i) {
+			for (size_t n = 0; n < emb_list.size(); ++n) {
+				BaseEdgeEmbedding *cur = &emb_list[n];
+				History history(cur);
+				auto e1 = history[rmpath[i]];
+				for (auto e = cgraph[e1->src].edge.begin(); e != cgraph[e1->src].edge.end(); ++ e) {
+					auto dst = e->dst;
+					auto &v = cgraph[dst];
+					if (e1->dst == dst || minlabel > v.label || history.hasVertex(dst)) continue;
+					if (cgraph[e1->dst].label <= v.label) {
+						if (flg == false) {
+							flg = true;
+							newfrom = pattern[rmpath[i]].from;
+						}
+						emb_lists_fwd[v.label].push(2, &(*e), cur);
+					}
+				}
+			}
+		}
+		if (flg) {
+			auto tolabel = emb_lists_fwd.begin();
+			pattern.push(newfrom, maxtoc + 1, (LabelT)-1, 0, tolabel->first);
+			auto size = pattern.size() - 1;
+			if (orig_pattern[size] != pattern[size]) return false;
+			return subgraph_is_min(orig_pattern, pattern, cgraph, tolabel->second);
+		} 
+		return true;
+	} 
+/*
 	bool is_min(Status &status) {
 		if (status.DFS_CODE.size() == 1) return true;
 		#ifdef USE_CUSTOM
@@ -420,15 +616,60 @@ protected:
 		} 
 		return true;
 	} // end subgraph_is_min
+*/
+	bool is_frequent(BaseEdgeEmbeddingList &emb_list, DFSCode &pattern) {
+		if (emb_list.size() < threshold) return false;
+		DomainSupport ds(pattern.size()+1);
+		ds.set_threshold(threshold);
+		unsigned emb_id = 0;
+		for (auto cur = emb_list.begin(); cur != emb_list.end(); ++cur) {
+			BaseEdgeEmbedding* emb_ptr = &(*cur);
+			size_t index = pattern.size() - 1;
+			while (emb_ptr != NULL) {
+				auto from = pattern[index].from;
+				auto to = pattern[index].to;
+				auto src = emb_ptr->edge->src;
+				auto dst = emb_ptr->edge->dst;
+				if (!ds.has_domain_reached_support(to) && to > from) ds.add_vertex(to, dst); //forward edge
+				if (!ds.has_domain_reached_support(from) && !emb_ptr->prev) ds.add_vertex(from, src); // last element
+				//if (to > from) ds.add_vertex(to, dst); //forward edge
+				//if (!emb_ptr->prev) ds.add_vertex(from, src); // last element
+				emb_ptr = emb_ptr->prev;
+				index--;
+			}
+			emb_id ++;
+			if (emb_id >= threshold) ds.set_frequent();
+			if (ds.is_frequent()) return true;
+		}
+		return false;
+	}
+	unsigned support(BaseEdgeEmbeddingList &emb_list, DFSCode &pattern) {
+		Map2D vid_counts;
+		for (auto cur = emb_list.begin(); cur != emb_list.end(); ++cur) {
+			BaseEdgeEmbedding* emb_ptr = &(*cur);
+			size_t index = pattern.size() - 1;
+			while (emb_ptr != NULL) {
+				auto from = pattern[index].from;
+				auto to = pattern[index].to;
+				auto src = emb_ptr->edge->src;
+				auto dst = emb_ptr->edge->dst;
+				if (to > from) vid_counts[to][dst]++; //forward edge
+				if (!emb_ptr->prev) vid_counts[from][src]++; // last element
+				emb_ptr = emb_ptr->prev;
+				index--;
+			}
+		}
+		unsigned min = 0xffffffff;
+		for(auto it = vid_counts.begin(); it != vid_counts.end(); it++)
+			if((it->second).size() < min) min = (it->second).size();
+		if(min == 0xffffffff) min = 0;
+		return min;
+	}
+/*
 	unsigned support(BaseEdgeEmbeddingList &emb_list, Status &status) {
-		#ifdef PRECOMPUTE
-		if (status.current_dfs_level == 0) return threshold;
-		#endif
 		Map2D vid_counts;
 		for(auto cur = emb_list.begin(); cur != emb_list.end(); ++cur) {
 			BaseEdgeEmbedding* emb_ptr = &(*cur);
-		//for(auto emb : emb_list) {
-		//	auto emb_ptr = &emb;
 			size_t index = status.DFS_CODE.size() - 1;
 			while (emb_ptr != NULL) {
 				auto from = status.DFS_CODE[index].from;
@@ -447,6 +688,7 @@ protected:
 		if(min == 0xffffffff) min = 0;
 		return min;
 	}
+//*/
 	inline InitPattern get_init_pattern(BYTE src_label, BYTE dst_label) {
 		if (src_label <= dst_label) return std::make_pair(src_label, dst_label);
 		else return std::make_pair(dst_label, src_label);

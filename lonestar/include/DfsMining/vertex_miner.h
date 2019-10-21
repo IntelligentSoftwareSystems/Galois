@@ -7,11 +7,11 @@
 
 class VertexMiner : public Miner {
 public:
-	VertexMiner(Graph *g, unsigned size = 3, int np = 1, bool use_dag = true, unsigned c = 0) {
+	VertexMiner(Graph *g, unsigned size = 3, int np = 1, bool directed = true, unsigned c = 1, bool symmetrize = false) {
 		graph = g;
 		max_size = size;
 		npatterns = np;
-		is_dag = use_dag;
+		is_directed = directed;
 		core = c;
 		if (npatterns == 1) total_num.reset();
 		else {
@@ -22,11 +22,13 @@ public:
 		degree_counting();
 		for (int i = 0; i < numThreads; i++) {
 			#ifdef USE_EGONET
+			#ifndef USE_MAP
 			egonets.getLocal(i)->allocate(core, size);
+			#endif
 			#endif
 			emb_lists.getLocal(i)->allocate(core, size);
 		}
-		edge_list.init(*g, is_dag);
+		edge_list.init(*g, is_directed, symmetrize);
 		// connected k=3 motifs
 		total_3_tris = 0;
 		total_3_path = 0;
@@ -375,7 +377,7 @@ public:
 		//std::cout << "[cxh debug] accumulators[1] = " << accumulators[1].reduce() << "\n";
 		#if defined(USE_EGONET) || defined(USE_ADHOC)
 		if (accumulators.size() == 2) {
-			if (is_dag) {
+			if (is_directed) {
 				total_3_tris = accumulators[0].reduce();
 				total_3_path = accumulators[1].reduce();
 			} else {
@@ -383,7 +385,7 @@ public:
 				total_3_path = accumulators[1].reduce()/2;
 			}
 		} else {
-			if (is_dag) {
+			if (is_directed) {
 				total_4_clique = accumulators[5].reduce();
 				total_4_diamond = accumulators[4].reduce() - total_4_clique;
 				total_4_cycle = accumulators[2].reduce();
@@ -435,7 +437,7 @@ public:
 
 protected:
 	int npatterns;
-	bool is_dag;
+	bool is_directed;
 	unsigned core;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;

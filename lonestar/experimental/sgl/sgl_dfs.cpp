@@ -17,7 +17,7 @@ protected:
 
 public:
 	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
-	AppMiner(Graph* dgraph, Graph* qgraph, unsigned size, int np) : VertexMiner(dgraph, size, np, false) {
+	AppMiner(Graph* dgraph, Graph* qgraph, unsigned size, int np) : VertexMiner(dgraph, size, np, false, 1, true) {
 		query_graph = qgraph;
 		matching_order.resize(max_size);
 		matching_order_map.resize(max_size);
@@ -49,6 +49,9 @@ public:
 				if (!is_connected(dst, d_vertex)) return false;
 			}
 		}
+		// if it is a redundant candidate (a neighbor of previous vertex)
+		//for (unsigned i = 0; i < pos; ++i)
+		//	if (is_connected(emb.get_vertex(i), dst)) return false;
 		// if it is not the canonical automorphism
 		for (unsigned i = 0; i < n; ++i) {
 			VertexId q_neighbor = get_query_vertex(i);
@@ -59,7 +62,6 @@ public:
 					return false;
 			}
 		}
-		if (debug) std::cout << "\t extending with vertex " << dst << "\n";
 		return true;
 	}
 	void vertex_process_naive() {
@@ -77,30 +79,20 @@ public:
 	}
 
 	void edge_process_naive() {
+		std::cout << "Starting edge-parallel subgraph listing\n";
 		VertexId qnode0 = get_query_vertex(0);
 		VertexId qnode1 = get_query_vertex(1);
-		//galois::do_all(galois::iterate((size_t)0, edge_list.size()),
-			//[&](const size_t& pos) {
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&](const auto& src) {
-				if (get_degree(graph, src) < get_degree(query_graph, qnode0)) return;
+		galois::do_all(galois::iterate((size_t)0, edge_list.size()),
+			[&](const size_t& pos) {
+				Edge edge = edge_list.get_edge(pos);
+				if (get_degree(graph, edge.src) < get_degree(query_graph, qnode0)) return;
+				if (get_degree(graph, edge.dst) < get_degree(query_graph, qnode1)) return;
 				EmbeddingList *emb_list = emb_lists.getLocal();
-				emb_list->init();
-				emb_list->set_size(1, 0);
-				for (auto e : graph->edges(src)) {
-					auto dst = graph->getEdgeDst(e);
-					if (fv || src < dst) { 
-						//Edge edge = edge_list.get_edge(pos);
-						//Edge edge(src, dst);
-						//emb_list->init(edge);
-						if (get_degree(graph, dst) < get_degree(query_graph, qnode1)) continue;
-						auto start = emb_list->size(1);
-						emb_list->set_vid(1, start, dst);
-						emb_list->set_idx(1, start, src);
-						emb_list->set_size(1, start+1);
-						dfs_extend_base(1, start, *emb_list);
-						//dfs_extend_base(1, *emb_list);
-					}
+				if ((fv && automorph_group_id[qnode0] != automorph_group_id[qnode1]) || edge.src < edge.dst) { 
+					emb_list->init(edge);
+					//if (debug) std::cout << "new embedding: src = " << edge.src << ", dst = " << edge.dst << "\n";
+					dfs_extend_base(1, 0, *emb_list);
+					//dfs_extend_base(1, *emb_list);
 				}
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
@@ -119,33 +111,44 @@ public:
 				VertexId q_dst = query_graph->getEdgeDst(q_edge);
 				unsigned q_order = matching_order_map[q_dst]; // using query vertex id to get its matching order
 				if (q_order < n) {
-					auto d_vertex = emb.get_vertex(q_order);
-					for (auto d_edge : graph->edges(d_vertex)) {
+					auto d_src = emb.get_vertex(q_order);
+					for (auto d_edge : graph->edges(d_src)) {
 						auto d_dst = graph->getEdgeDst(d_edge);
-						if (toAdd(n, emb, d_dst, q_order))
+						if (toAdd(n, emb, d_dst, q_order)) {
+							if (show) {
+								BaseEmbedding new_emb(emb);
+								new_emb.push_back(d_dst);
+								std::cout << "\tFound embedding: " << new_emb << "\n";
+							}
+							//if (debug) std::cout << "\t extending: dst = " << d_dst << ", src = " << d_src << "\n";
 							total_num += 1; // if size = max_size, no need to add to the queue, just accumulate
+						}
 					}
+					break;
 				}
 			}
 			return;
 		}
-		emb_list.set_size(level+1, 0);
 		for (auto q_edge : query_graph->edges(next_qnode)) {
 			VertexId q_dst = query_graph->getEdgeDst(q_edge);
 			unsigned q_order = matching_order_map[q_dst]; // using query vertex id to get its matching order
-			if (q_order < n) {
-				auto d_vertex = emb.get_vertex(q_order);
-				for (auto d_edge : graph->edges(d_vertex)) {
+			if (q_order < n) { 
+				auto d_src = emb.get_vertex(q_order);
+				//if (debug) std::cout << "\textending: q_order = " << q_order << ", src = " << d_src << "\n";
+				for (auto d_edge : graph->edges(d_src)) {
 					auto d_dst = graph->getEdgeDst(d_edge);
+					//if (debug) std::cout << "\tnew node dst = " << d_dst << "\n";
 					if (toAdd(n, emb, d_dst, q_order)) {
+						//if (debug) std::cout << "\textending: dst = " << d_dst << ", src = " << d_src << "\n";
+						emb_list.set_size(level+1, 0);
 						auto start = emb_list.size(level+1);
 						emb_list.set_vid(level+1, start, d_dst);
 						emb_list.set_idx(level+1, start, pos);
 						emb_list.set_size(level+1, start+1);
 						dfs_extend_base(level+1, start, emb_list);
 					}
-					break;
 				}
+				break;
 			}
 		}
 	}
