@@ -1368,12 +1368,15 @@ struct SortByHighDegreeParent : public Conversion {
     typedef galois::LargeArray<GNode> Permutation;
 
     Graph graph;
+    // get file graph
     graph.fromFile(infilename);
 
+    // get the number of vertices
     auto sz = graph.size();
 
     Permutation perm;
     perm.create(sz);
+    // fill the perm array with 0 through # vertices
     std::copy(boost::counting_iterator<GNode>(0),
               boost::counting_iterator<GNode>(sz), perm.begin());
 
@@ -1381,10 +1384,18 @@ struct SortByHighDegreeParent : public Conversion {
 
     std::deque<std::deque<std::pair<unsigned, GNode>>> inv(sz);
     unsigned count = 0;
+
+    // loop through all vertices
     for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+      // progress indicator print
       if (!(++count % 1024))
         std::cerr << static_cast<double>(count * 100) / sz << "\r";
+
+      // get the number of edges this vertex has
       unsigned dist = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+
+      // for each edge, get destination, and on that destination vertex save
+      // the source id (i.e. this is a transpose)
       for (auto dsti = graph.edge_begin(*ii), dste = graph.edge_end(*ii);
            dsti != dste; ++dsti)
         inv[graph.getEdgeDst(dsti)].push_back(std::make_pair(dist, *ii));
@@ -1393,33 +1404,49 @@ struct SortByHighDegreeParent : public Conversion {
     std::cout << "Found inverse\n";
 
     count = 0;
+    // looping through deques with incoming edges
+    // TODO this can probably be parallelized since each deque is disjoint
     for (auto ii = inv.begin(), ee = inv.end(); ii != ee; ++ii) {
-      if (!(++count % 1024))
+      // progress tracker
+      if (!(++count % 1024)) {
         std::cerr << count << " of " << sz << "\r";
+      }
+
+      // sort each deque
       std::sort(ii->begin(), ii->end(),
                 std::greater<std::pair<unsigned, GNode>>());
     }
 
-    std::sort(perm.begin(), perm.end(), [&inv](GNode lhs, GNode rhs) -> bool {
-      const auto& ll = inv[lhs].begin();
-      const auto& el = inv[lhs].end();
-      const auto& rr = inv[rhs].begin();
-      const auto& er = inv[rhs].begin();
-      // not less-than and not equal => greater-than
-      return !std::lexicographical_compare(ll, el, rr, er) &&
-             !(std::distance(ll, el) == std::distance(rr, er) &&
-               std::equal(ll, el, rr));
-    });
+    std::cout << "Beginning perm sort\n";
+
+    // sort the 0 -> # vertices array
+    std::sort(perm.begin(), perm.end(),
+      [&inv](GNode lhs, GNode rhs) -> bool {
+        const auto& leftBegin = inv[lhs].begin();
+        const auto& leftEnd = inv[lhs].end();
+        const auto& rightBegin = inv[rhs].begin();
+        const auto& rightEnd = inv[rhs].end();
+        // not less-than and not equal => greater-than
+        return (
+          !std::lexicographical_compare(leftBegin, leftEnd, rightBegin,
+                                        rightEnd) &&
+          !(std::distance(leftBegin, leftEnd) ==
+            std::distance(rightBegin, rightEnd) &&
+          std::equal(leftBegin, leftEnd, rightBegin))
+        );
+      }
+    );
 
     std::cout << "Done sorting\n";
 
     Permutation perm2;
     perm2.create(sz);
-    for (unsigned x = 0; x < perm.size(); ++x)
-      perm2[perm[x]] = x;
+    // perm2 stores the new ordering of a particular vertex
+    for (unsigned x = 0; x < perm.size(); ++x) perm2[perm[x]] = x;
 
     std::cout << "Done inverting\n";
 
+    // sanity check; this should print the same thing
     for (unsigned x = 0; x < perm2.size(); ++x) {
       if (perm[x] == 0) {
         std::cout << "Zero is at " << x << "\n";
@@ -1428,6 +1455,7 @@ struct SortByHighDegreeParent : public Conversion {
     }
     std::cout << "Zero is at " << perm2[0] << "\n";
 
+    // do actual permutation of the graph
     Graph out;
     galois::graphs::permute<EdgeTy>(graph, perm2, out);
     outputPermutation(perm2);
