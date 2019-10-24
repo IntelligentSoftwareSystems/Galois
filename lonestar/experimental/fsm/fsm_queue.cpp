@@ -59,7 +59,8 @@ int main(int argc, char** argv) {
 	Tinit.stop();
 	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 
-	EdgeMiner miner(&graph, k);
+	EdgeMiner miner(&graph);
+	miner.set_max_size(k);
 	miner.set_threshold(minsup);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();

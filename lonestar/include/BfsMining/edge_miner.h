@@ -27,12 +27,45 @@ typedef galois::substrate::PerThreadStorage<CgMapDomain> LocalCgMapDomain;
 
 class EdgeMiner : public Miner {
 public:
-	EdgeMiner(Graph *g, unsigned size) {
-		graph = g;
-		max_size = size;
-		construct_edgemap();
-	}
+	EdgeMiner(Graph *g) { graph = g; }
 	virtual ~EdgeMiner() {}
+	void clean() {
+		edge_map.clear();
+		freq_edge_set.clear();
+		is_frequent_edge.clear();
+		clean_maps();
+	}
+	void clean_maps() {
+		id_map.clear();
+		//freq_support_map.clear();
+		domain_support_map.clear();
+		for (auto ele : qp_map) ele.second->clean();
+		for (auto ele : cg_map) ele.second->clean();
+		for (auto ele : init_map) ele.second->clean();
+		qp_map.clear();
+		cg_map.clear();
+		init_map.clear();
+		for (auto i = 0; i < numThreads; i++) {
+			auto qp_map_ptr = qp_localmaps.getLocal(i);
+			for (auto ele : *qp_map_ptr) ele.second->clean();
+			qp_map_ptr->clear();
+			auto cg_map_ptr = cg_localmaps.getLocal(i);
+			for (auto ele : *cg_map_ptr) ele.second->clean();
+			cg_map_ptr->clear();
+			auto init_map_ptr = init_pattern_maps.getLocal(i);
+			for (auto ele : *init_map_ptr) ele.second->clean();
+			init_map_ptr->clear();
+		}
+	}
+	virtual void init() {}
+	virtual bool toExtend(unsigned n, const EdgeEmbedding &emb, unsigned pos) {
+		return true;
+	}
+	// toAdd (only add non-automorphisms)
+	virtual bool toAdd(unsigned n, const EdgeEmbedding &emb, unsigned pos, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
+		return !is_edge_automorphism(n, emb, pos, src, dst, existed, vertex_set);
+	}
+
 	// given an embedding, extend it with one more edge, and if it is not automorphism, insert the new embedding into the task queue
 	void extend_edge(EdgeEmbeddingQueue &in_queue, EdgeEmbeddingQueue &out_queue) {
 		//if (show) std::cout << "\n----------------------------- Extending -----------------------------\n";
@@ -58,7 +91,7 @@ public:
 							if (is_frequent_edge[*e])
 							#endif
 								// check if this is automorphism
-								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set)) {
+								if (toAdd(n, emb, i, src, dst, existed, vert_set)) {
 									auto dst_label = 0, edge_label = 0;
 									#ifdef ENABLE_LABEL
 									dst_label = graph->getData(dst);
@@ -97,7 +130,7 @@ public:
 							GNode dst = graph->getEdgeDst(e);
 							BYTE existed = 0;
 							if (is_frequent_edge[*e])
-								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set))
+								if (toAdd(n, emb, i, src, dst, existed, vert_set))
 									num_new_emb[pos] ++;
 						}
 					}
@@ -131,7 +164,7 @@ public:
 							GNode dst = graph->getEdgeDst(e);
 							BYTE existed = 0;
 							if (is_frequent_edge[*e])
-								if (!is_edge_automorphism(n, emb, i, src, dst, existed, vert_set)) {
+								if (toAdd(n, emb, i, src, dst, existed, vert_set)) {
 									emb_list.set_idx(level+1, start, pos);
 									emb_list.set_his(level+1, start, i);
 									emb_list.set_vid(level+1, start++, dst);
@@ -563,7 +596,8 @@ public:
 		);
 		emb_list.remove_tail(indices.back());
 	}
-	inline void set_threshold(const unsigned minsup) { threshold = minsup; }
+	void set_threshold(const unsigned minsup) { threshold = minsup; }
+	void set_max_size(unsigned size = 3) { max_size = size; }
 	inline void printout_agg(const CgMapFreq &cg_map) {
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 			std::cout << "{" << it->first << " --> " << it->second << std::endl;
@@ -607,7 +641,7 @@ private:
 	unsigned threshold;
 	InitMap init_map;
 	UintMap id_map;
-	FreqMap freq_support_map;
+	//FreqMap freq_support_map;
 	DomainMap domain_support_map;
 	galois::gstl::Map<OrderedEdge, unsigned> edge_map;
 	std::set<std::pair<VertexId,VertexId> > freq_edge_set;
@@ -644,7 +678,7 @@ private:
 		ElementType ele0(idx, 0, lab, 0);
 		emb.set_element(0, ele0);
 	}
-	bool is_quick_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed) {
+	bool is_quick_automorphism(unsigned size, const EdgeEmbedding& emb, unsigned history, VertexId src, VertexId dst, BYTE& existed) {
 		if (dst <= emb.get_vertex(0)) return true;
 		if (dst == emb.get_vertex(1)) return true;
 		if (history == 0 && dst < emb.get_vertex(1)) return true;
@@ -660,7 +694,7 @@ private:
 		}
 		return false;
 	}
-	bool is_edge_automorphism(unsigned size, const EdgeEmbedding& emb, BYTE history, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
+	bool is_edge_automorphism(unsigned size, const EdgeEmbedding& emb, unsigned history, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
 		if (size < 3) return is_quick_automorphism(size, emb, history, src, dst, existed);
 		// check with the first element
 		if (dst <= emb.get_vertex(0)) return true;

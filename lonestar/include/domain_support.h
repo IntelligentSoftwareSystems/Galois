@@ -4,13 +4,14 @@
 
 #ifdef USE_GSTL
 typedef galois::gstl::Set<int> IntSet;
-typedef galois::gstl::Vector<bool> BoolVec;
+//typedef galois::gstl::Vector<bool> BoolVec;
 typedef galois::gstl::Vector<IntSet> IntSets;
 #else
 typedef std::set<int> IntSet;
-typedef std::vector<bool> BoolVec;
+//typedef std::vector<bool> BoolVec;
 typedef std::vector<IntSet> IntSets;
 #endif
+typedef std::vector<bool> BoolVec;
 
 class DomainSupport {
 public:
@@ -28,6 +29,10 @@ public:
 	~DomainSupport() {}
 	void set_threshold(unsigned minsup) {
 		minimum_support = minsup;
+	}
+	void clean() {
+		domains_reached_support.clear();
+		domain_sets.clear();
 	}
 	void resize(unsigned n) {
 		num_domains = n;

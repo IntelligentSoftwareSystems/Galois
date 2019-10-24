@@ -1,8 +1,9 @@
-#define USE_PID
-#define USE_GSTL
-#define USE_DOMAIN
-#define USE_EMB_LIST
-#define ENABLE_LABEL
+#define USE_PID // record pattern ID for the pattern-support map
+#define USE_GSTL // use Galois memory allocator for domain support
+#define USE_DOMAIN // use domain support
+#define LARGE_SIZE // for large number of embeddings
+#define USE_EMB_LIST // use embedding list (SoA)
+#define ENABLE_LABEL // enable vertex label
 #define EDGE_INDUCED
 #define CHUNK_SIZE 256
 #include "pangolin.h"
@@ -13,10 +14,16 @@ const char* url  = 0;
 
 class AppMiner : public EdgeMiner {
 public:
-	AppMiner(Graph *g, unsigned size) : EdgeMiner(g, size) {
-		total_num = 0;
+	AppMiner(Graph *g) : EdgeMiner(g) {
 	}
 	~AppMiner() {}
+	void init() {
+		assert(k > 1);
+		set_max_size(k);
+		set_threshold(minsup);
+		construct_edgemap();
+		total_num = 0;
+	}
 	void print_output() {
 		std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n";
 	}

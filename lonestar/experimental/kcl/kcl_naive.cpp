@@ -27,8 +27,13 @@ const char* url  = 0;
 
 class AppMiner : public VertexMiner {
 public:
-	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	AppMiner(Graph *g) : VertexMiner(g) {}
 	~AppMiner() {}
+	void init() {
+		assert(k > 2);
+		set_max_size(k);
+		set_num_patterns(1);
+	}
 	// toExtend (extend every vertex in the embedding: slow)
 	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
 		return true;

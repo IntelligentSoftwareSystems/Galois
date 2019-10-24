@@ -33,8 +33,7 @@ public:
 	Miner() {}
 	virtual ~Miner() {}
 	// insert single-edge embeddings into the embedding queue (worklist)
-	inline void init(EmbeddingQueueType &queue) {
-		if (show) printf("\n=============================== Init ================================\n\n");
+	inline void insert(EmbeddingQueueType &queue) {
 		galois::do_all(galois::iterate(graph->begin(), graph->end()),
 			[&](const GNode& src) {
 				#ifdef ENABLE_LABEL
@@ -60,8 +59,9 @@ public:
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Initialization")
+			galois::loopname("InitEmbQueue")
 		);
+		if(show) queue.printout_embeddings(0);
 	}
 	inline unsigned intersect(unsigned a, unsigned b) {
 		return intersect_merge(a, b);

@@ -13,6 +13,7 @@ class AppMiner : public VertexMiner {
 public:
 	AppMiner(Graph *g) : VertexMiner(g) {}
 	~AppMiner() {}
+	void init() { set_num_patterns(1); }
 	// toExtend (only extend the last vertex in the embedding: fast)
 	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
 		return pos == n-1;

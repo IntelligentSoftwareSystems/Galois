@@ -32,8 +32,13 @@ int num_patterns[3] = {2, 6, 21};
 
 class AppMiner : public VertexMiner {
 public:
-	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
+	AppMiner(Graph *g) : VertexMiner(g) {}
 	~AppMiner() {}
+	void init() {
+		assert(k > 2);
+		set_max_size(k);
+		set_num_patterns(num_patterns[k-3]);
+	}
 	#ifdef USE_CUSTOM
 	// customized pattern classification method
 	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { 

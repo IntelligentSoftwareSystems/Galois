@@ -20,15 +20,20 @@ protected:
 	Graph *query_graph;
 
 public:
-	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
-	AppMiner(Graph* dgraph, Graph* qgraph, unsigned size, int np) : VertexMiner(dgraph, size, np) {
+	AppMiner(Graph *g) : VertexMiner(g) {}
+	AppMiner(Graph* dgraph, Graph* qgraph) : VertexMiner(dgraph) {
 		query_graph = qgraph;
+	}
+	~AppMiner() {}
+	void init() {
+		assert(k > 2);
+		set_max_size(query_graph->size());
+		set_num_patterns(1);
 		matching_order.resize(max_size);
 		matching_order_map.resize(max_size);
 		automorph_group_id.resize(max_size);
 		read_presets();
 	}
-	~AppMiner() {}
 	// toExtend (only extend the last vertex in the embedding: fast)
 	bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
 		return true;
@@ -146,12 +151,12 @@ int main(int argc, char** argv) {
 	read_graph(data_graph, filetype, filename, false, need_dag);
 	read_graph(query_graph, filetype, query_graph_filename, false, need_dag);
 	Tinitial.stop();
-	assert(k > 2);
 	std::cout << "Data_graph: num_vertices " << data_graph.size() << " num_edges " << data_graph.sizeEdges() << "\n";
 	std::cout << "Query_graph: num_vertices " << query_graph.size() << " num_edges " << query_graph.sizeEdges() << "\n";
 
 	ResourceManager rm;
-	AppMiner miner(&data_graph, &query_graph, query_graph.size(), 1);
+	AppMiner miner(&data_graph, &query_graph);
+	miner.init();
 
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();

@@ -119,6 +119,19 @@ public:
 			}
 		}
 	}
+	void clean() {
+		pid_list.clear();
+		for (unsigned i = 0; i < vid_lists.size(); i ++) {
+			#ifdef ENABLE_LABEL
+			his_lists[i].clear();
+			#endif
+			idx_lists[i].clear();
+			vid_lists[i].clear();
+		}
+		his_lists.clear();
+		idx_lists.clear();
+		vid_lists.clear();
+	}
 private:
 	UintList pid_list;
 	ByteLists his_lists;

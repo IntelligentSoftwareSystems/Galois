@@ -15,9 +15,6 @@ typedef galois::substrate::PerThreadStorage<StrCgMapFreq> LocalStrCgMapFreq;
 typedef galois::gstl::Vector<BaseEmbedding> BaseEmbeddingBuffer;
 typedef galois::gstl::Vector<VertexEmbedding> VertexEmbeddingBuffer;
 
-#define UNVISITED 0
-#define VISITED 1
-
 class Status {
 protected:
 	std::vector<uint8_t> visited;
@@ -29,7 +26,7 @@ public:
 		reset();
 	}
 	void reset() {
-		std::fill(visited.begin(), visited.end(), UNVISITED);
+		std::fill(visited.begin(), visited.end(), 0);
 	}
 	void set(VertexId pos, uint8_t value) { visited[pos] = value; }
 	uint8_t get(VertexId pos) { return visited[pos]; }
@@ -39,25 +36,35 @@ typedef galois::substrate::PerThreadStorage<Status> StatusMT; // multi-threaded
 
 class VertexMiner : public Miner {
 public:
-	VertexMiner(Graph *g, unsigned size = 3, int np = 1) {
+	VertexMiner(Graph *g) {
 		graph = g;
-		max_size = size;
 		degree_counting();
+	}
+	virtual ~VertexMiner() {}
+	void set_max_size(unsigned size = 3) { max_size = size; }
+	void set_num_patterns(int np = 1) {
 		npatterns = np;
-		if (npatterns == 1)
-			total_num.reset();
+		if (npatterns == 1) total_num.reset();
 		else {
 			accumulators.resize(npatterns);
 			for (int i = 0; i < npatterns; i++) accumulators[i].reset();
-			std::cout << max_size << "-motif has " << npatterns << " patterns in total\n";
+			//std::cout << max_size << "-motif has " << npatterns << " patterns in total\n";
 			#ifdef USE_MAP
 			for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
 			#endif
 		}
 	}
-	virtual ~VertexMiner() {}
+	void clean() {
+		is_wedge.clear();
+		accumulators.clear();
+		qp_map.clear();
+		cg_map.clear();
+		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
+		for (auto i = 0; i < numThreads; i++) cg_localmaps.getLocal(i)->clear();
+	}
 
 	// Pangolin APIs
+	virtual void init() {}
 	// toExtend
 	virtual bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
 		return true;
@@ -262,7 +269,7 @@ public:
 		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
 		num_new_emb.clear();
 		Ulong new_size = indices.back();
-		std::cout << "number of new embeddings: " << new_size << "\n";
+		//std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
 		#ifdef USE_WEDGE
 		if (level == 1 && max_size == 4) {
@@ -304,7 +311,7 @@ public:
 	// extension for vertex-induced clique
 	inline void extend_vertex_kcl(unsigned level, EmbeddingList& emb_list) {
 		auto cur_size = emb_list.size();
-		std::cout << "number of current embeddings: " << cur_size << "\n";
+		//std::cout << "number of current embeddings: " << cur_size << "\n";
 		UintList num_new_emb(cur_size);
 		//galois::runtime::profilePapi([&] () {
 		galois::do_all(galois::iterate((size_t)0, cur_size),
@@ -334,7 +341,7 @@ public:
 		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
 		num_new_emb.clear();
 		Ulong new_size = indices.back();
-		std::cout << "number of new embeddings: " << new_size << "\n";
+		//std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
 		//galois::runtime::profilePapi([&] () {
 		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
