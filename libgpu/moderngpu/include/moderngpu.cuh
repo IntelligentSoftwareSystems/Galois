@@ -35,5 +35,7 @@
 #pragma once
 
 #include "kernels/reduce.cuh"
+#include "kernels/segmentedsort.cuh"
 #include "kernels/merge.cuh"
 #include "kernels/mergesort.cuh"
+#include "util/mgpucontext.h"
