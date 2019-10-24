@@ -148,5 +148,9 @@ add_subdirectory(kcore)
 add_subdirectory(pagerank)
 add_subdirectory(sgd)
 add_subdirectory(sssp)
-
 add_subdirectory(partition)
+
+# currently tc only has a GPU implementation
+if(ENABLE_HETERO_GALOIS)
+  add_subdirectory(tc)
+endif()
