@@ -17,10 +17,6 @@ endif()
 
 target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
 
-if (USE_LCI)
-  add_dependencies(galois_dist_async lci)
-  target_link_libraries(galois_dist_async ${LWCI_LIBRARY} -lpsm2)
-endif()
 target_link_libraries(galois_dist_async ${MPI_CXX_LIBRARIES})
 
 target_include_directories(galois_dist_async PUBLIC
@@ -29,10 +25,6 @@ target_include_directories(galois_dist_async PUBLIC
   ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-
-if (USE_LCI)
-  target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
-endif()
 
 set_target_properties (galois_dist_async PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
@@ -50,3 +42,10 @@ set_target_properties (galois_dist_async_obj PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )
+
+if (USE_LCI)
+  add_dependencies(galois_dist_async lci)
+  target_link_libraries(galois_dist_async ${LWCI_LIBRARY} -lpsm2)
+  target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
+  target_include_directories(galois_dist_async_obj PUBLIC ${LWCI_INCLUDE})
+endif()
