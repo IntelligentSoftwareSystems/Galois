@@ -3,8 +3,8 @@
 #define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 #define ENABLE_STEAL
 #define USE_EMB_LIST
-#define CHUNK_SIZE 256
 #define USE_BASE_TYPES
+#define CHUNK_SIZE 256
 #include "pangolin.h"
 
 const char* name = "Kcl";
@@ -21,7 +21,8 @@ public:
 		set_num_patterns(1);
 	}
 	// toExtend (only extend the last vertex in the embedding: fast)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
+	bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+		// extend the last vertex in the embedding
 		return pos == n-1;
 	}
 	// toAdd (only add vertex that is connected to all the vertices in the embedding)
@@ -30,6 +31,7 @@ public:
 		return is_all_connected_dag(dst, emb, n-1);
 		#else
 		VertexId src = emb.get_vertex(pos);
+		// extend vertex in ascending order to avoid unnecessary enumeration
 		return (src < dst) && is_all_connected(dst, emb, n-1);
 		#endif
 	}

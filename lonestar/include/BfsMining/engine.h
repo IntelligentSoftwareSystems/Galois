@@ -36,16 +36,27 @@ void edgeSolver(AppMiner &miner, EmbeddingList& emb_list) {
 }
 #else
 void solver(AppMiner &miner, EmbeddingList &emb_list) {
-	unsigned level = 1;
-	while (1) {
-		if (show) emb_list.printout_embeddings(level);
-		#ifdef USE_MAP
-		miner.extend_vertex(level, emb_list);
-		#else
-		miner.extend_vertex_kcl(level, emb_list);
-		#endif
-		if (level == k-2) break; 
-		level ++;
+	size_t nnz = emb_list.size();
+	size_t chunk_length = (nnz - 1) / num_blocks + 1;
+    std::cout << "number of single-edge embeddings: " << nnz << "\n";
+    for (size_t cid = 0; cid < num_blocks; cid ++) {
+        size_t chunk_begin = cid * chunk_length;
+        size_t chunk_end = std::min((cid+1) * chunk_length, nnz);
+        size_t cur_size = chunk_end-chunk_begin;
+        std::cout << "Processing the " << cid << " chunk (" << cur_size << " edges) of " << num_blocks << " blocks\n";
+
+		unsigned level = 1;
+		while (1) {
+			if (show) emb_list.printout_embeddings(level);
+			#ifdef USE_MAP
+			miner.extend_vertex_multi(level, emb_list, chunk_begin, chunk_end);
+			#else
+			miner.extend_vertex_single(level, emb_list, chunk_begin, chunk_end);
+			#endif
+			if (level == k-2) break; 
+			level ++;
+		}
+		emb_list.reset_level();
 	}
 }
 #endif

@@ -4,7 +4,7 @@
 
 #ifdef LARGE_SIZE
 template <typename InTy = unsigned, typename OutTy = unsigned>
-inline std::vector<OutTy> parallel_prefix_sum(const std::vector<InTy> &in) {
+inline std::vector<OutTy> prefix_sum(const std::vector<InTy> &in) {
 	std::vector<OutTy> sums(in.size() + 1);
 	OutTy total = 0;
 	for (size_t n = 0; n < in.size(); n++) {
@@ -14,6 +14,40 @@ inline std::vector<OutTy> parallel_prefix_sum(const std::vector<InTy> &in) {
 	sums[in.size()] = total;
 	return sums;
 }
+
+template <typename InTy = unsigned, typename OutTy = unsigned>
+inline std::vector<OutTy> parallel_prefix_sum(const std::vector<InTy> &in) {
+    const size_t block_size = 1<<20;
+    const size_t num_blocks = (in.size() + block_size - 1) / block_size;
+    std::vector<OutTy> local_sums(num_blocks);
+	// count how many bits are set on each thread
+	galois::do_all(galois::iterate((size_t)0, num_blocks), [&](const size_t& block) {
+		OutTy lsum = 0;
+		size_t block_end = std::min((block + 1) * block_size, in.size());
+		for (size_t i=block * block_size; i < block_end; i++)
+			lsum += in[i];
+		local_sums[block] = lsum;
+	});
+	std::vector<OutTy> bulk_prefix(num_blocks+1);
+	OutTy total = 0;
+	for (size_t block=0; block < num_blocks; block++) {
+		bulk_prefix[block] = total;
+		total += local_sums[block];
+	}
+	bulk_prefix[num_blocks] = total;
+	std::vector<OutTy> prefix(in.size() + 1);
+	galois::do_all(galois::iterate((size_t)0, num_blocks), [&](const size_t& block) {
+		OutTy local_total = bulk_prefix[block];
+		size_t block_end = std::min((block + 1) * block_size, in.size());
+		for (size_t i=block * block_size; i < block_end; i++) {
+			prefix[i] = local_total;
+			local_total += in[i];
+		}
+	});
+	prefix[in.size()] = bulk_prefix[num_blocks];
+	return prefix;
+}
+
 #else
 template <typename InTy = unsigned, typename OutTy = unsigned>
 inline galois::gstl::Vector<OutTy> parallel_prefix_sum(const galois::gstl::Vector<InTy> &in) {
@@ -41,24 +75,24 @@ public:
 				#endif
 				for (auto e : graph->edges(src)) {
 					GNode dst = graph->getEdgeDst(e);
-					if(src < dst) {
-						#ifdef ENABLE_LABEL
-						auto& dst_label = graph->getData(dst);
-						#endif
-						EmbeddingType new_emb;
-						#ifdef ENABLE_LABEL
-						new_emb.push_back(ElementType(src, 0, src_label));
-						new_emb.push_back(ElementType(dst, 0, dst_label));
-						#else
-						new_emb.push_back(ElementType(src));
-						new_emb.push_back(ElementType(dst));
-						#endif
-						queue.push_back(new_emb);
-					}
+					#ifndef USE_DAG
+					if(src >= dst) continue;
+					#endif
+					#ifdef ENABLE_LABEL
+					auto& dst_label = graph->getData(dst);
+					#endif
+					EmbeddingType new_emb;
+					#ifdef ENABLE_LABEL
+					new_emb.push_back(ElementType(src, 0, src_label));
+					new_emb.push_back(ElementType(dst, 0, dst_label));
+					#else
+					new_emb.push_back(ElementType(src));
+					new_emb.push_back(ElementType(dst));
+					#endif
+					queue.push_back(new_emb);
 				}
 			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
 			galois::loopname("InitEmbQueue")
 		);
 		if(show) queue.printout_embeddings(0);
@@ -221,6 +255,7 @@ protected:
 		if (degrees[search] == 0) return false;
 		auto begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
 		auto end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		//return serial_search(key, begin, end);
 		return binary_search(key, begin, end);
 	}
 	inline bool serial_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {

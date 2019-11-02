@@ -109,6 +109,13 @@ public:
 		pid_list.resize(size);
 		#endif
 	}
+	void reset_level() {
+		for (size_t i = 2; i <= last_level; i ++) {
+			vid_lists[i].clear();
+			idx_lists[i].clear();
+		}
+		last_level = 1;
+	}
 	void printout_embeddings(int level, bool verbose = false) {
 		std::cout << "Number of embeddings in level " << level << ": " << size() << std::endl;
 		if(verbose) {
