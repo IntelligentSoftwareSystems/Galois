@@ -9,10 +9,15 @@ const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
 const char* url  = 0;
  
-class AppMiner : public Miner {
+class AppMiner : public EdgeMiner {
 public:
-	AppMiner(Graph *g, unsigned size) : Miner(g, size) {}
+	AppMiner(Graph *g) : EdgeMiner(g) {}
 	~AppMiner() {}
+	void init(unsigned max_degree, bool use_dag) {
+		assert(k > 1);
+		set_max_size(k);
+		set_threshold(minsup);
+	}
 };
 
 #include "DfsMining/engine.h"

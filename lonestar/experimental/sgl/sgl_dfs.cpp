@@ -16,9 +16,16 @@ protected:
 	Graph *query_graph;
 
 public:
-	AppMiner(Graph *g, unsigned size, int np) : VertexMiner(g, size, np) {}
-	AppMiner(Graph* dgraph, Graph* qgraph, unsigned size, int np) : VertexMiner(dgraph, size, np, false, 1, true) {
+	AppMiner(Graph *g) : VertexMiner(g) {}
+	AppMiner(Graph* dgraph, Graph* qgraph) : VertexMiner(dgraph) {
 		query_graph = qgraph;
+	}
+	void init() {
+		assert(k > 2);
+		set_max_size(query_graph->size());
+		set_num_patterns(1);
+		//set_directed(use_dag);
+		init_edgelist();
 		matching_order.resize(max_size);
 		matching_order_map.resize(max_size);
 		automorph_group_id.resize(max_size);
@@ -89,7 +96,7 @@ public:
 				if (get_degree(graph, edge.dst) < get_degree(query_graph, qnode1)) return;
 				EmbeddingList *emb_list = emb_lists.getLocal();
 				if ((fv && automorph_group_id[qnode0] != automorph_group_id[qnode1]) || edge.src < edge.dst) { 
-					emb_list->init(edge);
+					emb_list->init_edge(edge);
 					//if (debug) std::cout << "new embedding: src = " << edge.src << ", dst = " << edge.dst << "\n";
 					dfs_extend_base(1, 0, *emb_list);
 					//dfs_extend_base(1, *emb_list);
@@ -173,15 +180,16 @@ int main(int argc, char** argv) {
 	#endif
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	read_graph(data_graph, filetype, filename, false, need_dag);
-	read_graph(query_graph, filetype, query_graph_filename, false, need_dag);
+	read_graph(data_graph, filetype, filename, need_dag);
+	read_graph(query_graph, filetype, query_graph_filename, need_dag);
 	Tinitial.stop();
 	assert(k > 2);
 	std::cout << "Data_graph: num_vertices " << data_graph.size() << " num_edges " << data_graph.sizeEdges() << "\n";
 	std::cout << "Query_graph: num_vertices " << query_graph.size() << " num_edges " << query_graph.sizeEdges() << "\n";
 
 	ResourceManager rm;
-	AppMiner miner(&data_graph, &query_graph, query_graph.size(), 1);
+	AppMiner miner(&data_graph, &query_graph);
+	miner.init();
 	EmbeddingList emb_list;
 
 	galois::StatTimer Tcomp("Compute");

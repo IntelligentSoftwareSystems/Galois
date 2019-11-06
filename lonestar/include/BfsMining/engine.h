@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
 	#endif
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	read_graph(graph, filetype, filename, false, need_dag);
+	read_graph(graph, filetype, filename, need_dag);
 	Tinitial.stop();
 	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 	//std::cout << "max_size = " << k << std::endl;

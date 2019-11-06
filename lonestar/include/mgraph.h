@@ -7,9 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-#include "core.h"
-typedef int IndexT;
-typedef int ValueT;
+#include "types.h"
 
 struct MEdge {
 	IndexT src;
@@ -29,15 +27,13 @@ typedef std::vector<MEdge> MEdgeList;
 class MGraph {
 public:
 	//MEdgeList el;
-	MGraph() : need_relabel_edges(false), need_dag(false), symmetrize_(false), directed_(false) {}
-	MGraph(bool relabel_edges) : need_relabel_edges(relabel_edges), need_dag(false), symmetrize_(false), directed_(false) {}
-	MGraph(bool relabel_edges, bool dag) : need_relabel_edges(relabel_edges), need_dag(dag), symmetrize_(false), directed_(false) {}
+	MGraph() : need_dag(false), symmetrize_(false), directed_(false) {}
+	MGraph(bool dag) : need_dag(dag), symmetrize_(false), directed_(false) {}
 	void clean() {
 		el.clear();
 		delete[] rowptr_;
 		delete[] colidx_;
 		delete[] weight_;
-		rank.clear();
 		degrees.clear();
 		labels_.clear();
 		vertices.clear();
@@ -45,15 +41,15 @@ public:
 	IndexT * out_rowptr() const { return rowptr_; }
 	IndexT * out_colidx() const { return colidx_; }
 	ValueT * labels() { return labels_.data(); }
-	ValueT get_label(int n) { return labels_[n]; }
-	IndexT get_offset(int n) { return rowptr_[n]; }
-	IndexT get_dest(int n) { return colidx_[n]; }
-	ValueT get_weight(int n) { return weight_[n]; }
-	int get_core() { return core; }
-	int out_degree(int n) const { return rowptr_[n+1] - rowptr_[n]; }
+	ValueT get_label(IndexT n) { return labels_[n]; }
+	IndexT get_offset(IndexT n) { return rowptr_[n]; }
+	IndexT get_dest(IndexT n) { return colidx_[n]; }
+	ValueT get_weight(IndexT n) { return weight_[n]; }
+	unsigned get_max_degree() { return max_degree; }
+	unsigned out_degree(IndexT n) const { return rowptr_[n+1] - rowptr_[n]; }
 	bool directed() const { return directed_; }
-	int num_vertices() const { return num_vertices_; }
-	int num_edges() const { return num_edges_; }
+	size_t num_vertices() const { return num_vertices_; }
+	size_t num_edges() const { return num_edges_; }
 
 	void read_txt(const char *filename, bool symmetrize = true) {
 		std::ifstream is;
@@ -95,7 +91,7 @@ public:
 		}
 		is.close();
 		num_vertices_ = labels_.size();
-		int num_labels = count_unique_labels();
+		auto num_labels = count_unique_labels();
 		std::cout << "Number of unique vertex label values: " << num_labels << std::endl;
 		num_edges_ = el.size();
 		if (!directed_) symmetrize_ = false; // no need to symmetrize undirected graph
@@ -105,9 +101,9 @@ public:
 		FILE* fd = fopen(filename, "r");
 		assert(fd != NULL);
 		char buf[2048];
-		int size = 0, maxsize = 0;
+		unsigned size = 0, maxsize = 0;
 		while (fgets(buf, 2048, fd) != NULL) {
-			int len = strlen(buf);
+			auto len = strlen(buf);
 			size += len;
 			if (buf[len-1] == '\n') {
 				maxsize = std::max(size, maxsize);
@@ -142,7 +138,7 @@ public:
 		}
 		is.close();
 		num_vertices_ = labels_.size();
-		int num_labels = count_unique_labels();
+		auto num_labels = count_unique_labels();
 		std::cout << "Number of unique vertex label values: " << num_labels << std::endl;
 		num_edges_ = el.size();
 		if (!directed_) symmetrize_ = false; // no need to symmetrize undirected graph
@@ -188,7 +184,7 @@ public:
 			if (c == '%') { in.ignore(200, '\n');
 			} else { break; }
 		}
-		int64_t m, n, nonzeros;
+		size_t m, n, nonzeros;
 		in >> m >> n >> nonzeros >> std::ws;
 		if (m != n) {
 			std::cout << m << " " << n << " " << nonzeros << std::endl;
@@ -197,17 +193,16 @@ public:
 		}
 		while (std::getline(in, line)) {
 			std::istringstream edge_stream(line);
-			int u;
+			IndexT u;
 			edge_stream >> u;
 			if (read_weights) {
-				int v;
+				IndexT v;
 				edge_stream >> v;
-				int w = 1;
-				el.push_back(MEdge(u - 1, v - 1, w));
+				el.push_back(MEdge(u - 1, v - 1, 1));
 				if (symmetrize)
-					el.push_back(MEdge(v - 1, u - 1, w));
+					el.push_back(MEdge(v - 1, u - 1, 1));
 			} else {
-				int v;
+				IndexT v;
 				edge_stream >> v;
 				el.push_back(MEdge(u - 1, v - 1, 1));
 				if (symmetrize)
@@ -218,34 +213,30 @@ public:
 		labels_.resize(m);
 		directed_ = !undirected;
 		if (undirected) symmetrize_ = false; // no need to symmetrize undirected graph
-		for (int i = 0; i < m; i ++) { labels_[i] = rand() % 10 + 1; }
+		for (size_t i = 0; i < m; i ++) { labels_[i] = rand() % 10 + 1; }
 		num_vertices_ = m;
 		num_edges_ = el.size();
 		MakeGraphFromEL();
 	}
 	void read_gr(Graph& g) {
 		num_vertices_ = g.size();
-		//degrees.resize(num_vertices_);
-		//std::fill(degrees.begin(), degrees.end(), 0);
-		//std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
 		for (auto it = g.begin(); it != g.end(); it ++) {
 			GNode src = *it;
 			for (auto e : g.edges(src)) {
 				GNode dst = g.getEdgeDst(e);
 				el.push_back(MEdge(src, dst, 1));
-				//degrees[src] ++;
 			}
 		}
 		assert(el.size() == g.sizeEdges());
 		num_edges_ = el.size();
 		labels_.resize(num_vertices_);
-		for (int i = 0; i < num_vertices_; i ++) { labels_[i] = g.getData(i); }
+		for (size_t i = 0; i < num_vertices_; i ++) { labels_[i] = g.getData(i); }
 		MakeGraphFromEL();
 	}
 	void print_graph() {
 		if (directed_) std::cout << "directed graph\n";
 		else std::cout << "undirected graph\n";
-		for (int n = 0; n < num_vertices_; n ++) {
+		for (size_t n = 0; n < num_vertices_; n ++) {
 			IndexT row_begin = rowptr_[n];
 			IndexT row_end = rowptr_[n+1];
 			std::cout << "vertex " << n << ": label = " << labels_[n] << " edgelist = [ ";
@@ -256,29 +247,62 @@ public:
 			std::cout << "]" << std::endl;
 		}
 	}
-
+	unsigned orientation(Graph &og, Graph &g) {
+		std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
+		std::cout << "num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
+		g.allocateFrom(og.size(), og.sizeEdges()/2);
+		g.constructNodes();
+		std::vector<IndexT> degrees(og.size(), 0);
+		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+			degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
+		unsigned max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+		std::vector<IndexT> new_degrees(og.size(), 0);
+		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+			for (auto e : og.edges(src)) {
+				auto dst = og.getEdgeDst(e);
+				if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
+					new_degrees[src] ++;
+				}
+			}
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getNewDegrees"));
+		std::vector<IndexT> offsets = PrefixSum(new_degrees);
+		assert(offsets[og.size()] == og.sizeEdges()/2);
+		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+			g.getData(src) = 0;
+			auto row_begin = offsets[src];
+			g.fixEndEdge(src, row_begin+new_degrees[src]);
+			IndexT offset = 0;
+			for (auto e : og.edges(src)) {
+				auto dst = og.getEdgeDst(e);
+				if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
+					g.constructEdge(row_begin+offset, dst, 0);
+					offset ++;
+				}
+			}
+			assert(offset == new_degrees[src]);
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
+		g.sortAllEdgesByDst();
+		return max_degree;
+	}
 private:
 	MEdgeList el;
-	bool need_relabel_edges;
 	bool need_dag;
 	bool symmetrize_; // whether to symmetrize a directed graph
 	bool directed_;
-	int num_vertices_;
-	int num_edges_;
+	size_t num_vertices_;
+	size_t num_edges_;
 	IndexT *rowptr_;
 	IndexT *colidx_;
 	ValueT *weight_;
-	int core;
-	//int *in_rowptr_;
-	//int *in_colidx_;
-	std::vector<int> rank;
+	unsigned max_degree;
 	std::vector<IndexT> degrees;
 	std::vector<ValueT> labels_;
 	std::vector<std::vector<MEdge> > vertices;
 
-	int count_unique_labels() {
-		std::set<int> s;
-		int res = 0;
+	unsigned count_unique_labels() {
+		std::set<ValueT> s;
+		unsigned res = 0;
 		for (size_t i = 0; i < labels_.size(); i++) {
 			if (s.find(labels_[i]) == s.end()) {
 				s.insert(labels_[i]);
@@ -296,62 +320,10 @@ private:
 			if (symmetrize_) degrees[e.dst] ++;
 		}
 	}
-	void MakeCSRFromEL() {
-		CountDegrees(el);
-		core = *(std::max_element(degrees.begin(), degrees.end()));
-		std::vector<int> offsets = PrefixSum(degrees);
-		num_edges_ = offsets[num_vertices_];
-		weight_ = new ValueT[num_edges_];
-		colidx_ = new IndexT[num_edges_];
-		rowptr_ = new IndexT[num_vertices_+1]; 
-		for (int i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
-		for (auto it = el.begin(); it < el.end(); it++) {
-			MEdge e = *it;
-			weight_[offsets[e.src]] = e.elabel;
-			colidx_[offsets[e.src]++] = e.dst;
-			if (symmetrize_) {
-				weight_[offsets[e.dst]] = e.elabel;
-				colidx_[offsets[e.dst]++] = e.src;
-			}
-		}
-	}
-	//computing degeneracy ordering and core value
-	void ord_core() {
-		rank.resize(num_vertices_);
-		unsigned *d0 = (unsigned *)calloc(num_vertices_, sizeof(unsigned));
-		IndexT *cd0 = (IndexT*)malloc((num_vertices_ + 1)*sizeof(IndexT));
-		IndexT *adj0 = (IndexT*)malloc(2*num_edges_*sizeof(IndexT));
-		for (int i = 0; i < num_edges_; i ++) {
-			d0[el[i].src]++;
-			d0[el[i].dst]++;
-		}
-		cd0[0] = 0;
-		for (int i = 1; i < num_vertices_ + 1; i ++) {
-			cd0[i] = cd0[i-1] + d0[i-1];
-			d0[i-1] = 0;
-		}
-		for (int i = 0; i < num_edges_; i ++) {
-			adj0[ cd0[el[i].src] + d0[ el[i].src]++] = el[i].dst;
-			adj0[ cd0[el[i].dst] + d0[ el[i].dst]++] = el[i].src;
-		}
-		bheap heap;
-		heap.mkheap(num_vertices_, d0);
-		int r = 0;
-		for (int i = 0; i < num_vertices_; i ++) {
-			keyvalue kv = heap.popmin();
-			rank[kv.key] = num_vertices_ - (++r);
-			for (IndexT j = cd0[kv.key]; j < cd0[kv.key + 1]; j ++) {
-				heap.update(adj0[j]);
-			}
-		}
-		free(d0);
-		free(cd0);
-		free(adj0);
-	}
 	// relabel vertices by descending degree order (do not apply to weighted graphs)
 	void DegreeRanking() {
 		std::cout << " Relabeling vertices by descending degree order\n";
-		typedef std::pair<int, IndexT> degree_node_p;
+		typedef std::pair<unsigned, IndexT> degree_node_p;
 		std::vector<degree_node_p> degree_id_pairs(num_vertices_);
 		for (IndexT n = 0; n < num_vertices_; n++)
 			degree_id_pairs[n] = std::make_pair(out_degree(n), n);
@@ -379,58 +351,38 @@ private:
 		rowptr_ = index;
 		colidx_ = neighs;
 	}
-	void ConstructDAG() {
-		std::cout << "Constructing DAG\n";
-		MEdgeList new_el;
-		int count = 0;
-		for (int i = 0; i < num_edges_; i ++) {
-			IndexT from = el[i].src;
-			IndexT to = el[i].dst;
-			if (degrees[from] < degrees[to] || (degrees[from] == degrees[to] && from < to)) {
-				new_el.push_back(el[i]);
-				count ++;
+	void MakeCSRFromEL() {
+		CountDegrees(el);
+		max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+		std::vector<IndexT> offsets = PrefixSum(degrees);
+		num_edges_ = offsets[num_vertices_];
+		weight_ = new ValueT[num_edges_];
+		colidx_ = new IndexT[num_edges_];
+		rowptr_ = new IndexT[num_vertices_+1]; 
+		for (size_t i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
+		for (auto it = el.begin(); it < el.end(); it++) {
+			MEdge e = *it;
+			weight_[offsets[e.src]] = e.elabel;
+			colidx_[offsets[e.src]++] = e.dst;
+			if (symmetrize_) {
+				weight_[offsets[e.dst]] = e.elabel;
+				colidx_[offsets[e.dst]++] = e.src;
 			}
 		}
-		el = new_el;
-		assert(count == el.size());
-		num_edges_ = count;
-	}
-	void RelabelEdges() {
-		std::cout << "Relabeling edges\n";
-		ord_core();
-		//for (int i = 0; i < num_vertices_; i ++)
-		//	std::cout << i << " --> " << rank[i] << "\n";
-		for (int i = 0; i < num_edges_; i ++) {
-			int source = rank[el[i].src];
-			int target = rank[el[i].dst];
-			if (source < target) {
-				int tmp = source;
-				source = target;
-				target = tmp;
-			}
-			el[i].src = source;
-			el[i].dst = target;
-		}
-		std::vector<ValueT> new_labels(num_vertices_);
-		for (int i = 0; i < num_vertices_; i ++)
-			new_labels[rank[i]] = labels_[i];
-		for (int i = 0; i < num_vertices_; i ++)
-			labels_[i] = new_labels[i];
 	}
 	void MakeCSR(bool transpose) {
 		degrees.resize(num_vertices_);
 		std::fill(degrees.begin(), degrees.end(), 0);
-		for (int i = 0; i < num_vertices_; i ++)
+		for (size_t i = 0; i < num_vertices_; i ++)
 			degrees[i] = vertices[i].size();
-		core = *(std::max_element(degrees.begin(), degrees.end()));
-		//printf("core value (max truncated degree) = %u\n", core);
-		std::vector<int> offsets = PrefixSum(degrees);
+		max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+		std::vector<IndexT> offsets = PrefixSum(degrees);
 		assert(num_edges_ == offsets[num_vertices_]);
 		weight_ = new ValueT[num_edges_];
 		colidx_ = new IndexT[num_edges_];
 		rowptr_ = new IndexT[num_vertices_+1]; 
-		for (int i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
-		for (int i = 0; i < num_vertices_; i ++) {
+		for (size_t i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
+		for (size_t i = 0; i < num_vertices_; i ++) {
 			for (auto it = vertices[i].begin(); it < vertices[i].end(); it ++) {
 				MEdge e = *it;
 				assert(i == e.src);
@@ -448,21 +400,21 @@ private:
 	static bool compare_id(MEdge a, MEdge b) { return (a.dst < b.dst); }
 	void SquishGraph(bool remove_selfloops = true, bool remove_redundents = true) {
 		std::vector<MEdge> neighbors;
-		for (int i = 0; i < num_vertices_; i++)
+		for (size_t i = 0; i < num_vertices_; i++)
 			vertices.push_back(neighbors);
 		//assert(num_edges_ == el.size());
-		for (int i = 0; i < num_edges_; i ++)
+		for (size_t i = 0; i < num_edges_; i ++)
 			vertices[el[i].src].push_back(el[i]);
 		el.clear();
 		printf("Sorting the neighbor lists...");
-		for (int i = 0; i < num_vertices_; i ++)
+		for (size_t i = 0; i < num_vertices_; i ++)
 			std::sort(vertices[i].begin(), vertices[i].end(), compare_id);
 		printf(" Done\n");
 		//remove self loops
 		int num_selfloops = 0;
 		if(remove_selfloops) {
 			printf("Removing self loops...");
-			for(int i = 0; i < num_vertices_; i ++) {
+			for(size_t i = 0; i < num_vertices_; i ++) {
 				for(unsigned j = 0; j < vertices[i].size(); j ++) {
 					if(i == vertices[i][j].dst) {
 						vertices[i].erase(vertices[i].begin()+j);
@@ -478,7 +430,7 @@ private:
 		int num_redundents = 0;
 		if(remove_redundents) {
 			printf("Removing redundent edges...");
-			for (int i = 0; i < num_vertices_; i ++) {
+			for (size_t i = 0; i < num_vertices_; i ++) {
 				for (unsigned j = 1; j < vertices[i].size(); j ++) {
 					if (vertices[i][j].dst == vertices[i][j-1].dst) {
 						vertices[i].erase(vertices[i].begin()+j);
@@ -494,11 +446,11 @@ private:
 			int num_dag = 0;
 			std::cout << "Constructing DAG...";
 			degrees.resize(num_vertices_);
-			for (int i = 0; i < num_vertices_; i ++)
+			for (size_t i = 0; i < num_vertices_; i ++)
 				degrees[i] = vertices[i].size();
-			for (int i = 0; i < num_vertices_; i ++) {
+			for (size_t i = 0; i < num_vertices_; i ++) {
 				for (unsigned j = 0; j < vertices[i].size(); j ++) {
-					int to = vertices[i][j].dst;
+					IndexT to = vertices[i][j].dst;
 					if (degrees[to] < degrees[i] || (degrees[to] == degrees[i] && to < i)) {
 						vertices[i].erase(vertices[i].begin()+j);
 						num_dag ++;
@@ -511,16 +463,12 @@ private:
 		}
 	}
 	void MakeGraphFromEL() {
-		if (need_relabel_edges) RelabelEdges();
-		//if (need_dag) ConstructDAG();
-		//MakeCSRFromEL();
 		SquishGraph();
 		MakeCSR(false);
-		//if (!need_relabel_edges) DegreeRanking();
 	}
-	static std::vector<int> PrefixSum(const std::vector<int> &vec) {
-		std::vector<int> sums(vec.size() + 1);
-		int total = 0;
+	static std::vector<IndexT> PrefixSum(const std::vector<IndexT> &vec) {
+		std::vector<IndexT> sums(vec.size() + 1);
+		IndexT total = 0;
 		for (size_t n=0; n < vec.size(); n++) {
 			sums[n] = total;
 			total += vec[n];

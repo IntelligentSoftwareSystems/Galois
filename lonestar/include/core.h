@@ -15,7 +15,7 @@ public:
 		free(pt);
 		free(kv);
 	}
-	void construct(unsigned n_max) {
+	void construct(size_t n_max) {
 		n_max = n_max;
 		n = 0;
 		pt = (unsigned *)malloc(n_max*sizeof(unsigned));
@@ -76,9 +76,9 @@ public:
 		return min;
 	}
 	//Building the heap structure with (key,value)=(node,degree) for each node
-	void mkheap(unsigned n,unsigned *v) {
+	void mkheap(size_t n, std::vector<IndexT> v) {
 		construct(n);
-		for (unsigned i = 0; i < n; i ++) {
+		for (size_t i = 0; i < n; i ++) {
 			keyvalue item;
 			item.key = i;
 			item.value = v[i];

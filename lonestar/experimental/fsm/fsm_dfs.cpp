@@ -12,8 +12,13 @@ const char* url  = 0;
  
 class AppMiner : public EdgeMiner {
 public:
-	AppMiner(Graph *g, unsigned size) : EdgeMiner(g, size) {}
+	AppMiner(Graph *g) : EdgeMiner(g) {}
 	~AppMiner() {}
+	void init(unsigned max_degree, bool use_dag) {
+		assert(k > 1);
+		set_max_size(k);
+		set_threshold(minsup);
+	}
 	bool toAdd(BaseEdgeEmbeddingList &emb_list, DFSCode &pattern) {
 		return (is_frequent(emb_list, pattern) && is_canonical(pattern));
 	}

@@ -148,8 +148,8 @@ int main(int argc, char** argv) {
 	#endif
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	read_graph(data_graph, filetype, filename, false, need_dag);
-	read_graph(query_graph, filetype, query_graph_filename, false, need_dag);
+	read_graph(data_graph, filetype, filename, need_dag);
+	read_graph(query_graph, filetype, query_graph_filename, need_dag);
 	Tinitial.stop();
 	std::cout << "Data_graph: num_vertices " << data_graph.size() << " num_edges " << data_graph.sizeEdges() << "\n";
 	std::cout << "Query_graph: num_vertices " << query_graph.size() << " num_edges " << query_graph.sizeEdges() << "\n";

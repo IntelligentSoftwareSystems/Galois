@@ -10,29 +10,16 @@ int main(int argc, char** argv) {
 	#endif
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	int core = read_graph(graph, filetype, filename, false, need_dag);
-	//int core = read_graph(graph, filetype, filename, true);
+	unsigned max_degree = read_graph(graph, filetype, filename, need_dag);
 	Tinitial.stop();
-	#ifdef EDGE_INDUCED
-	assert(k > 1);
-	#else
-	assert(k > 2);
-	#endif
 	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 	if (show) std::cout << "k = " << k << "\n";
-	if (show) std::cout << "core = " << core << "\n";
+	if (show) std::cout << "max_degree = " << max_degree << "\n";
 	//print_graph(graph);
 
 	ResourceManager rm;
-	#ifdef EDGE_INDUCED
-	AppMiner miner(&graph, k);
-	#else
-	int npatterns = 1;
-	#ifdef USE_MAP
-	npatterns = num_patterns[k-3];
-	#endif
-	AppMiner miner(&graph, k, npatterns, need_dag, core);
-	#endif
+	AppMiner miner(&graph);
+	miner.init(max_degree, need_dag);
 
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
@@ -40,18 +27,17 @@ int main(int argc, char** argv) {
 	miner.process();
 	#else
 	#ifdef ALGO_EDGE
-	#ifdef USE_ADHOC
-	miner.edge_process_adhoc();
+	#ifdef USE_OPT
+	miner.edge_process_opt();
 	#else
-	#ifdef USE_EGONET
-	//miner.edge_process();
-	miner.edge_process_ego();
+	miner.edge_process();
+	#endif // USE_OPT
 	#else
-	miner.edge_process_naive();
-	#endif // USE_EGONET
-	#endif // USE_ADHOC
+	#ifdef USE_OPT
+	miner.vertex_process_opt();
 	#else
-	miner.vertex_process_adhoc();
+	miner.vertex_process();
+	#endif // USE_OPT
 	#endif // ALGO_EDGE
 	#endif // EDGE_INDUCED
 	Tcomp.stop();

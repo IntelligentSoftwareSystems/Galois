@@ -29,16 +29,14 @@ typedef galois::substrate::PerThreadStorage<Status> MtStatus; // Multi-threaded 
 
 class EdgeMiner : public Miner {
 public:
-	EdgeMiner(Graph *g, unsigned size) {
+	EdgeMiner(Graph *g) {
 		graph = g;
-		threshold = minsup;
-		max_size = size;
-		//for (int i = 0; i < numThreads; i++)
-		//	emb_lists.getLocal(i)->allocate(0, size);
 		edge_list.init(*g, true);
 		total_num.reset();
 	}
 	virtual ~EdgeMiner() {}
+	void set_max_size(unsigned size = 2) { max_size = size; }
+	void set_threshold(const unsigned minsup) { threshold = minsup; }
 	virtual bool toExtend(unsigned n, const EdgeEmbedding &emb, unsigned pos) {
 		//return emb.get_key(pos) == 0;
 		return true;
