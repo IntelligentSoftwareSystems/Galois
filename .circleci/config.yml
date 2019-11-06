@@ -11,14 +11,13 @@ version: 2
 
 jobs:
   "Debian":
-     # As of this writing, runs on Debian 9.5
     docker:
-      - image: gcc:9
+      - image: debian:10
     steps:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake libopenmpi-dev openmpi-bin
+          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ libmpich-dev mpich
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
