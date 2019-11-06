@@ -18,7 +18,6 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake
           apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake libopenmpi-dev openmpi-bin
           mkdir build
           cd build
