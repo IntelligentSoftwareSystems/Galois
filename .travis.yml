@@ -1,4 +1,4 @@
-dist: trusty
+dist: xenial
 sudo: false
 
 language: c++
@@ -16,13 +16,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-5
             - g++-5
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -31,13 +30,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-6
             - g++-6
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -46,13 +44,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-7
             - g++-7
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -61,13 +58,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-8
             - g++-8
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -76,13 +72,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-9
             - g++-9
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -92,13 +87,12 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
           packages:
             - gcc-9
             - g++-9
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -107,15 +101,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-3.8
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.8 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-3.8
             - gcc-5
             - g++-5
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -124,15 +118,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-3.9
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-3.9
             - gcc-5
             - g++-5
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -141,15 +135,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-4.0
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-4.0 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-4.0
             - gcc-5
             - g++-5
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -158,15 +152,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-5.0
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-5.0
             - gcc-7
             - g++-7
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -175,15 +169,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-6.0
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-6.0 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-6.0
             - gcc-8
             - g++-8
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - openmpi-bin
             - libopenmpi-dev
     - env:
@@ -191,15 +185,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-7
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-7
             - gcc-8
             - g++-8
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -208,15 +202,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-8
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-8
             - gcc-8
             - g++-8
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -226,15 +220,15 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-8
-            - sourceline: 'ppa:mhier/libboost-latest'
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-8
             - gcc-8
             - g++-8
-            - cmake3
-            - boost1.67
+            - cmake
+            - libboost-all-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
