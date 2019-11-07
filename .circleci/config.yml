@@ -113,10 +113,10 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j2
           make test || :
