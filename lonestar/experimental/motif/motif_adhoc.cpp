@@ -34,7 +34,7 @@ public:
 	void print_output() { printout_motifs(); }
 	void edge_process_opt() {
 		for (int i = 0; i < numThreads; i++) {
-			emb_lists.getLocal(i)->allocate(graph, max_size, core);
+			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
 		}
 		galois::do_all(galois::iterate(edge_list), [&](const auto& edge) {
 			EmbeddingList *emb_list = emb_lists.getLocal();

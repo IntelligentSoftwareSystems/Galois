@@ -247,44 +247,6 @@ public:
 			std::cout << "]" << std::endl;
 		}
 	}
-	unsigned orientation(Graph &og, Graph &g) {
-		std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
-		std::cout << "num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
-		g.allocateFrom(og.size(), og.sizeEdges()/2);
-		g.constructNodes();
-		std::vector<IndexT> degrees(og.size(), 0);
-		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
-			degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
-		unsigned max_degree = *(std::max_element(degrees.begin(), degrees.end()));
-		std::vector<IndexT> new_degrees(og.size(), 0);
-		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
-			for (auto e : og.edges(src)) {
-				auto dst = og.getEdgeDst(e);
-				if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
-					new_degrees[src] ++;
-				}
-			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getNewDegrees"));
-		std::vector<IndexT> offsets = PrefixSum(new_degrees);
-		assert(offsets[og.size()] == og.sizeEdges()/2);
-		galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
-			g.getData(src) = 0;
-			auto row_begin = offsets[src];
-			g.fixEndEdge(src, row_begin+new_degrees[src]);
-			IndexT offset = 0;
-			for (auto e : og.edges(src)) {
-				auto dst = og.getEdgeDst(e);
-				if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
-					g.constructEdge(row_begin+offset, dst, 0);
-					offset ++;
-				}
-			}
-			assert(offset == new_degrees[src]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
-		g.sortAllEdgesByDst();
-		return max_degree;
-	}
 private:
 	MEdgeList el;
 	bool need_dag;
@@ -320,63 +282,21 @@ private:
 			if (symmetrize_) degrees[e.dst] ++;
 		}
 	}
-	// relabel vertices by descending degree order (do not apply to weighted graphs)
-	void DegreeRanking() {
-		std::cout << " Relabeling vertices by descending degree order\n";
-		typedef std::pair<unsigned, IndexT> degree_node_p;
-		std::vector<degree_node_p> degree_id_pairs(num_vertices_);
-		for (IndexT n = 0; n < num_vertices_; n++)
-			degree_id_pairs[n] = std::make_pair(out_degree(n), n);
-		std::sort(degree_id_pairs.begin(), degree_id_pairs.end(), std::greater<degree_node_p>());
-		degrees.resize(num_vertices_);
-		std::fill(degrees.begin(), degrees.end(), 0);
-		std::vector<IndexT> new_ids(num_vertices_);
-		for (IndexT n = 0; n < num_vertices_; n++) {
-			degrees[n] = degree_id_pairs[n].first;
-			new_ids[degree_id_pairs[n].second] = n;
-		}
-		std::vector<IndexT> offsets = PrefixSum(degrees);
-		IndexT *index = new IndexT[num_vertices_+1];
-		IndexT *neighs = new IndexT[num_edges_];
-		for (IndexT i = 0; i < num_vertices_+1; i++) index[i] = offsets[i];
-		for (IndexT u = 0; u < num_vertices_; u++) {
-			for (IndexT offset = get_offset(u); offset < get_offset(u+1); offset++) {
-				IndexT v = get_dest(offset);
-				neighs[offsets[new_ids[u]]++] = new_ids[v];
-			}
-			std::sort(neighs+index[new_ids[u]], neighs+index[new_ids[u]+1]);
-		}
-		delete rowptr_;
-		delete colidx_;
-		rowptr_ = index;
-		colidx_ = neighs;
-	}
-	void MakeCSRFromEL() {
-		CountDegrees(el);
-		max_degree = *(std::max_element(degrees.begin(), degrees.end()));
-		std::vector<IndexT> offsets = PrefixSum(degrees);
-		num_edges_ = offsets[num_vertices_];
-		weight_ = new ValueT[num_edges_];
-		colidx_ = new IndexT[num_edges_];
-		rowptr_ = new IndexT[num_vertices_+1]; 
-		for (size_t i = 0; i < num_vertices_+1; i ++) rowptr_[i] = offsets[i];
-		for (auto it = el.begin(); it < el.end(); it++) {
-			MEdge e = *it;
-			weight_[offsets[e.src]] = e.elabel;
-			colidx_[offsets[e.src]++] = e.dst;
-			if (symmetrize_) {
-				weight_[offsets[e.dst]] = e.elabel;
-				colidx_[offsets[e.dst]++] = e.src;
-			}
-		}
-	}
 	void MakeCSR(bool transpose) {
 		degrees.resize(num_vertices_);
 		std::fill(degrees.begin(), degrees.end(), 0);
 		for (size_t i = 0; i < num_vertices_; i ++)
 			degrees[i] = vertices[i].size();
 		max_degree = *(std::max_element(degrees.begin(), degrees.end()));
-		std::vector<IndexT> offsets = PrefixSum(degrees);
+
+		std::vector<IndexT> offsets(degrees.size() + 1);
+		IndexT total = 0;
+		for (size_t n = 0; n < degrees.size(); n++) {
+			offsets[n] = total;
+			total += degrees[n];
+		}
+		offsets[degrees.size()] = total;
+
 		assert(num_edges_ == offsets[num_vertices_]);
 		weight_ = new ValueT[num_edges_];
 		colidx_ = new IndexT[num_edges_];
@@ -465,16 +385,6 @@ private:
 	void MakeGraphFromEL() {
 		SquishGraph();
 		MakeCSR(false);
-	}
-	static std::vector<IndexT> PrefixSum(const std::vector<IndexT> &vec) {
-		std::vector<IndexT> sums(vec.size() + 1);
-		IndexT total = 0;
-		for (size_t n=0; n < vec.size(); n++) {
-			sums[n] = total;
-			total += vec[n];
-		}
-		sums[vec.size()] = total;
-		return sums;
 	}
 	inline void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ") {
 		std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);

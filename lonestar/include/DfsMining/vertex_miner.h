@@ -106,7 +106,7 @@ public:
 			emb_list->init_edge(edge_list.get_edge(pos));
 			#ifdef USE_MAP
 			//dfs_extend_multi(1, 0, *emb_list);
-			ego_extend_multi(1, *emb_list);
+			ego_extend_opt(1, *emb_list);
 			solve_motif_equations(*emb_list);
 			if (max_size == 4) emb_list->clear_labels(edge_list.get_edge(pos).dst);
 			#else
@@ -172,11 +172,8 @@ public:
 	}
 	// DFS extension for k-cliques
 	void ego_extend_single(unsigned level, EmbeddingList &emb_list) {
-		//unsigned n = level+1;
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-				//BaseEmbedding emb(n);
-				//emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
 				auto vid = emb_list.get_vertex(level, emb_id);
 				auto begin = graph->edge_begin(vid);
 				auto end = graph->edge_end(vid);
@@ -190,8 +187,6 @@ public:
 			return;
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-			//BaseEmbedding emb(n);
-			//emb_list.get_embedding<BaseEmbedding>(level, emb_id, emb);
 			auto vid = emb_list.get_vertex(level, emb_id);
 			auto begin = graph->edge_begin(vid);
 			auto end = graph->edge_end(vid);
@@ -290,13 +285,15 @@ public:
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
 				auto vid = emb_list.get_vid(level, emb_id);
+				//for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 				unsigned previous_pid = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				//if (!toExtend(level, element_id)) continue; //if (element_id != level)
+				//auto src = emb_list.get_vertex(level, element_id);
 				auto begin = graph->edge_begin(vid);
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e != end; e ++) {
 					auto dst = graph->getEdgeDst(e);
-					//std::cout << "\t\tv3 = " << dst << "\n";
 					if (toAdd(level, dst, emb_list))
 						//reduction(getPattern(level, dst, emb_list, previous_pid), emb_list);
 						reduction(level, emb_list, vid, dst, previous_pid);
@@ -307,7 +304,6 @@ public:
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			emb_list.set_size(level+1, 0);
 			auto vid = emb_list.get_vid(level, emb_id);
-			//std::cout << "debug: (v0 = " << emb_list.get_history(0) << ", v1 = " << vid << ")\n";
 			//for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 				//if (!toExtend(level, element_id)) continue;
 				//auto src = emb_list.get_vertex(level, element_id);
@@ -325,7 +321,6 @@ public:
 						assert(start < max_degree);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_size(level+1, start+1);
-						//std::cout << "\tv2 = " << dst << ", pid = " << pid << "\n";
 						update(level, dst, start, previous_pid, emb_list);
 					}
 				}
@@ -334,41 +329,41 @@ public:
 			if (level > 1) emb_list.pop_history();
 		}
 	}
-	void dfs_extend_ego_motif(unsigned level, EmbeddingList &emb_list) {
+	void ego_extend_opt(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
-					if (!toExtend(level, element_id)) continue; //if (element_id != level)
-					auto src = emb_list.get_vertex(level, element_id);
-					auto begin = graph->edge_begin(src);
-					auto end = graph->edge_end(src);
-					for (auto e = begin; e < end; e ++) {
-						auto dst = graph->getEdgeDst(e);
-						if (toAdd(level, dst, emb_list))
-							reduction(level, emb_list, src, dst, 0);
-					}
+				auto src = emb_list.get_vid(level, emb_id);
+				unsigned previous_pid = 0;
+				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto e = begin; e < end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (toAdd(level, dst, emb_list))
+						reduction(level, emb_list, src, dst, previous_pid);
 				}
 			}
-			post_processing(level);
 			return;
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			emb_list.set_size(level+1, 0);
-			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
-				if (!toExtend(level, element_id)) continue;
-				auto src = emb_list.get_vertex(level, element_id);
-				for (auto e : graph->edges(src)) {
-					auto dst = graph->getEdgeDst(e);
-					if (toAdd(level, dst, emb_list)) {
-						auto start = emb_list.size(level+1);
-						emb_list.set_vid(level+1, start, dst);
-						emb_list.set_size(level+1, start+1);
-						update(level, dst, start, 0, emb_list);
-					}
+			auto src = emb_list.get_vid(level, emb_id);
+			unsigned previous_pid = 0;
+			if (level > 1) {
+				previous_pid = emb_list.get_pid(level, emb_id);
+				emb_list.push_history(src);
+			}
+			for (auto e : graph->edges(src)) {
+				auto dst = graph->getEdgeDst(e);
+				if (toAdd(level, dst, emb_list)) {
+					auto start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+					update(level, dst, start, previous_pid, emb_list);
 				}
 			}
-			dfs_extend_ego_motif(level+1, emb_list);
-			post_processing(level);
+			ego_extend_opt(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
 		}
 	}
 

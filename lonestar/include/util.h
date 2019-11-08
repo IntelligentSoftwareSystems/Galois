@@ -1,3 +1,6 @@
+#ifndef UTIL_H
+#define UTIL_H
+
 #include "mgraph.h"
 #include "res_man.h"
 
@@ -8,6 +11,17 @@ void print_graph(Graph &graph) {
 			std::cout << graph.getEdgeDst(e) << " ";
 		std::cout << "]" << std::endl;
 	}
+}
+
+static std::vector<IndexT> PrefixSum(const std::vector<IndexT> &vec) {
+	std::vector<IndexT> sums(vec.size() + 1);
+	IndexT total = 0;
+	for (size_t n=0; n < vec.size(); n++) {
+		sums[n] = total;
+		total += vec[n];
+	}
+	sums[vec.size()] = total;
+	return sums;
 }
 
 void genGraph(MGraph &mg, Graph &g) {
@@ -27,6 +41,90 @@ void genGraph(MGraph &mg, Graph &g) {
 			#endif
 		}
 	}
+}
+// relabel vertices by descending degree order (do not apply to weighted graphs)
+void DegreeRanking(Graph &og, Graph &g) {
+	std::cout << " Relabeling vertices by descending degree order\n";
+	std::vector<IndexT> old_degrees(og.size(), 0);
+	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+		old_degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
+
+	size_t num_vertices = og.size();
+	typedef std::pair<unsigned, IndexT> degree_node_p;
+	std::vector<degree_node_p> degree_id_pairs(num_vertices);
+	for (IndexT n = 0; n < num_vertices; n++)
+		degree_id_pairs[n] = std::make_pair(old_degrees[n], n);
+	std::sort(degree_id_pairs.begin(), degree_id_pairs.end(), std::greater<degree_node_p>());
+
+	std::vector<IndexT> degrees(num_vertices, 0);
+	std::vector<IndexT> new_ids(num_vertices);
+	for (IndexT n = 0; n < num_vertices; n++) {
+		degrees[n] = degree_id_pairs[n].first;
+		new_ids[degree_id_pairs[n].second] = n;
+	}
+	std::vector<IndexT> offsets = PrefixSum(degrees);
+	
+	g.allocateFrom(og.size(), og.sizeEdges());
+	g.constructNodes();
+	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+		auto row_begin = offsets[src];
+		g.fixEndEdge(src, row_begin+degrees[src]);
+		IndexT offset = 0;
+		for (auto e : og.edges(src)) {
+			auto dst = og.getEdgeDst(e);
+			g.constructEdge(row_begin+offset, new_ids[dst], 0);
+			offset ++;
+		}
+		assert(offset == degrees[src]);
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
+	g.sortAllEdgesByDst();
+}
+
+unsigned orientation(Graph &og, Graph &g) {
+	std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
+	std::cout << "num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
+	std::vector<IndexT> degrees(og.size(), 0);
+
+	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+		degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
+
+	unsigned max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+	std::vector<IndexT> new_degrees(og.size(), 0);
+
+	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+		for (auto e : og.edges(src)) {
+			auto dst = og.getEdgeDst(e);
+			if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
+				new_degrees[src] ++;
+			}
+		}
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getNewDegrees"));
+
+	std::vector<IndexT> offsets = PrefixSum(new_degrees);
+	assert(offsets[og.size()] == og.sizeEdges()/2);
+
+	g.allocateFrom(og.size(), og.sizeEdges()/2);
+	g.constructNodes();
+
+	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
+		g.getData(src) = 0;
+		auto row_begin = offsets[src];
+		g.fixEndEdge(src, row_begin+new_degrees[src]);
+		IndexT offset = 0;
+		for (auto e : og.edges(src)) {
+			auto dst = og.getEdgeDst(e);
+			if (degrees[dst] > degrees[src] || (degrees[dst] == degrees[src] && dst > src)) {
+				g.constructEdge(row_begin+offset, dst, 0);
+				offset ++;
+			}
+		}
+		assert(offset == new_degrees[src]);
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
+
+	g.sortAllEdgesByDst();
+	return max_degree;
 }
 
 // relabel is needed when we use DAG as input graph, and it is disabled when we use symmetrized graph
@@ -50,7 +148,7 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 		if(need_dag) {
 			Graph g_temp;
 			galois::graphs::readGraph(g_temp, filename);
-			max_degree = mgraph.orientation(g_temp, graph);
+			max_degree = orientation(g_temp, graph);
 		} else {
 			galois::graphs::readGraph(graph, filename);
 			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
@@ -73,3 +171,4 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 	return max_degree;
 }
 
+#endif

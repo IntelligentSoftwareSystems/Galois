@@ -72,7 +72,7 @@ private:
 		EdgeHeap min_heap;
 		BlissVertexList vertices = graph->get_vertices_rstream();
 		VertexId first_src = init_heapAndset(vertices, min_heap, set);
-		assert(first_src != -1);
+		assert(first_src != (VertexId)-1);
 		push_first_element(first_src, map, vertices);
 #ifdef USE_DOMAIN
 		bool is_first_edge = true;

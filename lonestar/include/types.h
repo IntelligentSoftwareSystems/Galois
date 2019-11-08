@@ -6,20 +6,20 @@
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/SimpleLock.h"
 
-typedef unsigned IndexT;
-typedef unsigned ValueT;
-
 typedef float Weight;
+typedef uint64_t Ulong;
+typedef unsigned ValueT;
 typedef unsigned VertexId;
 typedef unsigned char BYTE;
-typedef unsigned long Ulong;
 #ifdef LARGE_SIZE
-typedef size_t IndexTy;
+typedef uint64_t IndexT;
+typedef uint64_t IndexTy;
 typedef std::vector<BYTE> ByteList;
 typedef std::vector<unsigned> UintList;
 typedef std::vector<Ulong> UlongList;
 typedef std::vector<VertexId> VertexList;
 #else
+typedef unsigned IndexT;
 typedef unsigned IndexTy;
 typedef galois::gstl::Vector<BYTE> ByteList;
 typedef galois::gstl::Vector<unsigned> UintList;

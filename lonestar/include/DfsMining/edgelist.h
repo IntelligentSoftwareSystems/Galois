@@ -114,11 +114,11 @@ public:
 		for (size_t i = 0; i < num_edges; i ++) {
 			d[edges[i].src]++;
 		}
-		std::vector<IndexT> cd(num_vertices+1);
-		cd[0] = 0;
+		//std::vector<IndexT> cd(num_vertices+1);
+		//cd[0] = 0;
 		unsigned max = 0;
 		for (size_t i = 1; i < num_vertices+1; i ++) {
-			cd[i] = cd[i-1] + d[i-1];
+			//cd[i] = cd[i-1] + d[i-1];
 			max = (max > d[i-1]) ? max : d[i-1];
 			d[i-1] = 0;
 		}

@@ -3,6 +3,7 @@
 #define ALGO_EDGE
 #define USE_OPT
 #define SHRINK // enables graph shrinking
+#define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 #define USE_SIMPLE
 #define USE_BASE_TYPES
 #define CHUNK_SIZE 256
@@ -34,6 +35,7 @@ public:
 		for (int i = 0; i < numThreads; i++) {
 			emb_lists.getLocal(i)->allocate(graph, max_size, core);
 		}
+		std::cout << "max_size = " << max_size << "\n";
 		std::cout << "DFS edge processing using advanced optimization\n";
 		assert(max_size > 3);
 		//galois::for_each(galois::iterate(edge_list), [&](const Edge &edge, auto &ctx) {
