@@ -2,7 +2,7 @@
 #define USE_DFS
 #define USE_MAP
 #define USE_PID
-#define USE_FORMULA
+//#define USE_FORMULA
 #define ALGO_EDGE
 #define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 #define USE_SIMPLE
@@ -29,19 +29,14 @@ public:
 		init_edgelist();
 		#endif
 	}
-	// customized pattern classification method
-	unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned previous_pid) { 
-		if (n < 4) return find_motif_pattern_id_dfs(n, i, dst, emb, previous_pid);
-		return 0;
-	}
-	unsigned getPattern(unsigned level, VertexId vid, EmbeddingList &emb_list, unsigned previous_pid) { 
-		if (level < 3) return find_motif_pattern_id_dfs(level, vid, emb_list, previous_pid);
-		return 0;
-	}
 	void print_output() { printout_motifs(); }
-	bool toExtend(unsigned level, unsigned pos) {
-		return pos == level;
+	// customized pattern classification method
+	unsigned getPattern(unsigned level, VertexId vid, EmbeddingList &emb_list, unsigned previous_pid, BYTE src_idx) { 
+		if (level < 3) return find_pattern_id_dfs(level, vid, emb_list, previous_pid, src_idx);
+		return 0;
 	}
+	#ifdef USE_FORMULA // only find triangles, 4-cycles and 4-cliques
+	bool toExtend(unsigned level, unsigned v_idx) { return v_idx == level; }
 	bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list) {
 		return vid != emb_list.get_vid(0, 0);
 	}
@@ -70,7 +65,6 @@ public:
 		}
 		emb_list.set_pid(level+1, start, pid);
 	}
-	#ifdef USE_OPT
 	void post_processing(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
 			solve_motif_equations(emb_list);

@@ -71,16 +71,14 @@ public:
 	}
 	// toAdd (only add non-automorphisms)
 	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		auto src = emb.get_vertex(pos);
-		return !is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, src, dst);
+		return !is_vertexInduced_automorphism<BaseEmbedding>(n, emb, pos, dst);
 	}
 	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) {
 		return true;
 	}
 	// toAdd (only add non-automorphisms)
 	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
-		auto src = emb.get_vertex(pos);
-		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, src, dst);
+		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, dst);
 	}
 	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
 		return 0;
@@ -254,7 +252,6 @@ public:
 				auto src = emb.get_vertex(i);
 				for (auto e : graph->edges(src)) {
 					GNode dst = graph->getEdgeDst(e);
-					//if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
 					if (toAdd(n, emb, dst, i)) {
 						assert(start < indices.back());
 						if (n == 2 && max_size == 4)
@@ -317,166 +314,7 @@ public:
 		//}, "ExtendingInsertPapi");
 		indices.clear();
 	}
-	/*
-	inline void reduce(VertexEmbeddingQueue &queue) {
-		galois::do_all(galois::iterate(queue),
-			[&](const VertexEmbedding& emb) {
-				auto n = emb.size();
-				for (unsigned i = 0; i < n; ++i) {
-					auto src = emb.get_vertex(i);
-					for (auto e : graph->edges(src)) {
-						auto dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
-							assert(n < 4);
-							unsigned pid = find_motif_pattern_id(n, i, dst, emb);
-							accumulators[pid] += 1;
-						}
-					}
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(), 
-			#ifdef ENABLE_STEAL
-			galois::steal(),
-			#endif
-			galois::loopname("Reduce")
-		);
-	}
-	*/
-	/*
-	inline void reduce_lazy(VertexEmbeddingQueue &queue) {
-		galois::do_all(galois::iterate(queue),
-			[&](const VertexEmbedding& emb) {
-				unsigned n = emb.size();
-				//VertexEmbeddingBuffer emb_buffer; 
-				//UintList src_buffer;
-				UintList dst_buffer;
-				UintList pos_buffer;
-				for (unsigned i = 0; i < n; ++i) {
-					auto src = emb.get_vertex(i);
-					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
-						//src_buffer.push_back(src);
-						dst_buffer.push_back(dst);
-						//VertexEmbedding new_emb(emb);
-						//new_emb.push_back(dst);
-						//emb_buffer.push_back(new_emb);
-						pos_buffer.push_back(i);
-					}
-				}
-				for (size_t i = 0; i < pos_buffer.size(); i++) {
-					//auto src = src_buffer[i];
-					auto dst = dst_buffer[i];
-					auto pos = pos_buffer[i];
-					auto src = emb.get_vertex(pos);
-					//auto dst = emb_buffer[i].get_vertex(n);
-					if (!is_vertexInduced_automorphism(n, emb, pos, src, dst)) {
-						assert(n < 4);
-						unsigned pid = find_motif_pattern_id(n, pos, dst, emb);
-						accumulators[pid] += 1;
-					}
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(),
-			#ifdef ENABLE_STEAL
-			galois::steal(),
-			#endif
-			galois::loopname("Reduce")
-		);
-	}
-	//*/
-	/*
-	inline void reduce(unsigned level, EmbeddingList& emb_list) {
-		//galois::runtime::profileVtune([&] () {
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& pos) {
-				VertexEmbedding emb(level+1);
-				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-				auto n = emb.size();
-				if (n == 3) emb.set_pid(emb_list.get_pid(pos));
-				for (unsigned i = 0; i < n; ++i) {
-					auto src = emb.get_vertex(i);
-					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
-							assert(n < 4);
-							unsigned pid = find_motif_pattern_id(n, i, dst, emb, pos);
-							accumulators[pid] += 1;
-						}
-					}
-				}
-				emb.clean();
-			},
-			galois::chunk_size<CHUNK_SIZE>(), 
-			#ifdef ENABLE_STEAL
-			galois::steal(), 
-			#endif
-			galois::loopname("Reduce")
-		);
-		//}, "ReduceVtune");
-	}
-	// quick pattern reduction 
-	inline void quick_reduce(VertexEmbeddingQueue &queue) {
-		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
-		galois::do_all(galois::iterate(queue),
-			[&](const VertexEmbedding& emb) {
-				StrQpMapFreq *qp_map = qp_localmaps.getLocal();
-				unsigned n = emb.size();
-				for (unsigned i = 0; i < n; ++i) {
-					auto src = emb.get_vertex(i);
-					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
-							std::vector<bool> connected;
-							get_connectivity(n, i, dst, emb, connected);
-							StrQPattern qp(n+1, connected);
-							if (qp_map->find(qp) != qp_map->end()) {
-								(*qp_map)[qp] += 1;
-								qp.clean();
-							} else (*qp_map)[qp] = 1;
-						}
-					}
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(),
-			#ifdef ENABLE_STEAL
-			galois::steal(),
-			#endif
-			galois::loopname("QuickReduction")
-		);
-	}
-	inline void quick_reduce(unsigned level, const EmbeddingList& emb_list) {
-		for (auto i = 0; i < numThreads; i++) qp_localmaps.getLocal(i)->clear();
-		galois::do_all(galois::iterate((size_t)0, emb_list.size(level)),
-			[&](const size_t& pos) {
-				StrQpMapFreq* qp_map = qp_localmaps.getLocal();
-				VertexEmbedding emb(level+1);
-				get_embedding<VertexEmbedding>(level, pos, emb_list, emb);
-				unsigned n = emb.size();
-				for (unsigned i = 0; i < n; ++i) {
-					auto src = emb.get_vertex(i);
-					for (auto e : graph->edges(src)) {
-						GNode dst = graph->getEdgeDst(e);
-						if (!is_vertexInduced_automorphism(n, emb, i, src, dst)) {
-							std::vector<bool> connected;
-							get_connectivity(n, i, dst, emb, connected);
-							StrQPattern qp(n+1, connected);
-							if (qp_map->find(qp) != qp_map->end()) {
-								(*qp_map)[qp] += 1;
-								qp.clean();
-							} else (*qp_map)[qp] = 1;
-						}
-					}
-				}
-				emb.clean();
-			},
-			galois::chunk_size<CHUNK_SIZE>(),
-			#ifdef ENABLE_STEAL
-			galois::steal(),
-			#endif
-			galois::loopname("QuickReduction")
-		);
-	}
-	//*/
+	// quick pattern reduction
 	inline void quick_reduce(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, StrQpMapFreq *qp_lmap) {
 		std::vector<bool> connected;
 		get_connectivity(n, i, dst, emb, connected);
@@ -502,7 +340,6 @@ public:
 			#ifdef ENABLE_STEAL
 			galois::steal(),
 			#endif
-			//galois::no_conflicts(), galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalReduction")
 		);
 		qp_map.clear();
@@ -608,78 +445,6 @@ protected:
 	int npatterns;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
-	std::vector<unsigned> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
-
-	template <typename EmbeddingTy = VertexEmbedding>
-	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId src, VertexId dst) {
-		//unsigned n = emb.size();
-		// the new vertex id should be larger than the first vertex id
-		if (dst <= emb.get_vertex(0)) return true;
-		// the new vertex should not already exist in the embedding
-		for (unsigned i = 1; i < n; ++i)
-			if (dst == emb.get_vertex(i)) return true;
-		// the new vertex should not already be extended by any previous vertex in the embedding
-		for (unsigned i = 0; i < idx; ++i)
-			if (is_connected(emb.get_vertex(i), dst)) return true;
-		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
-		for (unsigned i = idx+1; i < n; ++i)
-			if (dst < emb.get_vertex(i)) return true;
-		return false;
-	}
-	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
-		unsigned pid = 0;
-		if (n == 2) { // count 3-motifs
-			pid = 1; // 3-chain
-			if (idx == 0) {
-				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
-				#ifdef USE_WEDGE
-				else if (max_size == 4) is_wedge[pos] = 1; // wedge; used for 4-motif
-				#endif
-			}
-		} else if (n == 3) { // count 4-motifs
-			unsigned num_edges = 1;
-			pid = emb.get_pid();
-			if (pid == 0) { // extending a triangle
-				for (unsigned j = idx+1; j < n; j ++)
-					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
-				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
-			} else { // extending a 3-chain
-				assert(pid == 1);
-				std::vector<bool> connected(3, false);
-				connected[idx] = true;
-				for (unsigned j = idx+1; j < n; j ++) {
-					if (is_connected(emb.get_vertex(j), dst)) {
-						num_edges ++;
-						connected[j] = true;
-					}
-				}
-				if (num_edges == 1) {
-					pid = 0; // p0: 3-path
-					unsigned center = 1;
-					#ifdef USE_WEDGE
-					if (is_wedge[pos]) center = 0;
-					#else
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					#endif
-					if (idx == center) pid = 1; // p1: 3-star
-				} else if (num_edges == 2) {
-					pid = 2; // p2: 4-cycle
-					unsigned center = 1;
-					#ifdef USE_WEDGE
-					if (is_wedge[pos]) center = 0;
-					#else
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					#endif
-					if (connected[center]) pid = 3; // p3: tailed-triangle
-				} else {
-					pid = 4; // p4: diamond
-				}
-			}
-		} else { // count 5-motif and beyond
-			pid = find_motif_pattern_id_eigen(n, idx, dst, emb);
-		}
-		return pid;
-	}
 };
 
 #endif // VERTEX_MINER_HPP_

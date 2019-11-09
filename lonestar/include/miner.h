@@ -108,6 +108,8 @@ protected:
 	Graph *graph;
 	unsigned max_size;
 	std::vector<unsigned> degrees;
+	std::vector<BYTE> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
+
 	#ifdef USE_QUERY_GRAPH
 	std::vector<VertexId> matching_order;
 	std::vector<VertexId> matching_order_map;
@@ -136,6 +138,76 @@ protected:
 		ifile.close();
 	}
 	#endif
+	template <typename EmbeddingTy = VertexEmbedding>
+	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
+		//unsigned n = emb.size();
+		// the new vertex id should be larger than the first vertex id
+		if (dst <= emb.get_vertex(0)) return true;
+		// the new vertex should not already exist in the embedding
+		for (unsigned i = 1; i < n; ++i)
+			if (dst == emb.get_vertex(i)) return true;
+		// the new vertex should not already be extended by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(emb.get_vertex(i), dst)) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < n; ++i)
+			if (dst < emb.get_vertex(i)) return true;
+		return false;
+	}
+	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
+		unsigned pid = 0;
+		if (n == 2) { // count 3-motifs
+			pid = 1; // 3-chain
+			if (idx == 0) {
+				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
+				#ifdef USE_WEDGE
+				else if (max_size == 4) is_wedge[pos] = 1; // wedge; used for 4-motif
+				#endif
+			}
+		} else if (n == 3) { // count 4-motifs
+			unsigned num_edges = 1;
+			pid = emb.get_pid();
+			if (pid == 0) { // extending a triangle
+				for (unsigned j = idx+1; j < n; j ++)
+					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
+				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
+			} else { // extending a 3-chain
+				assert(pid == 1);
+				std::vector<bool> connected(3, false);
+				connected[idx] = true;
+				for (unsigned j = idx+1; j < n; j ++) {
+					if (is_connected(emb.get_vertex(j), dst)) {
+						num_edges ++;
+						connected[j] = true;
+					}
+				}
+				if (num_edges == 1) {
+					pid = 0; // p0: 3-path
+					unsigned center = 1;
+					#ifdef USE_WEDGE
+					if (is_wedge[pos]) center = 0;
+					#else
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					#endif
+					if (idx == center) pid = 1; // p1: 3-star
+				} else if (num_edges == 2) {
+					pid = 2; // p2: 4-cycle
+					unsigned center = 1;
+					#ifdef USE_WEDGE
+					if (is_wedge[pos]) center = 0;
+					#else
+					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
+					#endif
+					if (connected[center]) pid = 3; // p3: tailed-triangle
+				} else {
+					pid = 4; // p4: diamond
+				}
+			}
+		} else { // count 5-motif and beyond
+			pid = find_motif_pattern_id_eigen(n, idx, dst, emb);
+		}
+		return pid;
+	}
 	unsigned get_degree(Graph *g, VertexId vid) {
 		return std::distance(g->edge_begin(vid), g->edge_end(vid));
 	}

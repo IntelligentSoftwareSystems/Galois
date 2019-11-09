@@ -43,17 +43,17 @@ public:
 	virtual bool toExtend(unsigned level, unsigned pos) { return true; }
 
 	// toAdd (only add non-automorphisms)
-	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) { return true; }
-	virtual bool toAdd(unsigned level, unsigned label) { return label == level; }
-	virtual bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list) {
-		return !is_vertexInduced_automorphism(level, vid, emb_list);
+	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) { return true; } // for naive DFS
+	virtual bool toAdd(unsigned level, unsigned label) { return label == level; } // for vertex-labeling DFS
+	virtual bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list) { return true; }
+	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
+		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, dst);
 	}
-	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) {
-		return 0;
+	virtual bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list, unsigned src_idx) { // for egonet DFS
+		return !is_vertex_automorphism_dfs(level, vid, emb_list, src_idx);
 	}
-	virtual unsigned getPattern(unsigned level, VertexId dst, EmbeddingList &emb_list, unsigned previous_pid) {
-		return 0;
-	}
+	virtual unsigned getPattern(unsigned n, unsigned i, VertexId dst, const VertexEmbedding &emb, unsigned pos) { return 0; } // for naive DFS
+	virtual unsigned getPattern(unsigned level, VertexId dst, EmbeddingList &emb_list, unsigned previous_pid, BYTE src_idx) { return 0; } // for vertex-labeling DFS
 	virtual void reduction(unsigned pid) {
 		#ifdef USE_MAP
 		accumulators[pid] += 1;
@@ -61,10 +61,7 @@ public:
 		total_num += 1;
 		#endif
 	}
-	virtual void reduction(unsigned pid, EmbeddingList &emb_list) {
-	}
-	virtual void reduction(unsigned level, EmbeddingList &emb_list, VertexId src, VertexId dst, unsigned previous_pid) {
-	}
+	virtual void reduction(unsigned level, EmbeddingList &emb_list, VertexId src, VertexId dst, unsigned previous_pid) { }
 	virtual void update(unsigned level, unsigned vid, unsigned pos, unsigned previous_pid, EmbeddingList &emb_list) { }
 	virtual void print_output() { }
 	virtual void post_processing(unsigned level) { }
@@ -86,8 +83,8 @@ public:
 			#else
 			//dfs_extend_single(1, 0, *emb_list);
 			ego_extend_single(1, *emb_list);
-			emb_list->clear_labels(vid);
 			#endif
+			emb_list->clear_labels(vid);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("DfsEdgeNaiveSolver"));
 		#ifdef USE_MAP
 		motif_count();
@@ -105,10 +102,15 @@ public:
 			EmbeddingList *emb_list = emb_lists.getLocal();
 			emb_list->init_edge(edge_list.get_edge(pos));
 			#ifdef USE_MAP
-			//dfs_extend_multi(1, 0, *emb_list);
-			ego_extend_opt(1, *emb_list);
+			#ifdef USE_FORMULA
+			ego_extend_opt(1, *emb_list); // egonet DFS with formula
 			solve_motif_equations(*emb_list);
 			if (max_size == 4) emb_list->clear_labels(edge_list.get_edge(pos).dst);
+			#else
+			//dfs_extend_multi(1, 0, *emb_list); // naive DFS
+			ego_extend_multi(1, *emb_list); // egonet DFS
+			emb_list->clear_labels(edge_list.get_edge(pos).dst);
+			#endif
 			#else
 			//dfs_extend_single(1, 0, *emb_list);
 			ego_extend_single(1, *emb_list);
@@ -241,10 +243,10 @@ public:
 		}
 	}
 
-	void dfs_extend_multi(unsigned level, unsigned pos, EmbeddingList &emb_list, unsigned previous_pid = 0) {
+	void dfs_extend_multi(unsigned level, unsigned emb_id, EmbeddingList &emb_list, unsigned previous_pid = 0) {
 		unsigned n = level + 1;
 		VertexEmbedding emb(n);
-		emb_list.get_embedding<VertexEmbedding>(level, pos, emb);
+		emb_list.get_embedding<VertexEmbedding>(level, emb_id, emb);
 		if (level == max_size-2) {
 			// extending every vertex in the embedding
 			for (unsigned element_id = 0; element_id < n; ++ element_id) {
@@ -272,9 +274,9 @@ public:
 				if (toAdd(n, emb, dst, element_id)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
-					emb_list.set_idx(level+1, start, pos);
+					emb_list.set_idx(level+1, start, emb_id);
 					emb_list.set_size(level+1, start+1);
-					unsigned pid = find_motif_pattern_id_dfs(n, element_id, dst, emb, start);
+					unsigned pid = find_motif_pattern_id(n, element_id, dst, emb, start);
 					dfs_extend_multi(level+1, start, emb_list, pid);
 				}
 			}
@@ -284,47 +286,71 @@ public:
 	void ego_extend_multi(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
-				auto vid = emb_list.get_vid(level, emb_id);
-				//for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
-				unsigned previous_pid = 0;
-				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
-				//if (!toExtend(level, element_id)) continue; //if (element_id != level)
-				//auto src = emb_list.get_vertex(level, element_id);
-				auto begin = graph->edge_begin(vid);
-				auto end = graph->edge_end(vid);
-				for (auto e = begin; e != end; e ++) {
-					auto dst = graph->getEdgeDst(e);
-					if (toAdd(level, dst, emb_list))
-						//reduction(getPattern(level, dst, emb_list, previous_pid), emb_list);
-						reduction(level, emb_list, vid, dst, previous_pid);
+				unsigned last_vid = 0;
+				if (level > 1) {
+					last_vid = emb_list.get_vertex(level, emb_id);
+					emb_list.push_history(last_vid);
+					emb_list.update_labels(level, last_vid);
 				}
+				//std::cout << "history[0] = " << emb_list.get_history(0) << ", history[1] = " << emb_list.get_history(1) << "\n";
+				VertexEmbedding emb(level+1);
+				emb_list.get_embedding(level, emb);
+				//std::cout << "current embedding: " << emb << "\n";
+				unsigned previous_pid = 0, src_idx = 0;
+				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
+				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+					if (!toExtend(level, element_id)) continue; // extend all
+					auto src = emb.get_vertex(element_id);
+					//auto src = emb_list.get_history(element_id);
+					auto begin = graph->edge_begin(src);
+					auto end = graph->edge_end(src);
+					//std::cout << "\tExtending src = " << src << "\n";
+					for (auto e = begin; e < end; e ++) {
+						auto dst = graph->getEdgeDst(e);
+						//std::cout << "\t\tdst = " << dst << ", label = " << emb_list.get_label(dst) << "\n";
+						if (toAdd(level, dst, emb_list, element_id)) { // add canonical
+							unsigned pid = getPattern(level, dst, emb_list, previous_pid, src_idx); // get pattern id using the labels
+							//std::cout << "\t\t\t Adding dst = " << dst << ", pid = " << pid << "\n";
+							reduction(pid);
+						}
+					}
+				}
+				if (level > 1) emb_list.resume_labels(level, last_vid);
+				if (level > 1) emb_list.pop_history();
 			}
 			return;
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			if (level > 1) {
+				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+				emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			VertexEmbedding emb(level+1);
+			emb_list.get_embedding(level, emb);
+			unsigned previous_pid = 0;
+			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 			emb_list.set_size(level+1, 0);
-			auto vid = emb_list.get_vid(level, emb_id);
-			//for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
-				//if (!toExtend(level, element_id)) continue;
-				//auto src = emb_list.get_vertex(level, element_id);
-				unsigned previous_pid = 0;
-				if (level > 1) {
-					previous_pid = emb_list.get_pid(level, emb_id);
-					emb_list.push_history(vid);
-				}
-				auto begin = graph->edge_begin(vid);
-				auto end = graph->edge_end(vid);
+			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+				if (!toExtend(level, element_id)) continue;
+				auto src = emb.get_vertex(element_id);
+				//auto src = emb_list.get_history(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = graph->getEdgeDst(edge);
-					if (toAdd(level, dst, emb_list)) {
+					if (toAdd(level, dst, emb_list, element_id)) {
 						auto start = emb_list.size(level+1);
 						assert(start < max_degree);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_size(level+1, start+1);
-						update(level, dst, start, previous_pid, emb_list);
+						unsigned pid = getPattern(level, dst, emb_list, previous_pid, element_id);
+						emb_list.set_pid(level+1, start, pid);
+						emb_list.set_src(level+1, start, element_id);
 					}
 				}
-			//}
+			}
 			ego_extend_multi(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
@@ -493,87 +519,51 @@ protected:
 	Ulong total_3_star;
 	Ulong total_4_path;
 
-	inline bool is_vertexInduced_automorphism(unsigned level, VertexId dst, const EmbeddingList& emb_list, unsigned idx = 0) {
+	inline bool is_vertex_automorphism_dfs(unsigned level, VertexId dst, const EmbeddingList& emb_list, unsigned idx) {
 		// the new vertex id should be larger than the first vertex id
-		if (dst <= emb_list.get_vertex(level, 0)) return true;
+		if (dst <= emb_list.get_history(0)) return true;
 		// the new vertex should not already exist in the embedding
 		for (unsigned i = 1; i < level+1; ++i)
-			if (dst == emb_list.get_vertex(level, i)) return true;
+			if (dst == emb_list.get_history(i)) return true;
 		// the new vertex should not already be extended by any previous vertex in the embedding
 		for (unsigned i = 0; i < idx; ++i)
-			if (is_connected(emb_list.get_vertex(level, i), dst)) return true;
+			if (emb_list.is_connected(level, dst, i)) return true;
 		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
 		for (unsigned i = idx+1; i < level+1; ++i)
-			if (dst < emb_list.get_vertex(level, i)) return true;
+			if (dst < emb_list.get_history(i)) return true;
 		return false;
 	}
-	inline unsigned find_motif_pattern_id_dfs(unsigned level, VertexId vid, EmbeddingList& emb_list, unsigned previous_pid = 0) {
+	inline unsigned find_pattern_id_dfs(unsigned level, VertexId vid, EmbeddingList& emb_list, unsigned previous_pid = 0, unsigned src_idx = 0) {
 		unsigned pid = 0;
 		//VertexId vid = emb_list.get_vid(level, pos);
 		if (level == 1) { // count 3-motifs
-			if (emb_list.get_label(vid) == 1) {
+			if (emb_list.get_label(vid) == 3) {
 				pid = 0; // triangle
 			} else {
 				pid = 1; //wedge 
 			}
 		} else if (level == 2) { // count 4-motifs
 			if (previous_pid == 0) { // extending a triangle
-				if (emb_list.get_label(vid) == 3) {
+				if (emb_list.get_label(vid) == 7) {
 					pid = 5; // clique
-				} else if (emb_list.get_label(vid) == 0) {
-					pid = 3; // tailed-triangle
-				} else pid = 4;
-			} else {
-				if (emb_list.get_label(vid) == 3) {
+				} else if (emb_list.get_label(vid) == 3 || emb_list.get_label(vid) == 5 || emb_list.get_label(vid) == 6) {
 					pid = 4; // diamond
-				} else if (emb_list.get_label(vid) == 0) {
-					pid = 0; // 3-path
-				} else if (emb_list.get_label(vid) == 1) {
-					pid = 2; // 4-cycle
 				} else pid = 3; // tailed-triangle
-			}
-		}
-		return pid;
-	}
-	inline unsigned find_motif_pattern_id_dfs(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned previous_pid) {
-		unsigned pid = 0;
-		if (n == 2) { // count 3-motifs
-			pid = 1; // 3-chain
-			if (idx == 0) {
-				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
-			}
-		} else if (n == 3) { // count 4-motifs
-			unsigned num_edges = 1;
-			if (previous_pid == 0) { // extending a triangle
-				for (unsigned j = idx+1; j < n; j ++)
-					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
-				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
-			} else { // extending a 3-chain
-				assert(previous_pid == 1);
-				std::vector<bool> connected(3, false);
-				connected[idx] = true;
-				for (unsigned j = idx+1; j < n; j ++) {
-					if (is_connected(emb.get_vertex(j), dst)) {
-						num_edges ++;
-						connected[j] = true;
-					}
-				}
-				if (num_edges == 1) {
-					pid = 0; // p0: 3-path
-					unsigned center = 1;
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					if (idx == center) pid = 1; // p1: 3-star
-				} else if (num_edges == 2) {
-					pid = 2; // p2: 4-cycle
-					unsigned center = 1;
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					if (connected[center]) pid = 3; // p3: tailed-triangle
+			} else {
+				if (emb_list.get_label(vid) == 7) {
+					pid = 4; // diamond
+				} else if (src_idx == 0) {
+					if (emb_list.get_label(vid) == 6) pid = 2; // 4-cycle
+					else if (emb_list.get_label(vid) == 3 || emb_list.get_label(vid) == 5) pid = 3; // tailed-triangle
+					else if (emb_list.get_label(vid) == 1) pid = 1; // 3-star
+					else pid = 0 ; // 4-chain
 				} else {
-					pid = 4; // p4: diamond
+					if (emb_list.get_label(vid) == 5) pid = 2; // 4-cycle
+					else if (emb_list.get_label(vid) == 3 || emb_list.get_label(vid) == 6) pid = 3; // tailed-triangle
+					else if (emb_list.get_label(vid) == 2) pid = 1; // 3-star
+					else pid = 0; // 4-chain
 				}
 			}
-		} else { // count 5-motif and beyond
-			find_motif_pattern_id_eigen(n, idx, dst, emb);
 		}
 		return pid;
 	}
