@@ -213,12 +213,9 @@ protected:
 	}
 	void degree_counting() {
 		degrees.resize(graph->size());
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&] (GNode v) {
-				degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
-			},
-			galois::loopname("DegreeCounting")
-		);
+		galois::do_all(galois::iterate(graph->begin(), graph->end()), [&] (GNode v) {
+			degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		}, galois::loopname("DegreeCounting"));
 	}
 	inline unsigned intersect_merge(unsigned src, unsigned dst) {
 		unsigned count = 0;

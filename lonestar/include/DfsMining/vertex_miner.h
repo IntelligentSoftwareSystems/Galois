@@ -19,6 +19,7 @@ public:
 		total_4_cycle = 0;
 		total_3_star = 0;
 		total_4_path = 0;
+		removed_edges.reset();
 	}
 	void init_edgelist(bool symmetrize = false) {
 		edge_list.init(*graph, is_directed, symmetrize);
@@ -39,14 +40,13 @@ public:
 	}
 	// Pangolin APIs
 	// toExtend
-	virtual bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) { return true; }
-	virtual bool toExtend(unsigned level, unsigned pos) { return true; }
+	virtual bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) { return true; } // for naive DFS
+	virtual bool toExtend(unsigned n, const VertexEmbedding &emb, unsigned pos) { return true; } // for naive DFS
+	virtual bool toExtend(unsigned level, unsigned pos) { return true; } // for egonet DFS
 
 	// toAdd (only add non-automorphisms)
 	virtual bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) { return true; } // for naive DFS
-	virtual bool toAdd(unsigned level, unsigned label) { return label == level; } // for vertex-labeling DFS
-	virtual bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list) { return true; }
-	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) {
+	virtual bool toAdd(unsigned n, const VertexEmbedding &emb, VertexId dst, unsigned pos) { // for naive DFS
 		return !is_vertexInduced_automorphism<VertexEmbedding>(n, emb, pos, dst);
 	}
 	virtual bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list, unsigned src_idx) { // for egonet DFS
@@ -68,13 +68,11 @@ public:
 	virtual void edge_process_opt() { }
 
 	void vertex_process() {
-		//galois::do_all(galois::iterate((size_t)0, (size_t)numThreads), [&](const size_t& tid) {
 		for (int i = 0; i < numThreads; i++) {
 			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
 		}
 		std::cout << "DFS vertex processing without advanced optimization\n";
 		galois::do_all(galois::iterate(graph->begin(), graph->end()), [&](const auto& vid) {
-			//std::cout << "debug: vid = " << vid << "\n";
 			EmbeddingList *emb_list = emb_lists.getLocal();
 			emb_list->init_vertex(vid);
 			#ifdef USE_MAP
@@ -85,37 +83,42 @@ public:
 			ego_extend_single(1, *emb_list);
 			#endif
 			emb_list->clear_labels(vid);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("DfsEdgeNaiveSolver"));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("DfsVertexNaiveSolver"));
 		#ifdef USE_MAP
 		motif_count();
 		#endif
 	}
 
 	void edge_process() {
-		//galois::do_all(galois::iterate((size_t)0, (size_t)numThreads), [&](const size_t& tid) {
-		for (int i = 0; i < numThreads; i++) {
+		for (int i = 0; i < numThreads; i++)
 			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
-		}
 		std::cout << "DFS edge processing without advanced optimization\n";
 		std::cout << "Number of single-edge embeddings: " << edge_list.size() << "\n";
-		galois::do_all(galois::iterate((size_t)0, edge_list.size()), [&](const size_t& pos) {
+		//galois::for_each(galois::iterate(edge_list), [&](const Edge &edge, auto &ctx) {
+		galois::do_all(galois::iterate(edge_list), [&](const Edge &edge) {
 			EmbeddingList *emb_list = emb_lists.getLocal();
-			emb_list->init_edge(edge_list.get_edge(pos));
 			#ifdef USE_MAP
+			emb_list->init_edge(edge);
 			#ifdef USE_FORMULA
 			ego_extend_opt(1, *emb_list); // egonet DFS with formula
 			solve_motif_equations(*emb_list);
-			if (max_size == 4) emb_list->clear_labels(edge_list.get_edge(pos).dst);
+			if (max_size == 4) emb_list->clear_labels(edge.dst);
 			#else
 			//dfs_extend_multi(1, 0, *emb_list); // naive DFS
 			ego_extend_multi(1, *emb_list); // egonet DFS
-			emb_list->clear_labels(edge_list.get_edge(pos).dst);
+			emb_list->clear_labels(edge.dst);
+			emb_list->clear_labels(edge.src);
 			#endif
 			#else
+			//if (degrees[edge.src] >= max_size-1 && degrees[edge.dst] >= max_size-2) {
+			//if (degrees[edge.src] < max_size-1 
+			//	|| degrees[edge.dst] < max_size-2) { removed_edges += 1; return; }
+			emb_list->init_edge(edge);
 			//dfs_extend_single(1, 0, *emb_list);
 			ego_extend_single(1, *emb_list);
+			emb_list->clear_labels(edge.src);
+			//}
 			#endif
-			emb_list->clear_labels(edge_list.get_edge(pos).src);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("DfsEdgeNaiveSolver"));
 		#ifdef USE_MAP
 		motif_count();
@@ -181,8 +184,7 @@ public:
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e < end; e ++) {
 					auto dst = graph->getEdgeDst(e);
-					//if (toAdd(n, emb, dst, n-1))
-					if (toAdd(level, emb_list.get_label(dst)))
+					if (toAdd(level, dst, emb_list, level))
 						reduction(0);
 				}
 			}
@@ -195,8 +197,7 @@ public:
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = graph->getEdgeDst(e);
-				//if (toAdd(n, emb, dst, n-1)) {
-				if (toAdd(level, emb_list.get_label(dst))) {
+				if (toAdd(level, dst, emb_list, level)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
@@ -229,7 +230,7 @@ public:
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = emb_list.getEdgeDst(e);
-				if (toAdd(level, emb_list.get_label(dst))) {
+				if (toAdd(level, dst, emb_list, level)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
@@ -365,7 +366,7 @@ public:
 				auto end = graph->edge_end(src);
 				for (auto e = begin; e < end; e ++) {
 					auto dst = graph->getEdgeDst(e);
-					if (toAdd(level, dst, emb_list))
+					if (toAdd(level, dst, emb_list, level))
 						reduction(level, emb_list, src, dst, previous_pid);
 				}
 			}
@@ -381,7 +382,7 @@ public:
 			}
 			for (auto e : graph->edges(src)) {
 				auto dst = graph->getEdgeDst(e);
-				if (toAdd(level, dst, emb_list)) {
+				if (toAdd(level, dst, emb_list, level)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_size(level+1, start+1);
@@ -507,6 +508,7 @@ protected:
 	unsigned max_degree;
 	unsigned core;
 	UlongAccu total_num;
+	UlongAccu removed_edges;
 	std::vector<UlongAccu> accumulators;
 	EmbeddingLists emb_lists;
 	EdgeList edge_list;

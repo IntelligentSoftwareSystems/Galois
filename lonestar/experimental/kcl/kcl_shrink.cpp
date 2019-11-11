@@ -25,10 +25,20 @@ public:
 		set_max_degree(max_degree);
 		set_num_patterns(1);
 		set_directed(use_dag);
+		#ifdef ALGO_EDGE
 		init_edgelist();
+		#endif
 	}
 	void print_output() {
 		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
+	}
+	// toExtend (only extend the last vertex in the embedding)
+	bool toExtend(unsigned level, unsigned pos) {
+		return pos == level;
+	}
+	// toAdd (only add cliques)
+	bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list, unsigned src_idx) { 
+		return emb_list.get_label(vid) == level; 
 	}
 
 	void edge_process_opt() {
@@ -39,7 +49,6 @@ public:
 		std::cout << "DFS edge processing using advanced optimization\n";
 		assert(max_size > 3);
 		//galois::for_each(galois::iterate(edge_list), [&](const Edge &edge, auto &ctx) {
-		//galois::do_all(galois::iterate(edge_list.begin(), edge_list.end()), [&](const Edge &edge) {
 		galois::do_all(galois::iterate(edge_list), [&](const Edge &edge) {
 			EmbeddingList *emb_list = emb_lists.getLocal();
 			emb_list->init_edge(edge);

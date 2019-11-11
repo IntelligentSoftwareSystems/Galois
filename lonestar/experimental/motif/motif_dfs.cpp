@@ -37,7 +37,7 @@ public:
 	}
 	#ifdef USE_FORMULA // only find triangles, 4-cycles and 4-cliques
 	bool toExtend(unsigned level, unsigned v_idx) { return v_idx == level; }
-	bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list) {
+	bool toAdd(unsigned level, VertexId vid, const EmbeddingList &emb_list, unsigned src_idx) { 
 		return vid != emb_list.get_vid(0, 0);
 	}
 	void reduction(unsigned level, EmbeddingList &emb_list, VertexId src, VertexId dst, unsigned previous_pid) {
