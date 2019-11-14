@@ -450,6 +450,37 @@ int main(int argc, char** argv) {
   std::cout << "Node " << reportNode << " has distance "
             << graph.getData(report) << "\n";
 
+  // Sanity checking code
+  galois::GReduceMax<uint64_t> maxDistance;
+  galois::GAccumulator<uint64_t> distanceSum;
+  galois::GAccumulator<uint32_t> visitedNode;
+  maxDistance.reset();
+  distanceSum.reset();
+  visitedNode.reset();
+
+  galois::do_all(
+    galois::iterate(graph),
+    [&] (uint64_t i) {
+      uint32_t myDistance = graph.getData(i);
+
+      if (myDistance != SSSP::DIST_INFINITY) {
+        maxDistance.update(myDistance);
+        distanceSum += myDistance;
+        visitedNode += 1;
+      }
+    },
+    galois::loopname("Sanity check"),
+    galois::no_stats()
+  );
+
+  // report sanity stats
+  uint64_t rMaxDistance = maxDistance.reduce();
+  uint64_t rDistanceSum = distanceSum.reduce();
+  uint64_t rVisitedNode = visitedNode.reduce();
+  galois::gInfo("# visited nodes is ", rVisitedNode);
+  galois::gInfo("Max distance is ", rMaxDistance);
+  galois::gInfo("Sum of visited distances is ", rDistanceSum);
+
   if (!skipVerify) {
     if (SSSP::verify(graph, source)) {
       std::cout << "Verification successful.\n";
