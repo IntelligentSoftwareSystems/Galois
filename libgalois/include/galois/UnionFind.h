@@ -57,6 +57,25 @@ public:
 
   T* find() { return findImpl(); }
 
+  //! Compress ONLY node to point directly to the root of the tree;
+  //! nodes on path are not altered
+  void compress() {
+    if (isRep()) return;
+
+    // my current component
+    T* rep  = m_component;
+
+    // loop until rep == itself; i.e. get root
+    while (rep->m_component.load(std::memory_order_relaxed) != rep) {
+      // get next parent
+      T* next = rep->m_component.load(std::memory_order_relaxed);
+      rep  = next;
+    }
+
+    // at this point rep is the parent: save as my parent
+    m_component.store(rep, std::memory_order_relaxed);
+  }
+
   T* findAndCompress() {
     // Basic outline of race in synchronous path compression is that two path
     // compressions along two different paths to the root can create a cycle
