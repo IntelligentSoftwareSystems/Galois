@@ -53,6 +53,8 @@ public:
     return m_component.load(std::memory_order_relaxed) == this;
   }
 
+  T* get() const { return m_component.load(std::memory_order_relaxed); }
+
   const T* find() const { return findImpl(); }
 
   T* find() { return findImpl(); }

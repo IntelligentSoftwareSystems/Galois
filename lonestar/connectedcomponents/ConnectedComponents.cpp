@@ -106,7 +106,7 @@ struct Node : public galois::UnionFindNode<Node> {
     return *this;
   }
 
-  component_type component() { return this->findAndCompress(); }
+  component_type component() { return this->get(); }
   bool isRepComp(unsigned int x) { return false; }
 };
 
