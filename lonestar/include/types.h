@@ -10,7 +10,7 @@ typedef float Weight;
 typedef uint64_t Ulong;
 typedef unsigned ValueT;
 typedef unsigned VertexId;
-typedef unsigned char BYTE;
+typedef uint8_t BYTE;
 #ifdef LARGE_SIZE
 typedef uint64_t IndexT;
 typedef uint64_t IndexTy;

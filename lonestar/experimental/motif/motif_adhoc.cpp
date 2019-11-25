@@ -30,12 +30,10 @@ public:
 		#ifdef ALGO_EDGE
 		init_edgelist();
 		#endif
+		init_emb_list();
 	}
 	void print_output() { printout_motifs(); }
 	void edge_process_opt() {
-		for (int i = 0; i < numThreads; i++) {
-			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
-		}
 		galois::do_all(galois::iterate(edge_list), [&](const auto& edge) {
 			EmbeddingList *emb_list = emb_lists.getLocal();
 			//std::cout << "debug: edge = " << edge.to_string() << "\n";

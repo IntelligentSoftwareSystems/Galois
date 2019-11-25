@@ -1,5 +1,6 @@
 #define USE_DAG
 #define USE_DFS
+//#define NO_LABEL
 #define ALGO_EDGE
 #define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 #define USE_SIMPLE
@@ -26,6 +27,7 @@ public:
 		#ifdef ALGO_EDGE
 		init_edgelist();
 		#endif
+		init_emb_list();
 	}
 	void print_output() {
 		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";

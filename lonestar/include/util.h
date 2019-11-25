@@ -144,6 +144,10 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 		mgraph.read_mtx(filename.c_str(), true); //symmetrize
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
+		#ifdef EDGE_INDUCED
+		printf("ERROR: gr is not acceptable for an edge-induced app. Use adj instead.\n");
+		exit(1);
+		#endif
 		printf("Reading .gr file: %s\n", filename.c_str());
 		if(need_dag) {
 			Graph g_temp;

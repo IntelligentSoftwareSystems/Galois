@@ -25,6 +25,14 @@ public:
 		edge_list.init(*graph, is_directed, symmetrize);
 		core = edge_list.get_core();
 	}
+	void init_emb_list() {
+		for (int i = 0; i < numThreads; i++)
+			#ifdef SHRINK
+			emb_lists.getLocal(i)->allocate(graph, max_size, core);
+			#else
+			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
+			#endif
+	}
 	virtual ~VertexMiner() {}
 	void set_max_size(unsigned size = 3) { max_size = size; }
 	void set_max_degree(unsigned d = 1) { max_degree = d; }
@@ -68,9 +76,6 @@ public:
 	virtual void edge_process_opt() { }
 
 	void vertex_process() {
-		for (int i = 0; i < numThreads; i++) {
-			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
-		}
 		std::cout << "DFS vertex processing without advanced optimization\n";
 		galois::do_all(galois::iterate(graph->begin(), graph->end()), [&](const auto& vid) {
 			EmbeddingList *emb_list = emb_lists.getLocal();
@@ -90,12 +95,11 @@ public:
 	}
 
 	void edge_process() {
-		for (int i = 0; i < numThreads; i++)
-			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
 		std::cout << "DFS edge processing without advanced optimization\n";
 		std::cout << "Number of single-edge embeddings: " << edge_list.size() << "\n";
 		//galois::for_each(galois::iterate(edge_list), [&](const Edge &edge, auto &ctx) {
 		galois::do_all(galois::iterate(edge_list), [&](const Edge &edge) {
+			//std::cout << "Processing edge: " << edge.to_string() << "\n";
 			EmbeddingList *emb_list = emb_lists.getLocal();
 			#ifdef USE_MAP
 			emb_list->init_edge(edge);
@@ -105,18 +109,30 @@ public:
 			if (max_size == 4) emb_list->clear_labels(edge.dst);
 			#else
 			//dfs_extend_multi(1, 0, *emb_list); // naive DFS
+			#ifdef NO_LABEL
+			ego_extend_multi_no_labeling(1, *emb_list); // egonet DFS
+			#else
 			ego_extend_multi(1, *emb_list); // egonet DFS
+			//ego_extend_multi_non_canonical(1, *emb_list); // egonet DFS
+			//ego_extend_sgl(1, *emb_list);
+			//ego_extend_sgl_auto(1, *emb_list);
+			//ego_extend_sgl_naive(1, *emb_list);
 			emb_list->clear_labels(edge.dst);
 			emb_list->clear_labels(edge.src);
-			#endif
+			#endif // NO_LABEL
+			#endif // USE_FORMULA
 			#else
 			//if (degrees[edge.src] >= max_size-1 && degrees[edge.dst] >= max_size-2) {
 			//if (degrees[edge.src] < max_size-1 
 			//	|| degrees[edge.dst] < max_size-2) { removed_edges += 1; return; }
 			emb_list->init_edge(edge);
 			//dfs_extend_single(1, 0, *emb_list);
+			#ifndef NO_LABEL
 			ego_extend_single(1, *emb_list);
 			emb_list->clear_labels(edge.src);
+			#else
+			ego_extend_single_no_labeling(1, *emb_list);
+			#endif
 			//}
 			#endif
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("DfsEdgeNaiveSolver"));
@@ -126,9 +142,6 @@ public:
 	}
 
 	void vertex_process_opt() {
-		for (int i = 0; i < numThreads; i++) {
-			emb_lists.getLocal(i)->allocate(graph, max_size, max_degree);
-		}
 		std::cout << "DFS vertex processing using advanced optimization\n";
 		//galois::do_all(galois::iterate(*graph), [&](const auto& vid) {
 		galois::for_each(galois::iterate(graph->begin(), graph->end()), [&](const auto &vid, auto &ctx) {
@@ -143,7 +156,7 @@ public:
 		motif_count();
 		#endif
 	}
-
+/*
 	// naive DFS extension for k-cliques
 	void dfs_extend_single(unsigned level, unsigned pos, EmbeddingList &emb_list) {
 		unsigned n = level+1;
@@ -175,6 +188,45 @@ public:
 			}
 		}
 	}
+//*/
+	// DFS extension for k-cliques
+	void ego_extend_single_no_labeling(unsigned level, EmbeddingList &emb_list) {
+		if (level == max_size-2) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+				auto vid = emb_list.get_vertex(level, emb_id);
+				if (level > 1) emb_list.push_history(vid);
+				auto emb = emb_list.get_history();
+				auto begin = graph->edge_begin(vid);
+				auto end = graph->edge_end(vid);
+				for (auto e = begin; e < end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (is_all_connected_dag(dst, emb, level))
+						reduction(0);
+				}
+				if (level > 1) emb_list.pop_history();
+			}
+			return;
+		}
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			auto vid = emb_list.get_vertex(level, emb_id);
+			if (level > 1) emb_list.push_history(vid);
+			auto emb = emb_list.get_history();
+			auto begin = graph->edge_begin(vid);
+			auto end = graph->edge_end(vid);
+			emb_list.set_size(level+1, 0);
+			for (auto e = begin; e < end; e ++) {
+				auto dst = graph->getEdgeDst(e);
+				if (is_all_connected_dag(dst, emb, level)) {
+					auto start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+				}
+			}
+			ego_extend_single_no_labeling(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
+		}
+	}
+
 	// DFS extension for k-cliques
 	void ego_extend_single(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
@@ -184,7 +236,8 @@ public:
 				auto end = graph->edge_end(vid);
 				for (auto e = begin; e < end; e ++) {
 					auto dst = graph->getEdgeDst(e);
-					if (toAdd(level, dst, emb_list, level))
+					//if (toAdd(level, dst, emb_list, level))
+					if (level == emb_list.get_label(dst))
 						reduction(0);
 				}
 			}
@@ -197,7 +250,8 @@ public:
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = graph->getEdgeDst(e);
-				if (toAdd(level, dst, emb_list, level)) {
+				//if (toAdd(level, dst, emb_list, level)) {
+				if (level == emb_list.get_label(dst)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
@@ -208,6 +262,7 @@ public:
 			emb_list.reset_labels(level);
 		}
 	}
+
 	// DFS extension for k-cliques using graph shrinking
 	void dfs_extend(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
@@ -230,7 +285,8 @@ public:
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = emb_list.getEdgeDst(e);
-				if (toAdd(level, dst, emb_list, level)) {
+				//if (toAdd(level, dst, emb_list, level)) {
+				if (emb_list.get_label(dst) == level) { 
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
@@ -244,6 +300,215 @@ public:
 		}
 	}
 
+	void ego_extend_sgl(unsigned level, EmbeddingList &emb_list) {
+		if (level == max_size-2) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+				unsigned last_vid = 0;
+				if (level > 1) {
+					last_vid = emb_list.get_vertex(level, emb_id);
+					emb_list.push_history(last_vid);
+					emb_list.update_labels(level, last_vid);
+				}
+				unsigned previous_pid = 0, src_idx = 0;
+				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
+				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+					//if (!toExtend(level, element_id)) continue; // extend all
+					auto src = emb_list.get_history(element_id);
+					auto begin = graph->edge_begin(src);
+					auto end = graph->edge_end(src);
+					for (auto e = begin; e < end; e ++) {
+						auto dst = graph->getEdgeDst(e);
+						if (toAdd(level, dst, emb_list, element_id)) { // add canonical
+							if (is_tailed_triangle(previous_pid, src_idx, emb_list.get_label(dst))) total_num += 1;
+							//reduction(level, emb_list, src_idx, dst, previous_pid);
+						}
+					}
+				}
+				if (level > 1) emb_list.resume_labels(level, last_vid);
+				if (level > 1) emb_list.pop_history();
+			}
+			return;
+		}
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			if (level > 1) {
+				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+				emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			unsigned previous_pid = 0;
+			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+			emb_list.set_size(level+1, 0);
+			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+				//if (!toExtend(level, element_id)) continue;
+				auto src = emb_list.get_history(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto edge = begin; edge < end; edge ++) {
+					auto dst = graph->getEdgeDst(edge);
+					if (toAdd(level, dst, emb_list, element_id)) {
+						auto start = emb_list.size(level+1);
+						assert(start < max_degree);
+						emb_list.set_vid(level+1, start, dst);
+						emb_list.set_size(level+1, start+1);
+						//unsigned pid = getPattern(level, dst, emb_list, previous_pid, element_id);
+						unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, element_id);
+						emb_list.set_pid(level+1, start, pid);
+						emb_list.set_src(level+1, start, element_id);
+					}
+				}
+			}
+			ego_extend_sgl(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
+		}
+	}
+	void ego_extend_sgl_auto(unsigned level, EmbeddingList &emb_list) {
+		if (level == max_size-2) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+				unsigned last_vid = 0;
+				if (level > 1) {
+					last_vid = emb_list.get_vertex(level, emb_id);
+					emb_list.push_history(last_vid);
+					emb_list.update_labels(level, last_vid);
+				}
+				auto src = emb_list.get_history(level);
+				#ifdef DIAMOND
+				for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+					auto dst = emb_list.get_vertex(level, emb_id);
+					if (dst != src && emb_list.get_label(dst) == 3)
+				#else
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto e = begin; e < end; e ++) {
+					auto dst = graph->getEdgeDst(e);
+					if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
+					//if (level > 1 && dst == emb_list.get_history(2)) continue;
+					if (emb_list.get_label(dst) == 4) // tailed_triangle
+				#endif
+						total_num += 1;
+				}
+				if (level > 1) emb_list.resume_labels(level, last_vid);
+				if (level > 1) emb_list.pop_history();
+			}
+			return;
+		}
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			if (level > 1) {
+				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+				emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			emb_list.set_size(level+1, 0);
+			auto src = emb_list.get_history(level);
+			auto begin = graph->edge_begin(src);
+			auto end = graph->edge_end(src);
+			for (auto edge = begin; edge < end; edge ++) {
+				auto dst = graph->getEdgeDst(edge);
+				//#ifdef DIAMOND
+				if (emb_list.get_label(dst) == 3) { // triangles
+				//#else // cycle
+				//if (emb_list.get_label(dst) != 3) { // wedges
+				//#endif
+					auto start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+				}
+			}
+			ego_extend_sgl_auto(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
+		}
+	}
+	inline bool is_diamond(unsigned previous_pid, unsigned qcode) {
+		if ((previous_pid == 0 && (qcode == 3 || qcode == 5 || qcode == 6)) ||
+			(previous_pid == 1 && qcode == 7)) return true;
+		return false;
+	}
+	inline bool is_4cycle(unsigned previous_pid, unsigned src_idx, unsigned qcode) {
+		if (previous_pid == 1) {
+			if (src_idx == 0) {
+				if (qcode == 6) return true;
+			} else {
+				if (qcode == 5) return true;
+			}
+		}
+		return false;
+	}
+	inline bool is_tailed_triangle(unsigned previous_pid, unsigned src_idx, unsigned qcode) {
+		if (previous_pid == 0 && qcode < 5 && qcode != 3) return true; 
+		if (previous_pid == 1) {
+			if (src_idx == 0) {
+				if (qcode == 3 || qcode == 5) return true;
+			} else {
+				if (qcode == 3 || qcode == 6) return true;
+			}
+		}
+		return false;
+	}
+
+	void ego_extend_sgl_naive(unsigned level, EmbeddingList &emb_list) {
+		if (level == max_size-2) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+				unsigned last_vid = 0;
+				if (level > 1) {
+					last_vid = emb_list.get_vertex(level, emb_id);
+					emb_list.push_history(last_vid);
+					emb_list.update_labels(level, last_vid);
+				}
+				unsigned previous_pid = 0, src_idx = 0;
+				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
+				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+					auto src = emb_list.get_history(element_id);
+					auto begin = graph->edge_begin(src);
+					auto end = graph->edge_end(src);
+					for (auto e = begin; e < end; e ++) {
+						auto dst = graph->getEdgeDst(e);
+						if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
+						if (level > 1 && dst == emb_list.get_history(2)) continue;
+						#ifdef DIAMOND
+						if (is_diamond(previous_pid, emb_list.get_label(dst)))
+						#else
+						if (is_tailed_triangle(previous_pid, src_idx, emb_list.get_label(dst)))
+						#endif
+							total_num += 1;
+					}
+				}
+				if (level > 1) emb_list.resume_labels(level, last_vid);
+				if (level > 1) emb_list.pop_history();
+			}
+			return;
+		}
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			if (level > 1) {
+				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+				emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			emb_list.set_size(level+1, 0);
+			unsigned previous_pid = 0;
+			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+				auto src = emb_list.get_history(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto edge = begin; edge < end; edge ++) {
+					auto dst = graph->getEdgeDst(edge);
+					if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
+					if (level > 1 && dst == emb_list.get_history(2)) continue;
+					auto start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+					unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, element_id);
+					emb_list.set_pid(level+1, start, pid);
+					emb_list.set_src(level+1, start, element_id);
+				}
+			}
+			ego_extend_sgl_naive(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
+		}
+	}
+
+/*
 	void dfs_extend_multi(unsigned level, unsigned emb_id, EmbeddingList &emb_list, unsigned previous_pid = 0) {
 		unsigned n = level + 1;
 		VertexEmbedding emb(n);
@@ -283,7 +548,7 @@ public:
 			}
 		}
 	}
-
+*/
 	void ego_extend_multi(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
@@ -293,10 +558,8 @@ public:
 					emb_list.push_history(last_vid);
 					emb_list.update_labels(level, last_vid);
 				}
-				//std::cout << "history[0] = " << emb_list.get_history(0) << ", history[1] = " << emb_list.get_history(1) << "\n";
 				VertexEmbedding emb(level+1);
 				emb_list.get_embedding(level, emb);
-				//std::cout << "current embedding: " << emb << "\n";
 				unsigned previous_pid = 0, src_idx = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
@@ -306,13 +569,11 @@ public:
 					//auto src = emb_list.get_history(element_id);
 					auto begin = graph->edge_begin(src);
 					auto end = graph->edge_end(src);
-					//std::cout << "\tExtending src = " << src << "\n";
 					for (auto e = begin; e < end; e ++) {
 						auto dst = graph->getEdgeDst(e);
-						//std::cout << "\t\tdst = " << dst << ", label = " << emb_list.get_label(dst) << "\n";
 						if (toAdd(level, dst, emb_list, element_id)) { // add canonical
-							unsigned pid = getPattern(level, dst, emb_list, previous_pid, src_idx); // get pattern id using the labels
-							//std::cout << "\t\t\t Adding dst = " << dst << ", pid = " << pid << "\n";
+							//unsigned pid = getPattern(level, dst, emb_list, previous_pid, src_idx); // get pattern id using the labels
+							unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, src_idx);
 							reduction(pid);
 						}
 					}
@@ -346,7 +607,8 @@ public:
 						assert(start < max_degree);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_size(level+1, start+1);
-						unsigned pid = getPattern(level, dst, emb_list, previous_pid, element_id);
+						//unsigned pid = getPattern(level, dst, emb_list, previous_pid, element_id);
+						unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, element_id);
 						emb_list.set_pid(level+1, start, pid);
 						emb_list.set_src(level+1, start, element_id);
 					}
@@ -356,6 +618,66 @@ public:
 			if (level > 1) emb_list.pop_history();
 		}
 	}
+
+	void ego_extend_multi_non_canonical(unsigned level, EmbeddingList &emb_list) {
+		if (level == max_size-2) {
+			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+				unsigned last_vid = 0;
+				if (level > 1) {
+					last_vid = emb_list.get_vertex(level, emb_id);
+					emb_list.push_history(last_vid);
+					emb_list.update_labels(level, last_vid);
+				}
+				unsigned previous_pid = 0, src_idx = 0;
+				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
+				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+					auto src = emb_list.get_history(element_id);
+					auto begin = graph->edge_begin(src);
+					auto end = graph->edge_end(src);
+					for (auto e = begin; e < end; e ++) {
+						auto dst = graph->getEdgeDst(e);
+						if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
+						if (level > 1 && dst == emb_list.get_history(2)) continue;
+						unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, src_idx);
+						reduction(pid);
+					}
+				}
+				if (level > 1) emb_list.pop_history();
+				if (level > 1) emb_list.resume_labels(level, last_vid);
+			}
+			return;
+		}
+		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
+			if (level > 1) {
+				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+				emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			unsigned previous_pid = 0;
+			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
+			emb_list.set_size(level+1, 0);
+			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
+				auto src = emb_list.get_history(element_id);
+				auto begin = graph->edge_begin(src);
+				auto end = graph->edge_end(src);
+				for (auto edge = begin; edge < end; edge ++) {
+					auto dst = graph->getEdgeDst(edge);
+					if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
+					if (level > 1 && dst == emb_list.get_history(2)) continue;
+					auto start = emb_list.size(level+1);
+					emb_list.set_vid(level+1, start, dst);
+					emb_list.set_size(level+1, start+1);
+					unsigned pid = find_pattern_id_dfs(level, dst, emb_list, previous_pid, element_id);
+					emb_list.set_pid(level+1, start, pid);
+					emb_list.set_src(level+1, start, element_id);
+				}
+			}
+			ego_extend_multi_non_canonical(level+1, emb_list);
+			if (level > 1) emb_list.pop_history();
+		}
+	}
+
 	void ego_extend_opt(unsigned level, EmbeddingList &emb_list) {
 		if (level == max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
@@ -520,6 +842,21 @@ protected:
 	Ulong total_4_cycle;
 	Ulong total_3_star;
 	Ulong total_4_path;
+
+	inline bool is_vertex_automorphism(unsigned level, VertexId dst, std::vector<VertexId>& emb, unsigned idx) {
+		// the new vertex id should be larger than the first vertex id
+		if (dst <= emb[0]) return true;
+		// the new vertex should not already exist in the embedding
+		for (unsigned i = 1; i < level+1; ++i)
+			if (dst == emb[i]) return true;
+		// the new vertex should not already be extended by any previous vertex in the embedding
+		for (unsigned i = 0; i < idx; ++i)
+			if (is_connected(dst, emb[i])) return true;
+		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
+		for (unsigned i = idx+1; i < level+1; ++i)
+			if (dst < emb[i]) return true;
+		return false;
+	}
 
 	inline bool is_vertex_automorphism_dfs(unsigned level, VertexId dst, const EmbeddingList& emb_list, unsigned idx) {
 		// the new vertex id should be larger than the first vertex id

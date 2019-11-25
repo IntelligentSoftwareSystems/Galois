@@ -110,6 +110,10 @@ public:
 		history.clear();
 		history.push_back(edge.src);
 		history.push_back(edge.dst);
+		vid_lists[1][0] = edge.dst;
+		vid_lists[0][0] = edge.src;
+		set_size(1, 1);
+
 		#ifdef SHRINK
 		if (ids.empty()) {
 			ids.resize(global_graph->size());
@@ -122,11 +126,21 @@ public:
 			ids[dst] = (unsigned)-2;
 		}
 		size_t index = 0;
+		for (auto e : global_graph->edges(edge.src)) {
+			auto dst = global_graph->getEdgeDst(e);
+			if (ids[dst] == (unsigned)-2) { // intersection
+				ids[dst] = index;
+				old_ids[index] = dst;
+				labels[index] = 2;
+				set_vid(2, index, index);
+				shrink_graph.set_degree(2, index, 0);//new degrees
+				index ++;
+			}
+		}
+		set_size(2, index); // number of neighbors of src. 
+		if (max_level > 3) construct_local_graph_from_edge(edge);
 		#else
-		vid_lists[1][0] = edge.dst;
-		vid_lists[0][0] = edge.src;
-		set_size(1, 1);
-		#endif
+		#ifndef NO_LABEL
 		#ifdef USE_MAP
 		for (auto e : global_graph->edges(edge.dst)) {
 			auto dst = global_graph->getEdgeDst(e);
@@ -135,17 +149,6 @@ public:
 		#endif
 		for (auto e : global_graph->edges(edge.src)) {
 			auto dst = global_graph->getEdgeDst(e);
-			#ifdef SHRINK
-			if (ids[dst] == (unsigned)-2) { // intersection
-				//std::cout << "\tdst = " << dst << ", new_id = " << index << "\n";
-				ids[dst] = index;
-				old_ids[index] = dst;
-				labels[index] = 2;
-				set_vid(2, index, index);
-				shrink_graph.set_degree(2, index, 0);//new degrees
-				index ++;
-			}
-			#else
 			if (dst == edge.dst) continue;
 			#ifdef USE_MAP
 			#ifndef MOTIF_ADHOC
@@ -154,13 +157,10 @@ public:
 			#endif
 			#endif
 			labels[dst] = 1; // mark the neighbors of edge.src
-			#endif
 		}
-		#ifdef SHRINK
-		set_size(2, index); // number of neighbors of src. 
-		construct_local_graph_from_edge(edge);
-		#endif
-
+		#endif // NO_LABEL
+		#endif // SHRINK
+		
 		#ifdef MOTIF_ADHOC
 		if (W_u.empty()) {
 			T_vu.resize(length+1); // hold the vertices that form a triangle with u and v
@@ -325,20 +325,21 @@ public:
 	size_t size(unsigned level) const { return sizes[level]; }
 	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
 	VertexId get_vid(unsigned level, size_t i) const { return vid_lists[level][i]; }
+	std::vector<VertexId> get_history() const { return history; }
 	VertexId get_history(unsigned level) const { return history[level]; }
 	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
 	BYTE get_pid(unsigned level, size_t i) const { return pid_lists[level][i]; }
 	BYTE get_src(unsigned level, size_t i) const { return src_indices[level][i]; }
-	//BYTE get_label(VertexId vid) const { return labels[vid]; }
-	unsigned get_label(VertexId vid) const { return labels[vid]; }
+	BYTE get_label(VertexId vid) const { return labels[vid]; }
+	//unsigned get_label(VertexId vid) const { return labels[vid]; }
 	unsigned get_level() const { return cur_level; }
 	void set_size(unsigned level, size_t size) { sizes[level] = size; }
 	void set_vid(unsigned level, size_t id, VertexId vid) { vid_lists[level][id] = vid; }
 	void set_idx(unsigned level, size_t id, IndexTy idx) { idx_lists[level][id] = idx; }
 	void set_pid(unsigned level, size_t id, BYTE pid) { pid_lists[level][id] = pid; }
 	void set_src(unsigned level, size_t id, BYTE src) { src_indices[level][id] = src; }
-	//void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
-	void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
+	void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
+	//void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
 	void set_level(unsigned level) { cur_level = level; }
 	VertexId edge_begin(unsigned level, VertexId vid) { return shrink_graph.edge_begin(vid); }
 	VertexId edge_end(unsigned level, VertexId vid) { return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid); }
@@ -363,8 +364,7 @@ protected:
 	IndexLists idx_lists;
 	ByteLists pid_lists; //pid[i] is the pattern id of each embedding
 	UintList sizes; //sizes[level]: no. of embeddings (i.e. no. of vertices in the the current level)
-	//ByteList labels; //labels[i] is the label of each vertex i; it is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
-	UintList labels;
+	ByteList labels; //labels[i] is the label of each vertex i; it is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
 	unsigned max_level;
 	unsigned cur_level;
 	unsigned length;

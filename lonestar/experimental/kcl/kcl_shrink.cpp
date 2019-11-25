@@ -28,6 +28,7 @@ public:
 		#ifdef ALGO_EDGE
 		init_edgelist();
 		#endif
+		init_emb_list();
 	}
 	void print_output() {
 		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
@@ -42,9 +43,6 @@ public:
 	}
 
 	void edge_process_opt() {
-		for (int i = 0; i < numThreads; i++) {
-			emb_lists.getLocal(i)->allocate(graph, max_size, core);
-		}
 		std::cout << "max_size = " << max_size << "\n";
 		std::cout << "DFS edge processing using advanced optimization\n";
 		assert(max_size > 3);

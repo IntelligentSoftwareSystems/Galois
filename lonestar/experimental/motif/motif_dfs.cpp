@@ -28,6 +28,7 @@ public:
 		#ifdef ALGO_EDGE
 		init_edgelist();
 		#endif
+		init_emb_list();
 	}
 	void print_output() { printout_motifs(); }
 	// customized pattern classification method
@@ -41,7 +42,7 @@ public:
 		return vid != emb_list.get_vid(0, 0);
 	}
 	void reduction(unsigned level, EmbeddingList &emb_list, VertexId src, VertexId dst, unsigned previous_pid) {
-		if (max_size == 3 && emb_list.get_label(dst) == 1) {
+		if (max_size == 3 && emb_list.get_label(dst) == 3) {
 			emb_list.inc_tri_count();
 		} else if (max_size == 4) {
 			if (src < dst && previous_pid == 0 && emb_list.get_label(dst) == 3) { // clique

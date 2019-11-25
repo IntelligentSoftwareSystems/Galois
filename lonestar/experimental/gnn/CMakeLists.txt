@@ -1,0 +1,1 @@
+app(gnn gnn.cpp)
