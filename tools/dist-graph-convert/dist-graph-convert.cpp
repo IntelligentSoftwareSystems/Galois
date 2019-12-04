@@ -407,7 +407,7 @@ struct Gr2CGr : public Conversion {
 
     if (totalNumEdges == cleanEdgeCount) {
       if (hostID == 0) {
-        galois::gInfo("IMPORTANT: Graph was already clean; ending convert now")
+        galois::gInfo("IMPORTANT: Graph was already clean; ending convert now");
       }
       return;
     }
