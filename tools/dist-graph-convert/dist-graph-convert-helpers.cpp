@@ -466,7 +466,8 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
 
 std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead,
-    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges) {
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
+    bool keepSelfLoops) {
   galois::graphs::BufferedGraph<void> bufGraph;
   bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second,
@@ -484,7 +485,8 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
 
                    for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
                      uint32_t edgeDest = bufGraph.edgeDestination(i);
-                     if (edgeDest != gID) {
+                     // checking if this is a self edge
+                     if ((edgeDest != gID) || keepSelfLoops) {
                        nonDupSets[vectorIndex].insert(edgeDest);
                      }
                    }

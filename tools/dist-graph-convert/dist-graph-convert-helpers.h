@@ -720,7 +720,8 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
 std::vector<uint32_t>
 loadCleanEdgesFromBufferedGraph(const std::string& inputFile,
                                 Uint64Pair nodesToRead, Uint64Pair edgesToRead,
-                                uint64_t totalNumNodes, uint64_t totalNumEdges);
+                                uint64_t totalNumNodes, uint64_t totalNumEdges,
+                                bool keepSelfLoops);
 
 /**
  * Loads the node to new node mapping, then reads the edges that this host

@@ -3,7 +3,7 @@
  * The code is being released under the terms of the 3-Clause BSD License (a
  * copy is located in LICENSE.txt at the top-level directory).
  *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -16,6 +16,10 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
+
+
+// @todo MPI files probably not necessary to use here; just use regular C
+// files and/or mmap
 
 #include <utility>
 
@@ -39,6 +43,10 @@ enum ConvertMode {
 
 enum EdgeType { uint32_, void_ };
 
+////////////////////////////////////////////////////////////////////////////////
+// Command Line Args
+////////////////////////////////////////////////////////////////////////////////
+
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional,
@@ -51,6 +59,7 @@ static cll::opt<EdgeType>
                          clEnumValN(EdgeType::void_, "void", "no edge values"),
                          clEnumValEnd),
              cll::init(EdgeType::void_));
+
 static cll::opt<ConvertMode> convertMode(
     cll::desc("Conversion mode:"),
     cll::values(clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
@@ -67,10 +76,13 @@ static cll::opt<ConvertMode> convertMode(
                 clEnumVal(nodemap2binary, "Convert node map into binary form"),
                 clEnumValEnd),
     cll::Required);
+
 static cll::opt<unsigned long long>
     totalNumNodes("numNodes", cll::desc("Nodes in input graph"), cll::init(0));
+
 static cll::opt<unsigned> threadsToUse("t", cll::desc("Threads to use"),
                                        cll::init(1));
+
 static cll::opt<bool> editInPlace("inPlace",
                                   cll::desc("Flag specifying conversion is in "
                                             "place"),
@@ -79,20 +91,32 @@ static cll::opt<std::string>
     nodeMapBinary("nodeMapBinary",
                   cll::desc("Binary file of numbers mapping nodes"),
                   cll::init(std::string()));
+
 static cll::opt<bool>
     startAtOne("startAtOne",
                cll::desc("Set this if edgelist nodeid start at 1"),
                cll::init(false));
+
 static cll::opt<bool>
     ignoreWeights("ignoreWeights",
                   cll::desc("Set this to ignore edgelist weights"),
                   cll::init(false));
 
-struct Conversion {};
+static cll::opt<bool>
+    keepSelfLoops("keepSelfLoops",
+                  cll::desc("Used for graph cleaning: if set, keeps self "
+                            "loops instead of removing them"),
+                  cll::init(false));
+
+static cll::opt<bool> cleanCheck("cleanCheck",
+                  cll::desc("Only checks if graph is clean; no write occurs."),
+                  cll::init(false));
 
 ////////////////////////////////////////////////////////////////////////////////
 // BEGIN CONVERT CODE/STRUCTS
 ////////////////////////////////////////////////////////////////////////////////
+
+struct Conversion {};
 
 /**
  * Convert 1: figure out edge type, then call convert with edge type as
@@ -328,7 +352,9 @@ struct Gr2CGr : public Conversion {
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(std::is_void<EdgeTy>::value,
                   "Edge type must be void to clean graph");
-    GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
+    if (!cleanCheck) {
+      GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
+    }
 
     auto& net       = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
@@ -349,14 +375,28 @@ struct Gr2CGr : public Conversion {
            edgesToRead.second - edgesToRead.first);
 
     std::vector<uint32_t> localEdges = loadCleanEdgesFromBufferedGraph(
-        inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges);
+        inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges,
+        keepSelfLoops);
     uint64_t cleanEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     GALOIS_ASSERT(cleanEdgeCount <= totalNumEdges,
                   "clean should not increase edge count");
 
     if (hostID == 0) {
       galois::gPrint("From ", totalNumEdges, " edges to ", cleanEdgeCount,
-                     "edges\n");
+                     " edges\n");
+    }
+
+    if (cleanCheck) {
+      // only want a clean check; ok to quit here
+      galois::runtime::getHostBarrier().wait();
+      if (hostID == 0) {
+        if (totalNumEdges == cleanEdgeCount) {
+          galois::gInfo("Graph is clean");
+        } else {
+          galois::gInfo("Graph is not clean");
+        }
+      }
+      return;
     }
 
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, cleanEdgeCount,
@@ -586,6 +626,10 @@ int main(int argc, char** argv) {
     GALOIS_DIE("unable to init mpi with thread multiple");
   }
 #endif
+
+  if (cleanCheck) {
+    convertMode = gr2cgr;
+  }
 
   switch (convertMode) {
   case edgelist2gr:
