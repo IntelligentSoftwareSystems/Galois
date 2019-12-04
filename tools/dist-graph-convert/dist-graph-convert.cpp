@@ -112,6 +112,11 @@ static cll::opt<bool> cleanCheck("cleanCheck",
                   cll::desc("Only checks if graph is clean; no write occurs."),
                   cll::init(false));
 
+static cll::opt<bool> symNoClean("symNoClean",
+                  cll::desc("gr2sgr option: if true, does not clean the graph "
+                            "after symmetrization"),
+                  cll::init(false));
+
 ////////////////////////////////////////////////////////////////////////////////
 // BEGIN CONVERT CODE/STRUCTS
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,7 +164,7 @@ void convert(C& c, Conversion) {
   convertTimer.stop();
 
   if (net.ID == 0) {
-    galois::gPrint("Done with convert\n");
+    galois::gInfo("Done with convert\n");
   }
 }
 
@@ -289,6 +294,7 @@ struct Gr2SGr : public Conversion {
     uint64_t doubleEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     GALOIS_ASSERT(doubleEdgeCount == 2 * totalNumEdges,
                   "data needs to have twice as many edges as original graph");
+
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, doubleEdgeCount,
                                 outputFile);
     galois::runtime::getHostBarrier().wait();
@@ -382,8 +388,8 @@ struct Gr2CGr : public Conversion {
                   "clean should not increase edge count");
 
     if (hostID == 0) {
-      galois::gPrint("From ", totalNumEdges, " edges to ", cleanEdgeCount,
-                     " edges\n");
+      galois::gInfo("From ", totalNumEdges, " edges to ", cleanEdgeCount,
+                    " edges\n");
     }
 
     if (cleanCheck) {
@@ -643,6 +649,21 @@ int main(int argc, char** argv) {
     break;
   case gr2sgr:
     convert<Gr2SGr>();
+
+    // clean graph of multiedges and selfloops
+    // Note: if want to keep self loops use the flag for it
+    if (!symNoClean) {
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::gInfo("Cleaning the newly symmetrized graph");
+        if (!keepSelfLoops) {
+          galois::gInfo("Removing self loops: if want to keep, use the flag");
+        }
+      }
+      // overwrite new symmetric graph with clean version of self
+      inputFilename = outputFilename;
+      convert<Gr2CGr>();
+    }
+
     break;
   case gr2cgr:
     convert<Gr2CGr>();
