@@ -29,6 +29,8 @@ public:
 	~DomainSupport() {}
 	void set_threshold(unsigned minsup) {
 		minimum_support = minsup;
+		//for (auto i = 0; i < num_domains; i++)
+		//	domain_sets[i].get_allocator().allocate(minsup+1);
 	}
 	void clean() {
 		domains_reached_support.clear();

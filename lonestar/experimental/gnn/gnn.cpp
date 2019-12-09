@@ -14,14 +14,15 @@
 namespace cll = llvm::cl;
 //static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
-static cll::opt<unsigned> K("k", cll::desc("number of itertions (default value 3)"), cll::init(3));
+static cll::opt<unsigned> L("l", cll::desc("depth, i.e. number of layers (default value 3)"), cll::init(3));
+static cll::opt<unsigned> K("k", cll::desc("number of epoch, i.e. iterations (default value 5)"), cll::init(5));
 #ifdef EDGE_LABEL
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 #else
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 #endif
 typedef Graph::GraphNode GNode;
-typedef float FeatureT;
+typedef float FeatureT; // feature type
 typedef std::vector<FeatureT> FV; // feature vector
 typedef std::vector<FV> FV2D; // feature vectors
 typedef std::vector<FV2D> FV3D; // matrices 
@@ -51,13 +52,13 @@ inline FeatureT sigmoid_func(FeatureT x) {
 	return 0.5 * tanh(0.5 * x) + 0.5;
 }
 
-void aggregate(FV a, FV b) {
+void vadd(FV in_a, FV in_b, FV &out) {
+	for (size_t i = 0; i < Dim; ++i) {
+		out[i] = in_a[i] + in_b[i];
+	}
 }
 
-void combine(FV a, FV b) {
-}
-
-void matmul(FV2D weights, FV input_vector, FV output_vector) {
+void mvmul(FV2D weights, FV input_vector, FV &output_vector) {
 	for (size_t i = 0; i < Dim; ++i) { 
 		for (size_t j = 0; j < Dim; ++j) { 
 			output_vector[i] += weights[i][j] * input_vector[j];
@@ -65,8 +66,18 @@ void matmul(FV2D weights, FV input_vector, FV output_vector) {
 	} 
 }
 
+void matmul(FV2D weights, FV2D input_vectors, FV2D &output_vectors) {
+	for (size_t i = 0; i < Dim; ++i) { 
+		for (size_t j = 0; j < Dim; ++j) { 
+			for (size_t k = 0; k < Dim; ++k) { 
+				output_vectors[i][j] += weights[i][k] * input_vectors[k][j];
+			} 
+		} 
+	} 
+}
+
 const float negative_slope = 0;
-void relu(FV fv) {
+void relu(FV &fv) {
 	size_t count = fv.size();
 	for (size_t i = 0; i < count; ++i) {
 		fv[i] = std::max(fv[i], (FeatureT)0) + negative_slope * std::min(fv[i], (FeatureT)0);
@@ -80,36 +91,51 @@ void sigmoid(FV fv) {
 	}
 }
 
+// user-defined aggregation function
+void aggregate(FV a, FV &b) {
+	for (size_t i = 0; i < Dim; ++i) {
+		b[i] += a[i];
+	}
+}
+
+void combine(FV2D weights, FV2D biases, FV a, FV b, unsigned degree, FV &out) {
+	for (size_t i = 0; i < Dim; ++i) b[i] /= degree; // average
+	FV c(Dim, 0);
+	FV d(Dim, 0);
+	mvmul(biases, a, c);
+	mvmul(weights, b, d);
+	vadd(c, d, out);
+}
+
 void normalize(FV2D features) {
 }
 
-void encoder(Graph &g, FV2D inputs, FV3D weight_matrices, FV2D outputs) {
+void forward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D outputs) {
 	auto n = g.size();
 	FV2D h_curr = inputs;
 	FV2D h_next;
 	h_next.resize(n);
 	for (size_t i = 0; i < n; ++i) h_next[i].resize(Dim);
-	for (unsigned l = 1; l < K; l ++) {
-		galois::do_all(galois::iterate(g.begin(), g.end()),
-			[&](const auto& src) {
-				//auto& src_label = g.getData(src);
-				FV h_src = h_curr[src];
-				FV h_neighbors(Dim, 0);
-				for (auto e : g.edges(src)) {
-					auto dst = g.getEdgeDst(e);
-					FV h_dst = h_curr[dst];
-					aggregate(h_dst, h_neighbors);
-				}
-				combine(h_src, h_neighbors);
-				matmul(weight_matrices[l], h_src, h_next[src]);
-				relu(h_next[src]);
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-			galois::loopname("Encoder")
-		);
+	for (unsigned l = 1; l < L; l ++) {
+		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
+			FV h_src = h_curr[src];
+			FV h_neighbors(Dim, 0);
+			unsigned degree = 0;
+			for (auto e : g.edges(src)) {
+				auto dst = g.getEdgeDst(e);
+				FV h_dst = h_curr[dst];
+				aggregate(h_dst, h_neighbors);
+				degree ++;
+			}
+			combine(weight_matrices[l], bias_matrices[l], h_src, h_neighbors, degree, h_next[src]);
+			relu(h_next[src]);
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
 		normalize(h_next);
 	}
 	outputs = h_next;
+}
+
+void backward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D outputs) {
 }
 
 int main(int argc, char** argv) {
@@ -128,12 +154,17 @@ int main(int argc, char** argv) {
 	FV2D input_features;
 	FV2D output_features;
 	FV3D weight_matrices;
+	FV3D bias_matrices;
 	init_features(n, input_features);
 
 	ResourceManager rm;
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
-	encoder(graph, input_features, weight_matrices, output_features);
+	// run K epoches
+	for (size_t i = 0; i < K; i++) {
+		forward(graph, input_features, weight_matrices, bias_matrices, output_features); // forward-propogation, i.e. inference
+		backward(graph, input_features, weight_matrices, bias_matrices, output_features); // back propogation
+	}
 	Tcomp.stop();
 	//print_output();
 	std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
