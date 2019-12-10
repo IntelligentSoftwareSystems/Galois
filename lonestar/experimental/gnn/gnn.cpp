@@ -47,17 +47,34 @@ void init_features(size_t n, FV2D x) {
 	}
 }
 
+void init_matrices(unsigned l, FV3D x) {
+	x.resize(l);
+	std::default_random_engine rng;
+	std::uniform_real_distribution<float> dist(0, 0.1);
+	for (size_t i = 0; i < l; ++i) {
+		x[i].resize(Dim);
+		for (size_t j = 0; j < Dim; ++j) {
+			x[i][j].resize(Dim);
+			for (size_t k = 0; k < Dim; ++k) {
+				x[i][j][k] = dist(rng);
+			}
+		}
+	}
+}
+
 #include <cmath>
 inline FeatureT sigmoid_func(FeatureT x) {
 	return 0.5 * tanh(0.5 * x) + 0.5;
 }
 
+// vector add
 void vadd(FV in_a, FV in_b, FV &out) {
 	for (size_t i = 0; i < Dim; ++i) {
 		out[i] = in_a[i] + in_b[i];
 	}
 }
 
+// matrix-vector multiply
 void mvmul(FV2D weights, FV input_vector, FV &output_vector) {
 	for (size_t i = 0; i < Dim; ++i) { 
 		for (size_t j = 0; j < Dim; ++j) { 
@@ -66,6 +83,7 @@ void mvmul(FV2D weights, FV input_vector, FV &output_vector) {
 	} 
 }
 
+// matrix multiply
 void matmul(FV2D weights, FV2D input_vectors, FV2D &output_vectors) {
 	for (size_t i = 0; i < Dim; ++i) { 
 		for (size_t j = 0; j < Dim; ++j) { 
@@ -76,6 +94,7 @@ void matmul(FV2D weights, FV2D input_vectors, FV2D &output_vectors) {
 	} 
 }
 
+// ReLU
 const float negative_slope = 0;
 void relu(FV &fv) {
 	size_t count = fv.size();
@@ -91,15 +110,24 @@ void sigmoid(FV fv) {
 	}
 }
 
-// user-defined aggregation function
-void aggregate(FV a, FV &b) {
+inline void agg_func(FV a, FV &b) {
 	for (size_t i = 0; i < Dim; ++i) {
 		b[i] += a[i];
 	}
 }
 
-void combine(FV2D weights, FV2D biases, FV a, FV b, unsigned degree, FV &out) {
-	for (size_t i = 0; i < Dim; ++i) b[i] /= degree; // average
+// user-defined aggregation function
+void aggregate(Graph &g, VertexId src, FV2D embeddings, FV &sum) {
+	unsigned degree = 0;
+	for (auto e : g.edges(src)) {
+		auto dst = g.getEdgeDst(e);
+		agg_func(embeddings[dst], sum);
+		degree ++;
+	}
+	for (size_t i = 0; i < Dim; ++i) sum[i] /= degree; // average
+}
+
+void combine(FV2D weights, FV2D biases, FV a, FV b, FV &out) {
 	FV c(Dim, 0);
 	FV d(Dim, 0);
 	mvmul(biases, a, c);
@@ -110,32 +138,27 @@ void combine(FV2D weights, FV2D biases, FV a, FV b, unsigned degree, FV &out) {
 void normalize(FV2D features) {
 }
 
-void forward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D outputs) {
+// forward propogation, i.e. inference
+void forward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D &outputs) {
 	auto n = g.size();
-	FV2D h_curr = inputs;
-	FV2D h_next;
+	FV2D h_curr = inputs; // current level embedding
+	FV2D h_next; // next level embedding
 	h_next.resize(n);
 	for (size_t i = 0; i < n; ++i) h_next[i].resize(Dim);
 	for (unsigned l = 1; l < L; l ++) {
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV h_src = h_curr[src];
-			FV h_neighbors(Dim, 0);
-			unsigned degree = 0;
-			for (auto e : g.edges(src)) {
-				auto dst = g.getEdgeDst(e);
-				FV h_dst = h_curr[dst];
-				aggregate(h_dst, h_neighbors);
-				degree ++;
-			}
-			combine(weight_matrices[l], bias_matrices[l], h_src, h_neighbors, degree, h_next[src]);
+			FV h_neighbors(Dim, 0); // used to gather neighbors' embeddings
+			aggregate(g, src, h_curr, h_neighbors);
+			combine(weight_matrices[l], bias_matrices[l], h_curr[src], h_neighbors, h_next[src]);
 			relu(h_next[src]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
-		normalize(h_next);
+		//normalize(h_next);
 	}
 	outputs = h_next;
 }
 
-void backward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D outputs) {
+// back propogation
+void backward(Graph &g, FV2D inputs, FV2D outputs, FV3D &weight_matrices, FV3D &bias_matrices) {
 }
 
 int main(int argc, char** argv) {
@@ -152,10 +175,12 @@ int main(int argc, char** argv) {
 	
 	auto n = graph.size();
 	FV2D input_features;
-	FV2D output_features;
-	FV3D weight_matrices;
-	FV3D bias_matrices;
+	FV2D output_features; // vertex embeddings to get from inference
+	FV3D weight_matrices; // parameters to learn
+	FV3D bias_matrices; // parameters to learn
 	init_features(n, input_features);
+	init_matrices(L, weight_matrices);
+	init_matrices(L, bias_matrices);
 
 	ResourceManager rm;
 	galois::StatTimer Tcomp("Compute");
@@ -163,7 +188,7 @@ int main(int argc, char** argv) {
 	// run K epoches
 	for (size_t i = 0; i < K; i++) {
 		forward(graph, input_features, weight_matrices, bias_matrices, output_features); // forward-propogation, i.e. inference
-		backward(graph, input_features, weight_matrices, bias_matrices, output_features); // back propogation
+		backward(graph, input_features, output_features, weight_matrices, bias_matrices); // back propogation
 	}
 	Tcomp.stop();
 	//print_output();
