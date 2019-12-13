@@ -75,6 +75,7 @@ enum ConvertMode {
   gr2treegr,
   gr2trigr,
   gr2totem,
+  gr2neo4j,
   mtx2gr,
   nodelist2gr,
   pbbs2gr,
@@ -172,6 +173,7 @@ static cll::opt<ConvertMode> convertMode(
         clEnumVal(gr2trigr, "Convert symmetric binary gr to triangular form by "
                             "removing reverse edges"),
         clEnumVal(gr2totem, "Convert binary gr totem input format"),
+        clEnumVal(gr2neo4j, "Convert binary gr to a vertex/edge csv for neo4j"),
         clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
         clEnumVal(nodelist2gr, "Convert node list to binary gr"),
         clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
@@ -691,8 +693,6 @@ struct Gr2Adjacencylist : public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef galois::LargeArray<EdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -2535,6 +2535,71 @@ struct Gr2Totem : public HasNoVoidSpecialization {
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
+
+struct Gr2Neo4j : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    // TODO Need to figure out how we want to deal with labels
+
+    using Graph = galois::graphs::FileGraph;
+    using GNode = Graph::GraphNode;
+    using EdgeData = galois::LargeArray<EdgeTy>;
+    using edge_value_type = typename EdgeData::value_type;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    // output node csv for node creation
+
+    // first is header
+    std::string nodeHFile = outfilename + ".nodesheader";
+    std::ofstream fileH(nodeHFile.c_str());
+    fileH << "uid:ID,:LABEL\n";
+    fileH.close();
+
+    // then nodes
+    std::string nodeFile = outfilename + ".nodes";
+    std::ofstream fileN(nodeFile.c_str());
+    for (size_t i = 0; i < graph.size(); i++) {
+      fileN << i << ",v\n";
+    }
+    fileN.close();
+
+    // output edge CSV with or without data for edge creation
+    std::string edgeHFile = outfilename + ".edgesheader";
+    std::ofstream fileHE(edgeHFile.c_str());
+    if (EdgeData::has_value) {
+      fileHE << ":START_ID,:END_ID,:TYPE,value\n";
+    } else {
+      fileHE << ":START_ID,:END_ID,:TYPE\n";
+    }
+    fileHE.close();
+
+    // output edge CSV with or without data for edge creation
+    std::string edgeFile = outfilename + ".edges";
+    std::ofstream fileE(edgeFile.c_str());
+
+    // write edges
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      for (Graph::edge_iterator jj = graph.edge_begin(src),
+                                ej = graph.edge_end(src);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        if (EdgeData::has_value) {
+          fileE << src << "," << dst << ",e,"
+               << graph.getEdgeData<edge_value_type>(jj) << "\n";
+        } else {
+          fileE << src << "," << dst << ",e\n";
+        }
+      }
+    }
+    fileE.close();
+
+    printStatus(graph.size(), graph.sizeEdges());
+  }
+};
+
 /**
  * METIS format (1-indexed). See METIS 4.10 manual, section 4.5.
  *  % comment prefix
@@ -2904,6 +2969,9 @@ int main(int argc, char** argv) {
     break;
   case gr2totem:
     convert<Gr2Totem<IdLess>>();
+    break;
+  case gr2neo4j:
+    convert<Gr2Neo4j>();
     break;
   case mtx2gr:
     convert<Mtx2Gr>();
