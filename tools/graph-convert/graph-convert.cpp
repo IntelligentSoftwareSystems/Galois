@@ -543,6 +543,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
       }
 
       for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
+        printf("Current edge progress %lf%%\r", ((double)edge_num / nedges) * 100);
         uint32_t cur_id, neighbor_id;
         double weight = 1;
 
@@ -570,6 +571,8 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
         GALOIS_DIE("Error: additional lines in file");
       }
     }
+    // this is for the progress print
+    printf("\n");
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
