@@ -1,0 +1,247 @@
+#include <random>
+#include <iomanip>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include "gnn.h"
+#include "lgraph.h"
+#include "math_functions.hpp"
+
+std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
+
+class ResourceManager {
+public:
+	ResourceManager() {}
+	~ResourceManager(){}
+	//peak memory usage
+	std::string get_peak_memory() {
+		double kbm;
+		struct rusage CurUsage;
+		getrusage(RUSAGE_SELF, &CurUsage);
+		kbm = (double)CurUsage.ru_maxrss;
+		double mbm = kbm / 1024.0;
+		double gbm = mbm / 1024.0;
+		return
+			"Peak memory: " +
+			to_string_with_precision(mbm, 3) + " MB; " +
+			to_string_with_precision(gbm, 3) + " GB";
+	}
+private:
+	template <typename T = double>
+	std::string to_string_with_precision(const T a_value, const int& n) {
+		std::ostringstream out;
+		out << std::fixed;
+		out << std::setprecision(n) << a_value;
+		return out.str();
+	}
+};
+
+class Timer {
+public:
+	Timer() {}
+	void Start() { gettimeofday(&start_time_, NULL); }
+	void Stop() {
+		gettimeofday(&elapsed_time_, NULL);
+		elapsed_time_.tv_sec  -= start_time_.tv_sec;
+		elapsed_time_.tv_usec -= start_time_.tv_usec;
+	}
+	double Seconds() const { return elapsed_time_.tv_sec + (double)elapsed_time_.tv_usec/1e6; }
+	double Millisecs() const { return 1000*elapsed_time_.tv_sec + (double)elapsed_time_.tv_usec/1000; }
+	double Microsecs() const { return 1e6*elapsed_time_.tv_sec + (double)elapsed_time_.tv_usec; }
+private:
+	struct timeval start_time_;
+	struct timeval elapsed_time_;
+};
+
+inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
+	std::default_random_engine rng;
+	std::uniform_real_distribution<FeatureT> dist(0, 0.1);
+	matrix.resize(dim_x);
+	for (size_t i = 0; i < dim_x; ++i) {
+		matrix[i].resize(dim_y);
+		for (size_t j = 0; j < dim_y; ++j)
+			matrix[i][j] = dist(rng);
+	}
+}
+
+inline void init_features(size_t dim, FV &x) {
+	std::default_random_engine rng;
+	std::uniform_real_distribution<FeatureT> dist(0, 0.1);
+	for (size_t i = 0; i < dim; ++i)
+		x[i] = dist(rng);
+}
+
+void read_labels(std::string filename, std::vector<unsigned> &labels) {
+	std::ifstream in;
+	std::string line;
+	in.open(filename, std::ios::in);
+	size_t m, n;
+	in >> m >> n >> std::ws;
+	assert(m == labels.size()); // number of vertices
+	std::cout << "label conuts: " << n << std::endl; // number of vertex types
+	IndexT v = 0;
+	while (std::getline(in, line)) {
+		std::istringstream label_stream(line);
+		unsigned x;
+		for (size_t idx = 0; idx < n; ++idx) {
+			label_stream >> x;
+			if (x != 0) {
+				labels[v] = idx;
+				break;
+			}
+		}
+		v ++;
+	}
+
+	for (size_t i = 0; i < 10; ++i) {
+		std::cout << "labels[" << i << "]: " << labels[i] << std::endl;
+	}
+}
+
+void read_features(std::string dataset_str, FV2D &features) {
+	std::string filename = path + dataset_str + ".ft";
+	std::ifstream in;
+	std::string line;
+	in.open(filename, std::ios::in);
+	size_t m, n;
+	in >> m >> n >> std::ws;
+	assert(m == features.size()); // number of vertices
+	std::cout << "feature dimention: " << n << std::endl;
+	for (size_t i = 0; i < m; ++i) {
+		features[i].resize(n);
+		for (size_t j = 0; j < n; ++j) {
+			features[i][j] = 0;
+		}
+	}
+	while (std::getline(in, line)) {
+		std::istringstream edge_stream(line);
+		IndexT u, v;
+		FeatureT w;
+		edge_stream >> u;
+		edge_stream >> v;
+		edge_stream >> w;
+		features[u][v] = w;
+	}
+/*
+	for (size_t i = 0; i < 10; ++i) {
+		for (size_t j = 0; j < n; ++j) {
+			if (features[i][j] > 0)
+				std::cout << "features[" << i << "][" << j << "]: " << features[i][j] << std::endl;
+		}
+	}
+//*/
+}
+
+void genGraph(LGraph &lg, Graph &g) {
+	g.allocateFrom(lg.num_vertices(), lg.num_edges());
+	g.constructNodes();
+	for (size_t i = 0; i < lg.num_vertices(); i++) {
+		g.getData(i) = 1;
+		auto row_begin = lg.get_offset(i);
+		auto row_end = lg.get_offset(i+1);
+		g.fixEndEdge(i, row_end);
+		for (auto offset = row_begin; offset < row_end; offset ++)
+			g.constructEdge(offset, lg.get_dest(offset), 0); // do not consider edge labels currently
+	}
+}
+
+unsigned read_graph(Graph &graph, std::string filename, std::string filetype = "el") {
+	LGraph lgraph;
+	unsigned max_degree = 0;
+	if (filetype == "el") {
+		printf("Reading .el file: %s\n", filename.c_str());
+		lgraph.read_edgelist(filename.c_str()); //symmetrize
+		genGraph(lgraph, graph);
+	} else if (filetype == "gr") {
+		printf("Reading .gr file: %s\n", filename.c_str());
+		galois::graphs::readGraph(graph, filename);
+		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
+			graph.getData(vid) = 1;
+			//for (auto e : graph.edges(n)) graph.getEdgeData(e) = 1;
+		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("assignVertexLabels"));
+		std::vector<unsigned> degrees(graph.size());
+		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
+			degrees[vid] = std::distance(graph.edge_begin(vid), graph.edge_end(vid));
+		}, galois::loopname("computeMaxDegree"));
+		max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+	} else { printf("Unkown file format\n"); exit(1); }
+	if (filetype != "gr") {
+		max_degree = lgraph.get_max_degree();
+		lgraph.clean();
+	}
+	printf("max degree = %u\n", max_degree);
+	return max_degree;
+}
+
+/*
+ Loads input data from gcn/data directory
+ ind.dataset_str.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
+ ind.dataset_str.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
+ ind.dataset_str.allx => the feature vectors of both labeled and unlabeled training instances
+ (a superset of ind.dataset_str.x) as scipy.sparse.csr.csr_matrix object;
+ ind.dataset_str.y => the one-hot labels of the labeled training instances as numpy.ndarray object;
+ ind.dataset_str.ty => the one-hot labels of the test instances as numpy.ndarray object;
+ ind.dataset_str.ally => the labels for instances in ind.dataset_str.allx as numpy.ndarray object;
+ ind.dataset_str.test.index => the indices of test instances in graph, for the inductive setting as list object.
+
+ All objects above must be saved using python pickle module.
+
+ :param dataset_str: Dataset name
+ :return: All data input files loaded (as well the training/test data).
+*/
+void load_data(std::string dataset_str, Graph &g, FV2D &features) {
+	//std::string filename = dataset_str + ".gr";
+	std::string filename = path + dataset_str + ".el";
+	galois::StatTimer Tread("GraphReadingTime");
+	printf("Start readGraph\n");
+	Tread.start();
+	read_graph(g, filename);
+	Tread.stop();
+	printf("Done readGraph\n");
+	std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
+
+	auto n = g.size();
+	features.resize(n);
+	read_features(dataset_str, features);
+
+}
+
+void load_labels(size_t n, std::string dataset_str, LabelList &labels, LabelList &y_train, LabelList &y_val, LabelList &y_test) {
+	std::string filename = path + dataset_str + "-labels.txt";
+	read_labels(filename, labels);
+}
+
+void set_masks(size_t n, MaskList &train_mask, MaskList &val_mask, MaskList &test_mask) {
+	for (size_t i = 0; i < n; i++) {
+		if (i < 120) train_mask[i] = 1; // [0, 120) train size = 120
+		else if (i < 620) val_mask[i] = 1; // [120, 620) validation size = 500
+		else if (i >= 2312) test_mask[i] = 1; // [2312, 3327) test size = 1015
+		else ; // unlabeled vertices
+	}
+}
+
+inline double masked_softmax_cross_entropy(LabelList preds, LabelList labels, MaskList masks) {
+	size_t n = masks.size();
+	std::vector<float> loss(n);
+	softmax_cross_entropy_with_logits(preds, labels, loss);
+	auto sum_mask = accumulate(masks.begin(), masks.end(), 0);
+	//float avg_mask = reduce_mean<MaskT>(masks);
+	float avg_mask = (float)sum_mask / (float)n;
+	for (size_t i = 0; i < n; i ++) 
+		loss[i] = loss[i] * (float)masks[i] / avg_mask;
+	auto sum_loss = accumulate(loss.begin(), loss.end(), 0);
+	return sum_loss / n;
+}
+
+inline double masked_accuracy(LabelList preds, LabelList labels, MaskList masks) {
+	size_t n = labels.size();
+	std::vector<float> accuracy_all(n, 0);
+	for (size_t i = 0; i < n; i++)
+		if (preds[i] == labels[i]) accuracy_all[i] = 1;
+	auto sum_mask = accumulate(masks.begin(), masks.end(), 0);
+	float avg_mask = (float)sum_mask / (float)n;
+	for (size_t i = 0; i < n; i ++) 
+		accuracy_all[i] = accuracy_all[i] * (float)masks[i] / avg_mask;
+	auto sum_accuracy_all = accumulate(accuracy_all.begin(), accuracy_all.end(), 0);
+	return sum_accuracy_all / n;
+}
+

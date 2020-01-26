@@ -1,197 +1,164 @@
 // Graph Neural Networks
 // Xuhao Chen <cxh@utexas.edu>
-#include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Bag.h"
-#include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/runtime/Profile.h"
-#include <boost/iterator/transform_iterator.hpp>
-
-namespace cll = llvm::cl;
-//static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
-static cll::opt<unsigned> L("l", cll::desc("depth, i.e. number of layers (default value 3)"), cll::init(3));
-static cll::opt<unsigned> K("k", cll::desc("number of epoch, i.e. iterations (default value 5)"), cll::init(5));
-#ifdef EDGE_LABEL
-typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-#else
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-#endif
-typedef Graph::GraphNode GNode;
-typedef float FeatureT; // feature type
-typedef std::vector<FeatureT> FV; // feature vector
-typedef std::vector<FV> FV2D; // feature vectors
-typedef std::vector<FV2D> FV3D; // matrices 
-#define Dim 20 // vector dimension
+#include "gnn.h"
+#include "types.h"
+#include "utils.h"
+#include "math_functions.hpp"
+#define NUM_LAYERS 2
 #define CHUNK_SIZE 256
 
-const char* name = "Graph Neural Networks";
-const char* desc = "Graph neural networks on an undirected graph";
+const char* name = "Graph Convolutional Networks";
+const char* desc = "Graph convolutional neural networks on an undirected graph";
 const char* url  = 0;
 
-#include "util.h"
-#include <random>
-void init_features(size_t n, FV2D x) {
-	x.resize(n);
-	std::default_random_engine rng;
-	std::uniform_real_distribution<float> dist(0, 0.1);
-	for (size_t i = 0; i < n; ++i) {
-		x[i].resize(Dim);
-		for (size_t j = 0; j < Dim; ++j) {
-			x[i][j] = dist(rng);
-		}
+inline void agg_func(size_t dim, FV in, FV &out) {
+	for (size_t i = 0; i < dim; ++i) {
+		out[i] += in[i];
 	}
 }
 
-void init_matrices(unsigned l, FV3D x) {
-	x.resize(l);
-	std::default_random_engine rng;
-	std::uniform_real_distribution<float> dist(0, 0.1);
-	for (size_t i = 0; i < l; ++i) {
-		x[i].resize(Dim);
-		for (size_t j = 0; j < Dim; ++j) {
-			x[i][j].resize(Dim);
-			for (size_t k = 0; k < Dim; ++k) {
-				x[i][j][k] = dist(rng);
-			}
-		}
-	}
-}
-
-#include <cmath>
-inline FeatureT sigmoid_func(FeatureT x) {
-	return 0.5 * tanh(0.5 * x) + 0.5;
-}
-
-// vector add
-void vadd(FV in_a, FV in_b, FV &out) {
-	for (size_t i = 0; i < Dim; ++i) {
-		out[i] = in_a[i] + in_b[i];
-	}
-}
-
-// matrix-vector multiply
-void mvmul(FV2D weights, FV input_vector, FV &output_vector) {
-	for (size_t i = 0; i < Dim; ++i) { 
-		for (size_t j = 0; j < Dim; ++j) { 
-			output_vector[i] += weights[i][j] * input_vector[j];
-		} 
-	} 
-}
-
-// matrix multiply
-void matmul(FV2D weights, FV2D input_vectors, FV2D &output_vectors) {
-	for (size_t i = 0; i < Dim; ++i) { 
-		for (size_t j = 0; j < Dim; ++j) { 
-			for (size_t k = 0; k < Dim; ++k) { 
-				output_vectors[i][j] += weights[i][k] * input_vectors[k][j];
-			} 
-		} 
-	} 
-}
-
-// ReLU
-const float negative_slope = 0;
-void relu(FV &fv) {
-	size_t count = fv.size();
-	for (size_t i = 0; i < count; ++i) {
-		fv[i] = std::max(fv[i], (FeatureT)0) + negative_slope * std::min(fv[i], (FeatureT)0);
-	}
-}
-
-void sigmoid(FV fv) {
-	size_t count = fv.size();
-	for (size_t i = 0; i < count; ++i) {
-		fv[i] = sigmoid_func(fv[i]);
-	}
-}
-
-inline void agg_func(FV a, FV &b) {
-	for (size_t i = 0; i < Dim; ++i) {
-		b[i] += a[i];
-	}
-}
-
-// user-defined aggregation function
-void aggregate(Graph &g, VertexId src, FV2D embeddings, FV &sum) {
+// user-defined aggregate function
+void aggregate(size_t dim, Graph &g, VertexID src, FV2D features, FV &sum) {
 	unsigned degree = 0;
 	for (auto e : g.edges(src)) {
 		auto dst = g.getEdgeDst(e);
-		agg_func(embeddings[dst], sum);
+		agg_func(dim, features[dst], sum);
 		degree ++;
 	}
-	for (size_t i = 0; i < Dim; ++i) sum[i] /= degree; // average
+	for (size_t i = 0; i < dim; ++i) sum[i] /= degree; // average
 }
 
-void combine(FV2D weights, FV2D biases, FV a, FV b, FV &out) {
-	FV c(Dim, 0);
-	FV d(Dim, 0);
-	mvmul(biases, a, c);
-	mvmul(weights, b, d);
-	vadd(c, d, out);
-}
-
-void normalize(FV2D features) {
+// user-defined combine function
+void combine(size_t dim, FV2D weights, FV2D biases, FV a, FV b, FV &out) {
+	FV c(dim, 0);
+	FV d(dim, 0);
+	mvmul(dim, biases, a, c);
+	mvmul(dim, weights, b, d);
+	vadd(dim, c, d, out);
 }
 
 // forward propogation, i.e. inference
-void forward(Graph &g, FV2D inputs, FV3D weight_matrices, FV3D bias_matrices, FV2D &outputs) {
+void forward(Graph &g, FV2D &features, FV3D &outs, FV3D weight_matrices, FV3D bias_matrices, LabelList labels, MaskList masks, double &loss, double &accuracy) {
 	auto n = g.size();
-	FV2D h_curr = inputs; // current level embedding
-	FV2D h_next; // next level embedding
-	h_next.resize(n);
-	for (size_t i = 0; i < n; ++i) h_next[i].resize(Dim);
-	for (unsigned l = 1; l < L; l ++) {
+	size_t dim = features[0].size();
+	FV2D h_curr = features; // current level embedding (top)
+	for (unsigned l = 0; l < NUM_LAYERS; l ++) {
+		outs[l].resize(n);
+		for (size_t i = 0; i < n; ++i) outs[l][i].resize(dim);
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV h_neighbors(Dim, 0); // used to gather neighbors' embeddings
-			aggregate(g, src, h_curr, h_neighbors);
-			combine(weight_matrices[l], bias_matrices[l], h_curr[src], h_neighbors, h_next[src]);
-			relu(h_next[src]);
+			FV h_neighbors(dim, 0); // used to gather neighbors' embeddings
+			aggregate(dim, g, src, h_curr, h_neighbors);
+			combine(dim, weight_matrices[l], bias_matrices[l], h_curr[src], h_neighbors, outs[l][src]);
+			relu(outs[l][src]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
-		//normalize(h_next);
+		h_curr = outs[l];
 	}
-	outputs = h_next;
+	features = outs[NUM_LAYERS-1];
+	LabelList predictions;
+	loss += masked_softmax_cross_entropy(predictions, labels, masks);
+	accuracy = masked_accuracy(predictions, labels, masks);
 }
 
 // back propogation
-void backward(Graph &g, FV2D inputs, FV2D outputs, FV3D &weight_matrices, FV3D &bias_matrices) {
+void backward(Graph &g, FV2D features, FV3D outs, FV3D &weight_matrices, FV3D &bias_matrices) {
+	auto n = g.size();
+	FV2D in_diff = features; // current level embedding (bottom)
+	FV2D out_diff; // next level embedding (top)
+	out_diff.resize(n);
+	for (unsigned l = NUM_LAYERS-1; l >= 0; --l) {
+		FV2D weight_diff;
+		out_diff.resize(n);
+		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& i) {
+			//out_diff[i] = in_diff[i] * (outs[l][i] > 0);
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
+	}
+}
+
+void evaluate(Graph &g, FV2D &features, FV3D weight_matrices, FV3D bias_matrices, LabelList labels, MaskList masks, double &loss, double &accuracy) {
+	auto n = g.size();
+	size_t dim = features[0].size();
+	FV2D h_curr = features; // current level embedding (top)
+	FV2D h_next; // next level embedding (bottom)
+	h_next.resize(n);
+	for (size_t i = 0; i < n; ++i) h_next[i].resize(dim);
+	for (unsigned l = 0; l < NUM_LAYERS; l ++) {
+		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
+			FV h_neighbors(dim, 0); // used to gather neighbors' embeddings
+			aggregate(dim, g, src, h_curr, h_neighbors);
+			combine(dim, weight_matrices[l], bias_matrices[l], h_curr[src], h_neighbors, h_next[src]);
+			relu(h_next[src]);
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
+		h_curr = h_next;
+	}
+	features = h_next;
+	LabelList predictions;
+	loss += masked_softmax_cross_entropy(predictions, labels, masks);
+	accuracy = masked_accuracy(predictions, labels, masks);
 }
 
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
+
 	Graph graph;
-	galois::StatTimer Tinitial("GraphReadingTime");
-	printf("Start readGraph\n");
-	Tinitial.start();
-    galois::graphs::readGraph(graph, filename);
-	Tinitial.stop();
-	printf("Done readGraph\n");
-	std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
-	
-	auto n = graph.size();
+
 	FV2D input_features;
-	FV2D output_features; // vertex embeddings to get from inference
+	//FV2D output_features; // vertex embeddings to get from inference
+	LabelList y_train, y_val, y_test; // labels for classification
+	load_data(dataset, graph, input_features); 
+	size_t n = graph.size();
+	std::vector<unsigned> labels(n, 0);
+	load_labels(n, dataset, labels, y_train, y_val, y_test);
+	MaskList train_mask(n, 0), val_mask(n, 0), test_mask(n, 0);
+	set_masks(n, train_mask, val_mask, test_mask);
+	return 0;
+	size_t feature_dim = input_features[0].size();
 	FV3D weight_matrices; // parameters to learn
 	FV3D bias_matrices; // parameters to learn
-	init_features(n, input_features);
-	init_matrices(L, weight_matrices);
-	init_matrices(L, bias_matrices);
+
+	weight_matrices.resize(NUM_LAYERS);
+	bias_matrices.resize(NUM_LAYERS);
+	for (int i = 0; i < NUM_LAYERS; i ++) {
+		init_matrix(feature_dim, feature_dim, weight_matrices[i]);
+		init_matrix(feature_dim, feature_dim, bias_matrices[i]);
+	}
 
 	ResourceManager rm;
-	galois::StatTimer Tcomp("Compute");
-	Tcomp.start();
-	// run K epoches
-	for (size_t i = 0; i < K; i++) {
-		forward(graph, input_features, weight_matrices, bias_matrices, output_features); // forward-propogation, i.e. inference
+	galois::StatTimer Ttrain("Train");
+	Ttrain.start();
+	Timer t_epoch;
+	// run epoches
+	for (size_t i = 0; i < epochs; i++) {
+		std::cout << "Epoch: " << i;
+		t_epoch.Start();
+		// Construct feed dictionary
+
+		// Training step
+		double train_loss, train_acc;
+		FV3D output_features;
+		forward(graph, input_features, output_features, weight_matrices, bias_matrices, y_train, train_mask, train_loss, train_acc);
 		backward(graph, input_features, output_features, weight_matrices, bias_matrices); // back propogation
+		std::cout << " train_loss = " << train_loss << " train_acc = " << train_acc;
+
+		// Validation
+		//double cost, acc;
+		//Timer t_eval;
+		//t_eval.Start();
+		//evaluate(graph, input_features, weight_matrices, bias_matrices, y_val, val_mask, cost, acc);
+		//std::cout << " val_loss = " << cost << " val_acc = " << acc 
+		//t_eval.Stop();
+		//t_eval.Millisecs();
+
+		t_epoch.Stop();
+		std::cout << " time = " << t_epoch.Millisecs() << "ms. \n";
 	}
-	Tcomp.stop();
-	//print_output();
+	Ttrain.stop();
+
+	double test_cost, test_acc;
+	galois::StatTimer Ttest("Test");
+	Ttest.start();
+	evaluate(graph, input_features, weight_matrices, bias_matrices, y_test, test_mask, test_cost, test_acc);
+	Ttest.stop();
 	std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
 	return 0;
 }

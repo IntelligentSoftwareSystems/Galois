@@ -139,6 +139,14 @@ protected:
 	}
 	#endif
 	template <typename EmbeddingTy = VertexEmbedding>
+	inline bool is_automorphism_dag(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
+		//if (dst <= emb.get_vertex(0)) return true;
+		for (unsigned i = 0; i < n; ++i) if (dst == emb.get_vertex(i)) return true;
+		for (unsigned i = 0; i < idx; ++i) if (is_connected_dag(dst, emb.get_vertex(i))) return true;
+		//for (unsigned i = idx+1; i < n; ++i) if (dst < emb.get_vertex(i)) return true;
+		return false;
+	}
+	template <typename EmbeddingTy = VertexEmbedding>
 	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
 		//unsigned n = emb.size();
 		// the new vertex id should be larger than the first vertex id
@@ -276,6 +284,19 @@ protected:
 			if (i == pos) continue;
 			unsigned from = emb.get_vertex(i);
 			if (!is_connected(from, dst)) {
+				all_connected = false;
+				break;
+			}
+		}
+		return all_connected;
+	}
+	inline bool is_all_connected_except_dag(unsigned dst, unsigned pos, const BaseEmbedding &emb) {
+		unsigned n = emb.size();
+		bool all_connected = true;
+		for(unsigned i = 0; i < n; ++i) {
+			if (i == pos) continue;
+			unsigned from = emb.get_vertex(i);
+			if (!is_connected_dag(dst, from)) {
 				all_connected = false;
 				break;
 			}
