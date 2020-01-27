@@ -35,7 +35,9 @@
 #include <numaif.h>
 #endif
 
+#ifdef GALOIS_USE_SCHED_SETAFFINITY
 #include <sched.h>
+#endif
 
 using namespace galois::substrate;
 
@@ -294,7 +296,7 @@ galois::substrate::getHWTopo() {
 
 //! binds current thread to OS HW context "proc"
 bool galois::substrate::bindThreadSelf(unsigned osContext) {
-#ifndef __CYGWIN__
+#ifdef GALOIS_USE_SCHED_SETAFFINITY
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
   CPU_ZERO(&mask);
@@ -311,7 +313,7 @@ bool galois::substrate::bindThreadSelf(unsigned osContext) {
   }
   return true;
 #else
-  galois::gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  galois::gWarn("Cannot set cpu affinity on this platform.  Performance will be bad.");
   return false;
 #endif
 }

@@ -312,11 +312,15 @@ endif()
 # PThreads
 find_package(Threads REQUIRED)
 
-#llvm ADT and command line parser
-#find_package(LLVM)
-
-# include(CheckCilk)
 include(CheckMmap)
+
+include(CheckSchedSetAffinity)
+if(SCHED_SETAFFINITY_FOUND)
+  add_definitions(-DGALOIS_USE_SCHED_SETAFFINITY)
+elseif(USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need sched_setaffinity")
+endif()
+
 
 # HugePages
 include(CheckHugePages)
@@ -340,11 +344,6 @@ include_directories(${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_NO_AUTO_PTR)
 
 include(CheckEndian)
-
-#include(llvm-extras)
-#always import c99 stdint functions into c++
-#include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
-#include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us
 
 ###### Build Hacks ######
 
@@ -413,16 +412,15 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(linkApp name extlibs)
-  # if(${APP_EXP_OPT})
-    # target_link_libraries(${name} galois_exp)
-  # endif()
   if (NOT extlibs STREQUAL "")
     target_link_libraries(${name} ${extlibs})
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
   target_link_libraries(${name} gllvm)
-  target_link_libraries(${name} rt)
+  if (SCHED_SETAFFINITY_FOUND)
+    target_link_libraries(${name} ${SCHED_SETAFFINITY_LIBRARIES})
+  endif()
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
   if(VTune_FOUND)
@@ -435,7 +433,7 @@ function(linkApp name extlibs)
 
 endfunction(linkApp)
 
-# TODO: sepearte out shared and dist libraries to link
+# TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
 function(app name)
   set(options DISTSAFE EXP_OPT)
