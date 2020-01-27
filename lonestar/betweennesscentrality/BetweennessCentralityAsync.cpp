@@ -458,7 +458,7 @@ int main(int argc, char** argv) {
   // reset everything in preparation for run
   galois::do_all(galois::iterate(0u, nnodes),
                  [&](auto i) { bcGraph.getData(i).reset(); });
-  galois::do_all(galois::iterate(0ul, nedges),
+  galois::do_all(galois::iterate(UINT64_C(0), nedges),
                  [&](auto i) { bcGraph.getEdgeData(i).reset(); });
 
   // reading in list of sources to operate on if provided

@@ -122,7 +122,7 @@ protected:
   void determineInEdgeIndices(EdgeIndData& dataBuffer) {
     // counting outgoing edges in the tranpose graph by
     // counting incoming edges in the original graph
-    galois::do_all(galois::iterate(0ul, BaseGraph::numEdges), [&](uint64_t e) {
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numEdges), [&](uint64_t e) {
       auto dst = BaseGraph::edgeDst[e];
       __sync_add_and_fetch(&(dataBuffer[dst]), 1);
     });
@@ -134,8 +134,8 @@ protected:
 
     // copy over the new tranposed edge index data
     inEdgeIndData.allocateInterleaved(BaseGraph::numNodes);
-    galois::do_all(galois::iterate(0ul, BaseGraph::numNodes),
-                   [&](uint32_t n) { inEdgeIndData[n] = dataBuffer[n]; });
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numNodes),
+                   [&](uint64_t n) { inEdgeIndData[n] = dataBuffer[n]; });
   }
 
   /**
@@ -150,8 +150,8 @@ protected:
     // saving an edge for a node
     if (BaseGraph::numNodes >= 1) {
       dataBuffer[0] = 0;
-      galois::do_all(galois::iterate(1ul, BaseGraph::numNodes),
-                     [&](uint32_t n) { dataBuffer[n] = inEdgeIndData[n - 1]; });
+      galois::do_all(galois::iterate(UINT64_C(1), BaseGraph::numNodes),
+                     [&](uint64_t n) { dataBuffer[n] = inEdgeIndData[n - 1]; });
     }
 
     // allocate edge dests and data
@@ -162,7 +162,7 @@ protected:
     }
 
     galois::do_all(
-        galois::iterate(0ul, BaseGraph::numNodes), [&](uint32_t src) {
+        galois::iterate(UINT64_C(0), BaseGraph::numNodes), [&](uint64_t src) {
           // e = start index into edge array for a particular node
           uint64_t e = (src == 0) ? 0 : BaseGraph::edgeIndData[src - 1];
 
@@ -213,8 +213,8 @@ public:
     // initialize the temp array
     EdgeIndData dataBuffer;
     dataBuffer.allocateInterleaved(BaseGraph::numNodes);
-    galois::do_all(galois::iterate(0ul, BaseGraph::numNodes),
-                   [&](uint32_t n) { dataBuffer[n] = 0; });
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numNodes),
+                   [&](uint64_t n) { dataBuffer[n] = 0; });
 
     determineInEdgeIndices(dataBuffer);
     determineInEdgeDestAndData(dataBuffer);
