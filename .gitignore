@@ -13,6 +13,7 @@ cscope.out
 tags
 .vscode
 .settings
+compile_commands.json
 
 /GPATH
 /GRTAGS
