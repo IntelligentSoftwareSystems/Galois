@@ -70,14 +70,15 @@ inline void init_features(size_t dim, FV &x) {
 		x[i] = dist(rng);
 }
 
-void read_labels(std::string filename, std::vector<unsigned> &labels) {
+size_t read_labels(std::string dataset_str, LabelList &labels) {
+	std::string filename = path + dataset_str + "-labels.txt";
 	std::ifstream in;
 	std::string line;
 	in.open(filename, std::ios::in);
 	size_t m, n;
 	in >> m >> n >> std::ws;
 	assert(m == labels.size()); // number of vertices
-	std::cout << "label conuts: " << n << std::endl; // number of vertex types
+	std::cout << "label conuts: " << n << std::endl; // number of vertex classes
 	IndexT v = 0;
 	while (std::getline(in, line)) {
 		std::istringstream label_stream(line);
@@ -92,25 +93,24 @@ void read_labels(std::string filename, std::vector<unsigned> &labels) {
 		v ++;
 	}
 
-	for (size_t i = 0; i < 10; ++i) {
-		std::cout << "labels[" << i << "]: " << labels[i] << std::endl;
-	}
+	//for (size_t i = 0; i < 10; ++i)
+	//	std::cout << "labels[" << i << "]: " << labels[i] << std::endl;
+	return n;
 }
 
-void read_features(std::string dataset_str, FV2D &features) {
+size_t read_features(std::string dataset_str, FV2D &features) {
 	std::string filename = path + dataset_str + ".ft";
 	std::ifstream in;
 	std::string line;
 	in.open(filename, std::ios::in);
 	size_t m, n;
 	in >> m >> n >> std::ws;
-	assert(m == features.size()); // number of vertices
+	assert(m == features.size()); // m = number of vertices
 	std::cout << "feature dimention: " << n << std::endl;
 	for (size_t i = 0; i < m; ++i) {
 		features[i].resize(n);
-		for (size_t j = 0; j < n; ++j) {
+		for (size_t j = 0; j < n; ++j)
 			features[i][j] = 0;
-		}
 	}
 	while (std::getline(in, line)) {
 		std::istringstream edge_stream(line);
@@ -129,6 +129,7 @@ void read_features(std::string dataset_str, FV2D &features) {
 		}
 	}
 //*/
+	return n;
 }
 
 void genGraph(LGraph &lg, Graph &g) {
@@ -144,12 +145,12 @@ void genGraph(LGraph &lg, Graph &g) {
 	}
 }
 
-unsigned read_graph(Graph &graph, std::string filename, std::string filetype = "el") {
+unsigned load_graph(Graph &graph, std::string filename, std::string filetype = "el") {
 	LGraph lgraph;
 	unsigned max_degree = 0;
 	if (filetype == "el") {
 		printf("Reading .el file: %s\n", filename.c_str());
-		lgraph.read_edgelist(filename.c_str()); //symmetrize
+		lgraph.read_edgelist(filename.c_str(), true); //symmetrize
 		genGraph(lgraph, graph);
 	} else if (filetype == "gr") {
 		printf("Reading .gr file: %s\n", filename.c_str());
@@ -172,42 +173,16 @@ unsigned read_graph(Graph &graph, std::string filename, std::string filetype = "
 	return max_degree;
 }
 
-/*
- Loads input data from gcn/data directory
- ind.dataset_str.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
- ind.dataset_str.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
- ind.dataset_str.allx => the feature vectors of both labeled and unlabeled training instances
- (a superset of ind.dataset_str.x) as scipy.sparse.csr.csr_matrix object;
- ind.dataset_str.y => the one-hot labels of the labeled training instances as numpy.ndarray object;
- ind.dataset_str.ty => the one-hot labels of the test instances as numpy.ndarray object;
- ind.dataset_str.ally => the labels for instances in ind.dataset_str.allx as numpy.ndarray object;
- ind.dataset_str.test.index => the indices of test instances in graph, for the inductive setting as list object.
-
- All objects above must be saved using python pickle module.
-
- :param dataset_str: Dataset name
- :return: All data input files loaded (as well the training/test data).
-*/
-void load_data(std::string dataset_str, Graph &g, FV2D &features) {
-	//std::string filename = dataset_str + ".gr";
-	std::string filename = path + dataset_str + ".el";
+void read_graph(std::string dataset_str, Graph &g) {
 	galois::StatTimer Tread("GraphReadingTime");
 	printf("Start readGraph\n");
 	Tread.start();
-	read_graph(g, filename);
+	//std::string filename = dataset_str + ".gr";
+	std::string filename = path + dataset_str + ".el";
+	load_graph(g, filename);
 	Tread.stop();
 	printf("Done readGraph\n");
 	std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
-
-	auto n = g.size();
-	features.resize(n);
-	read_features(dataset_str, features);
-
-}
-
-void load_labels(size_t n, std::string dataset_str, LabelList &labels, LabelList &y_train, LabelList &y_val, LabelList &y_test) {
-	std::string filename = path + dataset_str + "-labels.txt";
-	read_labels(filename, labels);
 }
 
 void set_masks(size_t n, MaskList &train_mask, MaskList &val_mask, MaskList &test_mask) {
@@ -219,10 +194,10 @@ void set_masks(size_t n, MaskList &train_mask, MaskList &val_mask, MaskList &tes
 	}
 }
 
-inline double masked_softmax_cross_entropy(LabelList preds, LabelList labels, MaskList masks) {
+inline AccT masked_softmax_cross_entropy(FV2D &h_out, LabelList &labels, MaskList &masks) {
 	size_t n = masks.size();
-	std::vector<float> loss(n);
-	softmax_cross_entropy_with_logits(preds, labels, loss);
+	std::vector<float> loss(n, 0.0);
+	softmax_cross_entropy_with_logits(h_out, labels, loss);
 	auto sum_mask = accumulate(masks.begin(), masks.end(), 0);
 	//float avg_mask = reduce_mean<MaskT>(masks);
 	float avg_mask = (float)sum_mask / (float)n;
@@ -232,7 +207,7 @@ inline double masked_softmax_cross_entropy(LabelList preds, LabelList labels, Ma
 	return sum_loss / n;
 }
 
-inline double masked_accuracy(LabelList preds, LabelList labels, MaskList masks) {
+inline AccT masked_accuracy(LabelList &preds, LabelList &labels, MaskList &masks) {
 	size_t n = labels.size();
 	std::vector<float> accuracy_all(n, 0);
 	for (size_t i = 0; i < n; i++)

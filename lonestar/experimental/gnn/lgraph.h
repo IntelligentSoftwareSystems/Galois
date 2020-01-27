@@ -1,5 +1,6 @@
 #ifndef __LGRAPH_HPP__
 #define __LGRAPH_HPP__
+
 //defines the Learning Graph (LGraph) data structure
 #include <set>
 #include <string>
@@ -32,7 +33,7 @@ public:
 		delete[] colidx_;
 		delete[] weight_;
 		degrees.clear();
-		//el.clear();
+		el.clear();
 		//labels_.clear();
 		//vertices.clear();
 	}
@@ -48,7 +49,7 @@ public:
 	unsigned get_max_degree() { return max_degree; }
 	//ValueT * labels() { return labels_.data(); }
 	//ValueT get_label(IndexT n) { return labels_[n]; }
-	void read_edgelist(const char *filename, bool symmetrize = false, bool needs_elabel = false) {
+	void read_edgelist(const char *filename, bool symmetrize = false) {
 		std::ifstream in;
 		std::string line;
 		in.open(filename, std::ios::in);
@@ -59,7 +60,7 @@ public:
 			edge_stream >> u;
 			edge_stream >> v;
 			el.push_back(Edge(u, v, 1));
-			//if (symmetrize) el.push_back(Edge(v, u, 1));
+			if (symmetrize) el.push_back(Edge(v, u, 1));
 			if (u > max_vid) max_vid = u;
 			if (v > max_vid) max_vid = v;
 		}
