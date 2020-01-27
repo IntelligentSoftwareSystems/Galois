@@ -62,6 +62,9 @@ class B_LC_CSR_Graph
       B_LC_CSR_Graph<NodeTy, EdgeTy, EdgeDataByValue, HasNoLockable,
                      UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy>;
 
+public:
+  //! Graph node typedef
+  using GraphNode = uint32_t;
 protected:
   // retypedefs of base class
   //! large array for edge data
@@ -70,7 +73,14 @@ protected:
   using EdgeDst = LargeArray<uint32_t>;
   //! large array for edge index data
   using EdgeIndData = LargeArray<uint64_t>;
+public:
+  //! iterator for edges
+  using edge_iterator =
+      boost::counting_iterator<typename EdgeIndData::value_type>;
+  //! reference to edge data
+  using edge_data_reference = typename EdgeData::reference;
 
+protected:
   //! edge index data for the reverse edges
   EdgeIndData inEdgeIndData;
   //! edge destination data for the reverse edges
@@ -82,6 +92,21 @@ protected:
       typename std::conditional<EdgeDataByValue, EdgeData, EdgeIndData>::type;
   //! The data for the reverse edges
   EdgeDataRep inEdgeData;
+
+  //! redefinition of the edge sort iterator in LC_CSR_Graph
+  using edge_sort_iterator =
+    internal::EdgeSortIterator<GraphNode, typename EdgeIndData::value_type,
+                               EdgeDst, EdgeDataRep>;
+
+  //! beginning iterator to an edge sorter for in-edges
+  edge_sort_iterator in_edge_sort_begin(GraphNode N) {
+    return edge_sort_iterator(*in_raw_begin(N), &inEdgeDst, &inEdgeData);
+  }
+
+  //! ending iterator to an edge sorter for in-edges
+  edge_sort_iterator in_edge_sort_end(GraphNode N) {
+    return edge_sort_iterator(*in_raw_end(N), &inEdgeDst, &inEdgeData);
+  }
 
   /**
    * Copy the data of outedge by value to inedge.
@@ -182,15 +207,8 @@ protected:
         });
   }
 
-public:
-  //! Graph node typedef
-  using GraphNode = uint32_t;
-  //! iterator for edges
-  using edge_iterator =
-      boost::counting_iterator<typename EdgeIndData::value_type>;
-  //! reference to edge data
-  using edge_data_reference = typename EdgeData::reference;
 
+public:
   //! default constructor
   B_LC_CSR_Graph() = default;
   //! default move constructor
@@ -365,6 +383,38 @@ public:
    * @returns the prefix sum of in-edges
    */
   const EdgeIndData& getInEdgePrefixSum() const { return inEdgeIndData; }
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Utility
+  /////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Sorts outgoing edges of a node. Comparison is over getEdgeDst(e).
+   */
+  void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    BaseGraph::acquireNode(N, mflag);
+    // depending on value/ref the type of EdgeSortValue changes
+    using EdgeSortVal =
+      EdgeSortValue<GraphNode,
+                    typename std::conditional<EdgeDataByValue, EdgeTy,
+                                              uint64_t>::type>;
+
+    std::sort(in_edge_sort_begin(N), in_edge_sort_end(N),
+              [=](const EdgeSortVal& e1, const EdgeSortVal& e2) {
+                return e1.dst < e2.dst;
+              });
+  }
+
+  /**
+   * Sorts all incoming edges of all nodes in parallel. Comparison is over
+   * getEdgeDst(e).
+   */
+  void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    galois::do_all(galois::iterate((size_t)0, this->size()),
+                   [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
+                   galois::no_stats(), galois::steal());
+  }
+
 };
 
 } // namespace graphs
