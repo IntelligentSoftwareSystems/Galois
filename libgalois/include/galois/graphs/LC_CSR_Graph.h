@@ -509,7 +509,7 @@ public:
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this),
+    galois::do_all(galois::iterate((size_t)0, this->size()),
                    [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
                    galois::no_stats(), galois::steal());
   }
