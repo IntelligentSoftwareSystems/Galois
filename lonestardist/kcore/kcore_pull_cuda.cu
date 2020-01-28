@@ -175,6 +175,7 @@ __global__ void KCore_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int _
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "45 -> 46;
 }

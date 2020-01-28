@@ -108,6 +108,7 @@ __global__ void InitializeGraph_TB_LB(CSRGraph graph, unsigned int __begin, unsi
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "43 -> 44;
 }
@@ -433,6 +434,7 @@ __global__ void PageRank_TB_LB(CSRGraph graph, unsigned int __begin, unsigned in
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "45 -> 46;
 }

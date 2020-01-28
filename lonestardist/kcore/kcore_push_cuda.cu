@@ -86,6 +86,7 @@ __global__ void InitializeGraph2_TB_LB(CSRGraph graph, unsigned int __begin, uns
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "43 -> 44;
 }
@@ -417,6 +418,7 @@ __global__ void KCoreStep1_TB_LB(CSRGraph graph, unsigned int __begin, unsigned 
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "43 -> 44;
 }

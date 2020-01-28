@@ -112,6 +112,7 @@ __global__ void FirstItr_BFS_TB_LB(CSRGraph graph, unsigned int __begin, unsigne
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "48 -> 49;
 }
@@ -427,6 +428,7 @@ __global__ void BFS_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __e
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "49 -> 50;
 }

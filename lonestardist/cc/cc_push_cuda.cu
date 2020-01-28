@@ -112,6 +112,7 @@ __global__ void FirstItr_ConnectedComp_TB_LB(CSRGraph graph, unsigned int __begi
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "48 -> 49;
 }
@@ -427,6 +428,7 @@ __global__ void ConnectedComp_TB_LB(CSRGraph graph, unsigned int __begin, unsign
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
   // FP: "49 -> 50;
 }
