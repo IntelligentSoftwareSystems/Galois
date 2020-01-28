@@ -16,7 +16,7 @@ private:
 private:
   void reset() {
     bag.clear();    
-    for (int i = 0; i < ctxPtr.size(); i++) {
+    for (unsigned i = 0; i < ctxPtr.size(); i++) {
       *(ctxPtr.getRemote(i)) = nullptr;
     }
   }
@@ -46,7 +46,7 @@ public:
           std::cout << item << std::endl;
 
           if (item < 2000) {
-            enqueue(item + item);
+            this->enqueue(item + item);
           }
         }
         , galois::loopname("execute")
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   ExampleWrappedWorklist q;
-  for (int i = 0; i < galois::getActiveThreads(); i++) {
+  for (unsigned i = 0; i < galois::getActiveThreads(); i++) {
     q.enqueue(i+1);
   }
   q.execute();
