@@ -1,6 +1,7 @@
 #ifndef _MATH_FUNCTIONS_
 #define _MATH_FUNCTIONS_
 #include <cmath>
+#include "random.h"
 
 // vector add
 inline void vadd(const FV &in_a, const FV &in_b, FV &out) {
@@ -93,6 +94,41 @@ inline void relu(FV &fv) {
 	for (size_t i = 0; i < count; ++i) {
 		fv[i] = std::max(fv[i], (FeatureT)0) + negative_slope * std::min(fv[i], (FeatureT)0);
 	}
+}
+
+inline void d_relu(FV &in_diff, FV &fv, FV &out_diff) {
+	size_t count = out_diff.size();
+	for (size_t i = 0; i < count; ++i) {
+		out_diff[i] = in_diff[i] * ((fv[i] > (FeatureT)0)  + negative_slope * (fv[i] <= (FeatureT)0));
+	}
+}
+
+#include <boost/random/bernoulli_distribution.hpp>
+template <typename Dtype=float>
+void rng_bernoulli(const int n, const Dtype p, std::vector<unsigned> r) {
+	boost::bernoulli_distribution<Dtype> random_distribution(p);
+	boost::variate_generator<rng_t*, boost::bernoulli_distribution<Dtype> >
+		variate_generator(rng(), random_distribution);
+	for (int i = 0; i < n; ++i)
+		r[i] = static_cast<unsigned>(variate_generator());
+}
+
+inline void dropout(FV &in, std::vector<unsigned> &mask, FV &out) {
+	size_t count = in.size();
+	float threshold_ = dropout_rate;
+	float scale_ = 1. / (1. - threshold_);
+	// Create random numbers
+	rng_bernoulli(count, 1. - threshold_, mask);
+	for (size_t i = 0; i < count; ++i)
+		out[i] = in[i] * mask[i] * scale_;
+}
+
+inline void d_dropout(FV &in_diff, FV &mask, FV &out_diff) {
+	size_t count = in_diff.size();
+	float threshold_ = dropout_rate;
+	float scale_ = 1. / (1. - threshold_);
+	for (size_t i = 0; i < count; ++i)
+		out_diff[i] = in_diff[i] * mask[i] * scale_;
 }
 
 inline FeatureT sigmoid_func(FeatureT x) {

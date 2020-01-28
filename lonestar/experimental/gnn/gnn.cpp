@@ -94,12 +94,22 @@ void evaluate(Graph &g, const FV2D &h_in, FV3D W, FV3D Q, LabelList labels, Mask
 // back propogation
 void backward(Graph &g, FV2D h_in, FV2D h_hidden1, FV2D h_out, FV3D &W, FV3D &Q) {
 	auto n = g.size();
-	FV2D in_diff = h_in; // input embedding
-	FV2D out_diff(n); // output embedding
+	FV2D in_diff(n);
 	FV2D hidden1_diff(n);
-	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& i) {
-		//out_diff[i] = in_diff[i] * (outs[l][i] > 0);
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Encoder"));
+	FV2D out_diff(n);
+	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
+		d_relu(in_diff[src], h_out[src], out_diff[src]);
+		//d_add();
+		//d_mvmul();
+		//d_mvmul();
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer1-back"));
+
+	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
+		//d_relu(in_diff[src], h_out[src], out_diff[src]);
+		//d_add();
+		//d_mvmul();
+		//d_mvmul();
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer0-back"));
 }
 
 int main(int argc, char** argv) {
