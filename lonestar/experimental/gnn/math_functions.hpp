@@ -11,14 +11,16 @@ inline void vadd(const FV &in_a, const FV &in_b, FV &out) {
 }
 
 // vector subtract
-inline void vsub(size_t dim, const FV &in_a, const FV &in_b, FV &out) {
+inline void vsub(const FV &in_a, const FV &in_b, FV &out) {
+	size_t dim = out.size();
 	for (size_t i = 0; i < dim; ++i) {
 		out[i] = in_a[i] - in_b[i];
 	}
 }
 
 // vector multiply
-inline void vmul(size_t dim, const FV &in_a, const FV &in_b, FV &out) {
+inline void vmul(const FV &in_a, const FV &in_b, FV &out) {
+	size_t dim = out.size();
 	for (size_t i = 0; i < dim; ++i) {
 		out[i] = in_a[i] * in_b[i];
 	}
@@ -106,28 +108,24 @@ inline void sigmoid(FV &fv) {
 }
 
 //Softmax
-//template <typename DataTy = float>
-inline void softmax(std::vector<float> &input, std::vector<float> &output) {
-	typedef float DataTy;
+template <typename DataTy = float>
+inline void softmax(std::vector<DataTy> &input, std::vector<DataTy> &output) {
 	auto n = input.size();
-	DataTy m = *(std::max_element(input.begin(), input.end()));
-	//DataTy m = -INFINITY;
-	//for (size_t i = 0; i < n; i++) if (input[i] > m) m = input[i];
+	//DataTy m = *(std::max_element(input.begin(), input.end()));
+	DataTy m = -INFINITY;
+	for (size_t i = 0; i < n; i++) if (input[i] > m) m = input[i];
 	DataTy sum = (DataTy)0;
-	for (size_t i = 0; i < n; i++)
-		sum += expf(input[i]-m);
+	for (size_t i = 0; i < n; i++) sum += expf(input[i]-m);
 	DataTy offset = m + logf(sum);
-	for (size_t i = 0; i < n; i++)
-		output[i] = expf(input[i]-offset);
+	for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
 }
 
-inline float cross_entropy(std::vector<float> &y, std::vector<float> &p) {
+template <typename DataTy = float>
+inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
 	auto n = y.size();
-	float loss = 0.0;
-	for (size_t i = 0; i < n; i++)
-		loss -= y[i] * logf(p[i]);
-	loss /= n;
-	return loss;
+	DataTy loss = 0.0;
+	for (size_t i = 0; i < n; i++) loss -= y[i] * logf(p[i]);
+	return loss / (DataTy)n;
 }
 
 // TODO: need optimization

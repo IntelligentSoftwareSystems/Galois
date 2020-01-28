@@ -53,14 +53,20 @@ private:
 };
 
 inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
+    // Glorot & Bengio (AISTATS 2010) init
+	auto init_range = sqrt(6.0/(dim_x + dim_y));
+	//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
 	std::default_random_engine rng;
-	std::uniform_real_distribution<FeatureT> dist(0, 0.1);
+	std::uniform_real_distribution<FeatureT> dist(-init_range, init_range);
 	matrix.resize(dim_x);
 	for (size_t i = 0; i < dim_x; ++i) {
 		matrix[i].resize(dim_y);
 		for (size_t j = 0; j < dim_y; ++j)
 			matrix[i][j] = dist(rng);
 	}
+	//for (size_t i = 0; i < 3; ++i)
+	//	for (size_t j = 0; j < 3; ++j)
+	//		std::cout << "matrix[" << i << "][" << j << "]: " << matrix[i][j] << std::endl;
 }
 
 inline void init_features(size_t dim, FV &x) {
@@ -174,14 +180,14 @@ unsigned load_graph(Graph &graph, std::string filename, std::string filetype = "
 }
 
 void read_graph(std::string dataset_str, Graph &g) {
+	//printf("Start readGraph\n");
 	galois::StatTimer Tread("GraphReadingTime");
-	printf("Start readGraph\n");
 	Tread.start();
 	//std::string filename = dataset_str + ".gr";
 	std::string filename = path + dataset_str + ".el";
 	load_graph(g, filename);
 	Tread.stop();
-	printf("Done readGraph\n");
+	//printf("Done readGraph\n");
 	std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
 }
 
@@ -196,27 +202,31 @@ void set_masks(size_t n, MaskList &train_mask, MaskList &val_mask, MaskList &tes
 
 inline AccT masked_softmax_cross_entropy(FV2D &h_out, LabelList &labels, MaskList &masks) {
 	size_t n = masks.size();
-	std::vector<float> loss(n, 0.0);
+	std::vector<AccT> loss(n, 0.0);
+	for (size_t i = 0; i < n; i++) loss[i] = 0.0;
 	softmax_cross_entropy_with_logits(h_out, labels, loss);
-	auto sum_mask = accumulate(masks.begin(), masks.end(), 0);
+
+	AccT sum_mask = std::accumulate(masks.begin(), masks.end(), (AccT)0);
 	//float avg_mask = reduce_mean<MaskT>(masks);
-	float avg_mask = (float)sum_mask / (float)n;
+	AccT avg_mask = sum_mask / (AccT)n;
 	for (size_t i = 0; i < n; i ++) 
-		loss[i] = loss[i] * (float)masks[i] / avg_mask;
-	auto sum_loss = accumulate(loss.begin(), loss.end(), 0);
-	return sum_loss / n;
+		loss[i] = loss[i] * (AccT)(masks[i]) / avg_mask;
+	AccT sum_loss = std::accumulate(loss.begin(), loss.end(), (AccT)0);
+	//AccT sum_loss = 0.0;
+	//for (size_t i = 0; i < n; i ++) sum_loss += loss[i];
+	return sum_loss / (AccT)n;
 }
 
 inline AccT masked_accuracy(LabelList &preds, LabelList &labels, MaskList &masks) {
 	size_t n = labels.size();
-	std::vector<float> accuracy_all(n, 0);
+	std::vector<AccT> accuracy_all(n, 0.0);
 	for (size_t i = 0; i < n; i++)
-		if (preds[i] == labels[i]) accuracy_all[i] = 1;
-	auto sum_mask = accumulate(masks.begin(), masks.end(), 0);
-	float avg_mask = (float)sum_mask / (float)n;
+		if (preds[i] == labels[i]) accuracy_all[i] = 1.0;
+	auto sum_mask = std::accumulate(masks.begin(), masks.end(), (int)0);
+	AccT avg_mask = (AccT)sum_mask / (AccT)n;
 	for (size_t i = 0; i < n; i ++) 
-		accuracy_all[i] = accuracy_all[i] * (float)masks[i] / avg_mask;
-	auto sum_accuracy_all = accumulate(accuracy_all.begin(), accuracy_all.end(), 0);
-	return sum_accuracy_all / n;
+		accuracy_all[i] = accuracy_all[i] * (AccT)masks[i] / avg_mask;
+	AccT sum_accuracy_all = std::accumulate(accuracy_all.begin(), accuracy_all.end(), (AccT)0);
+	return sum_accuracy_all / (AccT)n;
 }
 
