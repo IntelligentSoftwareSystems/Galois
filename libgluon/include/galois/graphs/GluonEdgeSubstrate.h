@@ -218,8 +218,8 @@ private:
     // TODO: use 32-bit distinct vectors for masters and mirrors from here on
     for (uint32_t h = 0; h < masterEdges.size(); ++h) {
       galois::do_all(
-          galois::iterate(0ul, masterEdges[h].size()),
-          [&](uint32_t n) {
+          galois::iterate(size_t{0}, masterEdges[h].size()),
+          [&](size_t n) {
             masterEdges[h][n] = userGraph.getEdgeLID(masterEdges[h][n]);
           },
 #if MORE_COMM_STATS
@@ -230,8 +230,8 @@ private:
 
     for (uint32_t h = 0; h < mirrorEdges.size(); ++h) {
       galois::do_all(
-          galois::iterate(0ul, mirrorEdges[h].size()),
-          [&](uint32_t n) {
+          galois::iterate(size_t{0}, mirrorEdges[h].size()),
+          [&](size_t n) {
             mirrorEdges[h][n] = userGraph.getEdgeLID(mirrorEdges[h][n]);
           },
 #if MORE_COMM_STATS
@@ -516,8 +516,8 @@ private:
       bitset_comm.reset();
       // determine which local edges in the indices array need to be
       // sychronized
-      galois::do_all(galois::iterate(0ul, indices.size()),
-                     [&](unsigned int n) {
+      galois::do_all(galois::iterate(size_t{0}, indices.size()),
+                     [&](size_t n) {
                        // assumes each lid is unique as test is not thread safe
                        size_t lid = indices[n];
                        if (bitset_compute.test(lid)) {
@@ -561,8 +561,8 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string doall_str(syncTypeStr + "_LID2GID_" +
                           get_run_identifier(loopName));
-    galois::do_all(galois::iterate(0ul, offsets.size()),
-                   [&](unsigned int n) {
+    galois::do_all(galois::iterate(size_t{0}, offsets.size()),
+                   [&](size_t n) {
                      offsets[n] =
                          static_cast<uint32_t>(
                            userGraph.getEdgeGID(indices[offsets[n]])
@@ -591,8 +591,8 @@ private:
     std::string doall_str(syncTypeStr + "_GID2LID_" +
                           get_run_identifier(loopName));
 
-    galois::do_all(galois::iterate(0ul, offsets.size()),
-                   [&](unsigned int n) {
+    galois::do_all(galois::iterate(size_t{0}, offsets.size()),
+                   [&](size_t n) {
                      offsets[n] = userGraph.getEdgeLID(offsets[n]);
                    },
 #if MORE_COMM_STATS

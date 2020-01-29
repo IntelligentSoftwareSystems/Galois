@@ -273,7 +273,7 @@ void topoAlgo(Graph& graph, const GNode& source) {
   oldDist.allocateInterleaved(graph.size());
 
   constexpr Dist INFTY = SSSP::DIST_INFINITY;
-  galois::do_all(galois::iterate(0ul, graph.size()),
+  galois::do_all(galois::iterate(size_t{0}, graph.size()),
                  [&](size_t i) { oldDist.constructAt(i, INFTY); },
                  galois::no_stats(), galois::loopname("initDistArray"));
 

@@ -50,7 +50,7 @@ template <typename V>
 size_t vecSumParallel(V& vec) {
   galois::runtime::profilePapi(
       [&](void) {
-        galois::do_all(galois::iterate(0ul, vec.size()),
+        galois::do_all(galois::iterate(size_t{0}, vec.size()),
                        [&](size_t i) { vec[i] = i; });
       },
       "vecInit");
@@ -59,7 +59,7 @@ size_t vecSumParallel(V& vec) {
 
   galois::runtime::profilePapi(
       [&](void) {
-        galois::do_all(galois::iterate(0ul, vec.size()),
+        galois::do_all(galois::iterate(size_t{0}, vec.size()),
                        [&](size_t i) { sum += vec[i]; });
       },
       "vecSum");
