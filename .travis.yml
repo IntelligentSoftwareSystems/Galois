@@ -11,6 +11,15 @@ git:
 
 matrix:
   include:
+    - os: osx
+      osx_image: xcode11.3
+      before_script:
+        - export CC=clang
+        - export CXX=clang++
+        - brew install openmpi
+        - mkdir build
+        - pushd build
+        - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
     - env:
         - GCC_VER=5
       addons:
