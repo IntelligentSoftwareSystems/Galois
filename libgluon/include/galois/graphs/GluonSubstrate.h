@@ -1618,9 +1618,9 @@ private:
             + (num * sizeof(typename SyncFnTy::ValTy)));
       }
     } else {
+      data_mode = noData;
       b.resize(0);
       if (!async) {
-        data_mode = noData;
         gSerialize(b, noData);
       }
     }
@@ -1880,9 +1880,9 @@ private:
       reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count,
                                     bit_set_comm);
     } else {
+      data_mode = noData;
       b.resize(0);
       if (!async) {
-        data_mode = noData;
         gSerialize(b, noData);
       }
     }

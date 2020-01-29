@@ -292,7 +292,6 @@ constexpr static const char* const name = "Betweeness Centrality Level by Level"
 constexpr static const char* const desc =
     "Betweeness Centrality, level by level, using synchronous BFS and Brandes "
     "backward dependency propagation.";
-constexpr static const char* const url = 0;
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;

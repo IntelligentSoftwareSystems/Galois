@@ -84,7 +84,9 @@ static cll::opt<Step> learningRateFunction(
 
 static cll::opt<int> cutoff("cutoff");
 
+#ifdef HAS_EIGEN
 static const unsigned ALS_CHUNK_SIZE = 4;
+#endif
 
 size_t NUM_ITEM_NODES = 0;
 
