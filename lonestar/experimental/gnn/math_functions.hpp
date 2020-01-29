@@ -4,42 +4,59 @@
 #include "random.h"
 
 // vector add
-inline void vadd(const FV &in_a, const FV &in_b, FV &out) {
-	size_t dim = out.size();
-	for (size_t i = 0; i < dim; ++i) {
-		out[i] = in_a[i] + in_b[i];
-	}
+template <typename DataTy = float>
+inline void vadd(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
+	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] + in_b[i];
 }
 
 // vector subtract
-inline void vsub(const FV &in_a, const FV &in_b, FV &out) {
-	size_t dim = out.size();
-	for (size_t i = 0; i < dim; ++i) {
-		out[i] = in_a[i] - in_b[i];
-	}
+template <typename DataTy = float>
+inline void vsub(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
+	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] - in_b[i];
 }
 
 // vector multiply
-inline void vmul(const FV &in_a, const FV &in_b, FV &out) {
-	size_t dim = out.size();
-	for (size_t i = 0; i < dim; ++i) {
-		out[i] = in_a[i] * in_b[i];
-	}
+template <typename DataTy = float>
+inline void vmul(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
+	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] * in_b[i];
 }
 
 // vector divide
-inline void vdiv(size_t dim, const FV &in_a, const FV &in_b, FV &out) {
-	for (size_t i = 0; i < dim; ++i) {
-		out[i] = in_a[i] / in_b[i];
-	}
+template <typename DataTy = float>
+inline void vdiv(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
+	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] / in_b[i];
+}
+
+// vector add scalar
+template <typename DataTy = float>
+inline void add_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+	for (size_t i = 0; i < Y.size(); ++i) Y[i] += alpha;
+}
+
+// vector subtract scalar
+template <typename DataTy = float>
+inline void sub_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+	for (size_t i = 0; i < Y.size(); ++i) Y[i] -= alpha;
+}
+
+// vector multiply scalar
+template <typename DataTy = float>
+inline void mul_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+	for (size_t i = 0; i < Y.size(); ++i) Y[i] *= alpha;
+}
+
+// vector divide scalar
+template <typename DataTy = float>
+inline void div_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+	for (size_t i = 0; i < Y.size(); ++i) Y[i] /= alpha;
 }
 
 // dot product
-inline FeatureT dot(const size_t n, const FV &x, const FV &y) {
-	FeatureT sum = 0;
-	for (size_t i = 0; i < n; ++i) {
+template <typename DataTy = float>
+inline DataTy dot(const std::vector<DataTy> x, const std::vector<DataTy> &y) {
+	DataTy sum = 0;
+	for (size_t i = 0; i < x.size(); ++i)
 		sum += x[i] * y[i];
-	}
 	return sum;
 }
 
@@ -87,22 +104,6 @@ inline float reduce_mean(const std::vector<DataTy> &x) {
 	return sum / (float)n;
 }
 
-// ReLU
-const float negative_slope = 0;
-inline void relu(FV &fv) {
-	size_t count = fv.size();
-	for (size_t i = 0; i < count; ++i) {
-		fv[i] = std::max(fv[i], (FeatureT)0) + negative_slope * std::min(fv[i], (FeatureT)0);
-	}
-}
-
-inline void d_relu(FV &in_diff, FV &fv, FV &out_diff) {
-	size_t count = out_diff.size();
-	for (size_t i = 0; i < count; ++i) {
-		out_diff[i] = in_diff[i] * ((fv[i] > (FeatureT)0)  + negative_slope * (fv[i] <= (FeatureT)0));
-	}
-}
-
 #include <boost/random/bernoulli_distribution.hpp>
 template <typename Dtype=float>
 void rng_bernoulli(const int n, const Dtype p, std::vector<unsigned> r) {
@@ -143,40 +144,4 @@ inline void sigmoid(FV &fv) {
 	}
 }
 
-//Softmax
-template <typename DataTy = float>
-inline void softmax(std::vector<DataTy> &input, std::vector<DataTy> &output) {
-	auto n = input.size();
-	//DataTy m = *(std::max_element(input.begin(), input.end()));
-	DataTy m = -INFINITY;
-	for (size_t i = 0; i < n; i++) if (input[i] > m) m = input[i];
-	DataTy sum = (DataTy)0;
-	for (size_t i = 0; i < n; i++) sum += expf(input[i]-m);
-	DataTy offset = m + logf(sum);
-	for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
-}
-
-template <typename DataTy = float>
-inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
-	auto n = y.size();
-	DataTy loss = 0.0;
-	for (size_t i = 0; i < n; i++) loss -= y[i] * logf(p[i]);
-	return loss / (DataTy)n;
-}
-
-// TODO: need optimization
-inline void softmax_cross_entropy_with_logits(FV2D &h_out, LabelList &labels, std::vector<float> &loss) {
-	auto n = h_out.size(); // V
-	auto m = h_out[0].size(); // E
-	std::vector<float> y(m); // ground truth
-	std::vector<float> p(m); // prediction
-	for (size_t i = 0; i < n; i++) {
-		if (labels[i] < 0) continue; // masked
-		softmax(h_out[i], p);
-		for (size_t j = 0; j < m; j ++) y[j] = 0.0; // ground truth
-		assert(labels[i] < m);
-		y[labels[i]] = 1.0;
-		loss[i] = cross_entropy(y, p);
-	}
-}
 #endif

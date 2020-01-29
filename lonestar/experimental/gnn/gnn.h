@@ -29,5 +29,6 @@ typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::typ
 #endif
 
 typedef Graph::GraphNode GNode;
+#define CHUNK_SIZE 256
 
 #endif
