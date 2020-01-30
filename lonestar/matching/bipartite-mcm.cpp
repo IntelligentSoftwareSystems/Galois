@@ -1008,7 +1008,6 @@ template <typename G>
 void generateRandomInput(int numA, int numB, int numEdges, int numGroups,
                          int seed, G& g) {
   typedef typename G::edge_data_type edge_data_type;
-  typedef typename G::GraphNode GNode;
 
   std::cout << "numGroups: " << numGroups << " seed: " << seed << "\n";
 

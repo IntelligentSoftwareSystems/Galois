@@ -333,9 +333,11 @@ struct ReadInput {
   Tree& tree;
   basePointBag& basePoints;
   ptrPointBag& ptrPoints;
+  std::random_device rng;
+  std::mt19937 urng;
 
   ReadInput(Graph& g, Tree& t, basePointBag& b, ptrPointBag& p)
-      : graph(g), tree(t), basePoints(b), ptrPoints(p) {}
+      : graph(g), tree(t), basePoints(b), ptrPoints(p), urng(rng()) {}
 
   void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
     Element large_triangle(p1, p2, p3);
@@ -402,7 +404,7 @@ struct ReadInput {
       divide(m, galois::split_range(m, e));
       divide(galois::split_range(m, e), e);
     } else {
-      std::random_shuffle(b, e);
+      std::shuffle(b, e, urng);
     }
   }
 

@@ -30,7 +30,6 @@ const char* desc =
     "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 
 enum Algo { Topo = 0, Residual };
-const char* const ALGO_NAMES[] = {"Topological", "Residual"};
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Topo, "Topological"),

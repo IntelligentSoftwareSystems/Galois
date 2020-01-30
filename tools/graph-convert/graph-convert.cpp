@@ -916,8 +916,6 @@ struct RandomizeNodes : public Conversion {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef galois::LargeArray<GNode> Permutation;
-    typedef typename std::iterator_traits<
-        typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -926,14 +924,9 @@ struct RandomizeNodes : public Conversion {
     perm.create(graph.size());
     std::copy(boost::counting_iterator<GNode>(0),
               boost::counting_iterator<GNode>(graph.size()), perm.begin());
-    std::mt19937 gen;
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
-    UniformDist<difference_type, std::mt19937, std::uniform_int_distribution>
-        dist(gen);
-#else
-    UniformDist<difference_type, std::mt19937, std::uniform_int> dist(gen);
-#endif
-    std::random_shuffle(perm.begin(), perm.end(), dist);
+    std::random_device rng;
+    std::mt19937 urng(rng());
+    std::shuffle(perm.begin(), perm.end(), urng);
 
     Graph out;
     galois::graphs::permute<EdgeTy>(graph, perm, out);

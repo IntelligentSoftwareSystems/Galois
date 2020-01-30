@@ -302,11 +302,6 @@ void readGraph(Graph& graph) {
     //graph.allocateAndLoadGraph(inputFilename);
     galois::gPrint("Done loading", inputFilename, "\n");
   }
-
-  size_t index = 0;
-  for (GNode n : graph) {
-    //graph.getData(n) = index++;
-  }
 }
 
 int main(int argc, char** argv) {
