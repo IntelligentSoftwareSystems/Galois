@@ -57,6 +57,10 @@ public:
 		for (size_t i = 0; i < n; ++i) h_hidden1[i].resize(hidden1);
 		for (size_t i = 0; i < n; ++i) h_out[i].resize(num_classes);
 		for (size_t i = 0; i < n; ++i) h_softmax[i].resize(num_classes);
+		hidden1_diff.resize(hidden1); // 16 x E
+		out_diff.resize(feature_dim); // D x 16
+		for (size_t i = 0; i < hidden1; ++i) hidden1_diff[i].resize(num_classes);
+		for (size_t i = 0; i < feature_dim; ++i) out_diff[i].resize(hidden1);
 	}
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
@@ -121,18 +125,18 @@ public:
 			d_cross_entropy(y, h_softmax[src], in_diff[src]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-back"));
 
-		FV2D hidden1_diff(n);
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 			FV temp_diff(num_classes);
-			d_relu(in_diff[src], h_out[src], temp_diff);
-			d_mvmul(temp_diff, hidden1_diff[src]);
+			d_relu(in_diff[src], h_out[src], temp_diff); // E x 1
+			d_mvmul(temp_diff, h_hidden1[src], hidden1_diff); // 16 x 1; E x 1; 16 x E
+			matadd(hidden1, num_classes, W[1], hidden1_diff, W[1]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer1-back"));
 
-		FV2D out_diff(n);
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV temp_diff(num_classes);
+			FV temp_diff(hidden1);
 			d_relu(hidden1_diff[src], h_hidden1[src], temp_diff);
-			d_mvmul(temp_diff, out_diff[src]);
+			d_mvmul(temp_diff, h_in[src], out_diff); // D x 1; 16 x 1; D x 16
+			matadd(feature_dim, hidden1, W[0], out_diff, W[0]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer0-back"));
 	}
 
@@ -171,7 +175,7 @@ public:
 			std::cout << " val_cost = " << val_cost << " val_acc = " << val_acc;
 
 			t_epoch.Stop();
-			std::cout << " time = " << t_epoch.Millisecs() << "ms. \n";
+			std::cout << " time = " << t_epoch.Millisecs() << "ms\n";
 		}
 	}
 
@@ -184,6 +188,8 @@ protected:
 	FV2D h_hidden1; // hidden1 level embedding: N x 16
 	FV2D h_out; // output embedding: N x E
 	FV2D h_softmax; // output embedding: N x E
+	FV2D hidden1_diff; // 16 x E
+	FV2D out_diff; // D x 16
 	std::vector<LabelT> labels; // labels for classification
 	FV3D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	FV3D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E

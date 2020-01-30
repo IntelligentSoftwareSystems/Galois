@@ -2,11 +2,19 @@
 #define _MATH_FUNCTIONS_
 #include <cmath>
 #include "random.h"
+#include <immintrin.h>
 
 // vector add
 template <typename DataTy = float>
-inline void vadd(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
-	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] + in_b[i];
+inline void vadd(const std::vector<DataTy> &a, const std::vector<DataTy> &b, std::vector<DataTy> &out) {
+	//for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
+	size_t n = out.size();
+	size_t vec_len = 8;
+	const size_t alignedN = n - n % vec_len;
+	for (size_t i = 0; i < alignedN; i += vec_len)
+		_mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
+	for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
+
 }
 
 // vector subtract
@@ -69,6 +77,24 @@ inline void mvmul(const FV2D &matrix, const FV &in_vector, FV &out_vector) {
 			out_vector[i] += matrix[i][j] * in_vector[j];
 		} 
 	} 
+}
+
+// vector-vector multiply
+inline void vvmul(const FV &a, const FV &b, FV2D &out) {
+	size_t m = a.size();
+	size_t n = b.size();
+	for (size_t i = 0; i < m; ++i) { 
+		for (size_t j = 0; j < n; ++j) { 
+			out[i][j] += a[i] * b[j];
+		} 
+	} 
+}
+
+// matrix addition
+inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
+	for (size_t i = 0; i < x; ++i)
+		for (size_t j = 0; j < y; ++j)
+			C[i][j] = A[i][j] + B[i][j];
 }
 
 // matrix multiply

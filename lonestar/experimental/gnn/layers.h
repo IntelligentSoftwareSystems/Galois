@@ -3,10 +3,10 @@
 #include <cmath>
 
 // Conv Layer
-inline void d_mvmul(FV &in_diff, FV &out_diff) {
-	for (size_t i = 0; i < out_diff.size(); ++i)
-		out_diff[i] = in_diff[i];
+inline void d_mvmul(FV &in_diff, FV &h_in, FV2D &out_diff) {
+	vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff 
 }
+
 inline void d_vadd(FV &in_diff, FV &out_diff) {
 	for (size_t i = 0; i < out_diff.size(); ++i)
 		out_diff[i] = in_diff[i];
