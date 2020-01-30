@@ -135,9 +135,6 @@ Uint64Pair determineByteRange(std::ifstream& edgeListFile, uint64_t fileSize) {
   std::tie(initialStart, initialEnd) = galois::block_range(
       (uint64_t)0, (uint64_t)fileSize, hostID, totalNumHosts);
 
-  // printf("[%lu] Initial byte %lu to %lu\n", hostID, initialStart,
-  // initialEnd);
-
   bool startGood = false;
   if (initialStart != 0) {
     // good starting point if the prev char was a new line (i.e. this start
@@ -242,7 +239,7 @@ void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
                       const std::vector<Uint64Pair>& chunkToNode,
                       galois::DynamicBitSet& uniqueChunkBitset) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  printf("[%lu] Finding unique chunks\n", hostID);
+  std::cout << "[" << hostID << "] Finding unique chunks\n";
   uniqueChunkBitset.reset();
 
   galois::do_all(galois::iterate((size_t)0, uniqueNodeBitset.size()),
@@ -255,7 +252,7 @@ void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
 
   freeVector(uniqueNodeBitset.get_vec());
 
-  printf("[%lu] Unique chunks found\n", hostID);
+  std::cout << "[" << hostID << "] Unique chunks found\n";
 }
 
 void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
@@ -263,7 +260,7 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Sending edge chunk counts\n", hostID);
+  std::cout << "[" << hostID << "] Sending edge chunk counts\n";
   // send off my chunk count vector to others so all hosts can have the
   // same count of edges in a chunk
   for (unsigned h = 0; h < totalNumHosts; h++) {
@@ -277,7 +274,7 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
   // receive chunk counts
   std::vector<uint64_t> recvChunkCounts;
 
-  printf("[%lu] Receiving edge chunk counts\n", hostID);
+  std::cout << "[" << hostID << "] Receiving edge chunk counts\n";
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID)
       continue;
@@ -324,8 +321,12 @@ getChunkToHostMapping(const std::vector<uint64_t>& chunkCountsPrefixSum,
         edgeCount = chunkCountsPrefixSum[upperChunk - 1] -
                     chunkCountsPrefixSum[lowerChunk - 1];
       }
-      printf("Host %lu gets nodes %lu to %lu (count %lu), with %lu edges\n", h,
-             lowerNode, upperNode, upperNode - lowerNode, edgeCount);
+      std::cout << "Host " << h << " gets nodes "
+        << lowerNode << " to "
+        << upperNode << " (count "
+        << (upperNode - lowerNode)
+        << "), with "
+        << edgeCount << " edges\n";
     }
 
     finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
@@ -441,8 +442,12 @@ getChunkToHostMappingLinear(const std::vector<uint64_t>& chunkCountsPrefixSum,
         edgeCount = chunkCountsPrefixSum[upperChunk - 1] -
                     chunkCountsPrefixSum[lowerChunk - 1];
       }
-      printf("Host %lu gets nodes %lu to %lu (count %lu), with %lu edges\n", h,
-             lowerNode, upperNode, upperNode - lowerNode, edgeCount);
+      std::cout << "Host " << h << " gets nodes "
+        << lowerNode << " to "
+        << upperNode << " (count "
+        << (upperNode - lowerNode)
+        << "), with "
+        << edgeCount << " edges\n";
     }
 
     finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
@@ -524,7 +529,7 @@ uint64_t receiveEdgeCounts() {
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Receiving edge counts\n", hostID);
+  std::cout << "[" << hostID << "] Receiving edge counts\n";
 
   uint64_t edgesToReceive = 0;
 
@@ -557,7 +562,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
   auto& net       = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;
 
-  printf("[%lu] Going to receive assigned edges\n", hostID);
+  std::cout << "[" << hostID << "] Going to receive assigned edges\n";
 
   // receive edges
   galois::on_each(
@@ -612,7 +617,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
       galois::loopname("EdgeReceiving"));
   galois::runtime::evilPhase++;
 
-  printf("[%lu] Receive assigned edges finished\n", hostID);
+  std::cout << "[" << hostID << "] Receive assigned edges finished\n";
 }
 
 std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
@@ -620,7 +625,7 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Informing other hosts about number of edges\n", hostID);
+  std::cout << "[" << hostID << "] Informing other hosts about number of edges\n";
 
   std::vector<uint64_t> edgesPerHost(totalNumHosts);
 
@@ -789,7 +794,7 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
                std::vector<std::vector<uint32_t>>& localSrcToData) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
-  printf("[%lu] Beginning write to file\n", hostID);
+  std::cout << "[" << hostID << "] Beginning write to file\n";
   MPI_File newGR;
 
   std::vector<char> fName(outputFile.begin(), outputFile.end());
@@ -823,13 +828,13 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
     // begin file writing
     uint64_t headerSize      = sizeof(uint64_t) * 4;
     uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
-    printf("[%lu] Write node index data\n", hostID);
+    std::cout << "[" << hostID << "] Write node index data\n";
     writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
     freeVector(edgePrefixSum);
 
     uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
                               globalEdgeOffset * sizeof(uint32_t);
-    printf("[%lu] Write edge dest data\n", hostID);
+    std::cout << "[" << hostID << "] Write edge dest data\n";
     std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
     freeVector(localSrcToDest);
     writeEdgeDestData(newGR, edgeDestOffset, destVector);
@@ -838,13 +843,13 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
     if (!localSrcToData.empty()) {
       uint64_t edgeDataOffset = getOffsetToLocalEdgeData(
           totalNumNodes, totalNumEdges, globalEdgeOffset);
-      printf("[%lu] Write edge data data\n", hostID);
+      std::cout << "[" << hostID << "] Write edge data data\n";
       std::vector<uint32_t> dataVector = flattenVectors(localSrcToData);
       freeVector(localSrcToData);
       writeEdgeDataData(newGR, edgeDataOffset, dataVector);
     }
 
-    printf("[%lu] Write to file done\n", hostID);
+    std::cout << "[" << hostID << "] Write to file done\n";
   }
 
   MPICheck(MPI_File_close(&newGR));
@@ -857,7 +862,7 @@ void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
                 std::vector<std::vector<uint32_t>>& localSrcToData) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
-  printf("[%lu] Beginning write to file\n", hostID);
+  std::cout << "[" << hostID << "] Beginning write to file\n";
   MPI_File newGR;
   std::vector<char> fName(outputFile.begin(), outputFile.end());
   fName.push_back('\0');
@@ -893,13 +898,13 @@ void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
     uint64_t headerSize      = sizeof(uint32_t) + sizeof(uint64_t);
     uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
 
-    printf("[%lu] Write node index data\n", hostID);
+    std::cout << "[" << hostID << "] Write node index data\n";
     writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
     freeVector(edgePrefixSum);
 
     uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
                               globalEdgeOffset * sizeof(uint32_t);
-    printf("[%lu] Write edge dest data\n", hostID);
+    std::cout << "[" << hostID << "] Write edge dest data\n";
     std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
     freeVector(localSrcToDest);
     writeEdgeDestData(newGR, edgeDestOffset, destVector);
@@ -913,13 +918,13 @@ void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
       // NO PADDING
       uint64_t edgeDataOffset = byteOffsetToEdgeData;
 
-      printf("[%lu] Write edge data data\n", hostID);
+      std::cout << "[" << hostID << "] Write edge data data\n";
       std::vector<uint32_t> dataVector = flattenVectors(localSrcToData);
       freeVector(localSrcToData);
       writeEdgeDataData(newGR, edgeDataOffset, dataVector);
     }
 
-    printf("[%lu] Write to file done\n", hostID);
+    std::cout << "[" << hostID << "] Write to file done\n";
   }
 
   MPICheck(MPI_File_close(&newGR));
