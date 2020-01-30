@@ -1239,7 +1239,7 @@ public://///////////////////////////////////////////////////////////////////////
     aux.allocateInterleaved(numNodes);
 
     if (!DirectedNotInOut) {
-      galois::do_all(galois::iterate(0ul, aux.size()),
+      galois::do_all(galois::iterate(size_t{0}, aux.size()),
                      [&](size_t index) { aux.constructAt(index); });
     }
   }

@@ -509,7 +509,7 @@ public:
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate((size_t)0, this->size()),
+    galois::do_all(galois::iterate(size_t{0}, this->size()),
                    [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
                    galois::no_stats(), galois::steal());
   }
@@ -566,8 +566,8 @@ public:
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(galois::iterate(0ul, numNodes),
-                   [&](uint32_t x) {
+    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
+                   [&](uint64_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    },
@@ -625,8 +625,8 @@ public:
     }
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(galois::iterate(0ul, numNodes),
-                   [&](uint32_t n) {
+    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
+                   [&](uint64_t n) {
                      edgeIndData_old[n]  = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    },
@@ -634,7 +634,7 @@ public:
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
 
     // get destination of edge, copy to array, and
-    galois::do_all(galois::iterate(0ul, numEdges),
+    galois::do_all(galois::iterate(UINT64_C(0), numEdges),
                    [&](uint64_t e) {
                      auto dst       = edgeDst[e];
                      edgeDst_old[e] = dst;
@@ -652,8 +652,8 @@ public:
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(galois::iterate(0ul, numNodes),
-                   [&](uint32_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
+    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
+                   [&](uint64_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
                    galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
 
@@ -662,13 +662,13 @@ public:
     if (numNodes >= 1) {
       edgeIndData_temp[0] = 0;
       galois::do_all(
-          galois::iterate(1ul, numNodes),
-          [&](uint32_t n) { edgeIndData_temp[n] = edgeIndData[n - 1]; },
+          galois::iterate(UINT64_C(1), numNodes),
+          [&](uint64_t n) { edgeIndData_temp[n] = edgeIndData[n - 1]; },
           galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
     }
 
-    galois::do_all(galois::iterate(0ul, numNodes),
-                   [&](uint32_t src) {
+    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
+                   [&](uint64_t src) {
                      // e = start index into edge array for a particular node
                      uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
 
@@ -692,8 +692,8 @@ public:
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
       galois::do_all(
-          galois::iterate(0ul, numEdges),
-          [&](uint32_t e) { edgeDataCopy(edgeData, edgeData_new, e, e); },
+          galois::iterate(UINT64_C(0), numEdges),
+          [&](uint64_t e) { edgeDataCopy(edgeData, edgeData_new, e, e); },
           galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDATA_SET"));
     }
 

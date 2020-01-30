@@ -259,7 +259,7 @@ struct ReadInput {
   template <typename L>
   void generateRoundsImpl(const L& loop, size_t size, PointList& points,
                           size_t log2) {
-    loop(galois::iterate(0ul, size),
+    loop(galois::iterate(size_t{0}, size),
          [&, this](size_t index) {
            const Point& p = points[index];
 

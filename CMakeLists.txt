@@ -142,11 +142,6 @@ if(CMAKE_COMPILER_IS_GNUCC)
   if(GCC_VERSION VERSION_LESS 5.2)
     message(FATAL_ERROR "GCC must be 5.2 or higher")
   endif()
-  #new debugging optimization level
-  # if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
-  # endif()
 endif()
 
 # Enable architecture-specific optimizations
@@ -190,8 +185,8 @@ endif()
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+  set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS}")
+  set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS}")
   include_directories(${MPI_INCLUDE_PATH})
 
   if (USE_LCI)
