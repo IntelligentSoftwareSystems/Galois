@@ -6,7 +6,6 @@ import cgen
 G = Graph("graph")
 WL = Worklist()
 ast = Module([
-CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("kcore_pull_cuda.cuh", system = False)], parse = False),
 Kernel("DegreeCounting", [G.param(), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('uint32_t *', 'p_current_degree'), ('DynamicBitset&', 'bitset_current_degree')],
 [
