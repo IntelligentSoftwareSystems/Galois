@@ -11,8 +11,9 @@
 #include <utility>
 #include <algorithm>
 #include <unordered_set>
-#include "types.h"
-#include "math_functions.hpp"
+#include "../types.h"
+#include "../optimizer.h"
+#include "../math_functions.hpp"
 /**
  * base class of all kind of NN layers
  *
@@ -33,6 +34,7 @@ public:
 			std::vector<FV> &out_grad, std::vector<FV> &in_grad) = 0;
 	virtual std::string layer_type() const = 0;
 	virtual void set_param(Graph *g, FV2D *w, FV2D *q, FV *d, LabelList *lab) = 0;
+	virtual void update_weights(optimizer *opt) = 0;
 protected:
 	std::string name;
 };

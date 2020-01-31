@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "lgraph.h"
 #include "layers.h"
+#include "optimizer.h"
 #include "math_functions.hpp"
 
 #define NUM_LAYERS 2
@@ -76,6 +77,8 @@ public:
 		diffs.resize(n);
 		layers[2] = new softmax_loss_layer();
 		layers[2]->set_param(NULL, NULL, NULL, &diffs, &labels);
+
+		opt = new adagrad(); 
 	}
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
@@ -101,14 +104,12 @@ public:
 	// back propogation
 	void backward(LabelList labels, MaskList masks) {
 		layers[2]->backward(h_out, h_softmax, in_grad, in_grad);
-		//layer1.backward();
-		//layer0.backward();
+		//layer[1].backward();
+		//layer[0].backward();
+		layers[1]->update_weights(opt);
+		layers[0]->update_weights(opt);
 	}
 
-	void update_weights() {
-		matadd(hidden1, num_classes, W[1], hidden1_grad, W[1]); // W[1] += hidden1_grad
-		matadd(feature_dim, hidden1, W[0], out_grad, W[0]); // W[0] += out_grad
-	}
 	// evaluate, i.e. inference or predict
 	double evaluate(LabelList labels, MaskList masks, AccT &loss, AccT &acc) {
 		Timer t_eval;
@@ -171,6 +172,7 @@ protected:
 	FV3D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	FV3D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 	std::vector<layer *> layers;
+	optimizer *opt;
 
 	inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
 		// Glorot & Bengio (AISTATS 2010) init

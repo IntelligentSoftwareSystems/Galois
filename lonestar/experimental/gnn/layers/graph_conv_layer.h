@@ -17,13 +17,14 @@ public:
 	graph_conv_layer(bool act_) { act = act_; }
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
+	void set_act(bool need_act) { act = need_act; }
 
 	void forward(const std::vector<FV> &in_data, std::vector<FV> &out_data) override {
 		size_t x = in_data.size();
 		size_t y = in_data[0].size();
 		size_t z = (*W)[0].size();
 		assert(y == (*W).size());
-		FV2D fv_temp(x); // x * z
+		tensor_t fv_temp(x); // x * z
 		for (size_t i = 0; i < x; ++i) fv_temp[i].resize(z);
 		matmul(in_data, *W, fv_temp); // x*y; y*z; x*z
 		update_all(graph, z, fv_temp, out_data);
@@ -50,19 +51,20 @@ public:
 		//d_update_all(out_grad, hidden1_diff[src]); // 16 x E; E x 1; hidden1_diff: N x 16 
 	}
 
-	void set_param(Graph *g, FV2D *w, FV2D *q, FV *d, LabelList *lab) {
+	void set_param(Graph *g, tensor_t *w, tensor_t *q, FV *d, LabelList *lab) override {
 		graph = g;
 		W = w;
 		Q = q;
 	}
 
-	void set_act(bool need_act) {
-		act = need_act;
+	void update_weights(optimizer *opt) override {
+		bool parallel = true;
+		//opt->update(grad, *W, parallel); // W += diff
 	}
 
 private:
 	Graph *graph;
-	FV2D *W; // parameters
-	FV2D *Q; // parameters
+	tensor_t *W; // parameters
+	tensor_t *Q; // parameters
 	bool act;
 };

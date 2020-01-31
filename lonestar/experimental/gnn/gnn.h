@@ -3,9 +3,7 @@
 
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
-#include "galois/Bag.h"
 #include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -22,13 +20,6 @@ static cll::opt<float> dropout_rate("d", cll::desc("Dropout rate (1 - keep proba
 static cll::opt<float> weight_decay("wd", cll::desc("Weight for L2 loss on embedding matrix (default value 5e-4)"), cll::init(5e-4));
 static cll::opt<float> early_stopping("es", cll::desc("Tolerance for early stopping (# of epochs) (default value 10)"), cll::init(10));
 static cll::opt<unsigned> max_degree("md", cll::desc("Maximum Chebyshev polynomial degree (default value 3)"), cll::init(3));
-#ifdef EDGE_LABEL
-typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-#else
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-#endif
-
-typedef Graph::GraphNode GNode;
 #define CHUNK_SIZE 256
 
 #endif

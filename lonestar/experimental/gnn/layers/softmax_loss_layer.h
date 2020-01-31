@@ -3,6 +3,8 @@
 
 class softmax_loss_layer: public layer {
 public:
+	softmax_loss_layer() {}
+	~softmax_loss_layer() {}
 	std::string layer_type() const override { return std::string("softmax_loss"); }
 
 	// TODO: need kernel fusion optimization
@@ -35,6 +37,9 @@ public:
 		diffs = d;
 		labels = lab;
 	}
+
+	void update_weights(optimizer *opt) override {}
+
 private:
 	FV *diffs;
 	LabelList *labels;
