@@ -3,6 +3,7 @@
 #include <cmath>
 #include "random.h"
 #include <immintrin.h>
+const float negative_slope = 0;
 
 // vector add
 template <typename DataTy = float>
@@ -98,11 +99,18 @@ inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
 }
 
 // matrix multiply
-inline void matmul(size_t dim, const FV2D &A, const FV2D &B, FV2D &C) {
-	for (size_t i = 0; i < dim; ++i) { 
-		for (size_t j = 0; j < dim; ++j) { 
-			for (size_t k = 0; k < dim; ++k) { 
-				C[i][j] += A[i][k] * B[k][j];
+inline void matmul(const FV2D &A, const FV2D &B, FV2D &C) {
+	size_t dim_x = A.size();
+	size_t dim_y = B.size();
+	size_t dim_z = B[0].size();
+	assert(A[0].size() == dim_y);
+	assert(C.size() == dim_x);
+	assert(C[0].size() == dim_z);
+
+	for (size_t i = 0; i < dim_x; ++i) { 
+		for (size_t j = 0; j < dim_y; ++j) { 
+			for (size_t k = 0; k < dim_z; ++k) { 
+				C[i][k] += A[i][j] * B[j][k];
 			} 
 		} 
 	} 
@@ -118,6 +126,39 @@ inline int argmax(const size_t n, const FV &x) {
 		}
 	}
 	return max_ind;
+}
+
+inline void update_all(Graph *g, size_t dim, const FV2D &in, FV2D &out) {
+	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
+		out[src].resize(dim, 0); // used to gather neighbors' embeddings
+		for (const auto e : g->edges(src)) {
+			const auto dst = g->getEdgeDst(e);
+			vadd(out[src], in[dst], out[src]); // out[src] += in[dst]
+		}
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
+}
+
+inline void relu(const FV &in, FV &out) {
+	size_t dim = out.size();
+	for (size_t i = 0; i < dim; ++i) {
+		out[i] = std::max(in[i], (FeatureT)0) + negative_slope * std::min(in[i], (FeatureT)0);
+	}
+}
+	
+inline void d_relu(const FV &in_diff, const FV &fv, FV &out_diff) {
+	size_t dim = out_diff.size();
+	for (size_t i = 0; i < dim; ++i) {
+		out_diff[i] = in_diff[i] * ((fv[i] > (FeatureT)0)  + negative_slope * (fv[i] <= (FeatureT)0));
+	}
+}
+
+inline void d_mvmul(FV &in_diff, FV &h_in, FV2D &out_diff) {
+	vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff 
+}
+
+inline void d_vadd(FV &in_diff, FV &out_diff) {
+	for (size_t i = 0; i < out_diff.size(); ++i)
+		out_diff[i] = in_diff[i];
 }
 
 template <typename DataTy = float>
@@ -168,6 +209,67 @@ inline void sigmoid(FV &fv) {
 	for (size_t i = 0; i < count; ++i) {
 		fv[i] = sigmoid_func(fv[i]);
 	}
+}
+
+// Softmax function takes an N-dimensional vector (X) of real number,
+// and transforms it into a vector of real number in range (0,1) which add upto 1.
+// To make softmax func numerically stable, we simply normalize the values in the vector, 
+// by multiplying the numerator and denominator with a constant C, where log(C)=-max(X)
+//    exps = np.exp(X - np.max(X))
+//    exps / np.sum(exps)
+template <typename DataTy = float>
+inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &output) {
+	auto n = input.size();
+
+	// find maximum element
+	//DataTy m = *(std::max_element(input.begin(), input.end()));
+	DataTy m = -INFINITY;
+	for (size_t i = 0; i < n; i++) if (input[i] > m) m = input[i];
+	std::vector<DataTy> exps(n, 0);
+
+	// subtraction and exponentiation
+	for (size_t i = 0; i < n; i++) exps[i] = expf(input[i]-m);
+
+	// sum after exp
+	DataTy sum = (DataTy)0;
+	//for (size_t i = 0; i < n; i++) sum += expf(input[i]-m);
+	for (size_t i = 0; i < n; i++) sum += exps[i];
+	//DataTy offset = m + logf(sum);
+
+	// division
+	//for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
+	for (size_t i = 0; i < n; i++) output[i] = exps[i] / sum;
+}
+
+// Due to the desirable property of softmax function outputting a probability distribution, 
+// we often use it as the final layer in neural networks.
+// For this we need to calculate the derivative or gradient,
+// and pass it back to the previous layer during backpropagation.
+template <typename DataTy = float>
+inline void d_softmax(std::vector<DataTy> &y, std::vector<DataTy> &p, std::vector<DataTy> &out_diff) {
+	auto n = y.size();
+	for (size_t i = 0; i < n; i++) {
+		for (size_t j = 0; j < n; j++) {
+			DataTy delta_ij = i == j? 1 : 0;
+			out_diff[i] += p[j] * (delta_ij - p[i]);
+		}
+	}
+}
+
+// cross entropy
+template <typename DataTy = float>
+inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
+	auto n = y.size();
+	DataTy loss = 0.0;
+	for (size_t i = 0; i < n; i++) loss -= y[i] * logf(p[i]);
+	return loss / (DataTy)n;
+}
+
+template <typename DataTy = float>
+inline void d_cross_entropy(const std::vector<DataTy> &y, const std::vector<DataTy> &p, std::vector<DataTy> &out_diff) {
+	auto n = y.size();
+	//softmax(x, out_diff);
+	for (size_t i = 0; i < n; i++) out_diff[i] = p[i] - y[i];
 }
 
 #endif

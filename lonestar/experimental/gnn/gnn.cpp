@@ -9,47 +9,35 @@ const char* url  = 0;
 
 class GraphSageMean: public Model {
 	// user-defined aggregate function
-	void aggregate(const VertexID src, const FV2D &features, FV &sum) {
-		unsigned degree = 0;
-		for (const auto e : g.edges(src)) {
-			const auto dst = g.getEdgeDst(e);
-			vadd(sum, features[dst], sum);
-			degree ++;
-		}
-		if (degree == 0) return;
-		for (size_t i = 0; i < sum.size(); ++i) sum[i] /= degree; // average
+	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
+		update_all(&g, dim, in, out);
 	}
 
 	// user-defined combine function
-	void combine(const FV2D ma, const FV2D mb, const FV &a, const FV &b, FV &out) {
-		size_t n = out.size();
-		FV c(n, 0);
-		FV d(n, 0);
-		mvmul(ma, a, c);
-		mvmul(mb, b, d);
-		vadd(c, d, out);
+	void combine(const FV2D mat_v, const FV2D mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
+		size_t dim = fv_out[0].size();
+		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
+			FV a(dim, 0);
+			FV b(dim, 0);
+			mvmul(mat_v, fv_v[src], a);
+			mvmul(mat_u, fv_u[src], b); 
+			vadd(a, b, fv_out[src]); // out[src] = W*v + Q*u
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("combine"));
 	}
 };
 
 class GCN: public Model {
 public:
 	// user-defined aggregate function
-	void aggregate(const VertexID src, const FV2D &features, FV &sum) {
-		unsigned degree = 0;
-		for (const auto e : g.edges(src)) {
-			const auto dst = g.getEdgeDst(e);
-			vadd(sum, features[dst], sum);
-			degree ++;
-		}
-		vadd(sum, features[src], sum);
-		degree ++;
-		for (size_t i = 0; i < sum.size(); ++i) sum[i] /= degree; // average
+	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
+		update_all(&g, dim, in, out);
 	}
 
 	// user-defined combine function
 	// matrix multiply feature vector
-	void combine(const FV2D matrix_v, const FV2D matrix_u, const FV &ft_v, const FV &fv_u, FV &out) {
-		mvmul(matrix_v, fv_u, out);
+	void combine(const FV2D mat_v, const FV2D mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
+		assert(mat_v.size() == fv_u[0].size);
+		matmul(fv_u, mat_v, fv_out);
 	}
 };
 

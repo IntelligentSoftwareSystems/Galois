@@ -20,7 +20,7 @@ public:
 	Model() {}
 
 	// user-defined aggregate function
-	virtual void aggregate(const VertexID src, const FV2D &features, FV &sum) {}
+	virtual void aggregate(size_t dim, const FV2D &features, FV2D &sum) {}
 	
 	// user-defined combine function
 	virtual void combine(const FV2D ma, const FV2D mb, const FV &a, const FV &b, FV &out) {}
@@ -57,10 +57,25 @@ public:
 		for (size_t i = 0; i < n; ++i) h_hidden1[i].resize(hidden1);
 		for (size_t i = 0; i < n; ++i) h_out[i].resize(num_classes);
 		for (size_t i = 0; i < n; ++i) h_softmax[i].resize(num_classes);
-		hidden1_diff.resize(hidden1); // 16 x E
-		out_diff.resize(feature_dim); // D x 16
-		for (size_t i = 0; i < hidden1; ++i) hidden1_diff[i].resize(num_classes);
-		for (size_t i = 0; i < feature_dim; ++i) out_diff[i].resize(hidden1);
+
+		in_grad.resize(n); // N x E
+		//relu1_diff.resize(n); // N x E
+		hidden1_grad.resize(hidden1); // 16 x E
+		//relu0_diff.resize(n); // N x 16
+		out_grad.resize(feature_dim); // D x 16
+		for (size_t i = 0; i < n; ++i) in_grad[i].resize(num_classes);
+		//for (size_t i = 0; i < n; ++i) relu1_diff[i].resize(n);
+		//for (size_t i = 0; i < n; ++i) relu0_diff[i].resize(hidden1);
+		for (size_t i = 0; i < hidden1; ++i) hidden1_grad[i].resize(num_classes);
+		for (size_t i = 0; i < feature_dim; ++i) out_grad[i].resize(hidden1);
+		layers.resize(NUM_LAYERS+1);
+		layers[0] = new graph_conv_layer();
+		layers[0]->set_param(&g, &(W[0]), &(Q[0]), NULL, NULL);
+		layers[1] = new graph_conv_layer(false);
+		layers[1]->set_param(&g, &(W[1]), &(Q[1]), NULL, NULL);
+		diffs.resize(n);
+		layers[2] = new softmax_loss_layer();
+		layers[2]->set_param(NULL, NULL, NULL, &diffs, &labels);
 	}
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
@@ -70,76 +85,30 @@ public:
 
 	// forward pass
 	void forward(LabelList labels, MaskList masks, AccT &loss, AccT &accuracy) {
-		//size_t dim = h_in[0].size();
-		//std::cout << "[debug] layer 0: input layer\n";
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV h_neighbors(feature_dim, 0); // used to gather neighbors' embeddings
-			aggregate(src, h_in, h_neighbors);
-			combine(W[0], Q[0], h_in[src], h_neighbors, h_hidden1[src]);
-			relu(h_hidden1[src]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Layer0"));
+		layers[0]->forward(h_in, h_hidden1); // N x D; N x 16
+		layers[1]->forward(h_hidden1, h_out); // N x 16; N x E
 
-		//std::cout << "[debug] layer 1: hidden1 layer\n";
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV h_neighbors(hidden1, 0); // used to gather neighbors' embeddings
-			aggregate(src, h_hidden1, h_neighbors);
-			combine(W[1], Q[1], h_hidden1[src], h_neighbors, h_out[src]);
-			relu(h_out[src]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Layer1"));
-
-		// TODO: need kernel fusion optimization
-		// h_out is the output from output layer (num_examples x num_classes).
-		// labels contains the ground truth labels for each example (num_examples x 1).
-		// Note that labels is not one-hot encoded vector,
-		// and it can be computed as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
-		std::vector<AccT> diffs(n, 0.0); // error for each vertex
-		//std::vector<DataTy> y(num_classes); // ground truth
-		//for (size_t src = 0; src < n; src++) {
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			if (labels[src] >= 0) { // masked
-				softmax(h_out[src], h_softmax[src]); // normalize h_out using softmax
-				// y  is a one hot encoded vector for the labels
-				std::vector<AccT> y(num_classes, 0.0); // ground truth
-				//for (size_t j = 0; j < num_classes; j ++) y[j] = 0.0; // ground truth
-				y[labels[src]] = 1.0;
-				diffs[src] = cross_entropy(y, h_softmax[src]);
-			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-back"));
+		// h_out (N x E) is the output from the previous layer (num_examples x num_classes).
+		layers[2]->forward(h_out, h_softmax);
 		loss = masked_avg_loss(diffs, masks);
-		//std::cout << "loss: " << loss << "\n";
 
 		// comparing outputs (N x E) with the ground truth (labels)
 		LabelList predictions(n);
-		//auto num_classes = W[1][0].size();
 		for (size_t i = 0; i < n; i ++) predictions[i] = argmax(num_classes, h_out[i]);
 		accuracy = masked_accuracy(predictions, labels, masks);
 	}
 
 	// back propogation
 	void backward(LabelList labels, MaskList masks) {
-		FV2D in_diff(n);
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			in_diff[src].resize(num_classes);
-			std::vector<AccT> y(num_classes, 0.0); // ground truth
-			y[labels[src]] = 1.0;
-			d_cross_entropy(y, h_softmax[src], in_diff[src]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-back"));
-
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV temp_diff(num_classes);
-			d_relu(in_diff[src], h_out[src], temp_diff); // E x 1
-			d_mvmul(temp_diff, h_hidden1[src], hidden1_diff); // 16 x 1; E x 1; 16 x E
-			matadd(hidden1, num_classes, W[1], hidden1_diff, W[1]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer1-back"));
-
-		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
-			FV temp_diff(hidden1);
-			d_relu(hidden1_diff[src], h_hidden1[src], temp_diff);
-			d_mvmul(temp_diff, h_in[src], out_diff); // D x 1; 16 x 1; D x 16
-			matadd(feature_dim, hidden1, W[0], out_diff, W[0]);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("layer0-back"));
+		layers[2]->backward(h_out, h_softmax, in_grad, in_grad);
+		//layer1.backward();
+		//layer0.backward();
 	}
 
+	void update_weights() {
+		matadd(hidden1, num_classes, W[1], hidden1_grad, W[1]); // W[1] += hidden1_grad
+		matadd(feature_dim, hidden1, W[0], out_grad, W[0]); // W[0] += out_grad
+	}
 	// evaluate, i.e. inference or predict
 	double evaluate(LabelList labels, MaskList masks, AccT &loss, AccT &acc) {
 		Timer t_eval;
@@ -167,6 +136,7 @@ public:
 			AccT train_loss = 0.0, train_acc = 0.0;
 			forward(y_train, train_mask, train_loss, train_acc);
 			//backward(); // back propogation
+			//update_weights();
 			std::cout << " train_loss = " << train_loss << " train_acc = " << train_acc;
 
 			// Validation
@@ -183,18 +153,24 @@ protected:
 	size_t n; // N
 	size_t feature_dim; // D
 	size_t num_classes; // E
+
 	Graph g; // the input graph
 	FV2D h_in; // input_features: N x D
 	FV2D h_hidden1; // hidden1 level embedding: N x 16
 	FV2D h_out; // output embedding: N x E
-	FV2D h_softmax; // output embedding: N x E
-	FV2D hidden1_diff; // 16 x E
-	FV2D out_diff; // D x 16
+	FV2D h_softmax; // normalized output embedding: N x E
+	FV2D hidden1_grad; // gradient: 16 x E
+	FV2D in_grad; // gradient: N x E
+	FV2D out_grad; // gradient: D x 16
+	std::vector<AccT> diffs; // error for each vertex
+
 	std::vector<LabelT> labels; // labels for classification
-	FV3D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-	FV3D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 	LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
+
+	FV3D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
+	FV3D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
+	std::vector<layer *> layers;
 
 	inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
 		// Glorot & Bengio (AISTATS 2010) init
@@ -220,6 +196,9 @@ protected:
 			x[i] = dist(rng);
 	}
 
+	// labels contains the ground truth (e.g. vertex classes) for each example (num_examples x 1).
+	// Note that labels is not one-hot encoded vector,
+	// and it can be computed as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
 	size_t read_labels(std::string dataset_str, LabelList &labels) {
 		std::string filename = path + dataset_str + "-labels.txt";
 		std::ifstream in;
