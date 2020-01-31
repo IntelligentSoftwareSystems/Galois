@@ -1,7 +1,9 @@
 DESCRIPTION 
 ===========
 
-This application does vertex classification in an undirected graph 
+This application does vertex classification in an undirected graph.
+It uses graph neural network (GNN) to train the vertex features 
+which are then used to classify vertices into different classes.
 
 INPUT
 ===========
@@ -33,3 +35,23 @@ PERFORMANCE
 - I
 - I
 - I
+
+REFERENCES
+===========
+The GCN model:
+Semi-Supervised Classification with Graph Convolutional Networks (ICLR 2017)  
+http://arxiv.org/abs/1609.02907 
+https://github.com/tkipf/gcn
+
+DGL:
+Deep Graph Library: Towards Efficient and Scalable Deep Learning on Graphs
+https://arxiv.org/abs/1909.01315
+https://github.com/dmlc/dgl
+
+GraphSAGE: 
+Inductive Representation Learning on Large Graphs
+http://snap.stanford.edu/graphsage/
+
+NeuGraph: Parallel Deep Neural Network Computation on Large Graphs
+https://www.usenix.org/conference/atc19/presentation/ma
+
