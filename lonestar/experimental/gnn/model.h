@@ -9,7 +9,7 @@
 #include "optimizer.h"
 #include "math_functions.hpp"
 
-#define NUM_LAYERS 2
+#define NUM_CONV_LAYERS 2
 std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
 
 // N: number of vertices, D: feature vector dimentions, 
@@ -29,103 +29,102 @@ public:
 	void init() {
 		read_graph(dataset, g); 
 		n = g.size(); // N
-		h_in.resize(n); // input embedding: N x D
-		feature_dim = read_features(dataset, h_in);
 		labels.resize(n, 0); // label for each vertex: N x 1
 		num_classes = read_labels(dataset, labels);
-		W.resize(NUM_LAYERS);
-		Q.resize(NUM_LAYERS);
-		init_matrix(feature_dim, hidden1, W[0]);
-		init_matrix(hidden1, num_classes, W[1]);
-		init_matrix(feature_dim, hidden1, Q[0]);
-		init_matrix(hidden1, num_classes, Q[1]);
 
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
-		//for (size_t i = 0; i < n; i ++) {
-		//	train_mask[i] = 0;
-		//	val_mask[i] = 0;
-		//}
 		set_masks(n, train_mask, val_mask);
 		y_train.resize(n, 0);
 		y_val.resize(n, 0);
 		for (size_t i = 0; i < n; i ++) y_train[i] = (train_mask[i] == 1 ? labels[i] : -1);
 		for (size_t i = 0; i < n; i ++) y_val[i] = (val_mask[i] == 1 ? labels[i] : -1);
-		
-		h_hidden1.resize(n); // hidden1 level embedding: N x 16
-		h_out.resize(n); // output embedding: N x E
-		h_softmax.resize(n); // normalized output embedding: N x E
-		for (size_t i = 0; i < n; ++i) h_hidden1[i].resize(hidden1);
-		for (size_t i = 0; i < n; ++i) h_out[i].resize(num_classes);
-		for (size_t i = 0; i < n; ++i) h_softmax[i].resize(num_classes);
 
-		in_grad.resize(n); // N x E
-		//relu1_diff.resize(n); // N x E
-		hidden1_grad.resize(hidden1); // 16 x E
-		//relu0_diff.resize(n); // N x 16
-		out_grad.resize(feature_dim); // D x 16
-		for (size_t i = 0; i < n; ++i) in_grad[i].resize(num_classes);
-		//for (size_t i = 0; i < n; ++i) relu1_diff[i].resize(n);
-		//for (size_t i = 0; i < n; ++i) relu0_diff[i].resize(hidden1);
-		for (size_t i = 0; i < hidden1; ++i) hidden1_grad[i].resize(num_classes);
-		for (size_t i = 0; i < feature_dim; ++i) out_grad[i].resize(hidden1);
-		layers.resize(NUM_LAYERS+1);
-		layers[0] = new graph_conv_layer();
-		layers[0]->set_param(&g, &(W[0]), &(Q[0]), NULL, NULL);
-		layers[1] = new graph_conv_layer(false);
-		layers[1]->set_param(&g, &(W[1]), &(Q[1]), NULL, NULL);
+		num_layers = NUM_CONV_LAYERS + 1;
+		features.resize(num_layers + 1);
+		features[0].resize(n); // input embedding: N x D
+		input_feature_dim = read_features(dataset, features[0]);
+
+		feature_dims.resize(num_layers + 1);
+		feature_dims[0] = input_feature_dim; // input feature dimension
+		feature_dims[1] = hidden1; // hidden1 level embedding: N x 16
+		feature_dims[2] = num_classes; // output embedding: N x E
+		feature_dims[3] = num_classes; // normalized output embedding: N x E
+		for (size_t i = 1; i < num_layers + 1; i ++) {
+			features[i].resize(n); 
+			for (size_t j = 0; j < n; ++j)
+				features[i][j].resize(feature_dims[i]);
+		}
+
+		gradients.resize(NUM_CONV_LAYERS+1);
+		for (size_t i = 0; i < NUM_CONV_LAYERS+1; i ++) {
+			//gradients[i].resize([i]);
+			//for (size_t j = 0; j < ; ++j)
+			//	gradients[i][j].resize();
+		}
+
 		diffs.resize(n);
-		layers[2] = new softmax_loss_layer();
-		layers[2]->set_param(NULL, NULL, NULL, &diffs, &labels);
+		layers.resize(num_layers);
+		std::vector<size_t> in_dims(2), out_dims(2);
+		in_dims[0] = out_dims[0] = n;
+		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
+			in_dims[1] = feature_dims[i];
+			out_dims[1] = feature_dims[i+1];
+			layers[i] = new graph_conv_layer(i, in_dims, out_dims);
+			layers[i]->setup(&g, NULL, NULL);
+		}
+		layers[0]->set_act(true);
+		//layers[1]->set_act(true);
+		in_dims[1] = feature_dims[2];
+		out_dims[1] = feature_dims[3];
+		layers[2] = new softmax_loss_layer(2, in_dims, out_dims);
+		layers[2]->setup(NULL, &diffs, &labels);
 
 		opt = new adagrad(); 
+		for (size_t i = 0; i < num_layers; i ++)
+			layers[i]->print_layer_info();
 	}
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
-	size_t get_ft_dim() { return feature_dim; }
+	size_t get_ft_dim() { return input_feature_dim; }
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
 
 	// forward pass
 	void forward(LabelList labels, MaskList masks, AccT &loss, AccT &accuracy) {
-		layers[0]->forward(h_in, h_hidden1); // N x D; N x 16
-		layers[1]->forward(h_hidden1, h_out); // N x 16; N x E
-
-		// h_out (N x E) is the output from the previous layer (num_examples x num_classes).
-		layers[2]->forward(h_out, h_softmax);
+		// layer0: from N x D to N x 16
+		// layer1: from N x 16 to N x E
+		// layer2: from N x E to N x E (normalize only)
+		for (size_t i = 0; i < num_layers; i ++)
+			layers[i]->forward(features[i], features[i+1]);
 		loss = masked_avg_loss(diffs, masks);
 
 		// comparing outputs (N x E) with the ground truth (labels)
 		LabelList predictions(n);
-		for (size_t i = 0; i < n; i ++) predictions[i] = argmax(num_classes, h_out[i]);
+		for (size_t i = 0; i < n; i ++)
+			predictions[i] = argmax(num_classes, features[NUM_CONV_LAYERS][i]);
 		accuracy = masked_accuracy(predictions, labels, masks);
 	}
 
 	// back propogation
 	void backward(LabelList labels, MaskList masks) {
-		layers[2]->backward(h_out, h_softmax, in_grad, in_grad);
-		//layer[1].backward();
-		//layer[0].backward();
-		layers[1]->update_weights(opt);
-		layers[0]->update_weights(opt);
+		for (size_t i = num_layers; i != 0; i --)
+			layers[i]->backward(features[i], features[i-1], gradients[i], gradients[i-1]);
+		for (size_t i = 0; i < num_layers; i ++)
+			if (layers[i]->trainable()) layers[i]->update_weights(opt);
 	}
 
 	// evaluate, i.e. inference or predict
 	double evaluate(LabelList labels, MaskList masks, AccT &loss, AccT &acc) {
 		Timer t_eval;
 		t_eval.Start();
-		auto num_classes = W[1][0].size();
-		FV2D h_hidden1(n); // hidden1 level embedding
-		FV2D h_out(n); // out level embedding
-		for (size_t i = 0; i < n; ++i) h_hidden1[i].resize(hidden1);
-		for (size_t i = 0; i < n; ++i) h_out[i].resize(num_classes);
-		//std::cout << "loss: " << loss << "\n";
 		forward(labels, masks, loss, acc);
 		t_eval.Stop();
 		return t_eval.Millisecs();
 	}
 
 	void train() {
+		std::cout << "\nStart training...\n";
 		Timer t_epoch;
 		// run epoches
 		for (size_t i = 0; i < epochs; i++) {
@@ -152,44 +151,22 @@ public:
 
 protected:
 	size_t n; // N
-	size_t feature_dim; // D
+	size_t input_feature_dim; // D
 	size_t num_classes; // E
+	size_t num_layers; // for now hard-coded: NUM_CONV_LAYERS + 1
+	std::vector<size_t> feature_dims;
 
 	Graph g; // the input graph
-	FV2D h_in; // input_features: N x D
-	FV2D h_hidden1; // hidden1 level embedding: N x 16
-	FV2D h_out; // output embedding: N x E
-	FV2D h_softmax; // normalized output embedding: N x E
-	FV2D hidden1_grad; // gradient: 16 x E
-	FV2D in_grad; // gradient: N x E
-	FV2D out_grad; // gradient: D x 16
-	std::vector<AccT> diffs; // error for each vertex
+	FV3D features; // features: num_layers x N x (D; 16; E)
+	FV3D gradients; // gradient: 16 x E; N x E; D x 16
+	std::vector<AccT> diffs; // error for each vertex: N
 
 	std::vector<LabelT> labels; // labels for classification
 	LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
 
-	FV3D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-	FV3D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
-	std::vector<layer *> layers;
-	optimizer *opt;
-
-	inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
-		// Glorot & Bengio (AISTATS 2010) init
-		auto init_range = sqrt(6.0/(dim_x + dim_y));
-		//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
-		std::default_random_engine rng;
-		std::uniform_real_distribution<FeatureT> dist(-init_range, init_range);
-		matrix.resize(dim_x);
-		for (size_t i = 0; i < dim_x; ++i) {
-			matrix[i].resize(dim_y);
-			for (size_t j = 0; j < dim_y; ++j)
-				matrix[i][j] = dist(rng);
-		}
-		//for (size_t i = 0; i < 3; ++i)
-		//	for (size_t j = 0; j < 3; ++j)
-		//		std::cout << "matrix[" << i << "][" << j << "]: " << matrix[i][j] << std::endl;
-	}
+	std::vector<layer *> layers; // all the layers in the neural network
+	optimizer *opt; // the optimizer used to update parameters
 
 	inline void init_features(size_t dim, FV &x) {
 		std::default_random_engine rng;

@@ -3,9 +3,13 @@
 
 class softmax_loss_layer: public layer {
 public:
-	softmax_loss_layer() {}
+	softmax_loss_layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims)
+		: layer(level, in_dims, out_dims) {
+		trainable_ = false;
+	}
 	~softmax_loss_layer() {}
 	std::string layer_type() const override { return std::string("softmax_loss"); }
+	void setup(Graph *g, FV *d, LabelList *lab) override { diffs = d; labels = lab; }
 
 	// TODO: need kernel fusion optimization
 	void forward(const std::vector<FV> &in_data, std::vector<FV> &out_data) override {
@@ -31,11 +35,6 @@ public:
 			y[(*labels)[i]] = 1.0;
 			d_cross_entropy(y, out_data[i], in_grad[i]);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-back"));
-	}
-
-	void set_param(Graph *g, FV2D *w, FV2D *q, FV *d, LabelList *lab) override {
-		diffs = d;
-		labels = lab;
 	}
 
 	void update_weights(optimizer *opt) override {}
