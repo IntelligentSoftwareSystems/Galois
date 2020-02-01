@@ -19,7 +19,7 @@ matrix:
         - brew install openmpi
         - mkdir build
         - pushd build
-        - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+        - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF .. || exit 1
     - env:
         - GCC_VER=5
       addons:
@@ -287,7 +287,7 @@ before_script:
     fi
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF .. || exit 1
 
 script:
   - make input

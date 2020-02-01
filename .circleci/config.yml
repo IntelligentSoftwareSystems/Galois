@@ -20,7 +20,7 @@ jobs:
           apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -34,7 +34,7 @@ jobs:
           apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -52,7 +52,7 @@ jobs:
           wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
-          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
+          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 -DUSE_LONGJMP_ABORT=OFF ..
           make -j2
           make test || :
   "CentOS-7-gcc":
@@ -85,7 +85,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -116,7 +116,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -141,7 +141,7 @@ jobs:
           conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib eigen
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -155,7 +155,7 @@ jobs:
           pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -170,7 +170,7 @@ jobs:
           cd build
           # Don't test dist here since there's an issue with the alpine openmpi-dev package.
           # It's good to test that configuration anyway.
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j4
           make test || :
@@ -185,7 +185,7 @@ jobs:
           zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip openmpi-devel
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -201,7 +201,7 @@ jobs:
           module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
@@ -220,7 +220,7 @@ jobs:
           module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON -DUSE_LONGJMP_ABORT=OFF ..
           make input
           make -j2
           make test || :
