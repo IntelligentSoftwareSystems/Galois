@@ -309,14 +309,6 @@ find_package(Threads REQUIRED)
 
 include(CheckMmap)
 
-include(CheckSchedSetAffinity)
-if(SCHED_SETAFFINITY_FOUND)
-  add_definitions(-DGALOIS_USE_SCHED_SETAFFINITY)
-elseif(USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need sched_setaffinity")
-endif()
-
-
 # HugePages
 include(CheckHugePages)
 if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
@@ -413,9 +405,6 @@ function(linkApp name extlibs)
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
   target_link_libraries(${name} gllvm)
-  if (SCHED_SETAFFINITY_FOUND)
-    target_link_libraries(${name} ${SCHED_SETAFFINITY_LIBRARIES})
-  endif()
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
   if(VTune_FOUND)
