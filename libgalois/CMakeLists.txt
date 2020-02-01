@@ -32,8 +32,7 @@ set(sources
         src/PageAlloc.cpp
         src/SubsInit.cpp
         src/FileGraph.cpp
-        src/FileGraphParallel_cpp11.cpp
-#        src/FileGraphParallel_pthread.cpp
+        src/FileGraphParallel.cpp
         src/OCFileGraph.cpp
         src/GraphHelpers.cpp
         src/ParaMeter.cpp
