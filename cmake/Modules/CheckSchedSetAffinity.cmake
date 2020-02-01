@@ -3,6 +3,7 @@ include(CheckSymbolExists)
 if(SCHED_SETAFFINITY_FOUND)
 
 else()
+  set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
   CHECK_SYMBOL_EXISTS(sched_setaffinity sched.h HAVE_SCHED_SETAFFINITY_INTERNAL)
   if(HAVE_SCHED_SETAFFINITY_INTERNAL)
     message(STATUS "sched_setaffinity found")
