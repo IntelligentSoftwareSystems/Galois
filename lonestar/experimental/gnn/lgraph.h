@@ -8,7 +8,8 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-#include "types.h"
+typedef unsigned IndexT;
+typedef float ValueT;
 
 struct Edge {
 	IndexT src;

@@ -99,25 +99,35 @@ inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
 }
 
 // matrix multiply
-inline void matmul(const FV2D &A, const FV2D &B, FV2D &C) {
+inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 	size_t dim_x = A.size();
-	size_t dim_y = B.size();
-	size_t dim_z = B[0].size();
-	assert(A[0].size() == dim_y);
+	size_t dim_y = A[0].size();
+	size_t dim_z = C[0].size();
 	assert(C.size() == dim_x);
-	assert(C[0].size() == dim_z);
 
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
 			for (size_t k = 0; k < dim_z; ++k) { 
-				C[i][k] += A[i][j] * B[j][k];
+				C[i][k] += A[i][j] * B[j*dim_z+k];
 			} 
 		} 
 	} 
 }
 
-inline int argmax(const size_t n, const FV &x) {
-	FeatureT max = x[0];
+template <typename DataTy = float>
+inline void transpose(const FV2D &in, FV2D &out) {
+	size_t x = in.size();
+	size_t y = in[0].size();
+	for (size_t i = 0; i < y; i ++) {
+		for (size_t j = 0; j < x; j ++) {
+			out[i][j] = in[j][i];
+		}
+	}
+}
+
+template <typename DataTy = float>
+inline int argmax(const size_t n, const std::vector<DataTy> &x) {
+	DataTy max = x[0];
 	int max_ind = 0;
 	for (size_t i = 1; i < n; i++) {
 		if (x[i] > max) {
@@ -138,17 +148,17 @@ inline void update_all(Graph *g, size_t dim, const FV2D &in, FV2D &out) {
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
 }
 
-inline void relu(const FV &in, FV &out) {
-	size_t dim = out.size();
-	for (size_t i = 0; i < dim; ++i) {
-		out[i] = std::max(in[i], (FeatureT)0) + negative_slope * std::min(in[i], (FeatureT)0);
+template <typename DataTy = float>
+inline void relu(const std::vector<DataTy> &in, std::vector<DataTy> &out) {
+	for (size_t i = 0; i < out.size(); ++i) {
+		out[i] = std::max(in[i], (DataTy)0) + negative_slope * std::min(in[i], (DataTy)0);
 	}
 }
-	
-inline void d_relu(const FV &in_diff, const FV &fv, FV &out_diff) {
-	size_t dim = out_diff.size();
-	for (size_t i = 0; i < dim; ++i) {
-		out_diff[i] = in_diff[i] * ((fv[i] > (FeatureT)0)  + negative_slope * (fv[i] <= (FeatureT)0));
+
+template <typename DataTy = float>
+inline void d_relu(const std::vector<DataTy> &in_diff, const std::vector<DataTy> &fv, std::vector<DataTy> &out_diff) {
+	for (size_t i = 0; i < out_diff.size(); ++i) {
+		out_diff[i] = in_diff[i] * ((fv[i] > (DataTy)0)  + negative_slope * (fv[i] <= (DataTy)0));
 	}
 }
 
@@ -172,10 +182,10 @@ inline float reduce_mean(const std::vector<DataTy> &x) {
 }
 
 #include <boost/random/bernoulli_distribution.hpp>
-template <typename Dtype=float>
-void rng_bernoulli(const int n, const Dtype p, std::vector<unsigned> r) {
-	boost::bernoulli_distribution<Dtype> random_distribution(p);
-	boost::variate_generator<rng_t*, boost::bernoulli_distribution<Dtype> >
+template <typename DataTy = float>
+void rng_bernoulli(const int n, const DataTy p, std::vector<unsigned> r) {
+	boost::bernoulli_distribution<DataTy> random_distribution(p);
+	boost::variate_generator<rng_t*, boost::bernoulli_distribution<DataTy> >
 		variate_generator(rng(), random_distribution);
 	for (int i = 0; i < n; ++i)
 		r[i] = static_cast<unsigned>(variate_generator());
@@ -199,12 +209,14 @@ inline void d_dropout(FV &in_diff, FV &mask, FV &out_diff) {
 		out_diff[i] = in_diff[i] * mask[i] * scale_;
 }
 
-inline FeatureT sigmoid_func(FeatureT x) {
+template <typename DataTy = float>
+inline DataTy sigmoid_func(DataTy x) {
 	return 0.5 * tanh(0.5 * x) + 0.5;
 }
 
 // Sigmoid
-inline void sigmoid(FV &fv) {
+template <typename DataTy = float>
+inline void sigmoid(std::vector<DataTy> &fv) {
 	size_t count = fv.size();
 	for (size_t i = 0; i < count; ++i) {
 		fv[i] = sigmoid_func(fv[i]);

@@ -1,32 +1,32 @@
 // Graph Neural Networks
 // Xuhao Chen <cxh@utexas.edu>
 #include "gnn.h"
-#include "model.h"
+#include "net.h"
 
 const char* name = "Graph Convolutional Networks";
 const char* desc = "Graph convolutional neural networks on an undirected graph";
 const char* url  = 0;
 
-class GraphSageMean: public Model {
+class GraphSageMean: public Net {
 	// user-defined aggregate function
 	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
 		update_all(&g, dim, in, out);
 	}
 
 	// user-defined combine function
-	void combine(const FV2D mat_v, const FV2D mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
+	void combine(const vec_t mat_v, const vec_t mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
 		size_t dim = fv_out[0].size();
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 			FV a(dim, 0);
 			FV b(dim, 0);
-			mvmul(mat_v, fv_v[src], a);
-			mvmul(mat_u, fv_u[src], b); 
+			//mvmul(mat_v, fv_v[src], a);
+			//mvmul(mat_u, fv_u[src], b); 
 			vadd(a, b, fv_out[src]); // out[src] = W*v + Q*u
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("combine"));
 	}
 };
 
-class GCN: public Model {
+class GCN: public Net {
 public:
 	// user-defined aggregate function
 	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
@@ -35,7 +35,7 @@ public:
 
 	// user-defined combine function
 	// matrix multiply feature vector
-	void combine(const FV2D mat_v, const FV2D mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
+	void combine(const vec_t mat_v, const vec_t mat_u, const FV2D &fv_v, const FV2D &fv_u, FV2D &fv_out) {
 		assert(mat_v.size() == fv_u[0].size);
 		matmul(fv_u, mat_v, fv_out);
 	}
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 	model.train();
 	Ttrain.stop();
 
-	AccT test_cost = 0.0, test_acc = 0.0;
+	acc_t test_cost = 0.0, test_acc = 0.0;
 	size_t n = model.get_nnodes();
 	MaskList test_mask(n, 0);
 	for (size_t i = 0; i < n; i++)

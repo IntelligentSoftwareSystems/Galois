@@ -16,15 +16,15 @@ std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
 // E: number of distinct labels, i.e. number of vertex classes
 // layer 1: features N x D, weights D x 16, out N x 16 (hidden1=16)
 // layer 2: features N x 16, weights 16 x E, out N x E
-class Model {
+class Net {
 public:
-	Model() {}
+	Net() {}
 
 	// user-defined aggregate function
 	virtual void aggregate(size_t dim, const FV2D &features, FV2D &sum) {}
 	
 	// user-defined combine function
-	virtual void combine(const FV2D ma, const FV2D mb, const FV &a, const FV &b, FV &out) {}
+	virtual void combine(const vec_t ma, const vec_t mb, const FV &a, const FV &b, FV &out) {}
 	
 	void init() {
 		read_graph(dataset, g); 
@@ -50,19 +50,13 @@ public:
 		feature_dims[1] = hidden1; // hidden1 level embedding: N x 16
 		feature_dims[2] = num_classes; // output embedding: N x E
 		feature_dims[3] = num_classes; // normalized output embedding: N x E
+		/*
 		for (size_t i = 1; i < num_layers + 1; i ++) {
 			features[i].resize(n); 
 			for (size_t j = 0; j < n; ++j)
 				features[i][j].resize(feature_dims[i]);
 		}
-
-		gradients.resize(NUM_CONV_LAYERS+1);
-		for (size_t i = 0; i < NUM_CONV_LAYERS+1; i ++) {
-			//gradients[i].resize([i]);
-			//for (size_t j = 0; j < ; ++j)
-			//	gradients[i][j].resize();
-		}
-
+		*/
 		diffs.resize(n);
 		layers.resize(num_layers);
 		std::vector<size_t> in_dims(2), out_dims(2);
@@ -74,11 +68,13 @@ public:
 			layers[i]->setup(&g, NULL, NULL);
 		}
 		layers[0]->set_act(true);
-		//layers[1]->set_act(true);
+		layers[0]->set_in_data(features[0]);
 		in_dims[1] = feature_dims[2];
 		out_dims[1] = feature_dims[3];
+		connect(layers[0], layers[1]);
 		layers[2] = new softmax_loss_layer(2, in_dims, out_dims);
 		layers[2]->setup(NULL, &diffs, &labels);
+		connect(layers[1], layers[2]);
 
 		opt = new adagrad(); 
 		for (size_t i = 0; i < num_layers; i ++)
@@ -91,31 +87,34 @@ public:
 	size_t get_label(size_t i) { return labels[i]; }
 
 	// forward pass
-	void forward(LabelList labels, MaskList masks, AccT &loss, AccT &accuracy) {
+	void forward(LabelList labels, MaskList masks, acc_t &loss, acc_t &accuracy) {
 		// layer0: from N x D to N x 16
 		// layer1: from N x 16 to N x E
 		// layer2: from N x E to N x E (normalize only)
 		for (size_t i = 0; i < num_layers; i ++)
-			layers[i]->forward(features[i], features[i+1]);
+			//layers[i]->forward(features[i], features[i+1]);
+			layers[i]->forward();
 		loss = masked_avg_loss(diffs, masks);
 
 		// comparing outputs (N x E) with the ground truth (labels)
 		LabelList predictions(n);
 		for (size_t i = 0; i < n; i ++)
-			predictions[i] = argmax(num_classes, features[NUM_CONV_LAYERS][i]);
+			//predictions[i] = argmax(num_classes, features[NUM_CONV_LAYERS][i]);
+			predictions[i] = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
 		accuracy = masked_accuracy(predictions, labels, masks);
 	}
 
 	// back propogation
 	void backward(LabelList labels, MaskList masks) {
 		for (size_t i = num_layers; i != 0; i --)
-			layers[i]->backward(features[i], features[i-1], gradients[i], gradients[i-1]);
+			//layers[i]->backward(features[i], features[i-1], gradients[i], gradients[i-1]);
+			layers[i]->backward();
 		for (size_t i = 0; i < num_layers; i ++)
 			if (layers[i]->trainable()) layers[i]->update_weights(opt);
 	}
 
 	// evaluate, i.e. inference or predict
-	double evaluate(LabelList labels, MaskList masks, AccT &loss, AccT &acc) {
+	double evaluate(LabelList labels, MaskList masks, acc_t &loss, acc_t &acc) {
 		Timer t_eval;
 		t_eval.Start();
 		forward(labels, masks, loss, acc);
@@ -133,14 +132,14 @@ public:
 			// Construct feed dictionary
 
 			// Training step
-			AccT train_loss = 0.0, train_acc = 0.0;
+			acc_t train_loss = 0.0, train_acc = 0.0;
 			forward(y_train, train_mask, train_loss, train_acc);
 			//backward(); // back propogation
 			//update_weights();
 			std::cout << " train_loss = " << train_loss << " train_acc = " << train_acc;
 
 			// Validation
-			AccT val_cost = 0.0, val_acc = 0.0;
+			acc_t val_cost = 0.0, val_acc = 0.0;
 			double eval_time = evaluate(y_val, val_mask, val_cost, val_acc);
 			std::cout << " val_cost = " << val_cost << " val_acc = " << val_acc;
 
@@ -159,9 +158,9 @@ protected:
 	Graph g; // the input graph
 	FV3D features; // features: num_layers x N x (D; 16; E)
 	FV3D gradients; // gradient: 16 x E; N x E; D x 16
-	std::vector<AccT> diffs; // error for each vertex: N
+	std::vector<acc_t> diffs; // error for each vertex: N
 
-	std::vector<LabelT> labels; // labels for classification
+	std::vector<label_t> labels; // labels for classification
 	LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
 
@@ -170,7 +169,7 @@ protected:
 
 	inline void init_features(size_t dim, FV &x) {
 		std::default_random_engine rng;
-		std::uniform_real_distribution<FeatureT> dist(0, 0.1);
+		std::uniform_real_distribution<feature_t> dist(0, 0.1);
 		for (size_t i = 0; i < dim; ++i)
 			x[i] = dist(rng);
 	}
@@ -187,7 +186,7 @@ protected:
 		in >> m >> n >> std::ws;
 		assert(m == labels.size()); // number of vertices
 		std::cout << "label conuts: " << n << std::endl; // number of vertex classes
-		IndexT v = 0;
+		unsigned v = 0;
 		while (std::getline(in, line)) {
 			std::istringstream label_stream(line);
 			unsigned x;
@@ -222,8 +221,8 @@ protected:
 		}
 		while (std::getline(in, line)) {
 			std::istringstream edge_stream(line);
-			IndexT u, v;
-			FeatureT w;
+			unsigned u, v;
+			float_t w;
 			edge_stream >> u;
 			edge_stream >> v;
 			edge_stream >> w;

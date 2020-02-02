@@ -22,12 +22,12 @@ public:
 	}
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
-	void setup(Graph *g, FV *d, LabelList *lab) override { graph = g; }
+	void setup(Graph *g, vec_t *d, LabelList *lab) override { graph = g; }
 
-	void forward(const std::vector<FV> &in_data, std::vector<FV> &out_data) override {
+	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
 		size_t x = output_dims[0];
 		size_t z = output_dims[1];
-		FV2D fv_temp(x); // x * z
+		tensor_t fv_temp(x); // x * z
 		for (size_t i = 0; i < x; ++i) fv_temp[i].resize(z);
 		matmul(in_data, W, fv_temp); // x*y; y*z; x*z
 		update_all(graph, z, fv_temp, out_data);
@@ -38,42 +38,53 @@ public:
 		}
 	}
 
-	void backward(const std::vector<FV> &in_data, const std::vector<FV> &out_data, std::vector<FV> &out_grad, std::vector<FV> &in_grad) override {
-		size_t x = in_grad.size();
-		size_t z = out_data[0].size();
-		assert(y == in_data[0].size());
+	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
+		size_t x = output_dims[0];
+		size_t y = input_dims[1];
+		size_t z = output_dims[1];
+		vec_t grad_temp(x*z);
 		if (act_) {
+			//for (size_t j = 0; j < z; ++j) 
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				for (size_t j = 0; j < z; ++j) 
-				d_relu(in_grad[i], out_data[i], out_grad[i]); // x*z
-			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("relu_back"));
+					grad_temp[i*z+j] = in_grad[i][j] * (out_data[i][j] > 0.0);
+			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_relu"));
 		}
-		//FV conv1_diff(num_classes, 0); // used to gather neighbors' gradients
-		matmul(in_grad, in_data, out_grad); // x*z; z*y; x*y
+		tensor_t trans_in_data(y); // y*x
+		for (size_t i = 0; i < y; ++i) trans_in_data[i].resize(x);
+		transpose(in_data, trans_in_data);
+		matmul(trans_in_data, grad_temp, out_grad); // y*x; x*z; y*z
 		//d_update_all(out_grad, hidden1_diff[src]); // 16 x E; E x 1; hidden1_diff: N x 16 
 	}
 
 	void update_weights(optimizer *opt) override {
-		bool parallel = true;
-		//opt->update(grad, W, parallel); // W += diff
+		// parallelize only when target size is big enough to mitigate thread spawning overhead.
+		bool parallel = (W.size() >= 512);
+		vec_t diff;
+		prev()->merge_grads(&diff);
+		auto in_data = prev()->get_data();
+		float_t rcp_batch_size = float_t(1.0) / in_data.size();
+		for (size_t i = 0; i < diff.size(); ++i)
+			diff[i] *= rcp_batch_size;
+		opt->update(diff, W, parallel); // W += diff
+		prev()->clear_grads();
 	}
 
 private:
 	Graph *graph;
-	FV2D W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-	FV2D Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
+	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
+	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 
-	inline void init_matrix(size_t dim_x, size_t dim_y, FV2D &matrix) {
+	inline void init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
 		// Glorot & Bengio (AISTATS 2010) init
 		auto init_range = sqrt(6.0/(dim_x + dim_y));
 		//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
 		std::default_random_engine rng;
-		std::uniform_real_distribution<FeatureT> dist(-init_range, init_range);
-		matrix.resize(dim_x);
+		std::uniform_real_distribution<float_t> dist(-init_range, init_range);
+		matrix.resize(dim_x * dim_y);
 		for (size_t i = 0; i < dim_x; ++i) {
-			matrix[i].resize(dim_y);
 			for (size_t j = 0; j < dim_y; ++j)
-				matrix[i][j] = dist(rng);
+				matrix[i*dim_y+j] = dist(rng);
 		}
 		//for (size_t i = 0; i < 3; ++i)
 		//	for (size_t j = 0; j < 3; ++j)

@@ -1,7 +1,5 @@
 #ifndef RANDOM_H
 #define RANDOM_H
-//#include <boost/shared_ptr.hpp>
-
 typedef boost::mt19937 rng_t;
 
 // random seeding
