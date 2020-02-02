@@ -13,18 +13,26 @@
 */
 class graph_conv_layer: public layer {
 public:
-	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims)
-		: layer(level, in_dims, out_dims) {
+	graph_conv_layer(unsigned level, Graph *g,
+		std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
+		layer(level, in_dims, out_dims), graph(g) {
 		trainable_ = true;
 		// randomly initialize trainable parameters for conv layers
 		init_matrix(input_dims[1], output_dims[1], W);
 		init_matrix(input_dims[1], output_dims[1], Q);
+		name_ = layer_type() + "_" + std::to_string(level);
+		alloc_grad();
 	}
+	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
+		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, in_dims, out_dims) {}
+
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
-	void setup(Graph *g, vec_t *d, LabelList *lab) override { graph = g; }
+	//void setup(Graph *g, vec_t *d, LabelList *lab) override { graph = g; }
 
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
+		//std::cout << name_ << " forward: in_x=" << in_data.size() << ", in_y=" 
+		//	<< in_data[0].size() << ", out_y=" << out_data[0].size() << "\n";
 		size_t x = output_dims[0];
 		size_t z = output_dims[1];
 		tensor_t fv_temp(x); // x * z
@@ -39,44 +47,36 @@ public:
 	}
 
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
+		//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
 		size_t x = output_dims[0];
 		size_t y = input_dims[1];
 		size_t z = output_dims[1];
-		vec_t grad_temp(x*z);
+		//vec_t grad_temp(x*z);
+		tensor_t grad_temp(x);
+		for (size_t i = 0; i < x; ++i) grad_temp[i].resize(z);
 		if (act_) {
 			//for (size_t j = 0; j < z; ++j) 
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				for (size_t j = 0; j < z; ++j) 
-					grad_temp[i*z+j] = in_grad[i][j] * (out_data[i][j] > 0.0);
+					//grad_temp[i*z+j] = out_grad[i][j] * (out_data[i][j] > 0.0);
+					grad_temp[i][j] = out_grad[i][j] * (out_data[i][j] > 0.0);
 			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_relu"));
 		}
-		tensor_t trans_in_data(y); // y*x
-		for (size_t i = 0; i < y; ++i) trans_in_data[i].resize(x);
-		transpose(in_data, trans_in_data);
-		matmul(trans_in_data, grad_temp, out_grad); // y*x; x*z; y*z
-		//d_update_all(out_grad, hidden1_diff[src]); // 16 x E; E x 1; hidden1_diff: N x 16 
-	}
-
-	void update_weights(optimizer *opt) override {
-		// parallelize only when target size is big enough to mitigate thread spawning overhead.
-		bool parallel = (W.size() >= 512);
-		vec_t diff;
-		prev()->merge_grads(&diff);
-		auto in_data = prev()->get_data();
-		float_t rcp_batch_size = float_t(1.0) / in_data.size();
-		for (size_t i = 0; i < diff.size(); ++i)
-			diff[i] *= rcp_batch_size;
-		opt->update(diff, W, parallel); // W += diff
-		prev()->clear_grads();
+		//tensor_t trans_data(y); // y*x
+		//for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
+		//transpose(in_data, trans_data);
+		//matmul(trans_data, grad_temp, in_grad); // y*x; x*z; y*z
+		vec_t trans_W(z*y);
+		transpose(y, z, W, trans_W);
+		matmul(grad_temp, trans_W, in_grad); // x*z; z*y; x*y
+		//d_update_all(out_grad, ); //
 	}
 
 private:
 	Graph *graph;
-	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 
+	// Glorot & Bengio (AISTATS 2010) init
 	inline void init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
-		// Glorot & Bengio (AISTATS 2010) init
 		auto init_range = sqrt(6.0/(dim_x + dim_y));
 		//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
 		std::default_random_engine rng;

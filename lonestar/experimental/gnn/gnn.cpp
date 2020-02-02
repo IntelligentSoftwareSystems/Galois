@@ -48,9 +48,11 @@ int main(int argc, char** argv) {
 	//GraphSageMean model;
 	model.init();
 	ResourceManager rm;
+
+	optimizer *opt = new adagrad(); // the optimizer used to update parameters
 	galois::StatTimer Ttrain("Train");
 	Ttrain.start();
-	model.train();
+	model.train(opt);
 	Ttrain.stop();
 
 	acc_t test_cost = 0.0, test_acc = 0.0;

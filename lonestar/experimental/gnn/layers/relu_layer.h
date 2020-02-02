@@ -8,16 +8,17 @@ public:
 		: layer(level, in_dims, out_dims) {
 		trainable_ = false;
 	}
-
-	// fv: input feature vectors (tensor)
-	inline void forward(tensor_t &fv) {
-		size_t n = fv.size(); // num_samples
-		if (n == 0) return;
-		size_t dim = fv[0].size(); // feature dimension
-		galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-			for (size_t i = 0; i < dim; ++i) 
-				fv[i] = std::max(fv[i], 0.0) + negative_slope * std::min(fv[i], 0.0);
+	std::string layer_type() const override { return std::string("relu"); }
+	// 𝑦[𝑙] = max(0, 𝑦[𝑙−1])
+	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
+		galois::do_all(galois::iterate((size_t)0, input_dims[0]), [&](const auto& i) {
+			for (size_t j = 0; j < input_dims[1]; ++j) 
+				out_data[i][j] = std::max(in_data[i][j], (float_t)0) +
+					negative_slope * std::min(in_data[i][j], (float_t)0);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("relu_layer-fw"));
 	}
-
+	// 𝜕𝐿 / 𝜕𝑦[𝑙−1] = 0, 𝑖𝑓 (𝑦[𝑙] < 0)
+	//              = 𝜕𝐿 / 𝜕𝑦𝑙 , 𝑜𝑡ℎ𝑒𝑟𝑤𝑖𝑠𝑒
+	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, 
+		tensor_t &out_grad, tensor_t &in_grad) override {}
 };

@@ -38,8 +38,7 @@ public:
 	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data,
 			tensor_t &out_grad, tensor_t &in_grad) = 0;
 	virtual std::string layer_type() const = 0;
-	virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
-	virtual void update_weights(optimizer *opt) = 0;
+	//virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
 
 	void set_act(bool act) { act_ = act; }
 	void set_trainable(bool trainable) { trainable_ = trainable; }
@@ -54,13 +53,26 @@ public:
 	void set_in_data(tensor_t data) {
 		prev_ = std::make_shared<edge>(this, input_dims[1]);
 		prev_->get_data() = data;
+		prev_->get_gradient().resize(input_dims[0]);
+		// allocate memory for intermediate gradients
+		std::cout << "l0 in_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
+		for (size_t i = 0; i < input_dims[0]; ++i)
+			prev_->get_gradient()[i].resize(input_dims[1]);
 	}
 	void add_edge() {
 		// add an outgoing edge
 		next_ = std::make_shared<edge>(this, output_dims[1]);
+		// allocate memory for intermediate feature vectors
 		next_->get_data().resize(output_dims[0]);
 		for (size_t i = 0; i < output_dims[0]; ++i)
 			next_->get_data()[i].resize(output_dims[1]);
+	}
+	void alloc_grad() {
+		// allocate memory for intermediate gradients
+		std::cout << "l" << level_ << " out_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
+		next_->get_gradient().resize(output_dims[0]);
+		for (size_t i = 0; i < output_dims[0]; ++i)
+			next_->get_gradient()[i].resize(output_dims[1]);
 	}
 	void forward() {
 		forward_propagation(prev()->get_data(), next()->get_data());
@@ -68,6 +80,19 @@ public:
 	void backward() {
 		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
 	}
+	void update_weight(optimizer *opt) {
+		// parallelize only when target size is big enough to mitigate thread spawning overhead.
+		bool parallel = (W.size() >= 512);
+		vec_t diff;
+		prev()->merge_grads(&diff);
+		auto in_data = prev()->get_data();
+		float_t rcp_batch_size = float_t(1.0) / in_data.size();
+		for (size_t i = 0; i < diff.size(); ++i)
+			diff[i] *= rcp_batch_size;
+		opt->update(diff, W, parallel); // W += diff
+		prev()->clear_grads();
+	}
+
 protected:
 	bool act_;
 	unsigned level_;
@@ -76,6 +101,8 @@ protected:
 	std::vector<size_t> output_dims;
 	std::string name_;
 	bool trainable_;
+	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
+	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 };
 
 // head: layer i+1, tail: layer i

@@ -33,7 +33,10 @@ inline void vmul(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_
 // vector divide
 template <typename DataTy = float>
 inline void vdiv(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_b, std::vector<DataTy> &out) {
-	for (size_t i = 0; i < out.size(); ++i) out[i] = in_a[i] / in_b[i];
+	for (size_t i = 0; i < out.size(); ++i) {
+		assert(in_b[i] != 0);
+		out[i] = in_a[i] / in_b[i];
+	}
 }
 
 // vector add scalar
@@ -57,6 +60,7 @@ inline void mul_scalar(const DataTy alpha, std::vector<DataTy> Y) {
 // vector divide scalar
 template <typename DataTy = float>
 inline void div_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+	assert(alpha != 0);
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] /= alpha;
 }
 
@@ -104,6 +108,7 @@ inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 	size_t dim_y = A[0].size();
 	size_t dim_z = C[0].size();
 	assert(C.size() == dim_x);
+	assert(B.size() == dim_y*dim_z);
 
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
@@ -115,12 +120,21 @@ inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 }
 
 template <typename DataTy = float>
-inline void transpose(const FV2D &in, FV2D &out) {
+inline void transpose2D(const FV2D &in, FV2D &out) {
 	size_t x = in.size();
 	size_t y = in[0].size();
 	for (size_t i = 0; i < y; i ++) {
 		for (size_t j = 0; j < x; j ++) {
 			out[i][j] = in[j][i];
+		}
+	}
+}
+
+template <typename DataTy = float>
+inline void transpose(size_t x, size_t y, const vec_t &in, vec_t &out) {
+	for (size_t i = 0; i < y; i ++) {
+		for (size_t j = 0; j < x; j ++) {
+			out[i*x+j] = in[j*y+i];
 		}
 	}
 }
@@ -174,6 +188,7 @@ inline void d_vadd(FV &in_diff, FV &out_diff) {
 template <typename DataTy = float>
 inline float reduce_mean(const std::vector<DataTy> &x) {
 	size_t n = x.size();
+	assert(n > 0);
 	float sum = (float)x[0];
 	for (size_t i = 1; i < n; i++) {
 		sum += (float)x[i];
@@ -192,6 +207,7 @@ void rng_bernoulli(const int n, const DataTy p, std::vector<unsigned> r) {
 }
 
 inline void dropout(FV &in, std::vector<unsigned> &mask, FV &out) {
+	assert(dropout_rate < 1.0);
 	size_t count = in.size();
 	float threshold_ = dropout_rate;
 	float scale_ = 1. / (1. - threshold_);
@@ -202,6 +218,7 @@ inline void dropout(FV &in, std::vector<unsigned> &mask, FV &out) {
 }
 
 inline void d_dropout(FV &in_diff, FV &mask, FV &out_diff) {
+	assert(dropout_rate < 1.0);
 	size_t count = in_diff.size();
 	float threshold_ = dropout_rate;
 	float scale_ = 1. / (1. - threshold_);
@@ -247,7 +264,7 @@ inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &outpu
 	//for (size_t i = 0; i < n; i++) sum += expf(input[i]-m);
 	for (size_t i = 0; i < n; i++) sum += exps[i];
 	//DataTy offset = m + logf(sum);
-
+	assert(sum != 0);
 	// division
 	//for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
 	for (size_t i = 0; i < n; i++) output[i] = exps[i] / sum;
@@ -272,6 +289,7 @@ inline void d_softmax(std::vector<DataTy> &y, std::vector<DataTy> &p, std::vecto
 template <typename DataTy = float>
 inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
 	auto n = y.size();
+	assert(n > 0);
 	DataTy loss = 0.0;
 	for (size_t i = 0; i < n; i++) loss -= y[i] * logf(p[i]);
 	return loss / (DataTy)n;

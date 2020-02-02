@@ -64,19 +64,16 @@ public:
 		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
 			in_dims[1] = feature_dims[i];
 			out_dims[1] = feature_dims[i+1];
-			layers[i] = new graph_conv_layer(i, in_dims, out_dims);
-			layers[i]->setup(&g, NULL, NULL);
+			layers[i] = new graph_conv_layer(i, &g, in_dims, out_dims);
 		}
 		layers[0]->set_act(true);
 		layers[0]->set_in_data(features[0]);
 		in_dims[1] = feature_dims[2];
 		out_dims[1] = feature_dims[3];
 		connect(layers[0], layers[1]);
-		layers[2] = new softmax_loss_layer(2, in_dims, out_dims);
-		layers[2]->setup(NULL, &diffs, &labels);
+		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &diffs, &labels);
 		connect(layers[1], layers[2]);
 
-		opt = new adagrad(); 
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->print_layer_info();
 	}
@@ -86,13 +83,12 @@ public:
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
 
-	// forward pass
-	void forward(LabelList labels, MaskList masks, acc_t &loss, acc_t &accuracy) {
+	// forward propagation
+	void fprop(LabelList labels, MaskList masks, acc_t &loss, acc_t &accuracy) {
 		// layer0: from N x D to N x 16
 		// layer1: from N x 16 to N x E
 		// layer2: from N x E to N x E (normalize only)
 		for (size_t i = 0; i < num_layers; i ++)
-			//layers[i]->forward(features[i], features[i+1]);
 			layers[i]->forward();
 		loss = masked_avg_loss(diffs, masks);
 
@@ -105,37 +101,38 @@ public:
 	}
 
 	// back propogation
-	void backward(LabelList labels, MaskList masks) {
+	void bprop() {
 		for (size_t i = num_layers; i != 0; i --)
-			//layers[i]->backward(features[i], features[i-1], gradients[i], gradients[i-1]);
-			layers[i]->backward();
+			layers[i-1]->backward();
+	}
+	void update_weights(optimizer *opt) {
 		for (size_t i = 0; i < num_layers; i ++)
-			if (layers[i]->trainable()) layers[i]->update_weights(opt);
+			if (layers[i]->trainable()) layers[i]->update_weight(opt);
 	}
 
 	// evaluate, i.e. inference or predict
 	double evaluate(LabelList labels, MaskList masks, acc_t &loss, acc_t &acc) {
 		Timer t_eval;
 		t_eval.Start();
-		forward(labels, masks, loss, acc);
+		fprop(labels, masks, loss, acc);
 		t_eval.Stop();
 		return t_eval.Millisecs();
 	}
 
-	void train() {
+	void train(optimizer *opt) {
 		std::cout << "\nStart training...\n";
 		Timer t_epoch;
 		// run epoches
 		for (size_t i = 0; i < epochs; i++) {
-			std::cout << "Epoch " << i << ": ";
+			std::cout << "Epoch " << i << ":";
 			t_epoch.Start();
 			// Construct feed dictionary
 
 			// Training step
 			acc_t train_loss = 0.0, train_acc = 0.0;
-			forward(y_train, train_mask, train_loss, train_acc);
-			//backward(); // back propogation
-			//update_weights();
+			fprop(y_train, train_mask, train_loss, train_acc);
+			bprop(); // back propogation
+			update_weights(opt);
 			std::cout << " train_loss = " << train_loss << " train_acc = " << train_acc;
 
 			// Validation
@@ -165,7 +162,6 @@ protected:
 	MaskList train_mask, val_mask; // masks for traning and validation
 
 	std::vector<layer *> layers; // all the layers in the neural network
-	optimizer *opt; // the optimizer used to update parameters
 
 	inline void init_features(size_t dim, FV &x) {
 		std::default_random_engine rng;
