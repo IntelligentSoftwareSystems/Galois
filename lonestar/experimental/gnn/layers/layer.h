@@ -92,6 +92,15 @@ public:
 		opt->update(diff, W, parallel); // W += diff
 		prev()->clear_grads();
 	}
+	inline acc_t get_masked_loss(MaskList &masks) {
+		size_t n = loss.size();
+		assert(n > 0);
+		acc_t sum_mask = std::accumulate(masks.begin(), masks.end(), (acc_t)0);
+		acc_t avg_mask = sum_mask / (acc_t)n;
+		for (size_t i = 0; i < n; i ++) loss[i] = loss[i] * (acc_t)(masks[i]) / avg_mask;
+		acc_t sum_loss = std::accumulate(loss.begin(), loss.end(), (acc_t)0);
+		return sum_loss / (acc_t)n;
+	}
 
 protected:
 	bool act_;
@@ -103,6 +112,7 @@ protected:
 	bool trainable_;
 	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
+	vec_t loss; // error for each vertex: N x 1
 };
 
 // head: layer i+1, tail: layer i

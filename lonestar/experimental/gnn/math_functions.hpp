@@ -74,12 +74,12 @@ inline DataTy dot(const std::vector<DataTy> x, const std::vector<DataTy> &y) {
 }
 
 // matrix-vector multiply
-inline void mvmul(const FV2D &matrix, const FV &in_vector, FV &out_vector) {
+inline void mvmul(const vec_t &matrix, const FV &in_vector, FV &out_vector) {
 	size_t m = out_vector.size();
 	size_t n = in_vector.size();
 	for (size_t i = 0; i < m; ++i) { 
 		for (size_t j = 0; j < n; ++j) { 
-			out_vector[i] += matrix[i][j] * in_vector[j];
+			out_vector[i] += matrix[i*n+j] * in_vector[j];
 		} 
 	} 
 }

@@ -21,7 +21,7 @@ public:
 	Net() {}
 
 	// user-defined aggregate function
-	virtual void aggregate(size_t dim, const FV2D &features, FV2D &sum) {}
+	virtual void aggregate(Graph *g, size_t dim, const FV2D &in_feats, FV2D &out_feats) {}
 	
 	// user-defined combine function
 	virtual void combine(const vec_t ma, const vec_t mb, const FV &a, const FV &b, FV &out) {}
@@ -41,23 +41,13 @@ public:
 		for (size_t i = 0; i < n; i ++) y_val[i] = (val_mask[i] == 1 ? labels[i] : -1);
 
 		num_layers = NUM_CONV_LAYERS + 1;
-		features.resize(num_layers + 1);
-		features[0].resize(n); // input embedding: N x D
-		input_feature_dim = read_features(dataset, features[0]);
-
 		feature_dims.resize(num_layers + 1);
-		feature_dims[0] = input_feature_dim; // input feature dimension
-		feature_dims[1] = hidden1; // hidden1 level embedding: N x 16
-		feature_dims[2] = num_classes; // output embedding: N x E
-		feature_dims[3] = num_classes; // normalized output embedding: N x E
-		/*
-		for (size_t i = 1; i < num_layers + 1; i ++) {
-			features[i].resize(n); 
-			for (size_t j = 0; j < n; ++j)
-				features[i][j].resize(feature_dims[i]);
-		}
-		*/
-		diffs.resize(n);
+		input_features.resize(n); // input embedding: N x D
+		feature_dims[0] = read_features(dataset, input_features); // input feature dimension: D
+		feature_dims[1] = hidden1; // hidden1 level embedding: 16
+		feature_dims[2] = num_classes; // output embedding: E
+		feature_dims[3] = num_classes; // normalized output embedding: E
+
 		layers.resize(num_layers);
 		std::vector<size_t> in_dims(2), out_dims(2);
 		in_dims[0] = out_dims[0] = n;
@@ -67,11 +57,11 @@ public:
 			layers[i] = new graph_conv_layer(i, &g, in_dims, out_dims);
 		}
 		layers[0]->set_act(true);
-		layers[0]->set_in_data(features[0]);
+		layers[0]->set_in_data(input_features);
 		in_dims[1] = feature_dims[2];
 		out_dims[1] = feature_dims[3];
 		connect(layers[0], layers[1]);
-		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &diffs, &labels);
+		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &labels);
 		connect(layers[1], layers[2]);
 
 		for (size_t i = 0; i < num_layers; i ++)
@@ -79,7 +69,7 @@ public:
 	}
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
-	size_t get_ft_dim() { return input_feature_dim; }
+	size_t get_ft_dim() { return feature_dims[0]; }
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
 
@@ -90,12 +80,11 @@ public:
 		// layer2: from N x E to N x E (normalize only)
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->forward();
-		loss = masked_avg_loss(diffs, masks);
+		loss = layers[num_layers-1]->get_masked_loss(masks);
 
 		// comparing outputs (N x E) with the ground truth (labels)
 		LabelList predictions(n);
 		for (size_t i = 0; i < n; i ++)
-			//predictions[i] = argmax(num_classes, features[NUM_CONV_LAYERS][i]);
 			predictions[i] = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
 		accuracy = masked_accuracy(predictions, labels, masks);
 	}
@@ -146,33 +135,30 @@ public:
 	}
 
 protected:
-	size_t n; // N
-	size_t input_feature_dim; // D
-	size_t num_classes; // E
+	size_t n; // number of samples: N
+	size_t num_classes; // number of vertex classes: E
 	size_t num_layers; // for now hard-coded: NUM_CONV_LAYERS + 1
-	std::vector<size_t> feature_dims;
+	std::vector<size_t> feature_dims; // feature dimnesions for each layer
 
-	Graph g; // the input graph
-	FV3D features; // features: num_layers x N x (D; 16; E)
-	FV3D gradients; // gradient: 16 x E; N x E; D x 16
-	std::vector<acc_t> diffs; // error for each vertex: N
-
-	std::vector<label_t> labels; // labels for classification
+	Graph g; // the input graph, |V| = N
+	FV2D input_features; // input features: N x D
+	std::vector<label_t> labels; // labels for classification: N x 1
 	LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
 
 	std::vector<layer *> layers; // all the layers in the neural network
-
+	/*
 	inline void init_features(size_t dim, FV &x) {
 		std::default_random_engine rng;
 		std::uniform_real_distribution<feature_t> dist(0, 0.1);
 		for (size_t i = 0; i < dim; ++i)
 			x[i] = dist(rng);
 	}
+	//*/
 
-	// labels contains the ground truth (e.g. vertex classes) for each example (num_examples x 1).
-	// Note that labels is not one-hot encoded vector,
-	// and it can be computed as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
+	// labels contain the ground truth (e.g. vertex classes) for each example (num_examples x 1).
+	// Note that labels is not one-hot encoded vector and it can be computed
+	// as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
 	size_t read_labels(std::string dataset_str, LabelList &labels) {
 		std::string filename = path + dataset_str + "-labels.txt";
 		std::ifstream in;
@@ -195,25 +181,24 @@ protected:
 			}
 			v ++;
 		}
-
 		//for (size_t i = 0; i < 10; ++i)
 		//	std::cout << "labels[" << i << "]: " << labels[i] << std::endl;
 		return n;
 	}
 
-	size_t read_features(std::string dataset_str, FV2D &features) {
+	size_t read_features(std::string dataset_str, FV2D &feats) {
 		std::string filename = path + dataset_str + ".ft";
 		std::ifstream in;
 		std::string line;
 		in.open(filename, std::ios::in);
 		size_t m, n;
 		in >> m >> n >> std::ws;
-		assert(m == features.size()); // m = number of vertices
+		assert(m == feats.size()); // m = number of vertices
 		std::cout << "feature dimention: " << n << std::endl;
 		for (size_t i = 0; i < m; ++i) {
-			features[i].resize(n);
+			feats[i].resize(n);
 			for (size_t j = 0; j < n; ++j)
-				features[i][j] = 0;
+				feats[i][j] = 0;
 		}
 		while (std::getline(in, line)) {
 			std::istringstream edge_stream(line);
@@ -222,15 +207,13 @@ protected:
 			edge_stream >> u;
 			edge_stream >> v;
 			edge_stream >> w;
-			features[u][v] = w;
+			feats[u][v] = w;
 		}
 		/*
-		for (size_t i = 0; i < 10; ++i) {
-			for (size_t j = 0; j < n; ++j) {
-				if (features[i][j] > 0)
-					std::cout << "features[" << i << "][" << j << "]: " << features[i][j] << std::endl;
-			}
-		}
+		for (size_t i = 0; i < 10; ++i)
+			for (size_t j = 0; j < n; ++j)
+				if (feats[i][j] > 0)
+					std::cout << "feats[" << i << "][" << j << "]: " << feats[i][j] << std::endl;
 		//*/
 		return n;
 	}
@@ -272,7 +255,7 @@ protected:
 			auto row_end = lg.get_offset(i+1);
 			g.fixEndEdge(i, row_end);
 			for (auto offset = row_begin; offset < row_end; offset ++)
-				g.constructEdge(offset, lg.get_dest(offset), 0); // do not consider edge labels currently
+				g.constructEdge(offset, lg.get_dest(offset), 0); // do not consider edge labels now
 		}
 	}
 
@@ -295,7 +278,6 @@ protected:
 			else ; // unlabeled vertices
 		}
 	}
-
 };
 
 #endif

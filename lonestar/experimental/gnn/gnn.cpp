@@ -9,8 +9,8 @@ const char* url  = 0;
 
 class GraphSageMean: public Net {
 	// user-defined aggregate function
-	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
-		update_all(&g, dim, in, out);
+	void aggregate(Graph *g, size_t dim, const FV2D &in, FV2D &out) {
+		update_all(g, dim, in, out);
 	}
 
 	// user-defined combine function
@@ -19,8 +19,8 @@ class GraphSageMean: public Net {
 		galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 			FV a(dim, 0);
 			FV b(dim, 0);
-			//mvmul(mat_v, fv_v[src], a);
-			//mvmul(mat_u, fv_u[src], b); 
+			mvmul(mat_v, fv_v[src], a);
+			mvmul(mat_u, fv_u[src], b); 
 			vadd(a, b, fv_out[src]); // out[src] = W*v + Q*u
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("combine"));
 	}

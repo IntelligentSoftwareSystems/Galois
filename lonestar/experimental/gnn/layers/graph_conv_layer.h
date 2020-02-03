@@ -30,6 +30,7 @@ public:
 	std::string layer_type() const override { return std::string("graph_conv"); }
 	//void setup(Graph *g, vec_t *d, LabelList *lab) override { graph = g; }
 
+	// 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
 		//std::cout << name_ << " forward: in_x=" << in_data.size() << ", in_y=" 
 		//	<< in_data[0].size() << ", out_y=" << out_data[0].size() << "\n";
@@ -46,6 +47,7 @@ public:
 		}
 	}
 
+	// 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
 		//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
 		size_t x = output_dims[0];
