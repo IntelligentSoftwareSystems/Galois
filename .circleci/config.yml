@@ -152,7 +152,7 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
+          pacman -q -S --noconfirm gcc make cmake boost1.69 eigen openmpi
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
