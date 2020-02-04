@@ -30,9 +30,7 @@
 #include <cassert>
 #include <cstdlib>
 
-#ifdef GALOIS_USE_LONGJMP_ABORT
-#include <setjmp.h>
-#endif
+#include <csetjmp>
 
 namespace galois {
 namespace runtime {
@@ -44,9 +42,31 @@ enum ConflictFlag {
   BREAK            = 2
 };
 
-#ifdef GALOIS_USE_LONGJMP_ABORT
-extern thread_local jmp_buf execFrame;
+extern thread_local std::jmp_buf execFrame;
+
+class Lockable;
+
+[[noreturn]] inline void signalConflict(Lockable* = nullptr) {
+#if defined(GALOIS_USE_LONGJMP_ABORT)
+  std::longjmp(execFrame, CONFLICT);
+  std::abort(); // shouldn't reach here after longjmp
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  throw CONFLICT;
 #endif
+}
+
+#ifdef GALOIS_USE_EXP
+bool owns(Lockable* lockable, MethodFlag m);
+#endif
+
+[[noreturn]] inline void signalFailSafe(void) {
+#if defined(GALOIS_USE_LONGJMP_ABORT)
+  std::longjmp(galois::runtime::execFrame, galois::runtime::REACHED_FAILSAFE);
+  std::abort(); // shouldn't reach here after longjmp
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  throw REACHED_FAILSAFE;
+#endif
+}
 
 //! used to release lock over exception path
 static inline void clearConflictLock() {}
@@ -130,7 +150,19 @@ protected:
     locks          = lockable;
   }
 
-  void acquire(Lockable* lockable, galois::MethodFlag m);
+  void acquire(Lockable* lockable, galois::MethodFlag m) {
+    AcquireStatus i;
+    if (customAcquire) {
+      subAcquire(lockable, m);
+    } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
+      if (i == AcquireStatus::NEW_OWNER) {
+        addToNhood(lockable);
+      }
+    } else {
+      signalConflict(lockable);
+    }
+  }
+
   void release(Lockable* lockable);
 
 public:
@@ -196,10 +228,6 @@ struct CheckedLockObj {
   CheckedLockObj(galois::MethodFlag _m) : m(_m) {}
   void operator()(Lockable* lockable) const { acquire(lockable, m); }
 };
-
-void signalConflict(Lockable* = nullptr);
-
-void signalFailSafe(void);
 
 } // namespace runtime
 } // end namespace galois
