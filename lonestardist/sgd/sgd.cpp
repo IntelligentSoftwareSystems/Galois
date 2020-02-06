@@ -69,8 +69,6 @@ static cll::opt<double>
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 
-const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
-
 struct NodeData {
 
   std::vector<galois::CopyableAtomic<double>> residual_latent_vector;
