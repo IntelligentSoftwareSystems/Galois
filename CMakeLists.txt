@@ -322,7 +322,6 @@ endif()
 
 # Boost
 set(Boost_ADDITIONAL_VERSIONS "1.58.0" "1.60.0" "1.61.0" "1.62.0")
-set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
