@@ -34,6 +34,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - GCC_VER=6
       addons:
@@ -48,6 +49,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - GCC_VER=7
       addons:
@@ -62,6 +64,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - GCC_VER=8
       addons:
@@ -76,6 +79,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - GCC_VER=9
       addons:
@@ -90,6 +94,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - GCC_VER=9
         - BUILD_TYPE=Debug
@@ -105,6 +110,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=4.0
       addons:
@@ -122,6 +128,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=5.0
       addons:
@@ -139,6 +146,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=6.0
       addons:
@@ -155,6 +163,7 @@ matrix:
             - libboost-all-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=7
       addons:
@@ -172,6 +181,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=8
       addons:
@@ -189,6 +199,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=9
       addons:
@@ -206,6 +217,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=9
         - BUILD_TYPE=Debug
@@ -224,6 +236,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=9
         - CXXFLAGS="-stdlib=libc++"
@@ -244,6 +257,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
     - env:
         - CLANG_VER=9
         - BUILD_TYPE=Debug
@@ -265,6 +279,7 @@ matrix:
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - openssh-client
 
 before_script:
   # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
