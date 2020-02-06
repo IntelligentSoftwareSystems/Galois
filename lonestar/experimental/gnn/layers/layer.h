@@ -55,7 +55,7 @@ public:
 		prev_->get_data() = data;
 		prev_->get_gradient().resize(input_dims[0]);
 		// allocate memory for intermediate gradients
-		std::cout << "l0 in_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
+		//std::cout << "l0 in_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
 		for (size_t i = 0; i < input_dims[0]; ++i)
 			prev_->get_gradient()[i].resize(input_dims[1]);
 	}
@@ -69,7 +69,7 @@ public:
 	}
 	void alloc_grad() {
 		// allocate memory for intermediate gradients
-		std::cout << "l" << level_ << " out_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
+		//std::cout << "l" << level_ << " out_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
 		next_->get_gradient().resize(output_dims[0]);
 		for (size_t i = 0; i < output_dims[0]; ++i)
 			next_->get_gradient()[i].resize(output_dims[1]);
@@ -99,7 +99,9 @@ public:
 		acc_t sum_mask = std::accumulate(masks.begin(), masks.end(), (acc_t)0);
 		acc_t avg_mask = sum_mask / (acc_t)n;
 		assert(avg_mask > 0.0);
-		for (size_t i = 0; i < n; i ++) loss[i] = loss[i] * (acc_t)(masks[i]) / avg_mask;
+		for (size_t i = 0; i < n; i ++) {
+			loss[i] = loss[i] * (acc_t)(masks[i]) / avg_mask;
+		}
 		acc_t sum_loss = std::accumulate(loss.begin(), loss.end(), (acc_t)0);
 		return sum_loss / (acc_t)n;
 	}

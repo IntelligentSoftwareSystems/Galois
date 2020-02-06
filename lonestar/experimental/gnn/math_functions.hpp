@@ -282,8 +282,16 @@ inline void sigmoid(std::vector<DataTy> &fv) {
 //    exps / np.sum(exps)
 template <typename DataTy = float>
 inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &output) {
-	auto n = input.size();
-
+	const float_t alpha = *std::max_element(input.begin(), input.end());
+	float_t denominator(0);
+	for (size_t j = 0; j < input.size(); j++) {
+		output[j] = std::exp(input[j] - alpha);
+		denominator += output[j];
+	}
+	for (size_t j = 0; j < input.size(); j++) {
+		output[j] /= denominator;
+	}
+/*
 	// find maximum element
 	//DataTy m = *(std::max_element(input.begin(), input.end()));
 	DataTy m = -INFINITY;
@@ -302,6 +310,7 @@ inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &outpu
 	// division
 	//for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
 	for (size_t i = 0; i < n; i++) output[i] = exps[i] / sum;
+//*/
 }
 
 // Due to the desirable property of softmax function outputting a probability distribution, 
@@ -309,34 +318,49 @@ inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &outpu
 // For this we need to calculate the derivative or gradient,
 // and pass it back to the previous layer during backpropagation.
 template <typename DataTy = float>
-inline void d_softmax(std::vector<DataTy> &y, std::vector<DataTy> &p, std::vector<DataTy> &out_diff) {
+inline void d_softmax(const std::vector<DataTy> &y, const std::vector<DataTy> &p, 
+		std::vector<DataTy> &dy, const std::vector<DataTy> &dp) {
 	auto n = y.size();
+	vec_t df(n, 0);
 	for (size_t i = 0; i < n; i++) {
 		for (size_t j = 0; j < n; j++) {
-			DataTy delta_ij = i == j? 1 : 0;
-			out_diff[i] += p[j] * (delta_ij - p[i]);
+			//DataTy delta_ij = i == j? 1 : 0;
+			//df[i] += p[j] * (delta_ij - p[i]);
+			df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
 		}
+		// dy = dp * (gradient of softmax)
+		dy[i] = dot(dp, df);
 	}
+/* 
+	for (size_t j = 0; j < x.size(); j++) {
+		for (size_t k = 0; k < x.size(); k++) {
+			df[k] = (k == j) ? y[j] * (float_t(1) - y[j]) : -y[k] * y[j];
+		}
+		dx[j] = vectorize::dot(&dy[0], &df[0], len);
+	}
+*/
 }
 
 // cross entropy
+// y: ground truth
+// p: predicted probability
 template <typename DataTy = float>
-inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
+inline DataTy cross_entropy(const std::vector<DataTy> &y, std::vector<DataTy> &p) {
 	auto n = y.size();
 	assert(n > 0);
 	DataTy loss = 0.0;
 	for (size_t i = 0; i < n; i++) {
-		assert(p[i] > (DataTy)0);
-		loss -= y[i] * logf(p[i]);
+		if (p[i]==float_t(0)) p[i] += 1e-10; // avoid log(0) exception
+		if (p[i]==float_t(1)) p[i] -= 1e-10; // avoid log(0) exception
+		loss -= y[i] * std::log(p[i]);// + (float_t(1) - y[i]) * std::log(float_t(1) - p[i]);
 	}
 	return loss / (DataTy)n;
 }
 
 template <typename DataTy = float>
-inline void d_cross_entropy(const std::vector<DataTy> &y, const std::vector<DataTy> &p, std::vector<DataTy> &out_diff) {
+inline void d_cross_entropy(const std::vector<DataTy> &y, const std::vector<DataTy> &p, std::vector<DataTy> &d) {
 	auto n = y.size();
-	//softmax(x, out_diff);
-	for (size_t i = 0; i < n; i++) out_diff[i] = p[i] - y[i];
+	for (size_t i = 0; i < n; i++) d[i] = (p[i] - y[i]);// / (p[i] * (float_t(1) - p[i]));
 }
 
 #endif

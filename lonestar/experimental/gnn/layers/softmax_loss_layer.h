@@ -35,10 +35,11 @@ public:
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
 		//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
 		galois::do_all(galois::iterate((size_t)0, output_dims[0]), [&](const auto& i) {
-			in_grad[i].resize(output_dims[1]);
+			vec_t norm_grad(output_dims[1]);
 			std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
 			y[(*labels)[i]] = 1.0;
-			d_cross_entropy(y, out_data[i], in_grad[i]);
+			d_cross_entropy(y, out_data[i], norm_grad);
+			d_softmax(in_data[i], out_data[i], in_grad[i], norm_grad);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-bw"));
 	}
 
