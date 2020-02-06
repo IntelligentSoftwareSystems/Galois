@@ -82,6 +82,8 @@ void DegreeRanking(Graph &og, Graph &g) {
 }
 
 unsigned orientation(Graph &og, Graph &g) {
+	galois::StatTimer Tdag("DAG");
+	Tdag.start();
 	std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
 	std::cout << "num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
 	std::vector<IndexT> degrees(og.size(), 0);
@@ -124,6 +126,7 @@ unsigned orientation(Graph &og, Graph &g) {
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
 
 	g.sortAllEdgesByDst();
+	Tdag.stop();
 	return max_degree;
 }
 

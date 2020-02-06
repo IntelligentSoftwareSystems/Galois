@@ -102,6 +102,40 @@ inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
 			C[i][j] = A[i][j] + B[i][j];
 }
 
+// matrix multiply: all 2D
+inline void matmul2D(const FV2D &A, const FV2D &B, FV2D &C) {
+	size_t dim_x = A.size();
+	size_t dim_y = A[0].size();
+	size_t dim_z = C[0].size();
+	assert(C.size() == dim_x);
+	assert(B.size() == dim_y);
+	assert(B[0].size() == dim_z);
+
+	for (size_t i = 0; i < dim_x; ++i) { 
+		for (size_t j = 0; j < dim_y; ++j) { 
+			for (size_t k = 0; k < dim_z; ++k) { 
+				C[i][k] += A[i][j] * B[j][k];
+			} 
+		} 
+	} 
+}
+
+inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
+	size_t dim_x = A.size();
+	size_t dim_y = A[0].size();
+	size_t dim_z = B[0].size();
+	assert(C.size() == dim_x*dim_z);
+	assert(B.size() == dim_y);
+
+	for (size_t i = 0; i < dim_x; ++i) { 
+		for (size_t j = 0; j < dim_y; ++j) { 
+			for (size_t k = 0; k < dim_z; ++k) { 
+				C[i*dim_z+k] += A[i][j] * B[j][k];
+			} 
+		} 
+	} 
+}
+
 // matrix multiply
 inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 	size_t dim_x = A.size();
@@ -291,7 +325,10 @@ inline DataTy cross_entropy(std::vector<DataTy> &y, std::vector<DataTy> &p) {
 	auto n = y.size();
 	assert(n > 0);
 	DataTy loss = 0.0;
-	for (size_t i = 0; i < n; i++) loss -= y[i] * logf(p[i]);
+	for (size_t i = 0; i < n; i++) {
+		assert(p[i] > (DataTy)0);
+		loss -= y[i] * logf(p[i]);
+	}
 	return loss / (DataTy)n;
 }
 

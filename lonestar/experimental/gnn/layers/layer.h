@@ -81,15 +81,16 @@ public:
 		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
 	}
 	void update_weight(optimizer *opt) {
+		//std::cout << "[debug] " << name_ << ": updating weight...\n"; 
 		// parallelize only when target size is big enough to mitigate thread spawning overhead.
 		bool parallel = (W.size() >= 512);
-		vec_t diff;
-		prev()->merge_grads(&diff);
-		auto in_data = prev()->get_data();
-		float_t rcp_batch_size = float_t(1.0) / in_data.size();
-		for (size_t i = 0; i < diff.size(); ++i)
-			diff[i] *= rcp_batch_size;
-		opt->update(diff, W, parallel); // W += diff
+		//vec_t diff;
+		//prev()->merge_grads(&diff);
+		//auto in_data = prev()->get_data();
+		//float_t rcp_batch_size = float_t(1.0) / in_data.size();
+		//for (size_t i = 0; i < diff.size(); ++i)
+		//	diff[i] *= rcp_batch_size;
+		opt->update(weight_grad, W, parallel); // W += grad
 		prev()->clear_grads();
 	}
 	inline acc_t get_masked_loss(MaskList &masks) {
@@ -97,6 +98,7 @@ public:
 		assert(n > 0);
 		acc_t sum_mask = std::accumulate(masks.begin(), masks.end(), (acc_t)0);
 		acc_t avg_mask = sum_mask / (acc_t)n;
+		assert(avg_mask > 0.0);
 		for (size_t i = 0; i < n; i ++) loss[i] = loss[i] * (acc_t)(masks[i]) / avg_mask;
 		acc_t sum_loss = std::accumulate(loss.begin(), loss.end(), (acc_t)0);
 		return sum_loss / (acc_t)n;
@@ -112,6 +114,7 @@ protected:
 	bool trainable_;
 	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
+	vec_t weight_grad;
 	vec_t loss; // error for each vertex: N x 1
 };
 

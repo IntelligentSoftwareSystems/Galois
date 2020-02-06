@@ -18,8 +18,9 @@ public:
 		layer(level, in_dims, out_dims), graph(g) {
 		trainable_ = true;
 		// randomly initialize trainable parameters for conv layers
-		init_matrix(input_dims[1], output_dims[1], W);
-		init_matrix(input_dims[1], output_dims[1], Q);
+		rand_init_matrix(input_dims[1], output_dims[1], W);
+		//rand_init_matrix(input_dims[1], output_dims[1], Q);
+		zero_init_matrix(input_dims[1], output_dims[1], weight_grad);
 		name_ = layer_type() + "_" + std::to_string(level);
 		alloc_grad();
 	}
@@ -53,32 +54,41 @@ public:
 		size_t x = output_dims[0];
 		size_t y = input_dims[1];
 		size_t z = output_dims[1];
-		//vec_t grad_temp(x*z);
-		tensor_t grad_temp(x);
-		for (size_t i = 0; i < x; ++i) grad_temp[i].resize(z);
+		tensor_t grad_temp = out_grad;
 		if (act_) {
 			//for (size_t j = 0; j < z; ++j) 
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				for (size_t j = 0; j < z; ++j) 
 					//grad_temp[i*z+j] = out_grad[i][j] * (out_data[i][j] > 0.0);
-					grad_temp[i][j] = out_grad[i][j] * (out_data[i][j] > 0.0);
+					if (out_data[i][j] <= 0.0) grad_temp[i][j] = 0.0;
 			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_relu"));
 		}
-		//tensor_t trans_data(y); // y*x
-		//for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
-		//transpose(in_data, trans_data);
-		//matmul(trans_data, grad_temp, in_grad); // y*x; x*z; y*z
 		vec_t trans_W(z*y);
 		transpose(y, z, W, trans_W);
 		matmul(grad_temp, trans_W, in_grad); // x*z; z*y; x*y
 		//d_update_all(out_grad, ); //
+
+		tensor_t trans_data(y); // y*x
+		for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
+		transpose2D(in_data, trans_data);
+		matmul2D1D(trans_data, grad_temp, weight_grad); // y*x; x*z; y*z
+		/*
+		for (size_t i = 0; i < 3; i ++)
+			for (size_t j = 0; j < 2; j ++) {
+				std::cout << "out_data[" << i << "][" << j << "]=" << out_data[i][j] << "\n";
+				std::cout << "out_grad[" << i << "][" << j << "]=" << out_grad[i][j] << "\n";
+				std::cout << "grad_temp[" << i << "][" << j << "]=" << grad_temp[i][j] << "\n";
+				std::cout << "trans_data[" << i << "][" << j << "]=" << trans_data[i][j] << "\n";
+			}
+		for (size_t i = 0; i < 6; i ++) std::cout << "weight_grad[" << i << "]=" << weight_grad[i] << "\n";
+		//*/
 	}
 
 private:
 	Graph *graph;
 
 	// Glorot & Bengio (AISTATS 2010) init
-	inline void init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
+	inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
 		auto init_range = sqrt(6.0/(dim_x + dim_y));
 		//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
 		std::default_random_engine rng;
@@ -91,5 +101,12 @@ private:
 		//for (size_t i = 0; i < 3; ++i)
 		//	for (size_t j = 0; j < 3; ++j)
 		//		std::cout << "matrix[" << i << "][" << j << "]: " << matrix[i][j] << std::endl;
+	}
+	inline void zero_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
+		matrix.resize(dim_x * dim_y);
+		for (size_t i = 0; i < dim_x; ++i) {
+			for (size_t j = 0; j < dim_y; ++j)
+				matrix[i*dim_y+j] = 0;
+		}
 	}
 };
