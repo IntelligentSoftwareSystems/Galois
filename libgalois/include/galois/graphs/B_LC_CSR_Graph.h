@@ -275,7 +275,7 @@ public:
   edge_iterator in_edge_begin(GraphNode N,
                               MethodFlag mflag = MethodFlag::WRITE) {
     BaseGraph::acquireNode(N, mflag);
-    if (galois::runtime::shouldLock(mflag)) {
+    if (!HasNoLockable && galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = in_raw_begin(N), ee = in_raw_end(N); ii != ee;
            ++ii) {
         BaseGraph::acquireNode(inEdgeDst[*ii], mflag);
