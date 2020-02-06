@@ -35,6 +35,10 @@
 #include <string>
 #include <map>
 #include <type_traits>
+
+#include <sys/resource.h>
+#include <sys/time.h>
+
 /**
  * TODO:
  * Print intra host stats with per-thread details and inter-host stats with
@@ -733,6 +737,12 @@ void reportParam(const S1& region, const S2& category, const V& value) {
 }
 
 void setStatFile(const std::string& f);
+
+
+//! Reports maximum resident set size and page faults stats using
+//! rusage
+//! @param id Identifier to prefix stat with in statistics output
+void reportRUsage(const std::string& id);
 
 // TODO: switch to gstl::Str in here
 //! Reports Galois system memory stats for all threads

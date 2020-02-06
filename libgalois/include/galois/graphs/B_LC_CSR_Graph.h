@@ -62,6 +62,9 @@ class B_LC_CSR_Graph
       B_LC_CSR_Graph<NodeTy, EdgeTy, EdgeDataByValue, HasNoLockable,
                      UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy>;
 
+public:
+  //! Graph node typedef
+  using GraphNode = uint32_t;
 protected:
   // retypedefs of base class
   //! large array for edge data
@@ -70,7 +73,14 @@ protected:
   using EdgeDst = LargeArray<uint32_t>;
   //! large array for edge index data
   using EdgeIndData = LargeArray<uint64_t>;
+public:
+  //! iterator for edges
+  using edge_iterator =
+      boost::counting_iterator<typename EdgeIndData::value_type>;
+  //! reference to edge data
+  using edge_data_reference = typename EdgeData::reference;
 
+protected:
   //! edge index data for the reverse edges
   EdgeIndData inEdgeIndData;
   //! edge destination data for the reverse edges
@@ -82,6 +92,21 @@ protected:
       typename std::conditional<EdgeDataByValue, EdgeData, EdgeIndData>::type;
   //! The data for the reverse edges
   EdgeDataRep inEdgeData;
+
+  //! redefinition of the edge sort iterator in LC_CSR_Graph
+  using edge_sort_iterator =
+    internal::EdgeSortIterator<GraphNode, typename EdgeIndData::value_type,
+                               EdgeDst, EdgeDataRep>;
+
+  //! beginning iterator to an edge sorter for in-edges
+  edge_sort_iterator in_edge_sort_begin(GraphNode N) {
+    return edge_sort_iterator(*in_raw_begin(N), &inEdgeDst, &inEdgeData);
+  }
+
+  //! ending iterator to an edge sorter for in-edges
+  edge_sort_iterator in_edge_sort_end(GraphNode N) {
+    return edge_sort_iterator(*in_raw_end(N), &inEdgeDst, &inEdgeData);
+  }
 
   /**
    * Copy the data of outedge by value to inedge.
@@ -122,7 +147,7 @@ protected:
   void determineInEdgeIndices(EdgeIndData& dataBuffer) {
     // counting outgoing edges in the tranpose graph by
     // counting incoming edges in the original graph
-    galois::do_all(galois::iterate(0ul, BaseGraph::numEdges), [&](uint64_t e) {
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numEdges), [&](uint64_t e) {
       auto dst = BaseGraph::edgeDst[e];
       __sync_add_and_fetch(&(dataBuffer[dst]), 1);
     });
@@ -134,8 +159,8 @@ protected:
 
     // copy over the new tranposed edge index data
     inEdgeIndData.allocateInterleaved(BaseGraph::numNodes);
-    galois::do_all(galois::iterate(0ul, BaseGraph::numNodes),
-                   [&](uint32_t n) { inEdgeIndData[n] = dataBuffer[n]; });
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numNodes),
+                   [&](uint64_t n) { inEdgeIndData[n] = dataBuffer[n]; });
   }
 
   /**
@@ -150,8 +175,8 @@ protected:
     // saving an edge for a node
     if (BaseGraph::numNodes >= 1) {
       dataBuffer[0] = 0;
-      galois::do_all(galois::iterate(1ul, BaseGraph::numNodes),
-                     [&](uint32_t n) { dataBuffer[n] = inEdgeIndData[n - 1]; });
+      galois::do_all(galois::iterate(UINT64_C(1), BaseGraph::numNodes),
+                     [&](uint64_t n) { dataBuffer[n] = inEdgeIndData[n - 1]; });
     }
 
     // allocate edge dests and data
@@ -162,7 +187,7 @@ protected:
     }
 
     galois::do_all(
-        galois::iterate(0ul, BaseGraph::numNodes), [&](uint32_t src) {
+        galois::iterate(UINT64_C(0), BaseGraph::numNodes), [&](uint64_t src) {
           // e = start index into edge array for a particular node
           uint64_t e = (src == 0) ? 0 : BaseGraph::edgeIndData[src - 1];
 
@@ -182,15 +207,8 @@ protected:
         });
   }
 
-public:
-  //! Graph node typedef
-  using GraphNode = uint32_t;
-  //! iterator for edges
-  using edge_iterator =
-      boost::counting_iterator<typename EdgeIndData::value_type>;
-  //! reference to edge data
-  using edge_data_reference = typename EdgeData::reference;
 
+public:
   //! default constructor
   B_LC_CSR_Graph() = default;
   //! default move constructor
@@ -213,8 +231,8 @@ public:
     // initialize the temp array
     EdgeIndData dataBuffer;
     dataBuffer.allocateInterleaved(BaseGraph::numNodes);
-    galois::do_all(galois::iterate(0ul, BaseGraph::numNodes),
-                   [&](uint32_t n) { dataBuffer[n] = 0; });
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numNodes),
+                   [&](uint64_t n) { dataBuffer[n] = 0; });
 
     determineInEdgeIndices(dataBuffer);
     determineInEdgeDestAndData(dataBuffer);
@@ -257,7 +275,7 @@ public:
   edge_iterator in_edge_begin(GraphNode N,
                               MethodFlag mflag = MethodFlag::WRITE) {
     BaseGraph::acquireNode(N, mflag);
-    if (galois::runtime::shouldLock(mflag)) {
+    if (!HasNoLockable && galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = in_raw_begin(N), ee = in_raw_end(N); ii != ee;
            ++ii) {
         BaseGraph::acquireNode(inEdgeDst[*ii], mflag);
@@ -365,6 +383,38 @@ public:
    * @returns the prefix sum of in-edges
    */
   const EdgeIndData& getInEdgePrefixSum() const { return inEdgeIndData; }
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Utility
+  /////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Sorts outgoing edges of a node. Comparison is over getEdgeDst(e).
+   */
+  void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    BaseGraph::acquireNode(N, mflag);
+    // depending on value/ref the type of EdgeSortValue changes
+    using EdgeSortVal =
+      EdgeSortValue<GraphNode,
+                    typename std::conditional<EdgeDataByValue, EdgeTy,
+                                              uint64_t>::type>;
+
+    std::sort(in_edge_sort_begin(N), in_edge_sort_end(N),
+              [=](const EdgeSortVal& e1, const EdgeSortVal& e2) {
+                return e1.dst < e2.dst;
+              });
+  }
+
+  /**
+   * Sorts all incoming edges of all nodes in parallel. Comparison is over
+   * getEdgeDst(e).
+   */
+  void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    galois::do_all(galois::iterate((size_t)0, this->size()),
+                   [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
+                   galois::no_stats(), galois::steal());
+  }
+
 };
 
 } // namespace graphs

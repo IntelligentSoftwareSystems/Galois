@@ -44,6 +44,24 @@ void galois::runtime::setStatFile(const std::string& f) {
   internal::sysStatManager()->setStatFile(f);
 }
 
+
+void galois::runtime::reportRUsage(const std::string& id) {
+  // get rusage at this point in time
+  struct rusage usage_stats;
+  int rusage_result = getrusage(RUSAGE_SELF, &usage_stats);
+  if (rusage_result != 0) {
+    GALOIS_DIE("getrusage failed to execute cleanly");
+  }
+
+  // report stats using ID to identify them
+  reportStat("rusage", "MaxResidentSetSize_" + id,
+             usage_stats.ru_maxrss, StatTotal::SINGLE);
+  reportStat("rusage", "SoftPageFaults_" + id,
+             usage_stats.ru_minflt, StatTotal::SINGLE);
+  reportStat("rusage", "HardPageFaults_" + id,
+             usage_stats.ru_majflt, StatTotal::SINGLE);
+}
+
 bool StatManager::printingThreadVals(void) {
   return galois::substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
 }

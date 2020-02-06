@@ -56,6 +56,7 @@ struct checker {
   }
 };
 
+#undef GALOIS_WLCOMPILECHECK
 #define GALOIS_WLCOMPILECHECK(name) checker<name<>> ck_##name;
 #include "galois/worklists/WorkList.h"
 

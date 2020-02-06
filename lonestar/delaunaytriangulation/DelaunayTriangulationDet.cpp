@@ -223,8 +223,11 @@ struct ReadInput {
   Graph& graph;
   BasePoints& basePoints;
   Rounds& rounds;
+  std::random_device rng;
+  std::mt19937 urng;
+
   ReadInput(Graph& g, BasePoints& b, Rounds& r)
-      : graph(g), basePoints(b), rounds(r) {}
+      : graph(g), basePoints(b), rounds(r), urng(rng()) {}
 
   void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
     Element large_triangle(p1, p2, p3);
@@ -259,7 +262,7 @@ struct ReadInput {
   template <typename L>
   void generateRoundsImpl(const L& loop, size_t size, PointList& points,
                           size_t log2) {
-    loop(galois::iterate(0ul, size),
+    loop(galois::iterate(size_t{0}, size),
          [&, this](size_t index) {
            const Point& p = points[index];
 
@@ -295,7 +298,7 @@ struct ReadInput {
         next *= next;
         int r = maxRounds - 1 - round;
         if (randomize)
-          std::random_shuffle(buf.begin(), buf.end());
+          std::shuffle(buf.begin(), buf.end(), urng);
         std::copy(buf.begin(), buf.end(), std::back_inserter(*rounds[r]));
         buf.clear();
         ++round;

@@ -75,6 +75,7 @@ enum ConvertMode {
   gr2treegr,
   gr2trigr,
   gr2totem,
+  gr2neo4j,
   mtx2gr,
   nodelist2gr,
   pbbs2gr,
@@ -172,6 +173,7 @@ static cll::opt<ConvertMode> convertMode(
         clEnumVal(gr2trigr, "Convert symmetric binary gr to triangular form by "
                             "removing reverse edges"),
         clEnumVal(gr2totem, "Convert binary gr totem input format"),
+        clEnumVal(gr2neo4j, "Convert binary gr to a vertex/edge csv for neo4j"),
         clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
         clEnumVal(nodelist2gr, "Convert node list to binary gr"),
         clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
@@ -541,6 +543,10 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
       }
 
       for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
+        if ((edge_num % (nedges / 500)) == 0) {
+          printf("Phase %d: current edge progress %lf%%\n", phase,
+                 ((double)edge_num / nedges) * 100);
+        }
         uint32_t cur_id, neighbor_id;
         double weight = 1;
 
@@ -568,6 +574,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
         GALOIS_DIE("Error: additional lines in file");
       }
     }
+    // this is for the progress print
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
@@ -691,8 +698,6 @@ struct Gr2Adjacencylist : public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef galois::LargeArray<EdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -911,8 +916,6 @@ struct RandomizeNodes : public Conversion {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef galois::LargeArray<GNode> Permutation;
-    typedef typename std::iterator_traits<
-        typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -921,14 +924,9 @@ struct RandomizeNodes : public Conversion {
     perm.create(graph.size());
     std::copy(boost::counting_iterator<GNode>(0),
               boost::counting_iterator<GNode>(graph.size()), perm.begin());
-    std::mt19937 gen;
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
-    UniformDist<difference_type, std::mt19937, std::uniform_int_distribution>
-        dist(gen);
-#else
-    UniformDist<difference_type, std::mt19937, std::uniform_int> dist(gen);
-#endif
-    std::random_shuffle(perm.begin(), perm.end(), dist);
+    std::random_device rng;
+    std::mt19937 urng(rng());
+    std::shuffle(perm.begin(), perm.end(), urng);
 
     Graph out;
     galois::graphs::permute<EdgeTy>(graph, perm, out);
@@ -1368,12 +1366,15 @@ struct SortByHighDegreeParent : public Conversion {
     typedef galois::LargeArray<GNode> Permutation;
 
     Graph graph;
+    // get file graph
     graph.fromFile(infilename);
 
+    // get the number of vertices
     auto sz = graph.size();
 
     Permutation perm;
     perm.create(sz);
+    // fill the perm array with 0 through # vertices
     std::copy(boost::counting_iterator<GNode>(0),
               boost::counting_iterator<GNode>(sz), perm.begin());
 
@@ -1381,10 +1382,18 @@ struct SortByHighDegreeParent : public Conversion {
 
     std::deque<std::deque<std::pair<unsigned, GNode>>> inv(sz);
     unsigned count = 0;
+
+    // loop through all vertices
     for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+      // progress indicator print
       if (!(++count % 1024))
         std::cerr << static_cast<double>(count * 100) / sz << "\r";
+
+      // get the number of edges this vertex has
       unsigned dist = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+
+      // for each edge, get destination, and on that destination vertex save
+      // the source id (i.e. this is a transpose)
       for (auto dsti = graph.edge_begin(*ii), dste = graph.edge_end(*ii);
            dsti != dste; ++dsti)
         inv[graph.getEdgeDst(dsti)].push_back(std::make_pair(dist, *ii));
@@ -1393,33 +1402,49 @@ struct SortByHighDegreeParent : public Conversion {
     std::cout << "Found inverse\n";
 
     count = 0;
+    // looping through deques with incoming edges
+    // TODO this can probably be parallelized since each deque is disjoint
     for (auto ii = inv.begin(), ee = inv.end(); ii != ee; ++ii) {
-      if (!(++count % 1024))
+      // progress tracker
+      if (!(++count % 1024)) {
         std::cerr << count << " of " << sz << "\r";
+      }
+
+      // sort each deque
       std::sort(ii->begin(), ii->end(),
                 std::greater<std::pair<unsigned, GNode>>());
     }
 
-    std::sort(perm.begin(), perm.end(), [&inv](GNode lhs, GNode rhs) -> bool {
-      const auto& ll = inv[lhs].begin();
-      const auto& el = inv[lhs].end();
-      const auto& rr = inv[rhs].begin();
-      const auto& er = inv[rhs].begin();
-      // not less-than and not equal => greater-than
-      return !std::lexicographical_compare(ll, el, rr, er) &&
-             !(std::distance(ll, el) == std::distance(rr, er) &&
-               std::equal(ll, el, rr));
-    });
+    std::cout << "Beginning perm sort\n";
+
+    // sort the 0 -> # vertices array
+    std::sort(perm.begin(), perm.end(),
+      [&inv](GNode lhs, GNode rhs) -> bool {
+        const auto& leftBegin = inv[lhs].begin();
+        const auto& leftEnd = inv[lhs].end();
+        const auto& rightBegin = inv[rhs].begin();
+        const auto& rightEnd = inv[rhs].end();
+        // not less-than and not equal => greater-than
+        return (
+          !std::lexicographical_compare(leftBegin, leftEnd, rightBegin,
+                                        rightEnd) &&
+          !(std::distance(leftBegin, leftEnd) ==
+            std::distance(rightBegin, rightEnd) &&
+          std::equal(leftBegin, leftEnd, rightBegin))
+        );
+      }
+    );
 
     std::cout << "Done sorting\n";
 
     Permutation perm2;
     perm2.create(sz);
-    for (unsigned x = 0; x < perm.size(); ++x)
-      perm2[perm[x]] = x;
+    // perm2 stores the new ordering of a particular vertex
+    for (unsigned x = 0; x < perm.size(); ++x) perm2[perm[x]] = x;
 
     std::cout << "Done inverting\n";
 
+    // sanity check; this should print the same thing
     for (unsigned x = 0; x < perm2.size(); ++x) {
       if (perm[x] == 0) {
         std::cout << "Zero is at " << x << "\n";
@@ -1428,6 +1453,7 @@ struct SortByHighDegreeParent : public Conversion {
     }
     std::cout << "Zero is at " << perm2[0] << "\n";
 
+    // do actual permutation of the graph
     Graph out;
     galois::graphs::permute<EdgeTy>(graph, perm2, out);
     outputPermutation(perm2);
@@ -2507,6 +2533,71 @@ struct Gr2Totem : public HasNoVoidSpecialization {
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
+
+struct Gr2Neo4j : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    // TODO Need to figure out how we want to deal with labels
+
+    using Graph = galois::graphs::FileGraph;
+    using GNode = Graph::GraphNode;
+    using EdgeData = galois::LargeArray<EdgeTy>;
+    using edge_value_type = typename EdgeData::value_type;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    // output node csv for node creation
+
+    // first is header
+    std::string nodeHFile = outfilename + ".nodesheader";
+    std::ofstream fileH(nodeHFile.c_str());
+    fileH << "uid:ID,:LABEL\n";
+    fileH.close();
+
+    // then nodes
+    std::string nodeFile = outfilename + ".nodes";
+    std::ofstream fileN(nodeFile.c_str());
+    for (size_t i = 0; i < graph.size(); i++) {
+      fileN << i << ",v\n";
+    }
+    fileN.close();
+
+    // output edge CSV with or without data for edge creation
+    std::string edgeHFile = outfilename + ".edgesheader";
+    std::ofstream fileHE(edgeHFile.c_str());
+    if (EdgeData::has_value) {
+      fileHE << ":START_ID,:END_ID,:TYPE,value\n";
+    } else {
+      fileHE << ":START_ID,:END_ID,:TYPE\n";
+    }
+    fileHE.close();
+
+    // output edge CSV with or without data for edge creation
+    std::string edgeFile = outfilename + ".edges";
+    std::ofstream fileE(edgeFile.c_str());
+
+    // write edges
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      for (Graph::edge_iterator jj = graph.edge_begin(src),
+                                ej = graph.edge_end(src);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        if (EdgeData::has_value) {
+          fileE << src << "," << dst << ",e,"
+               << graph.getEdgeData<edge_value_type>(jj) << "\n";
+        } else {
+          fileE << src << "," << dst << ",e\n";
+        }
+      }
+    }
+    fileE.close();
+
+    printStatus(graph.size(), graph.sizeEdges());
+  }
+};
+
 /**
  * METIS format (1-indexed). See METIS 4.10 manual, section 4.5.
  *  % comment prefix
@@ -2876,6 +2967,9 @@ int main(int argc, char** argv) {
     break;
   case gr2totem:
     convert<Gr2Totem<IdLess>>();
+    break;
+  case gr2neo4j:
+    convert<Gr2Neo4j>();
     break;
   case mtx2gr:
     convert<Mtx2Gr>();

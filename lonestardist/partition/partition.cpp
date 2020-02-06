@@ -26,8 +26,6 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 
-constexpr static const char* const regionname = "Partition";
-
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -37,8 +35,6 @@ namespace cll = llvm::cl;
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
-
-const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 
 struct NodeData {
   uint32_t dummy;

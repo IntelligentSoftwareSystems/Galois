@@ -87,7 +87,7 @@ class OfflineGraph {
     uint64_t retval;
     try {
       fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-    } catch (std::ifstream::failure e) {
+    } catch (const std::ifstream::failure& e) {
       std::cerr << "Exception while reading edge destinations:" << e.what()
                 << "\n";
       std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL "
@@ -120,7 +120,7 @@ class OfflineGraph {
       uint64_t retval;
       try {
         fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-      } catch (std::ifstream::failure e) {
+      } catch (const std::ifstream::failure& e) {
         std::cerr << "Exception while reading index:" << e.what() << "\n";
         std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL "
                   << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
@@ -135,7 +135,7 @@ class OfflineGraph {
       uint32_t retval;
       try {
         fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
-      } catch (std::ifstream::failure e) {
+      } catch (const std::ifstream::failure& e) {
         std::cerr << "Exception while reading index:" << e.what() << "\n";
         std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL "
                   << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
@@ -169,7 +169,7 @@ class OfflineGraph {
     T retval;
     try {
       fileEdgeData.read(reinterpret_cast<char*>(&retval), sizeof(T));
-    } catch (std::ifstream::failure e) {
+    } catch (const std::ifstream::failure& e) {
       std::cerr << "Exception while reading edge data:" << e.what() << "\n";
       std::cerr << "IO error flags: EOF " << fileEdgeData.eof() << " FAIL "
                 << fileEdgeData.fail() << " BAD " << fileEdgeData.bad() << "\n";
@@ -221,7 +221,7 @@ public:
                        sizeof(uint64_t));
       fileEdgeDst.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
       fileEdgeDst.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
-    } catch (std::ifstream::failure e) {
+    } catch (const std::ifstream::failure& e) {
       std::cerr << "Exception while reading graph header:" << e.what() << "\n";
       std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL "
                 << fileEdgeDst.fail() << " BAD " << fileEdgeDst.bad() << "\n";

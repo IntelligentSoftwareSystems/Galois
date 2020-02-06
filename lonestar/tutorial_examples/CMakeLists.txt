@@ -12,6 +12,7 @@ app(example-conflict-aware-torus ConflictAwareTorus.cpp)
 app(example-spanningtree SpanningTree.cpp)
 app(example-countlevels CountLevels.cpp)
 app(example-malloc ThirdPartyMalloc.cpp)
+app(example-wrapped-worklist ExampleWrappedWorklist.cpp)
 
 add_test_scale(small example-hello-world 2 10)
 add_test_scale(small example-torus 2 100)

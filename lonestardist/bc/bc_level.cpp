@@ -26,6 +26,7 @@
 
 constexpr static const char* const REGION_NAME = "BC";
 
+#include <iomanip>
 #include <iostream>
 #include <limits>
 
@@ -691,29 +692,32 @@ int main(int argc, char** argv) {
 
   // Verify, i.e. print out graph data for examination
   if (verify) {
-    char* v_out = (char*)malloc(40);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       for (auto ii = (*h_graph).masterNodesRange().begin();
           ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
-        galois::runtime::printOutput(v_out);
-        memset(v_out, '\0', 40);
+        std::stringstream out;
+        out << (*h_graph).getGID(*ii)
+          << " "
+          << std::setprecision(9)
+          << get_node_betweeness_centrality_cuda(cuda_ctx, *ii)
+          << "\n";
+        galois::runtime::printOutput(out.str().c_str());
       }
     } else if (personality == CPU)
 #endif
     {
       for (auto ii = (*h_graph).masterNodesRange().begin();
            ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                (*h_graph).getData(*ii).betweeness_centrality);
-
-        galois::runtime::printOutput(v_out);
+        std::stringstream out;
+        out << (*h_graph).getGID(*ii)
+          << " "
+          << std::setprecision(9)
+          << (*h_graph).getData(*ii).betweeness_centrality
+          << "\n";
+        galois::runtime::printOutput(out.str().c_str());
       }
     }
-    free(v_out);
   }
 
   return 0;

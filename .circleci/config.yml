@@ -11,19 +11,18 @@ version: 2
 
 jobs:
   "Debian":
-     # As of this writing, runs on Debian 9.5
     docker:
-      - image: gcc:9
+      - image: debian:10
     steps:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake
+          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Ubuntu-18.04":
     docker:
@@ -32,12 +31,12 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Ubuntu-16.04":
     docker:
@@ -46,15 +45,15 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ zlib1g-dev wget
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ zlib1g-dev wget libopenmpi-dev openmpi-bin
           mkdir build
           cd build
           # Also test custom GRAPH_LOCATION
           wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
-          make -j4
+          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
+          make -j2
           make test || :
   "CentOS-7-gcc":
     docker:
@@ -83,12 +82,12 @@ jobs:
           source activate
           # conda-forge used to use the devtoolset compilers.
           # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "CentOS-7-clang":
     # Clang on CentOS 7
@@ -119,51 +118,19 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
-          make -j4
+          make -j2
           make test || :
-  "CentOS-6-gcc":
-    docker:
-      # Use an image with sudo enabled so packages can be installed.
-      # Once we transition to building in our own containers we can
-      # move to something based off of centos/devtoolset-7-toolchain-centos7
-      # but, since that one doesn't include sudo by default, we need
-      # to use this container instead for now.
-      - image: vikas027/centos-ssh-sudo:6
-    steps:
-      - checkout
-      - run: |
-          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          sudo yum -y -q install devtoolset-7-toolchain
-          # For some reason using scl_source enable this way doesn't work when bash
-          # was started with -e, so temporarily disable that, then re-enable it afterward.
-          set +e
-          source scl_source enable devtoolset-7
-          set -e
-          # Use miniconda to get recent boost and cmake
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          # conda-forge used to use the devtoolset compilers.
-          # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
-          mkdir build
-          cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
-          make input
-          make -j4
-          make test || :
-  "CentOS-6-clang-libc++":
+  "CentOS-7-clang-libc++":
     # Clang on CentOS 7
     docker:
       # As with the previous Centos 7 build, until we start using our own containers,
       # we need to use an image that includes sudo. The default Centos 7 ones do not.
-      - image: vikas027/centos-ssh-sudo:6
+      - image: vikas027/centos-ssh-sudo:7
     steps:
       - checkout
       - run: |
-          # Use miniconda to get all needed packages
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
+          # Use miniconda to get all remaining needed packages
           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
           rm miniconda.sh
@@ -176,7 +143,7 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Arch":
     docker:
@@ -185,12 +152,12 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost eigen
+          pacman -q -S --noconfirm gcc make cmake boost1.69 eigen openmpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Alpine":
     docker:
@@ -201,6 +168,8 @@ jobs:
           apk add --no-cache --no-progress make cmake boost-dev zlib-dev eigen
           mkdir build
           cd build
+          # Don't test dist here since there's an issue with the alpine openmpi-dev package.
+          # It's good to test that configuration anyway.
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
@@ -213,12 +182,12 @@ jobs:
       - run: |
           # Note: Eigen is deliberately excluded here since the tests should still run properly without it installed.
           # It's also excluded here because, as of this writing, it doesn't have a stable package in the latest OpenSUSE release.
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip openmpi-devel
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Fedora-gcc":
     docker:
@@ -226,12 +195,15 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel
+          yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel mpich-devel
+          # Get the "module" function set up before loading MPI.
+          . /etc/bashrc
+          module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
   "Fedora-clang":
     docker:
@@ -242,12 +214,15 @@ jobs:
           # Install llvm-devel, not because it is required, but because it may
           # conflict with the llvm headers that are vendored for use when building
           # command line programs. That configuration needs to be tested.
-          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel
+          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel openmpi-devel
+          # Get the "module" function set up before loading MPI.
+          . /etc/bashrc
+          module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
-          make -j4
+          make -j2
           make test || :
  
 workflows:
@@ -259,10 +234,9 @@ workflows:
       - "Ubuntu-16.04"
       - "CentOS-7-gcc"
       - "CentOS-7-clang"
+      - "CentOS-7-clang-libc++"
       - "Arch"
       - "Alpine"
       - "openSUSE"
       - "Fedora-gcc"
       - "Fedora-clang"
-      - "CentOS-6-gcc"
-      - "CentOS-6-clang-libc++"

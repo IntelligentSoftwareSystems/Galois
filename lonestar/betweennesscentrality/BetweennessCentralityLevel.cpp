@@ -292,7 +292,6 @@ constexpr static const char* const name = "Betweeness Centrality Level by Level"
 constexpr static const char* const desc =
     "Betweeness Centrality, level by level, using synchronous BFS and Brandes "
     "backward dependency propagation.";
-constexpr static const char* const url = 0;
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -319,7 +318,7 @@ int main(int argc, char** argv) {
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(std::max(
-    (uint64_t)galois::getActiveThreads() * (graph.size() / 2000000),
+    (size_t)galois::getActiveThreads() * (graph.size() / 2000000),
     std::max(10u, galois::getActiveThreads()) * (size_t)10
   ));
   preallocTime.stop();

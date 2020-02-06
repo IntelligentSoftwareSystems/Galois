@@ -515,6 +515,20 @@ void run() {
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
   reportKTruss(g);
+
+  uint64_t numEdges = 0;
+
+  for (auto n : g) {
+    for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+      auto dst = g.getEdgeDst(e);
+      if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
+        numEdges++;
+      }
+    }
+  }
+
+  galois::gInfo("Number of edges left in truss is ", numEdges);
+
 }
 
 int main(int argc, char** argv) {

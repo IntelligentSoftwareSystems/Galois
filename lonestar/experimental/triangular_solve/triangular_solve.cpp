@@ -154,6 +154,16 @@ void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
   galois::graphs::readGraph(built_graph, temp_graph);
 }
 
+// Atomically do += operation on a double.
+void atomic_relaxed_plus_eq(std::atomic<double>& base,
+                            double increment) noexcept {
+  auto current = base.load(std::memory_order_relaxed);
+  while (!base.compare_exchange_weak(current, current + increment,
+    std::memory_order_relaxed,
+    std::memory_order_relaxed))
+  ;
+}
+
 int main(int argc, char** argv) noexcept {
   galois::SharedMemSys galois_system;
   LonestarStart(argc, argv, name, desc, url);
@@ -163,7 +173,7 @@ int main(int argc, char** argv) noexcept {
   generate_matrix(graph, n);
 
   // Initialize the right hand side with filler data for now.
-  galois::LargeArray<double> rhs;
+  galois::LargeArray<std::atomic<double>> rhs;
   rhs.create(n);
   std::fill(rhs.begin(), rhs.end(), 1.);
 
@@ -212,12 +222,14 @@ int main(int argc, char** argv) noexcept {
       auto edge_iterator = graph.edge_begin(node, galois::MethodFlag::UNPROTECTED);
       auto edge_end = graph.edge_end(node, galois::MethodFlag::UNPROTECTED);
       assert(graph.getEdgeDst(*edge_iterator) == node);
-      rhs[node] /= graph.getEdgeData(*edge_iterator);
+      // Usual CAS loop isn't necessary here since the dependency tracking guarantees that this is
+      // the last operation run on this atomic.
+      rhs[node].store(rhs[node].load(std::memory_order_relaxed) / graph.getEdgeData(*edge_iterator), std::memory_order_relaxed);
       ++edge_iterator;
       while (edge_iterator < edge_end) {
         auto neighbor = graph.getEdgeDst(*edge_iterator);
         assert(neighbor > node);
-        rhs[neighbor] -= rhs[node] * graph.getEdgeData(*edge_iterator);
+        atomic_relaxed_plus_eq(rhs[neighbor], - rhs[node].load() * graph.getEdgeData(*edge_iterator));
         auto &other_counter = graph.getData(neighbor, galois::MethodFlag::UNPROTECTED);
         if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
           context.push(neighbor);

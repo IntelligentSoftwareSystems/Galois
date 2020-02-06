@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
   Torus torus(std::atoi(argv[1]), std::atoi(argv[2]));
 
   galois::do_all(galois::iterate(
-                     0ul, torus.size()), // range as a pair of unsigned integers
+                     size_t{0}, torus.size()), // range as a pair of unsigned integers
                  [&](TorusNode n) { torus.getData(n) = 0; } // operator
                  ,
                  galois::loopname("do_all_torus_reset_self") // options

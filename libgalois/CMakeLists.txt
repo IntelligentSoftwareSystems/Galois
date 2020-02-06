@@ -26,14 +26,12 @@ set(sources
         src/Profile.cpp
         src/EnvCheck.cpp
         src/PerThreadStorage.cpp
-        src/HWTopoLinux.cpp
         src/Termination.cpp
         src/NumaMem.cpp
         src/PageAlloc.cpp
         src/SubsInit.cpp
         src/FileGraph.cpp
-        src/FileGraphParallel_cpp11.cpp
-#        src/FileGraphParallel_pthread.cpp
+        src/FileGraphParallel.cpp
         src/OCFileGraph.cpp
         src/GraphHelpers.cpp
         src/ParaMeter.cpp
@@ -41,11 +39,28 @@ set(sources
         src/Tracer.cpp
 )
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  list(APPEND sources src/HWTopoDarwin.cpp)
+else()
+  include(CheckSchedSetAffinity)
+  if (SCHED_SETAFFINITY_FOUND)
+    add_definitions(-DGALOIS_USE_SCHED_SETAFFINITY)
+  elseif (USE_STRICT_CONFIG)
+    message(FATAL_ERROR "Need sched_setaffinity")
+  endif()
+
+  list(APPEND sources src/HWTopoLinux.cpp)
+endif()
+
 add_library(galois_shmem ${sources})
 target_include_directories(galois_shmem PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${GALOIS_RELATIVE_INCLUDE_DIR}>
 )
+
+if (SCHED_SETAFFINITY_FOUND)
+  target_link_libraries(galois_shmem ${SCHED_SETAFFINITY_LIBRARIES})
+endif()
 
 target_link_libraries(galois_shmem ${Boost_SERIALIZATION_LIBRARY_RELEASE})
 
@@ -55,7 +70,7 @@ if (CMAKE_HAVE_PTHREAD_H)
 endif()
 
 find_package(NUMA)
-if(NUMA_FOUND)
+if (NUMA_FOUND)
   add_definitions(-DGALOIS_USE_NUMA)
   target_link_libraries(galois_shmem ${NUMA_LIBRARY})
 else()

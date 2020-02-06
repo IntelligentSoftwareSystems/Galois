@@ -190,6 +190,7 @@ struct StepFunction {
   virtual LatentValue stepSize(int round) const = 0;
   virtual std::string name() const              = 0;
   virtual bool isBold() const { return false; }
+  virtual ~StepFunction() { }
 };
 
 /*

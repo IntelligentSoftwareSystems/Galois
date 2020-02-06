@@ -20,9 +20,10 @@
 #ifndef _GALOIS_DIST_CONVERT_HELP_
 #define _GALOIS_DIST_CONVERT_HELP_
 
+#include <iostream>
 #include <mutex>
-#include <fstream>
 #include <random>
+
 #include <mpi.h>
 
 #include "galois/Galois.h"
@@ -162,8 +163,10 @@ loadEdgesFromEdgeList(std::ifstream& edgeListFile, uint64_t localStartByte,
     GALOIS_ASSERT(localNumEdges == (localEdges.size() / 3));
   }
 
-  printf("[%u] Local num edges from file is %lu\n",
-         galois::runtime::getSystemNetworkInterface().ID, localNumEdges);
+  std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] "
+    << "Local num edges from file is "
+    << localNumEdges
+    << "\n";
 
   return localEdges;
 }
@@ -259,7 +262,7 @@ template <typename EdgeDataTy>
 void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
                            galois::DynamicBitSet& uniqueNodeBitset) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  printf("[%lu] Finding unique nodes\n", hostID);
+  std::cout << "[" << hostID << "] Finding unique nodes\n";
   uniqueNodeBitset.reset();
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
@@ -274,7 +277,7 @@ void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
                  },
                  galois::loopname("FindUniqueNodes"));
 
-  printf("[%lu] Unique nodes found\n", hostID);
+  std::cout << "[" << hostID << "] Unique nodes found\n";
 }
 
 /**
@@ -320,8 +323,8 @@ void accumulateLocalEdgesToChunks(galois::DynamicBitSet& uniqueChunkBitset,
   freeVector(uniqueChunkBitset.get_vec());
 
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  printf("[%lu] Chunk accumulators created: %lu of them\n", hostID,
-         chunkToAccumulator.size());
+  std::cout << "[" << hostID << "] Chunk accumulators created: "
+    << chunkToAccumulator.size() << " of them\n";
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine which chunk edges go to
@@ -339,7 +342,7 @@ void accumulateLocalEdgesToChunks(galois::DynamicBitSet& uniqueChunkBitset,
                  },
                  galois::loopname("ChunkInspection"));
 
-  printf("[%lu] Chunk accumulators done accumulating\n", hostID);
+  std::cout << "[" << hostID << "] Chunk accumulators done accumulating\n";
 
   // update chunk count
   galois::do_all(
@@ -441,7 +444,7 @@ getEvenNodeToHostMapping(const std::vector<uint32_t>& localEdges,
   std::vector<Uint64Pair> chunkToNode;
 
   if (hostID == 0) {
-    printf("Num chunks is %lu\n", numNodeChunks);
+    std::cout << "Num chunks is " << numNodeChunks << "\n";
   }
 
   for (unsigned i = 0; i < numNodeChunks; i++) {
@@ -449,7 +452,7 @@ getEvenNodeToHostMapping(const std::vector<uint32_t>& localEdges,
         (uint64_t)0, (uint64_t)totalNodeCount, i, numNodeChunks));
   }
 
-  printf("[%lu] Determining edge to chunk counts\n", hostID);
+  std::cout << "[" << hostID << "] Determining edge to chunk counts\n";
 
   galois::DynamicBitSet uniqueNodeBitset;
   uniqueNodeBitset.resize(totalNodeCount);
@@ -461,7 +464,7 @@ getEvenNodeToHostMapping(const std::vector<uint32_t>& localEdges,
 
   std::vector<uint64_t> chunkCounts = getChunkEdgeCounts<EdgeDataTy>(
       uniqueChunkBitset, localEdges, chunkToNode);
-  printf("[%lu] Edge to chunk counts determined\n", hostID);
+  std::cout << "[" << hostID << "] Edge to chunk counts determined\n";
 
   // prefix sum on the chunks (reuse array to save memory)
   for (unsigned i = 1; i < numNodeChunks; i++) {
@@ -720,7 +723,8 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
 std::vector<uint32_t>
 loadCleanEdgesFromBufferedGraph(const std::string& inputFile,
                                 Uint64Pair nodesToRead, Uint64Pair edgesToRead,
-                                uint64_t totalNumNodes, uint64_t totalNumEdges);
+                                uint64_t totalNumNodes, uint64_t totalNumEdges,
+                                bool keepSelfLoops);
 
 /**
  * Loads the node to new node mapping, then reads the edges that this host
@@ -819,7 +823,7 @@ void sendEdgeCounts(const std::vector<Uint64Pair>& hostToNodes,
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Determinining edge counts\n", hostID);
+  std::cout << "[" << hostID << "] Determinining edge counts\n";
 
   std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
 
@@ -839,7 +843,7 @@ void sendEdgeCounts(const std::vector<Uint64Pair>& hostToNodes,
                  },
                  galois::loopname("EdgeInspection"));
 
-  printf("[%lu] Sending edge counts\n", hostID);
+  std::cout << "[" << hostID << "] Sending edge counts\n";
 
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID)
@@ -887,7 +891,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Going to send assigned edges\n", hostID);
+  std::cout << "[" << hostID << "] Going to send assigned edges\n";
 
   using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
   galois::substrate::PerThreadStorage<EdgeVectorTy> dstVectors(totalNumHosts);
@@ -905,7 +909,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
     }
   });
 
-  printf("[%lu] Passing through edges and assigning\n", hostID);
+  std::cout << "[" << hostID << "] Passing through edges and assigning\n";
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
@@ -954,7 +958,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
                  },
                  galois::loopname("Pass2"));
 
-  printf("[%lu] Buffer cleanup\n", hostID);
+  std::cout << "[" << hostID << "] Buffer cleanup\n";
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
@@ -995,7 +999,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  printf("[%lu] Going to send assigned edges\n", hostID);
+  std::cout << "[" << hostID << "] Going to send assigned edges\n";
 
   // initialize localsrctodata
   GALOIS_ASSERT(localSrcToData.empty());
@@ -1021,7 +1025,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
     }
   });
 
-  printf("[%lu] Passing through edges and assigning\n", hostID);
+  std::cout << "[" << hostID << "] Passing through edges and assigning\n";
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
@@ -1076,7 +1080,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
       },
       galois::loopname("Pass2"));
 
-  printf("[%lu] Buffer cleanup\n", hostID);
+  std::cout << "[" << hostID << "] Buffer cleanup\n";
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
@@ -1305,7 +1309,8 @@ sendAndReceiveAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
   std::atomic<uint64_t> edgesToReceive;
   edgesToReceive.store(receiveEdgeCounts());
 
-  printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
+  std::cout << "[" << hostID << "] Need to receive "
+    << edgesToReceive.load() << " edges\n";
 
   // FIXME ONLY V1 SUPPORT
   VoVUint32 localSrcToDest(localNumNodes);
@@ -1353,7 +1358,8 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
     totalAssignedEdges += localSrcToDest[i].size();
   }
 
-  printf("[%u] Will write %lu edges\n", hostID, totalAssignedEdges);
+  std::cout << "[" << hostID << "] Will write "
+    << totalAssignedEdges << " edges\n";
 
   // calculate global edge offset using edge counts from other hosts
   std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
@@ -1413,7 +1419,8 @@ void assignAndWriteEdgesLux(std::vector<uint32_t>& localEdges,
     totalAssignedEdges += localSrcToDest[i].size();
   }
 
-  printf("[%u] Will write %lu edges\n", hostID, totalAssignedEdges);
+  std::cout << "[" << hostID << "] Will write "
+    << totalAssignedEdges << " edges\n";
 
   // calculate global edge offset using edge counts from other hosts
   std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
