@@ -113,7 +113,7 @@ public:
 		Timer t_epoch;
 		// run epoches
 		for (size_t i = 0; i < epochs; i++) {
-			std::cout << "Epoch " << i << std::fixed << std::setprecision(3) << ":";
+			std::cout << "Epoch " << std::setw(2) << i << std::fixed << std::setprecision(3) << ":";
 			t_epoch.Start();
 			// Construct feed dictionary
 
@@ -125,12 +125,13 @@ public:
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation
-			acc_t val_cost = 0.0, val_acc = 0.0;
-			double eval_time = evaluate(y_val, val_mask, val_cost, val_acc);
-			std::cout << " val_cost = " << std::setw(5) << val_cost << " val_acc = " << std::setw(5) << val_acc;
+			acc_t val_loss = 0.0, val_acc = 0.0;
+			double val_time = evaluate(y_val, val_mask, val_loss, val_acc);
+			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
 
 			t_epoch.Stop();
-			std::cout << " time = " << t_epoch.Millisecs() << " ms\n";
+			double epoch_time = t_epoch.Millisecs();
+			std::cout << " time = " << epoch_time << " ms (train_time = " << epoch_time - val_time << " val_time = " << val_time << ")\n";
 		}
 	}
 

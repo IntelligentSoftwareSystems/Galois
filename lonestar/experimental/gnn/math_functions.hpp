@@ -282,35 +282,24 @@ inline void sigmoid(std::vector<DataTy> &fv) {
 //    exps / np.sum(exps)
 template <typename DataTy = float>
 inline void softmax(const std::vector<DataTy> &input, std::vector<DataTy> &output) {
-	const float_t alpha = *std::max_element(input.begin(), input.end());
+	const float_t max = *std::max_element(input.begin(), input.end());
 	float_t denominator(0);
-	for (size_t j = 0; j < input.size(); j++) {
-		output[j] = std::exp(input[j] - alpha);
-		denominator += output[j];
+	for (size_t i = 0; i < input.size(); i++) {
+		output[i] = std::exp(input[i] - max);
+		denominator += output[i];
 	}
-	for (size_t j = 0; j < input.size(); j++) {
-		output[j] /= denominator;
-	}
-/*
-	// find maximum element
-	//DataTy m = *(std::max_element(input.begin(), input.end()));
-	DataTy m = -INFINITY;
-	for (size_t i = 0; i < n; i++) if (input[i] > m) m = input[i];
-	std::vector<DataTy> exps(n, 0);
+	for (size_t i = 0; i < input.size(); i++)
+		output[i] /= denominator;
+}
 
-	// subtraction and exponentiation
-	for (size_t i = 0; i < n; i++) exps[i] = expf(input[i]-m);
-
-	// sum after exp
-	DataTy sum = (DataTy)0;
-	//for (size_t i = 0; i < n; i++) sum += expf(input[i]-m);
-	for (size_t i = 0; i < n; i++) sum += exps[i];
-	//DataTy offset = m + logf(sum);
-	assert(sum != 0);
-	// division
-	//for (size_t i = 0; i < n; i++) output[i] = expf(input[i]-offset);
-	for (size_t i = 0; i < n; i++) output[i] = exps[i] / sum;
-//*/
+template <typename DataTy = float>
+inline void log_softmax(const std::vector<DataTy> &input, std::vector<DataTy> &output) {
+	const float_t max = *std::max_element(input.begin(), input.end());
+	float_t denominator(0);
+	for (size_t i = 0; i < input.size(); i++)
+		denominator += std::exp(input[i] - max);
+	for (size_t i = 0; i < input.size(); i++)
+		output[i] = input[i] - max - denominator;
 }
 
 // Due to the desirable property of softmax function outputting a probability distribution, 
@@ -341,7 +330,7 @@ inline void d_softmax(const std::vector<DataTy> &y, const std::vector<DataTy> &p
 */
 }
 
-// cross entropy
+// cross-entropy loss function for multi-class classification
 // y: ground truth
 // p: predicted probability
 template <typename DataTy = float>
@@ -350,17 +339,23 @@ inline DataTy cross_entropy(const std::vector<DataTy> &y, std::vector<DataTy> &p
 	assert(n > 0);
 	DataTy loss = 0.0;
 	for (size_t i = 0; i < n; i++) {
-		if (p[i]==float_t(0)) p[i] += 1e-10; // avoid log(0) exception
-		if (p[i]==float_t(1)) p[i] -= 1e-10; // avoid log(0) exception
-		loss -= y[i] * std::log(p[i]);// + (float_t(1) - y[i]) * std::log(float_t(1) - p[i]);
+		if (y[i] == float_t(0)) continue;
+		if (p[i] == float_t(0)) loss -= y[i] * std::log(float_t(1e-10));
+		//if (p[i]==float_t(1)) loss -= (float_t(1) - y[i]) * std::log(float_t(1e-10));
+		else loss -= y[i] * std::log(p[i]);// + (float_t(1) - y[i]) * std::log(float_t(1) - p[i]);
+		//loss -= y[i] * std::log(p[i]);
 	}
-	return loss / (DataTy)n;
+	return loss;
 }
 
 template <typename DataTy = float>
 inline void d_cross_entropy(const std::vector<DataTy> &y, const std::vector<DataTy> &p, std::vector<DataTy> &d) {
 	auto n = y.size();
-	for (size_t i = 0; i < n; i++) d[i] = (p[i] - y[i]);// / (p[i] * (float_t(1) - p[i]));
+	//for (size_t i = 0; i < n; i++) d[i] = (p[i] - y[i]) / (p[i] * (float_t(1) - p[i]));
+	for (size_t i = 0; i < n; i++) {
+		d[i] = -y[i] / (p[i] + float_t(1e-10));
+		//d[i] = p[i] - y[i];
+	}
 }
 
 #endif

@@ -49,7 +49,8 @@ int main(int argc, char** argv) {
 	model.init();
 	ResourceManager rm;
 
-	optimizer *opt = new adagrad(); // the optimizer used to update parameters
+	//optimizer *opt = new adagrad(); // the optimizer used to update parameters
+	optimizer *opt = new adam(); // the optimizer used to update parameters
 	galois::StatTimer Ttrain("Train");
 	Ttrain.start();
 	model.train(opt);

@@ -28,6 +28,17 @@ public:
 				std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
 				y[(*labels)[i]] = 1.0; // one-hot
 				loss[i] = cross_entropy(y, out_data[i]);
+				/*
+				if (i < 10) {
+					std::cout << "vertex " << i << " label: " << (*labels)[i] << ", pred: [ ";
+					for (size_t j = 0; j < output_dims[1]; j++)
+						std::cout << in_data[i][j] << " ";
+					std::cout << "], normailized_pred: [ ";
+					for (size_t j = 0; j < output_dims[1]; j++)
+						std::cout << out_data[i][j] << " ";
+					std::cout << "], loss: " << loss[i] << "\n";
+				}
+				//*/
 			}
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax_loss-fw"));
 	}

@@ -74,7 +74,7 @@ struct adam : public stateful_optimizer<2> {
 			vt[i] = b2 * vt[i] + (float_t(1) - b2) * dW[i] * dW[i];
 			// L2 norm based update rule
 			W[i] -= alpha * (mt[i] / (float_t(1) - b1_t)) /
-			std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
+				std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("adam_update"));
 		b1_t *= b1;
 		b2_t *= b2;
