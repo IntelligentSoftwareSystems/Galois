@@ -104,33 +104,37 @@ inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
 
 // matrix multiply: all 2D
 inline void matmul2D(const FV2D &A, const FV2D &B, FV2D &C) {
+	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = A.size();
-	size_t dim_y = A[0].size();
-	size_t dim_z = C[0].size();
+	size_t dim_y = C[0].size();
+	size_t dim_z = A[0].size();
 	assert(C.size() == dim_x);
-	assert(B.size() == dim_y);
-	assert(B[0].size() == dim_z);
+	assert(B.size() == dim_z);
+	assert(B[0].size() == dim_y);
 
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
+			C[i][j] = 0;
 			for (size_t k = 0; k < dim_z; ++k) { 
-				C[i][k] += A[i][j] * B[j][k];
+				C[i][j] += A[i][k] * B[k][j];
 			} 
 		} 
 	} 
 }
 
 inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
+	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = A.size();
-	size_t dim_y = A[0].size();
-	size_t dim_z = B[0].size();
-	assert(C.size() == dim_x*dim_z);
-	assert(B.size() == dim_y);
+	size_t dim_y = B[0].size();
+	size_t dim_z = A[0].size();
+	assert(C.size() == dim_x*dim_y);
+	assert(B.size() == dim_z);
 
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
+			C[i*dim_y+j] = 0;
 			for (size_t k = 0; k < dim_z; ++k) { 
-				C[i*dim_z+k] += A[i][j] * B[j][k];
+				C[i*dim_y+j] += A[i][k] * B[k][j];
 			} 
 		} 
 	} 
@@ -138,16 +142,18 @@ inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
 
 // matrix multiply
 inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
-	size_t dim_x = A.size();
-	size_t dim_y = A[0].size();
-	size_t dim_z = C[0].size();
-	assert(C.size() == dim_x);
+	// A: x*z; B: z*y; C: x*y
+	size_t dim_x = C.size();
+	size_t dim_y = C[0].size();
+	size_t dim_z = A[0].size();
+	assert(A.size() == dim_x);
 	assert(B.size() == dim_y*dim_z);
 
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
+			C[i][j] = 0;
 			for (size_t k = 0; k < dim_z; ++k) { 
-				C[i][k] += A[i][j] * B[j*dim_z+k];
+				C[i][j] += A[i][k] * B[k*dim_y+j];
 			} 
 		} 
 	} 
@@ -186,9 +192,14 @@ inline int argmax(const size_t n, const std::vector<DataTy> &x) {
 	return max_ind;
 }
 
-inline void update_all(Graph *g, size_t dim, const FV2D &in, FV2D &out) {
+inline void clear(FV &in) {
+	for (size_t i = 0; i < in.size(); i++) in[i] = 0;
+}
+
+inline void update_all(Graph *g, const FV2D &in, FV2D &out) {
 	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
-		out[src].resize(dim, 0); // used to gather neighbors' embeddings
+		clear(out[src]);
+		// gather neighbors' embeddings
 		for (const auto e : g->edges(src)) {
 			const auto dst = g->getEdgeDst(e);
 			vadd(out[src], in[dst], out[src]); // out[src] += in[dst]
@@ -232,31 +243,25 @@ inline float reduce_mean(const std::vector<DataTy> &x) {
 
 #include <boost/random/bernoulli_distribution.hpp>
 template <typename DataTy = float>
-void rng_bernoulli(const int n, const DataTy p, std::vector<unsigned> r) {
+void rng_bernoulli(const DataTy p, std::vector<unsigned> &r) {
 	boost::bernoulli_distribution<DataTy> random_distribution(p);
 	boost::variate_generator<rng_t*, boost::bernoulli_distribution<DataTy> >
 		variate_generator(rng(), random_distribution);
-	for (int i = 0; i < n; ++i)
+	for (size_t i = 0; i < r.size(); ++i)
 		r[i] = static_cast<unsigned>(variate_generator());
 }
 
-inline void dropout(FV &in, std::vector<unsigned> &mask, FV &out) {
-	assert(dropout_rate < 1.0);
-	size_t count = in.size();
-	float threshold_ = dropout_rate;
-	float scale_ = 1. / (1. - threshold_);
-	// Create random numbers
-	rng_bernoulli(count, 1. - threshold_, mask);
-	for (size_t i = 0; i < count; ++i)
+const float scale_ = 1. / (1. - dropout_rate);
+inline void dropout(const FV &in, std::vector<unsigned> &mask, FV &out) {
+	assert(mask.size() == out.size());
+	//std::cout << "mask size: " << mask.size() << "\n";
+	rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
+	for (size_t i = 0; i < in.size(); ++i)
 		out[i] = in[i] * mask[i] * scale_;
 }
 
-inline void d_dropout(FV &in_diff, FV &mask, FV &out_diff) {
-	assert(dropout_rate < 1.0);
-	size_t count = in_diff.size();
-	float threshold_ = dropout_rate;
-	float scale_ = 1. / (1. - threshold_);
-	for (size_t i = 0; i < count; ++i)
+inline void d_dropout(const FV &in_diff, std::vector<unsigned> &mask, FV &out_diff) {
+	for (size_t i = 0; i < in_diff.size(); ++i)
 		out_diff[i] = in_diff[i] * mask[i] * scale_;
 }
 
@@ -334,7 +339,7 @@ inline void d_softmax(const std::vector<DataTy> &y, const std::vector<DataTy> &p
 // y: ground truth
 // p: predicted probability
 template <typename DataTy = float>
-inline DataTy cross_entropy(const std::vector<DataTy> &y, std::vector<DataTy> &p) {
+inline DataTy cross_entropy(const std::vector<DataTy> &y, const std::vector<DataTy> &p) {
 	auto n = y.size();
 	assert(n > 0);
 	DataTy loss = 0.0;

@@ -9,8 +9,8 @@ const char* url  = 0;
 
 class GraphSageMean: public Net {
 	// user-defined aggregate function
-	void aggregate(Graph *g, size_t dim, const FV2D &in, FV2D &out) {
-		update_all(g, dim, in, out);
+	void aggregate(Graph *g, const FV2D &in, FV2D &out) {
+		update_all(g, in, out);
 	}
 
 	// user-defined combine function
@@ -29,8 +29,8 @@ class GraphSageMean: public Net {
 class GCN: public Net {
 public:
 	// user-defined aggregate function
-	void aggregate(size_t dim, const FV2D &in, FV2D &out) {
-		update_all(&g, dim, in, out);
+	void aggregate(Graph *g, const FV2D &in, FV2D &out) {
+		update_all(g, in, out);
 	}
 
 	// user-defined combine function
@@ -49,8 +49,10 @@ int main(int argc, char** argv) {
 	model.init();
 	ResourceManager rm;
 
-	//optimizer *opt = new adagrad(); // the optimizer used to update parameters
-	optimizer *opt = new adam(); // the optimizer used to update parameters
+	// the optimizer used to update parameters
+	//optimizer *opt = new adagrad(); 
+	optimizer *opt = new adam();
+	//optimizer *opt = new gradient_descent();
 	galois::StatTimer Ttrain("Train");
 	Ttrain.start();
 	model.train(opt);

@@ -31,7 +31,7 @@ class layer : public node {
 public:
 	layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
 		node(in_dims.size(), out_dims.size()),
-		act_(false), level_(level), num_dims(in_dims.size()),
+		act_(false), dropout_(false), level_(level), num_dims(in_dims.size()),
 		input_dims(in_dims), output_dims(out_dims) { add_edge(); }
 	virtual ~layer() = default;
 	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data) = 0;
@@ -41,6 +41,7 @@ public:
 	//virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
 
 	void set_act(bool act) { act_ = act; }
+	void set_dropout(bool dropout) { dropout_ = dropout; }
 	void set_trainable(bool trainable) { trainable_ = trainable; }
 	bool trainable() const { return trainable_; }
 	void set_name(std::string name) { name_ = name; }
@@ -107,7 +108,8 @@ public:
 	}
 
 protected:
-	bool act_;
+	bool act_; // whether to use activation function at the end
+	bool dropout_; // whether to use dropout at first
 	unsigned level_;
 	size_t num_dims;
 	std::vector<size_t> input_dims;

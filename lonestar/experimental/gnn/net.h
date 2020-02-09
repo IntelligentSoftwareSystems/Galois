@@ -27,6 +27,7 @@ public:
 	virtual void combine(const vec_t ma, const vec_t mb, const FV &a, const FV &b, FV &out) {}
 	
 	void init() {
+		assert(dropout_rate < 1.0);
 		read_graph(dataset, g); 
 		n = g.size(); // N
 		labels.resize(n, 0); // label for each vertex: N x 1
@@ -54,7 +55,7 @@ public:
 		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
 			in_dims[1] = feature_dims[i];
 			out_dims[1] = feature_dims[i+1];
-			layers[i] = new graph_conv_layer(i, &g, in_dims, out_dims);
+			layers[i] = new graph_conv_layer(i, &g, true, in_dims, out_dims);
 		}
 		layers[0]->set_act(true);
 		layers[0]->set_in_data(input_features);

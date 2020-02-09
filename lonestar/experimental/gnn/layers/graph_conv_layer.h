@@ -13,9 +13,10 @@
 */
 class graph_conv_layer: public layer {
 public:
-	graph_conv_layer(unsigned level, Graph *g,
+	graph_conv_layer(unsigned level, Graph *g, bool dropout,
 		std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
 		layer(level, in_dims, out_dims), graph(g) {
+		assert(input_dims[0] == output_dims[0]); // num_vertices
 		trainable_ = true;
 		// randomly initialize trainable parameters for conv layers
 		rand_init_matrix(input_dims[1], output_dims[1], W);
@@ -23,9 +24,20 @@ public:
 		zero_init_matrix(input_dims[1], output_dims[1], weight_grad);
 		name_ = layer_type() + "_" + std::to_string(level);
 		alloc_grad();
+		dropout_ = dropout;
+		if (dropout_) {
+			dropout_mask.resize(input_dims[0]);
+			dropout_data.resize(input_dims[0]);
+			for (size_t i = 0; i < input_dims[0]; i++) {
+				dropout_mask[i].resize(input_dims[1]);
+				dropout_data[i].resize(input_dims[1]);
+			}
+		}
+		pre_sup.resize(output_dims[0]); // pre_sup: same as it is in original GCN implementation
+		for (size_t i = 0; i < input_dims[0]; ++i) pre_sup[i].resize(output_dims[1]);
 	}
 	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
-		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, in_dims, out_dims) {}
+		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, in_dims, out_dims) {}
 
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
@@ -33,14 +45,18 @@ public:
 
 	// 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
-		//std::cout << name_ << " forward: in_x=" << in_data.size() << ", in_y=" 
-		//	<< in_data[0].size() << ", out_y=" << out_data[0].size() << "\n";
-		size_t x = output_dims[0];
-		size_t z = output_dims[1];
-		tensor_t fv_temp(x); // x * z
-		for (size_t i = 0; i < x; ++i) fv_temp[i].resize(z);
-		matmul(in_data, W, fv_temp); // x*y; y*z; x*z
-		update_all(graph, z, fv_temp, out_data);
+		// if in_feats_dim > out_feats_dim:
+		// mult W first to reduce the feature size for aggregation
+		// else: aggregate first then mult W (not implemented yet)
+		size_t x = output_dims[0]; // input: x*y; W: y*z; output: x*z
+		if (dropout_) {
+			for (size_t i = 0; i < x; ++i) {
+			//galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
+				dropout(in_data[i], dropout_mask[i], dropout_data[i]);
+			}//, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("dropout"));
+			matmul(dropout_data, W, pre_sup);
+		} else matmul(in_data, W, pre_sup);
+		update_all(graph, pre_sup, out_data); // aggregate
 		if (act_) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				relu(out_data[i], out_data[i]);
@@ -50,7 +66,6 @@ public:
 
 	// 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
-		//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
 		size_t x = output_dims[0];
 		size_t y = input_dims[1];
 		size_t z = output_dims[1];
@@ -67,7 +82,13 @@ public:
 		transpose(y, z, W, trans_W);
 		matmul(grad_temp, trans_W, in_grad); // x*z; z*y; x*y
 		//d_update_all(out_grad, ); //
+		if (dropout_) {
+			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
+				d_dropout(in_grad[i], dropout_mask[i], in_grad[i]);
+			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_dropout"));
+		}
 
+		// calculate weight gradients
 		tensor_t trans_data(y); // y*x
 		for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
 		transpose2D(in_data, trans_data);
@@ -86,6 +107,9 @@ public:
 
 private:
 	Graph *graph;
+	tensor_t pre_sup;
+	tensor_t dropout_data;
+	std::vector<std::vector<unsigned> > dropout_mask;
 
 	// Glorot & Bengio (AISTATS 2010) init
 	inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
@@ -98,9 +122,6 @@ private:
 			for (size_t j = 0; j < dim_y; ++j)
 				matrix[i*dim_y+j] = dist(rng);
 		}
-		//for (size_t i = 0; i < 3; ++i)
-		//	for (size_t j = 0; j < 3; ++j)
-		//		std::cout << "matrix[" << i << "][" << j << "]: " << matrix[i][j] << std::endl;
 	}
 	inline void zero_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
 		matrix.resize(dim_x * dim_y);
