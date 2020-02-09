@@ -30,8 +30,8 @@
 class layer : public node {
 public:
 	layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
-		node(in_dims.size(), out_dims.size()),
-		act_(false), dropout_(false), level_(level), num_dims(in_dims.size()),
+		node(in_dims.size(), out_dims.size()), act_(false), dropout_(false), 
+		level_(level), begin_(0), end_(0), num_dims(in_dims.size()),
 		input_dims(in_dims), output_dims(out_dims) { add_edge(); }
 	virtual ~layer() = default;
 	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data) = 0;
@@ -50,6 +50,10 @@ public:
 		std::cout << "Layer" << level_ << " type: " << layer_type()
 			<< " input[" << input_dims[0] << "," << input_dims[1] 
 			<< "] output[" << output_dims[0] << "," << output_dims[1] << "]\n";
+	}
+	virtual void set_sample_range(size_t sample_begin, size_t sample_end) {
+		begin_ = sample_begin;
+		end_ = sample_end;
 	}
 	void set_in_data(tensor_t data) {
 		prev_ = std::make_shared<edge>(this, input_dims[1]);
@@ -94,23 +98,19 @@ public:
 		opt->update(weight_grad, W, parallel); // W += grad
 		prev()->clear_grads();
 	}
-	inline acc_t get_masked_loss(MaskList &masks) {
-		size_t n = loss.size();
-		assert(n > 0);
-		acc_t sum_mask = std::accumulate(masks.begin(), masks.end(), (acc_t)0);
-		acc_t avg_mask = sum_mask / (acc_t)n;
-		assert(avg_mask > 0.0);
-		for (size_t i = 0; i < n; i ++) {
-			loss[i] = loss[i] * (acc_t)(masks[i]) / avg_mask;
-		}
-		acc_t sum_loss = std::accumulate(loss.begin(), loss.end(), (acc_t)0);
-		return sum_loss / (acc_t)n;
+	inline acc_t get_masked_loss() {
+		acc_t total_loss = acc_t(0);
+		for (size_t i = begin_; i < end_; i ++)
+			total_loss += loss[i];
+		return total_loss / (acc_t)(end_ - begin_);
 	}
 
 protected:
 	bool act_; // whether to use activation function at the end
 	bool dropout_; // whether to use dropout at first
 	unsigned level_;
+	size_t begin_;
+	size_t end_;
 	size_t num_dims;
 	std::vector<size_t> input_dims;
 	std::vector<size_t> output_dims;

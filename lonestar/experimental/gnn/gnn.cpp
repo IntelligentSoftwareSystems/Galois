@@ -58,18 +58,13 @@ int main(int argc, char** argv) {
 	model.train(opt);
 	Ttrain.stop();
 
-	acc_t test_cost = 0.0, test_acc = 0.0;
+	acc_t test_loss = 0.0, test_acc = 0.0;
 	size_t n = model.get_nnodes();
-	MaskList test_mask(n, 0);
-	for (size_t i = 0; i < n; i++)
-		if (i >= 2312) test_mask[i] = 1; // [2312, 3327) test size = 1015
-	LabelList y_test;
-	y_test.resize(n);
-	for (size_t i = 0; i < n; i ++) y_test[i] = (test_mask[i] == 1 ? model.get_label(i) : -1);
+	size_t test_begin = 2312, test_end = n; // [2312, 3327) test size = 1015
 	galois::StatTimer Ttest("Test");
 	Ttest.start();
-	double test_time = model.evaluate(y_test, test_mask, test_cost, test_acc);
-	std::cout << "\nTesting: test_loss = " << test_cost << " test_acc = " << test_acc << " test_time = " << test_time << "\n";
+	double test_time = model.evaluate(test_begin, test_end, test_loss, test_acc);
+	std::cout << "\nTesting: test_loss = " << test_loss << " test_acc = " << test_acc << " test_time = " << test_time << "\n";
 	Ttest.stop();
 
 	std::cout << "\n" << rm.get_peak_memory() << "\n\n";

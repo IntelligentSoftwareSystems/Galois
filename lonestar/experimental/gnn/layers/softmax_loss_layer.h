@@ -21,7 +21,7 @@ public:
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
 		//std::cout << name_ << " forward: in_x=" << in_data.size() << ", in_y=" 
 		//	<< in_data[0].size() << ", out_y=" << out_data[0].size() << "\n";
-		galois::do_all(galois::iterate((size_t)0, output_dims[0]), [&](const auto& i) {
+		galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 			if ((*labels)[i] >= 0) { // masked
 				softmax(in_data[i], out_data[i]); // normalize using softmax
 				// y is a one hot encoded vector for the labels
@@ -45,7 +45,7 @@ public:
 
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
 		//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
-		galois::do_all(galois::iterate((size_t)0, output_dims[0]), [&](const auto& i) {
+		galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 			vec_t norm_grad(output_dims[1]);
 			std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
 			y[(*labels)[i]] = 1.0;

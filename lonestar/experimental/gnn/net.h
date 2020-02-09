@@ -35,7 +35,7 @@ public:
 
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
-		set_masks(n, train_mask, val_mask);
+		set_masks(train_mask, val_mask);
 		y_train.resize(n, 0);
 		y_val.resize(n, 0);
 		for (size_t i = 0; i < n; i ++) y_train[i] = (train_mask[i] == 1 ? labels[i] : -1);
@@ -73,21 +73,17 @@ public:
 	size_t get_ft_dim() { return feature_dims[0]; }
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
-
-	// forward propagation
-	void fprop(LabelList labels, MaskList masks, acc_t &loss, acc_t &accuracy) {
+	void set_val_range() { layers[num_layers-1]->set_sample_range(val_begin, val_end); }
+	// forward propagation: [begin, end) is the range of samples used.
+	acc_t fprop(size_t begin, size_t end) {
+		// set mask for the last layer
+		layers[num_layers-1]->set_sample_range(begin, end);
 		// layer0: from N x D to N x 16
 		// layer1: from N x 16 to N x E
 		// layer2: from N x E to N x E (normalize only)
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->forward();
-		loss = layers[num_layers-1]->get_masked_loss(masks);
-
-		// comparing outputs (N x E) with the ground truth (labels)
-		LabelList predictions(n);
-		for (size_t i = 0; i < n; i ++)
-			predictions[i] = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
-		accuracy = masked_accuracy(predictions, labels, masks);
+		return layers[num_layers-1]->get_masked_loss();
 	}
 
 	// back propogation
@@ -101,10 +97,11 @@ public:
 	}
 
 	// evaluate, i.e. inference or predict
-	double evaluate(LabelList labels, MaskList masks, acc_t &loss, acc_t &acc) {
+	double evaluate(size_t begin, size_t end, acc_t &loss, acc_t &acc) {
 		Timer t_eval;
 		t_eval.Start();
-		fprop(labels, masks, loss, acc);
+		loss = fprop(begin, end);
+		acc = masked_accuracy(begin, end);
 		t_eval.Stop();
 		return t_eval.Millisecs();
 	}
@@ -120,14 +117,15 @@ public:
 
 			// Training step
 			acc_t train_loss = 0.0, train_acc = 0.0;
-			fprop(y_train, train_mask, train_loss, train_acc);
+			train_loss = fprop(train_begin, train_end);
+			train_acc = masked_accuracy(train_begin, train_end);
 			bprop(); // back propogation
 			update_weights(opt);
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation
 			acc_t val_loss = 0.0, val_acc = 0.0;
-			double val_time = evaluate(y_val, val_mask, val_loss, val_acc);
+			double val_time = evaluate(val_begin, val_end, val_loss, val_acc);
 			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
 
 			t_epoch.Stop();
@@ -147,6 +145,7 @@ protected:
 	std::vector<label_t> labels; // labels for classification: N x 1
 	LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
+	size_t train_begin, train_end, val_begin, val_end;
 
 	std::vector<layer *> layers; // all the layers in the neural network
 	/*
@@ -183,8 +182,6 @@ protected:
 			}
 			v ++;
 		}
-		//for (size_t i = 0; i < 10; ++i)
-		//	std::cout << "labels[" << i << "]: " << labels[i] << std::endl;
 		return n;
 	}
 
@@ -273,12 +270,28 @@ protected:
 		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
 	}
 
-	void set_masks(size_t n, MaskList &train_mask, MaskList &val_mask) {
-		for (size_t i = 0; i < n; i++) {
+	void set_masks(MaskList &train_mask, MaskList &val_mask) {
+		set_citeseer_masks(train_mask, val_mask);
+	}
+	void set_citeseer_masks(MaskList &train_mask, MaskList &val_mask) {
+		train_begin = 0;
+		train_end = 120;
+		val_begin = 120;
+		val_end = 620;
+		for (size_t i = 0; i < train_mask.size(); i++) {
 			if (i < 120) train_mask[i] = 1; // [0, 120) train size = 120
 			else if (i < 620) val_mask[i] = 1; // [120, 620) validation size = 500
 			else ; // unlabeled vertices
 		}
+	}
+	inline acc_t masked_accuracy(size_t begin, size_t end) {
+		// comparing outputs with the ground truth (labels)
+		acc_t accuracy_all = 0.0;
+		for (size_t i = begin; i < end; i++) {
+			int prediction = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
+			if ((label_t)prediction == labels[i]) accuracy_all += 1.0;
+		}
+		return accuracy_all / (acc_t)(end-begin);
 	}
 };
 

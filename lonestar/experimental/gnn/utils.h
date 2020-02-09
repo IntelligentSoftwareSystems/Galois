@@ -48,16 +48,3 @@ private:
 	struct timeval elapsed_time_;
 };
 
-inline acc_t masked_accuracy(LabelList &preds, LabelList &labels, MaskList &masks) {
-	size_t n = labels.size();
-	std::vector<acc_t> accuracy_all(n, 0.0);
-	for (size_t i = 0; i < n; i++)
-		if (preds[i] == labels[i]) accuracy_all[i] = 1.0;
-	auto sum_mask = std::accumulate(masks.begin(), masks.end(), (int)0);
-	acc_t avg_mask = (acc_t)sum_mask / (acc_t)n;
-	for (size_t i = 0; i < n; i ++) 
-		accuracy_all[i] = accuracy_all[i] * (acc_t)masks[i] / avg_mask;
-	acc_t sum_accuracy_all = std::accumulate(accuracy_all.begin(), accuracy_all.end(), (acc_t)0);
-	return sum_accuracy_all / (acc_t)n;
-}
-
