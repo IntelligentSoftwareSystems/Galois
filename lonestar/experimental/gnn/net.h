@@ -2,15 +2,12 @@
 #define _MODEL_H_
 
 #include <random>
-#include "types.h"
-#include "utils.h"
+#include "gnn.h"
 #include "lgraph.h"
 #include "layers.h"
 #include "optimizer.h"
-#include "math_functions.hpp"
 
 #define NUM_CONV_LAYERS 2
-std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
 
 // N: number of vertices, D: feature vector dimentions, 
 // E: number of distinct labels, i.e. number of vertex classes
@@ -35,11 +32,14 @@ public:
 
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
-		set_masks(train_mask, val_mask);
-		y_train.resize(n, 0);
-		y_val.resize(n, 0);
-		for (size_t i = 0; i < n; i ++) y_train[i] = (train_mask[i] == 1 ? labels[i] : -1);
-		for (size_t i = 0; i < n; i ++) y_val[i] = (val_mask[i] == 1 ? labels[i] : -1);
+		//set_masks(dataset, train_mask, val_mask);
+		train_end = 120; val_end = 620; // TODO: supposed to be read from file
+		train_count = read_masks(dataset, "train", train_begin, train_end, train_mask);
+		val_count = read_masks(dataset, "val", val_begin, val_end, val_mask);
+		//y_train.resize(n, 0);
+		//y_val.resize(n, 0);
+		//for (size_t i = 0; i < n; i ++) y_train[i] = (train_mask[i] == 1 ? labels[i] : -1);
+		//for (size_t i = 0; i < n; i ++) y_val[i] = (val_mask[i] == 1 ? labels[i] : -1);
 
 		num_layers = NUM_CONV_LAYERS + 1;
 		feature_dims.resize(num_layers + 1);
@@ -105,9 +105,9 @@ public:
 	size_t get_label(size_t i) { return labels[i]; }
 
 	// forward propagation: [begin, end) is the range of samples used.
-	acc_t fprop(size_t begin, size_t end) {
+	acc_t fprop(size_t begin, size_t end, size_t count, MaskList &masks) {
 		// set mask for the last layer
-		layers[num_layers-1]->set_sample_range(begin, end);
+		layers[num_layers-1]->set_sample_mask(begin, end, count, masks);
 		// layer0: from N x D to N x 16
 		// layer1: from N x 16 to N x E
 		// layer2: from N x E to N x E (normalize only)
@@ -129,11 +129,11 @@ public:
 	}
 
 	// evaluate, i.e. inference or predict
-	double evaluate(size_t begin, size_t end, acc_t &loss, acc_t &acc) {
+	double evaluate(size_t begin, size_t end, size_t count, MaskList &masks, acc_t &loss, acc_t &acc) {
 		Timer t_eval;
 		t_eval.Start();
-		loss = fprop(begin, end);
-		acc = masked_accuracy(begin, end);
+		loss = fprop(begin, end, count, masks);
+		acc = masked_accuracy(begin, end, count, masks);
 		t_eval.Stop();
 		return t_eval.Millisecs();
 	}
@@ -149,15 +149,15 @@ public:
 
 			// training steps
 			acc_t train_loss = 0.0, train_acc = 0.0;
-			train_loss = fprop(train_begin, train_end); // forward
-			train_acc = masked_accuracy(train_begin, train_end); // predict
+			train_loss = fprop(train_begin, train_end, train_count, train_mask); // forward
+			train_acc = masked_accuracy(train_begin, train_end, train_count, train_mask); // predict
 			bprop(); // back propogation
 			update_weights(opt); // update parameters
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation
 			acc_t val_loss = 0.0, val_acc = 0.0;
-			double val_time = evaluate(val_begin, val_end, val_loss, val_acc);
+			double val_time = evaluate(val_begin, val_end, val_count, val_mask, val_loss, val_acc);
 			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
 
 			t_epoch.Stop();
@@ -175,9 +175,9 @@ protected:
 	Graph g; // the input graph, |V| = N
 	FV2D input_features; // input features: N x D
 	std::vector<label_t> labels; // labels for classification: N x 1
-	LabelList y_train, y_val; // labels for traning and validation
+	//LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
-	size_t train_begin, train_end, val_begin, val_end;
+	size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
 
 	std::vector<layer *> layers; // all the layers in the neural network
 	/*
@@ -214,6 +214,7 @@ protected:
 			}
 			v ++;
 		}
+		in.close();
 		return n;
 	}
 
@@ -246,6 +247,7 @@ protected:
 				if (feats[i][j] > 0)
 					std::cout << "feats[" << i << "][" << j << "]: " << feats[i][j] << std::endl;
 		//*/
+		in.close();
 		return n;
 	}
 
@@ -302,28 +304,38 @@ protected:
 		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
 	}
 
-	void set_masks(MaskList &train_mask, MaskList &val_mask) {
-		set_citeseer_masks(train_mask, val_mask);
-	}
-	void set_citeseer_masks(MaskList &train_mask, MaskList &val_mask) {
-		train_begin = 0;
-		train_end = 120;
-		val_begin = 120;
-		val_end = 620;
-		for (size_t i = 0; i < train_mask.size(); i++) {
-			if (i < 120) train_mask[i] = 1; // [0, 120) train size = 120
-			else if (i < 620) val_mask[i] = 1; // [120, 620) validation size = 500
-			else ; // unlabeled vertices
+	void set_masks(std::string dataset_str, MaskList &train_mask, MaskList &val_mask) {
+		if (dataset_str == "citeseer") {
+			train_begin = 0;
+			train_end = 120;
+			val_begin = 120;
+			val_end = 620;
+			// TODO: supposed to be read from file
+			for (size_t i = 0; i < train_mask.size(); i++) {
+				if (i < 120) train_mask[i] = 1; // [0, 120) train size = 120
+				else if (i < 620) val_mask[i] = 1; // [120, 620) validation size = 500
+				else ; // unlabeled vertices
+			}
+			train_count = train_end - train_begin;
+			val_count = val_end - val_begin;
+		} else {
+			std::cout << "Currently not supported\n";
+			exit(1);
 		}
 	}
-	inline acc_t masked_accuracy(size_t begin, size_t end) {
+	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
 		// comparing outputs with the ground truth (labels)
 		acc_t accuracy_all = 0.0;
+		size_t valid_sample_count = 0;
 		for (size_t i = begin; i < end; i++) {
-			int prediction = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
-			if ((label_t)prediction == labels[i]) accuracy_all += 1.0;
+			if (masks[i] == 1) {
+				int prediction = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
+				if ((label_t)prediction == labels[i]) accuracy_all += 1.0;
+				valid_sample_count ++;
+			}
 		}
-		return accuracy_all / (acc_t)(end-begin);
+		assert(valid_sample_count == count);
+		return accuracy_all / (acc_t)count;
 	}
 };
 

@@ -51,9 +51,11 @@ public:
 			<< " input[" << input_dims[0] << "," << input_dims[1] 
 			<< "] output[" << output_dims[0] << "," << output_dims[1] << "]\n";
 	}
-	virtual void set_sample_range(size_t sample_begin, size_t sample_end) {
+	virtual void set_sample_mask(size_t sample_begin, size_t sample_end, size_t sample_count, MaskList &masks) {
 		begin_ = sample_begin;
 		end_ = sample_end;
+		count_ = sample_count;
+		masks_ = masks;
 	}
 	void set_in_data(tensor_t data) {
 		prev_ = std::make_shared<edge>(this, input_dims[1]);
@@ -100,25 +102,33 @@ public:
 	}
 	inline acc_t get_masked_loss() {
 		acc_t total_loss = acc_t(0);
-		for (size_t i = begin_; i < end_; i ++)
-			total_loss += loss[i];
-		return total_loss / (acc_t)(end_ - begin_);
+		size_t valid_sample_count = 0;
+		for (size_t i = begin_; i < end_; i ++) {
+			if (masks_[i]) {
+				total_loss += loss[i];
+				valid_sample_count ++;
+			}
+		}
+		assert(valid_sample_count == count_);
+		return total_loss / (acc_t)count_;
 	}
 
 protected:
 	bool act_; // whether to use activation function at the end
 	bool dropout_; // whether to use dropout at first
-	unsigned level_;
-	size_t begin_;
-	size_t end_;
-	size_t num_dims;
-	std::vector<size_t> input_dims;
-	std::vector<size_t> output_dims;
-	std::string name_;
-	bool trainable_;
+	unsigned level_; // layer id: [0, num_layers-1]
+	size_t begin_; // sample begin index
+	size_t end_; // sample end index
+	size_t count_; // number of samples
+	MaskList masks_; // masks to show which samples are valid
+	size_t num_dims; // number of dimensions
+	std::vector<size_t> input_dims; // input dimensions
+	std::vector<size_t> output_dims; // output dimentions
+	std::string name_; // name of this layer
+	bool trainable_; // is this layer trainable
 	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
-	vec_t weight_grad;
+	vec_t weight_grad; // weight gradient for updating parameters
 	vec_t loss; // error for each vertex: N x 1
 };
 
