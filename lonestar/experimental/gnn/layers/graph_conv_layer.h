@@ -27,21 +27,31 @@ public:
 		dropout_ = dropout;
 		if (dropout_) {
 			dropout_mask.resize(input_dims[0]);
-			dropout_data.resize(input_dims[0]);
+			in_temp.resize(input_dims[0]);
 			for (size_t i = 0; i < input_dims[0]; i++) {
 				dropout_mask[i].resize(input_dims[1]);
-				dropout_data[i].resize(input_dims[1]);
+				in_temp[i].resize(input_dims[1]);
 			}
 		}
-		pre_sup.resize(output_dims[0]); // pre_sup: same as it is in original GCN implementation
-		for (size_t i = 0; i < input_dims[0]; ++i) pre_sup[i].resize(output_dims[1]);
+		out_temp.resize(output_dims[0]); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
+		for (size_t i = 0; i < input_dims[0]; ++i) out_temp[i].resize(output_dims[1]);
 	}
 	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
 		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, in_dims, out_dims) {}
-
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
-	//void setup(Graph *g, vec_t *d, LabelList *lab) override { graph = g; }
+
+	// user-defined aggregate function
+	void aggregate(Graph *g, const tensor_t &in, tensor_t &out) { update_all(g, in, out); }
+
+	// user-defined combine function
+	void combine(const vec_t &self, const vec_t &neighbors, const vec_t mat_v, const vec_t mat_u, vec_t &out) {
+		vec_t a(out.size(), 0);
+		vec_t b(out.size(), 0);
+		mvmul(mat_v, self, a);
+		mvmul(mat_u, neighbors, b); 
+		vadd(a, b, out); // out = W*self + Q*neighbors
+	}
 
 	// 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
@@ -52,11 +62,11 @@ public:
 		if (dropout_) {
 			for (size_t i = 0; i < x; ++i) {
 			//galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-				dropout(in_data[i], dropout_mask[i], dropout_data[i]);
+				dropout(in_data[i], dropout_mask[i], in_temp[i]);
 			}//, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("dropout"));
-			matmul(dropout_data, W, pre_sup);
-		} else matmul(in_data, W, pre_sup);
-		update_all(graph, pre_sup, out_data); // aggregate
+			matmul(in_temp, W, out_temp); // x*y; y*z; x*z
+		} else matmul(in_data, W, out_temp); // matrix multiply feature vector
+		aggregate(graph, out_temp, out_data); // aggregate
 		if (act_) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				relu(out_data[i], out_data[i]);
@@ -69,46 +79,37 @@ public:
 		size_t x = output_dims[0];
 		size_t y = input_dims[1];
 		size_t z = output_dims[1];
-		tensor_t grad_temp = out_grad;
+		out_temp = out_grad;
 		if (act_) {
 			//for (size_t j = 0; j < z; ++j) 
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				for (size_t j = 0; j < z; ++j) 
-					//grad_temp[i*z+j] = out_grad[i][j] * (out_data[i][j] > 0.0);
-					if (out_data[i][j] <= 0.0) grad_temp[i][j] = 0.0;
+					if (out_data[i][j] <= 0.0) out_temp[i][j] = 0.0;
 			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_relu"));
 		}
-		vec_t trans_W(z*y);
-		transpose(y, z, W, trans_W);
-		matmul(grad_temp, trans_W, in_grad); // x*z; z*y; x*y
-		//d_update_all(out_grad, ); //
-		if (dropout_) {
-			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-				d_dropout(in_grad[i], dropout_mask[i], in_grad[i]);
-			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_dropout"));
+		if (level_ != 0) { // no need to calculate in_grad for the first layer
+			vec_t trans_W(z*y);
+			transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
+			matmul(out_temp, trans_W, in_temp); // x*z; z*y -> x*y
+			update_all(graph, in_temp, in_grad); // x*x; x*y -> x*y NOTE: since graph is symmetric, the derivative is the same
+			if (dropout_) {
+				galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
+					d_dropout(in_grad[i], dropout_mask[i], in_grad[i]);
+				}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_dropout"));
+			}
 		}
 
 		// calculate weight gradients
 		tensor_t trans_data(y); // y*x
 		for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
 		transpose2D(in_data, trans_data);
-		matmul2D1D(trans_data, grad_temp, weight_grad); // y*x; x*z; y*z
-		/*
-		for (size_t i = 0; i < 3; i ++)
-			for (size_t j = 0; j < 2; j ++) {
-				std::cout << "out_data[" << i << "][" << j << "]=" << out_data[i][j] << "\n";
-				std::cout << "out_grad[" << i << "][" << j << "]=" << out_grad[i][j] << "\n";
-				std::cout << "grad_temp[" << i << "][" << j << "]=" << grad_temp[i][j] << "\n";
-				std::cout << "trans_data[" << i << "][" << j << "]=" << trans_data[i][j] << "\n";
-			}
-		for (size_t i = 0; i < 6; i ++) std::cout << "weight_grad[" << i << "]=" << weight_grad[i] << "\n";
-		//*/
+		matmul2D1D(trans_data, out_temp, weight_grad); // y*x; x*z; y*z
 	}
 
 private:
 	Graph *graph;
-	tensor_t pre_sup;
-	tensor_t dropout_data;
+	tensor_t out_temp;
+	tensor_t in_temp;
 	std::vector<std::vector<unsigned> > dropout_mask;
 
 	// Glorot & Bengio (AISTATS 2010) init

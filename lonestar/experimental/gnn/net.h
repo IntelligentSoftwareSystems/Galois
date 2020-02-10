@@ -48,8 +48,13 @@ public:
 		feature_dims[1] = hidden1; // hidden1 level embedding: 16
 		feature_dims[2] = num_classes; // output embedding: E
 		feature_dims[3] = num_classes; // normalized output embedding: E
-
 		layers.resize(num_layers);
+		construct_layers();
+	}
+	size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
+	size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id+1]; }
+
+	void construct_layers() {
 		std::vector<size_t> in_dims(2), out_dims(2);
 		in_dims[0] = out_dims[0] = n;
 		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
@@ -64,16 +69,41 @@ public:
 		connect(layers[0], layers[1]);
 		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &labels);
 		connect(layers[1], layers[2]);
+		print_layers_info();
+	}
 
+	void print_layers_info() {
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->print_layer_info();
 	}
+
+	void append_conv_layer(size_t layer_id, bool act, bool dropout = true, bool bias = false) {
+		assert(layer_id < NUM_CONV_LAYERS);
+		std::vector<size_t> in_dims(2), out_dims(2);
+		in_dims[0] = out_dims[0] = n;
+		in_dims[1] = get_in_dim(layer_id);
+		out_dims[1] = get_out_dim(layer_id);
+		layers[layer_id] = new graph_conv_layer(layer_id, &g, dropout, in_dims, out_dims);
+		layers[layer_id]->set_act(act);
+		if(layer_id > 0) connect(layers[layer_id-1], layers[layer_id]);
+	}
+
+	void append_out_layer(size_t layer_id) {
+		assert(layer_id > 0); // can not be the first layer
+		std::vector<size_t> in_dims(2), out_dims(2);
+		in_dims[0] = out_dims[0] = n;
+		in_dims[1] = get_in_dim(layer_id);
+		out_dims[1] = get_out_dim(layer_id);
+		layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims, &labels);
+		connect(layers[layer_id-1], layers[layer_id]);
+	}
+
 	size_t get_nnodes() { return n; }
 	size_t get_nedges() { return g.sizeEdges(); }
 	size_t get_ft_dim() { return feature_dims[0]; }
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
-	void set_val_range() { layers[num_layers-1]->set_sample_range(val_begin, val_end); }
+
 	// forward propagation: [begin, end) is the range of samples used.
 	acc_t fprop(size_t begin, size_t end) {
 		// set mask for the last layer
@@ -91,6 +121,8 @@ public:
 		for (size_t i = num_layers; i != 0; i --)
 			layers[i-1]->backward();
 	}
+
+	// update trainable weights after back-propagation
 	void update_weights(optimizer *opt) {
 		for (size_t i = 0; i < num_layers; i ++)
 			if (layers[i]->trainable()) layers[i]->update_weight(opt);
@@ -106,6 +138,7 @@ public:
 		return t_eval.Millisecs();
 	}
 
+	// training
 	void train(optimizer *opt) {
 		std::cout << "\nStart training...\n";
 		Timer t_epoch;
@@ -113,14 +146,13 @@ public:
 		for (size_t i = 0; i < epochs; i++) {
 			std::cout << "Epoch " << std::setw(2) << i << std::fixed << std::setprecision(3) << ":";
 			t_epoch.Start();
-			// Construct feed dictionary
 
-			// Training step
+			// training steps
 			acc_t train_loss = 0.0, train_acc = 0.0;
-			train_loss = fprop(train_begin, train_end);
-			train_acc = masked_accuracy(train_begin, train_end);
+			train_loss = fprop(train_begin, train_end); // forward
+			train_acc = masked_accuracy(train_begin, train_end); // predict
 			bprop(); // back propogation
-			update_weights(opt);
+			update_weights(opt); // update parameters
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation

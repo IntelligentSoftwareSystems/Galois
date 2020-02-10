@@ -22,4 +22,6 @@ static cll::opt<float> early_stopping("es", cll::desc("Tolerance for early stopp
 static cll::opt<unsigned> max_degree("md", cll::desc("Maximum Chebyshev polynomial degree (default value 3)"), cll::init(3));
 #define CHUNK_SIZE 256
 
+#include "net.h"
+
 #endif
