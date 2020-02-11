@@ -51,27 +51,23 @@ private:
 };
 
 size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin, size_t &end, MaskList &masks) {
-	if (dataset_str != "citeseer") {
+	if (dataset_str != "citeseer" && dataset_str != "cora") {
 		std::cout << "Dataset currently not supported\n";
 		exit(1);
 	}
 	size_t i = 0;
 	size_t sample_count = 0;
-	bool first_found = false;
 	std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
 	//std::cout << "Reading " << filename << "\n";
 	std::ifstream in;
 	std::string line;
 	in.open(filename, std::ios::in);
+	in >> begin >> end >> std::ws;
 	while (std::getline(in, line)) {
 		std::istringstream mask_stream(line);
-		mask_stream >> masks[i];
-		if (masks[i] == 1) {
-			sample_count ++;
-			if (first_found == false) {
-				begin = i;
-				first_found = true;
-			}
+		if (i >= begin && i < end) {
+			mask_stream >> masks[i];
+			if (masks[i] == 1) sample_count ++;
 		}
 		i ++;
 	} 

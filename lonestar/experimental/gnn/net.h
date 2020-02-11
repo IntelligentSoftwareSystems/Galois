@@ -32,14 +32,8 @@ public:
 
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
-		//set_masks(dataset, train_mask, val_mask);
-		train_end = 120; val_end = 620; // TODO: supposed to be read from file
 		train_count = read_masks(dataset, "train", train_begin, train_end, train_mask);
 		val_count = read_masks(dataset, "val", val_begin, val_end, val_mask);
-		//y_train.resize(n, 0);
-		//y_val.resize(n, 0);
-		//for (size_t i = 0; i < n; i ++) y_train[i] = (train_mask[i] == 1 ? labels[i] : -1);
-		//for (size_t i = 0; i < n; i ++) y_val[i] = (val_mask[i] == 1 ? labels[i] : -1);
 
 		num_layers = NUM_CONV_LAYERS + 1;
 		feature_dims.resize(num_layers + 1);
@@ -49,29 +43,15 @@ public:
 		feature_dims[2] = num_classes; // output embedding: E
 		feature_dims[3] = num_classes; // normalized output embedding: E
 		layers.resize(num_layers);
-		construct_layers();
-		print_layers_info();
 	}
 	size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
 	size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id+1]; }
-
+	size_t get_nnodes() { return n; }
+	size_t get_nedges() { return g.sizeEdges(); }
+	size_t get_ft_dim() { return feature_dims[0]; }
+	size_t get_nclasses() { return num_classes; }
+	size_t get_label(size_t i) { return labels[i]; }
 	void construct_layers() {
-		/*
-		std::vector<size_t> in_dims(2), out_dims(2);
-		in_dims[0] = out_dims[0] = n;
-		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
-			in_dims[1] = feature_dims[i];
-			out_dims[1] = feature_dims[i+1];
-			layers[i] = new graph_conv_layer(i, &g, true, in_dims, out_dims);
-		}
-		layers[0]->set_act(true);
-		layers[0]->set_in_data(input_features);
-		in_dims[1] = feature_dims[2];
-		out_dims[1] = feature_dims[3];
-		connect(layers[0], layers[1]);
-		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &labels);
-		connect(layers[1], layers[2]);
-		*/
 		append_conv_layer(0, true); // first conv layer
 		append_conv_layer(1); // hidden1 layer
 		append_out_layer(2); // output layer
@@ -102,12 +82,6 @@ public:
 		layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims, &labels);
 		connect(layers[layer_id-1], layers[layer_id]);
 	}
-
-	size_t get_nnodes() { return n; }
-	size_t get_nedges() { return g.sizeEdges(); }
-	size_t get_ft_dim() { return feature_dims[0]; }
-	size_t get_nclasses() { return num_classes; }
-	size_t get_label(size_t i) { return labels[i]; }
 
 	// forward propagation: [begin, end) is the range of samples used.
 	acc_t fprop(size_t begin, size_t end, size_t count, MaskList &masks) {
@@ -146,6 +120,9 @@ public:
 	// training
 	void train(optimizer *opt) {
 		std::cout << "\nStart training...\n";
+		galois::StatTimer Tupdate("WeightUpdate");
+		galois::StatTimer Tfw("Forward");
+		galois::StatTimer Tbw("Backward");
 		Timer t_epoch;
 		// run epoches
 		for (size_t i = 0; i < epochs; i++) {
@@ -154,10 +131,16 @@ public:
 
 			// training steps
 			acc_t train_loss = 0.0, train_acc = 0.0;
+			Tfw.start();
 			train_loss = fprop(train_begin, train_end, train_count, train_mask); // forward
 			train_acc = masked_accuracy(train_begin, train_end, train_count, train_mask); // predict
+			Tfw.stop();
+			Tbw.start();
 			bprop(); // back propogation
+			Tbw.stop();
+			Tupdate.start();
 			update_weights(opt); // update parameters
+			Tupdate.stop();
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation
@@ -308,7 +291,7 @@ protected:
 		//printf("Done readGraph\n");
 		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
 	}
-
+/*
 	void set_masks(std::string dataset_str, MaskList &train_mask, MaskList &val_mask) {
 		if (dataset_str == "citeseer") {
 			train_begin = 0;
@@ -328,6 +311,7 @@ protected:
 			exit(1);
 		}
 	}
+*/
 	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
 		// comparing outputs with the ground truth (labels)
 		acc_t accuracy_all = 0.0;

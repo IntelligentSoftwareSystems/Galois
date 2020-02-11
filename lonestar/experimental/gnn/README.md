@@ -29,6 +29,7 @@ RUN
 The following are a few example command lines.
 
 $ ./gnn citeseer -t=56 -k=3
+$ ./gnn cora -t=14 -k=3
 
 PERFORMANCE
 ===========

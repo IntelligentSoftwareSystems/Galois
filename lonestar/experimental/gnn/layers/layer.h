@@ -99,16 +99,22 @@ public:
 		prev()->clear_grads();
 	}
 	inline acc_t get_masked_loss() {
-		acc_t total_loss = acc_t(0);
-		size_t valid_sample_count = 0;
-		for (size_t i = begin_; i < end_; i ++) {
+		//acc_t total_loss = acc_t(0);
+		//size_t valid_sample_count = 0;
+		AccumF total_loss;
+		AccumU valid_sample_count;
+		total_loss.reset();
+		valid_sample_count.reset();
+		//for (size_t i = begin_; i < end_; i ++) {
+		galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 			if (masks_[i]) {
 				total_loss += loss[i];
-				valid_sample_count ++;
+				valid_sample_count += 1;
 			}
-		}
-		assert(valid_sample_count == count_);
-		return total_loss / (acc_t)count_;
+		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
+		//}
+		assert(valid_sample_count.reduce() == count_);
+		return total_loss.reduce() / (acc_t)count_;
 	}
 
 protected:
