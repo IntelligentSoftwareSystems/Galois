@@ -55,7 +55,6 @@ size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin,
 		std::cout << "Dataset currently not supported\n";
 		exit(1);
 	}
-
 	size_t i = 0;
 	size_t sample_count = 0;
 	bool first_found = false;

@@ -30,7 +30,7 @@
 class layer : public node {
 public:
 	layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
-		node(in_dims.size(), out_dims.size()), act_(false), dropout_(false), 
+		node(in_dims.size(), out_dims.size()), 
 		level_(level), begin_(0), end_(0), num_dims(in_dims.size()),
 		input_dims(in_dims), output_dims(out_dims) { add_edge(); }
 	virtual ~layer() = default;
@@ -40,8 +40,6 @@ public:
 	virtual std::string layer_type() const = 0;
 	//virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
 
-	void set_act(bool act) { act_ = act; }
-	void set_dropout(bool dropout) { dropout_ = dropout; }
 	void set_trainable(bool trainable) { trainable_ = trainable; }
 	bool trainable() const { return trainable_; }
 	void set_name(std::string name) { name_ = name; }
@@ -114,8 +112,6 @@ public:
 	}
 
 protected:
-	bool act_; // whether to use activation function at the end
-	bool dropout_; // whether to use dropout at first
 	unsigned level_; // layer id: [0, num_layers-1]
 	size_t begin_; // sample begin index
 	size_t end_; // sample end index

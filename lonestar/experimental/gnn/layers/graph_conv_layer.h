@@ -4,45 +4,52 @@
 /* GraphConv Layer
 	Parameters
 	----------
-	in_feats : int, Input feature size.
-	out_feats : int, Output feature size.
+	x: int, number of samples.
+	y: int, Input feature size.
+	z: int, Output feature size.
+	dropout: bool, optional, if True, a dropout operation is applied before other operations.
 	norm : bool, optional, if True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
-	bias : bool, optional, if True, adds a learnable bias to the output. Default: ``True``.
+	bias : bool, optional, if True, adds a learnable bias to the output. Default: ``False``.
 	activation: callable activation function/layer or None, optional
 	If not None, applies an activation function to the updated node features. Default: ``None``.
 */
 class graph_conv_layer: public layer {
 public:
-	graph_conv_layer(unsigned level, Graph *g, bool dropout,
+	graph_conv_layer(unsigned level, Graph *g, bool act, bool norm, bool bias, bool dropout,
 		std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
-		layer(level, in_dims, out_dims), graph(g) {
+		layer(level, in_dims, out_dims), graph(g), act_(act), norm_(norm), bias_(bias), dropout_(dropout) {
 		assert(input_dims[0] == output_dims[0]); // num_vertices
+		x = input_dims[0];
+		y = input_dims[1];
+		z = output_dims[1];
 		trainable_ = true;
-		// randomly initialize trainable parameters for conv layers
-		rand_init_matrix(input_dims[1], output_dims[1], W);
-		//rand_init_matrix(input_dims[1], output_dims[1], Q);
-		zero_init_matrix(input_dims[1], output_dims[1], weight_grad);
 		name_ = layer_type() + "_" + std::to_string(level);
+		std::cout << name_ << " constructed: act(" << act_ << ") dropout(" << dropout << ")\n";
+		init();
+	}
+	void init() {
+		// randomly initialize trainable parameters for conv layers
+		rand_init_matrix(y, z, W);
+		//rand_init_matrix(y, z, Q);
+		zero_init_matrix(y, z, weight_grad);
 		alloc_grad();
-		dropout_ = dropout;
 		if (dropout_) {
-			dropout_mask.resize(input_dims[0]);
-			in_temp.resize(input_dims[0]);
-			for (size_t i = 0; i < input_dims[0]; i++) {
-				dropout_mask[i].resize(input_dims[1]);
-				in_temp[i].resize(input_dims[1]);
-			}
+			dropout_mask.resize(x);
+			for (size_t i = 0; i < x; i++) dropout_mask[i].resize(y);
 		}
-		out_temp.resize(output_dims[0]); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
-		for (size_t i = 0; i < input_dims[0]; ++i) out_temp[i].resize(output_dims[1]);
+		in_temp.resize(x);
+		for (size_t i = 0; i < x; ++i) in_temp[i].resize(y);
+		out_temp.resize(x); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
+		for (size_t i = 0; i < x; ++i) out_temp[i].resize(z);
+		if (norm_) norm_factor_counting();
 	}
 	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
-		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, in_dims, out_dims) {}
+		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, true, false, true, in_dims, out_dims) {}
 	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
 
 	// user-defined aggregate function
-	void aggregate(Graph *g, const tensor_t &in, tensor_t &out) { update_all(g, in, out); }
+	void aggregate(Graph *g, const tensor_t &in, tensor_t &out) { update_all(g, in, out, true, norm_factor); }
 
 	// user-defined combine function
 	void combine(const vec_t &self, const vec_t &neighbors, const vec_t mat_v, const vec_t mat_u, vec_t &out) {
@@ -55,10 +62,10 @@ public:
 
 	// 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 	void forward_propagation(const tensor_t &in_data, tensor_t &out_data) override {
-		// if in_feats_dim > out_feats_dim:
+		// input: x*y; W: y*z; output: x*z
+		// if y > z:
 		// mult W first to reduce the feature size for aggregation
 		// else: aggregate first then mult W (not implemented yet)
-		size_t x = output_dims[0]; // input: x*y; W: y*z; output: x*z
 		if (dropout_) {
 			for (size_t i = 0; i < x; ++i) {
 			//galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
@@ -76,9 +83,6 @@ public:
 
 	// 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
-		size_t x = output_dims[0];
-		size_t y = input_dims[1];
-		size_t z = output_dims[1];
 		out_temp = out_grad;
 		if (act_) {
 			//for (size_t j = 0; j < z; ++j) 
@@ -91,7 +95,7 @@ public:
 			vec_t trans_W(z*y);
 			transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
 			matmul(out_temp, trans_W, in_temp); // x*z; z*y -> x*y
-			update_all(graph, in_temp, in_grad); // x*x; x*y -> x*y NOTE: since graph is symmetric, the derivative is the same
+			update_all(graph, in_temp, in_grad, true, norm_factor); // x*x; x*y -> x*y NOTE: since graph is symmetric, the derivative is the same
 			if (dropout_) {
 				galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 					d_dropout(in_grad[i], dropout_mask[i], in_grad[i]);
@@ -106,16 +110,43 @@ public:
 		matmul2D1D(trans_data, out_temp, weight_grad); // y*x; x*z; y*z
 	}
 
+	void degree_counting() {
+		assert(x == graph->size());
+		degrees.resize(x);
+		galois::do_all(galois::iterate((size_t)0, x), [&] (auto v) {
+			degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
+		}, galois::loopname("DegreeCounting"));
+	}
+
+	// for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
+	void norm_factor_counting() {
+		degree_counting();
+		norm_factor.resize(x);
+		galois::do_all(galois::iterate((size_t)0, x), [&] (auto v) {
+			float_t temp = std::sqrt(float_t(degrees[v]));
+			if (temp == 0.0) norm_factor[v] = 0.0;
+			else norm_factor[v] = 1.0 / temp;
+		}, galois::loopname("NormCounting"));
+	}
+
 private:
 	Graph *graph;
+	bool act_; // whether to use activation function at the end
+	bool norm_; // whether to normalize data
+	bool bias_; // whether to add bias afterwards
+	bool dropout_; // whether to use dropout at first
+	size_t x;
+	size_t y;
+	size_t z;
 	tensor_t out_temp;
 	tensor_t in_temp;
+	std::vector<unsigned> degrees;
+	std::vector<float_t> norm_factor; // normalization constant based on graph structure
 	std::vector<std::vector<unsigned> > dropout_mask;
 
 	// Glorot & Bengio (AISTATS 2010) init
 	inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {
 		auto init_range = sqrt(6.0/(dim_x + dim_y));
-		//std::cout << "Matrix init_range: (" << -init_range << ", " << init_range << ")\n";
 		std::default_random_engine rng;
 		std::uniform_real_distribution<float_t> dist(-init_range, init_range);
 		matrix.resize(dim_x * dim_y);

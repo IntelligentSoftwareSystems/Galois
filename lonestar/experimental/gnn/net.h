@@ -50,11 +50,13 @@ public:
 		feature_dims[3] = num_classes; // normalized output embedding: E
 		layers.resize(num_layers);
 		construct_layers();
+		print_layers_info();
 	}
 	size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
 	size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id+1]; }
 
 	void construct_layers() {
+		/*
 		std::vector<size_t> in_dims(2), out_dims(2);
 		in_dims[0] = out_dims[0] = n;
 		for (size_t i = 0; i < NUM_CONV_LAYERS; ++i) {
@@ -69,7 +71,11 @@ public:
 		connect(layers[0], layers[1]);
 		layers[2] = new softmax_loss_layer(2, in_dims, out_dims, &labels);
 		connect(layers[1], layers[2]);
-		print_layers_info();
+		*/
+		append_conv_layer(0, true); // first conv layer
+		append_conv_layer(1); // hidden1 layer
+		append_out_layer(2); // output layer
+		layers[0]->set_in_data(input_features); // feed input data
 	}
 
 	void print_layers_info() {
@@ -77,14 +83,13 @@ public:
 			layers[i]->print_layer_info();
 	}
 
-	void append_conv_layer(size_t layer_id, bool act, bool dropout = true, bool bias = false) {
+	void append_conv_layer(size_t layer_id, bool act = false, bool norm = true, bool bias = false, bool dropout = true) {
 		assert(layer_id < NUM_CONV_LAYERS);
 		std::vector<size_t> in_dims(2), out_dims(2);
 		in_dims[0] = out_dims[0] = n;
 		in_dims[1] = get_in_dim(layer_id);
 		out_dims[1] = get_out_dim(layer_id);
-		layers[layer_id] = new graph_conv_layer(layer_id, &g, dropout, in_dims, out_dims);
-		layers[layer_id]->set_act(act);
+		layers[layer_id] = new graph_conv_layer(layer_id, &g, act, norm, bias, dropout, in_dims, out_dims);
 		if(layer_id > 0) connect(layers[layer_id-1], layers[layer_id]);
 	}
 

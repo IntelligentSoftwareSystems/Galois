@@ -196,13 +196,20 @@ inline void clear(FV &in) {
 	for (size_t i = 0; i < in.size(); i++) in[i] = 0;
 }
 
-inline void update_all(Graph *g, const FV2D &in, FV2D &out) {
+inline void update_all(Graph *g, const FV2D &in, FV2D &out, bool norm, const vec_t norm_factor) {
 	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
 		clear(out[src]);
+		float_t a = 0.0, b = 0.0;
+		if (norm) a = norm_factor[src];
 		// gather neighbors' embeddings
 		for (const auto e : g->edges(src)) {
 			const auto dst = g->getEdgeDst(e);
-			vadd(out[src], in[dst], out[src]); // out[src] += in[dst]
+			if (norm) {
+				b = a * norm_factor[dst];
+				vec_t neighbor = in[dst];
+				mul_scalar(b, neighbor);
+				vadd(out[src], neighbor, out[src]); // out[src] += in[dst]
+			} else vadd(out[src], in[dst], out[src]); // out[src] += in[dst]
 		}
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
 }
