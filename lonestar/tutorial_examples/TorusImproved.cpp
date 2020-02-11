@@ -118,10 +118,7 @@ int main(int argc, char** argv) {
 
   galois::Timer T;
   T.start();
-  // Unlike galois::for_each, galois::for_each initially assigns work
-  // based on which thread created each node (galois::for_each uses a simple
-  // blocking of the iterator range to initialize work, but the iterator order
-  // of a Graph is implementation-defined).
+
   galois::for_each(galois::iterate(graph), [&](GNode n, auto& ctx) {
     // For each outgoing edge (n, dst)
     for (auto ii : graph.edges(n)) {
