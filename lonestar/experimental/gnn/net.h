@@ -18,10 +18,10 @@ public:
 	Net() {}
 
 	// user-defined aggregate function
-	virtual void aggregate(Graph *g, size_t dim, const FV2D &in_feats, FV2D &out_feats) {}
+	virtual void aggregate(Graph *g, size_t dim, const tensor_t &in_feats, tensor_t &out_feats) {}
 	
 	// user-defined combine function
-	virtual void combine(const vec_t ma, const vec_t mb, const FV &a, const FV &b, FV &out) {}
+	virtual void combine(const vec_t ma, const vec_t mb, const vec_t &a, const vec_t &b, vec_t &out) {}
 	
 	void init() {
 		assert(dropout_rate < 1.0);
@@ -161,7 +161,7 @@ protected:
 	std::vector<size_t> feature_dims; // feature dimnesions for each layer
 
 	Graph g; // the input graph, |V| = N
-	FV2D input_features; // input features: N x D
+	tensor_t input_features; // input features: N x D
 	std::vector<label_t> labels; // labels for classification: N x 1
 	//LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
@@ -169,7 +169,7 @@ protected:
 
 	std::vector<layer *> layers; // all the layers in the neural network
 	/*
-	inline void init_features(size_t dim, FV &x) {
+	inline void init_features(size_t dim, vec_t &x) {
 		std::default_random_engine rng;
 		std::uniform_real_distribution<feature_t> dist(0, 0.1);
 		for (size_t i = 0; i < dim; ++i)
@@ -206,7 +206,7 @@ protected:
 		return n;
 	}
 
-	size_t read_features(std::string dataset_str, FV2D &feats) {
+	size_t read_features(std::string dataset_str, tensor_t &feats) {
 		std::string filename = path + dataset_str + ".ft";
 		std::ifstream in;
 		std::string line;
