@@ -12,6 +12,7 @@
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> dataset(cll::Positional, cll::desc("<dataset name>"), cll::Required); // 'cora', 'citeseer', 'pubmed'
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: el,gr>"), cll::init("gr")); // file format of the input graph
 static cll::opt<std::string> model("m", cll::desc("Model string"), cll::init("gcn")); // 'gcn', 'gcn_cheby', 'dense'
 static cll::opt<float> learning_rate("lr", cll::desc("Initial learning rate (default value 0.01)"), cll::init(0.01));
 static cll::opt<unsigned> epochs("k", cll::desc("number of epoch, i.e. iterations (default value 1)"), cll::init(1));

@@ -1,7 +1,7 @@
 #ifndef _MATH_FUNCTIONS_
 #define _MATH_FUNCTIONS_
 #include <cmath>
-#include "random.h"
+#include "utils.h"
 #include <immintrin.h>
 
 #ifdef WITH_BLAS
@@ -318,21 +318,12 @@ inline float reduce_mean(const std::vector<DataTy> &x) {
 	return sum / (float)n;
 }
 
-#include <boost/random/bernoulli_distribution.hpp>
-template <typename DataTy = float>
-void rng_bernoulli(const DataTy p, std::vector<unsigned> &r) {
-	boost::bernoulli_distribution<DataTy> random_distribution(p);
-	boost::variate_generator<rng_t*, boost::bernoulli_distribution<DataTy> >
-		variate_generator(rng(), random_distribution);
-	for (size_t i = 0; i < r.size(); ++i)
-		r[i] = static_cast<unsigned>(variate_generator());
-}
-
 const float scale_ = 1. / (1. - dropout_rate);
 inline void dropout(const vec_t &in, std::vector<unsigned> &mask, vec_t &out) {
 	assert(mask.size() == out.size());
-	//std::cout << "mask size: " << mask.size() << "\n";
-	rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
+	//rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
+	for (size_t i = 0; i < in.size(); ++i)
+		mask[i] = bernoulli(dropout_rate);
 	for (size_t i = 0; i < in.size(); ++i)
 		out[i] = in[i] * mask[i] * scale_;
 }

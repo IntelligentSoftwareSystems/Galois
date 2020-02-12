@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 	//optimizer *opt = new gradient_descent();
 	//optimizer *opt = new adagrad(); 
 	optimizer *opt = new adam();
-	galois::StatTimer Ttrain("Train");
+	galois::StatTimer Ttrain("TrainAndVal");
 	Ttrain.start();
 	network.train(opt); // do training using training samples
 	Ttrain.stop();
@@ -27,12 +27,15 @@ int main(int argc, char** argv) {
 	// test using test samples
 	size_t n = network.get_nnodes();
 	acc_t test_loss = 0.0, test_acc = 0.0;
-	size_t test_begin = 0, test_end = n;
+	size_t test_begin = 0, test_end = n, test_count = n;
 	MaskList test_mask(n, 0);
-	size_t test_sample_count = read_masks(dataset, "test", test_begin, test_end, test_mask);
+	if (dataset == "reddit") {
+		test_begin = 177262; test_count = 55703; test_end = test_begin + test_count;
+		for (size_t i = test_begin; i < test_end; i++) test_mask[i] = 1;
+	} else test_count = read_masks(dataset, "test", test_begin, test_end, test_mask);
 	galois::StatTimer Ttest("Test");
 	Ttest.start();
-	double test_time = network.evaluate(test_begin, test_end, test_sample_count, test_mask, test_loss, test_acc);
+	double test_time = network.evaluate(test_begin, test_end, test_count, test_mask, test_loss, test_acc);
 	std::cout << "\nTesting: test_loss = " << test_loss << " test_acc = " << test_acc << " test_time = " << test_time << "\n";
 	Ttest.stop();
 

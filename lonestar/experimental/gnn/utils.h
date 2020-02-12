@@ -1,10 +1,14 @@
+#pragma once
+
+#include <random>
 #include <iomanip>
 #include <fstream>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include "gnn.h"
-#include "math_functions.hpp"
+
 std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
+enum class net_phase { train, test };
 
 class ResourceManager {
 public:
@@ -50,6 +54,38 @@ private:
 	struct timeval elapsed_time_;
 };
 
+class random_generator {
+public:
+	static random_generator &get_instance() {
+		static random_generator instance;
+		return instance;
+	}
+	std::mt19937 &operator()() { return gen_; }
+	void set_seed(unsigned int seed) { gen_.seed(seed); }
+
+private:
+	random_generator() : gen_(1) {}
+	std::mt19937 gen_;
+};
+
+template <typename T>
+inline typename std::enable_if<std::is_integral<T>::value, T>::type
+uniform_rand(T min, T max) {
+	std::uniform_int_distribution<T> dst(min, max);
+	return dst(random_generator::get_instance()());
+}
+
+template <typename T>
+inline typename std::enable_if<std::is_floating_point<T>::value, T>::type
+uniform_rand(T min, T max) {
+	std::uniform_real_distribution<T> dst(min, max);
+	return dst(random_generator::get_instance()());
+}
+
+inline bool bernoulli(float_t p) {
+	return uniform_rand(float_t{0}, float_t{1}) <= p;
+}
+
 size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin, size_t &end, MaskList &masks) {
 	if (dataset_str != "citeseer" && dataset_str != "cora") {
 		std::cout << "Dataset currently not supported\n";
@@ -66,8 +102,12 @@ size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin,
 	while (std::getline(in, line)) {
 		std::istringstream mask_stream(line);
 		if (i >= begin && i < end) {
-			mask_stream >> masks[i];
-			if (masks[i] == 1) sample_count ++;
+			unsigned mask = 0;
+			mask_stream >> mask;
+			if (mask == 1) {
+				masks[i] = 1;
+				sample_count ++;
+			}
 		}
 		i ++;
 	} 

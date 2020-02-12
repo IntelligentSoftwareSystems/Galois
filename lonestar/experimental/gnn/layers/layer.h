@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include "../node.h"
 #include "../types.h"
+#include "../utils.h"
 #include "../optimizer.h"
 #include "../math_functions.hpp"
 /**
@@ -38,6 +39,7 @@ public:
 	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data,
 			tensor_t &out_grad, tensor_t &in_grad) = 0;
 	virtual std::string layer_type() const = 0;
+	virtual void set_context(net_phase ctx) {}
 	//virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
 
 	void set_trainable(bool trainable) { trainable_ = trainable; }

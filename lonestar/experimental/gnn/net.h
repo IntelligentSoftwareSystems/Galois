@@ -32,9 +32,15 @@ public:
 
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
-		train_count = read_masks(dataset, "train", train_begin, train_end, train_mask);
-		val_count = read_masks(dataset, "val", val_begin, val_end, val_mask);
-
+		if (dataset == "reddit") {
+			train_begin = 0, train_count = 153431, train_end = train_begin + train_count;
+			val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
+			for (size_t i = train_begin; i < train_end; i++) train_mask[i] = 1;
+			for (size_t i = val_begin; i < val_end; i++) val_mask[i] = 1;
+		} else {
+			train_count = read_masks(dataset, "train", train_begin, train_end, train_mask);
+			val_count = read_masks(dataset, "val", val_begin, val_end, val_mask);
+		}
 		num_layers = NUM_CONV_LAYERS + 1;
 		feature_dims.resize(num_layers + 1);
 		input_features.resize(n); // input embedding: N x D
@@ -56,6 +62,11 @@ public:
 		append_conv_layer(1); // hidden1 layer
 		append_out_layer(2); // output layer
 		layers[0]->set_in_data(input_features); // feed input data
+	}
+
+	void set_netphase(net_phase phase) {
+		for (size_t i = 0; i < num_layers; i ++)
+			layers[i]->set_context(phase);
 	}
 
 	void print_layers_info() {
@@ -120,9 +131,10 @@ public:
 	// training
 	void train(optimizer *opt) {
 		std::cout << "\nStart training...\n";
-		galois::StatTimer Tupdate("WeightUpdate");
-		galois::StatTimer Tfw("Forward");
-		galois::StatTimer Tbw("Backward");
+		galois::StatTimer Tupdate("Train-WeightUpdate");
+		galois::StatTimer Tfw("Train-Forward");
+		galois::StatTimer Tbw("Train-Backward");
+		galois::StatTimer Tval("Validation");
 		Timer t_epoch;
 		// run epoches
 		for (size_t i = 0; i < epochs; i++) {
@@ -130,6 +142,7 @@ public:
 			t_epoch.Start();
 
 			// training steps
+			set_netphase(net_phase::train);
 			acc_t train_loss = 0.0, train_acc = 0.0;
 			Tfw.start();
 			train_loss = fprop(train_begin, train_end, train_count, train_mask); // forward
@@ -141,11 +154,14 @@ public:
 			Tupdate.start();
 			update_weights(opt); // update parameters
 			Tupdate.stop();
+			set_netphase(net_phase::test);
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
 
 			// Validation
 			acc_t val_loss = 0.0, val_acc = 0.0;
+			Tval.start();
 			double val_time = evaluate(val_begin, val_end, val_count, val_mask, val_loss, val_acc);
+			Tval.stop();
 			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
 
 			t_epoch.Stop();
@@ -163,7 +179,6 @@ protected:
 	Graph g; // the input graph, |V| = N
 	tensor_t input_features; // input features: N x D
 	std::vector<label_t> labels; // labels for classification: N x 1
-	//LabelList y_train, y_val; // labels for traning and validation
 	MaskList train_mask, val_mask; // masks for traning and validation
 	size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
 
@@ -239,16 +254,22 @@ protected:
 		return n;
 	}
 
-	unsigned load_graph(Graph &graph, std::string filename, std::string filetype = "el") {
+	unsigned read_graph(std::string dataset_str, Graph &graph) {
+		//printf("Start readGraph\n");
+		galois::StatTimer Tread("GraphReadingTime");
+		Tread.start();
 		LGraph lgraph;
 		unsigned max_degree = 0;
 		if (filetype == "el") {
+			std::string filename = path + dataset_str + ".el";
 			printf("Reading .el file: %s\n", filename.c_str());
 			lgraph.read_edgelist(filename.c_str(), true); //symmetrize
 			genGraph(lgraph, graph);
 		} else if (filetype == "gr") {
+			std::string filename = path + dataset_str + ".csgr";
 			printf("Reading .gr file: %s\n", filename.c_str());
 			galois::graphs::readGraph(graph, filename);
+			/*
 			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
 				graph.getData(vid) = 1;
 				//for (auto e : graph.edges(n)) graph.getEdgeData(e) = 1;
@@ -258,12 +279,16 @@ protected:
 				degrees[vid] = std::distance(graph.edge_begin(vid), graph.edge_end(vid));
 			}, galois::loopname("computeMaxDegree"));
 			max_degree = *(std::max_element(degrees.begin(), degrees.end()));
+			*/
 		} else { printf("Unkown file format\n"); exit(1); }
 		if (filetype != "gr") {
 			max_degree = lgraph.get_max_degree();
 			lgraph.clean();
 		}
 		printf("max degree = %u\n", max_degree);
+		Tread.stop();
+		//printf("Done readGraph\n");
+		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
 		return max_degree;
 	}
 
@@ -280,51 +305,20 @@ protected:
 		}
 	}
 
-	void read_graph(std::string dataset_str, Graph &g) {
-		//printf("Start readGraph\n");
-		galois::StatTimer Tread("GraphReadingTime");
-		Tread.start();
-		//std::string filename = dataset_str + ".gr";
-		std::string filename = path + dataset_str + ".el";
-		load_graph(g, filename);
-		Tread.stop();
-		//printf("Done readGraph\n");
-		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
-	}
-/*
-	void set_masks(std::string dataset_str, MaskList &train_mask, MaskList &val_mask) {
-		if (dataset_str == "citeseer") {
-			train_begin = 0;
-			train_end = 120;
-			val_begin = 120;
-			val_end = 620;
-			// TODO: supposed to be read from file
-			for (size_t i = 0; i < train_mask.size(); i++) {
-				if (i < 120) train_mask[i] = 1; // [0, 120) train size = 120
-				else if (i < 620) val_mask[i] = 1; // [120, 620) validation size = 500
-				else ; // unlabeled vertices
-			}
-			train_count = train_end - train_begin;
-			val_count = val_end - val_begin;
-		} else {
-			std::cout << "Currently not supported\n";
-			exit(1);
-		}
-	}
-*/
 	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
 		// comparing outputs with the ground truth (labels)
-		acc_t accuracy_all = 0.0;
-		size_t valid_sample_count = 0;
-		for (size_t i = begin; i < end; i++) {
+		//acc_t accuracy_all = 0.0;
+		AccumF accuracy_all;
+		accuracy_all.reset();
+		//for (size_t i = begin; i < end; i++) {
+		galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
 			if (masks[i] == 1) {
 				int prediction = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
 				if ((label_t)prediction == labels[i]) accuracy_all += 1.0;
-				valid_sample_count ++;
 			}
-		}
-		assert(valid_sample_count == count);
-		return accuracy_all / (acc_t)count;
+		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
+		//}
+		return accuracy_all.reduce() / (acc_t)count;
 	}
 };
 

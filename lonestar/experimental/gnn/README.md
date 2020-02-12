@@ -28,8 +28,10 @@ RUN
 
 The following are a few example command lines.
 
-$ ./gnn citeseer -t=56 -k=3
-$ ./gnn cora -t=14 -k=3
+$ export OPENBLAS_NUM_THREADS=28
+$ ./gnn cora -t=1 -k=3
+$ ./gnn citeseer -t=3 -k=30
+$ ./gnn reddit -t=56 -k=3
 
 PERFORMANCE
 ===========

@@ -17,7 +17,7 @@ typedef std::vector<feature_t> FV; // feature vector
 typedef std::vector<FV> FV2D; // feature vectors: num_samples x feature_dim
 typedef float acc_t; // Accuracy type
 typedef short label_t; // label is for classification (supervised learning)
-typedef unsigned short mask_t; // mask is used to indicate different uses of labels: train, val, test
+typedef uint8_t mask_t; // mask is used to indicate different uses of labels: train, val, test
 typedef std::vector<label_t> LabelList; // label list to store label for each vertex
 typedef std::vector<mask_t> MaskList; // mask list to store mask for each vertex
 typedef galois::GAccumulator<acc_t> AccumF;

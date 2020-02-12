@@ -50,4 +50,14 @@ inline rng_t* rng() {
 	return static_cast<rng_t*>(rng_stream().generator());
 }
 
+#include <boost/random/bernoulli_distribution.hpp>
+template <typename DataTy = float>
+void rng_bernoulli(const DataTy p, std::vector<unsigned> &r) {
+	boost::bernoulli_distribution<DataTy> random_distribution(p);
+	boost::variate_generator<rng_t*, boost::bernoulli_distribution<DataTy> >
+		variate_generator(rng(), random_distribution);
+	for (size_t i = 0; i < r.size(); ++i)
+		r[i] = static_cast<unsigned>(variate_generator());
+}
+
 #endif
