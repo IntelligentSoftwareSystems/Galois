@@ -3,6 +3,14 @@
 #include <cmath>
 #include "random.h"
 #include <immintrin.h>
+
+#ifdef WITH_BLAS
+extern "C" {
+#include <cblas.h>
+//#include <clapack.h>
+}
+#endif
+
 const float negative_slope = 0;
 
 // vector add
@@ -74,7 +82,7 @@ inline DataTy dot(const std::vector<DataTy> x, const std::vector<DataTy> &y) {
 }
 
 // matrix-vector multiply
-inline void mvmul(const vec_t &matrix, const FV &in_vector, FV &out_vector) {
+inline void mvmul(const vec_t &matrix, const vec_t &in_vector, vec_t &out_vector) {
 	size_t m = out_vector.size();
 	size_t n = in_vector.size();
 	for (size_t i = 0; i < m; ++i) { 
@@ -85,7 +93,7 @@ inline void mvmul(const vec_t &matrix, const FV &in_vector, FV &out_vector) {
 }
 
 // vector-vector multiply
-inline void vvmul(const FV &a, const FV &b, FV2D &out) {
+inline void vvmul(const vec_t &a, const vec_t &b, tensor_t &out) {
 	size_t m = a.size();
 	size_t n = b.size();
 	for (size_t i = 0; i < m; ++i) { 
@@ -96,14 +104,14 @@ inline void vvmul(const FV &a, const FV &b, FV2D &out) {
 }
 
 // matrix addition
-inline void matadd(size_t x, size_t y, const FV2D &A, const FV2D &B, FV2D &C) {
+inline void matadd(size_t x, size_t y, const tensor_t &A, const tensor_t &B, tensor_t &C) {
 	for (size_t i = 0; i < x; ++i)
 		for (size_t j = 0; j < y; ++j)
 			C[i][j] = A[i][j] + B[i][j];
 }
 
 // matrix multiply: all 2D
-inline void matmul2D(const FV2D &A, const FV2D &B, FV2D &C) {
+inline void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C) {
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = A.size();
 	size_t dim_y = C[0].size();
@@ -122,7 +130,37 @@ inline void matmul2D(const FV2D &A, const FV2D &B, FV2D &C) {
 	} 
 }
 
-inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
+inline void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, 
+	const vec_t &A, const vec_t &B, vec_t &C) {
+#ifdef WITH_BLAS
+	const int M = dim_x;
+	const int N = dim_y;
+	const int K = dim_z;
+	const float alpha = 1.0;
+	const float beta = 0.0;
+	const CBLAS_TRANSPOSE TransA = CblasNoTrans;
+	const CBLAS_TRANSPOSE TransB = CblasNoTrans;
+	int lda = (TransA == CblasNoTrans) ? K : M;
+	int ldb = (TransB == CblasNoTrans) ? N : K;
+	cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, &A[0], lda, &B[0], ldb, beta, &C[0], N);
+#else
+	//std::cout << "using naive matmul, slow\n";
+	assert(A.size() == dim_x*dim_z);
+	assert(B.size() == dim_z*dim_y);
+	assert(C.size() == dim_x*dim_y);
+
+	for (size_t i = 0; i < dim_x; ++i) { 
+		for (size_t j = 0; j < dim_y; ++j) { 
+			C[i*dim_y+j] = 0;
+			for (size_t k = 0; k < dim_z; ++k) { 
+				C[i*dim_y+j] += A[i*dim_z+k] * B[k*dim_y+j];
+			} 
+		} 
+	} 
+#endif
+}
+
+inline void matmul2D1D(const tensor_t &A, const tensor_t &B, vec_t &C) {
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = A.size();
 	size_t dim_y = B[0].size();
@@ -130,6 +168,21 @@ inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
 	assert(C.size() == dim_x*dim_y);
 	assert(B.size() == dim_z);
 
+#ifdef WITH_BLAS
+	vec_t A1D(dim_x*dim_z);
+	vec_t B1D(dim_z*dim_y);
+	auto ptr = &A1D[0];
+	for (size_t i = 0; i < dim_x; i++) {
+		std::copy(A[i].begin(), A[i].end(), ptr);
+		ptr += dim_z;
+	}
+	ptr = &B1D[0];
+	for (size_t i = 0; i < dim_z; i++) {
+		std::copy(B[i].begin(), B[i].end(), ptr);
+		ptr += dim_y;
+	}
+	matmul1D1D(dim_x, dim_y, dim_z, A1D, B1D, C);
+#else
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
 			C[i*dim_y+j] = 0;
@@ -138,10 +191,11 @@ inline void matmul2D1D(const FV2D &A, const FV2D &B, vec_t &C) {
 			} 
 		} 
 	} 
+#endif
 }
 
 // matrix multiply
-inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
+inline void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = C.size();
 	size_t dim_y = C[0].size();
@@ -149,6 +203,21 @@ inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 	assert(A.size() == dim_x);
 	assert(B.size() == dim_y*dim_z);
 
+#ifdef WITH_BLAS
+	vec_t A1D(dim_x*dim_z);
+	vec_t C1D(dim_x*dim_y, 0);
+	auto ptr = &A1D[0];
+	for (size_t i = 0; i < dim_x; i++) {
+		std::copy(A[i].begin(), A[i].end(), ptr);
+		ptr += dim_z;
+	}
+	matmul1D1D(dim_x, dim_y, dim_z, A1D, B, C1D);
+	for (size_t i = 0; i < dim_x; i++) {
+		for (size_t j = 0; j < dim_y; ++j) { 
+			C[i][j] = C1D[i*dim_y+j];
+		}
+	}
+#else
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
 			C[i][j] = 0;
@@ -157,10 +226,11 @@ inline void matmul(const FV2D &A, const vec_t &B, FV2D &C) {
 			} 
 		} 
 	} 
+#endif
 }
 
 template <typename DataTy = float>
-inline void transpose2D(const FV2D &in, FV2D &out) {
+inline void transpose2D(const tensor_t &in, tensor_t &out) {
 	size_t x = in.size();
 	size_t y = in[0].size();
 	for (size_t i = 0; i < y; i ++) {
@@ -192,11 +262,11 @@ inline int argmax(const size_t n, const std::vector<DataTy> &x) {
 	return max_ind;
 }
 
-inline void clear(FV &in) {
+inline void clear(vec_t &in) {
 	for (size_t i = 0; i < in.size(); i++) in[i] = 0;
 }
 
-inline void update_all(Graph *g, const FV2D &in, FV2D &out, bool norm, const vec_t norm_factor) {
+inline void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t norm_factor) {
 	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
 		clear(out[src]);
 		float_t a = 0.0, b = 0.0;
@@ -228,11 +298,11 @@ inline void d_relu(const std::vector<DataTy> &in_diff, const std::vector<DataTy>
 	}
 }
 
-inline void d_mvmul(FV &in_diff, FV &h_in, FV2D &out_diff) {
+inline void d_mvmul(vec_t &in_diff, vec_t &h_in, tensor_t &out_diff) {
 	vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff 
 }
 
-inline void d_vadd(FV &in_diff, FV &out_diff) {
+inline void d_vadd(vec_t &in_diff, vec_t &out_diff) {
 	for (size_t i = 0; i < out_diff.size(); ++i)
 		out_diff[i] = in_diff[i];
 }
@@ -259,7 +329,7 @@ void rng_bernoulli(const DataTy p, std::vector<unsigned> &r) {
 }
 
 const float scale_ = 1. / (1. - dropout_rate);
-inline void dropout(const FV &in, std::vector<unsigned> &mask, FV &out) {
+inline void dropout(const vec_t &in, std::vector<unsigned> &mask, vec_t &out) {
 	assert(mask.size() == out.size());
 	//std::cout << "mask size: " << mask.size() << "\n";
 	rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
@@ -267,7 +337,7 @@ inline void dropout(const FV &in, std::vector<unsigned> &mask, FV &out) {
 		out[i] = in[i] * mask[i] * scale_;
 }
 
-inline void d_dropout(const FV &in_diff, std::vector<unsigned> &mask, FV &out_diff) {
+inline void d_dropout(const vec_t &in_diff, std::vector<unsigned> &mask, vec_t &out_diff) {
 	for (size_t i = 0; i < in_diff.size(); ++i)
 		out_diff[i] = in_diff[i] * mask[i] * scale_;
 }

@@ -27,7 +27,7 @@ public:
 				y[(*labels)[i]] = 1.0; // one-hot
 				loss[i] = cross_entropy(y, out_data[i]);
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax_loss-fw"));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-fw"));
 	}
 
 	void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) override {
@@ -38,7 +38,7 @@ public:
 			y[(*labels)[i]] = 1.0;
 			d_cross_entropy(y, out_data[i], norm_grad);
 			d_softmax(in_data[i], out_data[i], in_grad[i], norm_grad);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("cross-entropy-bw"));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-bw"));
 	}
 
 private:
