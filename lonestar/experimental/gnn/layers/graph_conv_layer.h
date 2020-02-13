@@ -68,28 +68,28 @@ public:
 		// if y > z:
 		// mult W first to reduce the feature size for aggregation
 		// else: aggregate first then mult W (not implemented yet)
-		Timer t_matmul, t_agg, t_dropout;
-		t_matmul.Start();
+		//Timer t_matmul, t_agg, t_dropout;
+		//t_matmul.Start();
 		if (dropout_ && phase_ == net_phase::train) {
-			t_dropout.Start();
+			//t_dropout.Start();
 			//for (size_t i = 0; i < x; ++i) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				dropout(in_data[i], dropout_mask[i], in_temp[i]);
 			}, galois::loopname("dropout"));
-			t_dropout.Stop();
+			//t_dropout.Stop();
 			matmul(in_temp, W, out_temp); // x*y; y*z; x*z
 		} else matmul(in_data, W, out_temp); // matrix multiply feature vector
-		t_matmul.Stop();
-		t_agg.Start();
+		//t_matmul.Stop();
+		//t_agg.Start();
 		aggregate(graph, out_temp, out_data); // aggregate
-		t_agg.Stop();
+		//t_agg.Stop();
 		if (act_) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				relu(out_data[i], out_data[i]);
 			}, galois::loopname("relu"));
 		}
-		double dropout_time = 0;
-		if (dropout_ && phase_ == net_phase::train) dropout_time = t_dropout.Millisecs();
+		//double dropout_time = 0;
+		//if (dropout_ && phase_ == net_phase::train) dropout_time = t_dropout.Millisecs();
 		//std::cout << "\n\t" << name_ << " matmul time: " << t_matmul.Millisecs() 
 		//	<< ", aggregation time: " << t_agg.Millisecs() << ", dropout time: " << dropout_time << "\n";
 	}

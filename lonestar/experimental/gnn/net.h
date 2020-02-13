@@ -58,6 +58,7 @@ public:
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
 	void construct_layers() {
+		std::cout << "\nConstructing layers...\n";
 		append_conv_layer(0, true); // first conv layer
 		append_conv_layer(1); // hidden1 layer
 		append_out_layer(2); // output layer
@@ -156,17 +157,20 @@ public:
 			Tupdate.stop();
 			set_netphase(net_phase::test);
 			std::cout << " train_loss = " << std::setw(5) << train_loss << " train_acc = " << std::setw(5) << train_acc;
-
-			// Validation
-			acc_t val_loss = 0.0, val_acc = 0.0;
-			Tval.start();
-			double val_time = evaluate(val_begin, val_end, val_count, val_mask, val_loss, val_acc);
-			Tval.stop();
-			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
-
 			t_epoch.Stop();
 			double epoch_time = t_epoch.Millisecs();
-			std::cout << " time = " << epoch_time << " ms (train_time = " << epoch_time - val_time << " val_time = " << val_time << ")\n";
+
+			if (do_validate) {
+				// Validation
+				acc_t val_loss = 0.0, val_acc = 0.0;
+				Tval.start();
+				double val_time = evaluate(val_begin, val_end, val_count, val_mask, val_loss, val_acc);
+				Tval.stop();
+				std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
+				std::cout << " time = " << epoch_time + val_time << " ms (train_time = " << epoch_time << " val_time = " << val_time << ")\n";
+			} else {
+				std::cout << " train_time = " << epoch_time << " ms\n";
+			}
 		}
 	}
 

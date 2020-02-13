@@ -21,6 +21,8 @@ static cll::opt<float> dropout_rate("d", cll::desc("Dropout rate (1 - keep proba
 static cll::opt<float> weight_decay("wd", cll::desc("Weight for L2 loss on embedding matrix (default value 5e-4)"), cll::init(5e-4));
 static cll::opt<float> early_stopping("es", cll::desc("Tolerance for early stopping (# of epochs) (default value 10)"), cll::init(10));
 static cll::opt<unsigned> max_degree("md", cll::desc("Maximum Chebyshev polynomial degree (default value 3)"), cll::init(3));
+static cll::opt<unsigned> do_validate("dv", cll::desc("enable validation"), cll::init(1));
+static cll::opt<unsigned> do_test("dt", cll::desc("enable test"), cll::init(1));
 #define CHUNK_SIZE 256
 
 #include "types.h"

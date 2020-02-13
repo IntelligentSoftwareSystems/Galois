@@ -49,32 +49,32 @@ inline void vdiv(const std::vector<DataTy> &in_a, const std::vector<DataTy> &in_
 
 // vector add scalar
 template <typename DataTy = float>
-inline void add_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+inline void add_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] += alpha;
 }
 
 // vector subtract scalar
 template <typename DataTy = float>
-inline void sub_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+inline void sub_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] -= alpha;
 }
 
 // vector multiply scalar
 template <typename DataTy = float>
-inline void mul_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+inline void mul_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] *= alpha;
 }
 
 // vector divide scalar
 template <typename DataTy = float>
-inline void div_scalar(const DataTy alpha, std::vector<DataTy> Y) {
+inline void div_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 	assert(alpha != 0);
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] /= alpha;
 }
 
 // dot product
 template <typename DataTy = float>
-inline DataTy dot(const std::vector<DataTy> x, const std::vector<DataTy> &y) {
+inline DataTy dot(const std::vector<DataTy> &x, const std::vector<DataTy> &y) {
 	DataTy sum = 0;
 	for (size_t i = 0; i < x.size(); ++i)
 		sum += x[i] * y[i];
@@ -196,6 +196,8 @@ inline void matmul2D1D(const tensor_t &A, const tensor_t &B, vec_t &C) {
 
 // matrix multiply
 inline void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
+	galois::StatTimer Tmatmul("MatMul");
+	Tmatmul.start();
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = C.size();
 	size_t dim_y = C[0].size();
@@ -227,6 +229,7 @@ inline void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
 		} 
 	} 
 #endif
+	Tmatmul.stop();
 }
 
 template <typename DataTy = float>
@@ -266,7 +269,7 @@ inline void clear(vec_t &in) {
 	for (size_t i = 0; i < in.size(); i++) in[i] = 0;
 }
 
-inline void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t norm_factor) {
+inline void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
 	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
 		clear(out[src]);
 		float_t a = 0.0, b = 0.0;
