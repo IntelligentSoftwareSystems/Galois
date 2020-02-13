@@ -28,6 +28,9 @@ public:
 		init();
 	}
 	void init() {
+		std::cout << name_ << ": allocating memory for parameters and intermediate data... ";
+		Timer t_alloc;
+		t_alloc.Start();
 		// randomly initialize trainable parameters for conv layers
 		rand_init_matrix(y, z, W);
 		//rand_init_matrix(y, z, Q);
@@ -37,11 +40,15 @@ public:
 			dropout_mask.resize(x);
 			for (size_t i = 0; i < x; i++) dropout_mask[i].resize(y);
 		}
-		in_temp.resize(x);
-		for (size_t i = 0; i < x; ++i) in_temp[i].resize(y);
-		out_temp.resize(x); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
-		for (size_t i = 0; i < x; ++i) out_temp[i].resize(z);
+		in_temp.resize(x*y);
+		//for (size_t i = 0; i < x; ++i) in_temp[i].resize(y);
+		out_temp.resize(x*z); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
+		//for (size_t i = 0; i < x; ++i) out_temp[i].resize(z);
+		trans_data.resize(y*x); // y*x
+		//for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
 		if (norm_) norm_factor_counting();
+		t_alloc.Stop();
+		std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
 	}
 	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
 		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, true, false, true, in_dims, out_dims) {}
@@ -49,7 +56,7 @@ public:
 	std::string layer_type() const override { return std::string("graph_conv"); }
 
 	// user-defined aggregate function
-	void aggregate(Graph *g, const tensor_t &in, tensor_t &out) { update_all(g, in, out, true, norm_factor); }
+	void aggregate(Graph *g, const vec_t &in, tensor_t &out) { update_all(g, in, out, true, norm_factor); }
 
 	// user-defined combine function
 	void combine(const vec_t &self, const vec_t &neighbors, const vec_t mat_v, const vec_t mat_u, vec_t &out) {
@@ -74,11 +81,11 @@ public:
 			//t_dropout.Start();
 			//for (size_t i = 0; i < x; ++i) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-				dropout(in_data[i], dropout_mask[i], in_temp[i]);
+				dropout(in_data[i], dropout_mask[i], &in_temp[i*y]);
 			}, galois::loopname("dropout"));
 			//t_dropout.Stop();
-			matmul(in_temp, W, out_temp); // x*y; y*z; x*z
-		} else matmul(in_data, W, out_temp); // matrix multiply feature vector
+			matmul1D1D(x, z, y, in_temp, W, out_temp); // x*y; y*z; x*z
+		} else matmul2D1D(z, in_data, W, out_temp); // x*y; y*z; x*z
 		//t_matmul.Stop();
 		//t_agg.Start();
 		aggregate(graph, out_temp, out_data); // aggregate
@@ -101,13 +108,14 @@ public:
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				for (size_t j = 0; j < z; ++j) 
 					//if (out_data[i][j] <= 0.0) out_temp[i][j] = 0.0;
-					out_temp[i][j] = out_data[i][j] > float_t(0) ? out_grad[i][j] : float_t(0);
+					out_temp[i*z+j] = out_data[i][j] > float_t(0) ? out_grad[i][j] : float_t(0);
 			}, galois::loopname("d_relu"));
-		} else out_temp = out_grad;
+		//} else out_temp = out_grad; // TODO: avoid copying
+		} else copy2D1D(out_grad, out_temp);
 		if (level_ != 0) { // no need to calculate in_grad for the first layer
 			vec_t trans_W(z*y);
 			transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
-			matmul(out_temp, trans_W, in_temp); // x*z; z*y -> x*y
+			matmul1D1D(x, y, z, out_temp, trans_W, in_temp); // x*z; z*y -> x*y
 			update_all(graph, in_temp, in_grad, true, norm_factor); // x*x; x*y -> x*y NOTE: since graph is symmetric, the derivative is the same
 			if (dropout_) {
 				galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
@@ -117,10 +125,8 @@ public:
 		}
 
 		// calculate weight gradients
-		tensor_t trans_data(y); // y*x
-		for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
-		transpose2D(in_data, trans_data);
-		matmul2D1D(trans_data, out_temp, weight_grad); // y*x; x*z; y*z
+		transpose2D1D(in_data, trans_data); // y*x
+		matmul1D1D(y, z, x, trans_data, out_temp, weight_grad); // y*x; x*z; y*z
 	}
 
 	void degree_counting() {
@@ -152,8 +158,9 @@ private:
 	size_t x;
 	size_t y;
 	size_t z;
-	tensor_t out_temp;
-	tensor_t in_temp;
+	vec_t out_temp;
+	vec_t in_temp;
+	vec_t trans_data; // y*x
 	std::vector<unsigned> degrees;
 	std::vector<float_t> norm_factor; // normalization constant based on graph structure
 	std::vector<std::vector<unsigned> > dropout_mask;

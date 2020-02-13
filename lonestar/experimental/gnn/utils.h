@@ -111,8 +111,8 @@ size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin,
 		}
 		i ++;
 	} 
-	std::cout << mask_type + "_mask range: [" << begin << ", " << end
-		<< ") Number of valid samples: " << sample_count << "\n";
+	//std::cout << mask_type + "_mask range: [" << begin << ", " << end
+	//	<< ") Number of valid samples: " << sample_count << "\n";
 	in.close();
 	return sample_count;
 }

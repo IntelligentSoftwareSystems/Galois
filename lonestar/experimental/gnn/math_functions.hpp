@@ -23,7 +23,15 @@ inline void vadd(const std::vector<DataTy> &a, const std::vector<DataTy> &b, std
 	for (size_t i = 0; i < alignedN; i += vec_len)
 		_mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
 	for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
+}
 
+template <typename DataTy = float>
+inline void vadd(size_t n, const DataTy *a, const DataTy *b, DataTy *out) {
+	size_t vec_len = 8;
+	const size_t alignedN = n - n % vec_len;
+	for (size_t i = 0; i < alignedN; i += vec_len)
+		_mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
+	for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
 }
 
 // vector subtract
@@ -63,6 +71,11 @@ inline void sub_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 template <typename DataTy = float>
 inline void mul_scalar(const DataTy alpha, std::vector<DataTy> &Y) {
 	for (size_t i = 0; i < Y.size(); ++i) Y[i] *= alpha;
+}
+
+template <typename DataTy = float>
+inline void mul_scalar(size_t n, const DataTy alpha, const DataTy *in, DataTy *out) {
+	for (size_t i = 0; i < n; ++i) out[i] = alpha *in[i];
 }
 
 // vector divide scalar
@@ -108,6 +121,27 @@ inline void matadd(size_t x, size_t y, const tensor_t &A, const tensor_t &B, ten
 	for (size_t i = 0; i < x; ++i)
 		for (size_t j = 0; j < y; ++j)
 			C[i][j] = A[i][j] + B[i][j];
+}
+
+// TODO: vectorize
+template <typename DataTy = float>
+inline void copy2D1D(const tensor_t &in, vec_t &out) {
+	size_t x = in.size();
+	size_t y = in[0].size();
+#ifdef WITH_BLAS
+	auto ptr = &out[0];
+	for (size_t i = 0; i < x; i++) {
+		std::copy(in[i].begin(), in[i].end(), ptr);
+		ptr += y;
+	}
+#else
+	assert(out.size() == x*y);
+	for (size_t i = 0; i < x; i ++) {
+		for (size_t j = 0; j < y; j ++) {
+			out[i*y+j] = in[i][j];
+		}
+	}
+#endif
 }
 
 // matrix multiply: all 2D
@@ -160,28 +194,17 @@ inline void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_
 #endif
 }
 
-inline void matmul2D1D(const tensor_t &A, const tensor_t &B, vec_t &C) {
+inline void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, vec_t &C) {
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = A.size();
-	size_t dim_y = B[0].size();
 	size_t dim_z = A[0].size();
+	assert(B.size() == dim_z*dim_y);
 	assert(C.size() == dim_x*dim_y);
-	assert(B.size() == dim_z);
 
 #ifdef WITH_BLAS
 	vec_t A1D(dim_x*dim_z);
-	vec_t B1D(dim_z*dim_y);
-	auto ptr = &A1D[0];
-	for (size_t i = 0; i < dim_x; i++) {
-		std::copy(A[i].begin(), A[i].end(), ptr);
-		ptr += dim_z;
-	}
-	ptr = &B1D[0];
-	for (size_t i = 0; i < dim_z; i++) {
-		std::copy(B[i].begin(), B[i].end(), ptr);
-		ptr += dim_y;
-	}
-	matmul1D1D(dim_x, dim_y, dim_z, A1D, B1D, C);
+	copy2D1D(A, A1D);
+	matmul1D1D(dim_x, dim_y, dim_z, A1D, B, C);
 #else
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
@@ -243,6 +266,19 @@ inline void transpose2D(const tensor_t &in, tensor_t &out) {
 	}
 }
 
+// TODO: vectorize
+template <typename DataTy = float>
+inline void transpose2D1D(const tensor_t &in, vec_t &out) {
+	size_t x = in.size();
+	size_t y = in[0].size();
+	assert(out.size() == x*y);
+	for (size_t i = 0; i < y; i ++) {
+		for (size_t j = 0; j < x; j ++) {
+			out[i*x+j] = in[j][i];
+		}
+	}
+}
+
 template <typename DataTy = float>
 inline void transpose(size_t x, size_t y, const vec_t &in, vec_t &out) {
 	for (size_t i = 0; i < y; i ++) {
@@ -271,7 +307,7 @@ inline void clear(vec_t &in) {
 
 inline void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
 	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
-		clear(out[src]);
+		clear(out[src]); // TODO: vectorize clear
 		float_t a = 0.0, b = 0.0;
 		if (norm) a = norm_factor[src];
 		// gather neighbors' embeddings
@@ -283,6 +319,25 @@ inline void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, c
 				mul_scalar(b, neighbor);
 				vadd(out[src], neighbor, out[src]); // out[src] += in[dst]
 			} else vadd(out[src], in[dst], out[src]); // out[src] += in[dst]
+		}
+	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
+}
+
+inline void update_all(Graph *g, const vec_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
+	size_t len = out[0].size();
+	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
+		clear(out[src]);
+		float_t a = 0.0, b = 0.0;
+		if (norm) a = norm_factor[src];
+		// gather neighbors' embeddings
+		for (const auto e : g->edges(src)) {
+			const auto dst = g->getEdgeDst(e);
+			if (norm) {
+				b = a * norm_factor[dst];
+				vec_t neighbor(len);
+				mul_scalar(len, b, &in[dst*len], neighbor.data());
+				vadd(out[src], neighbor, out[src]); // out[src] += in[dst]
+			} else vadd(len, out[src].data(), &in[dst*len], out[src].data()); // out[src] += in[dst]
 		}
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
 }
@@ -322,9 +377,17 @@ inline float reduce_mean(const std::vector<DataTy> &x) {
 }
 
 const float scale_ = 1. / (1. - dropout_rate);
+
 inline void dropout(const vec_t &in, std::vector<unsigned> &mask, vec_t &out) {
 	assert(mask.size() == out.size());
 	//rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
+	for (size_t i = 0; i < in.size(); ++i)
+		mask[i] = bernoulli(dropout_rate);
+	for (size_t i = 0; i < in.size(); ++i)
+		out[i] = in[i] * mask[i] * scale_;
+}
+
+inline void dropout(const vec_t &in, std::vector<unsigned> &mask, float_t *out) {
 	for (size_t i = 0; i < in.size(); ++i)
 		mask[i] = bernoulli(dropout_rate);
 	for (size_t i = 0; i < in.size(); ++i)

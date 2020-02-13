@@ -30,6 +30,7 @@ public:
 		labels.resize(n, 0); // label for each vertex: N x 1
 		num_classes = read_labels(dataset, labels);
 
+		std::cout << "Reading label masks ... ";
 		train_mask.resize(n, 0);
 		val_mask.resize(n, 0);
 		if (dataset == "reddit") {
@@ -41,6 +42,8 @@ public:
 			train_count = read_masks(dataset, "train", train_begin, train_end, train_mask);
 			val_count = read_masks(dataset, "val", val_begin, val_end, val_mask);
 		}
+		std::cout << "Done\n";
+
 		num_layers = NUM_CONV_LAYERS + 1;
 		feature_dims.resize(num_layers + 1);
 		input_features.resize(n); // input embedding: N x D
@@ -200,6 +203,9 @@ protected:
 	// Note that labels is not one-hot encoded vector and it can be computed
 	// as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
 	size_t read_labels(std::string dataset_str, LabelList &labels) {
+		std::cout << "Reading labels ... ";
+		Timer t_read;
+		t_read.Start();
 		std::string filename = path + dataset_str + "-labels.txt";
 		std::ifstream in;
 		std::string line;
@@ -207,7 +213,6 @@ protected:
 		size_t m, n;
 		in >> m >> n >> std::ws;
 		assert(m == labels.size()); // number of vertices
-		std::cout << "label conuts: " << n << std::endl; // number of vertex classes
 		unsigned v = 0;
 		while (std::getline(in, line)) {
 			std::istringstream label_stream(line);
@@ -222,10 +227,16 @@ protected:
 			v ++;
 		}
 		in.close();
+		t_read.Stop();
+		// number of vertex classes
+		std::cout << "Done, unique label counts: " << n << ", time: " << t_read.Millisecs() << " ms\n";
 		return n;
 	}
 
 	size_t read_features(std::string dataset_str, tensor_t &feats) {
+		std::cout << "Reading features ... ";
+		Timer t_read;
+		t_read.Start();
 		std::string filename = path + dataset_str + ".ft";
 		std::ifstream in;
 		std::string line;
@@ -233,7 +244,6 @@ protected:
 		size_t m, n;
 		in >> m >> n >> std::ws;
 		assert(m == feats.size()); // m = number of vertices
-		std::cout << "feature dimention: " << n << std::endl;
 		for (size_t i = 0; i < m; ++i) {
 			feats[i].resize(n);
 			for (size_t j = 0; j < n; ++j)
@@ -255,6 +265,8 @@ protected:
 					std::cout << "feats[" << i << "][" << j << "]: " << feats[i][j] << std::endl;
 		//*/
 		in.close();
+		t_read.Stop();
+		std::cout << "Done, feature dimention: " << n << ", time: " << t_read.Millisecs() << " ms\n";
 		return n;
 	}
 
