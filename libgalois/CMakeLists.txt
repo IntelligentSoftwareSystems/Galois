@@ -63,6 +63,7 @@ if (SCHED_SETAFFINITY_FOUND)
 endif()
 
 target_link_libraries(galois_shmem ${Boost_SERIALIZATION_LIBRARY_RELEASE})
+target_link_libraries(galois_shmem tsuba)
 
 if (CMAKE_HAVE_PTHREAD_H)
    add_definitions(-DGALOIS_HAVE_PTHREAD)
