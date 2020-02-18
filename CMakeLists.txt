@@ -493,6 +493,7 @@ endfunction()
 ###### Source finding ######
 #include_directories(include)
 
+add_subdirectory(libtsuba)
 add_subdirectory(libllvm)
 add_subdirectory(libgalois)
 if(ENABLE_DIST_GALOIS)
