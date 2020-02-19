@@ -166,6 +166,8 @@ inline void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C) {
 
 inline void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, 
 	const vec_t &A, const vec_t &B, vec_t &C) {
+	galois::StatTimer Tmatmul("MatMul");
+	Tmatmul.start();
 #ifdef WITH_BLAS
 	const int M = dim_x;
 	const int N = dim_y;
@@ -192,6 +194,7 @@ inline void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_
 		} 
 	} 
 #endif
+	Tmatmul.stop();
 }
 
 inline void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, vec_t &C) {
@@ -219,8 +222,6 @@ inline void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, ve
 
 // matrix multiply
 inline void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
-	galois::StatTimer Tmatmul("MatMul");
-	Tmatmul.start();
 	// A: x*z; B: z*y; C: x*y
 	size_t dim_x = C.size();
 	size_t dim_y = C[0].size();
@@ -252,7 +253,6 @@ inline void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
 		} 
 	} 
 #endif
-	Tmatmul.stop();
 }
 
 template <typename DataTy = float>
