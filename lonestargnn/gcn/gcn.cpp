@@ -1,6 +1,5 @@
 // Graph Neural Networks
 // Xuhao Chen <cxh@utexas.edu>
-#include "gnn.h"
 #include "lonestargnn.h"
 
 const char* name = "Graph Convolutional Networks";

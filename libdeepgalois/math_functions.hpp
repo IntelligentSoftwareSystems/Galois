@@ -164,27 +164,27 @@ inline void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C) {
 	} 
 }
 
+void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB, 
+	const int M, const int N, const int K, const float alpha, 
+	const float* A, const float* B, const float beta, float* C) {
+	int lda = (TransA == CblasNoTrans) ? K : M;
+	int ldb = (TransB == CblasNoTrans) ? N : K;
+	cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb, beta, C, N);
+}
+
 inline void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, 
 	const vec_t &A, const vec_t &B, vec_t &C) {
 	galois::StatTimer Tmatmul("MatMul");
 	Tmatmul.start();
-#ifdef WITH_BLAS
-	const int M = dim_x;
-	const int N = dim_y;
-	const int K = dim_z;
-	const float alpha = 1.0;
-	const float beta = 0.0;
-	const CBLAS_TRANSPOSE TransA = CblasNoTrans;
-	const CBLAS_TRANSPOSE TransB = CblasNoTrans;
-	int lda = (TransA == CblasNoTrans) ? K : M;
-	int ldb = (TransB == CblasNoTrans) ? N : K;
-	cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, &A[0], lda, &B[0], ldb, beta, &C[0], N);
-#else
-	//std::cout << "using naive matmul, slow\n";
 	assert(A.size() == dim_x*dim_z);
 	assert(B.size() == dim_z*dim_y);
 	assert(C.size() == dim_x*dim_y);
 
+#ifdef WITH_BLAS
+	const CBLAS_TRANSPOSE TransA = CblasNoTrans;
+	const CBLAS_TRANSPOSE TransB = CblasNoTrans;
+	sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, &A[0], &B[0], 0.0, &C[0]);
+#else
 	for (size_t i = 0; i < dim_x; ++i) { 
 		for (size_t j = 0; j < dim_y; ++j) { 
 			C[i*dim_y+j] = 0;

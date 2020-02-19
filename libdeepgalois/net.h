@@ -2,7 +2,8 @@
 #define _MODEL_H_
 
 #include <random>
-#include "gnn.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
 #include "lgraph.h"
 #include "layers.h"
 #include "optimizer.h"

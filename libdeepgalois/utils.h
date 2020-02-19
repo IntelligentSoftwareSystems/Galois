@@ -5,7 +5,6 @@
 #include <fstream>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include "gnn.h"
 
 std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
 enum class net_phase { train, test };
