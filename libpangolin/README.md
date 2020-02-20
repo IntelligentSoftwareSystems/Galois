@@ -38,7 +38,7 @@ Vertex ids are expected to be sequential integers between 0 and (total number of
 BUILD
 ===========
 
-1. Run cmake at BUILD directory `cd build; cmake -DUSE_EXP=1 ../`
+1. Run cmake at BUILD directory `cd build; cmake -DUSE_PANGOLIN=1 ../`
 
 2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
 
