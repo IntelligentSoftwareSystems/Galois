@@ -3,10 +3,11 @@
 #include <random>
 #include <iomanip>
 #include <fstream>
+#include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
 
-std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
+const std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
 enum class net_phase { train, test };
 
 class ResourceManager {
@@ -85,7 +86,7 @@ inline bool bernoulli(float_t p) {
 	return uniform_rand(float_t{0}, float_t{1}) <= p;
 }
 
-size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin, size_t &end, MaskList &masks) {
+inline size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin, size_t &end, std::vector<uint8_t> &masks) {
 	if (dataset_str != "citeseer" && dataset_str != "cora") {
 		std::cout << "Dataset currently not supported\n";
 		exit(1);

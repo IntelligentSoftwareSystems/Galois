@@ -1,4 +1,6 @@
 #pragma once
+#include "types.h"
+#include "utils.h"
 #include "cutils.h"
 
 class DeepGalois {
@@ -29,9 +31,9 @@ public:
 		CURAND_CHECK(curandCreateGenerator(&Get().curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
 		CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(Get().curand_generator_, cluster_seedgen()));
 	}
-	static void DeviceQuery();
-	static bool CheckDevice(const int device_id);
-	static int FindDevice(const int start_id = 0);
+	static void DeviceQuery() {}
+	static bool CheckDevice(const int device_id) { return true; }
+	static int FindDevice(const int start_id = 0) { return 0; }
 
 protected:
 	cublasHandle_t cublas_handle_;

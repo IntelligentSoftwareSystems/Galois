@@ -39,7 +39,7 @@ protected:
  * The Journal of Machine Learning Research, pages 2121-2159, 2011.
  **/
 struct adagrad : public stateful_optimizer<1> {
-	adagrad() : alpha(learning_rate), eps(float_t(1e-8)) {}
+	adagrad() : alpha(0.01), eps(float_t(1e-8)) {}
 	void update(const vec_t &dW, vec_t &W, bool parallelize) {
 		vec_t &g = get<0>(W);
 		if (parallelize) {
@@ -83,7 +83,7 @@ private:
 // Adam: A Method for Stochastic Optimization
 // http://arxiv.org/abs/1412.6980
 struct adam : public stateful_optimizer<2> {
-	adam() : alpha(learning_rate), b1(float_t(0.9)),
+	adam() : alpha(0.01), b1(float_t(0.9)),
 		b2(float_t(0.999)), b1_t(float_t(0.9)),
 		b2_t(float_t(0.999)), eps(float_t(1e-8)) {}
 
@@ -96,7 +96,7 @@ struct adam : public stateful_optimizer<2> {
 			// L2 norm based update rule
 			W[i] -= alpha * (mt[i] / (float_t(1) - b1_t)) /
 				std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("adam_update"));
+		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("adam_update"));
 		b1_t *= b1;
 		b2_t *= b2;
 	}

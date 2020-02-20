@@ -24,7 +24,6 @@ static cll::opt<float> early_stopping("es", cll::desc("Tolerance for early stopp
 static cll::opt<unsigned> max_degree("md", cll::desc("Maximum Chebyshev polynomial degree (default value 3)"), cll::init(3));
 static cll::opt<unsigned> do_validate("dv", cll::desc("enable validation"), cll::init(1));
 static cll::opt<unsigned> do_test("dt", cll::desc("enable test"), cll::init(1));
-#define CHUNK_SIZE 256
 
 //! standard global options to the benchmarks
 extern llvm::cl::opt<bool> skipVerify;

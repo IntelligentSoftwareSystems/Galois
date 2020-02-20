@@ -25,7 +25,6 @@ public:
 	virtual void combine(const vec_t ma, const vec_t mb, const vec_t &a, const vec_t &b, vec_t &out) {}
 	
 	void init() {
-		assert(dropout_rate < 1.0);
 		read_graph(dataset, g); 
 		n = g.size(); // N
 		labels.resize(n, 0); // label for each vertex: N x 1
@@ -79,13 +78,14 @@ public:
 			layers[i]->print_layer_info();
 	}
 
-	void append_conv_layer(size_t layer_id, bool act = false, bool norm = true, bool bias = false, bool dropout = true) {
+	void append_conv_layer(size_t layer_id, bool act = false, bool norm = true, bool bias = false, bool dropout = true, float dropout_rate = 0.5) {
+		assert(dropout_rate < 1.0);
 		assert(layer_id < NUM_CONV_LAYERS);
 		std::vector<size_t> in_dims(2), out_dims(2);
 		in_dims[0] = out_dims[0] = n;
 		in_dims[1] = get_in_dim(layer_id);
 		out_dims[1] = get_out_dim(layer_id);
-		layers[layer_id] = new graph_conv_layer(layer_id, &g, act, norm, bias, dropout, in_dims, out_dims);
+		layers[layer_id] = new graph_conv_layer(layer_id, &g, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
 		if(layer_id > 0) connect(layers[layer_id-1], layers[layer_id]);
 	}
 

@@ -1,0 +1,43 @@
+#ifndef _MATH_FUNCTIONS_
+#define _MATH_FUNCTIONS_
+#include <cmath>
+#include "types.h"
+#include <immintrin.h>
+
+const float negative_slope = 0;
+
+void vadd(const vec_t &a, const vec_t &b, vec_t &out);
+void vadd(size_t n, const float_t *a, const float_t *b, float_t *out);
+void vsub(const vec_t &a, const vec_t &b, vec_t &out);
+void vmul(const vec_t &a, const vec_t &b, vec_t &out);
+void vdiv(const vec_t &a, const vec_t &b, vec_t &out);
+void add_scalar(const float_t alpha, vec_t &Y);
+void sub_scalar(const float_t alpha, vec_t &Y);
+void mul_scalar(const float_t alpha, vec_t &Y);
+void mul_scalar(size_t n, const float_t alpha, const float_t *in, float_t *out);
+void div_scalar(const float_t alpha, vec_t &Y);
+float_t dot(const vec_t &x, const vec_t &y);
+void mvmul(const vec_t &matrix, const vec_t &in_vector, vec_t &out_vector);
+void vvmul(const vec_t &a, const vec_t &b, tensor_t &out);
+void matadd(size_t x, size_t y, const tensor_t &A, const tensor_t &B, tensor_t &C);
+void copy2D1D(const tensor_t &in, vec_t &out);
+void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C);
+void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, const vec_t &A, const vec_t &B, vec_t &C);
+void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, vec_t &C);
+void transpose2D(const tensor_t &in, tensor_t &out);
+void transpose2D1D(const tensor_t &in, vec_t &out);
+void transpose(size_t x, size_t y, const vec_t &in, vec_t &out);
+int argmax(const size_t n, const vec_t &x);
+void clear(vec_t &in);
+void relu(const vec_t &in, vec_t &out);
+void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t &norm_factor);
+void update_all(Graph *g, const vec_t &in, tensor_t &out, bool norm, const vec_t &norm_factor);
+void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &mask, vec_t &out);
+void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &mask, float_t *out);
+void d_dropout(const float scale, const vec_t &in_diff, std::vector<unsigned> &mask, vec_t &out_diff);
+void softmax(const vec_t &input, vec_t &output);
+void d_softmax(const vec_t &y, const vec_t &p, vec_t &dy, const vec_t &dp);
+float_t cross_entropy(const vec_t &y, const vec_t &p);
+void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d);
+
+#endif

@@ -3,6 +3,6 @@ include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/../libllvm/include
 )
 include_directories(${CMAKE_SOURCE_DIR}/lonestargnn)
-include_directories(${CMAKE_SOURCE_DIR}/libdeepgalois)
+include_directories(${CMAKE_SOURCE_DIR}/libdeepgalois/include)
 
 add_subdirectory(gcn)

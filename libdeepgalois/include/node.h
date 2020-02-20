@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "types.h"
 class node;
 class layer;
 class edge;

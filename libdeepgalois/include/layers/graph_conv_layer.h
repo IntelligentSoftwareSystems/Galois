@@ -16,8 +16,9 @@
 class graph_conv_layer: public layer {
 public:
 	graph_conv_layer(unsigned level, Graph *g, bool act, bool norm, bool bias, bool dropout,
-		std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
-		layer(level, in_dims, out_dims), graph(g), act_(act), norm_(norm), bias_(bias), dropout_(dropout) {
+		float dropout_rate, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
+		layer(level, in_dims, out_dims), graph(g), act_(act), norm_(norm), bias_(bias), 
+		dropout_(dropout), dropout_rate_(dropout_rate) {
 		assert(input_dims[0] == output_dims[0]); // num_vertices
 		x = input_dims[0];
 		y = input_dims[1];
@@ -26,7 +27,11 @@ public:
 		name_ = layer_type() + "_" + std::to_string(level);
 		//std::cout << name_ << " constructed: act(" << act_ << ") dropout(" << dropout << ")\n";
 		init();
+		scale_ = 1. / (1. - dropout_rate_);
 	}
+	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
+		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, true, false, true, 0.5, in_dims, out_dims) {}
+	~graph_conv_layer() {}
 	void init() {
 		std::cout << name_ << ": allocating memory for parameters and intermediate data... ";
 		Timer t_alloc;
@@ -50,9 +55,6 @@ public:
 		t_alloc.Stop();
 		std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
 	}
-	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
-		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, true, false, true, in_dims, out_dims) {}
-	~graph_conv_layer() {}
 	std::string layer_type() const override { return std::string("graph_conv"); }
 
 	// user-defined aggregate function
@@ -78,12 +80,10 @@ public:
 		//Timer t_matmul, t_agg, t_dropout;
 		//t_matmul.Start();
 		if (dropout_ && phase_ == net_phase::train) {
-			//t_dropout.Start();
 			//for (size_t i = 0; i < x; ++i) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-				dropout(in_data[i], dropout_mask[i], &in_temp[i*y]);
+				dropout(scale_, dropout_rate_, in_data[i], dropout_mask[i], &in_temp[i*y]);
 			}, galois::loopname("dropout"));
-			//t_dropout.Stop();
 			matmul1D1D(x, z, y, in_temp, W, out_temp); // x*y; y*z; x*z
 		} else matmul2D1D(z, in_data, W, out_temp); // x*y; y*z; x*z
 		//t_matmul.Stop();
@@ -119,7 +119,7 @@ public:
 			update_all(graph, in_temp, in_grad, true, norm_factor); // x*x; x*y -> x*y NOTE: since graph is symmetric, the derivative is the same
 			if (dropout_) {
 				galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-					d_dropout(in_grad[i], dropout_mask[i], in_grad[i]);
+					d_dropout(scale_, in_grad[i], dropout_mask[i], in_grad[i]);
 				}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("d_dropout"));
 			}
 		}
@@ -154,6 +154,8 @@ private:
 	bool norm_; // whether to normalize data
 	bool bias_; // whether to add bias afterwards
 	bool dropout_; // whether to use dropout at first
+	const float dropout_rate_;
+	float scale_;
 	net_phase phase_;
 	size_t x;
 	size_t y;

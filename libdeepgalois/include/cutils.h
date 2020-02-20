@@ -1,4 +1,9 @@
 #pragma once
+#include <cuda.h>
+#include <curand.h>
+#include <cublas_v2.h>
+#include <cuda_runtime.h>
+#include <driver_types.h>
 
 // CUDA: use 256 threads per block
 const int CUDA_NUM_THREADS = 256;
@@ -10,7 +15,6 @@ inline int CUDA_GET_BLOCKS(const int N) {
 
 // CUDA: various checks for different function calls.
 #define CUDA_CHECK(condition) \
-  // Code block avoids redefinition of cudaError_t error \
   do { \
     cudaError_t error = condition; \
     CHECK_EQ(error, cudaSuccess) << " " << cudaGetErrorString(error); \
