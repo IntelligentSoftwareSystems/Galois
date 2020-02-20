@@ -103,12 +103,11 @@ void rationalConversionError(double fpVal) {
 }
 
 int main() {
-
-  Rational x(1, 3);
-
   multiplyTest(0.125, 1000.0, 125.0);
 
   multiplyTestRational(Rational(125, 1000), Rational(1000), Rational(125));
+
+  rationalConversionError(boost::rational_cast<double>(Rational(1, 3)));
 
   rationalConversionError(sqrt(2.0));
   rationalConversionError(sqrt(3.0));

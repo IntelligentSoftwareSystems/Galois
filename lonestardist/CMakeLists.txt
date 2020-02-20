@@ -152,3 +152,8 @@ add_subdirectory(sssp)
 #add_subdirectory(kclique)
 
 add_subdirectory(partition)
+
+# currently tc only has a GPU implementation
+if(ENABLE_HETERO_GALOIS)
+  add_subdirectory(tc)
+endif()

@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(std::max(
-    (uint64_t)galois::getActiveThreads() * (graph.size() / 1000000),
+    (size_t)galois::getActiveThreads() * (graph.size() / 1000000),
     std::max(10u, galois::getActiveThreads()) * (size_t)10
   ));
   preallocTime.stop();

@@ -106,7 +106,7 @@ struct Node : public galois::UnionFindNode<Node> {
     return *this;
   }
 
-  component_type component() { return this->findAndCompress(); }
+  component_type component() { return this->get(); }
   bool isRepComp(unsigned int x) { return false; }
 };
 
@@ -322,6 +322,16 @@ struct AsyncAlgo {
         },
         galois::loopname("CC-Async"));
 
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("CC-Async-Compress")
+    );
+
     galois::runtime::reportStat_Single("CC-Async", "emptyMerges",
                                        emptyMerges.reduce());
   }
@@ -413,6 +423,16 @@ struct EdgeTiledAsyncAlgo {
         galois::chunk_size<CHUNK_SIZE>() // 16 -> 1
     );
 
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("CC-Async-Compress")
+    );
+
     galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges",
                                        emptyMerges.reduce());
   }
@@ -460,6 +480,16 @@ struct EdgeAsyncAlgo {
           }
         },
         galois::loopname("CC-EdgeAsync"), galois::steal());
+
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("CC-Async-Compress")
+    );
 
     galois::runtime::reportStat_Single("CC-Async", "emptyMerges",
                                        emptyMerges.reduce());
@@ -535,6 +565,16 @@ struct BlockedAsyncAlgo {
                      },
                      galois::loopname("Merge"),
                      galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
+
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("CC-Async-Compress")
+    );
   }
 };
 

@@ -165,7 +165,7 @@ public:
     }
     if (!active) { // check pending receives after checking snapshot
       active = net.anyPendingReceives();
-      if (active) galois::gDebug("[", net.ID, "] pending receive \n");
+      if (active) galois::gDebug("[", net.ID, "] pending receive");
     }
     if (active) {
       work_done = true;
@@ -176,14 +176,14 @@ public:
           work_done = false;
           prev_snapshot = snapshot;
           ++snapshot;
-          galois::gDebug("[", net.ID, "] work done, taking snapshot ", snapshot, " \n");
+          galois::gDebug("[", net.ID, "] work done, taking snapshot ", snapshot);
           initiate_snapshot();
         } else if (prev_snapshot != snapshot) {
           prev_snapshot = snapshot;
-          galois::gDebug("[", net.ID, "] no work done, taking snapshot ", snapshot, " \n");
+          galois::gDebug("[", net.ID, "] no work done, taking snapshot ", snapshot);
           initiate_snapshot();
         } else {
-          galois::gDebug("[", net.ID, "] terminating ", snapshot, " \n");
+          galois::gDebug("[", net.ID, "] terminating ", snapshot);
           reinitialize(); // for next async phase
           return true;
         }

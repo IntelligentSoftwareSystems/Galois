@@ -204,7 +204,7 @@ public:
     size_t bit_index    = index / bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index % bits_uint64);
-    size_t old_val = bitvec[bit_index];
+    uint64_t old_val = bitvec[bit_index];
     // test and set
     // if old_bit is 0, then atomically set it
     while (((old_val & bit_offset) == 0) &&
@@ -224,7 +224,7 @@ public:
     size_t bit_index = index/bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index%bits_uint64);
-    size_t old_val = bitvec[bit_index];
+    uint64_t old_val = bitvec[bit_index];
     // test and reset
     // if old_bit is 1, then atomically reset it
     while (((old_val & bit_offset) != 0) &&
@@ -238,7 +238,7 @@ public:
   void bitwise_or(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(0ul, bitvec.size()),
+    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
                    [&](size_t i) { bitvec[i] |= other_bitvec[i]; },
                    galois::no_stats());
   }
@@ -253,7 +253,7 @@ public:
   void bitwise_and(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(0ul, bitvec.size()),
+    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
                    [&](size_t i) { bitvec[i] &= other_bitvec[i]; },
                    galois::no_stats());
   }
@@ -271,7 +271,7 @@ public:
     auto& other_bitvec1 = other1.get_vec();
     auto& other_bitvec2 = other2.get_vec();
 
-    galois::do_all(galois::iterate(0ul, bitvec.size()),
+    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
                    [&](size_t i) {
                      bitvec[i] = other_bitvec1[i] & other_bitvec2[i];
                    },
@@ -286,7 +286,7 @@ public:
   void bitwise_xor(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(0ul, bitvec.size()),
+    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
                    [&](size_t i) { bitvec[i] ^= other_bitvec[i]; },
                    galois::no_stats());
   }
@@ -304,7 +304,7 @@ public:
     auto& other_bitvec1 = other1.get_vec();
     auto& other_bitvec2 = other2.get_vec();
 
-    galois::do_all(galois::iterate(0ul, bitvec.size()),
+    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
                    [&](size_t i) {
                      bitvec[i] = other_bitvec1[i] ^ other_bitvec2[i];
                    },

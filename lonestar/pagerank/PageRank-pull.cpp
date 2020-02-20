@@ -30,7 +30,6 @@ const char* desc =
     "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 
 enum Algo { Topo = 0, Residual };
-const char* const ALGO_NAMES[] = {"Topological", "Residual"};
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Topo, "Topological"),
@@ -291,6 +290,34 @@ int main(int argc, char** argv) {
   }
 
   galois::reportPageAlloc("MeminfoPost");
+
+  // Sanity checking code
+  galois::GReduceMax<PRTy> maxRank;
+  galois::GReduceMin<PRTy> minRank;
+  galois::GAccumulator<PRTy> distanceSum;
+  maxRank.reset();
+  minRank.reset();
+  distanceSum.reset();
+
+  galois::do_all(
+    galois::iterate(transposeGraph),
+    [&] (uint64_t i) {
+      PRTy rank = transposeGraph.getData(i).value;
+
+      maxRank.update(rank);
+      minRank.update(rank);
+      distanceSum += rank;
+    },
+    galois::loopname("Sanity check"),
+    galois::no_stats()
+  );
+
+  PRTy rMaxRank = maxRank.reduce();
+  PRTy rMinRank = minRank.reduce();
+  PRTy rSum = distanceSum.reduce();
+  galois::gInfo("Max rank is ", rMaxRank);
+  galois::gInfo("Min rank is ", rMinRank);
+  galois::gInfo("Sum is ", rSum);
 
   if (!skipVerify) {
     printTop(transposeGraph);

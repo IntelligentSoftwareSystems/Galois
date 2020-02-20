@@ -7,7 +7,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=False $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 struct ThreadWork t_work;
 bool enable_lb = true;
 #include "bfs_push_cuda.cuh"
@@ -112,8 +112,9 @@ __global__ void FirstItr_BFS_TB_LB(CSRGraph graph, unsigned int __begin, unsigne
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
-  // FP: "48 -> 49;
+  // FP: "49 -> 50;
 }
 __global__ void FirstItr_BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {
@@ -427,8 +428,9 @@ __global__ void BFS_TB_LB(CSRGraph graph, unsigned int __begin, unsigned int __e
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
-  // FP: "49 -> 50;
+  // FP: "50 -> 51;
 }
 __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t local_priority, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices, HGAccumulator<unsigned int> work_items, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {

@@ -25,6 +25,46 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
   }
 };
 
+/**
+ */
+class MiningPolicyNaive : public galois::graphs::ReadMasterAssignment {
+ public:
+  MiningPolicyNaive(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
+                    std::vector<uint64_t>&) :
+    galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) { }
+
+  static bool needNodeDegrees() {
+    return false;
+  }
+
+  bool keepEdge(uint32_t src, uint32_t dst) const {
+    return src < dst;
+  }
+};
+
+class MiningPolicyDegrees : public galois::graphs::ReadMasterAssignment {
+  std::vector<uint64_t>& ndegrees;
+ public:
+  MiningPolicyDegrees(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
+                std::vector<uint64_t>& _ndeg) :
+    galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0), ndegrees(_ndeg) { }
+
+  static bool needNodeDegrees() {
+    return true;
+  }
+
+  bool keepEdge(uint32_t src, uint32_t dst) const {
+    uint64_t sourceDegree = ndegrees[src];
+    uint64_t destDegree = ndegrees[dst];
+    if ((destDegree > sourceDegree) ||
+        ((destDegree == sourceDegree) && (src < dst))) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class GenericCVC : public galois::graphs::ReadMasterAssignment {

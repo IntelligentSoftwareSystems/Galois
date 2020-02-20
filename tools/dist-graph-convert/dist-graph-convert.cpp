@@ -3,7 +3,7 @@
  * The code is being released under the terms of the 3-Clause BSD License (a
  * copy is located in LICENSE.txt at the top-level directory).
  *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -16,6 +16,10 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
+
+
+// @todo MPI files probably not necessary to use here; just use regular C
+// files and/or mmap
 
 #include <utility>
 
@@ -39,6 +43,10 @@ enum ConvertMode {
 
 enum EdgeType { uint32_, void_ };
 
+////////////////////////////////////////////////////////////////////////////////
+// Command Line Args
+////////////////////////////////////////////////////////////////////////////////
+
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional,
@@ -51,6 +59,7 @@ static cll::opt<EdgeType>
                          clEnumValN(EdgeType::void_, "void", "no edge values"),
                          clEnumValEnd),
              cll::init(EdgeType::void_));
+
 static cll::opt<ConvertMode> convertMode(
     cll::desc("Conversion mode:"),
     cll::values(clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
@@ -67,10 +76,13 @@ static cll::opt<ConvertMode> convertMode(
                 clEnumVal(nodemap2binary, "Convert node map into binary form"),
                 clEnumValEnd),
     cll::Required);
+
 static cll::opt<unsigned long long>
     totalNumNodes("numNodes", cll::desc("Nodes in input graph"), cll::init(0));
+
 static cll::opt<unsigned> threadsToUse("t", cll::desc("Threads to use"),
                                        cll::init(1));
+
 static cll::opt<bool> editInPlace("inPlace",
                                   cll::desc("Flag specifying conversion is in "
                                             "place"),
@@ -79,20 +91,37 @@ static cll::opt<std::string>
     nodeMapBinary("nodeMapBinary",
                   cll::desc("Binary file of numbers mapping nodes"),
                   cll::init(std::string()));
+
 static cll::opt<bool>
     startAtOne("startAtOne",
                cll::desc("Set this if edgelist nodeid start at 1"),
                cll::init(false));
+
 static cll::opt<bool>
     ignoreWeights("ignoreWeights",
                   cll::desc("Set this to ignore edgelist weights"),
                   cll::init(false));
 
-struct Conversion {};
+static cll::opt<bool>
+    keepSelfLoops("keepSelfLoops",
+                  cll::desc("Used for graph cleaning: if set, keeps self "
+                            "loops instead of removing them"),
+                  cll::init(false));
+
+static cll::opt<bool> cleanCheck("cleanCheck",
+                  cll::desc("Only checks if graph is clean; no write occurs."),
+                  cll::init(false));
+
+static cll::opt<bool> symNoClean("symNoClean",
+                  cll::desc("gr2sgr option: if true, does not clean the graph "
+                            "after symmetrization"),
+                  cll::init(false));
 
 ////////////////////////////////////////////////////////////////////////////////
 // BEGIN CONVERT CODE/STRUCTS
 ////////////////////////////////////////////////////////////////////////////////
+
+struct Conversion {};
 
 /**
  * Convert 1: figure out edge type, then call convert with edge type as
@@ -123,8 +152,8 @@ void convert(C& c, Conversion) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    printf("Input: %s; Output: %s\n", inputFilename.c_str(),
-           outputFilename.c_str());
+    std::cout << "Input: " << inputFilename
+      << "; Output: " << outputFilename << "\n";
   }
 
   galois::runtime::getHostBarrier().wait();
@@ -135,7 +164,7 @@ void convert(C& c, Conversion) {
   convertTimer.stop();
 
   if (net.ID == 0) {
-    galois::gPrint("Done with convert\n");
+    galois::gInfo("Done with convert\n");
   }
 }
 
@@ -161,16 +190,13 @@ struct Edgelist2Gr : public Conversion {
     std::ifstream edgeListFile(inputFile.c_str());
     uint64_t fileSize = getFileSize(edgeListFile);
     if (hostID == 0) {
-      printf("File size is %lu\n", fileSize);
+      std::cout << "File size is " << fileSize << "\n";
     }
 
     uint64_t localStartByte;
     uint64_t localEndByte;
     std::tie(localStartByte, localEndByte) =
         determineByteRange(edgeListFile, fileSize);
-    // printf("[%lu] Byte start %lu byte end %lu, num bytes %lu\n", hostID,
-    //               localStartByte, localEndByte, localEndByte -
-    //               localStartByte);
     // load edges into a vector
     std::vector<uint32_t> localEdges = loadEdgesFromEdgeList<EdgeTy>(
         edgeListFile, localStartByte, localEndByte, totalNumNodes, startAtOne,
@@ -179,7 +205,7 @@ struct Edgelist2Gr : public Conversion {
 
     uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     if (hostID == 0) {
-      printf("Total num edges %lu\n", totalEdgeCount);
+      std::cout << "Total num edges " << totalEdgeCount << "\n";
     }
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, totalEdgeCount,
                                 outputFile);
@@ -207,11 +233,14 @@ struct Gr2TGr : public Conversion {
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
-    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-           nodesToRead.second);
-    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID,
-           edgesToRead.first, edgesToRead.second,
-           edgesToRead.second - edgesToRead.first);
+    std::cout << "[" << hostID << "] Reads nodes "
+      << nodesToRead.first << " to "
+      << nodesToRead.second << "\n";
+    std::cout << "[" << hostID << "] Reads edges "
+      << edgesToRead.first << " to "
+      << edgesToRead.second << " (count "
+      << (edgesToRead.second - edgesToRead.first)
+      << ")\n";
 
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to do it TRANSPOSED
@@ -250,11 +279,14 @@ struct Gr2SGr : public Conversion {
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
-    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-           nodesToRead.second);
-    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID,
-           edgesToRead.first, edgesToRead.second,
-           edgesToRead.second - edgesToRead.first);
+    std::cout << "[" << hostID << "] Reads nodes "
+      << nodesToRead.first << " to "
+      << nodesToRead.second << "\n";
+    std::cout << "[" << hostID << "] Reads edges "
+      << edgesToRead.first << " to "
+      << edgesToRead.second << " (count "
+      << (edgesToRead.second - edgesToRead.first)
+      << ")\n";
 
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to load one edge as 2 edges (i.e. symmetric)
@@ -265,6 +297,7 @@ struct Gr2SGr : public Conversion {
     uint64_t doubleEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     GALOIS_ASSERT(doubleEdgeCount == 2 * totalNumEdges,
                   "data needs to have twice as many edges as original graph");
+
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, doubleEdgeCount,
                                 outputFile);
     galois::runtime::getHostBarrier().wait();
@@ -290,8 +323,9 @@ struct Gr2WGr : public Conversion {
     std::tie(localEdgeBegin, localEdgeEnd) = getLocalAssignment(totalNumEdges);
 
     uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-    printf("[%u] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
-           localEdgeEnd);
+    std::cout << "[" << hostID << "] Responsible for edges "
+      << localEdgeBegin << " to "
+      << localEdgeEnd << "\n";
 
     // get edge data to write (random numbers) and get location to start
     // write
@@ -328,7 +362,9 @@ struct Gr2CGr : public Conversion {
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(std::is_void<EdgeTy>::value,
                   "Edge type must be void to clean graph");
-    GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
+    if (!cleanCheck) {
+      GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
+    }
 
     auto& net       = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
@@ -342,21 +378,45 @@ struct Gr2CGr : public Conversion {
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
-    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-           nodesToRead.second);
-    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID,
-           edgesToRead.first, edgesToRead.second,
-           edgesToRead.second - edgesToRead.first);
+    std::cout << "[" << hostID << "] Reads nodes "
+      << nodesToRead.first << " to "
+      << nodesToRead.second << "\n";
+    std::cout << "[" << hostID << "] Reads edges "
+      << edgesToRead.first << " to "
+      << edgesToRead.second << " (count "
+      << (edgesToRead.second - edgesToRead.first)
+      << ")\n";
 
     std::vector<uint32_t> localEdges = loadCleanEdgesFromBufferedGraph(
-        inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges);
+        inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges,
+        keepSelfLoops);
     uint64_t cleanEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     GALOIS_ASSERT(cleanEdgeCount <= totalNumEdges,
                   "clean should not increase edge count");
 
     if (hostID == 0) {
-      galois::gPrint("From ", totalNumEdges, " edges to ", cleanEdgeCount,
-                     "edges\n");
+      galois::gInfo("From ", totalNumEdges, " edges to ", cleanEdgeCount,
+                    " edges\n");
+    }
+
+    if (cleanCheck) {
+      // only want a clean check; ok to quit here
+      galois::runtime::getHostBarrier().wait();
+      if (hostID == 0) {
+        if (totalNumEdges == cleanEdgeCount) {
+          galois::gInfo("Graph is clean");
+        } else {
+          galois::gInfo("Graph is not clean");
+        }
+      }
+      return;
+    }
+
+    if (totalNumEdges == cleanEdgeCount) {
+      if (hostID == 0) {
+        galois::gInfo("IMPORTANT: Graph was already clean; ending convert now");
+      }
+      return;
     }
 
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, cleanEdgeCount,
@@ -488,11 +548,14 @@ struct Tgr2Lux : public Conversion {
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
-    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-           nodesToRead.second);
-    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID,
-           edgesToRead.first, edgesToRead.second,
-           edgesToRead.second - edgesToRead.first);
+    std::cout << "[" << hostID << "] Reads nodes "
+      << nodesToRead.first << " to "
+      << nodesToRead.second << "\n";
+    std::cout << "[" << hostID << "] Reads edges "
+      << edgesToRead.first << " to "
+      << edgesToRead.second << " (count "
+      << (edgesToRead.second - edgesToRead.first)
+      << ")\n";
 
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to do it TRANSPOSED
@@ -525,7 +588,7 @@ struct Nodemap2Binary : public Conversion {
     std::ifstream mapFile(inputFile.c_str());
     uint64_t fileSize = getFileSize(mapFile);
     if (hostID == 0) {
-      printf("File size is %lu\n", fileSize);
+      std::cout << "File size is " << fileSize << "\n";
     }
     uint64_t localStartByte;
     uint64_t localEndByte;
@@ -541,9 +604,12 @@ struct Nodemap2Binary : public Conversion {
     }
     mapFile.close();
 
-    printf("[%u] Read %lu numbers\n",
-           galois::runtime::getSystemNetworkInterface().ID,
-           nodesToWrite.size());
+    std::cout
+      << "["
+      << galois::runtime::getSystemNetworkInterface().ID
+      << "] Read "
+      << nodesToWrite.size()
+      << "numbers\n";
 
     // determine where to start writing using prefix sum of read nodes
     std::vector<uint64_t> nodesEachHostRead =
@@ -587,6 +653,10 @@ int main(int argc, char** argv) {
   }
 #endif
 
+  if (cleanCheck) {
+    convertMode = gr2cgr;
+  }
+
   switch (convertMode) {
   case edgelist2gr:
     convert<Edgelist2Gr>();
@@ -599,6 +669,21 @@ int main(int argc, char** argv) {
     break;
   case gr2sgr:
     convert<Gr2SGr>();
+
+    // clean graph of multiedges and selfloops
+    // Note: if want to keep self loops use the flag for it
+    if (!symNoClean) {
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::gInfo("Cleaning the newly symmetrized graph");
+        if (!keepSelfLoops) {
+          galois::gInfo("Removing self loops: if want to keep, use the flag");
+        }
+      }
+      // overwrite new symmetric graph with clean version of self
+      inputFilename = outputFilename;
+      convert<Gr2CGr>();
+    }
+
     break;
   case gr2cgr:
     convert<Gr2CGr>();

@@ -143,11 +143,6 @@ if(CMAKE_COMPILER_IS_GNUCC)
   if(GCC_VERSION VERSION_LESS 5.2)
     message(FATAL_ERROR "GCC must be 5.2 or higher")
   endif()
-  #new debugging optimization level
-  # if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
-  # endif()
 endif()
 
 # Enable architecture-specific optimizations
@@ -189,9 +184,10 @@ if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
 if(ENABLE_DIST_GALOIS)
+  add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+  set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS}")
+  set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS}")
   include_directories(${MPI_INCLUDE_PATH})
 
   if (USE_LCI)
@@ -312,10 +308,6 @@ endif()
 # PThreads
 find_package(Threads REQUIRED)
 
-#llvm ADT and command line parser
-#find_package(LLVM)
-
-# include(CheckCilk)
 include(CheckMmap)
 
 # HugePages
@@ -340,11 +332,6 @@ include_directories(${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_NO_AUTO_PTR)
 
 include(CheckEndian)
-
-#include(llvm-extras)
-#always import c99 stdint functions into c++
-#include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
-#include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us
 
 ###### Build Hacks ######
 
@@ -413,16 +400,12 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(linkApp name extlibs)
-  # if(${APP_EXP_OPT})
-    # target_link_libraries(${name} galois_exp)
-  # endif()
   if (NOT extlibs STREQUAL "")
     target_link_libraries(${name} ${extlibs})
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
   target_link_libraries(${name} gllvm)
-  target_link_libraries(${name} rt)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
   if(VTune_FOUND)
@@ -435,7 +418,7 @@ function(linkApp name extlibs)
 
 endfunction(linkApp)
 
-# TODO: sepearte out shared and dist libraries to link
+# TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
 function(app name)
   set(options DISTSAFE EXP_OPT)

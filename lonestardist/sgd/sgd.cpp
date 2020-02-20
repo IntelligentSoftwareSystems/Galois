@@ -292,12 +292,12 @@ struct SGD {
         galois::atomicAdd(
             residual_user_node[i],
             double(step_size * (cur_error * prevMovie - LAMBDA * prevUser)));
-        assert(std::isnormal(residual_user_node[i]));
+        assert(std::isnormal(residual_user_node[i].load()));
 
         galois::atomicAdd(
             residual_movie_node[i],
             double(step_size * (cur_error * prevUser - LAMBDA * prevMovie)));
-        assert(std::isnormal(residual_movie_node[i]));
+        assert(std::isnormal(residual_movie_node[i].load()));
       }
     }
   }

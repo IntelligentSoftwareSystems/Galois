@@ -471,8 +471,6 @@ double checkAllPairs(Bodies& bodies, int N) {
 }
 
 void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
-  typedef galois::worklists::PerSocketChunkLIFO<256> WL_;
-  typedef galois::worklists::PerThreadChunkLIFO<32> WL;
   typedef galois::worklists::StableIterator<true> WLL;
 
   galois::preAlloc(galois::getActiveThreads() +

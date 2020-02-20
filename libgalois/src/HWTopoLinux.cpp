@@ -35,7 +35,9 @@
 #include <numaif.h>
 #endif
 
+#ifdef GALOIS_USE_SCHED_SETAFFINITY
 #include <sched.h>
+#endif
 
 using namespace galois::substrate;
 
@@ -64,22 +66,18 @@ static bool operator<(const cpuinfo& lhs, const cpuinfo& rhs) {
 }
 
 static unsigned getNumaNode(cpuinfo& c) {
-  static bool numaAvail = false;
   static bool warnOnce  = false;
+#ifdef GALOIS_USE_NUMA
+  static bool numaAvail = false;
+
   if (!warnOnce) {
     warnOnce = true;
-#ifdef GALOIS_USE_NUMA
     numaAvail = numa_available() >= 0;
     if (!numaAvail)
       galois::gWarn("Numa support configured but not present at runtime.  "
                     "Assuming numa topology matches socket topology.");
-#else
-    galois::gWarn("Numa Support Not configured (install libnuma-dev).  "
-                  "Assuming numa topology matches socket topology.");
-#endif
   }
 
-#ifdef GALOIS_USE_NUMA
   if (!numaAvail)
     return c.physid;
   int i = numa_node_of_cpu(c.proc);
@@ -87,6 +85,11 @@ static unsigned getNumaNode(cpuinfo& c) {
     GALOIS_SYS_DIE("failed finding numa node for ", c.proc);
   return i;
 #else
+  if (!warnOnce) {
+    warnOnce = true;
+    galois::gWarn("Numa Support Not configured (install libnuma-dev).  "
+                  "Assuming numa topology matches socket topology.");
+  }
   return c.physid;
 #endif
 }
@@ -294,7 +297,7 @@ galois::substrate::getHWTopo() {
 
 //! binds current thread to OS HW context "proc"
 bool galois::substrate::bindThreadSelf(unsigned osContext) {
-#ifndef __CYGWIN__
+#ifdef GALOIS_USE_SCHED_SETAFFINITY
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
   CPU_ZERO(&mask);
@@ -311,7 +314,7 @@ bool galois::substrate::bindThreadSelf(unsigned osContext) {
   }
   return true;
 #else
-  galois::gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  galois::gWarn("Cannot set cpu affinity on this platform.  Performance will be bad.");
   return false;
 #endif
 }

@@ -623,7 +623,7 @@ struct GetCRend
   }
 };
 
-enum StlIterKind { NORMAL, CONST, REVERSE, CONST_REVERSE };
+enum StlIterKind { NORMAL, _CONST, REVERSE, _CONST_REVERSE };
 
 template <typename C, typename I>
 struct IsConstIter {
@@ -663,7 +663,7 @@ struct GetStlIterKind {
       IsConstIter<C, I>::value || IsRvrsConstIter<C, I>::value;
 
   static const StlIterKind value =
-      isRvrs ? (isConst ? CONST_REVERSE : REVERSE) : (isConst ? CONST : NORMAL);
+      isRvrs ? (isConst ? _CONST_REVERSE : REVERSE) : (isConst ? _CONST : NORMAL);
 };
 
 template <typename C, typename I, enum StlIterKind>
@@ -680,7 +680,7 @@ struct ChooseStlIter<C, I, NORMAL> {
 };
 
 template <typename C, typename I>
-struct ChooseStlIter<C, I, CONST> {
+struct ChooseStlIter<C, I, _CONST> {
 
   typedef typename C::const_iterator Inner;
   typedef GetCbegin<C> InnerBegFn;
@@ -696,7 +696,7 @@ struct ChooseStlIter<C, I, REVERSE> {
 };
 
 template <typename C, typename I>
-struct ChooseStlIter<C, I, CONST_REVERSE> {
+struct ChooseStlIter<C, I, _CONST_REVERSE> {
 
   typedef typename C::const_reverse_iterator Inner;
   typedef GetCRbegin<C> InnerBegFn;
