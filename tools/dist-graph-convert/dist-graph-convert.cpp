@@ -609,7 +609,7 @@ struct Nodemap2Binary : public Conversion {
       << galois::runtime::getSystemNetworkInterface().ID
       << "] Read "
       << nodesToWrite.size()
-      << "numbers\n";
+      << " numbers\n";
 
     // determine where to start writing using prefix sum of read nodes
     std::vector<uint64_t> nodesEachHostRead =

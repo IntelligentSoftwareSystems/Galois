@@ -25,6 +25,7 @@ constexpr static const char* const REGION_NAME = "MRBC";
 #include "DistBenchStart.h"
 
 #include <iostream>
+#include <iomanip>
 
 // type of short path
 using ShortPathType = double;
@@ -713,14 +714,17 @@ int main(int argc, char** argv) {
 
   // Verify, i.e. print out graph data for examination
   if (verify) {
-    // buffer for text to be written out to file
-    char* v_out = (char*)malloc(40);
-
     for (auto ii = (*hg).masterNodesRange().begin();
          ii != (*hg).masterNodesRange().end(); ++ii) {
       if (!outputDistPaths) {
         // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
+        std::stringstream out;
+        out << (*hg).getGID(*ii)
+          << " "
+          << std::setprecision(9)
+          << (*hg).getData(*ii).bc
+          << "\n";
+        galois::runtime::printOutput(out.str().c_str());
       } else {
         uint64_t a      = 0;
         ShortPathType b = 0;
@@ -731,11 +735,7 @@ int main(int argc, char** argv) {
           b += (*hg).getData(*ii).sourceData[i].shortPathCount;
         }
       }
-
-      galois::runtime::printOutput(v_out);
     }
-
-    free(v_out);
   }
 
   return 0;

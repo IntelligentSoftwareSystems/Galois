@@ -35,11 +35,8 @@ struct emp {
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
-      // if (galois::runtime::LL::getTID() == 0)
-      //   usleep(100);
       b.wait();
     }
-    // std::cout << galois::runtime::LL::getTID() << " ";
   }
 
   template <typename T>
