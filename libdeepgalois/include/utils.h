@@ -3,6 +3,7 @@
 #include <random>
 #include <iomanip>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>

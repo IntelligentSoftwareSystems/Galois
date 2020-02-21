@@ -17,21 +17,23 @@ inline int CUDA_GET_BLOCKS(const int N) {
 #define CUDA_CHECK(condition) \
   do { \
     cudaError_t error = condition; \
-    CHECK_EQ(error, cudaSuccess) << " " << cudaGetErrorString(error); \
+    if (error != cudaSuccess) {    \
+      fprintf(stderr, "error %d: Cuda error in file '%s' in line %i : %s.\n", \
+      error, __FILE__, __LINE__, cudaGetErrorString(error) );                    \
+      exit(EXIT_FAILURE);                                                     \
+    } \
   } while (0)
 
 #define CUBLAS_CHECK(condition) \
   do { \
-    cublasStatus_t status = condition; \
-    CHECK_EQ(status, CUBLAS_STATUS_SUCCESS) << " " \
-      << caffe::cublasGetErrorString(status); \
+    cublasStatus_t status = condition;   \
+    if (status != CUBLAS_STATUS_SUCCESS) \
+      ;      \
   } while (0)
 
 #define CURAND_CHECK(condition) \
   do { \
     curandStatus_t status = condition; \
-    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << " " \
-      << caffe::curandGetErrorString(status); \
   } while (0)
 
 // CUDA: grid stride looping

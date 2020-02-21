@@ -2,7 +2,7 @@
 #define _MODEL_H_
 
 #include <random>
-#include "galois/Galois.h"
+#include "gtypes.h"
 #include "galois/Timer.h"
 #include "lgraph.h"
 #include "layers.h"
@@ -18,12 +18,6 @@ class Net {
 public:
 	Net() {}
 
-	// user-defined aggregate function
-	virtual void aggregate(Graph *g, size_t dim, const tensor_t &in_feats, tensor_t &out_feats) {}
-	
-	// user-defined combine function
-	virtual void combine(const vec_t ma, const vec_t mb, const vec_t &a, const vec_t &b, vec_t &out) {}
-	
 	void init() {
 		read_graph(dataset, g); 
 		n = g.size(); // N

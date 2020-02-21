@@ -21,6 +21,8 @@ void softmax_loss_layer::forward_propagation(const tensor_t &in_data, tensor_t &
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-fw"));
 }
 
+void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) { }
+
 void softmax_loss_layer::back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) {
 	//std::cout << name_ << " backward: x=" << in_grad.size() << ", y=" << in_grad[0].size() << "\n";
 	galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
@@ -32,3 +34,4 @@ void softmax_loss_layer::back_propagation(const tensor_t &in_data, const tensor_
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-bw"));
 }
 
+void softmax_loss_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) { }

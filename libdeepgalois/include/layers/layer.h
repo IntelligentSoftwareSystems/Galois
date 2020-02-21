@@ -6,6 +6,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <cassert>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -15,8 +16,9 @@
 #include "../node.h"
 #include "../types.h"
 #include "../utils.h"
+#include "../gtypes.h"
 #include "../optimizer.h"
-#include "../math_functions.hpp"
+#include "../math_functions.hh"
 /**
  * base class of all kind of NN layers
  *
@@ -36,11 +38,11 @@ public:
 		input_dims(in_dims), output_dims(out_dims) { add_edge(); }
 	virtual ~layer() = default;
 	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data) = 0;
-	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data,
-			tensor_t &out_grad, tensor_t &in_grad) = 0;
+	virtual void forward_propagation(const float_t *in_data, float_t *out_data) = 0;
+	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) = 0;
+	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 	virtual std::string layer_type() const = 0;
 	virtual void set_context(net_phase ctx) {}
-	//virtual void setup(Graph *g, vec_t *diff, LabelList *lab) = 0;
 
 	void set_trainable(bool trainable) { trainable_ = trainable; }
 	bool trainable() const { return trainable_; }
