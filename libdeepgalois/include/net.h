@@ -19,8 +19,7 @@ public:
 	Net() {}
 
 	void init() {
-		read_graph(dataset, g); 
-		n = g.size(); // N
+		n = read_graph_cpu(dataset, graph_cpu); 
 		labels.resize(n, 0); // label for each vertex: N x 1
 		num_classes = read_labels(dataset, labels);
 
@@ -50,7 +49,6 @@ public:
 	size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
 	size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id+1]; }
 	size_t get_nnodes() { return n; }
-	size_t get_nedges() { return g.sizeEdges(); }
 	size_t get_ft_dim() { return feature_dims[0]; }
 	size_t get_nclasses() { return num_classes; }
 	size_t get_label(size_t i) { return labels[i]; }
@@ -79,7 +77,11 @@ public:
 		in_dims[0] = out_dims[0] = n;
 		in_dims[1] = get_in_dim(layer_id);
 		out_dims[1] = get_out_dim(layer_id);
-		layers[layer_id] = new graph_conv_layer(layer_id, &g, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
+#ifdef CPU_ONLY
+		layers[layer_id] = new graph_conv_layer(layer_id, &graph_cpu, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
+#else
+		layers[layer_id] = new graph_conv_layer(layer_id, &graph_gpu, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
+#endif
 		if(layer_id > 0) connect(layers[layer_id-1], layers[layer_id]);
 	}
 
@@ -177,8 +179,11 @@ protected:
 	size_t num_classes; // number of vertex classes: E
 	size_t num_layers; // for now hard-coded: NUM_CONV_LAYERS + 1
 	std::vector<size_t> feature_dims; // feature dimnesions for each layer
-
-	Graph g; // the input graph, |V| = N
+#ifdef CPU_ONLY
+	Graph graph_cpu; // the input graph, |V| = N
+#else
+	CSRGraph graph_gpu; // the input graph, |V| = N
+#endif
 	tensor_t input_features; // input features: N x D
 	std::vector<label_t> labels; // labels for classification: N x 1
 	MaskList train_mask, val_mask; // masks for traning and validation
@@ -265,42 +270,23 @@ protected:
 		return n;
 	}
 
-	unsigned read_graph(std::string dataset_str, Graph &graph) {
-		//printf("Start readGraph\n");
+	size_t read_graph_cpu(std::string dataset_str, Graph &graph) {
 		galois::StatTimer Tread("GraphReadingTime");
 		Tread.start();
 		LGraph lgraph;
-		unsigned max_degree = 0;
 		if (filetype == "el") {
 			std::string filename = path + dataset_str + ".el";
 			printf("Reading .el file: %s\n", filename.c_str());
 			lgraph.read_edgelist(filename.c_str(), true); //symmetrize
 			genGraph(lgraph, graph);
+			lgraph.clean();
 		} else if (filetype == "gr") {
 			std::string filename = path + dataset_str + ".csgr";
 			printf("Reading .gr file: %s\n", filename.c_str());
 			galois::graphs::readGraph(graph, filename);
-			/*
-			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
-				graph.getData(vid) = 1;
-				//for (auto e : graph.edges(n)) graph.getEdgeData(e) = 1;
-			}, galois::chunk_size<256>(), galois::steal(), galois::loopname("assignVertexLabels"));
-			std::vector<unsigned> degrees(graph.size());
-			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
-				degrees[vid] = std::distance(graph.edge_begin(vid), graph.edge_end(vid));
-			}, galois::loopname("computeMaxDegree"));
-			max_degree = *(std::max_element(degrees.begin(), degrees.end()));
-			*/
 		} else { printf("Unkown file format\n"); exit(1); }
-		if (filetype != "gr") {
-			max_degree = lgraph.get_max_degree();
-			lgraph.clean();
-		}
-		printf("max degree = %u\n", max_degree);
 		Tread.stop();
-		//printf("Done readGraph\n");
-		std::cout << "num_vertices " << g.size() << " num_edges " << g.sizeEdges() << "\n";
-		return max_degree;
+		return graph.size();
 	}
 
 	void genGraph(LGraph &lg, Graph &g) {
@@ -312,23 +298,20 @@ protected:
 			auto row_end = lg.get_offset(i+1);
 			g.fixEndEdge(i, row_end);
 			for (auto offset = row_begin; offset < row_end; offset ++)
-				g.constructEdge(offset, lg.get_dest(offset), 0); // do not consider edge labels now
+				g.constructEdge(offset, lg.get_dest(offset), 0);
 		}
 	}
 
+	// comparing outputs with the ground truth (labels)
 	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
-		// comparing outputs with the ground truth (labels)
-		//acc_t accuracy_all = 0.0;
 		AccumF accuracy_all;
 		accuracy_all.reset();
-		//for (size_t i = begin; i < end; i++) {
 		galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
 			if (masks[i] == 1) {
-				int prediction = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
-				if ((label_t)prediction == labels[i]) accuracy_all += 1.0;
+				int preds = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
+				if ((label_t)preds == labels[i]) accuracy_all += 1.0;
 			}
 		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
-		//}
 		return accuracy_all.reduce() / (acc_t)count;
 	}
 };

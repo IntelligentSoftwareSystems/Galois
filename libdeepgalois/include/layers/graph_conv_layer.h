@@ -1,6 +1,6 @@
 #pragma once
 #include "layer.h"
-#include "gtypes.h"
+#include "aggregator.h"
 
 /* GraphConv Layer
 	Parameters
@@ -16,22 +16,15 @@
 */
 class graph_conv_layer: public layer {
 public:
+#ifdef CPU_ONLY
 	graph_conv_layer(unsigned level, Graph *g, bool act, bool norm, bool bias, bool dropout,
-		float dropout_rate, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
-		layer(level, in_dims, out_dims), graph(g), act_(act), norm_(norm), bias_(bias), 
-		dropout_(dropout), dropout_rate_(dropout_rate) {
-		assert(input_dims[0] == output_dims[0]); // num_vertices
-		x = input_dims[0];
-		y = input_dims[1];
-		z = output_dims[1];
-		trainable_ = true;
-		name_ = layer_type() + "_" + std::to_string(level);
-		//std::cout << name_ << " constructed: act(" << act_ << ") dropout(" << dropout << ")\n";
-		init();
-		scale_ = 1. / (1. - dropout_rate_);
-	}
-	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, 
-		std::vector<size_t> out_dims) : graph_conv_layer(level, NULL, false, true, false, true, 0.5, in_dims, out_dims) {}
+		float dropout_rate, std::vector<size_t> in_dims, std::vector<size_t> out_dims);
+#else
+	graph_conv_layer(unsigned level, CSRGraph *g, bool act, bool norm, bool bias, bool dropout,
+		float dropout_rate, std::vector<size_t> in_dims, std::vector<size_t> out_dims);
+#endif
+	graph_conv_layer(unsigned level, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
+		graph_conv_layer(level, NULL, false, true, false, true, 0.5, in_dims, out_dims) {}
 	~graph_conv_layer() {}
 	void init() {
 		std::cout << name_ << ": allocating memory for parameters and intermediate data... ";
@@ -47,11 +40,8 @@ public:
 			for (size_t i = 0; i < x; i++) dropout_mask[i].resize(y);
 		}
 		in_temp.resize(x*y);
-		//for (size_t i = 0; i < x; ++i) in_temp[i].resize(y);
 		out_temp.resize(x*z); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
-		//for (size_t i = 0; i < x; ++i) out_temp[i].resize(z);
 		trans_data.resize(y*x); // y*x
-		//for (size_t i = 0; i < y; ++i) trans_data[i].resize(x);
 		if (norm_) norm_factor_counting();
 		t_alloc.Stop();
 		std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
@@ -59,20 +49,21 @@ public:
 	std::string layer_type() const override { return std::string("graph_conv"); }
 	void set_context(net_phase ctx) override { phase_ = ctx; }
 	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data);
-	virtual void forward_propagation(const float_t *in_data, float_t *out_data);
 	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad);
+	virtual void forward_propagation(const float_t *in_data, float_t *out_data);
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad);
 	// user-defined aggregate function
+#ifdef CPU_ONLY
 	virtual void aggregate(Graph *g, const vec_t &in, tensor_t &out);
+#else
+	virtual void aggregate(CSRGraph g, const float_t *in, float_t *out);
+#endif
 	// user-defined combine function
-	virtual void combine(const vec_t &self, const vec_t &neighbors, const vec_t mat_v, const vec_t mat_u, vec_t &out) {
-		vec_t a(out.size(), 0);
-		vec_t b(out.size(), 0);
-		mvmul(mat_v, self, a);
-		mvmul(mat_u, neighbors, b); 
-		vadd(a, b, out); // out = W*self + Q*neighbors
-	}
+	virtual void combine(const vec_t &self, const vec_t &neighbors, vec_t &out);
+	// user-defined pre-computing function, called during initialization
+	virtual void norm_factor_counting();
 
+protected:
 	void degree_counting() {
 		assert(x == graph->size());
 		degrees.resize(x);
@@ -81,19 +72,12 @@ public:
 		}, galois::loopname("DegreeCounting"));
 	}
 
-	// for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
-	void norm_factor_counting() {
-		degree_counting();
-		norm_factor.resize(x);
-		galois::do_all(galois::iterate((size_t)0, x), [&] (auto v) {
-			float_t temp = std::sqrt(float_t(degrees[v]));
-			if (temp == 0.0) norm_factor[v] = 0.0;
-			else norm_factor[v] = 1.0 / temp;
-		}, galois::loopname("NormCounting"));
-	}
-
 private:
+#ifdef CPU_ONLY
 	Graph *graph;
+#else
+	CSRGraph graph_gpu;
+#endif
 	bool act_; // whether to use activation function at the end
 	bool norm_; // whether to normalize data
 	bool bias_; // whether to add bias afterwards
