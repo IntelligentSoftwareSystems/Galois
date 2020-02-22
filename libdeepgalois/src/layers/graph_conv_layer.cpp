@@ -80,6 +80,9 @@ void graph_conv_layer::back_propagation(const tensor_t &in_data, const tensor_t 
 	transpose2D1D(in_data, trans_data); // y*x
 	matmul1D1D(y, z, x, trans_data, out_temp, weight_grad); // y*x; x*z; y*z
 }
+
+void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {}
+void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {}
 #else
 graph_conv_layer::graph_conv_layer(unsigned level, CSRGraph *g, bool act, bool norm, bool bias, 
 	bool dropout, float dropout_rate, std::vector<size_t> in_dims, std::vector<size_t> out_dims) :
@@ -94,7 +97,10 @@ graph_conv_layer::graph_conv_layer(unsigned level, CSRGraph *g, bool act, bool n
 	init();
 	scale_ = 1. / (1. - dropout_rate_);
 }
-	
+
+void graph_conv_layer::forward_propagation(const tensor_t &in_data, tensor_t &out_data) {}
+void graph_conv_layer::back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) {}
+
 // GPU forward
 void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
 }
