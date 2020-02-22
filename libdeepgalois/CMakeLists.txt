@@ -9,6 +9,7 @@ SET(CUDA_LIB /org/centers/cdgc/cuda/cuda-8.0/lib64/)
 include_directories(${OPENBLAS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CUDA_INC})
 link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
@@ -23,14 +24,13 @@ else()
   set(CUDA_HOST_COMPILER g++)
   #list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_60,code=sm_60")
   #list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_60,code=sm_60; -std=c++11")
-  cuda_include_directories(${CUDA_INC})
   cuda_include_directories("${CUB_ROOT}")
   cuda_include_directories("${MGPU_ROOT}/src")
   cuda_include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
   link_directories(${CUDA_LIB})
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
   file(GLOB CUDA_FILES "src/" *.cu)
-  cuda_cpmpile(CU_O src/math_functions.cu src/aggregator.cu)
+  cuda_compile(CU_O src/math_functions.cu src/aggregator.cu)
   #CUDA_COMPILE(CU_O ${CUDA_FILES})
 endif()
 
@@ -41,6 +41,8 @@ set(sources
   src/layers/softmax_loss_layer.cpp
   src/math_functions.cpp
   src/aggregator.cpp
+  src/context.cpp
+  src/net.cpp
   ${CU_O}
 )
 add_library(deepgalois STATIC ${sources})
@@ -48,7 +50,7 @@ add_library(deepgalois STATIC ${sources})
 target_link_libraries(deepgalois galois_shmem gllvm galois_gpu)
 target_link_libraries(deepgalois ${MPI_CXX_LIBRARIES})
 target_link_libraries(deepgalois -lopenblas)
-target_link_libraries(deepgalois -lcudart -lcublas)
+target_link_libraries(deepgalois -lcudart -lcublas -lcurand)
 
 target_include_directories(deepgalois PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include

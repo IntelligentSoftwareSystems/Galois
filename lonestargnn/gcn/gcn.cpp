@@ -10,8 +10,8 @@ int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarGnnStart(argc, argv, name, desc, url);
 	Net network; // the neural network to train
-	network.init();
-	network.construct_layers(); // default setting for now; see its implementation to find how to customize it by the user
+	network.init(dataset, epochs, hidden1);
+	network.construct_layers(); // default setting for now; can be customized by the user
 	network.print_layers_info();
 	ResourceManager rm;
 
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 	optimizer *opt = new adam();
 	galois::StatTimer Ttrain("TrainAndVal");
 	Ttrain.start();
-	network.train(opt); // do training using training samples
+	network.train(opt, do_validate); // do training using training samples
 	Ttrain.stop();
 
 	if (do_test) {

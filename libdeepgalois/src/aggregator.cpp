@@ -1,14 +1,14 @@
 #include "aggregator.h"
 #include "math_functions.hh"
 
-void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
-	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
+void update_all(Graph &g, const tensor_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
+	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 		clear(out[src]); // TODO: vectorize clear
 		float_t a = 0.0, b = 0.0;
 		if (norm) a = norm_factor[src];
 		// gather neighbors' embeddings
-		for (const auto e : g->edges(src)) {
-			const auto dst = g->getEdgeDst(e);
+		for (const auto e : g.edges(src)) {
+			const auto dst = g.getEdgeDst(e);
 			if (norm) {
 				b = a * norm_factor[dst];
 				vec_t neighbor = in[dst];
@@ -19,15 +19,15 @@ void update_all(Graph *g, const tensor_t &in, tensor_t &out, bool norm, const ve
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("update_all"));
 }
 
-void update_all(Graph *g, const vec_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
+void update_all(Graph &g, const vec_t &in, tensor_t &out, bool norm, const vec_t &norm_factor) {
 	size_t len = out[0].size();
-	galois::do_all(galois::iterate(g->begin(), g->end()), [&](const auto& src) {
+	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 		clear(out[src]);
 		float_t a = 0.0, b = 0.0;
 		if (norm) a = norm_factor[src];
 		// gather neighbors' embeddings
-		for (const auto e : g->edges(src)) {
-			const auto dst = g->getEdgeDst(e);
+		for (const auto e : g.edges(src)) {
+			const auto dst = g.getEdgeDst(e);
 			if (norm) {
 				b = a * norm_factor[dst];
 				vec_t neighbor(len);

@@ -17,6 +17,7 @@
 #include "../types.h"
 #include "../utils.h"
 #include "../gtypes.h"
+#include "../context.h"
 #include "../optimizer.h"
 #include "../math_functions.hh"
 /**
@@ -42,7 +43,8 @@ public:
 	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) = 0;
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 	virtual std::string layer_type() const = 0;
-	virtual void set_context(net_phase ctx) {}
+	virtual void set_context(Context *ctx) { context = ctx; }
+	virtual void set_netphase(net_phase phase) {}
 
 	void set_trainable(bool trainable) { trainable_ = trainable; }
 	bool trainable() const { return trainable_; }
@@ -136,6 +138,7 @@ protected:
 	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 	vec_t weight_grad; // weight gradient for updating parameters
 	vec_t loss; // error for each vertex: N x 1
+	Context *context;
 };
 
 // head: layer i+1, tail: layer i
