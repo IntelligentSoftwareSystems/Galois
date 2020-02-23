@@ -25,13 +25,12 @@ Context::Context() : mode_(Context::CPU), solver_count_(1),
 	solver_rank_(0), multiprocess_(false) { }
 Context::~Context() {}
 #else
-Context::Context() : mode_(Context::GPU), solver_count_(1), 
-	solver_rank_(0), multiprocess_(false) { }
-
 cublasHandle_t Context::cublas_handle_ = 0;
 curandGenerator_t Context::curand_generator_ = 0;
 
-void Context::create_blas_handle() {
+Context::Context() : mode_(Context::GPU), solver_count_(1), 
+	solver_rank_(0), multiprocess_(false) {
+//void Context::create_blas_handle() {
 	CUBLAS_CHECK(cublasCreate(&cublas_handle_));
 	CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
 	CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
@@ -59,9 +58,9 @@ void Context::SetDevice(const int device_id) {
 
 size_t Context::read_graph(std::string dataset_str) {
 #ifdef CPU_ONLY
-	size_t n = read_graph_cpu(dataset_str, "gr");
+	n = read_graph_cpu(dataset_str, "gr");
 #else
-	size_t n = read_graph_gpu(dataset_str);
+	n = read_graph_gpu(dataset_str);
 #endif
 	return n;
 }
@@ -103,8 +102,7 @@ void Context::genGraph(LGraph &lg, Graph &g) {
 size_t Context::read_graph_gpu(std::string dataset_str) {
 	std::string filename = path + dataset_str + ".csgr";
 	graph_gpu.read(filename.c_str(), false);
-	exit(0);
-	return 0;
+	return graph_gpu.nnodes;
 }
 
 void copy_data_to_device() {
@@ -112,7 +110,7 @@ void copy_data_to_device() {
 	CUDA_SAFE_CALL(cudaMemcpy(d_labels, labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
 	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * sizeof(float_t)));
-	CUDA_SAFE_CALL(cudaMemcpy(d_feats, h_feats, n * sizeof(float_t), cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpy(d_feats, h_feats, n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
 }
 #endif
 
@@ -120,7 +118,6 @@ void copy_data_to_device() {
 // for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
 void Context::norm_factor_counting() {
 #ifdef CPU_ONLY
-	size_t n = graph_cpu.size();
 	norm_factor.resize(n);
 	galois::do_all(galois::iterate((size_t)0, n), [&] (auto v) {
 		float_t temp = std::sqrt(float_t(degrees[v]));
@@ -132,7 +129,6 @@ void Context::norm_factor_counting() {
 
 void Context::degree_counting() {
 #ifdef CPU_ONLY
-	size_t n = graph_cpu.size();
 	degrees.resize(n);
 	galois::do_all(galois::iterate((size_t)0, n), [&] (auto v) {
 		degrees[v] = std::distance(graph_cpu.edge_begin(v), graph_cpu.edge_end(v));
@@ -151,14 +147,15 @@ size_t Context::read_labels(std::string dataset_str) {
 	std::ifstream in;
 	std::string line;
 	in.open(filename, std::ios::in);
-	size_t m, n; // m: number of vertices; n: number of classes
-	in >> m >> n >> std::ws;
+	size_t m; // m: number of samples
+	in >> m >> num_classes >> std::ws;
+	assert(m == n);
 	labels.resize(m, 0); // label for each vertex: N x 1
 	unsigned v = 0;
 	while (std::getline(in, line)) {
 		std::istringstream label_stream(line);
 		unsigned x;
-		for (size_t idx = 0; idx < n; ++idx) {
+		for (size_t idx = 0; idx < num_classes; ++idx) {
 			label_stream >> x;
 			if (x != 0) {
 				labels[v] = idx;
@@ -170,8 +167,9 @@ size_t Context::read_labels(std::string dataset_str) {
 	in.close();
 	t_read.Stop();
 	// print the number of vertex classes
-	std::cout << "Done, unique label counts: " << n << ", time: " << t_read.Millisecs() << " ms\n";
-	return n;
+	std::cout << "Done, unique label counts: " << num_classes 
+		<< ", time: " << t_read.Millisecs() << " ms\n";
+	return num_classes;
 }
 
 size_t Context::read_features(std::string dataset_str) {

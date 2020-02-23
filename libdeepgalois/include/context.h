@@ -20,7 +20,7 @@ public:
 #ifndef CPU_ONLY
 	inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
 	inline static curandGenerator_t curand_generator() { return curand_generator_; }
-	static void create_blas_handle();
+	//static void create_blas_handle();
 #endif
 	Brew mode() { return mode_; }
 	void set_mode(Brew mode) { mode_ = mode; }
@@ -42,6 +42,8 @@ public:
 	std::vector<float_t> norm_factor; // normalization constant based on graph structure
 	std::vector<unsigned> degrees;
 	tensor_t h_feats; // input features: N x D
+	size_t n; // number of samples: N
+	size_t num_classes; // number of classes: E
 	size_t feat_len; // input feature length: D
 #ifdef CPU_ONLY
 	Graph graph_cpu; // the input graph, |V| = N
@@ -53,6 +55,7 @@ public:
 	float_t *d_norm_factor; // norm_factor on device
 	float_t *d_feats; // input features on device
 	size_t read_graph_gpu(std::string dataset_str);
+	void copy_data_to_device(); // copy labels and input features
 	void SetDevice(const int device_id);
 	void DeviceQuery() {}
 	bool CheckDevice(const int device_id) { return true; }

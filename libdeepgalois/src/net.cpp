@@ -2,9 +2,7 @@
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 	context = new Context();
-#ifndef CPU_ONLY
-	Context::create_blas_handle();
-#endif
+	//Context::create_blas_handle();
 	num_samples = context->read_graph(dataset_str);
 	num_classes = context->read_labels(dataset_str);
 	context->degree_counting();
@@ -32,6 +30,9 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 	feature_dims[2] = num_classes; // output embedding: E
 	feature_dims[3] = num_classes; // normalized output embedding: E
 	layers.resize(num_layers);
+#ifndef CPU_ONLY
+	copy_data_to_device(); // copy labels and input features to the device
+#endif
 }
 
 void Net::train(optimizer *opt, bool need_validate) {
