@@ -2,6 +2,9 @@
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 	context = new Context();
+#ifndef CPU_ONLY
+	Context::create_blas_handle();
+#endif
 	n = context->read_graph(dataset_str);
 	num_classes = context->read_labels(dataset_str, n);
 	context->degree_counting();

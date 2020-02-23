@@ -20,6 +20,7 @@ public:
 #ifndef CPU_ONLY
 	inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
 	inline static curandGenerator_t curand_generator() { return curand_generator_; }
+	static void create_blas_handle();
 #endif
 	Brew mode() { return mode_; }
 	void set_mode(Brew mode) { mode_ = mode; }

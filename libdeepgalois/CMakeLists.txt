@@ -16,8 +16,7 @@ include_directories("${MGPU_ROOT}/src")
 link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-#deepgalois_option(CPU_ONLY "Build DeepGalois without CUDA support" OFF)
-set(USE_CPU ON CACHE BOOL "Build DeepGalois without CUDA support")
+set(USE_CPU OFF CACHE BOOL "Build DeepGalois without CUDA support")
 if(USE_CPU)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
 else()
@@ -26,12 +25,14 @@ else()
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
   set(CUDA_HOST_COMPILER g++)
   #list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_60,code=sm_60")
-  #list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_60,code=sm_60; -std=c++11")
   link_directories(${CUDA_LIB})
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
-  file(GLOB CUDA_FILES "src/" *.cu)
-  cuda_compile(CU_O src/math_functions.cu src/aggregator.cu)
-  #CUDA_COMPILE(CU_O ${CUDA_FILES})
+  set(CUDA_SOURCES src/math_functions.cu src/aggregator.cu)
+  cuda_add_library(dg_gpu ${CUDA_SOURCES})
+  set_target_properties(dg_gpu PROPERTIES COMPILE_FLAGS "-DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CUDA")
+  set_target_properties(dg_gpu PROPERTIES CUDA_SEPERABLE_COMPILATION ON)
+  #cuda_compile(MF_O src/math_functions.cu)
+  #cuda_compile(AGG_O src/aggregator.cu)
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -43,22 +44,21 @@ set(sources
   src/aggregator.cpp
   src/context.cpp
   src/net.cpp
-  ${CU_O}
 )
-add_library(deepgalois STATIC ${sources})
+add_library(dg_cpu STATIC ${sources})
 
-target_link_libraries(deepgalois galois_shmem gllvm galois_gpu)
-target_link_libraries(deepgalois ${MPI_CXX_LIBRARIES})
-target_link_libraries(deepgalois -lopenblas)
-target_link_libraries(deepgalois -lcudart -lcublas -lcurand)
+target_link_libraries(dg_cpu galois_shmem gllvm galois_gpu)
+target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
+target_link_libraries(dg_cpu -lopenblas)
+target_link_libraries(dg_cpu -lcudart -lcublas -lcurand)
 
-target_include_directories(deepgalois PUBLIC
+target_include_directories(dg_cpu PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-set_target_properties(deepgalois PROPERTIES
+set_target_properties(dg_cpu PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )

@@ -41,9 +41,9 @@ void d_softmax(const vec_t &y, const vec_t &p, vec_t &dy, const vec_t &dp);
 float_t cross_entropy(const vec_t &y, const vec_t &p);
 void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d);
 
-void vadd_gpu(const size_t n, const float_t *a, const float_t *b, float_t *out); // vector add
-void relu_gpu(const size_t n, const float_t *in, float_t *out); // ReLU
-void d_relu_gpu(const size_t n, const float_t *in_diff, const float_t *data, float_t *out_diff); // ReLU derivative
+void vadd_gpu(const int n, const float_t *a, const float_t *b, float_t *out); // vector add
+void relu_gpu(const int n, const float_t *in, float_t *out); // ReLU
+void d_relu_gpu(const int n, const float_t *in_diff, const float_t *data, float_t *out_diff); // ReLU derivative
 void dropout_gpu(const float scale, const float dropout_rate, const float_t *in, unsigned *mask, float_t *out); // dropout
 void d_dropout_gpu(const float scale, const float_t *in_diff, const unsigned *mask, float_t *out_diff); // dropout derivative
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C); // matrix multiply
