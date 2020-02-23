@@ -34,14 +34,7 @@
 unsigned const debug = GGDEBUG;
 
 #include "Timer.h"
-
-static void check_cuda_error(const cudaError_t e, const char* file,
-                             const int line) {
-  if (e != cudaSuccess) {
-    fprintf(stderr, "%s:%d: %s (%d)\n", file, line, cudaGetErrorString(e), e);
-    exit(1);
-  }
-}
+#include "checker.h"
 
 template <typename T>
 static void check_retval(const T retval, const T expected, const char* file,
@@ -64,7 +57,6 @@ inline static __device__ __host__ int GG_MIN(int x, int y) {
     return x;
 }
 
-#define check_cuda(x) check_cuda_error(x, __FILE__, __LINE__)
 #define check_rv(r, x) check_retval(r, x, __FILE__, __LINE__)
 
 #include "bmk2.h"

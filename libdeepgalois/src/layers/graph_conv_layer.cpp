@@ -1,7 +1,12 @@
 #include "layers/graph_conv_layer.h"
 
+#ifdef CPU_ONLY
 void graph_conv_layer::aggregate(Graph &g, const vec_t &in, tensor_t &out) {
 	update_all(g, in, out, true, context->norm_factor);
+#else
+void graph_conv_layer::aggregate(CSRGraph &g, const float_t *in, float_t *out) {
+	update_all(g, in, out, true, NULL);
+#endif
 }
 
 void graph_conv_layer::combine(const vec_t &self, const vec_t &neighbors, vec_t &out) {

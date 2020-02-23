@@ -35,7 +35,7 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
 	int ldb = (TransB == CblasNoTrans) ? N : K;
 	cublasOperation_t cuTransA = (TransA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
 	cublasOperation_t cuTransB = (TransB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-	CUBLAS_CHECK(cublasSgemm(DeepGalois::cublas_handle(), cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A, lda, &beta, C, N));
+	CUBLAS_CHECK(cublasSgemm(Context::cublas_handle(), cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A, lda, &beta, C, N));
 }
 
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C) {
@@ -52,24 +52,24 @@ int argmax_gpu(const size_t n, const float_t *x) {
 void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N, 
 	const float alpha, const float* A, const float* x, const float beta, float* y) {
 	cublasOperation_t cuTransA = (TransA == CblasNoTrans) ? CUBLAS_OP_T : CUBLAS_OP_N;
-	CUBLAS_CHECK(cublasSgemv(DeepGalois::cublas_handle(), cuTransA, N, M, &alpha, A, N, x, 1, &beta, y, 1));
+	CUBLAS_CHECK(cublasSgemv(Context::cublas_handle(), cuTransA, N, M, &alpha, A, N, x, 1, &beta, y, 1));
 }
 
 void scal_gpu(const int N, const float alpha, float *X) {
-	CUBLAS_CHECK(cublasSscal(DeepGalois::cublas_handle(), N, &alpha, X, 1));
+	CUBLAS_CHECK(cublasSscal(Context::cublas_handle(), N, &alpha, X, 1));
 }
 
 void dot_gpu(const int n, const float* x, const float* y, float* out) {
-	CUBLAS_CHECK(cublasSdot(DeepGalois::cublas_handle(), n, x, 1, y, 1, out));
+	CUBLAS_CHECK(cublasSdot(Context::cublas_handle(), n, x, 1, y, 1, out));
 }
 
 void asum_gpu(const int n, const float* x, float* y) {
-	CUBLAS_CHECK(cublasSasum(DeepGalois::cublas_handle(), n, x, 1, y));
+	CUBLAS_CHECK(cublasSasum(Context::cublas_handle(), n, x, 1, y));
 }
 
 void scale_gpu(const int n, const float alpha, const float *x, float* y) {
-	CUBLAS_CHECK(cublasScopy(DeepGalois::cublas_handle(), n, x, 1, y, 1));
-	CUBLAS_CHECK(cublasSscal(DeepGalois::cublas_handle(), n, &alpha, y, 1));
+	CUBLAS_CHECK(cublasScopy(Context::cublas_handle(), n, x, 1, y, 1));
+	CUBLAS_CHECK(cublasSscal(Context::cublas_handle(), n, &alpha, y, 1));
 }
 
 __global__ void set_kernel(const int n, const float_t alpha, float_t* y) {

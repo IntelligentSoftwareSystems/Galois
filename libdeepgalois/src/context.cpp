@@ -1,4 +1,5 @@
 #include "context.h"
+#include "gtypes.h"
 #include <cstdio>
 #include <ctime>
 
@@ -19,6 +20,31 @@ int64_t cluster_seedgen(void) {
 	return seed;
 }
 
+#ifdef CPU_ONLY
+Context::Context() : mode_(Context::CPU), solver_count_(1), 
+	solver_rank_(0), multiprocess_(false) { }
+Context::~Context() {}
+#else
+Context::Context() : mode_(Context::GPU), solver_count_(1), 
+	solver_rank_(0), multiprocess_(false) {
+	// Try to create a cublas handler, and report an error if failed (but we will
+	// keep the program running as one might just want to run CPU code).
+	if (cublasCreate(&cublas_handle_) != CUBLAS_STATUS_SUCCESS) {
+		std::cout << "Cannot create Cublas handle. Cublas won't be available.";
+	}
+	// Try to create a curand handler.
+	if (curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT) != CURAND_STATUS_SUCCESS ||
+		curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()) != CURAND_STATUS_SUCCESS)
+		std::cout << "Cannot create Curand generator. Curand won't be available.";
+}
+
+Context::~Context() {
+	if (cublas_handle_) CUBLAS_CHECK(cublasDestroy(cublas_handle_));
+	if (curand_generator_) {
+		CURAND_CHECK(curandDestroyGenerator(curand_generator_));
+	}
+}
+
 void Context::SetDevice(const int device_id) {
 	int current_device;
 	CUDA_CHECK(cudaGetDevice(&current_device));
@@ -30,25 +56,7 @@ void Context::SetDevice(const int device_id) {
 	CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
 	CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
 }
-
-Context::Context() : 
-		mode_(Context::CPU),
-		cublas_handle_(NULL), curand_generator_(NULL), 
-		//random_generator_(NULL), mode_(Context::CPU),
-		solver_count_(1), solver_rank_(0), multiprocess_(false) {
-#ifndef CPU_ONLY
-	mode_ = Context::GPU;
-	// Try to create a cublas handler, and report an error if failed (but we will
-	// keep the program running as one might just want to run CPU code).
-	if (cublasCreate(&cublas_handle_) != CUBLAS_STATUS_SUCCESS) {
-		std::cout << "Cannot create Cublas handle. Cublas won't be available.";
-	}
-	// Try to create a curand handler.
-	if (curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT) != CURAND_STATUS_SUCCESS ||
-		curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()) != CURAND_STATUS_SUCCESS)
-		std::cout << "Cannot create Curand generator. Curand won't be available.";
 #endif
-}
 
 size_t Context::read_graph(std::string dataset_str) {
 #ifdef CPU_ONLY
@@ -59,6 +67,7 @@ size_t Context::read_graph(std::string dataset_str) {
 	return n;
 }
 
+#ifdef CPU_ONLY
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype) {
 	galois::StatTimer Tread("GraphReadingTime");
 	Tread.start();
@@ -79,9 +88,6 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype) {
 	return graph_cpu.size();
 }
 
-size_t Context::read_graph_gpu(std::string dataset_str) {
-}
-
 void Context::genGraph(LGraph &lg, Graph &g) {
 	g.allocateFrom(lg.num_vertices(), lg.num_edges());
 	g.constructNodes();
@@ -94,6 +100,10 @@ void Context::genGraph(LGraph &lg, Graph &g) {
 			g.constructEdge(offset, lg.get_dest(offset), 0);
 	}
 }
+#else
+size_t Context::read_graph_gpu(std::string dataset_str) {
+}
+#endif
 
 // user-defined pre-computing function, called during initialization
 // for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
