@@ -32,26 +32,32 @@ public:
 	void set_multiprocess(bool val) { multiprocess_ = val; }
 	bool root_solver() { return solver_rank_ == 0; }
 	size_t read_graph(std::string dataset_str);
-	size_t read_labels(std::string dataset_str, size_t num);
+	size_t read_labels(std::string dataset_str);
+	size_t read_features(std::string dataset_str);
 	label_t get_label(size_t i) { return labels[i]; }
 	label_t *get_labels_ptr(size_t i) { return &(labels[0]); }
 	void degree_counting();
 	void norm_factor_counting();
+	std::vector<label_t> labels; // labels for classification: N x 1
+	std::vector<float_t> norm_factor; // normalization constant based on graph structure
+	std::vector<unsigned> degrees;
+	tensor_t h_feats; // input features: N x D
+	size_t feat_len; // input feature length: D
 #ifdef CPU_ONLY
 	Graph graph_cpu; // the input graph, |V| = N
 	void genGraph(LGraph &lg, Graph &g);
 	size_t read_graph_cpu(std::string dataset_str, std::string filetype = "gr");
 #else
 	CSRGraph graph_gpu; // the input graph, |V| = N
+	label_t *d_labels; // labels on device
+	float_t *d_norm_factor; // norm_factor on device
+	float_t *d_feats; // input features on device
 	size_t read_graph_gpu(std::string dataset_str);
 	void SetDevice(const int device_id);
 	void DeviceQuery() {}
 	bool CheckDevice(const int device_id) { return true; }
 	int FindDevice(const int start_id = 0) { return 0; }
 #endif
-	std::vector<label_t> labels; // labels for classification: N x 1
-	std::vector<float_t> norm_factor; // normalization constant based on graph structure
-	std::vector<unsigned> degrees;
 
 protected:
 #ifndef CPU_ONLY

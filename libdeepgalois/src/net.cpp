@@ -5,14 +5,15 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 #ifndef CPU_ONLY
 	Context::create_blas_handle();
 #endif
-	n = context->read_graph(dataset_str);
-	num_classes = context->read_labels(dataset_str, n);
+	num_samples = context->read_graph(dataset_str);
+	num_classes = context->read_labels(dataset_str);
 	context->degree_counting();
 	context->norm_factor_counting(); // pre-compute normalizing factor
 	num_epochs = epochs;
+
 	std::cout << "Reading label masks ... ";
-	train_mask.resize(n, 0);
-	val_mask.resize(n, 0);
+	train_mask.resize(num_samples, 0);
+	val_mask.resize(num_samples, 0);
 	if (dataset_str == "reddit") {
 		train_begin = 0, train_count = 153431, train_end = train_begin + train_count;
 		val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
@@ -26,43 +27,11 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 
 	num_layers = NUM_CONV_LAYERS + 1;
 	feature_dims.resize(num_layers + 1);
-	input_features.resize(n); // input embedding: N x D
-	feature_dims[0] = read_features(dataset_str, input_features); // input feature dimension: D
+	feature_dims[0] = context->read_features(dataset_str); // input feature dimension: D
 	feature_dims[1] = hidden1; // hidden1 level embedding: 16
 	feature_dims[2] = num_classes; // output embedding: E
 	feature_dims[3] = num_classes; // normalized output embedding: E
 	layers.resize(num_layers);
-}
-
-size_t Net::read_features(std::string dataset_str, tensor_t &feats) {
-	std::cout << "Reading features ... ";
-	Timer t_read;
-	t_read.Start();
-	std::string filename = path + dataset_str + ".ft";
-	std::ifstream in;
-	std::string line;
-	in.open(filename, std::ios::in);
-	size_t m, n;
-	in >> m >> n >> std::ws;
-	assert(m == feats.size()); // m = number of vertices
-	for (size_t i = 0; i < m; ++i) {
-		feats[i].resize(n);
-		for (size_t j = 0; j < n; ++j)
-			feats[i][j] = 0;
-	}
-	while (std::getline(in, line)) {
-		std::istringstream edge_stream(line);
-		unsigned u, v;
-		float_t w;
-		edge_stream >> u;
-		edge_stream >> v;
-		edge_stream >> w;
-		feats[u][v] = w;
-	}
-	in.close();
-	t_read.Stop();
-	std::cout << "Done, feature dimention: " << n << ", time: " << t_read.Millisecs() << " ms\n";
-	return n;
 }
 
 void Net::train(optimizer *opt, bool need_validate) {
@@ -106,5 +75,14 @@ void Net::train(optimizer *opt, bool need_validate) {
 			std::cout << " train_time = " << epoch_time << " ms\n";
 		}
 	}
+}
+
+void Net::construct_layers() {
+	std::cout << "\nConstructing layers...\n";
+	append_conv_layer(0, true); // first conv layer
+	append_conv_layer(1); // hidden1 layer
+	append_out_layer(2); // output layer
+	layers[0]->set_in_data(context->h_feats); // feed input data
+	set_contexts();
 }
 

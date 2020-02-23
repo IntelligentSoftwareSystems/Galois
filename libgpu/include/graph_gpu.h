@@ -27,7 +27,7 @@ typedef int node_data_type;
 
 // very simple implementation
 struct CSRGraph {
-  unsigned read(char file[], bool read_edge_data = true);
+  unsigned read(const char file[], bool read_edge_data = true);
   void copy_to_gpu(struct CSRGraph& copygraph);
   void copy_to_cpu(struct CSRGraph& copygraph);
 
@@ -37,7 +37,7 @@ struct CSRGraph {
   unsigned allocOnHost(bool no_edge_data = false);
   unsigned allocOnDevice(bool no_edge_data = false);
   void progressPrint(unsigned maxii, unsigned ii);
-  unsigned readFromGR(char file[], bool read_edge_data = true);
+  unsigned readFromGR(const char file[], bool read_edge_data = true);
 
   unsigned deallocOnHost();
   unsigned deallocOnDevice();

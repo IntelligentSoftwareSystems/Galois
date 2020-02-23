@@ -150,7 +150,7 @@ void CSRGraph::progressPrint(unsigned maxii, unsigned ii) {
   }
 }
 
-unsigned CSRGraph::readFromGR(char file[], bool read_edge_data) {
+unsigned CSRGraph::readFromGR(const char file[], bool read_edge_data) {
   std::ifstream cfile;
   cfile.open(file);
 
@@ -237,7 +237,7 @@ unsigned CSRGraph::readFromGR(char file[], bool read_edge_data) {
   return 0;
 }
 
-unsigned CSRGraph::read(char file[], bool read_edge_data) {
+unsigned CSRGraph::read(const char file[], bool read_edge_data) {
   return readFromGR(file, read_edge_data);
 }
 

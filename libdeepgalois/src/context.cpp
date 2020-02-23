@@ -101,7 +101,18 @@ void Context::genGraph(LGraph &lg, Graph &g) {
 }
 #else
 size_t Context::read_graph_gpu(std::string dataset_str) {
+	std::string filename = path + dataset_str + ".csgr";
+	graph_gpu.read(filename.c_str(), false);
+	exit(0);
 	return 0;
+}
+
+void copy_data_to_device() {
+	CUDA_CHECK(cudaMalloc((void **)&d_labels, n * sizeof(label_t)));
+	CUDA_SAFE_CALL(cudaMemcpy(d_labels, labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
+	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * sizeof(float_t)));
+	CUDA_SAFE_CALL(cudaMemcpy(d_feats, h_feats, n * sizeof(float_t), cudaMemcpyHostToDevice));
 }
 #endif
 
@@ -132,18 +143,17 @@ void Context::degree_counting() {
 // labels contain the ground truth (e.g. vertex classes) for each example (num_examples x 1).
 // Note that labels is not one-hot encoded vector and it can be computed
 // as y.argmax(axis=1) from one-hot encoded vector (y) of labels if required.
-size_t Context::read_labels(std::string dataset_str, size_t num) {
+size_t Context::read_labels(std::string dataset_str) {
 	std::cout << "Reading labels ... ";
-	labels.resize(num, 0); // label for each vertex: N x 1
 	Timer t_read;
 	t_read.Start();
 	std::string filename = path + dataset_str + "-labels.txt";
 	std::ifstream in;
 	std::string line;
 	in.open(filename, std::ios::in);
-	size_t m, n;
+	size_t m, n; // m: number of vertices; n: number of classes
 	in >> m >> n >> std::ws;
-	assert(m == labels.size()); // number of vertices
+	labels.resize(m, 0); // label for each vertex: N x 1
 	unsigned v = 0;
 	while (std::getline(in, line)) {
 		std::istringstream label_stream(line);
@@ -159,8 +169,49 @@ size_t Context::read_labels(std::string dataset_str, size_t num) {
 	}
 	in.close();
 	t_read.Stop();
-	// number of vertex classes
+	// print the number of vertex classes
 	std::cout << "Done, unique label counts: " << n << ", time: " << t_read.Millisecs() << " ms\n";
 	return n;
 }
+
+size_t Context::read_features(std::string dataset_str) {
+	std::cout << "Reading features ... ";
+	Timer t_read;
+	t_read.Start();
+	std::string filename = path + dataset_str + ".ft";
+	std::ifstream in;
+	std::string line;
+	in.open(filename, std::ios::in);
+	size_t m; // m = number of vertices
+	in >> m >> feat_len >> std::ws;
+	//assert(m == );
+	h_feats.resize(m);
+	for (size_t i = 0; i < m; ++i) {
+		h_feats[i].resize(feat_len);
+		for (size_t j = 0; j < feat_len; ++j)
+			h_feats[i][j] = 0;
+	}
+	while (std::getline(in, line)) {
+		std::istringstream edge_stream(line);
+		unsigned u, v;
+		float_t w;
+		edge_stream >> u;
+		edge_stream >> v;
+		edge_stream >> w;
+		h_feats[u][v] = w;
+	}
+	in.close();
+	t_read.Stop();
+	std::cout << "Done, feature length: " << feat_len << ", time: " << t_read.Millisecs() << " ms\n";
+	return feat_len;
+}
+
+/*
+inline void init_features(size_t dim, vec_t &x) {
+	std::default_random_engine rng;
+	std::uniform_real_distribution<feature_t> dist(0, 0.1);
+	for (size_t i = 0; i < dim; ++i)
+		x[i] = dist(rng);
+}
+//*/
 

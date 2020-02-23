@@ -21,27 +21,17 @@ public:
 	void init(std::string dataset_str, unsigned epochs, unsigned hidden1);
 	size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
 	size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id+1]; }
-	size_t get_ft_dim() { return feature_dims[0]; }
-	size_t read_features(std::string dataset_str, tensor_t &feats);
-	void construct_layers() {
-		std::cout << "\nConstructing layers...\n";
-		append_conv_layer(0, true); // first conv layer
-		append_conv_layer(1); // hidden1 layer
-		append_out_layer(2); // output layer
-		layers[0]->set_in_data(input_features); // feed input data
-		set_contexts();
-	}
-
+	size_t get_nnodes() { return num_samples; }
+	void train(optimizer *opt, bool need_validate); // training
+	void construct_layers();
 	void set_contexts() {
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->set_context(context);
 	}
-
 	void set_netphases(net_phase phase) {
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->set_netphase(phase);
 	}
-
 	void print_layers_info() {
 		for (size_t i = 0; i < num_layers; i ++)
 			layers[i]->print_layer_info();
@@ -51,21 +41,17 @@ public:
 		assert(dropout_rate < 1.0);
 		assert(layer_id < NUM_CONV_LAYERS);
 		std::vector<size_t> in_dims(2), out_dims(2);
-		in_dims[0] = out_dims[0] = n;
+		in_dims[0] = out_dims[0] = num_samples;
 		in_dims[1] = get_in_dim(layer_id);
 		out_dims[1] = get_out_dim(layer_id);
-#ifdef CPU_ONLY
 		layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
-#else
-		layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout, dropout_rate, in_dims, out_dims);
-#endif
 		if(layer_id > 0) connect(layers[layer_id-1], layers[layer_id]);
 	}
 
 	void append_out_layer(size_t layer_id) {
 		assert(layer_id > 0); // can not be the first layer
 		std::vector<size_t> in_dims(2), out_dims(2);
-		in_dims[0] = out_dims[0] = n;
+		in_dims[0] = out_dims[0] = num_samples;
 		in_dims[1] = get_in_dim(layer_id);
 		out_dims[1] = get_out_dim(layer_id);
 		layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
@@ -106,29 +92,16 @@ public:
 		return t_eval.Millisecs();
 	}
 
-	// training
-	void train(optimizer *opt, bool need_validate);
-	size_t get_nnodes() { return n; }
-
 protected:
 	Context *context;
-	size_t n; // number of samples: N
+	size_t num_samples; // number of samples: N
 	size_t num_classes; // number of vertex classes: E
 	size_t num_layers; // for now hard-coded: NUM_CONV_LAYERS + 1
 	unsigned num_epochs; // number of epochs
 	std::vector<size_t> feature_dims; // feature dimnesions for each layer
-	tensor_t input_features; // input features: N x D
 	MaskList train_mask, val_mask; // masks for traning and validation
 	size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
 	std::vector<layer *> layers; // all the layers in the neural network
-	/*
-	inline void init_features(size_t dim, vec_t &x) {
-		std::default_random_engine rng;
-		std::uniform_real_distribution<feature_t> dist(0, 0.1);
-		for (size_t i = 0; i < dim; ++i)
-			x[i] = dist(rng);
-	}
-	//*/
 
 	// comparing outputs with the ground truth (labels)
 	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
