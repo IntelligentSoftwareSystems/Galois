@@ -4,9 +4,12 @@ include_directories(BEFORE
 )
 include_directories(${CMAKE_SOURCE_DIR}/lonestargnn)
 include_directories(${CMAKE_SOURCE_DIR}/libdeepgalois/include)
+
 SET(CUDA_INC /org/centers/cdgc/cuda/cuda-10.0/include)
 include_directories(${CUDA_INC})
-include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
+if(NOT USE_CPU)
+  include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
+endif()
 
 SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS/build/include)
 SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS/build/lib)
