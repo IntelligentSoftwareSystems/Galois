@@ -55,7 +55,7 @@ public:
 			<< " input[" << input_dims[0] << "," << input_dims[1] 
 			<< "] output[" << output_dims[0] << "," << output_dims[1] << "]\n";
 	}
-	virtual void set_sample_mask(size_t sample_begin, size_t sample_end, size_t sample_count, MaskList &masks) {
+	virtual void set_sample_mask(size_t sample_begin, size_t sample_end, size_t sample_count, mask_t *masks) {
 		begin_ = sample_begin;
 		end_ = sample_end;
 		count_ = sample_count;
@@ -123,7 +123,6 @@ protected:
 	size_t begin_; // sample begin index
 	size_t end_; // sample end index
 	size_t count_; // number of samples
-	MaskList masks_; // masks to show which samples are valid
 	size_t num_dims; // number of dimensions
 	std::vector<size_t> input_dims; // input dimensions
 	std::vector<size_t> output_dims; // output dimentions
@@ -134,6 +133,8 @@ protected:
 	vec_t weight_grad; // weight gradient for updating parameters
 	float_t *d_W;
 	float_t *d_weight_grad;
+	mask_t *masks_; // masks to show which samples are valid
+	mask_t *d_masks_;
 	float_t *loss; // error for each vertex: N x 1
 	Context *context;
 };

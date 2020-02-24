@@ -58,6 +58,7 @@ float_t cross_entropy(size_t n, const float_t *y, const float_t *p);
 void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d);
 void d_cross_entropy(size_t n, const float_t *y, const float_t *p, float_t *d);
 
+void out_malloc_device(int n, mask_t *h_masks, mask_t *d_masks, float_t *loss);
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad);
 void copy_gpu(size_t len, const float_t *in, float_t *out);
 void malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out);
@@ -70,7 +71,8 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
 	const int M, const int N, const int K, const float alpha, const float* A, const float* B, const float beta, float* C);
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C); // matrix multiply
 int argmax_gpu(const size_t n, const float_t *x); // the arguments of the maxima
-void softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, float_t *out_data);
+void softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, const mask_t *masks, const label_t *labels, float_t *loss, float_t *out_data);
+void d_softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, const mask_t *masks, const label_t *labels, const float_t *out_data, float_t *diff);
 void scal_gpu(const int N, const float alpha, float *X);
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
 

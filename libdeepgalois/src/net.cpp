@@ -51,8 +51,8 @@ void Net::train(optimizer *opt, bool need_validate) {
 		set_netphases(net_phase::train);
 		acc_t train_loss = 0.0, train_acc = 0.0;
 		Tfw.start();
-		train_loss = fprop(train_begin, train_end, train_count, train_mask); // forward
-		train_acc = masked_accuracy(train_begin, train_end, train_count, train_mask); // predict
+		train_loss = fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
+		train_acc = masked_accuracy(train_begin, train_end, train_count, &train_mask[0]); // predict
 		Tfw.stop();
 		Tbw.start();
 		bprop(); // back propogation
@@ -68,7 +68,7 @@ void Net::train(optimizer *opt, bool need_validate) {
 			// Validation
 			acc_t val_loss = 0.0, val_acc = 0.0;
 			Tval.start();
-			double val_time = evaluate(val_begin, val_end, val_count, val_mask, val_loss, val_acc);
+			double val_time = evaluate(val_begin, val_end, val_count, &val_mask[0], val_loss, val_acc);
 			Tval.stop();
 			std::cout << " val_loss = " << std::setw(5) << val_loss << " val_acc = " << std::setw(5) << val_acc;
 			std::cout << " time = " << epoch_time + val_time << " ms (train_time = " << epoch_time << " val_time = " << val_time << ")\n";

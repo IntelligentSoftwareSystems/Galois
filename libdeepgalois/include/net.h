@@ -59,9 +59,9 @@ public:
 	}
 
 	// forward propagation: [begin, end) is the range of samples used.
-	acc_t fprop(size_t begin, size_t end, size_t count, MaskList &masks) {
+	acc_t fprop(size_t begin, size_t end, size_t count, mask_t *masks) {
 		// set mask for the last layer
-		layers[num_layers-1]->set_sample_mask(begin, end, count, masks);
+		layers[num_layers-1]->set_sample_mask(begin, end, count, &masks[0]);
 		// layer0: from N x D to N x 16
 		// layer1: from N x 16 to N x E
 		// layer2: from N x E to N x E (normalize only)
@@ -83,7 +83,7 @@ public:
 	}
 
 	// evaluate, i.e. inference or predict
-	double evaluate(size_t begin, size_t end, size_t count, MaskList &masks, acc_t &loss, acc_t &acc) {
+	double evaluate(size_t begin, size_t end, size_t count, mask_t *masks, acc_t &loss, acc_t &acc) {
 		Timer t_eval;
 		t_eval.Start();
 		loss = fprop(begin, end, count, masks);
@@ -99,12 +99,12 @@ protected:
 	size_t num_layers; // for now hard-coded: NUM_CONV_LAYERS + 1
 	unsigned num_epochs; // number of epochs
 	std::vector<size_t> feature_dims; // feature dimnesions for each layer
-	MaskList train_mask, val_mask; // masks for traning and validation
+	std::vector<mask_t> train_mask, val_mask; // masks for traning and validation
 	size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
 	std::vector<layer *> layers; // all the layers in the neural network
 
 	// comparing outputs with the ground truth (labels)
-	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, MaskList &masks) {
+	inline acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t *masks) {
 		AccumF accuracy_all;
 		accuracy_all.reset();
 		galois::do_all(galois::iterate(begin, end), [&](const auto& i) {

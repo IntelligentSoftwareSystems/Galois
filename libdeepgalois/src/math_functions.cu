@@ -16,6 +16,11 @@ void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_
 	CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
+void out_malloc_device(int n, mask_t *h_masks, mask_t *d_masks, float_t *loss) {
+	CUDA_CHECK(cudaMalloc((void **)&d_masks, n * sizeof(mask_t)));
+	CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMalloc((void **)&loss, n * sizeof(float_t)));
+}
 
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad) {
 	if (dropout) CUDA_CHECK(cudaMalloc((void **)&masks, x * y * sizeof(unsigned)));
@@ -144,5 +149,41 @@ void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
 	vadd_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, a, b, y);
 }
 
-void softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, float_t *out_data) {
+// TODO: use warp
+__device__ void softmax(int n, const float_t *input, float_t *output) {
+	float_t max = input[0];
+	for (size_t i = 1; i < n; i++) if (input[i] > max) max = input[i];
+	float_t denominator = 0.0;
+	for (size_t i = 0; i < n; i++) {
+		output[i] = exp(input[i] - max);
+		denominator += output[i];
+	}
+	for (size_t i = 0; i < n; i++) output[i] /= denominator;
 }
+
+__device__ void cross_entropy(int n, const label_t idx, float_t *p, float_t &loss) {
+	if (p[idx] == 0.0) loss -= log(float_t(1e-10));
+	else loss -= log(p[idx]);
+}
+
+// n: number of vectors
+// len: length of vectors
+// for each vector, do softmax to normalize the vector, and then compute a loss
+__global__ void softmax_cross_entropy_kernel(int n, int len, const float_t *in_data,
+	const mask_t *masks, const label_t *labels, float_t *loss, float_t *out_data) {
+	CUDA_KERNEL_LOOP(i, n) {
+		if (masks[i] == 1) { // masked
+			softmax(len, in_data+len*i, out_data+len*i); // normalize using softmax
+			loss[i] = 0.0;
+			cross_entropy(len, labels[i], &out_data[len*i], loss[i]);
+		}
+	}
+}
+
+void softmax_cross_entropy_gpu(int n, int len, const float_t *in, const mask_t *masks, const label_t *labels, float_t *loss, float_t *out) {
+	softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, in, masks, labels, loss, out);
+}
+
+void d_softmax_cross_entropy_gpu(int x, int y, const float_t *in, const mask_t *masks, const label_t *labels, const float_t *out, float_t *diff) {
+}
+
