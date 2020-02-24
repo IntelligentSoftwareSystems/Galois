@@ -100,6 +100,7 @@ void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *o
 #else
 // GPU forward
 void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+	assert(y <= 128); // currently only support feature length <= 128
 	if (dropout_ && phase_ == net_phase::train) {
 		dropout_gpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
 		matmul1D1D_gpu(x, z, y, in_temp, d_W, out_temp);
