@@ -6,6 +6,11 @@
 #include <cstdint>
 #include "types.h"
 
+extern "C" {
+#include <cblas.h>
+//#include <clapack.h>
+}
+
 const float negative_slope = 0;
 
 void vadd(const vec_t &a, const vec_t &b, vec_t &out); // vector add
@@ -53,13 +58,20 @@ float_t cross_entropy(size_t n, const float_t *y, const float_t *p);
 void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d);
 void d_cross_entropy(size_t n, const float_t *y, const float_t *p, float_t *d);
 
+void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad);
+void copy_gpu(size_t len, const float_t *in, float_t *out);
+void malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out);
 void vadd_gpu(const int n, const float_t *a, const float_t *b, float_t *out); // vector add
 void relu_gpu(const int n, const float_t *in, float_t *out); // ReLU
 void d_relu_gpu(const int n, const float_t *in_diff, const float_t *data, float_t *out_diff); // ReLU derivative
-void dropout_gpu(const float scale, const float dropout_rate, const float_t *in, unsigned *mask, float_t *out); // dropout
+void dropout_gpu(const int n, const float scale, const float dropout_rate, const float_t *in, unsigned *mask, float_t *out); // dropout
 void d_dropout_gpu(const float scale, const float_t *in_diff, const unsigned *mask, float_t *out_diff); // dropout derivative
+void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB, 
+	const int M, const int N, const int K, const float alpha, const float* A, const float* B, const float beta, float* C);
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C); // matrix multiply
 int argmax_gpu(const size_t n, const float_t *x); // the arguments of the maxima
 void softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, float_t *out_data);
+void scal_gpu(const int N, const float alpha, float *X);
+void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
 
 #endif

@@ -48,10 +48,10 @@ private:
 	size_t x;
 	size_t y;
 	size_t z;
-	vec_t out_temp;
-	vec_t in_temp;
-	vec_t trans_data; // y*x
-	std::vector<unsigned>  dropout_mask; // x*y
+	float_t *out_temp;
+	float_t *in_temp;
+	float_t *trans_data; // y*x
+	unsigned * dropout_mask; // x*y
 
 	// Glorot & Bengio (AISTATS 2010)
 	inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {

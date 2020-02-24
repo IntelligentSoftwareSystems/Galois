@@ -1,9 +1,47 @@
 #include "math_functions.hh"
 #include "context.h"
 
-extern "C" {
-#include <cblas.h>
-//#include <clapack.h>
+void gpu_rng_uniform(const int n, unsigned *r) {
+	CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
+}
+
+void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) {
+	CURAND_CHECK(curandGenerateUniform(Context::curand_generator(), r, n));
+	const float range = b - a;
+	if (range != float_t{1}) scal_gpu(n, range, r);
+	if (a != float_t{0}) add_scalar_gpu(n, a, r);
+}
+
+void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_t *r) {
+	CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
+}
+
+
+void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad) {
+	if (dropout) CUDA_CHECK(cudaMalloc((void **)&masks, x * y * sizeof(unsigned)));
+	CUDA_CHECK(cudaMalloc((void **)&in, x * y * sizeof(float_t)));
+	CUDA_CHECK(cudaMalloc((void **)&out, x * z * sizeof(float_t)));
+	CUDA_CHECK(cudaMalloc((void **)&matrix, y * z * sizeof(float_t)));
+	auto init_range = sqrt(6.0/(y + z));
+	// Glorot & Bengio (AISTATS 2010)
+	gpu_rng_uniform(y*z, -init_range, init_range, matrix);
+	CUDA_CHECK(cudaMalloc((void **)&grad, y * z * sizeof(float_t)));
+	CUDA_CHECK(cudaMemset(grad, 0, y * z * sizeof(float_t)));
+}
+
+void copy_gpu(size_t len, const float_t *in, float_t *out) {
+	CUDA_CHECK(cudaMemcpy(out, in, len * sizeof(float_t), cudaMemcpyDeviceToDevice));
+}
+
+__global__ void dropout_kernel(const int n, const float scale, const float dropout_rate, const float_t* in, unsigned *masks, float_t* out) {
+	CUDA_KERNEL_LOOP(i, n) {
+		//masks[i] = bernoulli(dropout_rate);
+		out[i] = in[i] * masks[i] * scale;
+	}
+}
+
+void dropout_gpu(const int n, const float scale, const float dropout_rate, const float_t *in, unsigned *masks, float_t *out) {
+	dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, scale, dropout_rate, in, masks, out);
 }
 
 // flattern data into 1D before feed into the ReLU operater
@@ -13,8 +51,8 @@ __global__ void relu_kernel(const int n, const float_t* in, float_t* out) {
 	}
 }
 
-void relu_gpu(const int n, const float_t *in_data, float_t* out_data) {
-	relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in_data, out_data);
+void relu_gpu(const int n, const float_t *in, float_t* out) {
+	relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in, out);
 }
 
 __global__ void d_relu_kernel(const int n, const float_t* in_diff, const float_t* data, float_t* out_diff) {
