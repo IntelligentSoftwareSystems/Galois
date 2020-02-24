@@ -109,7 +109,7 @@ protected:
 		accuracy_all.reset();
 		galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
 			if (masks[i] == 1) {
-				int preds = argmax(num_classes, layers[NUM_CONV_LAYERS-1]->next()->get_data()[i]);
+				int preds = argmax(num_classes, &(layers[NUM_CONV_LAYERS-1]->next()->get_data()[i*num_classes]));
 				if ((label_t)preds == context->get_label(i)) accuracy_all += 1.0;
 			}
 		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));

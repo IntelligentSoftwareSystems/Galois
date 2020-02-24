@@ -25,38 +25,31 @@ protected:
 // edges manage the input/output data and gradients between nodes
 class edge {
 public:
-	edge(node *prev, size_t len) :
-		ft_dim_(len),
-		data_({vec_t(len)}),
-		grad_({vec_t(len)}),
+	edge(node *prev, size_t n, size_t len) :
+		num_samples_(n), ft_dim_(len),
+		data_(vec_t(n*len)), grad_(vec_t(n*len)),
 		prev_(prev) {}
 
 	void merge_grads(vec_t *dst) {
 		assert(!grad_.empty());
-		const auto &grad_head = grad_[0];
-		size_t sz             = grad_head.size();
-		dst->resize(sz);
+		dst->resize(ft_dim_);
 		float_t *pdst = &(*dst)[0];
-		std::copy(grad_head.begin(), grad_head.end(), pdst);
+		std::copy(grad_.begin(), grad_.begin()+ft_dim_, pdst);
 		// @todo consider adding parallelism and vectorization
-		for (size_t sample = 1; sample < grad_.size(); ++sample) {
-			for (size_t i = 0; i < sz; i++) pdst[i] += grad_[sample][i];
-			//vectorize::reduce<float_t>(&grad_[sample][0], sz, pdst);
+		for (size_t sample = 1; sample < num_samples_; ++sample) {
+			for (size_t i = 0; i < ft_dim_; i++) pdst[i] += grad_[sample*ft_dim_+i];
+			//vectorize::reduce<float_t>(&grad_[sample][0], ft_dim_, pdst);
 		}
 	}
 	void clear_grads() {
-		for (size_t sample = 0; sample < grad_.size(); ++sample) {
-			auto &g = grad_[sample];
-			std::fill(g.begin(), g.end(), 0.0); // TODO: need vectorize
-			//vectorize::fill(&g[0], g.size(), float_t{0});
-		}
+		std::fill(grad_.begin(), grad_.end(), float_t{0}); // TODO: need vectorize
+		//vectorize::fill(&grad_[0], grad_.size(), float_t{0});
 	}
 
-	tensor_t *get_data_ptr() { return &data_; }
-	tensor_t &get_data() { return data_; }
-	const tensor_t &get_data() const { return data_; }
-	tensor_t &get_gradient() { return grad_; }
-	const tensor_t &get_gradient() const { return grad_; }
+	vec_t &get_data() { return data_; }
+	const vec_t &get_data() const { return data_; }
+	vec_t &get_gradient() { return grad_; }
+	const vec_t &get_gradient() const { return grad_; }
 	float_t *get_gpu_data() const { return gpu_data_; }
 	float_t *get_gpu_gradient() { return gpu_grad_; }
 
@@ -66,12 +59,13 @@ public:
 	void add_next_node(node *next) { next_ = next; }
 
 private:
+	size_t num_samples_;// number of samples
 	size_t ft_dim_;     // feature dimensions
-	tensor_t data_;     // feature vectors on CPU
-	tensor_t grad_;     // gradients on CPU
+	vec_t data_;        // feature vectors on CPU
+	vec_t grad_;        // gradients on CPU
 	float_t *gpu_data_; // feature vectors on GPU
 	float_t *gpu_grad_; // gradients on CPU
-	node *prev_;        // previous node, "producer" of this tensor
-	node *next_;        // next node, "consumer" of this tensor
+	node *prev_;        // previous node, "producer" of data
+	node *next_;        // next node, "consumer" of data
 };
 

@@ -38,13 +38,13 @@ public:
 		level_(level), begin_(0), end_(0), num_dims(in_dims.size()),
 		input_dims(in_dims), output_dims(out_dims) { add_edge(); }
 	virtual ~layer() = default;
-	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data) = 0;
-	virtual void forward_propagation(const float_t *in_data, float_t *out_data) = 0;
-	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) = 0;
-	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 	virtual std::string layer_type() const = 0;
-	virtual void set_context(Context *ctx) { context = ctx; }
 	virtual void set_netphase(net_phase phase) {}
+	virtual void set_context(Context *ctx) { context = ctx; }
+	virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) = 0;
+	virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
+	virtual void forward_propagation(const float_t *in_data, float_t *out_data) = 0;
+	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 
 	void set_trainable(bool trainable) { trainable_ = trainable; }
 	bool trainable() const { return trainable_; }
@@ -61,29 +61,22 @@ public:
 		count_ = sample_count;
 		masks_ = masks;
 	}
-	void set_in_data(tensor_t data) {
-		prev_ = std::make_shared<edge>(this, input_dims[1]);
+	void set_in_data(vec_t data) {
+		prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
+		// allocate memory for intermediate features
 		prev_->get_data() = data;
-		prev_->get_gradient().resize(input_dims[0]);
 		// allocate memory for intermediate gradients
-		//std::cout << "l0 in_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
-		for (size_t i = 0; i < input_dims[0]; ++i)
-			prev_->get_gradient()[i].resize(input_dims[1]);
+		prev_->get_gradient().resize(input_dims[0]*output_dims[1]);
 	}
 	void add_edge() {
 		// add an outgoing edge
-		next_ = std::make_shared<edge>(this, output_dims[1]);
+		next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
 		// allocate memory for intermediate feature vectors
-		next_->get_data().resize(output_dims[0]);
-		for (size_t i = 0; i < output_dims[0]; ++i)
-			next_->get_data()[i].resize(output_dims[1]);
+		next_->get_data().resize(output_dims[0]*output_dims[1]);
 	}
 	void alloc_grad() {
 		// allocate memory for intermediate gradients
-		//std::cout << "l" << level_ << " out_grad alloc: x=" << output_dims[0] << ", y=" << output_dims[1] << "\n";
-		next_->get_gradient().resize(output_dims[0]);
-		for (size_t i = 0; i < output_dims[0]; ++i)
-			next_->get_gradient()[i].resize(output_dims[1]);
+		next_->get_gradient().resize(output_dims[0]*output_dims[1]);
 	}
 	void forward() {
 		forward_propagation(prev()->get_data(), next()->get_data());
@@ -92,7 +85,6 @@ public:
 		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
 	}
 	void update_weight(optimizer *opt) {
-		//std::cout << "[debug] " << name_ << ": updating weight...\n"; 
 		// parallelize only when target size is big enough to mitigate thread spawning overhead.
 		bool parallel = (W.size() >= 512);
 		//vec_t diff;
@@ -105,20 +97,16 @@ public:
 		prev()->clear_grads();
 	}
 	inline acc_t get_masked_loss() {
-		//acc_t total_loss = acc_t(0);
-		//size_t valid_sample_count = 0;
 		AccumF total_loss;
 		AccumU valid_sample_count;
 		total_loss.reset();
 		valid_sample_count.reset();
-		//for (size_t i = begin_; i < end_; i ++) {
 		galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 			if (masks_[i]) {
 				total_loss += loss[i];
 				valid_sample_count += 1;
 			}
 		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
-		//}
 		assert(valid_sample_count.reduce() == count_);
 		return total_loss.reduce() / (acc_t)count_;
 	}

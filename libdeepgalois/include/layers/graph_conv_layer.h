@@ -24,15 +24,15 @@ public:
 	void init();
 	std::string layer_type() const override { return std::string("graph_conv"); }
 	void set_netphase(net_phase ctx) override { phase_ = ctx; }
-	virtual void forward_propagation(const tensor_t &in_data, tensor_t &out_data);
-	virtual void back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad);
+	virtual void forward_propagation(const vec_t &in_data, vec_t &out_data);
+	virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad);
 	virtual void forward_propagation(const float_t *in_data, float_t *out_data);
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad);
 	// user-defined aggregate function
 #ifdef CPU_ONLY
-	virtual void aggregate(Graph &g, const vec_t &in, tensor_t &out);
+	virtual void aggregate(size_t len, Graph &g, const vec_t &in, vec_t &out);
 #else
-	virtual void aggregate(CSRGraph &g, const float_t *in, float_t *out);
+	virtual void aggregate(size_t len, CSRGraph &g, const float_t *in, float_t *out);
 #endif
 	// user-defined combine function
 	virtual void combine(const vec_t &self, const vec_t &neighbors, vec_t &out);
@@ -51,7 +51,7 @@ private:
 	vec_t out_temp;
 	vec_t in_temp;
 	vec_t trans_data; // y*x
-	std::vector<std::vector<unsigned> > dropout_mask;
+	std::vector<unsigned>  dropout_mask; // x*y
 
 	// Glorot & Bengio (AISTATS 2010)
 	inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t &matrix) {

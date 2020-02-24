@@ -31,7 +31,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 	feature_dims[3] = num_classes; // normalized output embedding: E
 	layers.resize(num_layers);
 #ifndef CPU_ONLY
-	copy_data_to_device(); // copy labels and input features to the device
+	context->copy_data_to_device(); // copy labels and input features to the device
 #endif
 }
 

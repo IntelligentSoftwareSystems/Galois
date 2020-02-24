@@ -9,27 +9,30 @@ softmax_loss_layer::softmax_loss_layer(unsigned level, std::vector<size_t> in_di
 
 // TODO: need kernel fusion optimization
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
-void softmax_loss_layer::forward_propagation(const tensor_t &in_data, tensor_t &out_data) {
+void softmax_loss_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {
+	size_t len = input_dims[1];
 	galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 		if (masks_[i] == 1) { // masked
-			softmax(in_data[i], out_data[i]); // normalize using softmax
+			softmax(len, &in_data[len*i], &out_data[len*i]); // normalize using softmax
 			// y is a one hot encoded vector for the labels
 			std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
 			y[context->get_label(i)] = 1.0; // one-hot
-			loss[i] = cross_entropy(y, out_data[i]);
+			loss[i] = cross_entropy(len, &y[0], &out_data[len*i]);
 		}
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-fw"));
 }
 
-void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) { }
+void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+}
 
-void softmax_loss_layer::back_propagation(const tensor_t &in_data, const tensor_t &out_data, tensor_t &out_grad, tensor_t &in_grad) {
+void softmax_loss_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {
+	size_t len = input_dims[1];
 	galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
-		vec_t norm_grad(output_dims[1]);
-		std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
+		vec_t norm_grad(len);
+		std::vector<acc_t> y(len, 0.0); // ground truth
 		y[context->get_label(i)] = 1.0;
-		d_cross_entropy(y, out_data[i], norm_grad);
-		d_softmax(in_data[i], out_data[i], in_grad[i], norm_grad);
+		d_cross_entropy(len, &y[0], &out_data[len*i], &norm_grad[0]);
+		d_softmax(len, &in_data[len*i], &out_data[len*i], &in_grad[len*i], &norm_grad[0]);
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-bw"));
 }
 

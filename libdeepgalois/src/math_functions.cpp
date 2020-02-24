@@ -78,6 +78,13 @@ float_t dot(const vec_t &x, const vec_t &y) {
 	return sum;
 }
 
+float_t dot(size_t n, const float_t *x, const float_t *y) {
+	float_t sum = 0;
+	for (size_t i = 0; i < n; ++i)
+		sum += x[i] * y[i];
+	return sum;
+}
+
 // matrix-vector multiply
 void mvmul(const vec_t &matrix, const vec_t &in_vector, vec_t &out_vector) {
 	size_t m = out_vector.size();
@@ -116,6 +123,14 @@ void copy2D1D(const tensor_t &in, vec_t &out) {
 		std::copy(in[i].begin(), in[i].end(), ptr);
 		ptr += y;
 	}
+}
+
+void copy1D1D(const vec_t &in, vec_t &out) {
+	std::copy(in.begin(), in.end(), &out[0]);
+}
+
+void copy1D1D(size_t len, const float_t *in, float_t *out) {
+	std::copy(in, in+len, out);
 }
 
 void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB, 
@@ -220,7 +235,28 @@ void transpose(size_t x, size_t y, const vec_t &in, vec_t &out) {
 		}
 	}
 }
+
+void transpose(size_t x, size_t y, const float_t *in, float_t *out) {
+	for (size_t i = 0; i < y; i ++) {
+		for (size_t j = 0; j < x; j ++) {
+			out[i*x+j] = in[j*y+i];
+		}
+	}
+}
+
 int argmax(const size_t n, const vec_t &x) {
+	float_t max = x[0];
+	int max_ind = 0;
+	for (size_t i = 1; i < n; i++) {
+		if (x[i] > max) {
+			max_ind = i;
+			max = x[i];
+		}
+	}
+	return max_ind;
+}
+
+int argmax(const size_t n, const float_t *x) {
 	float_t max = x[0];
 	int max_ind = 0;
 	for (size_t i = 1; i < n; i++) {
@@ -236,10 +272,19 @@ void clear(vec_t &in) {
 	for (size_t i = 0; i < in.size(); i++) in[i] = 0;
 }
 
+void clear(size_t n, float_t *in) {
+	for (size_t i = 0; i < n; i++) in[i] = 0;
+}
+
 void relu(const vec_t &in, vec_t &out) {
 	for (size_t i = 0; i < out.size(); ++i) {
 		out[i] = std::max(in[i], (float_t)0) + negative_slope * std::min(in[i], (float_t)0);
 	}
+}
+
+void relu(size_t n, const float_t *in, float_t *out) {
+	for (size_t i = 0; i < n; ++i)
+		out[i] = std::max(in[i], float_t{0});
 }
 
 void d_relu(const vec_t &in_diff, const vec_t &fv, vec_t &out_diff) {
@@ -283,8 +328,20 @@ void dropout(const float scale, const float dropout_rate, const vec_t &in, std::
 		out[i] = in[i] * mask[i] * scale;
 }
 
+void dropout(size_t n, const float scale, const float dropout_rate, const float_t *in, unsigned *mask, float_t *out) {
+	for (size_t i = 0; i < n; ++i)
+		mask[i] = bernoulli(dropout_rate);
+	for (size_t i = 0; i < n; ++i)
+		out[i] = in[i] * mask[i] * scale;
+}
+
 void d_dropout(const float scale, const vec_t &in_diff, std::vector<unsigned> &mask, vec_t &out_diff) {
 	for (size_t i = 0; i < in_diff.size(); ++i)
+		out_diff[i] = in_diff[i] * mask[i] * scale;
+}
+
+void d_dropout(size_t n, const float scale, const float_t *in_diff, unsigned *mask, float_t *out_diff) {
+	for (size_t i = 0; i < n; ++i)
 		out_diff[i] = in_diff[i] * mask[i] * scale;
 }
 
@@ -317,6 +374,17 @@ void softmax(const vec_t &input, vec_t &output) {
 		output[i] /= denominator;
 }
 
+void softmax(size_t n, const float_t *input, float_t *output) {
+	const float_t max = *std::max_element(input, input+n);
+	float_t denominator(0);
+	for (size_t i = 0; i < n; i++) {
+		output[i] = std::exp(input[i] - max);
+		denominator += output[i];
+	}
+	for (size_t i = 0; i < n; i++)
+		output[i] /= denominator;
+}
+
 void log_softmax(const vec_t &input, vec_t &output) {
 	const float_t max = *std::max_element(input.begin(), input.end());
 	float_t denominator(0);
@@ -344,6 +412,16 @@ void d_softmax(const vec_t &y, const vec_t &p, vec_t &dy, const vec_t &dp) {
 	}
 }
 
+void d_softmax(size_t n, const float_t *y, const float_t *p, float_t *dy, const float_t *dp) {
+	vec_t df(n, 0);
+	for (size_t i = 0; i < n; i++) {
+		for (size_t j = 0; j < n; j++) {
+			df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
+		}
+		dy[i] = dot(n, dp, &df[0]);
+	}
+}
+
 // cross-entropy loss function for multi-class classification
 // y: ground truth
 // p: predicted probability
@@ -361,12 +439,28 @@ float_t cross_entropy(const vec_t &y, const vec_t &p) {
 	return loss;
 }
 
+float_t cross_entropy(size_t n, const float_t *y, const float_t *p) {
+	float_t loss = 0.0;
+	for (size_t i = 0; i < n; i++) {
+		if (y[i] == float_t(0)) continue;
+		if (p[i] == float_t(0)) loss -= y[i] * std::log(float_t(1e-10));
+		else loss -= y[i] * std::log(p[i]);
+	}
+	return loss;
+}
+
 void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d) {
 	auto n = y.size();
 	//for (size_t i = 0; i < n; i++) d[i] = (p[i] - y[i]) / (p[i] * (float_t(1) - p[i]));
 	for (size_t i = 0; i < n; i++) {
 		d[i] = -y[i] / (p[i] + float_t(1e-10));
 		//d[i] = p[i] - y[i];
+	}
+}
+
+void d_cross_entropy(size_t n, const float_t *y, const float_t *p, float_t *d) {
+	for (size_t i = 0; i < n; i++) {
+		d[i] = -y[i] / (p[i] + float_t(1e-10));
 	}
 }
 

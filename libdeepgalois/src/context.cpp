@@ -105,12 +105,12 @@ size_t Context::read_graph_gpu(std::string dataset_str) {
 	return graph_gpu.nnodes;
 }
 
-void copy_data_to_device() {
+void Context::copy_data_to_device() {
 	CUDA_CHECK(cudaMalloc((void **)&d_labels, n * sizeof(label_t)));
-	CUDA_SAFE_CALL(cudaMemcpy(d_labels, labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(d_labels, &labels[0], n * sizeof(label_t), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
 	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * sizeof(float_t)));
-	CUDA_SAFE_CALL(cudaMemcpy(d_feats, h_feats, n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
 }
 #endif
 
@@ -183,12 +183,7 @@ size_t Context::read_features(std::string dataset_str) {
 	size_t m; // m = number of vertices
 	in >> m >> feat_len >> std::ws;
 	//assert(m == );
-	h_feats.resize(m);
-	for (size_t i = 0; i < m; ++i) {
-		h_feats[i].resize(feat_len);
-		for (size_t j = 0; j < feat_len; ++j)
-			h_feats[i][j] = 0;
-	}
+	h_feats.resize(m*feat_len, 0);
 	while (std::getline(in, line)) {
 		std::istringstream edge_stream(line);
 		unsigned u, v;
@@ -196,7 +191,7 @@ size_t Context::read_features(std::string dataset_str) {
 		edge_stream >> u;
 		edge_stream >> v;
 		edge_stream >> w;
-		h_feats[u][v] = w;
+		h_feats[u*feat_len+v] = w;
 	}
 	in.close();
 	t_read.Stop();
