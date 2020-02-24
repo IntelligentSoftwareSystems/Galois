@@ -132,7 +132,7 @@ protected:
 	vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
 	vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x 16, layer1: 16 x E
 	vec_t weight_grad; // weight gradient for updating parameters
-	vec_t loss; // error for each vertex: N x 1
+	float_t *loss; // error for each vertex: N x 1
 	Context *context;
 };
 

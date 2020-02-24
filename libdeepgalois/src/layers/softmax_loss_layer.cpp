@@ -3,7 +3,7 @@
 softmax_loss_layer::softmax_loss_layer(unsigned level, std::vector<size_t> in_dims, 
 	std::vector<size_t> out_dims) : layer(level, in_dims, out_dims) {
 	trainable_ = false;
-	loss.resize(in_dims[0]); // error for each sample
+	loss = new float_t[in_dims[0]]; // error for each sample
 	name_ = layer_type() + "_" + std::to_string(level);
 }
 #ifdef CPU_ONLY

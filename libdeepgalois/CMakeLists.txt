@@ -16,7 +16,7 @@ include_directories("${MGPU_ROOT}/src")
 link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-set(USE_CPU ON CACHE BOOL "Build DeepGalois without CUDA support")
+set(USE_CPU OFF CACHE BOOL "Build DeepGalois without CUDA support")
 if(USE_CPU)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
 else()
@@ -27,7 +27,11 @@ else()
   #list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_60,code=sm_60")
   link_directories(${CUDA_LIB})
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
-  set(CUDA_SOURCES src/math_functions.cu src/aggregator.cu)
+  set(CUDA_SOURCES
+    src/math_functions.cu
+	src/aggregator.cu
+	src/node.cu
+  )
   cuda_add_library(dg_gpu ${CUDA_SOURCES})
   target_link_libraries(dg_gpu galois_gpu -lcudart -lcublas -lcurand)
   set_target_properties(dg_gpu PROPERTIES COMPILE_FLAGS "-DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CUDA")
@@ -43,6 +47,7 @@ set(sources
   src/math_functions.cpp
   src/aggregator.cpp
   src/context.cpp
+  src/node.cpp
   src/net.cpp
 )
 add_library(dg_cpu STATIC ${sources})
