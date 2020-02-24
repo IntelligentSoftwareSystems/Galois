@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-const std::string path = "/h2/xchen/datasets/Learning/"; // path to the input dataset
+const std::string path = "/net/ohm/export/iss/inputs/Learning/"; // path to the input dataset
 enum class net_phase { train, test };
 
 class ResourceManager {

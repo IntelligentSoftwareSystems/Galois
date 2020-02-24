@@ -40,7 +40,7 @@ else()
   #cuda_compile(AGG_O src/aggregator.cu)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -mavx2")
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
