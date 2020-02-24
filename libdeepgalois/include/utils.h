@@ -84,7 +84,7 @@ uniform_rand(T min, T max) {
 }
 
 inline bool bernoulli(float_t p) {
-	return uniform_rand(float_t{0}, float_t{1}) <= p;
+	return uniform_rand(float_t(0), float_t(1)) <= p;
 }
 
 inline size_t read_masks(std::string dataset_str, std::string mask_type, size_t &begin, size_t &end, std::vector<uint8_t> &masks) {

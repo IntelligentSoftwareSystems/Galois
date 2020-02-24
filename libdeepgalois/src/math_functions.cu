@@ -8,8 +8,8 @@ void gpu_rng_uniform(const int n, unsigned *r) {
 void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) {
 	CURAND_CHECK(curandGenerateUniform(Context::curand_generator(), r, n));
 	const float range = b - a;
-	if (range != float_t{1}) scal_gpu(n, range, r);
-	if (a != float_t{0}) add_scalar_gpu(n, a, r);
+	if (range != float_t(1)) scal_gpu(n, range, r);
+	if (a != float_t(0)) add_scalar_gpu(n, a, r);
 }
 
 void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_t *r) {
@@ -161,9 +161,26 @@ __device__ void softmax(int n, const float_t *input, float_t *output) {
 	for (size_t i = 0; i < n; i++) output[i] /= denominator;
 }
 
-__device__ void cross_entropy(int n, const label_t idx, float_t *p, float_t &loss) {
+// TODO: use warp
+__device__ void d_softmax(size_t n, const float_t *p, const float_t *dp, float_t *dy) {
+	for (size_t i = 0; i < n; i++) {
+		dy[i] = 0;
+		for (size_t j = 0; j < n; j++) {
+			float_t df = (j == i) ? p[i] * (1.0 - p[i]) : -p[j] * p[i];
+			dy[i] += df * dp[j];
+		}
+	}
+}
+
+__device__ void cross_entropy(int n, const label_t idx, const float_t *p, float_t &loss) {
 	if (p[idx] == 0.0) loss -= log(float_t(1e-10));
 	else loss -= log(p[idx]);
+}
+
+__device__ void d_cross_entropy(int n, const label_t idx, const float_t *p, float_t *d) {
+	for (int i = 0; i < n; i++)
+		if (i == (int)idx) d[i] = -1.0 / (p[i] + 1e-10);
+		else d[i] = 0.0;
 }
 
 // n: number of vectors
@@ -184,6 +201,16 @@ void softmax_cross_entropy_gpu(int n, int len, const float_t *in, const mask_t *
 	softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, in, masks, labels, loss, out);
 }
 
-void d_softmax_cross_entropy_gpu(int x, int y, const float_t *in, const mask_t *masks, const label_t *labels, const float_t *out, float_t *diff) {
+__global__ void d_softmax_cross_entropy_kernel(int n, int len, const float_t *in,
+	const mask_t *masks, const label_t *labels, const float_t *out, float_t *diff) {
+	CUDA_KERNEL_LOOP(i, n) {
+		float_t out_grad[41];
+		d_cross_entropy(len, labels[i], out+len*i, out_grad);
+		d_softmax(len, out+len*i, out_grad, diff+len*i);
+	}
+}
+
+void d_softmax_cross_entropy_gpu(int n, int len, const float_t *in, const mask_t *masks, const label_t *labels, const float_t *out, float_t *diff) {
+	d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, in, masks, labels, out, diff);
 }
 

@@ -290,7 +290,7 @@ void relu(const vec_t &in, vec_t &out) {
 
 void relu(size_t n, const float_t *in, float_t *out) {
 	for (size_t i = 0; i < n; ++i)
-		out[i] = std::max(in[i], float_t{0});
+		out[i] = std::max(in[i], float_t(0));
 }
 
 void d_relu(const vec_t &in_diff, const vec_t &fv, vec_t &out_diff) {

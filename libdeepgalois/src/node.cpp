@@ -27,8 +27,8 @@ void edge::merge_grads(vec_t *dst) {
 
 void edge::clear_grads() {
 #ifdef CPU_ONLY
-	std::fill(grad_, grad_+ft_dim_*num_samples_, float_t{0}); // TODO: need vectorize
-	//vectorize::fill(&grad_[0], grad_.size(), float_t{0});
+	std::fill(grad_, grad_+ft_dim_*num_samples_, float_t(0)); // TODO: need vectorize
+	//vectorize::fill(&grad_[0], grad_.size(), float_t(0));
 #else
 	clear_grads_gpu();
 #endif
