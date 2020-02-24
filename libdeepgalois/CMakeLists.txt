@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
-SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS/build/include)
-SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS/build/lib)
+SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/include)
+SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/lib)
 set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
 set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
 SET(CUDA_INC /org/centers/cdgc/cuda/cuda-8.0/include)
@@ -40,7 +40,7 @@ else()
   #cuda_compile(AGG_O src/aggregator.cu)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -mavx2")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp

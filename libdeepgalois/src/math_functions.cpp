@@ -9,6 +9,7 @@ extern "C" {
 }
 
 // vector add
+#if defined(__AVX__) || defined(__AVX2__)
 void vadd(const vec_t &a, const vec_t &b, vec_t &out) {
 	//for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
 	size_t n = out.size();
@@ -26,6 +27,14 @@ void vadd(size_t n, const float_t *a, const float_t *b, float_t *out) {
 		_mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
 	for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
 }
+#else
+void vadd(const vec_t &a, const vec_t &b, vec_t &out) {
+	for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
+}
+void vadd(size_t n, const float_t *a, const float_t *b, float_t *out) {
+	for (size_t i = 0; i < n; ++i) out[i] = a[i] + b[i];
+}
+#endif
 
 // vector subtract
 void vsub(const vec_t &in_a, const vec_t &in_b, vec_t &out) {
