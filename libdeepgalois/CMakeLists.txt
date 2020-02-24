@@ -16,7 +16,7 @@ include_directories("${MGPU_ROOT}/src")
 link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-set(USE_CPU OFF CACHE BOOL "Build DeepGalois without CUDA support")
+set(USE_CPU ON CACHE BOOL "Build DeepGalois without CUDA support")
 if(USE_CPU)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
 else()
