@@ -161,15 +161,12 @@ void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C) {
 }
 
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, 
-	const vec_t &A, const vec_t &B, vec_t &C) {
+	const float_t *A, const float_t *B, float_t *C) {
 	galois::StatTimer Tmatmul("MatMul");
 	Tmatmul.start();
-	assert(A.size() == dim_x*dim_z);
-	assert(B.size() == dim_z*dim_y);
-	assert(C.size() == dim_x*dim_y);
 	const CBLAS_TRANSPOSE TransA = CblasNoTrans;
 	const CBLAS_TRANSPOSE TransB = CblasNoTrans;
-	sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, &A[0], &B[0], 0.0, &C[0]);
+	sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
 	Tmatmul.stop();
 }
 
@@ -181,7 +178,7 @@ void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, vec_t &C)
 	assert(C.size() == dim_x*dim_y);
 	vec_t A1D(dim_x*dim_z);
 	copy2D1D(A, A1D);
-	matmul1D1D(dim_x, dim_y, dim_z, A1D, B, C);
+	matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C[0]);
 }
 
 void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
@@ -198,7 +195,7 @@ void matmul(const tensor_t &A, const vec_t &B, tensor_t &C) {
 		std::copy(A[i].begin(), A[i].end(), ptr);
 		ptr += dim_z;
 	}
-	matmul1D1D(dim_x, dim_y, dim_z, A1D, B, C1D);
+	matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C1D[0]);
 	for (size_t i = 0; i < dim_x; i++) {
 		for (size_t j = 0; j < dim_y; ++j) { 
 			C[i][j] = C1D[i*dim_y+j];

@@ -39,7 +39,7 @@ public:
 	void degree_counting();
 	void norm_factor_counting();
 	std::vector<label_t> labels; // labels for classification: N x 1
-	vec_t norm_factor; // normalization constant based on graph structure
+	float_t *norm_factor; // normalization constant based on graph structure
 	std::vector<unsigned> degrees;
 	vec_t h_feats; // input features: N x D
 	size_t n; // number of samples: N

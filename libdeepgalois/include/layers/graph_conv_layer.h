@@ -24,13 +24,13 @@ public:
 	void init();
 	std::string layer_type() const override { return std::string("graph_conv"); }
 	void set_netphase(net_phase ctx) override { phase_ = ctx; }
-	virtual void forward_propagation(const vec_t &in_data, vec_t &out_data);
-	virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad);
+	//virtual void forward_propagation(const vec_t &in_data, vec_t &out_data);
+	//virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad);
 	virtual void forward_propagation(const float_t *in_data, float_t *out_data);
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad);
 	// user-defined aggregate function
 #ifdef CPU_ONLY
-	virtual void aggregate(size_t len, Graph &g, const vec_t &in, vec_t &out);
+	virtual void aggregate(size_t len, Graph &g, const float_t *in, float_t *out);
 #else
 	virtual void aggregate(size_t len, CSRGraph &g, const float_t *in, float_t *out);
 #endif

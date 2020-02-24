@@ -1,7 +1,7 @@
 #include "layers/graph_conv_layer.h"
 
 #ifdef CPU_ONLY
-void graph_conv_layer::aggregate(size_t len, Graph &g, const vec_t &in, vec_t &out) {
+void graph_conv_layer::aggregate(size_t len, Graph &g, const float_t *in, float_t *out) {
 	update_all(len, g, in, out, true, context->norm_factor);
 #else
 void graph_conv_layer::aggregate(size_t len, CSRGraph &g, const float_t *in, float_t *out) {
@@ -39,7 +39,7 @@ void graph_conv_layer::init() {
 	rand_init_matrix(y, z, W);
 	//rand_init_matrix(y, z, Q);
 	zero_init_matrix(y, z, weight_grad);
-	alloc_grad();
+	//alloc_grad();
 	if (dropout_) dropout_mask.resize(x*y);
 	in_temp.resize(x*y);
 	out_temp.resize(x*z); // same as pre_sup in original GCN code: https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
@@ -50,7 +50,8 @@ void graph_conv_layer::init() {
 
 #ifdef CPU_ONLY
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
-void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {
+void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+//void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {
 	// input: x*y; W: y*z; output: x*z
 	// if y > z: mult W first to reduce the feature size for aggregation
 	// else: aggregate first then mult W (not implemented yet)
@@ -58,9 +59,9 @@ void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data
 		galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 			dropout(y, scale_, dropout_rate_, &in_data[i*y], &dropout_mask[i*y], &in_temp[i*y]);
 		}, galois::loopname("dropout"));
-		matmul1D1D(x, z, y, in_temp, W, out_temp); // x*y; y*z; x*z
-	} else matmul1D1D(x, z, y, in_data, W, out_temp); // x*y; y*z; x*z
-	aggregate(z, context->graph_cpu, out_temp, out_data); // aggregate
+		matmul1D1D(x, z, y, &in_temp[0], &W[0], &out_temp[0]); // x*y; y*z; x*z
+	} else matmul1D1D(x, z, y, in_data, &W[0], &out_temp[0]); // x*y; y*z; x*z
+	aggregate(z, context->graph_cpu, &out_temp[0], out_data); // aggregate
 	if (act_) {
 		galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 			relu(z, &out_data[i*z], &out_data[i*z]);
@@ -69,19 +70,21 @@ void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
-void graph_conv_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {
+void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {
+//void graph_conv_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {
 	if (act_) {
 		galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 			for (size_t j = 0; j < z; ++j) //TODO: use in_data or out_data?
 				out_temp[i*z+j] = out_data[i*z+j] > float_t(0) ? out_grad[i*z+j] : float_t(0);
 		}, galois::loopname("d_relu"));
-	} else copy1D1D(out_grad, out_temp); // TODO: avoid copying
+	//} else copy1D1D(out_grad, out_temp); // TODO: avoid copying
+	} else copy1D1D(x*z, out_grad, &out_temp[0]); // TODO: avoid copying
 	if (level_ != 0) { // no need to calculate in_grad for the first layer
 		vec_t trans_W(z*y);
 		transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
-		matmul1D1D(x, y, z, out_temp, trans_W, in_temp); // x*z; z*y -> x*y
+		matmul1D1D(x, y, z, &out_temp[0], &trans_W[0], &in_temp[0]); // x*z; z*y -> x*y
 		//NOTE: since graph is symmetric, the derivative is the same
-		update_all(y, context->graph_cpu, in_temp, in_grad, true, context->norm_factor); // x*x; x*y -> x*y
+		update_all(y, context->graph_cpu, &in_temp[0], in_grad, true, context->norm_factor); // x*x; x*y -> x*y
 		if (dropout_) {
 			galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
 				d_dropout(y, scale_, &in_grad[i*y], &dropout_mask[i*y], &in_grad[i*y]);
@@ -89,15 +92,13 @@ void graph_conv_layer::back_propagation(const vec_t &in_data, const vec_t &out_d
 		}
 	}
 	// calculate weight gradients
-	transpose(x, y, in_data, trans_data); // y*x
-	matmul1D1D(y, z, x, trans_data, out_temp, weight_grad); // y*x; x*z; y*z
+	transpose(x, y, in_data, &trans_data[0]); // y*x
+	matmul1D1D(y, z, x, &trans_data[0], &out_temp[0], &weight_grad[0]); // y*x; x*z; y*z
 }
 
-void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {}
-void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {}
 #else
-void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {}
-void graph_conv_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {}
+//void graph_conv_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {}
+//void graph_conv_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {}
 
 // GPU forward
 void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {

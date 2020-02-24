@@ -3,7 +3,7 @@
 #include "aggregator.h"
 #include "math_functions.hh"
 
-void update_all(size_t len, Graph &g, const vec_t &in, vec_t &out, bool norm, const vec_t &norm_factor) {
+void update_all(size_t len, Graph &g, const float_t *in, float_t *out, bool norm, const float_t *norm_factor) {
 	galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto& src) {
 		clear(len, &out[src*len]);
 		float_t a = 0.0, b = 0.0;

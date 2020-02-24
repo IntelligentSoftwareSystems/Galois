@@ -26,7 +26,7 @@ void copy2D1D(const tensor_t &in, vec_t &out);
 void copy1D1D(const vec_t &in, vec_t &out);
 void copy1D1D(size_t len, const float_t *in, float_t *out);
 void matmul2D(const tensor_t &A, const tensor_t &B, tensor_t &C);
-void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, const vec_t &A, const vec_t &B, vec_t &C); // matrix multiply
+void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C); // matrix multiply
 void matmul2D1D(const size_t dim_y, const tensor_t &A, const vec_t &B, vec_t &C);
 void transpose2D(const tensor_t &in, tensor_t &out);
 void transpose2D1D(const tensor_t &in, vec_t &out);

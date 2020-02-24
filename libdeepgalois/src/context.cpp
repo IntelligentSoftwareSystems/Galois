@@ -109,7 +109,7 @@ void Context::copy_data_to_device() {
 	CUDA_CHECK(cudaMalloc((void **)&d_labels, n * sizeof(label_t)));
 	CUDA_CHECK(cudaMemcpy(d_labels, &labels[0], n * sizeof(label_t), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
-	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * sizeof(float_t)));
+	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * feat_len *  sizeof(float_t)));
 	CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
 }
 #endif
@@ -118,7 +118,7 @@ void Context::copy_data_to_device() {
 // for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
 void Context::norm_factor_counting() {
 #ifdef CPU_ONLY
-	norm_factor.resize(n);
+	norm_factor = new float_t[n];
 	galois::do_all(galois::iterate((size_t)0, n), [&] (auto v) {
 		float_t temp = std::sqrt(float_t(degrees[v]));
 		if (temp == 0.0) norm_factor[v] = 0.0;

@@ -6,10 +6,11 @@ softmax_loss_layer::softmax_loss_layer(unsigned level, std::vector<size_t> in_di
 	loss.resize(in_dims[0]); // error for each sample
 	name_ = layer_type() + "_" + std::to_string(level);
 }
-
+#ifdef CPU_ONLY
 // TODO: need kernel fusion optimization
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
-void softmax_loss_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {
+void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+//void softmax_loss_layer::forward_propagation(const vec_t &in_data, vec_t &out_data) {
 	size_t len = input_dims[1];
 	galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 		if (masks_[i] == 1) { // masked
@@ -22,10 +23,8 @@ void softmax_loss_layer::forward_propagation(const vec_t &in_data, vec_t &out_da
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-fw"));
 }
 
-void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
-}
-
-void softmax_loss_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {
+//void softmax_loss_layer::back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) {
+void softmax_loss_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {
 	size_t len = input_dims[1];
 	galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
 		vec_t norm_grad(len);
@@ -35,6 +34,10 @@ void softmax_loss_layer::back_propagation(const vec_t &in_data, const vec_t &out
 		d_softmax(len, &in_data[len*i], &out_data[len*i], &in_grad[len*i], &norm_grad[0]);
 	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("softmax-loss-bw"));
 }
+#else // GPU implementation
+void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+}
 
 void softmax_loss_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {
 }
+#endif

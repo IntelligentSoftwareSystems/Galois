@@ -41,8 +41,8 @@ public:
 	virtual std::string layer_type() const = 0;
 	virtual void set_netphase(net_phase phase) {}
 	virtual void set_context(Context *ctx) { context = ctx; }
-	virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) = 0;
-	virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
+	//virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) = 0;
+	//virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
 	virtual void forward_propagation(const float_t *in_data, float_t *out_data) = 0;
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 
@@ -62,21 +62,23 @@ public:
 		masks_ = masks;
 	}
 	void set_in_data(vec_t data) {
+		assert(data.size() == input_dims[0]*input_dims[1]);
 		prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
 		// allocate memory for intermediate features
-		prev_->get_data() = data;
+		//prev_->get_data() = data;
+		std::copy(data.begin(), data.end(), prev_->get_data());
 		// allocate memory for intermediate gradients
-		prev_->get_gradient().resize(input_dims[0]*output_dims[1]);
+		//prev_->get_gradient().resize(input_dims[0]*input_dims[1]);
 	}
 	void add_edge() {
 		// add an outgoing edge
 		next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
 		// allocate memory for intermediate feature vectors
-		next_->get_data().resize(output_dims[0]*output_dims[1]);
+		//next_->get_data().resize(output_dims[0]*output_dims[1]);
 	}
 	void alloc_grad() {
 		// allocate memory for intermediate gradients
-		next_->get_gradient().resize(output_dims[0]*output_dims[1]);
+		//next_->get_gradient().resize(output_dims[0]*output_dims[1]);
 	}
 	void forward() {
 		forward_propagation(prev()->get_data(), next()->get_data());
