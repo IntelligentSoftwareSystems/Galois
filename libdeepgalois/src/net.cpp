@@ -83,7 +83,7 @@ void Net::construct_layers() {
 	append_conv_layer(0, true); // first conv layer
 	append_conv_layer(1); // hidden1 layer
 	append_out_layer(2); // output layer
-	layers[0]->set_in_data(context->h_feats); // feed input data
+	layers[0]->set_in_data(context->get_in_ptr()); // feed input data
 	set_contexts();
 }
 

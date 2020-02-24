@@ -61,19 +61,23 @@ public:
 		count_ = sample_count;
 		masks_ = masks;
 	}
-	void set_in_data(vec_t data) {
+	void set_in_data(float_t *data) {
 		assert(data.size() == input_dims[0]*input_dims[1]);
 		prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
+		prev_->set_data(data);
+		// no need to allocate memory for gradients, since this is the input layer.
+		//
 		// allocate memory for intermediate features
 		//prev_->get_data() = data;
-		std::copy(data.begin(), data.end(), prev_->get_data());
+		//std::copy(data.begin(), data.end(), prev_->get_data());
 		// allocate memory for intermediate gradients
 		//prev_->get_gradient().resize(input_dims[0]*input_dims[1]);
 	}
 	void add_edge() {
 		// add an outgoing edge
 		next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
-		// allocate memory for intermediate feature vectors
+		// allocate memory for intermediate feature vectors and gradients
+		next_->alloc();
 		//next_->get_data().resize(output_dims[0]*output_dims[1]);
 	}
 	void alloc_grad() {
@@ -96,7 +100,8 @@ public:
 		//for (size_t i = 0; i < diff.size(); ++i)
 		//	diff[i] *= rcp_batch_size;
 		opt->update(weight_grad, W, parallel); // W += grad
-		prev()->clear_grads();
+		//prev()->clear_grads();
+		next()->clear_grads();
 	}
 	inline acc_t get_masked_loss() {
 		AccumF total_loss;

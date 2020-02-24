@@ -28,13 +28,15 @@ public:
 	edge(node *prev, size_t n, size_t len) :
 		num_samples_(n), ft_dim_(len),
 		//data_(vec_t(n*len)), grad_(vec_t(n*len)),
-		data_(NULL), grad_(NULL), prev_(prev) {
+		data_(NULL), grad_(NULL), prev_(prev) {}
+
+	void alloc() {
 #ifdef CPU_ONLY
-		data_ = new float_t[n*len];
-		grad_ = new float_t[n*len];
+		data_ = new float_t[num_samples_ * ft_dim_];
+		grad_ = new float_t[num_samples_ * ft_dim_];
 #else
-		CUDA_CHECK(cudaMalloc((void **)&data_, n * len * sizeof(float_t)));
-		CUDA_CHECK(cudaMalloc((void **)&grad_, n * len * sizeof(float_t)));
+		CUDA_CHECK(cudaMalloc((void **)&data_, num_samples_ * ft_dim_ * sizeof(float_t)));
+		CUDA_CHECK(cudaMalloc((void **)&grad_, num_samples_ * ft_dim_ * sizeof(float_t)));
 #endif
 	}
 
@@ -75,6 +77,7 @@ public:
 	float_t *get_gpu_gradient() { return gpu_grad_; }
 	const float_t *get_gpu_gradient() const { return gpu_grad_; }
 */
+	void set_data(float_t *ptr) { data_ = ptr; }
 	float_t *get_data() { return data_; }
 	const float_t *get_data() const { return data_; }
 	float_t *get_gradient() { return grad_; }

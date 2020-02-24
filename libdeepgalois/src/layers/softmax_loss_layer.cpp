@@ -36,6 +36,7 @@ void softmax_loss_layer::back_propagation(const float_t *in_data, const float_t 
 }
 #else // GPU implementation
 void softmax_loss_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
+	softmax_cross_entropy_gpu(input_dims[0], input_dims[1], in_data, out_data);
 }
 
 void softmax_loss_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {

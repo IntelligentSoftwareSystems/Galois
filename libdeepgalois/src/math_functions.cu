@@ -106,3 +106,5 @@ void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
 	vadd_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, a, b, y);
 }
 
+void softmax_cross_entropy_gpu(int x, int y, float_t *in_data, float_t *out_data) {
+}

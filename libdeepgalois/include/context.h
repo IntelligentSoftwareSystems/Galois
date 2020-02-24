@@ -36,6 +36,7 @@ public:
 	size_t read_features(std::string dataset_str);
 	label_t get_label(size_t i) { return labels[i]; }
 	label_t *get_labels_ptr(size_t i) { return &(labels[0]); }
+	float_t * get_in_ptr();
 	void degree_counting();
 	void norm_factor_counting();
 	std::vector<label_t> labels; // labels for classification: N x 1

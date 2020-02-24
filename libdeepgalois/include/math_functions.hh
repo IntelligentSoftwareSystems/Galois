@@ -60,5 +60,6 @@ void dropout_gpu(const float scale, const float dropout_rate, const float_t *in,
 void d_dropout_gpu(const float scale, const float_t *in_diff, const unsigned *mask, float_t *out_diff); // dropout derivative
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z, const float_t *A, const float_t *B, float_t *C); // matrix multiply
 int argmax_gpu(const size_t n, const float_t *x); // the arguments of the maxima
+void softmax_cross_entropy_gpu(int x, int y, float_t *in_data, float_t *out_data);
 
 #endif

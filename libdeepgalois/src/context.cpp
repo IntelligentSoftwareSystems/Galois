@@ -98,6 +98,7 @@ void Context::genGraph(LGraph &lg, Graph &g) {
 			g.constructEdge(offset, lg.get_dest(offset), 0);
 	}
 }
+float_t * Context::get_in_ptr() { return &h_feats[0]; }
 #else
 size_t Context::read_graph_gpu(std::string dataset_str) {
 	std::string filename = path + dataset_str + ".csgr";
@@ -112,6 +113,7 @@ void Context::copy_data_to_device() {
 	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * feat_len *  sizeof(float_t)));
 	CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
 }
+float_t * Context::get_in_ptr() { return d_feats; }
 #endif
 
 // user-defined pre-computing function, called during initialization
