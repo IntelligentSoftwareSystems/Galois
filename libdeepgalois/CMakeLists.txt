@@ -40,7 +40,7 @@ else()
   #cuda_compile(AGG_O src/aggregator.cu)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -mavx2")
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
@@ -52,7 +52,12 @@ set(sources
 )
 add_library(dg_cpu STATIC ${sources})
 
-target_link_libraries(dg_cpu galois_shmem gllvm galois_gpu)
+if(USE_CPU)
+  target_link_libraries(dg_cpu galois_shmem gllvm)
+else()
+  target_link_libraries(dg_cpu galois_shmem gllvm galois_gpu)
+endif()
+
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
 target_link_libraries(dg_cpu -lopenblas)
 target_link_libraries(dg_cpu -lcudart -lcublas -lcurand)
