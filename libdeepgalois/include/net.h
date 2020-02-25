@@ -62,17 +62,17 @@ public:
     connect(layers[layer_id - 1], layers[layer_id]);
   }
 
-	// forward propagation: [begin, end) is the range of samples used.
-	acc_t fprop(size_t begin, size_t end, size_t count, mask_t *masks) {
-		// set mask for the last layer
-		layers[num_layers-1]->set_sample_mask(begin, end, count, masks);
-		// layer0: from N x D to N x 16
-		// layer1: from N x 16 to N x E
-		// layer2: from N x E to N x E (normalize only)
-		for (size_t i = 0; i < num_layers; i ++)
-			layers[i]->forward();
-		return layers[num_layers-1]->get_masked_loss();
-	}
+  // forward propagation: [begin, end) is the range of samples used.
+  acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
+    // set mask for the last layer
+    layers[num_layers - 1]->set_sample_mask(begin, end, count, &masks[0]);
+    // layer0: from N x D to N x 16
+    // layer1: from N x 16 to N x E
+    // layer2: from N x E to N x E (normalize only)
+    for (size_t i = 0; i < num_layers; i++)
+      layers[i]->forward();
+    return layers[num_layers - 1]->get_masked_loss();
+  }
 
   // back propogation
   void bprop() {
@@ -108,8 +108,27 @@ protected:
   std::vector<mask_t> train_mask, val_mask; // masks for traning and validation
   size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
   std::vector<layer*> layers; // all the layers in the neural network
-	// comparing outputs with the ground truth (labels)
-	acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t *masks);
+
+  // comparing outputs with the ground truth (labels)
+  inline acc_t masked_accuracy(size_t begin, size_t end, size_t count,
+                               mask_t* masks) {
+    AccumF accuracy_all;
+    accuracy_all.reset();
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const auto& i) {
+                     if (masks[i] == 1) {
+                       int preds = argmax(num_classes,
+                                          &(layers[NUM_CONV_LAYERS - 1]
+                                                ->next()
+                                                ->get_data()[i * num_classes]));
+                       if ((label_t)preds == context->get_label(i))
+                         accuracy_all += 1.0;
+                     }
+                   },
+                   galois::chunk_size<256>(), galois::steal(),
+                   galois::loopname("getMaskedLoss"));
+    return accuracy_all.reduce() / (acc_t)count;
+  }
 };
 
 #endif

@@ -12,4 +12,5 @@ public:
   virtual void forward_propagation(const float_t* in_data, float_t* out_data);
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);
+  virtual acc_t get_masked_loss();
 };

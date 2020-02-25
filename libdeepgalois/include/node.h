@@ -31,9 +31,7 @@ protected:
 class edge {
 public:
   edge(node* prev, size_t n, size_t len)
-      : num_samples_(n), ft_dim_(len),
-        // data_(vec_t(n*len)), grad_(vec_t(n*len)),
-        data_(NULL), grad_(NULL), prev_(prev) {}
+      : num_samples_(n), ft_dim_(len), data_(NULL), grad_(NULL), prev_(prev) {}
 
   void alloc();
   void alloc_gpu();

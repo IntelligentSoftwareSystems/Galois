@@ -44,69 +44,76 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void set_netphase(net_phase phase) {}
   virtual void set_context(Context* ctx) { context = ctx; }
-  // virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) =
-  // 0; virtual void back_propagation(const vec_t &in_data, const vec_t
-  // &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
+  virtual acc_t get_masked_loss() { return acc_t(0); }
   virtual void forward_propagation(const float_t* in_data,
                                    float_t* out_data)                = 0;
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad) = 0;
 
-	void set_trainable(bool trainable) { trainable_ = trainable; }
-	bool trainable() const { return trainable_; }
-	void set_name(std::string name) { name_ = name; }
-	std::string get_name() { return name_; }
-	mask_t *get_device_masks() { return d_masks_; }
-	void print_layer_info() {
-		std::cout << "Layer" << level_ << " type: " << layer_type()
-			<< " input[" << input_dims[0] << "," << input_dims[1] 
-			<< "] output[" << output_dims[0] << "," << output_dims[1] << "]\n";
-	}
-	virtual void set_sample_mask(size_t sample_begin, size_t sample_end, size_t sample_count, mask_t *masks) {
-		begin_ = sample_begin;
-		end_ = sample_end;
-		count_ = sample_count;
-		masks_ = masks;
+  void set_trainable(bool trainable) { trainable_ = trainable; }
+  bool trainable() const { return trainable_; }
+  void set_name(std::string name) { name_ = name; }
+  std::string get_name() { return name_; }
+  void print_layer_info() {
+    std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
+              << input_dims[0] << "," << input_dims[1] << "] output["
+              << output_dims[0] << "," << output_dims[1] << "]\n";
+  }
+  virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
+                               size_t sample_count, mask_t* masks) {
+    begin_ = sample_begin;
+    end_   = sample_end;
+    count_ = sample_count;
+    masks_ = masks;
 #ifndef CPU_ONLY
-		copy_masks_device(input_dims[0], masks_, d_masks_);
+    copy_masks_device(input_dims[0], masks_, d_masks_);
 #endif
-	}
-	void set_in_data(float_t *data) {
-		prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
-		prev_->set_data(data);
-		// no need to allocate memory for gradients, since this is the input layer.
-	}
-	void add_edge() {
-		// add an outgoing edge
-		next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
-		// allocate memory for intermediate feature vectors and gradients
-		next_->alloc();
-	}
-	void alloc_grad() {
-		// allocate memory for intermediate gradients
-	}
-	void forward() {
-		//std::cout << name_ << ": forwarding ... ";
-		forward_propagation(prev()->get_data(), next()->get_data());
-	}
-	void backward() {
-		//std::cout << name_ << ": backwarding ... ";
-		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
-	}
-	void update_weight(optimizer *opt) {
-		//std::cout << name_ << ": weight updating ... ";
-		//vec_t diff;
-		//prev()->merge_grads(&diff);
+  }
+  void set_in_data(float_t* data) {
+    assert(data.size() == input_dims[0] * input_dims[1]);
+    prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
+    prev_->set_data(data);
+    // no need to allocate memory for gradients, since this is the input layer.
+    //
+    // allocate memory for intermediate features
+    // prev_->get_data() = data;
+    // std::copy(data.begin(), data.end(), prev_->get_data());
+    // allocate memory for intermediate gradients
+    // prev_->get_gradient().resize(input_dims[0]*input_dims[1]);
+  }
+  void add_edge() {
+    // add an outgoing edge
+    next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
+    // allocate memory for intermediate feature vectors and gradients
+    next_->alloc();
+  }
+  void alloc_grad() {
+    // allocate memory for intermediate gradients
+  }
+  void forward() {
+    std::cout << name_ << ": forwarding ... ";
+    forward_propagation(prev()->get_data(), next()->get_data());
+  }
+  void backward() {
+    std::cout << name_ << ": backwarding ... ";
+    back_propagation(prev()->get_data(), next()->get_data(),
+                     next()->get_gradient(), prev()->get_gradient());
+  }
+  void update_weight(optimizer* opt) {
+    std::cout << name_ << ": weight updating ... ";
+    // vec_t diff;
+    // prev()->merge_grads(&diff);
 #ifdef CPU_ONLY
-		// parallelize only when target size is big enough to mitigate thread spawning overhead.
-		bool parallel = (W.size() >= 512);
-		opt->update(weight_grad, W, parallel); // W += grad
+    // parallelize only when target size is big enough to mitigate thread
+    // spawning overhead.
+    bool parallel = (W.size() >= 512);
+    opt->update(weight_grad, W, parallel); // W += grad
 #else
-		opt->update_gpu(d_weight_grad, d_W); // W += grad
+    opt->update_gpu(d_weight_grad, d_W); // W += grad
 #endif
-		//prev()->clear_grads();
-		next()->clear_grads();
-	}
+    // prev()->clear_grads();
+    next()->clear_grads();
+  }
 
 protected:
   unsigned level_;                 // layer id: [0, num_layers-1]

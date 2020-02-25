@@ -13,6 +13,18 @@ inline int CUDA_GET_BLOCKS(const int N) {
   return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
 }
 
+inline unsigned CudaTest(const char* msg) {
+  cudaError_t e;
+  // cudaThreadSynchronize();
+  cudaDeviceSynchronize();
+  if (cudaSuccess != (e = cudaGetLastError())) {
+    fprintf(stderr, "%s: %d\n", msg, e);
+    fprintf(stderr, "%s\n", cudaGetErrorString(e));
+    exit(-1);
+  }
+  return 0;
+}
+
 inline const char* cublasGetErrorString(cublasStatus_t error) {
   switch (error) {
   case CUBLAS_STATUS_SUCCESS:

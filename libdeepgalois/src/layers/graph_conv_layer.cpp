@@ -37,10 +37,10 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
 }
 
 void graph_conv_layer::init() {
-  std::cout << name_
-            << ": allocating memory for parameters and intermediate data... ";
   Timer t_alloc;
   t_alloc.Start();
+  // std::cout << name_ << ": allocating memory for parameters and intermediate
+  // data... ";
 #ifdef CPU_ONLY
   rand_init_matrix(y, z, W); // randomly initialize trainable parameters
   // rand_init_matrix(y, z, Q);
@@ -57,27 +57,33 @@ void graph_conv_layer::init() {
                       d_weight_grad);
 #endif
   t_alloc.Stop();
-  std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
+  // std::cout << "Done, time: " << t_alloc.Millisecs() << " ms\n";
 }
 
 #ifdef CPU_ONLY
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
-void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
-	// input: x*y; W: y*z; output: x*z
-	// if y > z: mult W first to reduce the feature size for aggregation
-	// else: aggregate first then mult W (not implemented yet)
-	if (dropout_ && phase_ == net_phase::train) {
-		galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-			dropout(y, scale_, dropout_rate_, &in_data[i*y], &dropout_mask[i*y], &in_temp[i*y]);
-		}, galois::loopname("dropout"));
-		matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
-	} else matmul1D1D(x, z, y, in_data, &W[0], out_temp); // x*y; y*z; x*z
-	aggregate(z, context->graph_cpu, out_temp, out_data);
-	if (act_) {
-		galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
-			relu(z, &out_data[i*z], &out_data[i*z]);
-		}, galois::loopname("relu"));
-	}
+void graph_conv_layer::forward_propagation(const float_t* in_data,
+                                           float_t* out_data) {
+  // input: x*y; W: y*z; output: x*z
+  // if y > z: mult W first to reduce the feature size for aggregation
+  // else: aggregate first then mult W (not implemented yet)
+  if (dropout_ && phase_ == net_phase::train) {
+    galois::do_all(galois::iterate((size_t)0, x),
+                   [&](const auto& i) {
+                     dropout(y, scale_, dropout_rate_, &in_data[i * y],
+                             &dropout_mask[i * y], &in_temp[i * y]);
+                   },
+                   galois::loopname("dropout"));
+    matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
+  } else
+    matmul1D1D(x, z, y, in_data, &W[0], out_temp);      // x*y; y*z; x*z
+  aggregate(z, context->graph_cpu, out_temp, out_data); // aggregate
+  if (act_) {
+    galois::do_all(
+        galois::iterate((size_t)0, x),
+        [&](const auto& i) { relu(z, &out_data[i * z], &out_data[i * z]); },
+        galois::loopname("relu"));
+  }
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
@@ -123,29 +129,39 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 
 #else
 // GPU forward
-void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
-	assert(y <= 128); // currently only support feature length <= 128
-	assert(in_data != NULL);
-	assert(in_temp != NULL);
-	assert(dropout_mask != NULL);
-	//std::cout << "in_data=" << in_data << ", in_temp=" << in_temp << ", dropout_mask=" << dropout_mask << ", out_temp=" << out_temp << ", out_data=" << out_data << "\n";
-	if (dropout_ && phase_ == net_phase::train) {
-		dropout_gpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
-		matmul1D1D_gpu(x, z, y, in_temp, d_W, out_temp);
-	} else matmul1D1D_gpu(x, z, y, in_data, d_W, out_temp);
-	//aggregate(z, context->graph_gpu, out_temp, out_data);
-	if (act_) relu_gpu(x*z, out_data, out_data);
+void graph_conv_layer::forward_propagation(const float_t* in_data,
+                                           float_t* out_data) {
+  assert(y <= 128); // currently only support feature length <= 128
+  assert(in_data != NULL);
+  assert(in_temp != NULL);
+  assert(dropout_mask != NULL);
+  if (dropout_ && phase_ == net_phase::train) {
+    dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
+    matmul1D1D_gpu(x, z, y, in_temp, d_W, out_temp);
+  } else
+    matmul1D1D_gpu(x, z, y, in_data, d_W, out_temp);
+  aggregate(z, context->graph_gpu, out_temp, out_data);
+  if (act_)
+    relu_gpu(x * z, out_data, out_data);
 }
 
 // GPU backward
-void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) {
-	if (act_) d_relu_gpu(x*z, out_grad, out_data, out_temp);
-	else copy_gpu(x*z, out_grad, out_temp);
-	if (level_ != 0) {
-		sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
-		//update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
-		if (dropout_) d_dropout_gpu(x*y, scale_, in_grad, dropout_mask, in_grad);
-	}
-	sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);
+void graph_conv_layer::back_propagation(const float_t* in_data,
+                                        const float_t* out_data,
+                                        float_t* out_grad, float_t* in_grad) {
+  if (act_)
+    d_relu_gpu(x * z, out_grad, out_data, out_temp);
+  else
+    copy_gpu(x * z, out_grad, out_temp);
+  if (level_ != 0) {
+    sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0,
+              in_temp);
+    update_all(y, context->graph_gpu, in_temp, in_grad, true,
+               context->d_norm_factor);
+    if (dropout_)
+      d_dropout_gpu(y, scale_, in_grad, dropout_mask, in_grad);
+  }
+  sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0,
+            d_weight_grad);
 }
 #endif
