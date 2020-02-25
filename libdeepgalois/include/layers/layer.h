@@ -59,6 +59,9 @@ public:
 		end_ = sample_end;
 		count_ = sample_count;
 		masks_ = masks;
+#ifndef CPU_ONLY
+		copy_masks_device(input_dims[0], masks_, d_masks_);
+#endif
 	}
 	void set_in_data(float_t *data) {
 		assert(data.size() == input_dims[0]*input_dims[1]);
@@ -77,11 +80,9 @@ public:
 		next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
 		// allocate memory for intermediate feature vectors and gradients
 		next_->alloc();
-		//next_->get_data().resize(output_dims[0]*output_dims[1]);
 	}
 	void alloc_grad() {
 		// allocate memory for intermediate gradients
-		//next_->get_gradient().resize(output_dims[0]*output_dims[1]);
 	}
 	void forward() {
 		forward_propagation(prev()->get_data(), next()->get_data());
@@ -90,15 +91,15 @@ public:
 		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
 	}
 	void update_weight(optimizer *opt) {
-		// parallelize only when target size is big enough to mitigate thread spawning overhead.
-		bool parallel = (W.size() >= 512);
 		//vec_t diff;
 		//prev()->merge_grads(&diff);
-		//auto in_data = prev()->get_data();
-		//float_t rcp_batch_size = float_t(1.0) / in_data.size();
-		//for (size_t i = 0; i < diff.size(); ++i)
-		//	diff[i] *= rcp_batch_size;
+#ifdef CPU_ONLY
+		// parallelize only when target size is big enough to mitigate thread spawning overhead.
+		bool parallel = (W.size() >= 512);
 		opt->update(weight_grad, W, parallel); // W += grad
+#else
+		opt->update_gpu(d_weight_grad, d_W); // W += grad
+#endif
 		//prev()->clear_grads();
 		next()->clear_grads();
 	}

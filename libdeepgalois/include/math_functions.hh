@@ -58,10 +58,7 @@ float_t cross_entropy(size_t n, const float_t *y, const float_t *p);
 void d_cross_entropy(const vec_t &y, const vec_t &p, vec_t &d);
 void d_cross_entropy(size_t n, const float_t *y, const float_t *p, float_t *d);
 
-void out_malloc_device(int n, mask_t *h_masks, mask_t *d_masks, float_t *loss);
-void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad);
 void copy_gpu(size_t len, const float_t *in, float_t *out);
-void malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out);
 void vadd_gpu(const int n, const float_t *a, const float_t *b, float_t *out); // vector add
 void relu_gpu(const int n, const float_t *in, float_t *out); // ReLU
 void d_relu_gpu(const int n, const float_t *in_diff, const float_t *data, float_t *out_diff); // ReLU derivative
@@ -76,5 +73,10 @@ void d_softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, const mas
 void scal_gpu(const int N, const float alpha, float *X);
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
 acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t *masks, float_t *loss);
+
+void copy_masks_device(int n, mask_t *h_masks, mask_t *d_masks);
+void malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out);
+void loss_malloc_device(int n, float_t *loss);
+void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad);
 
 #endif

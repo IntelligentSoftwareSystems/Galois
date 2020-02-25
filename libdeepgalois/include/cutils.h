@@ -13,7 +13,7 @@ inline int CUDA_GET_BLOCKS(const int N) {
 	return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
 }
 
-static unsigned CudaTest(const char *msg) {
+inline unsigned CudaTest(const char *msg) {
 	cudaError_t e;
 	//cudaThreadSynchronize();
 	cudaDeviceSynchronize();

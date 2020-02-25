@@ -32,9 +32,9 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm, bool bia
 }
 
 void graph_conv_layer::init() {
-	std::cout << name_ << ": allocating memory for parameters and intermediate data... ";
 	Timer t_alloc;
 	t_alloc.Start();
+	//std::cout << name_ << ": allocating memory for parameters and intermediate data... ";
 #ifdef CPU_ONLY
 	rand_init_matrix(y, z, W); // randomly initialize trainable parameters
 	//rand_init_matrix(y, z, Q);
@@ -47,7 +47,7 @@ void graph_conv_layer::init() {
 	gconv_malloc_device(x, y, z, dropout_, dropout_mask, in_temp, out_temp, d_W, d_weight_grad);
 #endif
 	t_alloc.Stop();
-	std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
+	//std::cout << "Done, time: " << t_alloc.Millisecs() << " ms\n";
 }
 
 #ifdef CPU_ONLY
@@ -101,6 +101,9 @@ void graph_conv_layer::back_propagation(const float_t *in_data, const float_t *o
 // GPU forward
 void graph_conv_layer::forward_propagation(const float_t *in_data, float_t *out_data) {
 	assert(y <= 128); // currently only support feature length <= 128
+	assert(in_data != NULL);
+	assert(in_temp != NULL);
+	assert(dropout_mask != NULL);
 	if (dropout_ && phase_ == net_phase::train) {
 		dropout_gpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
 		matmul1D1D_gpu(x, z, y, in_temp, d_W, out_temp);

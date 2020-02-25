@@ -19,10 +19,14 @@ void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_
 	CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
-void out_malloc_device(int n, mask_t *h_masks, mask_t *d_masks, float_t *loss) {
+void loss_malloc_device(int n, float_t *loss) {
+	CUDA_CHECK(cudaMalloc((void **)&loss, n * sizeof(float_t)));
+}
+
+void copy_masks_device(int n, mask_t *h_masks, mask_t *d_masks) {
+	assert(h_masks != NULL);
 	CUDA_CHECK(cudaMalloc((void **)&d_masks, n * sizeof(mask_t)));
 	CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
-	CUDA_CHECK(cudaMalloc((void **)&loss, n * sizeof(float_t)));
 }
 
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned *masks, float_t *in, float_t *out, float_t *matrix, float_t *grad) {

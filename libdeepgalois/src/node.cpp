@@ -1,6 +1,8 @@
 #include "node.h"
+#include <iostream>
 
 void edge::alloc() {
+	std::cout << "Allocating memory for tensors (intermediate features and gradients... ";
 #ifdef CPU_ONLY
 	data_ = new float_t[num_samples_ * ft_dim_];
 	grad_ = new float_t[num_samples_ * ft_dim_];

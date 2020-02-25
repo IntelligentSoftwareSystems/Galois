@@ -14,6 +14,7 @@ struct optimizer {
 	optimizer &operator=(optimizer &&) = default;
 	virtual ~optimizer()               = default;
 	virtual void update(const vec_t &dW, vec_t &W, bool parallelize) = 0;
+	virtual void update_gpu(const float_t *dW, float_t *W) = 0;
 	virtual void reset() {}  // override to implement pre-learning action
 };
 
@@ -40,20 +41,8 @@ protected:
  **/
 struct adagrad : public stateful_optimizer<1> {
 	adagrad() : alpha(0.01), eps(float_t(1e-8)) {}
-	void update(const vec_t &dW, vec_t &W, bool parallelize) {
-		vec_t &g = get<0>(W);
-		if (parallelize) {
-			galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-				g[i] += dW[i] * dW[i];
-				W[i] -= alpha * dW[i] / (std::sqrt(g[i]) + eps);
-			}, galois::loopname("adagrad_update"));
-		} else {
-			for (size_t i = 0; i < W.size(); i++) {
-				g[i] += dW[i] * dW[i];
-				W[i] -= alpha * dW[i] / (std::sqrt(g[i]) + eps);
-			}
-		}
-	}
+	void update(const vec_t &dW, vec_t &W, bool parallelize);
+	void update_gpu(const float_t *dW, float_t *W) {}
 	float_t alpha;  // learning rate
 	private:
 	float_t eps;
@@ -67,13 +56,8 @@ struct adagrad : public stateful_optimizer<1> {
  **/
 struct RMSprop : public stateful_optimizer<1> {
 	RMSprop() : alpha(float_t(0.0001)), mu(float_t(0.99)), eps(float_t(1e-8)) {}
-	void update(const vec_t &dW, vec_t &W, bool parallelize) {
-		vec_t &g = get<0>(W);
-		galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-			g[i] = mu * g[i] + (1 - mu) * dW[i] * dW[i];
-			W[i] -= alpha * dW[i] / std::sqrt(g[i] + eps);
-		}, galois::loopname("rms_update"));
-	}
+	void update(const vec_t &dW, vec_t &W, bool parallelize);
+	void update_gpu(const float_t *dW, float_t *W) {}
 	float_t alpha;  // learning rate
 	float_t mu;     // decay term
 private:
@@ -83,23 +67,10 @@ private:
 // Adam: A Method for Stochastic Optimization
 // http://arxiv.org/abs/1412.6980
 struct adam : public stateful_optimizer<2> {
-	adam() : alpha(0.01), b1(float_t(0.9)),
-		b2(float_t(0.999)), b1_t(float_t(0.9)),
-		b2_t(float_t(0.999)), eps(float_t(1e-8)) {}
-
-	void update(const vec_t &dW, vec_t &W, bool parallelize) {
-		vec_t &mt = get<0>(W);
-		vec_t &vt = get<1>(W);
-		galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-			mt[i] = b1 * mt[i] + (float_t(1) - b1) * dW[i];
-			vt[i] = b2 * vt[i] + (float_t(1) - b2) * dW[i] * dW[i];
-			// L2 norm based update rule
-			W[i] -= alpha * (mt[i] / (float_t(1) - b1_t)) /
-				std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
-		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("adam_update"));
-		b1_t *= b1;
-		b2_t *= b2;
-	}
+	adam() : alpha(float_t(0.01)), b1(float_t(0.9)), b2(float_t(0.999)), 
+		b1_t(float_t(0.9)), b2_t(float_t(0.999)), eps(float_t(1e-8)) {}
+	void update(const vec_t &dW, vec_t &W, bool parallelize);
+	void update_gpu(const float_t *dW, float_t *W);
 
 	float_t alpha;  // learning rate
 	float_t b1;     // decay term
@@ -118,24 +89,11 @@ private:
  *
  */
 struct adamax : public stateful_optimizer<2> {
-	adamax()
-		: alpha(float_t(0.002)),
-		b1(float_t(0.9)),
-		b2(float_t(0.999)),
-		b1_t(b1),
-		eps(float_t(1e-8)) {}
-
-	void update(const vec_t &dW, vec_t &W, bool parallelize) {
-		vec_t &mt = get<0>(W);
-		vec_t &ut = get<1>(W);
-		galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-			mt[i] = b1 * mt[i] + (float_t(1) - b1) * dW[i];
-			ut[i] = std::max(b2 * ut[i], std::abs(dW[i]));
-			// Lp norm based update rule
-			W[i] -= (alpha / (1.0 - b1_t)) * (mt[i] / (ut[i] + eps));
-		}, galois::loopname("adamax_update"));
-		b1_t *= b1;
-	}
+	adamax() : alpha(float_t(0.002)),
+		b1(float_t(0.9)), b2(float_t(0.999)),
+		b1_t(b1), eps(float_t(1e-8)) {}
+	void update(const vec_t &dW, vec_t &W, bool parallelize);
+	void update_gpu(const float_t *dW, float_t *W) {}
 
 	float_t alpha;  // learning rate
 	float_t b1;     // decay term
@@ -146,18 +104,12 @@ private:
 	float_t eps;  // constant value to avoid zero-division
 };
 
-/**
- * SGD without momentum
- *
- * slightly faster than tiny_dnn::momentum
- **/
+// SGD without momentum
+// slightly faster than tiny_dnn::momentum
 struct gradient_descent : public optimizer {
 	gradient_descent() : alpha(float_t(0.01)), lambda(float_t(0)) {}
-	void update(const vec_t &dW, vec_t &W, bool parallelize) {
-		galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-			W[i] = W[i] - alpha * (dW[i] + lambda * W[i]); 
-		}, galois::loopname("gradient_descent_update"));
-	}
+	void update(const vec_t &dW, vec_t &W, bool parallelize);
+	void update_gpu(const float_t *dW, float_t *W) {}
 	float_t alpha;   // learning rate
 	float_t lambda;  // weight decay
 };
@@ -172,18 +124,8 @@ struct gradient_descent : public optimizer {
 struct momentum : public stateful_optimizer<1> {
  public:
   momentum() : alpha(float_t(0.01)), lambda(float_t(0)), mu(float_t(0.9)) {}
-
-  void update(const vec_t &dW, vec_t &W, bool parallelize) {
-    vec_t &dWprev = get<0>(W);
-
-    //for_i(parallelize, W.size(), [&](size_t i) {
-	galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-      float_t V = mu * dWprev[i] - alpha * (dW[i] + W[i] * lambda);
-      W[i] += V;
-      dWprev[i] = V;
-    //});
-	}, galois::loopname("momentum_update"));
-  }
+  void update(const vec_t &dW, vec_t &W, bool parallelize);
+  void update_gpu(const float_t *dW, float_t *W) {}
 
   float_t alpha;   // learning rate
   float_t lambda;  // weight decay
@@ -201,18 +143,8 @@ struct nesterov_momentum : public stateful_optimizer<1> {
  public:
   nesterov_momentum()
     : alpha(float_t(0.01)), lambda(float_t(0)), mu(float_t(0.9)) {}
-
-  void update(const vec_t &dW, vec_t &W, bool parallelize) {
-    vec_t &dWprev = get<0>(W);
-
-    //for_i(parallelize, W.size(), [&](size_t i) {
-	galois::do_all(galois::iterate((size_t)0, W.size()), [&](const auto& i) {
-      float_t V = mu * dWprev[i] - alpha * (dW[i] + W[i] * lambda);
-      W[i] += (-mu) * dWprev[i] + (1 + mu) * V;
-      dWprev[i] = V;
-    //});
-	}, galois::loopname("nesterov_momentum_update"));
-  }
+  void update(const vec_t &dW, vec_t &W, bool parallelize);
+  void update_gpu(const float_t *dW, float_t *W) {}
 
   float_t alpha;   // learning rate
   float_t lambda;  // weight decay
