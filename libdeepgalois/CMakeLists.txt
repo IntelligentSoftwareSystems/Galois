@@ -30,6 +30,8 @@ else()
   set(CUDA_SOURCES
     src/math_functions.cu
 	src/aggregator.cu
+	src/optimizer.cu
+	src/context.cu
 	src/node.cu
   )
   cuda_add_library(dg_gpu ${CUDA_SOURCES})
@@ -46,6 +48,7 @@ set(sources
   src/layers/softmax_loss_layer.cpp
   src/math_functions.cpp
   src/aggregator.cpp
+  src/optimizer.cpp
   src/context.cpp
   src/node.cpp
   src/net.cpp
