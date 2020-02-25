@@ -100,3 +100,20 @@ void Net::construct_layers() {
   layers[0]->set_in_data(context->get_in_ptr()); // feed input data
   set_contexts();
 }
+
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t *masks) {
+#ifdef CPU_ONLY
+	AccumF accuracy_all;
+	accuracy_all.reset();
+	galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
+		if (masks[i] == 1) {
+			int preds = argmax(num_classes, &(layers[NUM_CONV_LAYERS-1]->next()->get_data()[i*num_classes]));
+			if ((label_t)preds == context->get_label(i)) accuracy_all += 1.0;
+		}
+	}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
+	return accuracy_all.reduce() / (acc_t)count;
+#else
+	return masked_accuracy_gpu(num_classes, begin, end, count, layers[NUM_CONV_LAYERS]->get_device_masks(), layers[NUM_CONV_LAYERS-1]->next()->get_data(), context->d_labels);
+#endif
+}
+

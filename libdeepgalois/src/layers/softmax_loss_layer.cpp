@@ -63,10 +63,7 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
                             context->d_labels, loss, out_data);
 }
 
-void softmax_loss_layer::back_propagation(const float_t* in_data,
-                                          const float_t* out_data,
-                                          float_t* out_grad, float_t* in_grad) {
-  d_softmax_cross_entropy_gpu(input_dims[0], input_dims[1], in_data, d_masks_,
-                              context->d_labels, out_data, in_grad);
+acc_t softmax_loss_layer::get_masked_loss() {
+	return masked_avg_loss(begin_, end_, count_, d_masks_, loss);
 }
 #endif

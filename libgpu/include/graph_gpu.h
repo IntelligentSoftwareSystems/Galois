@@ -110,18 +110,18 @@ struct CSRGraph {
 		//check_cuda(cudaMemcpy(d_degrees, h_degrees, m * sizeof(int), cudaMemcpyHostToDevice));
 	}
 
-	inline __device__ __host__ index_type getEdgeDst(unsigned edge) {
+	__device__ __host__ index_type getEdgeDst(unsigned edge) {
 		assert(edge < nedges);
 		return edge_dst[edge];
 	};
-	inline __device__ __host__ node_data_type getData(unsigned vid) {
+	__device__ __host__ node_data_type getData(unsigned vid) {
 		return node_data[vid];
 	}
-	inline __device__ __host__ index_type edge_begin(unsigned src) {
+	__device__ __host__ index_type edge_begin(unsigned src) {
 		assert(src <= nnodes);
 		return row_start[src];
 	};
-	inline __device__ __host__ index_type edge_end(unsigned src) {
+	__device__ __host__ index_type edge_end(unsigned src) {
 		assert(src <= nnodes);
 		return row_start[src+1];
 	};
