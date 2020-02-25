@@ -65,7 +65,7 @@ void Context::norm_factor_counting() {
 		else norm_factor[v] = 1.0 / temp;
 	}, galois::loopname("NormCounting"));
 #else
-	norm_factor_counting_gpu(n, graph_gpu, d_norm_factor);
+	norm_factor_counting_gpu();
 #endif
 }
 

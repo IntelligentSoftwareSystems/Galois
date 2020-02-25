@@ -21,17 +21,20 @@ int64_t cluster_seedgen(void) {
 	return seed;
 }
 
-__global__ void norm_factor_counting_kernel(size_t n, CSRGraph graph, float_t *norm_factor) {
+__global__ void norm_factor_counting_kernel(int n, CSRGraph graph, float_t *norm_fac) {
 	CUDA_KERNEL_LOOP(i, n) {
 		float_t temp = sqrt(float_t(graph.getOutDegree(i)));
-		if (temp == 0.0) norm_factor[i] = 0.0;
-		else norm_factor[i] = 1.0 / temp;
+		if (temp == 0.0) norm_fac[i] = 0.0;
+		else norm_fac[i] = 1.0 / temp;
 	}
 }
 
-void Context::norm_factor_counting_gpu(size_t n, CSRGraph graph, float_t *norm_factor) {
-	CUDA_CHECK(cudaMalloc((void **)&norm_factor, n * sizeof(float_t)));
-	norm_factor_counting_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, graph, norm_factor);
+void Context::norm_factor_counting_gpu() {
+	std::cout << "Pre-computing normalization factor (n=" << n << ")\n";
+	assert(graph_gpu.nnodes == n);
+	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
+	norm_factor_counting_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, graph_gpu, d_norm_factor);
+	CudaTest("solving norm_factor_counting kernel failed");
 }
 
 cublasHandle_t Context::cublas_handle_ = 0;
@@ -65,11 +68,14 @@ void Context::SetDevice(const int device_id) {
 
 size_t Context::read_graph_gpu(std::string dataset_str) {
 	std::string filename = path + dataset_str + ".csgr";
-	graph_gpu.read(filename.c_str(), false);
+	CSRGraph g;
+	g.read(filename.c_str(), false);
+	g.copy_to_gpu(graph_gpu);
 	return graph_gpu.nnodes;
 }
 
 void Context::copy_data_to_device() {
+	assert(labels.size() == n);
 	CUDA_CHECK(cudaMalloc((void **)&d_labels, n * sizeof(label_t)));
 	CUDA_CHECK(cudaMemcpy(d_labels, &labels[0], n * sizeof(label_t), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * feat_len *  sizeof(float_t)));
