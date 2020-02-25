@@ -318,37 +318,37 @@ float reduce_mean(const vec_t &x) {
 	return sum / (float)n;
 }
 
-void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &mask, vec_t &out) {
-	assert(mask.size() == out.size());
-	//rng_bernoulli(1. - dropout_rate, mask); // Create random numbers
+void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &masks, vec_t &out) {
+	assert(masks.size() == out.size());
+	//rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
 	for (size_t i = 0; i < in.size(); ++i)
-		mask[i] = bernoulli(dropout_rate);
+		masks[i] = bernoulli(dropout_rate);
 	for (size_t i = 0; i < in.size(); ++i)
-		out[i] = in[i] * mask[i] * scale;
+		out[i] = in[i] * masks[i] * scale;
 }
 
-void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &mask, float_t *out) {
+void dropout(const float scale, const float dropout_rate, const vec_t &in, std::vector<unsigned> &masks, float_t *out) {
 	for (size_t i = 0; i < in.size(); ++i)
-		mask[i] = bernoulli(dropout_rate);
+		masks[i] = bernoulli(dropout_rate);
 	for (size_t i = 0; i < in.size(); ++i)
-		out[i] = in[i] * mask[i] * scale;
+		out[i] = in[i] * masks[i] * scale;
 }
 
-void dropout(size_t n, const float scale, const float dropout_rate, const float_t *in, unsigned *mask, float_t *out) {
+void dropout(size_t n, const float scale, const float dropout_rate, const float_t *in, unsigned *masks, float_t *out) {
 	for (size_t i = 0; i < n; ++i)
-		mask[i] = bernoulli(dropout_rate);
+		masks[i] = bernoulli(dropout_rate);
 	for (size_t i = 0; i < n; ++i)
-		out[i] = in[i] * mask[i] * scale;
+		out[i] = in[i] * masks[i] * scale;
 }
 
-void d_dropout(const float scale, const vec_t &in_diff, std::vector<unsigned> &mask, vec_t &out_diff) {
+void d_dropout(const float scale, const vec_t &in_diff, std::vector<unsigned> &masks, vec_t &out_diff) {
 	for (size_t i = 0; i < in_diff.size(); ++i)
-		out_diff[i] = in_diff[i] * mask[i] * scale;
+		out_diff[i] = in_diff[i] * masks[i] * scale;
 }
 
-void d_dropout(size_t n, const float scale, const float_t *in_diff, unsigned *mask, float_t *out_diff) {
+void d_dropout(size_t n, const float scale, const float_t *in_diff, unsigned *masks, float_t *out_diff) {
 	for (size_t i = 0; i < n; ++i)
-		out_diff[i] = in_diff[i] * mask[i] * scale;
+		out_diff[i] = in_diff[i] * masks[i] * scale;
 }
 
 float_t sigmoid_func(float_t x) {

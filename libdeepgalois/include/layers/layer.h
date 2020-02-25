@@ -85,12 +85,15 @@ public:
 		// allocate memory for intermediate gradients
 	}
 	void forward() {
+		std::cout << name_ << ": forwarding ... ";
 		forward_propagation(prev()->get_data(), next()->get_data());
 	}
 	void backward() {
+		std::cout << name_ << ": backwarding ... ";
 		back_propagation(prev()->get_data(), next()->get_data(), next()->get_gradient(), prev()->get_gradient());
 	}
 	void update_weight(optimizer *opt) {
+		std::cout << name_ << ": weight updating ... ";
 		//vec_t diff;
 		//prev()->merge_grads(&diff);
 #ifdef CPU_ONLY
