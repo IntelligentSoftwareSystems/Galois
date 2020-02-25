@@ -10,19 +10,7 @@ const int CUDA_NUM_THREADS = 256;
 
 // CUDA: number of blocks for threads.
 inline int CUDA_GET_BLOCKS(const int N) {
-	return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
-}
-
-inline unsigned CudaTest(const char *msg) {
-	cudaError_t e;
-	//cudaThreadSynchronize();
-	cudaDeviceSynchronize();
-	if (cudaSuccess != (e = cudaGetLastError())) {
-		fprintf(stderr, "%s: %d\n", msg, e); 
-		fprintf(stderr, "%s\n", cudaGetErrorString(e));
-		exit(-1);
-	}
-	return 0;
+  return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
 }
 
 inline const char* cublasGetErrorString(cublasStatus_t error) {
@@ -88,41 +76,42 @@ inline const char* curandGetErrorString(curandStatus_t error) {
 }
 
 // CUDA: various checks for different function calls.
-#define CUDA_CHECK(condition) \
-  do { \
-    cudaError_t error = condition; \
-    if (error != cudaSuccess) {    \
-      fprintf(stderr, "error %d: Cuda error in file '%s' in line %i : %s.\n", \
-      error, __FILE__, __LINE__, cudaGetErrorString(error) );                    \
-      exit(EXIT_FAILURE);                                                     \
-    } \
+#define CUDA_CHECK(condition)                                                  \
+  do {                                                                         \
+    cudaError_t error = condition;                                             \
+    if (error != cudaSuccess) {                                                \
+      fprintf(stderr, "error %d: Cuda error in file '%s' in line %i : %s.\n",  \
+              error, __FILE__, __LINE__, cudaGetErrorString(error));           \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
   } while (0)
 
-#define CUBLAS_CHECK(condition) \
-  do { \
-    cublasStatus_t status = condition;   \
-    if (status != CUBLAS_STATUS_SUCCESS) { \
-      fprintf(stderr, "error %d: cuBLAS error in file '%s' in line %i : %s.\n", \
-      status, __FILE__, __LINE__, cublasGetErrorString(status) );      \
-      exit(EXIT_FAILURE);                                                     \
-    } \
+#define CUBLAS_CHECK(condition)                                                \
+  do {                                                                         \
+    cublasStatus_t status = condition;                                         \
+    if (status != CUBLAS_STATUS_SUCCESS) {                                     \
+      fprintf(stderr,                                                          \
+              "error %d: cuBLAS error in file '%s' in line %i : %s.\n",        \
+              status, __FILE__, __LINE__, cublasGetErrorString(status));       \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
   } while (0)
 
-#define CURAND_CHECK(condition) \
-  do { \
-    curandStatus_t status = condition; \
-    if (status != CURAND_STATUS_SUCCESS) { \
-      fprintf(stderr, "error %d: cuBLAS error in file '%s' in line %i : %s.\n", \
-      status, __FILE__, __LINE__, curandGetErrorString(status) );      \
-      exit(EXIT_FAILURE);                                                     \
-    } \
+#define CURAND_CHECK(condition)                                                \
+  do {                                                                         \
+    curandStatus_t status = condition;                                         \
+    if (status != CURAND_STATUS_SUCCESS) {                                     \
+      fprintf(stderr,                                                          \
+              "error %d: cuBLAS error in file '%s' in line %i : %s.\n",        \
+              status, __FILE__, __LINE__, curandGetErrorString(status));       \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
   } while (0)
 
 // CUDA: grid stride looping
-#define CUDA_KERNEL_LOOP(i, n) \
-  for (int i = blockIdx.x * blockDim.x + threadIdx.x; \
-       i < (n); i += blockDim.x * gridDim.x)
+#define CUDA_KERNEL_LOOP(i, n)                                                 \
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < (n);                 \
+       i += blockDim.x * gridDim.x)
 
 // CUDA: check for error after kernel execution and exit loudly if there is one.
 #define CUDA_POST_KERNEL_CHECK CUDA_CHECK(cudaPeekAtLastError())
-
