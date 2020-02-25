@@ -70,7 +70,11 @@ struct adam : public stateful_optimizer<2> {
 	adam() : alpha(float_t(0.01)), b1(float_t(0.9)), b2(float_t(0.999)), 
 		b1_t(float_t(0.9)), b2_t(float_t(0.999)), eps(float_t(1e-8)) {}
 	void update(const vec_t &dW, vec_t &W, bool parallelize);
+#ifdef CPU_ONLY
+	void update_gpu(const float_t *dW, float_t *W) {}
+#else
 	void update_gpu(const float_t *dW, float_t *W);
+#endif
 
 	float_t alpha;  // learning rate
 	float_t b1;     // decay term
