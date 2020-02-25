@@ -18,5 +18,7 @@ typedef float acc_t; // Accuracy type
 typedef short label_t; // label is for classification (supervised learning)
 typedef uint8_t mask_t; // mask is used to indicate different uses of labels: train, val, test
 #define CHUNK_SIZE 256
+#define TB_SIZE 256
+#define WARP_SIZE 32
 
 #endif

@@ -75,5 +75,6 @@ void softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, const mask_
 void d_softmax_cross_entropy_gpu(int x, int y, const float_t *in_data, const mask_t *masks, const label_t *labels, const float_t *out_data, float_t *diff);
 void scal_gpu(const int N, const float alpha, float *X);
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
+acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t *masks, float_t *loss);
 
 #endif

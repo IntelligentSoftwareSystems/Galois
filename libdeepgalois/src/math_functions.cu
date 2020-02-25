@@ -1,5 +1,8 @@
 #include "math_functions.hh"
 #include "context.h"
+#include "gg.h"
+#include "ggcuda.h"
+#include "cub/cub.cuh"
 
 void gpu_rng_uniform(const int n, unsigned *r) {
 	CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
@@ -212,5 +215,26 @@ __global__ void d_softmax_cross_entropy_kernel(int n, int len, const float_t *in
 
 void d_softmax_cross_entropy_gpu(int n, int len, const float_t *in, const mask_t *masks, const label_t *labels, const float_t *out, float_t *diff) {
 	d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, in, masks, labels, out, diff);
+}
+
+__global__ void masked_avg_loss_kernel(size_t begin, size_t end, mask_t *masks, float_t *loss, HGAccumulator<acc_t> total) {
+	total.thread_entry();
+	__shared__ cub::BlockReduce<acc_t, TB_SIZE>::TempStorage local_loss;
+	CUDA_KERNEL_LOOP(i, end-begin) {
+		if (masks[begin+i] == 1)
+			//total += loss[begin+i];
+			total.reduce(loss[begin+i]);
+	}
+	total.thread_exit<cub::BlockReduce<acc_t, TB_SIZE> >(local_loss);
+}
+
+acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t *masks, float_t *loss) {
+	HGAccumulator<acc_t> loss_accum;
+	Shared<acc_t> total_loss = Shared<acc_t>(1);
+	*(total_loss.cpu_wr_ptr()) = 0;
+	loss_accum.rv = total_loss.gpu_wr_ptr();
+	masked_avg_loss_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(begin, end, masks, loss, loss_accum);
+	cudaDeviceSynchronize();
+	return *(total_loss.cpu_rd_ptr());
 }
 

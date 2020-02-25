@@ -30,4 +30,4 @@ void update_all(size_t len, CSRGraph &g, const float_t *in, float_t *out, bool n
 	CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
 	update_all_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, g, in, out, norm, norm_factor);
 }
-	
+

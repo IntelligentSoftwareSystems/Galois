@@ -41,8 +41,7 @@ public:
 	virtual std::string layer_type() const = 0;
 	virtual void set_netphase(net_phase phase) {}
 	virtual void set_context(Context *ctx) { context = ctx; }
-	//virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) = 0;
-	//virtual void back_propagation(const vec_t &in_data, const vec_t &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
+	virtual acc_t get_masked_loss() { return acc_t(0); }
 	virtual void forward_propagation(const float_t *in_data, float_t *out_data) = 0;
 	virtual void back_propagation(const float_t *in_data, const float_t *out_data, float_t *out_grad, float_t *in_grad) = 0;
 
@@ -102,20 +101,6 @@ public:
 		opt->update(weight_grad, W, parallel); // W += grad
 		//prev()->clear_grads();
 		next()->clear_grads();
-	}
-	inline acc_t get_masked_loss() {
-		AccumF total_loss;
-		AccumU valid_sample_count;
-		total_loss.reset();
-		valid_sample_count.reset();
-		galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
-			if (masks_[i]) {
-				total_loss += loss[i];
-				valid_sample_count += 1;
-			}
-		}, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
-		assert(valid_sample_count.reduce() == count_);
-		return total_loss.reduce() / (acc_t)count_;
 	}
 
 protected:

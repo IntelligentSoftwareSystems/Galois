@@ -1,59 +1,10 @@
 #include "context.h"
 #include "gtypes.h"
-#include <cstdio>
-#include <ctime>
-
-// random seeding
-int64_t cluster_seedgen(void) {
-	int64_t s, seed, pid;
-	FILE* f = fopen("/dev/urandom", "rb");
-	if (f && fread(&seed, 1, sizeof(seed), f) == sizeof(seed)) {
-		fclose(f);
-		return seed;
-	}
-	std::cout << "System entropy source not available, "
-		"using fallback algorithm to generate seed instead.";
-	if (f) fclose(f);
-	pid = getpid();
-	s = time(NULL);
-	seed = std::abs(((s * 181) * ((pid - 83) * 359)) % 104729);
-	return seed;
-}
 
 #ifdef CPU_ONLY
 Context::Context() : mode_(Context::CPU), solver_count_(1), 
 	solver_rank_(0), multiprocess_(false) { }
 Context::~Context() {}
-#else
-cublasHandle_t Context::cublas_handle_ = 0;
-curandGenerator_t Context::curand_generator_ = 0;
-
-Context::Context() : mode_(Context::GPU), solver_count_(1), 
-	solver_rank_(0), multiprocess_(false) {
-//void Context::create_blas_handle() {
-	CUBLAS_CHECK(cublasCreate(&cublas_handle_));
-	CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
-	CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
-}
-
-Context::~Context() {
-	if (cublas_handle_) CUBLAS_CHECK(cublasDestroy(cublas_handle_));
-	if (curand_generator_) {
-		CURAND_CHECK(curandDestroyGenerator(curand_generator_));
-	}
-}
-
-void Context::SetDevice(const int device_id) {
-	int current_device;
-	CUDA_CHECK(cudaGetDevice(&current_device));
-	if (current_device == device_id) return;
-	CUDA_CHECK(cudaSetDevice(device_id));
-	if (cublas_handle_) CUBLAS_CHECK(cublasDestroy(cublas_handle_));
-	if (curand_generator_) CURAND_CHECK(curandDestroyGenerator(curand_generator_));
-	CUBLAS_CHECK(cublasCreate(&cublas_handle_));
-	CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
-	CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
-}
 #endif
 
 size_t Context::read_graph(std::string dataset_str) {
@@ -98,22 +49,8 @@ void Context::genGraph(LGraph &lg, Graph &g) {
 			g.constructEdge(offset, lg.get_dest(offset), 0);
 	}
 }
-float_t * Context::get_in_ptr() { return &h_feats[0]; }
-#else
-size_t Context::read_graph_gpu(std::string dataset_str) {
-	std::string filename = path + dataset_str + ".csgr";
-	graph_gpu.read(filename.c_str(), false);
-	return graph_gpu.nnodes;
-}
 
-void Context::copy_data_to_device() {
-	CUDA_CHECK(cudaMalloc((void **)&d_labels, n * sizeof(label_t)));
-	CUDA_CHECK(cudaMemcpy(d_labels, &labels[0], n * sizeof(label_t), cudaMemcpyHostToDevice));
-	CUDA_CHECK(cudaMalloc((void **)&d_norm_factor, n * sizeof(float_t)));
-	CUDA_CHECK(cudaMalloc((void **)&d_feats, n * feat_len *  sizeof(float_t)));
-	CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
-}
-float_t * Context::get_in_ptr() { return d_feats; }
+float_t * Context::get_in_ptr() { return &h_feats[0]; }
 #endif
 
 // user-defined pre-computing function, called during initialization
@@ -122,19 +59,13 @@ void Context::norm_factor_counting() {
 #ifdef CPU_ONLY
 	norm_factor = new float_t[n];
 	galois::do_all(galois::iterate((size_t)0, n), [&] (auto v) {
-		float_t temp = std::sqrt(float_t(degrees[v]));
+		auto degree = std::distance(graph_cpu.edge_begin(v), graph_cpu.edge_end(v));
+		float_t temp = std::sqrt(float_t(degree));
 		if (temp == 0.0) norm_factor[v] = 0.0;
 		else norm_factor[v] = 1.0 / temp;
 	}, galois::loopname("NormCounting"));
-#endif
-}
-
-void Context::degree_counting() {
-#ifdef CPU_ONLY
-	degrees.resize(n);
-	galois::do_all(galois::iterate((size_t)0, n), [&] (auto v) {
-		degrees[v] = std::distance(graph_cpu.edge_begin(v), graph_cpu.edge_end(v));
-	}, galois::loopname("DegreeCounting"));
+#else
+	norm_factor_counting_gpu(n, graph_gpu, d_norm_factor);
 #endif
 }
 

@@ -2,10 +2,8 @@
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 	context = new Context();
-	//Context::create_blas_handle();
 	num_samples = context->read_graph(dataset_str);
 	num_classes = context->read_labels(dataset_str);
-	context->degree_counting();
 	context->norm_factor_counting(); // pre-compute normalizing factor
 	num_epochs = epochs;
 

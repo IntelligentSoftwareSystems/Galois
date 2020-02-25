@@ -3,25 +3,19 @@
 #include <cassert>
 #include "types.h"
 #include "utils.h"
-#include "lgraph.h"
 #ifdef CPU_ONLY
+#include "lgraph.h"
 #include "gtypes.h"
 #else
 #include "graph_gpu.h"
-#endif
 #include "cutils.h"
+#endif
 
 class Context {
 public:
 	Context();
 	~Context();
 	enum Brew { CPU, GPU };
-	//static Context& Get();
-#ifndef CPU_ONLY
-	inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
-	inline static curandGenerator_t curand_generator() { return curand_generator_; }
-	//static void create_blas_handle();
-#endif
 	Brew mode() { return mode_; }
 	void set_mode(Brew mode) { mode_ = mode; }
 	int solver_count() { return solver_count_; }
@@ -46,21 +40,25 @@ public:
 	size_t n; // number of samples: N
 	size_t num_classes; // number of classes: E
 	size_t feat_len; // input feature length: D
-#ifdef CPU_ONLY
-	Graph graph_cpu; // the input graph, |V| = N
-	void genGraph(LGraph &lg, Graph &g);
-	size_t read_graph_cpu(std::string dataset_str, std::string filetype = "gr");
-#else
-	CSRGraph graph_gpu; // the input graph, |V| = N
 	label_t *d_labels; // labels on device
-	float_t *d_norm_factor; // norm_factor on device
 	float_t *d_feats; // input features on device
+	float_t *d_norm_factor; // norm_factor on device
+	size_t read_graph_cpu(std::string dataset_str, std::string filetype = "gr");
 	size_t read_graph_gpu(std::string dataset_str);
 	void copy_data_to_device(); // copy labels and input features
 	void SetDevice(const int device_id);
 	void DeviceQuery() {}
 	bool CheckDevice(const int device_id) { return true; }
 	int FindDevice(const int start_id = 0) { return 0; }
+
+#ifdef CPU_ONLY
+	Graph graph_cpu; // the input graph, |V| = N
+	void genGraph(LGraph &lg, Graph &g);
+#else
+	CSRGraph graph_gpu; // the input graph, |V| = N
+	inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
+	inline static curandGenerator_t curand_generator() { return curand_generator_; }
+	void norm_factor_counting_gpu(size_t n, CSRGraph graph, float_t *norm_factor);
 #endif
 
 protected:
@@ -69,8 +67,6 @@ protected:
 	static curandGenerator_t curand_generator_; // used to generate random numbers on GPU
 #endif
 	Brew mode_;
-	//shared_ptr<RNG> random_generator_;
-	// Parallel training
 	int solver_count_;
 	int solver_rank_;
 	bool multiprocess_;
