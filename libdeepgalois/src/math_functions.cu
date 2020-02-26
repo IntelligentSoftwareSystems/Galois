@@ -1,9 +1,5 @@
 #include "math_functions.hh"
 #include "context.h"
-#include "gg.h"
-#include "ggcuda.h"
-#include "cub/cub.cuh"
-#include <curand_kernel.h>
 
 void gpu_rng_uniform(const int n, unsigned* r) {
   CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
@@ -25,11 +21,11 @@ void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma,
       curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
-void loss_malloc_device(int n, float_t* loss) {
+void loss_malloc_device(int n, float_t*& loss) {
   CUDA_CHECK(cudaMalloc((void**)&loss, n * sizeof(float_t)));
 }
 
-void copy_masks_device(int n, mask_t* h_masks, mask_t* d_masks) {
+void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   assert(h_masks != NULL);
   CUDA_CHECK(cudaMalloc((void**)&d_masks, n * sizeof(mask_t)));
   CUDA_CHECK(
@@ -37,8 +33,8 @@ void copy_masks_device(int n, mask_t* h_masks, mask_t* d_masks) {
 }
 
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
-                         unsigned* masks, float_t* in, float_t* out,
-                         float_t* matrix, float_t* grad) {
+                         unsigned*& masks, float_t*& in, float_t*& out,
+                         float_t*& matrix, float_t*& grad) {
   if (dropout)
     CUDA_CHECK(cudaMalloc((void**)&masks, x * y * sizeof(unsigned)));
   CUDA_CHECK(cudaMalloc((void**)&in, x * y * sizeof(float_t)));
@@ -51,21 +47,17 @@ void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
   CUDA_CHECK(cudaMemset(grad, 0, y * z * sizeof(float_t)));
 }
 
-void copy_gpu(size_t len, const float_t* in, float_t* out) {
-  CUDA_CHECK(
-      cudaMemcpy(out, in, len * sizeof(float_t), cudaMemcpyDeviceToDevice));
+void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma,
+                      float_t* r) {
+  CURAND_CHECK(
+      curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
 __global__ void setup_curand_kernel(const int n, curandState* state) {
   CUDA_KERNEL_LOOP(i, n) {
-    curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
-    // curand_init(7+i, i, 0, &state[i]); // Each thread gets different seed
+    // curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
+    curand_init(7 + i, i, 0, &state[i]); // Each thread gets different seed
   }
-}
-
-__device__ bool bernoulli_gpu(int tid, curandState* state, float_t p) {
-  curandState local_state = state[tid];
-  return curand_uniform(&local_state) <= p;
 }
 
 __global__ void dropout_kernel(const int n, const float scale,
@@ -73,7 +65,9 @@ __global__ void dropout_kernel(const int n, const float scale,
                                unsigned* masks, curandState* state,
                                float_t* out) {
   CUDA_KERNEL_LOOP(i, n) {
-    masks[i] = bernoulli_gpu(i, state, dropout_rate);
+    // curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
+    // masks[i] = curand_uniform(&state[i]) <= dropout_rate ? 1 : 0;
+    masks[i] = 1.0 - dropout_rate;
     out[i]   = in[i] * masks[i] * scale;
   }
 }
@@ -82,28 +76,21 @@ void dropout_gpu(const int n, const float scale, const float dropout_rate,
                  const float_t* in, unsigned* masks, float_t* out) {
   curandState* devStates;
   CUDA_CHECK(cudaMalloc((void**)&devStates, n * sizeof(curandState)));
-  std::cout << "[debug]: setup curand, n = " << n << "\n";
-  setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, devStates);
-  CudaTest("solving setup_curand kernel failed");
-  std::cout << "[debug]: dropout_gpu\n";
+  // std::cout << "[debug]: setup curand, n = " << n << "\n";
+  // setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n,
+  // devStates); CudaTest("solving setup_curand kernel failed"); std::cout <<
+  // "[debug]: dropout_gpu\n";
   dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, scale, dropout_rate, in, masks, devStates, out);
   CudaTest("solving dropout kernel failed");
   CUDA_CHECK(cudaFree(devStates));
-  std::cout << "[debug]: dropout_gpu done\n";
+  // std::cout << "[debug]: dropout_gpu done\n";
 }
 
-__global__ void d_dropout_kernel(const int n, const float scale,
-                                 const float_t* in, const unsigned* masks,
-                                 float_t* out) {
-  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * masks[i] * scale; }
-}
-
-void d_dropout_gpu(const int n, const float scale, const float_t* in,
-                   const unsigned* masks, float_t* out) {
-  d_dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, scale, in,
-                                                             masks, out);
-  CudaTest("solving dropout kernel failed");
+void dropout_gpu(const int n, const float scale, const float dropout_rate,
+                 const float_t* in, unsigned* masks, float_t* out) {
+  dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      n, scale, dropout_rate, in, masks, out);
 }
 
 // flattern data into 1D before feed into the ReLU operater
@@ -112,7 +99,7 @@ __global__ void relu_kernel(const int n, const float_t* in, float_t* out) {
 }
 
 void relu_gpu(const int n, const float_t* in, float_t* out) {
-  std::cout << "[debug]: relu_gpu\n";
+  // std::cout << "[debug]: relu_gpu\n";
   relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in, out);
   CudaTest("solving relu kernel failed");
 }
@@ -128,7 +115,6 @@ void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
                 float_t* out_diff) {
   d_relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in_diff, data,
                                                           out_diff);
-  CudaTest("solving d_relu kernel failed");
 }
 
 void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
@@ -147,14 +133,11 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
 
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                     const float_t* A, const float_t* B, float_t* C) {
-  std::cout << "[debug]: matmul1D1D_gpu\n";
+  // std::cout << "[debug]: matmul1D1D_gpu\n";
   const CBLAS_TRANSPOSE TransA = CblasNoTrans;
   const CBLAS_TRANSPOSE TransB = CblasNoTrans;
   sgemm_gpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
 }
-
-// the arguments of the maxima
-int argmax_gpu(const size_t n, const float_t* x) { return 0; }
 
 void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N,
               const float alpha, const float* A, const float* x,
@@ -192,7 +175,6 @@ void set_gpu(const int N, const float_t alpha, float_t* Y) {
     return;
   }
   set_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
-  CudaTest("solving set kernel failed");
 }
 
 __global__ void add_scalar_kernel(const int n, const float_t alpha,
@@ -202,7 +184,6 @@ __global__ void add_scalar_kernel(const int n, const float_t alpha,
 
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y) {
   add_scalar_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
-  CudaTest("solving add_scalar kernel failed");
 }
 
 __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
@@ -212,7 +193,6 @@ __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
 
 void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
   vadd_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, a, b, y);
-  CudaTest("solving vadd kernel failed");
 }
 
 // TODO: use warp
@@ -308,13 +288,13 @@ __global__ void masked_avg_loss_kernel(size_t begin, size_t end, mask_t* masks,
                                        float_t* loss,
                                        HGAccumulator<acc_t> total) {
   total.thread_entry();
-  __shared__ cub::BlockReduce<acc_t, TB_SIZE>::TempStorage local_loss;
+  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage local_loss;
   CUDA_KERNEL_LOOP(i, end - begin) {
     if (masks[begin + i] == 1)
       // total += loss[begin+i];
       total.reduce(loss[begin + i]);
   }
-  total.thread_exit<cub::BlockReduce<acc_t, TB_SIZE>>(local_loss);
+  total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_loss);
 }
 
 acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t* masks,
@@ -327,5 +307,50 @@ acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t* masks,
       begin, end, masks, loss, loss_accum);
   CudaTest("solving masked_avg_loss kernel failed");
   cudaDeviceSynchronize();
-  return *(total_loss.cpu_rd_ptr());
+  return *(total_loss.cpu_rd_ptr()) / count;
+}
+
+// the arguments of the maxima
+__device__ size_t argmax_device(const size_t n, const float_t* x) {
+  float_t max    = x[0];
+  size_t max_ind = 0;
+  for (size_t i = 1; i < n; i++) {
+    if (x[i] > max) {
+      max_ind = i;
+      max     = x[i];
+    }
+  }
+  return max_ind;
+}
+
+__global__ void masked_accuracy_kernel(size_t num_classes, size_t begin,
+                                       size_t end, mask_t* masks,
+                                       float_t* preds, label_t* labels,
+                                       HGAccumulator<acc_t> total) {
+  total.thread_entry();
+  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage
+      local_accuracy;
+  CUDA_KERNEL_LOOP(i, end - begin) {
+    if (masks[begin + i] == 1) {
+      label_t pred = (label_t)argmax_device(num_classes,
+                                            preds + (begin + i) * num_classes);
+      if (pred == labels[begin + i])
+        total.reduce(1.0);
+    }
+  }
+  total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_accuracy);
+}
+
+acc_t masked_accuracy_gpu(size_t num_classes, size_t begin, size_t end,
+                          size_t count, mask_t* masks, float_t* preds,
+                          label_t* labels) {
+  HGAccumulator<acc_t> accuracy_accum;
+  Shared<acc_t> total_accuracy   = Shared<acc_t>(1);
+  *(total_accuracy.cpu_wr_ptr()) = 0;
+  accuracy_accum.rv              = total_accuracy.gpu_wr_ptr();
+  masked_accuracy_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
+      num_classes, begin, end, masks, preds, labels, accuracy_accum);
+  CudaTest("solving masked_avg_loss kernel failed");
+  cudaDeviceSynchronize();
+  return *(total_accuracy.cpu_rd_ptr()) / count;
 }

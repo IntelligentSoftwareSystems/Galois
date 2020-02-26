@@ -469,10 +469,9 @@ float_t cross_entropy(const vec_t& y, const vec_t& p) {
     // if (p[i]==float_t(1)) loss -= (float_t(1) - y[i]) *
     // std::log(float_t(1e-10));
     else
-      loss -= y[i] *
-              std::log(
-                  p[i]); // + (float_t(1) - y[i]) * std::log(float_t(1) - p[i]);
-                         // loss -= y[i] * std::log(p[i]);
+      loss -=
+          y[i] * std::log(p[i]); // + (float_t(1) - y[i]) * std::log(float_t(1)
+                                 // - p[i]); loss -= y[i] * std::log(p[i]);
   }
   return loss;
 }

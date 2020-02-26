@@ -34,8 +34,8 @@ __global__ void update_all_kernel(size_t n, size_t len, CSRGraph& g,
 
 void update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
-  std::cout << "[debug]: update_all on GPU\n";
   unsigned n = g.nnodes;
+  std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   update_all_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, len, g, in, out, norm, norm_factor);
