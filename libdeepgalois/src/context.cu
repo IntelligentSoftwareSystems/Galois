@@ -96,7 +96,7 @@ void Context::copy_data_to_device() {
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
   CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t),
                         cudaMemcpyHostToDevice));
-  print_device_vector(10, d_feats, "d_feats");
+  //print_device_vector(10, d_feats, "d_feats");
 }
 
 float_t* Context::get_in_ptr() { return d_feats; }

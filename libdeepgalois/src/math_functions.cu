@@ -32,6 +32,17 @@ void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
 }
 
+__global__ void init_const_kernel(int n, float_t value, float_t *array) {
+  CUDA_KERNEL_LOOP(i, n) {
+    array[i] = value;
+  }
+}
+
+void init_const_gpu(int n, float_t value, float_t *array) {
+  init_const_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, value, array);
+  CudaTest("solving init_const kernel failed");
+}
+
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad) {
@@ -60,8 +71,10 @@ __global__ void dropout_kernel(const int n, const float scale,
     // curandState_t curand_state;
     //curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
     //masks[i] = curand_uniform(&state[i]) <= dropout_rate ? 1 : 0;
-    masks[i] = 1.0 - dropout_rate;
-    out[i]   = in[i] * masks[i] * scale;
+    //masks[i] = 1.0 - dropout_rate;
+    //out[i]   = in[i] * masks[i] * scale;
+    masks[i] = 1.0;
+    out[i]   = in[i];
   }
 }
 
@@ -82,12 +95,14 @@ void dropout_gpu(const int n, const float scale, const float dropout_rate,
 
 __global__ void d_dropout_kernel(const int n, const float scale, const float_t* in,
                                  const unsigned* masks, float_t* out) {
-  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * masks[i] * scale; }
+  //CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * masks[i] * scale; }
+  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i]; }
 }
 
 void d_dropout_gpu(const int n, const float scale, const float_t* in,
                    const unsigned* masks, float_t* out) {
   d_dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, scale, in, masks, out);
+  CudaTest("solving d_dropout kernel failed");
 }
 
 // flattern data into 1D before feed into the ReLU operater
@@ -114,6 +129,28 @@ void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
   CudaTest("solving d_relu kernel failed");
 }
 
+__global__ void matmul_kernel(int x, int y, int z, const float_t* A,
+                              const float_t* B, float_t* C) {
+	int row = blockIdx.x*blockDim.x+threadIdx.x;
+	int col = blockIdx.y*blockDim.y+threadIdx.y;
+	float_t sum = 0.0f;
+	if (row < x && col < y) {
+		for (int i = 0; i < z; i++) {
+			sum += A[row * z + i] * B[i * y + col];
+		}
+	}
+	C[row * y + col] = sum;
+}
+
+#define TILE_SZ 16
+void matmul_gpu(const size_t x, const size_t y, const size_t z,
+                    const float_t* A, const float_t* B, float_t* C) {
+  dim3 threadsPerBlock(TILE_SZ, TILE_SZ);
+  dim3 blocksPerGrid((y-1)/TILE_SZ+1, (x-1)/TILE_SZ+1);
+  matmul_kernel<<<blocksPerGrid,threadsPerBlock>>>(x, y, z, A, B, C);
+  CudaTest("solving matmul kernel failed");
+}
+
 void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
                const int M, const int N, const int K, const float alpha,
                const float* A, const float* B, const float beta, float* C) {
@@ -124,8 +161,8 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
       (TransA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
   cublasOperation_t cuTransB =
       (TransB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  CUBLAS_CHECK(cublasSgemm(Context::cublas_handle(), cuTransB, cuTransA, N, M,
-                           K, &alpha, B, ldb, A, lda, &beta, C, N));
+  CUBLAS_CHECK(cublasSgemm(Context::cublas_handle(), cuTransB, cuTransA,
+                           N, M, K, &alpha, B, ldb, A, lda, &beta, C, N));
 }
 
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
@@ -190,7 +227,7 @@ __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
   CUDA_KERNEL_LOOP(index, n) { y[index] = a[index] + b[index]; }
 }
 
-void copy_gpu(size_t len, const float_t* in, float_t* out) {
+void copy_gpu(int len, const float_t* in, float_t* out) {
   CUDA_CHECK(cudaMemcpy(out, in, len * sizeof(float_t), cudaMemcpyDeviceToDevice));
 }
 
@@ -200,87 +237,100 @@ void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
 }
 
 // TODO: use warp
-__device__ void softmax(int n, const float_t* input, float_t* output) {
+__device__ void softmax_device(int n, const float_t* input, float_t* output) {
   float_t max = input[0];
-  for (size_t i = 1; i < n; i++)
+  for (int i = 1; i < n; i++)
     if (input[i] > max)
       max = input[i];
   float_t denominator = 0.0;
-  for (size_t i = 0; i < n; i++) {
-    output[i] = exp(input[i] - max);
+  for (int i = 0; i < n; i++) {
+    output[i] = expf(input[i] - max);
     denominator += output[i];
+	if (output[i] < 0.0) printf("in[%d]=%f, out[%d]=%f\n", i, input[i], i, output[i]);
+    //assert(output[i] >= 0.0);
   }
-  for (size_t i = 0; i < n; i++)
+  assert(denominator != 0.0);
+  for (int i = 0; i < n; i++) {
     output[i] /= denominator;
+    //assert(output[i] >= 0.0);
+    //assert(output[i] <= 1.0);
+  }
+}
+
+__device__ void cross_entropy_device(int n, const label_t idx, const float_t* p, float_t& loss) {
+  if (p[idx] == 0.0) loss -= logf(float_t(1e-10));
+  else loss -= logf(p[idx]);
+}
+
+// n: number of vectors
+// len: length of vectors
+// for each vector, do softmax to normalize the vector, and then compute a loss
+__global__ void softmax_cross_entropy_kernel(int len, int begin, int end,
+                                             const float_t* in_data,
+                                             const mask_t* masks,
+                                             const label_t* labels,
+                                             float_t* loss, float_t* out_data) {
+  CUDA_KERNEL_LOOP(i, end-begin) {
+    int id = begin + i;
+    if (masks[id] == 1) { // masked
+	  // normalize using softmax
+      softmax_device(len, in_data + len*id, out_data + len*id);
+      //loss[id] = 0.0;
+      cross_entropy_device(len, labels[id], out_data + len*id, loss[id]);
+    }
+  }
+}
+
+void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in,
+                               const mask_t* masks, const label_t* labels,
+                               float_t* loss, float_t* out) {
+  softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+      len, begin, end, in, masks, labels, loss, out);
+  CudaTest("solving softmax_cross_entropy kernel failed");
 }
 
 // TODO: use warp
-__device__ void d_softmax(size_t n, const float_t* p, const float_t* dp, float_t* dy) {
-  for (size_t i = 0; i < n; i++) {
+__device__ void d_softmax(int n, const float_t* p, const float_t* dp, float_t* dy) {
+  for (int i = 0; i < n; i++) {
     dy[i] = 0;
-    for (size_t j = 0; j < n; j++) {
+    for (int j = 0; j < n; j++) {
       float_t df = (j == i) ? p[i] * (1.0 - p[i]) : -p[j] * p[i];
       dy[i] += df * dp[j];
     }
   }
 }
 
-__device__ void cross_entropy(int n, const label_t idx, const float_t* p, float_t& loss) {
-  if (p[idx] == 0.0) loss -= log(float_t(1e-10));
-  else loss -= log(p[idx]);
-}
-
 __device__ void d_cross_entropy(int n, const label_t idx, const float_t* p, float_t* d) {
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
+    //assert(p[i] >= 0.0);
+    //assert(p[i] >= 0.0 && p[i] <= 1.0);
     if (i == (int)idx) d[i] = -1.0 / (p[i] + 1e-10);
     else d[i] = 0.0;
+  }
 }
 
-// n: number of vectors
-// len: length of vectors
-// for each vector, do softmax to normalize the vector, and then compute a loss
-__global__ void softmax_cross_entropy_kernel(int n, int len,
-                                             const float_t* in_data,
-                                             const mask_t* masks,
-                                             const label_t* labels,
-                                             float_t* loss, float_t* out_data) {
-  CUDA_KERNEL_LOOP(i, n) {
-    if (masks[i] == 1) { // masked
-	  // normalize using softmax
-      softmax(len, in_data + len * i, out_data + len * i);
-      loss[i] = 0.0;
-      cross_entropy(len, labels[i], &out_data[len * i], loss[i]);
+__global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
+                               const mask_t* masks, const label_t* labels,
+                               const float_t* out, float_t* diff) {
+  CUDA_KERNEL_LOOP(i, end-begin) {
+    int id = begin + i;
+    if (masks[id] == 1) { // masked
+	  float_t out_grad[41]; // TODO
+      d_cross_entropy(len, labels[id], out + len*id, out_grad);
+      d_softmax(len, out + len*id, out_grad, diff + len*id);
     }
   }
 }
 
-void softmax_cross_entropy_gpu(int n, int len, const float_t* in,
-                               const mask_t* masks, const label_t* labels,
-                               float_t* loss, float_t* out) {
-  softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, len, in, masks, labels, loss, out);
-  CudaTest("solving softmax_cross_entropy kernel failed");
-}
-
-__global__ void d_softmax_cross_entropy_kernel(int n, int len, const float_t* in,
-                               const mask_t* masks, const label_t* labels,
-                               const float_t* out, float_t* diff) {
-  CUDA_KERNEL_LOOP(i, n) {
-    float_t out_grad[41]; // TODO
-    d_cross_entropy(len, labels[i], out + len * i, out_grad);
-    d_softmax(len, out + len * i, out_grad, diff + len * i);
-  }
-}
-
-void d_softmax_cross_entropy_gpu(int n, int len, const float_t* in,
+void d_softmax_cross_entropy_gpu(int len, int begin, int end,
                                  const mask_t* masks, const label_t* labels,
                                  const float_t* out, float_t* diff) {
-  d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, len, in, masks, labels, out, diff);
+  d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+      len, begin, end, masks, labels, out, diff);
   CudaTest("solving d_softmax_cross_entropy kernel failed");
 }
 
-__global__ void masked_avg_loss_kernel(size_t begin, size_t end, mask_t* masks,
+__global__ void masked_avg_loss_kernel(int begin, int end, mask_t* masks,
                                        float_t* loss,
                                        HGAccumulator<acc_t> total) {
   total.thread_entry();
@@ -293,8 +343,9 @@ __global__ void masked_avg_loss_kernel(size_t begin, size_t end, mask_t* masks,
   total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_loss);
 }
 
-acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t* masks,
+acc_t masked_avg_loss(int begin, int end, int count, mask_t* masks,
                       float_t* loss) {
+  assert(count > 0);
   HGAccumulator<acc_t> loss_accum;
   Shared<acc_t> total_loss   = Shared<acc_t>(1);
   *(total_loss.cpu_wr_ptr()) = 0;
@@ -307,10 +358,10 @@ acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t* masks,
 }
 
 // the arguments of the maxima
-__device__ size_t argmax_device(const size_t n, const float_t* x) {
+__device__ int argmax_device(const int n, const float_t* x) {
   float_t max    = x[0];
-  size_t max_ind = 0;
-  for (size_t i = 1; i < n; i++) {
+  int max_ind = 0;
+  for (int i = 1; i < n; i++) {
     if (x[i] > max) {
       max_ind = i;
       max     = x[i];
@@ -319,8 +370,8 @@ __device__ size_t argmax_device(const size_t n, const float_t* x) {
   return max_ind;
 }
 
-__global__ void masked_accuracy_kernel(size_t num_classes, size_t begin,
-                                       size_t end, mask_t* masks,
+__global__ void masked_accuracy_kernel(int num_classes, int begin,
+                                       int end, mask_t* masks,
                                        float_t* preds, label_t* labels,
                                        HGAccumulator<acc_t> total) {
   total.thread_entry();
@@ -337,9 +388,10 @@ __global__ void masked_accuracy_kernel(size_t num_classes, size_t begin,
   total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_accuracy);
 }
 
-acc_t masked_accuracy_gpu(size_t num_classes, size_t begin, size_t end,
-                          size_t count, mask_t* masks, float_t* preds,
+acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
+                          int count, mask_t* masks, float_t* preds,
                           label_t* labels) {
+  assert(count > 0);
   HGAccumulator<acc_t> accuracy_accum;
   Shared<acc_t> total_accuracy   = Shared<acc_t>(1);
   *(total_accuracy.cpu_wr_ptr()) = 0;

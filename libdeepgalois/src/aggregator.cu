@@ -22,7 +22,6 @@ __global__ void update_all_kernel(size_t n, size_t len, CSRGraph g,
     index_type end   = g.edge_end(src);
     for (index_type e = begin; e != end; e++) {
       index_type dst = g.getEdgeDst(e);
-      assert(dst < n);
       if (norm) b = a * norm_factor[dst];
       scale_add(len, b, in + dst * len, out + src * len,
                 out + src * len); // out[src] += in[dst]
@@ -33,7 +32,8 @@ __global__ void update_all_kernel(size_t n, size_t len, CSRGraph g,
 void update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.nnodes;
-  std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
+  //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
+  //print_device_vector(10, norm_factor, "norm_factor");
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   update_all_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, len, g, in, out, norm, norm_factor);

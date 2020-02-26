@@ -53,24 +53,26 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, vec_t& out); // dropout
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, float_t* out);
-void dropout(size_t n, const float scale, const float dropout_rate,
+void dropout(int n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* mask, float_t* out);
 void d_dropout(const float scale, const vec_t& in_diff,
                std::vector<unsigned>& mask,
                vec_t& out_diff); // dropout derivative
-void d_dropout(size_t n, const float scale, const float_t* in_diff,
+void d_dropout(int n, const float scale, const float_t* in_diff,
                unsigned* mask, float_t* out_diff);
 void softmax(const vec_t& input, vec_t& output);
-void softmax(size_t n, const float_t* input, float_t* output);
+void softmax(int n, const float_t* input, float_t* output);
 void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
+void d_softmax(int n, const float_t* y, const float_t* p, float_t* dy,
                const float_t* dp);
 float_t cross_entropy(const vec_t& y, const vec_t& p);
-float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
+float_t cross_entropy(int n, const float_t* y, const float_t* p);
 void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
-void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
+void d_cross_entropy(int n, const float_t* y, const float_t* p, float_t* d);
 
-void copy_gpu(size_t len, const float_t* in, float_t* out);
+// GPU operators
+void init_const_gpu(int n, float_t value, float_t *array);
+void copy_gpu(int len, const float_t* in, float_t* out);
 void vadd_gpu(const int n, const float_t* a, const float_t* b,
               float_t* out);                                 // vector add
 void relu_gpu(const int n, const float_t* in, float_t* out); // ReLU
@@ -83,29 +85,27 @@ void d_dropout_gpu(const int n, const float scale, const float_t* in,
 void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
                const int M, const int N, const int K, const float alpha,
                const float* A, const float* B, const float beta, float* C);
+void matmul_gpu(const size_t x, const size_t y, const size_t z,
+                    const float_t* A, const float_t* B, float_t* C);
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                     const float_t* A, const float_t* B,
                     float_t* C); // matrix multiply
-void softmax_cross_entropy_gpu(int x, int y, const float_t* in_data,
+void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in_data,
                                const mask_t* masks, const label_t* labels,
                                float_t* loss, float_t* out_data);
-void d_softmax_cross_entropy_gpu(int x, int y, const float_t* in_data,
+void d_softmax_cross_entropy_gpu(int len, int bengin, int end,
                                  const mask_t* masks, const label_t* labels,
                                  const float_t* out_data, float_t* diff);
 void scal_gpu(const int N, const float alpha, float* X);
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
-acc_t masked_avg_loss(size_t begin, size_t end, size_t count, mask_t* masks,
+acc_t masked_avg_loss(int begin, int end, int count, mask_t* masks,
                       float_t* loss);
-acc_t masked_accuracy_gpu(size_t num_classes, size_t begin, size_t end,
-                          size_t count, mask_t* masks, float_t* preds,
+acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
+                          int count, mask_t* masks, float_t* preds,
                           label_t* labels);
-
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
-void malloc_device(size_t x, size_t y, size_t z, bool dropout, unsigned*& masks,
-                   float_t*& in, float_t*& out);
 void loss_malloc_device(int n, float_t*& loss);
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad);
-
 #endif

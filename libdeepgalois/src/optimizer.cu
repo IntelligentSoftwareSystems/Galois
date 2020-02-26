@@ -15,8 +15,8 @@ __global__ void update_kernel(const int n, float_t alpha, float_t b1,
 }
 
 void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
-  std::cout << "updating weights on GPU, n = " << n << "\n";
-  print_device_vector(10, dW, "dW");
+  //std::cout << "updating weights on GPU, n = " << n << "\n";
+  //print_device_vector(10, dW, "dW");
   float_t * W1, *W2;
   CUDA_CHECK(cudaMalloc((void**)&W1, n * sizeof(float_t)));
   CUDA_CHECK(cudaMalloc((void**)&W2, n * sizeof(float_t)));
