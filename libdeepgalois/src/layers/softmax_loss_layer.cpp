@@ -70,30 +70,8 @@ acc_t softmax_loss_layer::get_masked_loss() {
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
   init_const_gpu(input_dims[0], 0.0, loss);
-  if (isnan_gpu(input_dims[0]*input_dims[1], in_data)) {
-    std::cout << name_ << " Exception: in_data nan, exiting\n";
-    exit(0);
-  }
-  if (isnan_gpu(output_dims[0], loss)) {
-    std::cout << name_ << " Exception: loss nan, exiting\n";
-    exit(0);
-  }
-  /*
-  if (isnan_gpu(output_dims[0], d_masks_)) {
-    std::cout << name_ << " Exception: masks nan, exiting\n";
-    exit(0);
-  }
-  if (isnan_gpu(output_dims[0], context->d_labels)) {
-    std::cout << name_ << " Exception: labels nan, exiting\n";
-    exit(0);
-  }*/
-
   softmax_cross_entropy_gpu(input_dims[1], begin_, end_, in_data,
                             d_masks_, context->d_labels, loss, out_data);
-  if (isnan_gpu(output_dims[0]*output_dims[1], out_data)) {
-    std::cout << name_ << " Exception: out_data nan, exiting\n";
-    exit(0);
-  }
 }
 
 void softmax_loss_layer::back_propagation(const float_t* in_data,
@@ -101,10 +79,6 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
                                           float_t* out_grad, float_t* in_grad) {
   d_softmax_cross_entropy_gpu(input_dims[1], begin_, end_, d_masks_,
                               context->d_labels, out_data, in_grad);
-  if (isnan_gpu(input_dims[1]*input_dims[1], in_grad)) {
-    std::cout << name_ << " Exception: ingrad nan, exiting\n";
-    exit(0);
-  }
 }
 
 acc_t softmax_loss_layer::get_masked_loss() {
