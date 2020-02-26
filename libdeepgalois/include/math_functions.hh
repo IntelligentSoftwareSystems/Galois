@@ -53,22 +53,22 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, vec_t& out); // dropout
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, float_t* out);
-void dropout(int n, const float scale, const float dropout_rate,
+void dropout(size_t n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* mask, float_t* out);
 void d_dropout(const float scale, const vec_t& in_diff,
                std::vector<unsigned>& mask,
                vec_t& out_diff); // dropout derivative
-void d_dropout(int n, const float scale, const float_t* in_diff,
+void d_dropout(size_t n, const float scale, const float_t* in_diff,
                unsigned* mask, float_t* out_diff);
 void softmax(const vec_t& input, vec_t& output);
-void softmax(int n, const float_t* input, float_t* output);
+void softmax(size_t n, const float_t* input, float_t* output);
 void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_softmax(int n, const float_t* y, const float_t* p, float_t* dy,
+void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
                const float_t* dp);
 float_t cross_entropy(const vec_t& y, const vec_t& p);
-float_t cross_entropy(int n, const float_t* y, const float_t* p);
+float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
 void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
-void d_cross_entropy(int n, const float_t* y, const float_t* p, float_t* d);
+void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
 
 // GPU operators
 bool isnan_gpu(int n, const float_t *array); // does array contain any 'nan' element
