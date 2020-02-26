@@ -17,8 +17,6 @@ softmax_loss_layer::softmax_loss_layer(unsigned level,
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
-  // void softmax_loss_layer::forward_propagation(const vec_t &in_data, vec_t
-  // &out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_),
                  [&](const auto& i) {
@@ -35,8 +33,6 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
                  galois::loopname("softmax-loss-fw"));
 }
 
-// void softmax_loss_layer::back_propagation(const vec_t &in_data, const vec_t
-// &out_data, vec_t &out_grad, vec_t &in_grad) {
 void softmax_loss_layer::back_propagation(const float_t* in_data,
                                           const float_t* out_data,
                                           float_t* out_grad, float_t* in_grad) {
@@ -74,9 +70,6 @@ acc_t softmax_loss_layer::get_masked_loss() {
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
 }
-
-
-
 #else // GPU implementation
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {

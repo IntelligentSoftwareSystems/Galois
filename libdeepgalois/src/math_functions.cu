@@ -118,6 +118,7 @@ void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
                 float_t* out_diff) {
   d_relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in_diff, data,
                                                           out_diff);
+  CudaTest("solving d_relu kernel failed");
 }
 
 void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
@@ -178,6 +179,7 @@ void set_gpu(const int N, const float_t alpha, float_t* Y) {
     return;
   }
   set_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
+  CudaTest("solving set kernel failed");
 }
 
 __global__ void add_scalar_kernel(const int n, const float_t alpha,
@@ -187,6 +189,7 @@ __global__ void add_scalar_kernel(const int n, const float_t alpha,
 
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y) {
   add_scalar_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
+  CudaTest("solving add_scalar kernel failed");
 }
 
 __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
@@ -200,6 +203,7 @@ void copy_gpu(size_t len, const float_t* in, float_t* out) {
 
 void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
   vadd_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, a, b, y);
+  CudaTest("solving vadd kernel failed");
 }
 
 // TODO: use warp

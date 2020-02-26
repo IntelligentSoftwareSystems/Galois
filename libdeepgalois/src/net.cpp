@@ -2,18 +2,15 @@
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
   context = new Context();
-  // Context::create_blas_handle();
   // read graph, get num nodes
   num_samples = context->read_graph(dataset_str);
   num_classes = context->read_labels(dataset_str);
   context->norm_factor_counting(); // pre-compute normalizing factor
-
   num_epochs = epochs;
 
   std::cout << "Reading label masks ... ";
   train_mask.resize(num_samples, 0);
   val_mask.resize(num_samples, 0);
-
   // get testing and validation sets
   if (dataset_str == "reddit") {
     train_begin = 0, train_count = 153431,
@@ -28,7 +25,6 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
         read_masks(dataset_str, "train", train_begin, train_end, train_mask);
     val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask);
   }
-
   std::cout << "Done\n";
 
   num_layers = NUM_CONV_LAYERS + 1;
@@ -41,8 +37,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
   feature_dims[3] = num_classes;           // normalized output embedding: E
   layers.resize(num_layers);
 #ifndef CPU_ONLY
-  context
-      ->copy_data_to_device(); // copy labels and input features to the device
+  context->copy_data_to_device(); // copy labels and input features to the device
 #endif
 }
 
@@ -111,19 +106,15 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 #ifdef CPU_ONLY
   AccumF accuracy_all;
   accuracy_all.reset();
-  galois::do_all(galois::iterate(begin, end),
-                 [&](const auto& i) {
-                   if (masks[i] == 1) {
-                     int preds = argmax(num_classes,
-                                        &(layers[NUM_CONV_LAYERS - 1]
-                                              ->next()
-                                              ->get_data()[i * num_classes]));
-                     if ((label_t)preds == context->get_label(i))
-                       accuracy_all += 1.0;
-                   }
-                 },
-                 galois::chunk_size<256>(), galois::steal(),
-                 galois::loopname("getMaskedLoss"));
+  galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
+    if (masks[i] == 1) {
+      int preds = argmax(num_classes, 
+	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[i * num_classes]));
+      if ((label_t)preds == context->get_label(i))
+        accuracy_all += 1.0;
+    }
+  },
+  galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
   return accuracy_all.reduce() / (acc_t)count;
 #else
   return masked_accuracy_gpu(num_classes, begin, end, count,
