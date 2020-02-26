@@ -215,8 +215,7 @@ __device__ void softmax(int n, const float_t* input, float_t* output) {
 }
 
 // TODO: use warp
-__device__ void d_softmax(size_t n, const float_t* p, const float_t* dp,
-                          float_t* dy) {
+__device__ void d_softmax(size_t n, const float_t* p, const float_t* dp, float_t* dy) {
   for (size_t i = 0; i < n; i++) {
     dy[i] = 0;
     for (size_t j = 0; j < n; j++) {
@@ -226,21 +225,15 @@ __device__ void d_softmax(size_t n, const float_t* p, const float_t* dp,
   }
 }
 
-__device__ void cross_entropy(int n, const label_t idx, const float_t* p,
-                              float_t& loss) {
-  if (p[idx] == 0.0)
-    loss -= log(float_t(1e-10));
-  else
-    loss -= log(p[idx]);
+__device__ void cross_entropy(int n, const label_t idx, const float_t* p, float_t& loss) {
+  if (p[idx] == 0.0) loss -= log(float_t(1e-10));
+  else loss -= log(p[idx]);
 }
 
-__device__ void d_cross_entropy(int n, const label_t idx, const float_t* p,
-                                float_t* d) {
+__device__ void d_cross_entropy(int n, const label_t idx, const float_t* p, float_t* d) {
   for (int i = 0; i < n; i++)
-    if (i == (int)idx)
-      d[i] = -1.0 / (p[i] + 1e-10);
-    else
-      d[i] = 0.0;
+    if (i == (int)idx) d[i] = -1.0 / (p[i] + 1e-10);
+    else d[i] = 0.0;
 }
 
 // n: number of vectors
@@ -253,8 +246,8 @@ __global__ void softmax_cross_entropy_kernel(int n, int len,
                                              float_t* loss, float_t* out_data) {
   CUDA_KERNEL_LOOP(i, n) {
     if (masks[i] == 1) { // masked
-      softmax(len, in_data + len * i,
-              out_data + len * i); // normalize using softmax
+	  // normalize using softmax
+      softmax(len, in_data + len * i, out_data + len * i);
       loss[i] = 0.0;
       cross_entropy(len, labels[i], &out_data[len * i], loss[i]);
     }
@@ -269,8 +262,7 @@ void softmax_cross_entropy_gpu(int n, int len, const float_t* in,
   CudaTest("solving softmax_cross_entropy kernel failed");
 }
 
-__global__ void
-d_softmax_cross_entropy_kernel(int n, int len, const float_t* in,
+__global__ void d_softmax_cross_entropy_kernel(int n, int len, const float_t* in,
                                const mask_t* masks, const label_t* labels,
                                const float_t* out, float_t* diff) {
   CUDA_KERNEL_LOOP(i, n) {

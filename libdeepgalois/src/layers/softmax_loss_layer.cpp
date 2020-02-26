@@ -19,18 +19,16 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_),
-                 [&](const auto& i) {
-                   if (masks_[i] == 1) { // masked
-                     softmax(len, &in_data[len * i],
-                             &out_data[len * i]); // normalize using softmax
-                     // y is a one hot encoded vector for the labels
-                     std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
-                     y[context->get_label(i)] = 1.0;            // one-hot
-                     loss[i] = cross_entropy(len, &y[0], &out_data[len * i]);
-                   }
-                 },
-                 galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-                 galois::loopname("softmax-loss-fw"));
+    [&](const auto& i) {
+      if (masks_[i] == 1) { // masked
+        softmax(len, &in_data[len*i], &out_data[len*i]); // normalize using softmax
+        // y is a one hot encoded vector for the labels
+        std::vector<acc_t> y(output_dims[1], 0.0); // ground truth
+        y[context->get_label(i)] = 1.0;            // one-hot
+        loss[i] = cross_entropy(len, &y[0], &out_data[len*i]);
+      }
+    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+    galois::loopname("softmax-loss-fw"));
 }
 
 void softmax_loss_layer::back_propagation(const float_t* in_data,
@@ -38,19 +36,17 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
                                           float_t* out_grad, float_t* in_grad) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_),
-                 [&](const auto& i) {
-                   if (masks_[i] == 1) { // masked
-                     vec_t norm_grad(len);
-                     std::vector<acc_t> y(len, 0.0); // ground truth
-                     y[context->get_label(i)] = 1.0;
-                     d_cross_entropy(len, &y[0], &out_data[len * i],
-                                     &norm_grad[0]);
-                     d_softmax(len, &in_data[len * i], &out_data[len * i],
-                               &in_grad[len * i], &norm_grad[0]);
-                   }
-                 },
-                 galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-                 galois::loopname("softmax-loss-bw"));
+    [&](const auto& i) {
+      if (masks_[i] == 1) { // masked
+        vec_t norm_grad(len);
+        std::vector<acc_t> y(len, 0.0); // ground truth
+        y[context->get_label(i)] = 1.0;
+        d_cross_entropy(len, &y[0], &out_data[len * i], &norm_grad[0]);
+        d_softmax(len, &in_data[len * i], &out_data[len * i],
+                  &in_grad[len * i], &norm_grad[0]);
+      }
+    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+    galois::loopname("softmax-loss-bw"));
 }
 
 acc_t softmax_loss_layer::get_masked_loss() {
@@ -59,14 +55,13 @@ acc_t softmax_loss_layer::get_masked_loss() {
   total_loss.reset();
   valid_sample_count.reset();
   galois::do_all(galois::iterate(begin_, end_),
-                 [&](const auto& i) {
-                   if (masks_[i]) {
-                     total_loss += loss[i];
-                     valid_sample_count += 1;
-                   }
-                 },
-                 galois::chunk_size<256>(), galois::steal(),
-                 galois::loopname("getMaskedLoss"));
+    [&](const auto& i) {
+      if (masks_[i]) {
+        total_loss += loss[i];
+        valid_sample_count += 1;
+      }
+    }, galois::chunk_size<256>(), galois::steal(),
+    galois::loopname("getMaskedLoss"));
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
 }
