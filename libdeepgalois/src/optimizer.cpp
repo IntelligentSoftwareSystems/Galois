@@ -21,26 +21,24 @@ void adagrad::update(const vec_t& dW, vec_t& W, bool parallelize) {
 void RMSprop::update(const vec_t& dW, vec_t& W, bool parallelize) {
   vec_t& g = get<0>(W);
   galois::do_all(galois::iterate((size_t)0, W.size()),
-                 [&](const auto& i) {
-                   g[i] = mu * g[i] + (1 - mu) * dW[i] * dW[i];
-                   W[i] -= alpha * dW[i] / std::sqrt(g[i] + eps);
-                 },
-                 galois::loopname("rms_update"));
+    [&](const auto& i) {
+      g[i] = mu * g[i] + (1 - mu) * dW[i] * dW[i];
+      W[i] -= alpha * dW[i] / std::sqrt(g[i] + eps);
+    }, galois::loopname("rms_update"));
 }
 
 void adam::update(const vec_t& dW, vec_t& W, bool parallelize) {
   vec_t& mt = get<0>(W);
   vec_t& vt = get<1>(W);
   galois::do_all(galois::iterate((size_t)0, W.size()),
-                 [&](const auto& i) {
-                   mt[i] = b1 * mt[i] + (float_t(1) - b1) * dW[i];
-                   vt[i] = b2 * vt[i] + (float_t(1) - b2) * dW[i] * dW[i];
-                   // L2 norm based update rule
-                   W[i] -= alpha * (mt[i] / (float_t(1) - b1_t)) /
-                           std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
-                 },
-                 galois::chunk_size<256>(), galois::steal(),
-                 galois::loopname("adam_update"));
+    [&](const auto& i) {
+      mt[i] = b1 * mt[i] + (float_t(1) - b1) * dW[i];
+      vt[i] = b2 * vt[i] + (float_t(1) - b2) * dW[i] * dW[i];
+      // L2 norm based update rule
+      W[i] -= alpha * (mt[i] / (float_t(1) - b1_t)) /
+              std::sqrt((vt[i] / (float_t(1) - b2_t)) + eps);
+    }, galois::chunk_size<256>(), galois::steal(),
+    galois::loopname("adam_update"));
   b1_t *= b1;
   b2_t *= b2;
 }

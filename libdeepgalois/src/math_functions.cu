@@ -9,8 +9,7 @@ void gpu_rng_uniform(const int n, unsigned* r) {
   CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
 }
 
-void gpu_rng_uniform(const int n, const float_t a, const float_t b,
-                     float_t* r) {
+void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) {
   CURAND_CHECK(curandGenerateUniform(Context::curand_generator(), r, n));
   const float range = b - a;
   if (range != float_t(1))
@@ -19,10 +18,8 @@ void gpu_rng_uniform(const int n, const float_t a, const float_t b,
     add_scalar_gpu(n, a, r);
 }
 
-void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma,
-                      float_t* r) {
-  CURAND_CHECK(
-      curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
+void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_t* r) {
+  CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
 void loss_malloc_device(int n, float_t*& loss) {
@@ -32,15 +29,13 @@ void loss_malloc_device(int n, float_t*& loss) {
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   assert(h_masks != NULL);
   CUDA_CHECK(cudaMalloc((void**)&d_masks, n * sizeof(mask_t)));
-  CUDA_CHECK(
-      cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
 }
 
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad) {
-  if (dropout)
-    CUDA_CHECK(cudaMalloc((void**)&masks, x * y * sizeof(unsigned)));
+  if (dropout) CUDA_CHECK(cudaMalloc((void**)&masks, x * y * sizeof(unsigned)));
   CUDA_CHECK(cudaMalloc((void**)&in, x * y * sizeof(float_t)));
   CUDA_CHECK(cudaMalloc((void**)&out, x * z * sizeof(float_t)));
   CUDA_CHECK(cudaMalloc((void**)&matrix, y * z * sizeof(float_t)));
@@ -60,11 +55,11 @@ __global__ void setup_curand_kernel(const int n, curandState* state) {
 
 __global__ void dropout_kernel(const int n, const float scale,
                                const float dropout_rate, const float_t* in,
-                               unsigned* masks, curandState* state,
-                               float_t* out) {
+                               unsigned* masks, curandState* state, float_t* out) {
   CUDA_KERNEL_LOOP(i, n) {
-    // curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
-    // masks[i] = curand_uniform(&state[i]) <= dropout_rate ? 1 : 0;
+    // curandState_t curand_state;
+    //curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
+    //masks[i] = curand_uniform(&state[i]) <= dropout_rate ? 1 : 0;
     masks[i] = 1.0 - dropout_rate;
     out[i]   = in[i] * masks[i] * scale;
   }
@@ -74,20 +69,19 @@ void dropout_gpu(const int n, const float scale, const float dropout_rate,
                  const float_t* in, unsigned* masks, float_t* out) {
   curandState* devStates;
   CUDA_CHECK(cudaMalloc((void**)&devStates, n * sizeof(curandState)));
-  // std::cout << "[debug]: setup curand, n = " << n << "\n";
-  // setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, devStates); 
-  // CudaTest("solving setup_curand kernel failed"); std::cout <<
-  // "[debug]: dropout_gpu\n";
+  //std::cout << "[debug]: setup curand, n = " << n << "\n";
+  //setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, devStates); 
+  //CudaTest("solving setup_curand kernel failed"); 
+  std::cout << "[debug]: dropout_gpu\n";
   dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, scale, dropout_rate, in, masks, devStates, out);
   CudaTest("solving dropout kernel failed");
   CUDA_CHECK(cudaFree(devStates));
-  // std::cout << "[debug]: dropout_gpu done\n";
+  std::cout << "[debug]: dropout_gpu done\n";
 }
 
-__global__ void d_dropout_kernel(const int n, const float scale,
-                                 const float_t* in, const unsigned* masks,
-                                 float_t* out) {
+__global__ void d_dropout_kernel(const int n, const float scale, const float_t* in,
+                                 const unsigned* masks, float_t* out) {
   CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * masks[i] * scale; }
 }
 
@@ -102,7 +96,6 @@ __global__ void relu_kernel(const int n, const float_t* in, float_t* out) {
 }
 
 void relu_gpu(const int n, const float_t* in, float_t* out) {
-  // std::cout << "[debug]: relu_gpu\n";
   relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in, out);
   CudaTest("solving relu kernel failed");
 }
