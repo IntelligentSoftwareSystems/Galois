@@ -11,6 +11,12 @@
 typedef unsigned IndexT;
 typedef float ValueT;
 
+/**
+ * Used to temporarily store read edges from edge list; graph itself doesn't
+ * use these.
+ *
+ * Source, dest, label.
+ */
 struct Edge {
   IndexT src;
   IndexT dst;
@@ -25,6 +31,14 @@ struct Edge {
 };
 typedef std::vector<Edge> EdgeList;
 
+/**
+ * Learning graph.
+ *
+ * Provides basic accesors and such; nothing special. Just a CSR.
+ * Ultimatly becomes an LC_CSR.
+ *
+ * @todo remove this intermediate step if using edgelists
+ */
 class LGraph {
 public:
   LGraph() : symmetrize_(false), directed_(false) {}

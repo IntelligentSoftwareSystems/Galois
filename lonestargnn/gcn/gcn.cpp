@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarGnnStart(argc, argv, name, desc, url);
   Net network; // the neural network to train
+  // read network, features, ground truth, initialize metadata
   network.init(dataset, epochs, hidden1);
   network.construct_layers(); // default setting for now; can be customized by
                               // the user

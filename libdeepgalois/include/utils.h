@@ -94,6 +94,8 @@ inline bool bernoulli(float_t p) {
   return uniform_rand(float_t(0), float_t(1)) <= p;
 }
 
+//! Get masks from datafile where first line tells range of 
+//! set to create mask from
 inline size_t read_masks(std::string dataset_str, std::string mask_type,
                          size_t& begin, size_t& end,
                          std::vector<uint8_t>& masks) {

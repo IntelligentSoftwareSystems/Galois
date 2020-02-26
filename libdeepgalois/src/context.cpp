@@ -58,8 +58,6 @@ void Context::genGraph(LGraph& lg, Graph& g) {
 float_t* Context::get_in_ptr() { return &h_feats[0]; }
 #endif
 
-// user-defined pre-computing function, called during initialization
-// for each vertex v, compute pow(|N(v)|, -0.5), where |N(v)| is the degree of v
 void Context::norm_factor_counting() {
 #ifdef CPU_ONLY
   norm_factor = new float_t[n];
@@ -113,6 +111,8 @@ size_t Context::read_labels(std::string dataset_str) {
   return num_classes;
 }
 
+//! Read features, return the length of a feature vector
+//! Features are stored in the Context class
 size_t Context::read_features(std::string dataset_str) {
   std::cout << "Reading features ... ";
   Timer t_read;

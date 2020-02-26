@@ -24,6 +24,7 @@ public:
   size_t get_nnodes() { return num_samples; }
   void train(optimizer* opt, bool need_validate); // training
   void construct_layers();
+  //! Save the context object to all layers of the network
   void set_contexts() {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_context(context);
