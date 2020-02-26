@@ -12,7 +12,7 @@ __device__ void scale_add(const int n, const float_t alpha, const float_t* a,
     y[i] = alpha * a[i] + b[i];
 }
 
-__global__ void update_all_kernel(size_t n, size_t len, CSRGraph& g,
+__global__ void update_all_kernel(size_t n, size_t len, CSRGraph g,
                                   const float_t* in, float_t* out,
                                   bool norm, const float_t* norm_factor) {
   CUDA_KERNEL_LOOP(src, n) {

@@ -121,8 +121,10 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
     matmul1D1D_gpu(x, z, y, in_temp, d_W, out_temp);
   } else matmul1D1D_gpu(x, z, y, in_data, d_W, out_temp);
-  //aggregate(z, context->graph_gpu, out_temp, out_data);
+  aggregate(z, context->graph_gpu, out_temp, out_data);
   if (act_) relu_gpu(x * z, out_data, out_data);
+  std::cout << "Forward " << name_ << ":\n";
+  print_device_vector(10, in_data, "in_data");
 }
 
 // GPU backward: compute input gradients (in_grad) and weight gradients (d_weight_grad)
@@ -133,9 +135,12 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   else copy_gpu(x * z, out_grad, out_temp);
   if (level_ != 0) {
     sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
-    //update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
+    update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
     if (dropout_) d_dropout_gpu(x * y, scale_, in_grad, dropout_mask, in_grad);
   }
+  std::cout << "Backward " << name_ << ":\n";
+  print_device_vector(10, in_data, "in_data");
+  print_device_vector(10, out_temp, "out_temp");
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);
 }
 #endif

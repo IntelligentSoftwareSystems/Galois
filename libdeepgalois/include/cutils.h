@@ -4,6 +4,7 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include <driver_types.h>
+#include <iostream>
 
 // CUDA: use 256 threads per block
 const int CUDA_NUM_THREADS = 256;
@@ -127,3 +128,11 @@ inline const char* curandGetErrorString(curandStatus_t error) {
 
 // CUDA: check for error after kernel execution and exit loudly if there is one.
 #define CUDA_POST_KERNEL_CHECK CUDA_CHECK(cudaPeekAtLastError())
+
+inline void print_device_vector(size_t n, const float_t *d_x, std::string name = "x") {
+  float_t *h_x = new float_t[n];
+  CUDA_CHECK(cudaMemcpy(h_x, d_x, n * sizeof(float_t), cudaMemcpyDeviceToHost));
+  for (size_t i = 0; i < n; i ++) std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
+  delete h_x;
+}
+
