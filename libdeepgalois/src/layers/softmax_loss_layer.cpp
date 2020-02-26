@@ -9,7 +9,7 @@ softmax_loss_layer::softmax_loss_layer(unsigned level,
 #ifdef CPU_ONLY
   loss = new float_t[in_dims[0]]; // error for each sample
 #else
-  out_malloc_device(in_dims[0], masks_, d_masks_, loss);
+  loss_malloc_device(in_dims[0], loss);
 #endif
 }
 #ifdef CPU_ONLY

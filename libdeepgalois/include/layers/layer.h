@@ -44,6 +44,7 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void set_netphase(net_phase phase) {}
   virtual void set_context(Context* ctx) { context = ctx; }
+  virtual acc_t get_masked_loss() { return acc_t(0); }
   // virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) =
   // 0; virtual void back_propagation(const vec_t &in_data, const vec_t
   // &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
