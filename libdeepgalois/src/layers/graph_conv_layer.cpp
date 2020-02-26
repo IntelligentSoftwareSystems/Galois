@@ -118,20 +118,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 void graph_conv_layer::forward_propagation(const float_t* in_data,
                                            float_t* out_data) {
   assert(y <= 128); // currently only support feature length <= 128
-  //if (level_ == 0) print_device_vector(20, in_data, "in_data");
-  //if (level_ == 0) print_device_vector(20, d_W, "W");
-
   init_const_gpu(x*z, 0.0, out_temp);
   if (dropout_ && phase_ == net_phase::train) {
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
-    //matmul_gpu(x, z, y, in_temp, d_W, out_temp);
   } else sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, d_W, 0.0, out_temp);
-  //if (level_ == 0) print_device_vector(20, out_temp, "out_temp");
   aggregate(z, context->graph_gpu, out_temp, out_data);
   if (act_) relu_gpu(x * z, out_data, out_data);
-  //std::cout << "Forward " << name_ << ":\n";
-  //print_device_vector(20, out_data, "out_data");
 }
 
 // GPU backward: compute input gradients (in_grad) and weight gradients (d_weight_grad)
@@ -146,16 +139,5 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     if (dropout_) d_dropout_gpu(x * y, scale_, in_grad, dropout_mask, in_grad);
   }
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);
-  if (level_ == 0) {
-    //std::cout << "Backward " << name_ << ":\n";
-    //print_device_vector(20, in_data, "in_data");
-    //print_device_vector(20, out_temp, "out_temp");
-    //print_device_vector(20, d_weight_grad, "dW");
-  }
-
-  if (isnan_gpu(y*z, d_weight_grad)) {
-    std::cout << name_ << "Exception: ingrad nan, exiting\n";
-    exit(0);
-  }
 }
 #endif
