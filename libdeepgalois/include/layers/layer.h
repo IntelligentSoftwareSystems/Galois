@@ -97,15 +97,16 @@ public:
                      next()->get_gradient(), prev()->get_gradient());
   }
   void update_weight(optimizer* opt) {
-    // std::cout << name_ << ": weight updating ... ";
     // vec_t diff;
     // prev()->merge_grads(&diff);
 #ifdef CPU_ONLY
+    // std::cout << name_ << ": weight updating ... ";
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
     bool parallel = (W.size() >= 512);
     opt->update(weight_grad, W, parallel); // W += grad
 #else
+	std::cout << name_ << ": ";
     opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
 #endif
     // prev()->clear_grads();

@@ -1,3 +1,4 @@
+#include <iostream>
 #include "optimizer.h"
 #include "cutils.h"
 #include "math_functions.hh"
@@ -15,6 +16,7 @@ __global__ void update_kernel(const int n, float_t alpha, float_t b1,
 }
 
 void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  std::cout << updating weights on GPU, n = " << n << "\n";
   float_t * W1, *W2;
   CUDA_CHECK(cudaMalloc((void**)&W1, n * sizeof(float_t)));
   CUDA_CHECK(cudaMalloc((void**)&W2, n * sizeof(float_t)));
@@ -24,4 +26,6 @@ void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
       n, alpha, b1, b2, b1_t, b2_t, eps, W1, W2, dW, W);
   b1_t *= b1;
   b2_t *= b2;
+  CUDA_CHECK(cudaFree(W1));
+  CUDA_CHECK(cudaFree(W2));
 }
