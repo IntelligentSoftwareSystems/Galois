@@ -106,7 +106,7 @@ public:
     bool parallel = (W.size() >= 512);
     opt->update(weight_grad, W, parallel); // W += grad
 #else
-    opt->update_gpu(d_weight_grad, d_W); // W += grad
+    opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
 #endif
     // prev()->clear_grads();
     next()->clear_grads();

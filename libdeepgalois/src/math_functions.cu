@@ -72,12 +72,12 @@ void dropout_gpu(const int n, const float scale, const float dropout_rate,
   //std::cout << "[debug]: setup curand, n = " << n << "\n";
   //setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, devStates); 
   //CudaTest("solving setup_curand kernel failed"); 
-  std::cout << "[debug]: dropout_gpu\n";
+  //std::cout << "[debug]: dropout_gpu\n";
   dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, scale, dropout_rate, in, masks, devStates, out);
   CudaTest("solving dropout kernel failed");
   CUDA_CHECK(cudaFree(devStates));
-  std::cout << "[debug]: dropout_gpu done\n";
+  //std::cout << "[debug]: dropout_gpu done\n";
 }
 
 __global__ void d_dropout_kernel(const int n, const float scale, const float_t* in,
