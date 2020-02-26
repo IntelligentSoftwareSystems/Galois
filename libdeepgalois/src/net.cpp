@@ -3,15 +3,18 @@
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
   context = new Context();
   // Context::create_blas_handle();
+  // read graph, get num nodes
   num_samples = context->read_graph(dataset_str);
   num_classes = context->read_labels(dataset_str);
-  context->degree_counting();
   context->norm_factor_counting(); // pre-compute normalizing factor
+
   num_epochs = epochs;
 
   std::cout << "Reading label masks ... ";
   train_mask.resize(num_samples, 0);
   val_mask.resize(num_samples, 0);
+
+  // get testing and validation sets
   if (dataset_str == "reddit") {
     train_begin = 0, train_count = 153431,
     train_end = train_begin + train_count;
@@ -25,9 +28,11 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
         read_masks(dataset_str, "train", train_begin, train_end, train_mask);
     val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask);
   }
+
   std::cout << "Done\n";
 
   num_layers = NUM_CONV_LAYERS + 1;
+  // initialize feature metadata
   feature_dims.resize(num_layers + 1);
   feature_dims[0] =
       context->read_features(dataset_str); // input feature dimension: D
@@ -42,7 +47,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
-  std::cout << "\nStart training...\n";
+  galois::gPrint("\nStart training...\n");
   galois::StatTimer Tupdate("Train-WeightUpdate");
   galois::StatTimer Tfw("Train-Forward");
   galois::StatTimer Tbw("Train-Backward");
