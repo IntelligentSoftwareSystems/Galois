@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <unordered_map>
 #include "types.h"
-
+#ifndef CPU_ONLY
+#include "math_functions.hh"
+#endif
 // base class of optimizer
 // usesHessian : true if an optimizer uses hessian (2nd order derivative of loss
 // function)
@@ -36,6 +38,18 @@ protected:
     return E_[Index][&key];
   }
   std::unordered_map<const vec_t*, vec_t> E_[N];
+#ifndef CPU_ONLY
+  template <int Index>
+  float_t *get_gpu(const size_t n, const float_t *key) {
+    static_assert(Index < N, "index out of range");
+    if (!is_allocated_device(dE_[Index][key])) {
+      float_malloc_device(n, dE_[Index][key]);
+      init_const_gpu(n, 0.0, dE_[Index][key]);
+    }
+    return dE_[Index][key];
+  }
+  std::unordered_map<const float_t*, float_t*> dE_[N];
+#endif
 };
 
 /**

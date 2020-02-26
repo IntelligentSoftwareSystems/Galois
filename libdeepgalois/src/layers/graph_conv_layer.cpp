@@ -120,17 +120,46 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   assert(y <= 128); // currently only support feature length <= 128
   //if (level_ == 0) print_device_vector(20, in_data, "in_data");
   //if (level_ == 0) print_device_vector(20, d_W, "W");
+
+  if (isnan_gpu(x*z, out_temp)) {
+    std::cout << name_ << " forward before sgemm Exception: out_temp nan, exiting\n";
+    exit(0);
+  }
+  init_const_gpu(x*z, 0.0, out_temp);
+  if (isnan_gpu(x*y, in_temp)) {
+    std::cout << name_ << " forward Exception: in_temp nan, exiting\n";
+    exit(0);
+  }
+
+  if (isnan_gpu(y*z, d_W)) {
+    std::cout << name_ << " forward before sgemm Exception: d_W nan, exiting\n";
+    exit(0);
+  }
+
   if (dropout_ && phase_ == net_phase::train) {
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
-    sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
-    //copy_gpu(x*y, in_data, in_temp);
-    //matmul_gpu(x, z, y, in_temp, d_W, out_temp);
+    //sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
+    matmul_gpu(x, z, y, in_temp, d_W, out_temp);
   } else sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, d_W, 0.0, out_temp);
   //if (level_ == 0) print_device_vector(20, out_temp, "out_temp");
   aggregate(z, context->graph_gpu, out_temp, out_data);
   if (act_) relu_gpu(x * z, out_data, out_data);
   //std::cout << "Forward " << name_ << ":\n";
   //print_device_vector(20, out_data, "out_data");
+  if (isnan_gpu(x*y, in_data)) {
+    std::cout << name_ << " forward Exception: in_data nan, exiting\n";
+    exit(0);
+  }
+
+  if (isnan_gpu(x*z, out_temp)) {
+    std::cout << name_ << " forward after sgemm Exception: out_temp nan, exiting\n";
+    exit(0);
+  }
+
+  if (isnan_gpu(x*z, out_data)) {
+    std::cout << name_ << " forward Exception: out_data nan, exiting\n";
+    exit(0);
+  }
 }
 
 // GPU backward: compute input gradients (in_grad) and weight gradients (d_weight_grad)
@@ -143,6 +172,10 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
     update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
     if (dropout_) d_dropout_gpu(x * y, scale_, in_grad, dropout_mask, in_grad);
+    if (isnan_gpu(x*y, in_grad)) {
+      std::cout << name_ << "Exception: ingrad nan, exiting\n";
+      exit(0);
+    }
   }
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);
   if (level_ == 0) {
@@ -150,6 +183,16 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     print_device_vector(20, in_data, "in_data");
     print_device_vector(20, out_temp, "out_temp");
     print_device_vector(20, d_weight_grad, "dW");
+  }
+
+  if (isnan_gpu(x*z, out_temp)) {
+    std::cout << name_ << " backward Exception: out_temp nan, exiting\n";
+    exit(0);
+  }
+
+  if (isnan_gpu(y*z, d_weight_grad)) {
+    std::cout << name_ << "Exception: ingrad nan, exiting\n";
+    exit(0);
   }
 }
 #endif

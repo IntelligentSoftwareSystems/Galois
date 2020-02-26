@@ -71,6 +71,7 @@ void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
 void d_cross_entropy(int n, const float_t* y, const float_t* p, float_t* d);
 
 // GPU operators
+bool isnan_gpu(int n, const float_t *array); // does array contain any 'nan' element
 void init_const_gpu(int n, float_t value, float_t *array);
 void copy_gpu(int len, const float_t* in, float_t* out);
 void vadd_gpu(const int n, const float_t* a, const float_t* b,
@@ -103,8 +104,9 @@ acc_t masked_avg_loss(int begin, int end, int count, mask_t* masks,
 acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
                           int count, mask_t* masks, float_t* preds,
                           label_t* labels);
+bool is_allocated_device(float_t* data);
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
-void loss_malloc_device(int n, float_t*& loss);
+void float_malloc_device(int n, float_t*& loss);
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad);

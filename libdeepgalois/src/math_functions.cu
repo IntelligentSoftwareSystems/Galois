@@ -5,6 +5,29 @@
 #include "cub/cub.cuh"
 #include <curand_kernel.h>
 
+__global__ void init_const_kernel(int n, float_t value, float_t *array) {
+  CUDA_KERNEL_LOOP(i, n) { array[i] = value; }
+}
+
+void init_const_gpu(int n, float_t value, float_t *array) {
+  init_const_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, value, array);
+  CudaTest("solving init_const kernel failed");
+}
+
+__global__ void isnan_test(const int n, const float *data, bool *result) {
+	CUDA_KERNEL_LOOP(i, n) { if (isnan(data[i])) *result = true; }
+}
+
+bool isnan_gpu(int n, const float_t *array) {
+  bool  *d_result, h_result = false;
+  cudaMalloc((void **)&d_result, sizeof (bool));
+  cudaMemcpy(d_result, &h_result, sizeof(bool), cudaMemcpyHostToDevice);
+  isnan_test<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, array, d_result);
+  CudaTest("solving init_const kernel failed");
+  cudaMemcpy(&h_result, d_result, sizeof(bool), cudaMemcpyDeviceToHost);
+  return h_result;
+}
+
 void gpu_rng_uniform(const int n, unsigned* r) {
   CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
 }
@@ -22,7 +45,15 @@ void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_
   CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
 }
 
-void loss_malloc_device(int n, float_t*& loss) {
+bool is_allocated_device(float_t* data) {
+  if (data == NULL) return false;
+  cudaPointerAttributes attributes;
+  CUDA_CHECK(cudaPointerGetAttributes(&attributes, data));
+  if (attributes.devicePointer != NULL) return true;
+  return false;
+}
+
+void float_malloc_device(int n, float_t*& loss) {
   CUDA_CHECK(cudaMalloc((void**)&loss, n * sizeof(float_t)));
 }
 
@@ -32,23 +63,14 @@ void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
 }
 
-__global__ void init_const_kernel(int n, float_t value, float_t *array) {
-  CUDA_KERNEL_LOOP(i, n) {
-    array[i] = value;
-  }
-}
-
-void init_const_gpu(int n, float_t value, float_t *array) {
-  init_const_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, value, array);
-  CudaTest("solving init_const kernel failed");
-}
-
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad) {
   if (dropout) CUDA_CHECK(cudaMalloc((void**)&masks, x * y * sizeof(unsigned)));
   CUDA_CHECK(cudaMalloc((void**)&in, x * y * sizeof(float_t)));
+  init_const_gpu(x*y, 0.0, in);
   CUDA_CHECK(cudaMalloc((void**)&out, x * z * sizeof(float_t)));
+  init_const_gpu(x*z, 0.0, out);
   CUDA_CHECK(cudaMalloc((void**)&matrix, y * z * sizeof(float_t)));
   auto init_range = sqrt(6.0 / (y + z));
   // Glorot & Bengio (AISTATS 2010)
