@@ -1,4 +1,13 @@
 #pragma once
+/**
+ * Code based on below link.
+ *
+ * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/layers/layer.h
+ *
+ * Copyright (c) 2013, Taiga Nomi and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
 
 #include <queue>
 #include <cmath>
@@ -29,8 +38,10 @@
  * - in_shape            ... specify input data shapes
  * - out_shape           ... specify output data shapes
  * - layer_type          ... name of layer
+ *
+ * Node inheritance is just to get accessed to linked-list semantics it
+ * provides
  **/
-
 class layer : public node {
 public:
   layer(unsigned level, std::vector<size_t> in_dims,
@@ -43,21 +54,26 @@ public:
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
   virtual void set_netphase(net_phase phase) {}
+  //! save context
   virtual void set_context(Context* ctx) { context = ctx; }
   virtual acc_t get_masked_loss() { return acc_t(0); }
-  // virtual void forward_propagation(const vec_t &in_data, vec_t &out_data) =
-  // 0; virtual void back_propagation(const vec_t &in_data, const vec_t
-  // &out_data, vec_t &out_grad, vec_t &in_grad) = 0;
+
+  // main functions for layer work
   virtual void forward_propagation(const float_t* in_data,
                                    float_t* out_data)                = 0;
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad) = 0;
 
+  // is this layer trainable?
   void set_trainable(bool trainable) { trainable_ = trainable; }
   bool trainable() const { return trainable_; }
+
+  // name metadata
   void set_name(std::string name) { name_ = name; }
   std::string get_name() { return name_; }
+
   mask_t* get_device_masks() { return d_masks_; }
+  //! debug print function
   void print_layer_info() {
     std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
               << input_dims[0] << "," << input_dims[1] << "] output["
@@ -73,11 +89,14 @@ public:
     copy_masks_device(input_dims[0], masks_, d_masks_);
 #endif
   }
+
+  //! set the data of the previous layer connected to this one
   void set_in_data(float_t* data) {
     prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
     prev_->set_data(data);
     // no need to allocate memory for gradients, since this is the input layer.
   }
+
   void add_edge() {
     // add an outgoing edge
     next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
@@ -87,15 +106,22 @@ public:
   void alloc_grad() {
     // allocate memory for intermediate gradients
   }
+
+  //! calls forward propagation using previous layer as input and writes
+  //! to next layer as output
   void forward() {
     // std::cout << name_ << ": forwarding ... ";
     forward_propagation(prev()->get_data(), next()->get_data());
   }
+
+  //! calls backward propagation
   void backward() {
     // std::cout << name_ << ": backwarding ... ";
     back_propagation(prev()->get_data(), next()->get_data(),
                      next()->get_gradient(), prev()->get_gradient());
   }
+
+  //! use optimizer to update weights given gradient
   void update_weight(optimizer* opt) {
     // vec_t diff;
     // prev()->merge_grads(&diff);
