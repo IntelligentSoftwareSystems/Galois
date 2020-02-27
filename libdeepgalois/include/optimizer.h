@@ -1,3 +1,11 @@
+/**
+ * Code modified from below link.
+ *
+ * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/optimizers/optimizer.h
+ * Copyright (c) 2013, Taiga Nomi and the respective contributors
+ * All rights reserved.
+ * Reused under 3-BSD
+ */
 #pragma once
 
 #include <algorithm>
@@ -6,6 +14,7 @@
 #ifndef CPU_ONLY
 #include "math_functions.hh"
 #endif
+
 // base class of optimizer
 // usesHessian : true if an optimizer uses hessian (2nd order derivative of loss
 // function)
