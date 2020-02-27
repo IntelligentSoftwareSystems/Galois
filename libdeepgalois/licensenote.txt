@@ -1,0 +1,8 @@
+TODO
+
+figure out which files have coded based on other codebsaes, get license,
+note here
+
+e.g.
+https://github.com/tiny-dnn/tiny-dnn/tree/master/tiny_dnn
+under BSD-3
