@@ -1,4 +1,14 @@
 #pragma once
+/**
+ * Code modified from below
+ *
+ * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/node.h
+ *
+ * Copyright (c) 2013, Taiga Nomi and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include <vector>
 #include <memory>
 #include <cassert>
