@@ -18,7 +18,7 @@ void graph_conv_layer::combine(const vec_t& self, const vec_t& neighbors, vec_t&
 }
 
 graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
-                                   bool bias, bool dropout, float dropout_rate,
+                                   bool bias, bool dropout, float_t dropout_rate,
                                    std::vector<size_t> in_dims,
                                    std::vector<size_t> out_dims)
     : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),

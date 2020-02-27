@@ -18,7 +18,7 @@
 class graph_conv_layer : public layer {
 public:
   graph_conv_layer(unsigned level, bool act, bool norm, bool bias, bool dropout,
-                   float dropout_rate, std::vector<size_t> in_dims,
+                   float_t dropout_rate, std::vector<size_t> in_dims,
                    std::vector<size_t> out_dims);
   graph_conv_layer(unsigned level, std::vector<size_t> in_dims,
                    std::vector<size_t> out_dims)
@@ -49,8 +49,8 @@ private:
   bool norm_;    // whether to normalize data
   bool bias_;    // whether to add bias afterwards
   bool dropout_; // whether to use dropout at first
-  const float dropout_rate_;
-  float scale_;
+  const float_t dropout_rate_;
+  float_t scale_;
   net_phase phase_;
   size_t x;
   size_t y;

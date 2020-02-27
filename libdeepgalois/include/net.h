@@ -39,7 +39,7 @@ public:
 
   void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
                          bool bias = false, bool dropout = true,
-                         float dropout_rate = 0.5) {
+                         float_t dropout_rate = 0.5) {
     assert(dropout_rate < 1.0);
     assert(layer_id < NUM_CONV_LAYERS);
     std::vector<size_t> in_dims(2), out_dims(2);
