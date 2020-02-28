@@ -1,5 +1,6 @@
 // Copyright (c) 2019, Xuhao Chen
 #include <cub/cub.cuh>
+#include "kcl.h"
 #define USE_SIMPLE
 #define USE_BASE_TYPES
 #include "gpu_mining/miner.cuh"
@@ -143,10 +144,10 @@ __global__ void extend_insert(size_t begin, size_t end, unsigned level, GraphGPU
 	}
 }
 
-void kcl_gpu_solver(std::string filename, unsigned k, AccType &total, size_t N_CHUNK = 1) {
+void kcl_gpu_solver(std::string fname, unsigned k, AccType &total, size_t N_CHUNK = 1) {
 	GraphGPU graph_cpu, graph_gpu;
+	graph_cpu.read(fname, false); // read graph into CPU memory
 	graph_cpu.copy_to_gpu(graph_gpu); // copy graph to GPU memory
-	graph_cpu.read(filename, false); // read graph into CPU memory
 	int nthreads = BLOCK_SIZE;
 	int nblocks = DIVIDE_INTO(m, nthreads);
 	EmbeddingList emb_list;
