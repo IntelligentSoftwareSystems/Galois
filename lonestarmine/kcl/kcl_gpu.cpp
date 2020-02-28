@@ -8,6 +8,7 @@ const char* desc = "Listing all k-cliques in an undirected graph";
 const char* url  = 0;
 
 int main(int argc, char** argv) {
+	LonestarMineStart(argc, argv, name, desc, url);
 	AccType total;
 	kcl_gpu_solver(filename, k, total);
 	std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";

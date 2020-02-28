@@ -22,8 +22,15 @@ protected:
 	int nedges;
 	bool device_graph;
 public:
-	CSRGraph() {}
+	CSRGraph() { init(); }
 	//~CSRGraph() {}
+	void init() {
+		row_start = edge_dst = NULL;
+		edge_data = NULL;
+		node_data = NULL;
+		nnodes = nedges = 0;
+		device_graph = false;
+	}
 	int get_nnodes() { return nnodes; }
 	int get_nedges() { return nedges; }
 	void clean() {
@@ -63,6 +70,7 @@ public:
 		return row_start[src+1];
 	};
 	void read(std::string file, bool read_edge_data) {
+		std::cout << "Reading graph fomr file: " << file << "\n";
 		readFromGR(file.c_str(), read_edge_data);
 	}
 	void readFromGR(const char file[], bool read_edge_data) {
@@ -143,6 +151,7 @@ public:
 		assert(nnodes > 0);
 		assert(!device_graph);
 		if(row_start != NULL) return true;
+		std::cout << "Allocating memory on CPU\n";
 		size_t mem_usage = ((nnodes + 1) + nedges) * sizeof(index_type) + (nnodes) * sizeof(node_data_type);
 		if (!no_edge_data) mem_usage += (nedges) * sizeof(edge_data_type);
 		printf("Host memory for graph: %3u MB\n", mem_usage / 1048756);

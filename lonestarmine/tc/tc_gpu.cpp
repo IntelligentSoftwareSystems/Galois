@@ -8,6 +8,7 @@ const char* desc = "Counting triangles in an undirected graph";
 const char* url  = 0;
 
 int main(int argc, char** argv) {
+	LonestarMineStart(argc, argv, name, desc, url);
 	AccType total;
 	tc_gpu_solver(filename, total);
 	std::cout << "\n\ttotal_num_triangles = " << total << "\n\n";
