@@ -12,7 +12,7 @@ __device__ void printout_embedding(unsigned level, IndexT *emb) {
 	printf("%d]\n", emb[level]);
 }
 
-inline __device__ bool binary_search(GraphGPU graph, IndexT key, IndexT begin, IndexT end) {
+inline __device__ bool binary_search(CSRGraph graph, IndexT key, IndexT begin, IndexT end) {
 	assert(begin < end);
 	int l = begin;
 	int r = end-1;
@@ -40,7 +40,7 @@ inline __device__ bool binary_search(IndexT *column_indices, IndexT key, IndexT 
 	return false;
 }
 
-inline __device__ unsigned intersect_dag_merge(IndexT p, IndexT q, GraphGPU graph) {
+inline __device__ unsigned intersect_dag_merge(IndexT p, IndexT q, CSRGraph graph) {
 	unsigned count = 0;
 	IndexT p_start, p_end, q_start, q_end, p_it, q_it;
 	p_start = graph.edge_begin(p);
@@ -61,7 +61,7 @@ inline __device__ unsigned intersect_dag_merge(IndexT p, IndexT q, GraphGPU grap
 	return count;
 }
 
-inline __device__ bool is_connected(IndexT a, IndexT b, GraphGPU graph) {
+inline __device__ bool is_connected(IndexT a, IndexT b, CSRGraph graph) {
 	if (graph.getOutDegree(a) == 0 || graph.getOutDegree(b) == 0) return false;
 	IndexT key = a;
 	IndexT search = b;
@@ -83,7 +83,7 @@ inline __device__ bool is_connected(IndexT a, IndexT b, GraphGPU graph) {
 	return false;
 }
 
-inline __device__ bool is_connected_dag(IndexT key, IndexT search, GraphGPU graph) {
+inline __device__ bool is_connected_dag(IndexT key, IndexT search, CSRGraph graph) {
 	if (graph.getOutDegree(search) == 0) return false;
 	IndexT begin = graph.edge_begin(search);
 	IndexT end = graph.edge_end(search);
@@ -99,7 +99,7 @@ inline __device__ bool is_connected_dag(IndexT key, IndexT search, GraphGPU grap
 	return false;
 }
 
-inline __device__ bool is_vertexInduced_automorphism(unsigned n, IndexT *emb, unsigned idx, IndexT src, IndexT dst, GraphGPU g) {
+inline __device__ bool is_vertexInduced_automorphism(unsigned n, IndexT *emb, unsigned idx, IndexT src, IndexT dst, CSRGraph g) {
 	// the new vertex id should be larger than the first vertex id
 	if (dst <= emb[0]) return true;
 	// the new vertex should not already exist in the embedding
@@ -115,7 +115,7 @@ inline __device__ bool is_vertexInduced_automorphism(unsigned n, IndexT *emb, un
 }
 
 // count 3-motifs
-inline __device__ unsigned find_3motif_pattern_id(unsigned idx, IndexT dst, IndexT* emb, GraphGPU g, unsigned pos = 0) {
+inline __device__ unsigned find_3motif_pattern_id(unsigned idx, IndexT dst, IndexT* emb, CSRGraph g, unsigned pos = 0) {
 	unsigned pid = 1; // 3-chain
 	if (idx == 0) {
 		if (is_connected(emb[1], dst, g)) pid = 0; // triangle
@@ -126,7 +126,7 @@ inline __device__ unsigned find_3motif_pattern_id(unsigned idx, IndexT dst, Inde
 	return pid;
 }
 // count 4-motifs
-inline __device__ unsigned find_4motif_pattern_id(unsigned n, unsigned idx, IndexT dst, IndexT* emb, unsigned pattern, GraphGPU g, unsigned pos = 0) {
+inline __device__ unsigned find_4motif_pattern_id(unsigned n, unsigned idx, IndexT dst, IndexT* emb, unsigned pattern, CSRGraph g, unsigned pos = 0) {
 	unsigned pid = pattern;
 	unsigned num_edges = 1;
 	if (pid == 0) { // extending a triangle
@@ -169,11 +169,11 @@ inline __device__ unsigned find_4motif_pattern_id(unsigned n, unsigned idx, Inde
 	return pid;
 }
 
-inline __device__ unsigned intersect_dag(IndexT a, IndexT b, GraphGPU g) {
+inline __device__ unsigned intersect_dag(IndexT a, IndexT b, CSRGraph g) {
 	return intersect_dag_merge(a, b, g);
 }
 
-inline __device__ bool is_all_connected_dag(IndexT dst, IndexT *emb, IndexT end, GraphGPU g) {
+inline __device__ bool is_all_connected_dag(IndexT dst, IndexT *emb, IndexT end, CSRGraph g) {
 	bool all_connected = true;
 	for(IndexT i = 0; i < end; ++i) {
 		IndexT from = emb[i];

@@ -1,5 +1,3 @@
-app(kcl kcl.cpp)
-app(kcl_gpu kcl_gpu.cpp)
 mineApp(kcl)
 #app(kcl_naive kcl_naive.cpp)
 #app(kcl_queue kcl_queue.cpp)

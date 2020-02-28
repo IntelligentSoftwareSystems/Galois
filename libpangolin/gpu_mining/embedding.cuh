@@ -11,9 +11,9 @@ public:
 	//Embedding(const Embedding &emb) { size_ = emb.size(); elements = emb.elements; }
 	~Embedding() { }
 	__device__ IndexT get_vertex(unsigned i) const { return elements[i].get_vid(); }
-	__device__ BYTE get_history(unsigned i) const { return elements[i].get_his(); }
-	__device__ BYTE get_label(unsigned i) const { return elements[i].get_vlabel(); }
-	__device__ BYTE get_key(unsigned i) const { return elements[i].get_key(); }
+	__device__ history_type get_history(unsigned i) const { return elements[i].get_his(); }
+	__device__ node_data_type get_label(unsigned i) const { return elements[i].get_vlabel(); }
+	__device__ key_type get_key(unsigned i) const { return elements[i].get_key(); }
 	__device__ bool empty() const { return size_ == 0; }
 	__device__ size_t size() const { return size_; }
 	__device__ ElementTy& back() { return elements[size_-1]; }
@@ -66,33 +66,33 @@ public:
 		max_level = max_size;
 		h_vid_lists = (IndexT **)malloc(max_level * sizeof(IndexT*));
 		h_idx_lists = (IndexT **)malloc(max_level * sizeof(IndexT*));
-		CUDA_SAFE_CALL(cudaMalloc(&d_vid_lists, max_level * sizeof(IndexT*)));
-		CUDA_SAFE_CALL(cudaMalloc(&d_idx_lists, max_level * sizeof(IndexT*)));
+		check_cuda(cudaMalloc(&d_vid_lists, max_level * sizeof(IndexT*)));
+		check_cuda(cudaMalloc(&d_idx_lists, max_level * sizeof(IndexT*)));
 		#ifdef ENABLE_LABEL
-		h_his_lists = (BYTE **)malloc(max_level * sizeof(BYTE*));
-		CUDA_SAFE_CALL(cudaMalloc(&d_his_lists, max_level * sizeof(BYTE*)));
+		h_his_lists = (history_type **)malloc(max_level * sizeof(history_type*));
+		check_cuda(cudaMalloc(&d_his_lists, max_level * sizeof(history_type*)));
 		#endif
-		sizes.resize(max_level);
+		sizes = new size_t[max_level];
 		sizes[0] = 0;
 		int nnz = nedges;
 		if (!use_dag) nnz = nnz / 2;
 		sizes[1] = nnz;
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_vid_lists[1], nnz * sizeof(IndexT)));
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_idx_lists[1], nnz * sizeof(IndexT)));
-		CUDA_SAFE_CALL(cudaMemcpy(d_vid_lists, h_vid_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_idx_lists, h_idx_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMalloc((void **)&h_vid_lists[1], nnz * sizeof(IndexT)));
+		check_cuda(cudaMalloc((void **)&h_idx_lists[1], nnz * sizeof(IndexT)));
+		check_cuda(cudaMemcpy(d_vid_lists, h_vid_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(d_idx_lists, h_idx_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
 		#ifdef ENABLE_LABEL
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_his_lists[1], nnz * sizeof(BYTE)));
-		CUDA_SAFE_CALL(cudaMemcpy(d_his_lists, h_his_lists, max_level * sizeof(BYTE*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMalloc((void **)&h_his_lists[1], nnz * sizeof(history_type)));
+		check_cuda(cudaMemcpy(d_his_lists, h_his_lists, max_level * sizeof(history_type*), cudaMemcpyHostToDevice));
 		#endif
 	}
-	void init_cpu(Graph *graph, bool is_dag = false) {
-		int nnz = graph->num_edges();
+	void init_cpu(CSRGraph *graph, bool is_dag = false) {
+		int nnz = graph->get_nedges();
 		if (!is_dag) nnz = nnz / 2;
 		IndexT *vid_list = (IndexT *)malloc(nnz*sizeof(IndexT));
 		IndexT *idx_list = (IndexT *)malloc(nnz*sizeof(IndexT));
 		int eid = 0;
-		for (int src = 0; src < graph->num_vertices(); src ++) {
+		for (int src = 0; src < graph->get_nnodes(); src ++) {
 			IndexT row_begin = graph->edge_begin(src);
 			IndexT row_end = graph->edge_end(src);
 			for (IndexT e = row_begin; e < row_end; e++) {
@@ -104,19 +104,19 @@ public:
 				}
 			}
 		}
-		CUDA_SAFE_CALL(cudaMemcpy(h_vid_lists[1], vid_list, nnz * sizeof(IndexT), cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(h_idx_lists[1], idx_list, nnz * sizeof(IndexT), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(h_vid_lists[1], vid_list, nnz * sizeof(IndexT), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(h_idx_lists[1], idx_list, nnz * sizeof(IndexT), cudaMemcpyHostToDevice));
 		#ifdef ENABLE_LABEL
-		CUDA_SAFE_CALL(cudaMemset(h_his_lists[1], 0, nnz * sizeof(BYTE)));
+		check_cuda(cudaMemset(h_his_lists[1], 0, nnz * sizeof(history_type)));
 		#endif
 	}
 	__device__ IndexT get_vid(unsigned level, IndexT id) const { return d_vid_lists[level][id]; }
 	__device__ IndexT get_idx(unsigned level, IndexT id) const { return d_idx_lists[level][id]; }
-	__device__ BYTE get_his(unsigned level, IndexT id) const { return d_his_lists[level][id]; }
+	__device__ history_type get_his(unsigned level, IndexT id) const { return d_his_lists[level][id]; }
 	__device__ unsigned get_pid(IndexT id) const { return pid_list[id]; }
 	__device__ void set_vid(unsigned level, IndexT id, IndexT vid) { d_vid_lists[level][id] = vid; }
 	__device__ void set_idx(unsigned level, IndexT id, IndexT idx) { d_idx_lists[level][id] = idx; }
-	__device__ void set_his(unsigned level, IndexT id, BYTE lab) { d_his_lists[level][id] = lab; }
+	__device__ void set_his(unsigned level, IndexT id, history_type lab) { d_his_lists[level][id] = lab; }
 	__device__ void set_pid(IndexT id, unsigned pid) { pid_list[id] = pid; }
 	size_t size() const { return sizes[last_level]; }
 	size_t size(unsigned level) const { return sizes[level]; }
@@ -126,26 +126,26 @@ public:
 	void add_level(unsigned size) { // TODO: this size could be larger than 2^32, when running LiveJournal and even larger graphs
 		last_level ++;
 		assert(last_level < max_level);
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_vid_lists[last_level], size * sizeof(IndexT)));
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_idx_lists[last_level], size * sizeof(IndexT)));
+		check_cuda(cudaMalloc((void **)&h_vid_lists[last_level], size * sizeof(IndexT)));
+		check_cuda(cudaMalloc((void **)&h_idx_lists[last_level], size * sizeof(IndexT)));
 		#ifdef ENABLE_LABEL
-		CUDA_SAFE_CALL(cudaMalloc((void **)&h_his_lists[last_level], size * sizeof(BYTE)));
+		check_cuda(cudaMalloc((void **)&h_his_lists[last_level], size * sizeof(history_type)));
 		#endif
 		#ifdef USE_PID
-		CUDA_SAFE_CALL(cudaMalloc((void **)&pid_list, size * sizeof(unsigned)));
+		check_cuda(cudaMalloc((void **)&pid_list, size * sizeof(unsigned)));
 		#endif
-		CUDA_SAFE_CALL(cudaMemcpy(d_vid_lists, h_vid_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_idx_lists, h_idx_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(d_vid_lists, h_vid_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(d_idx_lists, h_idx_lists, max_level * sizeof(IndexT*), cudaMemcpyHostToDevice));
 		#ifdef ENABLE_LABEL
-		CUDA_SAFE_CALL(cudaMemcpy(d_his_lists, h_his_lists, max_level * sizeof(BYTE*), cudaMemcpyHostToDevice));
+		check_cuda(cudaMemcpy(d_his_lists, h_his_lists, max_level * sizeof(history_type*), cudaMemcpyHostToDevice));
 		#endif
 		sizes[last_level] = size;
 	}
 	void remove_tail(unsigned idx) { sizes[last_level] = idx; }
 	void reset_level() {
 		for (size_t i = 2; i <= last_level; i ++) {
-			CUDA_SAFE_CALL(cudaFree(h_vid_lists[i]));
-			CUDA_SAFE_CALL(cudaFree(h_idx_lists[i]));
+			check_cuda(cudaFree(h_vid_lists[i]));
+			check_cuda(cudaFree(h_idx_lists[i]));
 		}
 		last_level = 1;
 	}
@@ -173,10 +173,10 @@ public:
 		}
 		emb[0] = idx;
 	}
-	__device__ void get_edge_embedding(unsigned level, unsigned pos, IndexT *vids, BYTE *hiss) {
+	__device__ void get_edge_embedding(unsigned level, unsigned pos, IndexT *vids, history_type *hiss) {
 		IndexT vid = get_vid(level, pos);
 		IndexT idx = get_idx(level, pos);
-		BYTE his = get_his(level, pos);
+		history_type his = get_his(level, pos);
 		vids[level] = vid;
 		hiss[level] = his;
 		for (unsigned l = 1; l < level; l ++) {
@@ -193,17 +193,17 @@ public:
 private:
 	unsigned max_level;
 	unsigned last_level;
-	std::vector<size_t> sizes;
+	size_t *sizes;
 	unsigned *pid_list;
 	IndexT** h_idx_lists;
 	IndexT** h_vid_lists;
-	BYTE** h_his_lists;
+	history_type** h_his_lists;
 	IndexT** d_idx_lists;
 	IndexT** d_vid_lists;
-	BYTE** d_his_lists;
+	history_type** d_his_lists;
 };
 
-__global__ void init_gpu_dag(int m, GraphGPU graph, EmbeddingList emb_list) {
+__global__ void init_gpu_dag(int m, CSRGraph graph, EmbeddingList emb_list) {
 	unsigned src = blockIdx.x * blockDim.x + threadIdx.x;
 	if (src < m) {
 		IndexT row_begin = graph.edge_begin(src);
@@ -216,19 +216,19 @@ __global__ void init_gpu_dag(int m, GraphGPU graph, EmbeddingList emb_list) {
 	}
 }
 
-__global__ void init_alloc(int m, GraphGPU graph, EmbeddingList emb_list, IndexT *num_emb) {
+__global__ void init_alloc(int m, CSRGraph graph, EmbeddingList emb_list, IndexT *num_emb) {
 	unsigned src = blockIdx.x * blockDim.x + threadIdx.x;
 	if (src < m) {
 		num_emb[src] = 0;
 		#ifdef ENABLE_LABEL
-		BYTE src_label = graph.getData(src);
+		node_data_type src_label = graph.getData(src);
 		#endif
 		IndexT row_begin = graph.edge_begin(src);
 		IndexT row_end = graph.edge_end(src);
 		for (IndexT e = row_begin; e < row_end; e++) {
 			IndexT dst = graph.getEdgeDst(e);
 			#ifdef ENABLE_LABEL
-			BYTE dst_label = graph.getData(dst);
+			node_data_type dst_label = graph.getData(dst);
 			#endif
 			#ifdef ENABLE_LABEL
 			if (src_label <= dst_label) num_emb[src] ++;
@@ -239,11 +239,11 @@ __global__ void init_alloc(int m, GraphGPU graph, EmbeddingList emb_list, IndexT
 	}
 }
 
-__global__ void init_insert(int m, GraphGPU graph, EmbeddingList emb_list, IndexT *indices) {
+__global__ void init_insert(int m, CSRGraph graph, EmbeddingList emb_list, IndexT *indices) {
 	unsigned src = blockIdx.x * blockDim.x + threadIdx.x;
 	if (src < m) {
 		#ifdef ENABLE_LABEL
-		BYTE src_label = graph.getData(src);
+		node_data_type src_label = graph.getData(src);
 		#endif
 		IndexT start = indices[src];
 		IndexT row_begin = graph.edge_begin(src);
@@ -251,7 +251,7 @@ __global__ void init_insert(int m, GraphGPU graph, EmbeddingList emb_list, Index
 		for (IndexT e = row_begin; e < row_end; e++) {
 			IndexT dst = graph.getEdgeDst(e);
 			#ifdef ENABLE_LABEL
-			BYTE dst_label = graph.getData(dst);
+			node_data_type dst_label = graph.getData(dst);
 			#endif
 			#ifdef ENABLE_LABEL
 			if (src_label <= dst_label) {

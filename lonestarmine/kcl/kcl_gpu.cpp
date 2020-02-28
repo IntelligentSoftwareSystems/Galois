@@ -9,7 +9,7 @@ const char* url  = 0;
 
 int main(int argc, char** argv) {
 	AccType total;
-	//kcl_gpu_solver(filename, k, total);
+	kcl_gpu_solver(filename, k, total);
 	std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
 	return 0;
 }

@@ -1,85 +1,70 @@
 #pragma once
 #include <cassert>
 #include <fstream>
+#include <fcntl.h>
+#include <cassert>
+#include <unistd.h>
+#include <stdint.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include "types.cuh"
 #include "checker.h"
 
-typedef unsigned IndexT;
-typedef unsigned index_type;
-typedef int edge_data_type;
-typedef int node_data_type;
-
-class GraphGPU {
+class CSRGraph {
 protected:
-	IndexT *d_row_offsets;
-	IndexT *d_column_indices;
-	BYTE *d_labels;
-	int *d_degrees;
-	int num_vertices;
-	int num_edges;
-	int nedges;
+	IndexT *row_start;
+	IndexT *edge_dst;
+	node_data_type *node_data;
+	edge_data_type *edge_data;
+	int *degrees;
 	int nnodes;
+	int nedges;
+	bool device_graph;
 public:
-	GraphGPU() {}
-	~GraphGPU() {}
+	CSRGraph() {}
+	//~CSRGraph() {}
+	int get_nnodes() { return nnodes; }
+	int get_nedges() { return nedges; }
 	void clean() {
-		CUDA_SAFE_CALL(cudaFree(d_row_offsets));
-		CUDA_SAFE_CALL(cudaFree(d_column_indices));
+		check_cuda(cudaFree(row_start));
+		check_cuda(cudaFree(edge_dst));
 	}
-	/*
-	void init(Graph *hg) {
-		int m = hg->num_vertices();
-		int nnz = hg->num_edges();
-		num_vertices = m;
-		num_edges = nnz;
-		IndexT *h_row_offsets = hg->out_rowptr();
-		IndexT *h_column_indices = hg->out_colidx();
-		int *h_degrees = (int *)malloc(m * sizeof(int));
-		for (int i = 0; i < m; i++) h_degrees[i] = h_row_offsets[i + 1] - h_row_offsets[i];
-		CUDA_SAFE_CALL(cudaMalloc((void **)&d_row_offsets, (m + 1) * sizeof(IndexT)));
-		CUDA_SAFE_CALL(cudaMalloc((void **)&d_column_indices, nnz * sizeof(IndexT)));
-		CUDA_SAFE_CALL(cudaMemcpy(d_row_offsets, h_row_offsets, (m + 1) * sizeof(IndexT), cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_column_indices, h_column_indices, nnz * sizeof(IndexT), cudaMemcpyHostToDevice));
-		#ifdef ENABLE_LABEL
-		BYTE *h_labels = (BYTE *)malloc(m * sizeof(BYTE));
-		for (int i = 0; i < m; i++) h_labels[i] = hg->getData(i);
-		CUDA_SAFE_CALL(cudaMalloc((void **)&d_labels, m * sizeof(BYTE)));
-		CUDA_SAFE_CALL(cudaMemcpy(d_labels, h_labels, m * sizeof(BYTE), cudaMemcpyHostToDevice));
-		#endif
-	}
-	*/
-	__device__ __host__ bool valid_node(IndexT node) { return (node < num_vertices); }
-	__device__ __host__ bool valid_edge(IndexT edge) { return (edge < num_edges); }
+	__device__ __host__ bool valid_node(IndexT node) { return (node < nnodes); }
+	__device__ __host__ bool valid_edge(IndexT edge) { return (edge < nedges); }
 	__device__ __host__ IndexT getOutDegree(unsigned src) {
-		assert(src < num_vertices);
-		return d_row_offsets[src+1] - d_row_offsets[src];
+		assert(src < nnodes);
+		return row_start[src+1] - row_start[src];
 	};
 	__device__ __host__ IndexT getDestination(unsigned src, unsigned edge) {
-		assert(src < num_vertices);
+		assert(src < nnodes);
 		assert(edge < getOutDegree(src));
-		IndexT abs_edge = d_row_offsets[src] + edge;
-		assert(abs_edge < num_edges);
-		return d_column_indices[abs_edge];
+		IndexT abs_edge = row_start[src] + edge;
+		assert(abs_edge < nedges);
+		return edge_dst[abs_edge];
 	};
 	__device__ __host__ IndexT getAbsDestination(unsigned abs_edge) {
-		assert(abs_edge < num_edges);
-		return d_column_indices[abs_edge];
+		assert(abs_edge < nedges);
+		return edge_dst[abs_edge];
 	};
 	inline __device__ __host__ IndexT getEdgeDst(unsigned edge) {
-		assert(edge < num_edges);
-		return d_column_indices[edge];
+		assert(edge < nedges);
+		return edge_dst[edge];
 	};
-	inline __device__ __host__ BYTE getData(unsigned vid) {
-		return d_labels[vid];
+	inline __device__ __host__ node_data_type getData(unsigned vid) {
+		return node_data[vid];
 	}
 	inline __device__ __host__ IndexT edge_begin(unsigned src) {
-		assert(src <= num_vertices);
-		return d_row_offsets[src];
+		assert(src <= nnodes);
+		return row_start[src];
 	};
 	inline __device__ __host__ IndexT edge_end(unsigned src) {
-		assert(src <= num_vertices);
-		return d_row_offsets[src+1];
+		assert(src <= nnodes);
+		return row_start[src+1];
 	};
-
+	void read(std::string file, bool read_edge_data) {
+		readFromGR(file.c_str(), read_edge_data);
+	}
 	void readFromGR(const char file[], bool read_edge_data) {
 		std::ifstream cfile;
 		cfile.open(file);
@@ -87,7 +72,7 @@ public:
 		int masterFD = open(file, O_RDONLY);
 		if (masterFD == -1) {
 			printf("FileGraph::structureFromFile: unable to open %s.\n", file);
-			return 1;
+			return;
 		}
 		struct stat buf;
 		int f = fstat(masterFD, &buf);
@@ -104,7 +89,7 @@ public:
 			abort();
 		}
 		//ggc::Timer t("graphreader");
-		t.start();
+		//t.start();
 		//parse file
 		uint64_t* fptr = (uint64_t*)m;
 		__attribute__((unused)) uint64_t version = le64toh(*fptr++);
@@ -141,7 +126,7 @@ public:
 		cfile.close();	// probably galois doesn't close its file due to mmap.
 		//t.stop();
 		//printf("read %lld bytes in %d ms (%0.2f MB/s)\n\r\n", masterLength, t.duration_ms(), (masterLength / 1000.0) / (t.duration_ms()));
-		return 0;
+		return;
 	}
 
 	void copy_to_gpu(struct CSRGraph &copygraph) {
@@ -154,4 +139,28 @@ public:
 		check_cuda(cudaMemcpy(copygraph.row_start, row_start, (nnodes+1) * sizeof(index_type), cudaMemcpyHostToDevice));
 	}
 
+	unsigned allocOnHost(bool no_edge_data) {
+		assert(nnodes > 0);
+		assert(!device_graph);
+		if(row_start != NULL) return true;
+		size_t mem_usage = ((nnodes + 1) + nedges) * sizeof(index_type) + (nnodes) * sizeof(node_data_type);
+		if (!no_edge_data) mem_usage += (nedges) * sizeof(edge_data_type);
+		printf("Host memory for graph: %3u MB\n", mem_usage / 1048756);
+		row_start = (index_type *) calloc(nnodes+1, sizeof(index_type));
+		edge_dst  = (index_type *) calloc(nedges, sizeof(index_type));
+		if (!no_edge_data) edge_data = (edge_data_type *) calloc(nedges, sizeof(edge_data_type));
+		node_data = (node_data_type *) calloc(nnodes, sizeof(node_data_type));
+		return ((no_edge_data || edge_data) && row_start && edge_dst && node_data);
+	}
+
+	unsigned allocOnDevice(bool no_edge_data) {
+		if(edge_dst != NULL) return true;  
+		assert(edge_dst == NULL); // make sure not already allocated
+		check_cuda(cudaMalloc((void **) &edge_dst, nedges * sizeof(index_type)));
+		check_cuda(cudaMalloc((void **) &row_start, (nnodes+1) * sizeof(index_type)));
+		if (!no_edge_data) check_cuda(cudaMalloc((void **) &edge_data, nedges * sizeof(edge_data_type)));
+		check_cuda(cudaMalloc((void **) &node_data, nnodes * sizeof(node_data_type)));
+		device_graph = true;
+		return (edge_dst && (no_edge_data || edge_data) && row_start && node_data);
+	}
 };

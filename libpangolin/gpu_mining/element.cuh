@@ -1,5 +1,6 @@
 #ifndef ELEMENT_CUH_
 #define ELEMENT_CUH_
+#include "types.cuh"
 
 struct SimpleElement {
 protected:
@@ -7,15 +8,15 @@ protected:
 public:
 	SimpleElement() : vertex_id(0) { }
 	SimpleElement(IndexT _vertex_id) : vertex_id(_vertex_id) { }
-	SimpleElement(IndexT _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
-	SimpleElement(IndexT _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
+	SimpleElement(IndexT _vertex_id, edge_data_type _edge_label, node_data_type _vertex_label, history_type _history) : vertex_id(_vertex_id) { }
+	SimpleElement(IndexT _vertex_id, key_type _key_index, edge_data_type _edge_label, node_data_type _vertex_label, history_type _history) : vertex_id(_vertex_id) { }
 	~SimpleElement() { }
 	inline __device__ void set_vertex_id(IndexT new_id) { vertex_id = new_id; }
-	inline __device__ void set_history_info(BYTE his) { }
-	inline __device__ void set_vertex_label(BYTE lab) { }
+	inline __device__ void set_history_info(history_type his) { }
+	inline __device__ void set_vertex_label(node_data_type lab) { }
 	inline __device__ IndexT get_vid() const { return vertex_id; }
-	inline __device__ BYTE get_his() const { return 0; }
-	inline __device__ BYTE get_key() const { return 0; }
+	inline __device__ history_type get_his() const { return 0; }
+	inline __device__ key_type get_key() const { return 0; }
 	inline __device__ int cmp(const SimpleElement& other) const {
 		if(vertex_id < other.get_vid()) return -1;
 		if(vertex_id > other.get_vid()) return 1;
