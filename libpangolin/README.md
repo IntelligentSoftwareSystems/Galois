@@ -39,6 +39,7 @@ BUILD
 ===========
 
 1. Run cmake at BUILD directory `cd build; cmake -DUSE_PANGOLIN=1 ../`
+To enable GPU mining, do `cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
 
 2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
 

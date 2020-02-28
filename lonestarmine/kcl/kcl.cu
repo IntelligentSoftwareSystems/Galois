@@ -150,11 +150,11 @@ void kcl_gpu_solver(std::string fname, unsigned k, AccType &total, size_t N_CHUN
 	int m = graph_cpu.get_nnodes();
 	int nnz = graph_cpu.get_nedges();
 	graph_cpu.copy_to_gpu(graph_gpu); // copy graph to GPU memory
+	EmbeddingList emb_list;
+	emb_list.init(nnz, k);
 
 	int nthreads = BLOCK_SIZE;
 	int nblocks = DIVIDE_INTO(m, nthreads);
-	EmbeddingList emb_list;
-	emb_list.init(nnz, k);
 	init_gpu_dag<<<nblocks, nthreads>>>(m, graph_gpu, emb_list);
 	check_cuda(cudaDeviceSynchronize());
 
