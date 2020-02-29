@@ -1,5 +1,6 @@
 // Copyright 2019, University of Texas at Austin
 // Authors: Xuhao Chen <cxh@utexas.edu>
+#define EDGE_INDUCED
 #include "fsm.h"
 #include "../lonestarmine.h"
 
