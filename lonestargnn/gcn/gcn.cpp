@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
   Ttrain.stop();
 
   if (do_test) {
+    std::cout << "\n";
     // test using test samples
     size_t n        = network.get_nnodes();
     acc_t test_loss = 0.0, test_acc = 0.0;
@@ -44,7 +45,7 @@ int main(int argc, char** argv) {
     Ttest.start();
     double test_time = network.evaluate(test_begin, test_end, test_count,
                                         &test_mask[0], test_loss, test_acc);
-    std::cout << "\nTesting: test_loss = " << test_loss
+    std::cout << "Testing: test_loss = " << test_loss
               << " test_acc = " << test_acc << " test_time = " << test_time
               << "\n";
     Ttest.stop();

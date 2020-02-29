@@ -99,7 +99,7 @@ inline bool bernoulli(float_t p) {
 inline size_t read_masks(std::string dataset_str, std::string mask_type,
                          size_t& begin, size_t& end,
                          std::vector<uint8_t>& masks) {
-  if (dataset_str != "citeseer" && dataset_str != "cora") {
+  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed") {
     std::cout << "Dataset currently not supported\n";
     exit(1);
   }
@@ -123,8 +123,8 @@ inline size_t read_masks(std::string dataset_str, std::string mask_type,
     }
     i++;
   }
-  // std::cout << mask_type + "_mask range: [" << begin << ", " << end
-  //	<< ") Number of valid samples: " << sample_count << "\n";
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << "\n";
   in.close();
   return sample_count;
 }

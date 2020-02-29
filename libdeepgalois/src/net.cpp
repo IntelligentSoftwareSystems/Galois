@@ -8,7 +8,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
   context->norm_factor_counting(); // pre-compute normalizing factor
   num_epochs = epochs;
 
-  std::cout << "Reading label masks ... ";
+  //std::cout << "Reading label masks ... ";
   train_mask.resize(num_samples, 0);
   val_mask.resize(num_samples, 0);
   // get testing and validation sets
@@ -25,7 +25,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1) {
         read_masks(dataset_str, "train", train_begin, train_end, train_mask);
     val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask);
   }
-  std::cout << "Done\n";
+  //std::cout << "Done\n";
 
   num_layers = NUM_CONV_LAYERS + 1;
   // initialize feature metadata
