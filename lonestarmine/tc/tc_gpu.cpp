@@ -9,7 +9,11 @@ const char* url  = 0;
 
 int main(int argc, char** argv) {
 	LonestarMineStart(argc, argv, name, desc, url);
-	AccType total;
+	if (filetype != "gr") {
+		std::cout << "Only support gr format\n";
+		exit(1);
+	}
+	AccType total = 0;
 	tc_gpu_solver(filename, total);
 	std::cout << "\n\ttotal_num_triangles = " << total << "\n\n";
 	return 0;

@@ -146,7 +146,7 @@ __global__ void extend_insert(size_t begin, size_t end, unsigned level, CSRGraph
 
 void kcl_gpu_solver(std::string fname, unsigned k, AccType &total, size_t N_CHUNK) {
 	CSRGraph graph_cpu, graph_gpu;
-	graph_cpu.read(fname, false); // read graph into CPU memoryA
+	graph_cpu.read(fname, false, true); // read graph into CPU memory, use DAG
 	int m = graph_cpu.get_nnodes();
 	int nnz = graph_cpu.get_nedges();
 	graph_cpu.copy_to_gpu(graph_gpu); // copy graph to GPU memory

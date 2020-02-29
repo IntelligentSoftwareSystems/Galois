@@ -7,6 +7,7 @@ typedef uint8_t edge_data_type;
 typedef uint8_t node_data_type;
 typedef uint8_t key_type;
 typedef uint8_t history_type;
+typedef unsigned char SetType;
 typedef unsigned long long AccType;
 
 #define MAX_SIZE     5

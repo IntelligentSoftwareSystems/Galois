@@ -10,6 +10,10 @@ static int num_patterns[3] = {2, 6, 21};
 
 int main(int argc, char** argv) {
 	LonestarMineStart(argc, argv, name, desc, url);
+	if (filetype != "gr") {
+		std::cout << "Only support gr format\n";
+		exit(1);
+	}
 	int npatterns = num_patterns[k-3];
 	std::cout << k << "-motif has " << npatterns << " patterns in total\n";
 	std::vector<AccType> accumulators(npatterns);
