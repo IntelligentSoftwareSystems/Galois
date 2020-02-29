@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 		std::cout << "Only support adj format for FSM\n";
 		exit(1);
 	}
-	AccType total;
+	AccType total = 0;
 	fsm_gpu_solver(filename, k, minsup, total);
 	std::cout << "\n\ttotal_num_frequent_patterns = " << total << "\n\n";
 	return 0;
