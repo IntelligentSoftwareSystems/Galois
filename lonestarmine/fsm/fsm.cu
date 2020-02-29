@@ -82,7 +82,7 @@ __global__ void extend_alloc(unsigned m, unsigned level, CSRGraph graph, Embeddi
 	if(pos < m) {
 		emb_list.get_edge_embedding(level, pos, vid[tid], his[tid]);
 		num_new_emb[pos] = 0;
-		if (pos == 1) printf("src=%d, dst=%d\n", vid[tid][0], vid[tid][1]);
+		//if (pos == 1) printf("src=%d, dst=%d\n", vid[tid][0], vid[tid][1]);
 		for (unsigned i = 0; i < level+1; ++i) {
 			IndexT src = vid[tid][i];
 			IndexT row_begin = graph.edge_begin(src);
@@ -127,13 +127,11 @@ __global__ void init_aggregate(unsigned m, unsigned num_emb, CSRGraph graph, Emb
 		IndexT dst = emb_list.get_vid(1, pos);
 		node_data_type src_label = graph.getData(src);
 		node_data_type dst_label = graph.getData(dst);
-		//if (pos == 1) printf("src=%d, dst=%d, src_label=%d, dst_label=%d\n", src, dst, src_label, dst_label);
 		int pid = 0;
 		if (src_label <= dst_label)
 			pid = get_init_pattern_id(src_label, dst_label, nlabels);
 		else pid = get_init_pattern_id(dst_label, src_label, nlabels);
 		pids[pos] = pid;
-		//if (pos == 1) printf("pid = %d\n", pid);
 		if (src_label < dst_label) {
 			small_sets.set(pid, src);
 			large_sets.set(pid, dst);
@@ -441,12 +439,9 @@ void fsm_gpu_solver(std::string fname, unsigned k, unsigned minsup, AccType &tot
 		nblocks = (num_emb-1)/nthreads+1;
 		extend_alloc<<<nblocks, nthreads>>>(num_emb, level, graph_gpu, emb_list, num_new_emb);
 		CudaTest("solving extend_alloc failed");
-		//std::cout << "Extend_alloc Done\n";
 		thrust::exclusive_scan(thrust::device, num_new_emb, num_new_emb+num_emb+1, indices);
 		CudaTest("Scan failed");
-		//std::cout << "PrefixSum Done\n";
 		CUDA_SAFE_CALL(cudaMemcpy(&new_size, &indices[num_emb], sizeof(IndexT), cudaMemcpyDeviceToHost));
-		assert(new_size < 4294967296); // TODO: currently do not support vector size larger than 2^32
 		std::cout << "number of new embeddings: " << new_size << "\n";
 		emb_list.add_level(new_size);
 		extend_insert<<<nblocks, nthreads>>>(num_emb, level, graph_gpu, emb_list, indices);
