@@ -23,7 +23,6 @@ struct Edge {
 	IndexT dst;
 };
 
-std::vector<Edge> el;
 std::vector<std::vector<Edge> > vertices;
 
 class CSRGraph {
@@ -31,8 +30,6 @@ protected:
 	IndexT *row_start;
 	IndexT *edge_dst;
 	node_data_type *node_data;
-	//edge_data_type *edge_data;
-	IndexT *degrees;
 	int nnodes;
 	int nedges;
 	bool need_dag;
@@ -45,7 +42,6 @@ public:
 	void init() {
 		row_start = edge_dst = NULL;
 		node_data = NULL;
-		//edge_data = NULL;
 		nnodes = nedges = 0;
 		need_dag = false;
 		device_graph = false;
@@ -105,7 +101,6 @@ public:
 	void readFromGR(const char file[]) {
 		std::ifstream cfile;
 		cfile.open(file);
-		// copied from GaloisCpp/trunk/src/FileGraph.h
 		int masterFD = open(file, O_RDONLY);
 		if (masterFD == -1) {
 			printf("FileGraph::structureFromFile: unable to open %s.\n", file);
@@ -127,7 +122,6 @@ public:
 		}
 		Timer t;
 		t.Start();
-		//parse file
 		uint64_t* fptr = (uint64_t*)m;
 		__attribute__((unused)) uint64_t version = le64toh(*fptr++);
 		assert(version == 1);
@@ -140,12 +134,11 @@ public:
 		uint32_t *outs = fptr32; 
 		fptr32 += numEdges;
 		if (numEdges % 2) fptr32 += 1;
-		
-		// cuda.
 		nnodes = numNodes;
 		nedges = numEdges;
 		printf("nnodes=%d, nedges=%d, sizeEdge=%d.\n", nnodes, nedges, sizeEdgeTy);
-		allocOnHost();
+		row_start = (index_type *) calloc(nnodes+1, sizeof(index_type));
+		edge_dst  = (index_type *) calloc(nedges, sizeof(index_type));
 		row_start[0] = 0;
 		for (unsigned ii = 0; ii < nnodes; ++ii) {
 			row_start[ii+1] = le64toh(outIdx[ii]);
@@ -162,17 +155,16 @@ public:
 		double runtime = t.Millisecs();
 		printf("read %lld bytes in %.1f ms (%0.2f MB/s)\n\r\n", masterLength, runtime, (masterLength / 1000.0) / runtime);
 		if (need_dag) {
-			degrees = new IndexT[nnodes];
-			construct_from_csr();
+			reconstruct_from_csr();
 			SquishGraph();
-			MakeCSR();
-			delete degrees;
+			MakeCSR(vertices);
+			vertices.clear();
 		}
 		return;
 	}
-	void construct_from_csr() {
+	void reconstruct_from_csr() {
 		vertices.resize(nnodes);
-		std::cout << "constructing from CSR graph ... ";
+		std::cout << "Reconstructing from CSR graph ... ";
 		for (int i = 0; i < nnodes; i++) {
 			std::vector<Edge> neighbors;
 			for (IndexT j = row_start[i]; j < row_start[i+1]; j ++)
@@ -199,70 +191,68 @@ public:
 		fclose(fd);
 		nnodes = numNodes;
 		printf("nnodes=%d.\n", nnodes);
-		allocOnHost();
 		std::ifstream is;
 		is.open(filename, std::ios::in);
 		char*line = new char[maxsize+1];
 		std::vector<std::string> result;
+		nedges = 0;
+		node_data = (node_data_type *) calloc(nnodes, sizeof(node_data_type));
+		vertices.resize(nnodes);
+		std::vector<Edge> neighbors;
+		for (size_t i = 0; i < nnodes; i++)
+			vertices.push_back(neighbors);
+		int line_count = 0;
 		while(is.getline(line, maxsize+1)) {
 			result.clear();
 			split(line, result);
 			IndexT src = atoi(result[0].c_str());
+			assert(src == line_count);
+			assert(src < nnodes);
 			node_data[src] = atoi(result[1].c_str());
-			std::set<IndexT> neighbors;
 			for(size_t i = 2; i < result.size(); i++) {
 				IndexT dst = atoi(result[i].c_str());
 				if (src == dst) continue; // remove self-loop
-				neighbors.insert(dst); // remove redundant edge
+				vertices[src].push_back(Edge(src,dst));
+				nedges ++;
 			}
-			for (auto it = neighbors.begin(); it != neighbors.end(); ++it)
-				el.push_back(Edge(src, *it));
+			line_count ++;
 		}
 		is.close();
+		printf("nedges=%d\n", nedges);
 		int num_labels = count_unique_labels();
 		std::cout << "Number of unique vertex label values: " << num_labels << std::endl;
-		nedges = el.size();
-		degrees = new IndexT[nnodes];
-		std::fill(degrees, degrees+nnodes, 0);
-		construct_from_edgelist();
 		SquishGraph();
-		MakeCSR();
-		delete degrees;
+		printf("nedges after clean: %d\n", nedges);
+		row_start = (index_type *) calloc(nnodes+1, sizeof(index_type));
+		edge_dst  = (index_type *) calloc(nedges, sizeof(index_type));
+		MakeCSR(vertices);
+		vertices.clear();
 		return num_labels;
 	}
 
-	void MakeCSR() {
-		for (size_t i = 0; i < nnodes; i ++) degrees[i] = vertices[i].size();
+	void MakeCSR(const std::vector<std::vector<Edge> > vert) {
+		printf("Constructing CSR graph ... ");
 		std::vector<IndexT> offsets(nnodes + 1);
 		IndexT total = 0;
-		for (size_t n = 0; n < nnodes; n++) {
-			offsets[n] = total;
-			total += degrees[n];
+		for (int i = 0; i < nnodes; i++) {
+			offsets[i] = total;
+			total += vert[i].size();
 		}
 		offsets[nnodes] = total;
 		assert(nedges == offsets[nnodes]);
+		assert(row_start != NULL);
 		for (size_t i = 0; i < nnodes+1; i ++) row_start[i] = offsets[i];
 		for (size_t i = 0; i < nnodes; i ++) {
-			for (auto it = vertices[i].begin(); it < vertices[i].end(); it ++) {
-				Edge e = *it;
+			for (auto e : vert[i]) {
+				if (i != e.src) std::cout << "[debug] i = " << i << ", src = " << e.src << ", dst = " << e.dst << "\n";
 				assert(i == e.src);
 				edge_dst[offsets[e.src]++] = e.dst;
 			}
 		}
-		vertices.clear();
+		printf("Done\n");
 	}
 
 	static bool compare_id(Edge a, Edge b) { return (a.dst < b.dst); }
-
-	void construct_from_edgelist() {
-		std::vector<Edge> neighbors;
-		for (size_t i = 0; i < nnodes; i++)
-			vertices.push_back(neighbors);
-		for (size_t i = 0; i < nedges; i ++)
-			vertices[el[i].src].push_back(el[i]);
-		el.clear();
-	}
-
 	void SquishGraph(bool remove_selfloops = true, bool remove_redundents = true) {
 		printf("Sorting the neighbor lists...");
 		for (size_t i = 0; i < nnodes; i ++)
@@ -303,18 +293,20 @@ public:
 		if(need_dag) {
 			int num_dag = 0;
 			std::cout << "Constructing DAG...";
-			for (size_t i = 0; i < nnodes; i ++)
-				degrees[i] = vertices[i].size();
+			IndexT * degrees = new IndexT[nnodes];
+			for (size_t i = 0; i < nnodes; i ++) degrees[i] = vertices[i].size();
 			for (size_t i = 0; i < nnodes; i ++) {
 				for (unsigned j = 0; j < vertices[i].size(); j ++) {
 					IndexT to = vertices[i][j].dst;
-					if (degrees[to] < degrees[i] || (degrees[to] == degrees[i] && to < i)) {
+					auto di = degrees[i];
+					if (degrees[to] < di || (degrees[to] == di && to < i)) {
 						vertices[i].erase(vertices[i].begin()+j);
 						num_dag ++;
 						j --;
 					}
 				}
 			}
+			delete degrees;
 			printf(" %d dag edges are removed\n", num_dag);
 			nedges -= num_dag;
 		}
@@ -345,7 +337,7 @@ public:
 	void copy_to_gpu(struct CSRGraph &copygraph) {
 		copygraph.nnodes = nnodes;
 		copygraph.nedges = nedges;
-		assert(copygraph.allocOnDevice());
+		assert(copygraph.allocOnDevice(use_node_data));
 		check_cuda(cudaMemcpy(copygraph.edge_dst, edge_dst, nedges * sizeof(index_type), cudaMemcpyHostToDevice));
 		check_cuda(cudaMemcpy(copygraph.row_start, row_start, (nnodes+1) * sizeof(index_type), cudaMemcpyHostToDevice));
 		if (use_node_data) 
@@ -368,12 +360,12 @@ public:
 		return ((!use_node_data || node_data) && row_start && edge_dst);
 	}
 
-	unsigned allocOnDevice() {
+	unsigned allocOnDevice(bool use_label) {
 		assert(edge_dst == NULL); // make sure not already allocated
 		device_graph = true;
 		check_cuda(cudaMalloc((void **) &edge_dst, nedges * sizeof(index_type)));
 		check_cuda(cudaMalloc((void **) &row_start, (nnodes+1) * sizeof(index_type)));
-		if (use_node_data) check_cuda(cudaMalloc((void **) &node_data, nnodes * sizeof(node_data_type)));
+		if (use_label) check_cuda(cudaMalloc((void **) &node_data, nnodes * sizeof(node_data_type)));
 		return (edge_dst && (!use_node_data || node_data) && row_start);
 	}
 };
