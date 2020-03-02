@@ -15,6 +15,8 @@ int main(int argc, char** argv) {
   network.construct_layers(); // default setting for now; can be customized by
                               // the user
   network.print_layers_info();
+
+  // tracks peak memory usage
   deepgalois::ResourceManager rm;
 
   // the optimizer used to update parameters, see optimizer.h for more details
@@ -27,7 +29,7 @@ int main(int argc, char** argv) {
   Ttrain.stop();
 
   if (do_test) {
-    std::cout << "\n";
+    galois::gPrint("\n");
     // test using test samples
     size_t n        = network.get_nnodes();
     acc_t test_loss = 0.0, test_acc = 0.0;
@@ -45,11 +47,10 @@ int main(int argc, char** argv) {
     Ttest.start();
     double test_time = network.evaluate(test_begin, test_end, test_count,
                                         &test_mask[0], test_loss, test_acc);
-    std::cout << "Testing: test_loss = " << test_loss
-              << " test_acc = " << test_acc << " test_time = " << test_time
-              << "\n";
+    galois::gPrint("Testing: test_loss = ", test_loss, " test_acc = ", test_acc,
+                   " test_time = ", test_time, "\n");
     Ttest.stop();
   }
-  std::cout << "\n" << rm.get_peak_memory() << "\n\n";
+  galois::gPrint("\n", rm.get_peak_memory(), "\n\n");
   return 0;
 }
