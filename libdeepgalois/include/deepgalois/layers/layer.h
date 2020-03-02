@@ -122,7 +122,7 @@ public:
   }
 
   //! use optimizer to update weights given gradient
-  void update_weight(optimizer* opt) {
+  void update_weight(deepgalois::optimizer* opt) {
     // vec_t diff;
     // prev()->merge_grads(&diff);
 #ifdef CPU_ONLY

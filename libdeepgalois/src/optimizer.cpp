@@ -1,6 +1,8 @@
 #include "deepgalois/optimizer.h"
 #include "galois/Galois.h"
 
+namespace deepgalois {
+
 void adagrad::update(const vec_t& dW, vec_t& W, bool parallelize) {
   vec_t& g = get<0>(W);
   if (parallelize) {
@@ -80,3 +82,5 @@ void nesterov_momentum::update(const vec_t& dW, vec_t& W, bool parallelize) {
       dWprev[i] = V;
     }, galois::loopname("nesterov_momentum_update"));
 }
+
+} // namespace deepgalois

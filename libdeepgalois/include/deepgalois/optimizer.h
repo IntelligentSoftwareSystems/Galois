@@ -1,5 +1,5 @@
 /**
- * Code modified from below link.
+ * Code taken/modified from below link.
  *
  * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/optimizers/optimizer.h
  * Copyright (c) 2013, Taiga Nomi and the respective contributors
@@ -8,12 +8,19 @@
  */
 #pragma once
 
+// TODO:
+// - use classes, not structs (modern C++)
+// - templatize this instead of using inheritance
+// - put optimizers in their own namespace
+
 #include <algorithm>
 #include <unordered_map>
 #include "deepgalois/types.h"
 #ifndef CPU_ONLY
 #include "deepgalois/math_functions.hh"
 #endif
+
+namespace deepgalois {
 
 // base class of optimizer
 // usesHessian : true if an optimizer uses hessian (2nd order derivative of loss
@@ -184,3 +191,5 @@ public:
   float_t lambda; // weight decay
   float_t mu;     // momentum
 };
+
+} // namespace deepgalois
