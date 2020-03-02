@@ -2,19 +2,24 @@
 #include "layer.h"
 #include "aggregator.h"
 
-/* GraphConv Layer
-    Parameters
-    ----------
-    x: int, number of samples.
-    y: int, Input feature size.
-    z: int, Output feature size.
-    dropout: bool, optional, if True, a dropout operation is applied before
-   other operations. norm : bool, optional, if True, the normalizer
-   :math:`c_{ij}` is applied. Default: ``True``. bias : bool, optional, if True,
-   adds a learnable bias to the output. Default: ``False``. activation: callable
-   activation function/layer or None, optional If not None, applies an
-   activation function to the updated node features. Default: ``None``.
-*/
+
+/**
+ * GraphConv Layer; based on DGL implementation
+ * https://docs.dgl.ai/en/0.4.x/_modules/dgl/nn/pytorch/conv/graphconv.html
+ *
+ *   Parameters
+ *   ----------
+ *   x: int, number of samples.
+ *   y: int, Input feature size.
+ *   z: int, Output feature size.
+ *   dropout: bool, optional, if True, a dropout operation is applied before
+ *   other operations.
+ *   norm : bool, optional, if True, the normalizer :math:`c_{ij}` is applied.
+ *          Default: ``True``.
+ *   bias : bool, optional, if True, adds a learnable bias to the output.
+ *          Default: ``False``.
+ *   activation: default false
+ */
 class graph_conv_layer : public layer {
 public:
   graph_conv_layer(unsigned level, bool act, bool norm, bool bias, bool dropout,

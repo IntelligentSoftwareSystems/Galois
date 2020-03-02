@@ -73,9 +73,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
                 &dropout_mask[i * y], &in_temp[i * y]);
       }, galois::loopname("dropout"));
     matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
-  } else
+  } else {
     matmul1D1D(x, z, y, in_data, &W[0], out_temp); // x*y; y*z; x*z
+  }
+
   aggregate(z, context->graph_cpu, out_temp, out_data);
+
   if (act_) {
     galois::do_all(
         galois::iterate((size_t)0, x),
@@ -95,7 +98,10 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
           out_temp[i * z + j] = out_data[i * z + j] > float_t(0)
                                 ? out_grad[i * z + j] : float_t(0);
       }, galois::loopname("d_relu"));
-  } else copy1D1D(x * z, out_grad, out_temp); // TODO: avoid copying
+  } else {
+    copy1D1D(x * z, out_grad, out_temp); // TODO: avoid copying
+  }
+
   if (level_ != 0) { // no need to calculate in_grad for the first layer
     vec_t trans_W(z * y);
     transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
@@ -113,6 +119,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
         galois::loopname("d_dropout"));
     }
   }
+
   // calculate weight gradients
   transpose(x, y, in_data, trans_data);                       // y*x
   matmul1D1D(y, z, x, trans_data, out_temp, &weight_grad[0]); // y*x; x*z; y*z

@@ -185,6 +185,7 @@ void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C) {
   }
 }
 
+// num rows in A, C; num columns in B, C; num columns in A, rows in B
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B, float_t* C) {
   galois::StatTimer Tmatmul("MatMul");

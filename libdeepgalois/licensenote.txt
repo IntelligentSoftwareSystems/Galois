@@ -6,3 +6,5 @@ note here
 e.g.
 https://github.com/tiny-dnn/tiny-dnn/tree/master/tiny_dnn
 under BSD-3
+
+DGL structure as well from what I can tell
