@@ -1,7 +1,7 @@
 #include "deepgalois/aggregator.h"
 #include "deepgalois/math_functions.hh"
 
-void update_all(size_t len, Graph& g, const float_t* in, float_t* out,
+void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   galois::do_all(galois::iterate(g.begin(), g.end()),
                  [&](const auto& src) {
