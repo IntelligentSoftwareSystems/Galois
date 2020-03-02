@@ -1,4 +1,4 @@
-#include "layers/softmax_loss_layer.h"
+#include "deepgalois/layers/softmax_loss_layer.h"
 
 softmax_loss_layer::softmax_loss_layer(unsigned level,
                                        std::vector<size_t> in_dims,

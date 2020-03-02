@@ -2,11 +2,12 @@
 #define _MODEL_H_
 
 #include <random>
+#include "galois/Timer.h"
 #include "deepgalois/types.h"
 #include "deepgalois/gtypes.h"
 #include "deepgalois/context.h"
-#include "galois/Timer.h"
-#include "layers.h"
+#include "deepgalois/layers/graph_conv_layer.h"
+#include "deepgalois/layers/softmax_loss_layer.h"
 #include "optimizer.h"
 
 #define NUM_CONV_LAYERS 2

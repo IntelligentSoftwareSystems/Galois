@@ -22,13 +22,13 @@
 #include <utility>
 #include <algorithm>
 #include <unordered_set>
-#include "../node.h"
+#include "../../node.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/gtypes.h"
 #include "deepgalois/context.h"
-#include "../optimizer.h"
-#include "../math_functions.hh"
+#include "../../optimizer.h"
+#include "../../math_functions.hh"
 /**
  * base class of all kind of NN layers
  *

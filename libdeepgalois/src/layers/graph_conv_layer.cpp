@@ -1,4 +1,4 @@
-#include "layers/graph_conv_layer.h"
+#include "deepgalois/layers/graph_conv_layer.h"
 
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {

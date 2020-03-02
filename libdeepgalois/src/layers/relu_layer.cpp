@@ -1,4 +1,4 @@
-#include "layers/relu_layer.h"
+#include "deepgalois/layers/relu_layer.h"
 
 // 𝑦[𝑙] = max(0, 𝑦[𝑙−1])
 void relu_layer::forward_propagation(const tensor_t& in_data,
