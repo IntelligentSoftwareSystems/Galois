@@ -1,3 +1,7 @@
+/**
+ * File inspired by similar one from TinyDNN
+ * https://github.com/tiny-dnn/
+ */
 #ifndef _MATH_FUNCTIONS_
 #define _MATH_FUNCTIONS_
 #include <cmath>
