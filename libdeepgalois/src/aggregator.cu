@@ -62,10 +62,17 @@ __global__ void update_all_warp(size_t n, size_t len, CSRGraph g,
 void update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.nnodes;
-  //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
-  //print_device_vector(10, norm_factor, "norm_factor");
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   //update_all_naive<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, g, in, out, norm, norm_factor);
   update_all_warp<<<(n-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(n, len, g, in, out, norm, norm_factor);
   CudaTest("solving update_all kernel failed");
+}
+
+void update_all_cusparse(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+                bool norm, const float_t* norm_factor) {
+  unsigned n = g.nnodes;
+  CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
+  //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
+  //print_device_vector(10, norm_factor, "norm_factor");
+  csrmm_gpu(n, len, n, g.nedges, 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, out);
 }

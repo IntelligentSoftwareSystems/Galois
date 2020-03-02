@@ -1,4 +1,14 @@
 #pragma once
+/**
+ * Code modified from below
+ *
+ * https://github.com/BVLC/caffe/blob/master/include/caffe/common.hpp
+ *
+ * Copyright (c) 2014-2017 The Regents of the University of California (Regents)
+ * All rights reserved.
+ * Reused/revised under BSD 2-Clause license
+ */
+
 #include <string>
 #include <cassert>
 #include "types.h"
@@ -58,6 +68,8 @@ public:
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
+  inline static cusparseHandle_t cusparse_handle() { return cusparse_handle_; }
+  inline static cusparseMatDescr_t cusparse_matdescr() { return cusparse_matdescr_; }
   inline static curandGenerator_t curand_generator() {
     return curand_generator_;
   }
@@ -66,15 +78,12 @@ public:
 protected:
 #ifndef CPU_ONLY
   static cublasHandle_t cublas_handle_; // used to call cuBLAS
-  static curandGenerator_t
-      curand_generator_; // used to generate random numbers on GPU
+  static cusparseHandle_t cusparse_handle_; // used to call cuSPARSE
+  static cusparseMatDescr_t cusparse_matdescr_; // used to call cuSPARSE
+  static curandGenerator_t curand_generator_; // used to generate random numbers on GPU
 #endif
   Brew mode_;
   int solver_count_;
   int solver_rank_;
   bool multiprocess_;
-
-private:
-  // The private constructor to avoid duplicate instantiation.
-  // Context();
 };

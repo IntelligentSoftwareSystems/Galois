@@ -91,6 +91,10 @@ void matmul_gpu(const size_t x, const size_t y, const size_t z,
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                     const float_t* A, const float_t* B,
                     float_t* C); // matrix multiply
+void csrmm_gpu(const int M, const int N, const int K, const int nnz, 
+               const float alpha, const float* A_nonzeros, 
+	           const int* A_idx_ptr, const int* A_nonzero_idx,
+               const float* B, const float beta, float* C);
 void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in_data,
                                const mask_t* masks, const label_t* labels,
                                float_t* loss, float_t* out_data);

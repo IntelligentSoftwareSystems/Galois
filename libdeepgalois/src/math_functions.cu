@@ -183,6 +183,23 @@ void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
   sgemm_gpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
 }
 
+void csrmm_gpu(const int M, const int N, const int K, const int nnz, 
+               const float alpha, const float* A_nonzeros, 
+	           const int* A_idx_ptr, const int* A_nnz_idx,
+               const float* B, const float beta, float* C) {
+  float *transpose_C;
+  CUDA_CHECK(cudaMalloc((void**)&transpose_C, N * K * sizeof(float)));
+  CUSPARSE_CHECK(cusparseScsrmm2(Context::cusparse_handle(),
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                 M, N, K, nnz, &alpha, Context::cusparse_matdescr(), A_nonzeros, 
+                 A_idx_ptr, A_nnz_idx, B, N, &beta, transpose_C, M)); 
+  //transpose C
+  const float one = 1.0;
+  const float zero = 0.0; 
+  CUBLAS_CHECK(cublasSgeam(Context::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T,
+                           N, M, &one, transpose_C, M, &zero, transpose_C, M, C, N)); 
+}
+
 void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N,
               const float alpha, const float* A, const float* x,
               const float beta, float* y) {

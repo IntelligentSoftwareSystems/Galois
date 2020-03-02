@@ -3,11 +3,16 @@
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   update_all(len, g, in, out, true, context->norm_factor);
+}
 #else
 void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
+  #ifdef USE_CUSPARSE
+  update_all_cusparse(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
+  #else
   update_all(len, g, in, out, true, context->d_norm_factor);
-#endif
+  #endif
 }
+#endif
 
 void graph_conv_layer::combine(const vec_t& self, const vec_t& neighbors, vec_t& out) {
   vec_t a(out.size(), 0);
@@ -35,7 +40,7 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
 }
 
 void graph_conv_layer::init() {
-  std::cout << name_ << ": allocating memory for params and temp data... ";
+  //std::cout << name_ << ": allocating memory for params and temp data... ";
   Timer t_alloc;
   t_alloc.Start();
 #ifdef CPU_ONLY
@@ -135,7 +140,11 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   else copy_gpu(x * z, out_grad, out_temp);
   if (level_ != 0) {
     sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
+#ifdef USE_CUSPARSE
+    update_all_cusparse(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
+#else
     update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
+#endif
     if (dropout_) d_dropout_gpu(x * y, scale_, dropout_rate_, in_grad, dropout_mask, in_grad);
   }
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);

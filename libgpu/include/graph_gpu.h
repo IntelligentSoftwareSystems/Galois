@@ -125,6 +125,14 @@ struct CSRGraph {
 		assert(src <= nnodes);
 		return row_start[src+1];
 	};
+	__device__ __host__ index_type *row_start_ptr() { return row_start; }
+	__device__ __host__ const index_type *row_start_ptr() const { return row_start; }
+	__device__ __host__ index_type *edge_dst_ptr() { return edge_dst; }
+	__device__ __host__ const index_type *edge_dst_ptr() const { return edge_dst; }
+	__device__ __host__ node_data_type *node_data_ptr() { return node_data; }
+	__device__ __host__ const node_data_type *node_data_ptr() const { return node_data; }
+	__device__ __host__ edge_data_type *edge_data_ptr() { return edge_data; }
+	__device__ __host__ const edge_data_type *edge_data_ptr() const { return edge_data; }
 
   index_type nnodes, nedges;
   index_type* row_start; // row_start[node] points into edge_dst, node starts at

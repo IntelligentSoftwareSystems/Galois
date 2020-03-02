@@ -1,6 +1,7 @@
 #pragma once
 #include <cuda.h>
 #include <curand.h>
+#include <cusparse.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include <driver_types.h>
@@ -56,6 +57,32 @@ inline const char* cublasGetErrorString(cublasStatus_t error) {
   return "Unknown cublas status";
 }
 
+inline const char* cusparseGetErrorString(cusparseStatus_t error) {
+  switch (error) {
+  case CUSPARSE_STATUS_SUCCESS:
+    return "CUSPARSE_STATUS_SUCCESS";
+  case CUSPARSE_STATUS_NOT_INITIALIZED:
+    return "CUSPARSE_STATUS_NOT_INITIALIZED";
+  case CUSPARSE_STATUS_ALLOC_FAILED:
+    return "CUSPARSE_STATUS_ALLOC_FAILED";
+  case CUSPARSE_STATUS_INVALID_VALUE:
+    return "CUSPARSE_STATUS_INVALID_VALUE";
+  case CUSPARSE_STATUS_ARCH_MISMATCH:
+    return "CUSPARSE_STATUS_ARCH_MISMATCH";
+  case CUSPARSE_STATUS_MAPPING_ERROR:
+    return "CUSPARSE_STATUS_MAPPING_ERROR";
+  case CUSPARSE_STATUS_EXECUTION_FAILED:
+    return "CUSPARSE_STATUS_EXECUTION_FAILED";
+  case CUSPARSE_STATUS_INTERNAL_ERROR:
+    return "CUSPARSE_STATUS_INTERNAL_ERROR";
+  case CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED:
+      return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
+  case CUSPARSE_STATUS_ZERO_PIVOT:
+        return "CUSPARSE_STATUS_ZERO_PIVOT";
+  }
+  return "Unknown cusparse status";
+}
+
 inline const char* curandGetErrorString(curandStatus_t error) {
   switch (error) {
   case CURAND_STATUS_SUCCESS:
@@ -106,6 +133,17 @@ inline const char* curandGetErrorString(curandStatus_t error) {
       fprintf(stderr,                                                          \
               "error %d: cuBLAS error in file '%s' in line %i : %s.\n",        \
               status, __FILE__, __LINE__, cublasGetErrorString(status));       \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
+#define CUSPARSE_CHECK(condition)                                              \
+  do {                                                                         \
+    cusparseStatus_t status = condition;                                       \
+    if (status != CUSPARSE_STATUS_SUCCESS) {                                   \
+      fprintf(stderr,                                                          \
+              "error %d: cuSPARSE error in file '%s' in line %i : %s.\n",      \
+              status, __FILE__, __LINE__, cusparseGetErrorString(status));     \
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   } while (0)
