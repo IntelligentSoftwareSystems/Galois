@@ -4,7 +4,8 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include "types.h"
+#include "deepgalois/types.h"
+#include "deepgalois/utils.h"
 
 extern "C" {
 #include <cblas.h>

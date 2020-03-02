@@ -1,5 +1,4 @@
 #include "deepgalois/context.h"
-#include "gtypes.h"
 
 #ifdef CPU_ONLY
 Context::Context()

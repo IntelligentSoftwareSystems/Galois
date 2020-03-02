@@ -1,5 +1,4 @@
 #include "math_functions.hh"
-#include "utils.h"
 #include "galois/Timer.h"
 #include <immintrin.h>
 

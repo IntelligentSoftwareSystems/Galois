@@ -12,7 +12,7 @@
 #include <vector>
 #include <memory>
 #include <cassert>
-#include "types.h"
+#include "deepgalois/types.h"
 class node;
 class layer;
 class edge;

@@ -1,7 +1,7 @@
 #pragma once
-#include "types.h"
+#include "deepgalois/types.h"
 #ifdef CPU_ONLY
-#include "gtypes.h"
+#include "deepgalois/gtypes.h"
 void update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor);
 #else

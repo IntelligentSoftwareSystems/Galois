@@ -2,8 +2,8 @@
 #define _MODEL_H_
 
 #include <random>
-#include "types.h"
-#include "gtypes.h"
+#include "deepgalois/types.h"
+#include "deepgalois/gtypes.h"
 #include "deepgalois/context.h"
 #include "galois/Timer.h"
 #include "layers.h"

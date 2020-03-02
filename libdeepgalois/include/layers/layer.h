@@ -1,6 +1,6 @@
 #pragma once
 /**
- * Code based on below link.
+ * Code from on below link. Modified under Galois.
  *
  * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/layers/layer.h
  *
@@ -23,9 +23,9 @@
 #include <algorithm>
 #include <unordered_set>
 #include "../node.h"
-#include "../types.h"
-#include "../utils.h"
-#include "../gtypes.h"
+#include "deepgalois/types.h"
+#include "deepgalois/utils.h"
+#include "deepgalois/gtypes.h"
 #include "deepgalois/context.h"
 #include "../optimizer.h"
 #include "../math_functions.hh"

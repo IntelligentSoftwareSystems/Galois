@@ -10,7 +10,7 @@
 
 #include <algorithm>
 #include <unordered_map>
-#include "types.h"
+#include "deepgalois/types.h"
 #ifndef CPU_ONLY
 #include "math_functions.hh"
 #endif

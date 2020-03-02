@@ -104,6 +104,6 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   galois::runtime::reportParam("(NULL)", "Hostname", name);
 }
 
-#include "types.h"
-#include "utils.h"
+#include "deepgalois/types.h"
+#include "deepgalois/utils.h"
 #include "net.h"
