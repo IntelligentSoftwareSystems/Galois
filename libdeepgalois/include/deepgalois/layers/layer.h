@@ -55,7 +55,7 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void set_netphase(net_phase phase) {}
   //! save context
-  virtual void set_context(Context* ctx) { context = ctx; }
+  virtual void set_context(deepgalois::Context* ctx) { context = ctx; }
   virtual acc_t get_masked_loss() { return acc_t(0); }
 
   // main functions for layer work
@@ -158,7 +158,7 @@ protected:
   mask_t* masks_; // masks to show which samples are valid
   mask_t* d_masks_;
   float_t* loss; // error for each vertex: N x 1
-  Context* context;
+  deepgalois::Context* context;
 };
 
 // head: layer i+1, tail: layer i

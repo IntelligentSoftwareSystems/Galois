@@ -1,5 +1,7 @@
 #include "deepgalois/context.h"
 
+namespace deepgalois {
+
 #ifdef CPU_ONLY
 Context::Context()
     : mode_(Context::CPU), solver_count_(1), solver_rank_(0),
@@ -179,4 +181,5 @@ inline void init_features(size_t dim, vec_t &x) {
     for (size_t i = 0; i < dim; ++i)
         x[i] = dist(rng);
 }
-//*/
+*/
+} // end deepgalois namespace

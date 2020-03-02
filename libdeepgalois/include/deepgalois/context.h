@@ -21,6 +21,7 @@
 #include "deepgalois/cutils.h"
 #endif
 
+namespace deepgalois {
 class Context {
 public:
   Context();
@@ -88,3 +89,4 @@ protected:
   int solver_rank_;
   bool multiprocess_;
 };
+} // end deepgalois namespace

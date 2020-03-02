@@ -54,6 +54,8 @@ __global__ void norm_factor_counting_edge(int n, CSRGraph graph,
   }
 }
 
+namespace deepgalois {
+
 void Context::norm_factor_counting_gpu() {
   assert(graph_gpu.nnodes == n);
   std::cout << "Pre-computing normalization factor (n=" << n << ")\n";
@@ -137,4 +139,4 @@ void Context::copy_data_to_device() {
 }
 
 float_t* Context::get_in_ptr() { return d_feats; }
-
+} // namespace context

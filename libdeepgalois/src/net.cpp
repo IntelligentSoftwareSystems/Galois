@@ -1,7 +1,7 @@
 #include "deepgalois/net.h"
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
-  context = new Context();
+  context = new deepgalois::Context();
   // read graph, get num nodes
   num_samples = context->read_graph(dataset_str, selfloop);
   num_classes = context->read_labels(dataset_str);

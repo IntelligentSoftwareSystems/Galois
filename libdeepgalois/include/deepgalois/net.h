@@ -101,7 +101,7 @@ public:
   }
 
 protected:
-  Context* context;
+  deepgalois::Context* context;
   size_t num_samples;               // number of samples: N
   size_t num_classes;               // number of vertex classes: E
   size_t num_layers;                // for now hard-coded: NUM_CONV_LAYERS + 1
