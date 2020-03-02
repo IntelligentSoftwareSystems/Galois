@@ -1,6 +1,6 @@
 #pragma once
 #include "layer.h"
-#include "aggregator.h"
+#include "deepgalois/aggregator.h"
 
 
 /**

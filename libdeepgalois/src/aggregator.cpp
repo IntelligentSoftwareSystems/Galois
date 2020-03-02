@@ -1,4 +1,4 @@
-#include "aggregator.h"
+#include "deepgalois/aggregator.h"
 #include "math_functions.hh"
 
 void update_all(size_t len, Graph& g, const float_t* in, float_t* out,
