@@ -18,20 +18,23 @@ size_t Context::read_graph(std::string dataset_str) {
 }
 
 #ifdef CPU_ONLY
-size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype) {
+size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop = false) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
-  LGraph lgraph;
   if (filetype == "el") {
     std::string filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());
+    LGraph lgraph;
     lgraph.read_edgelist(filename.c_str(), true); // symmetrize
     genGraph(lgraph, graph_cpu);
     lgraph.clean();
   } else if (filetype == "gr") {
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());
-    galois::graphs::readGraph(graph_cpu, filename);
+    if (selfloop) {
+      galois::graphs::readGraph(graph_temp, filename);
+      add_selfloop(graph_temp, graph_cpu);
+    } else galois::graphs::readGraph(graph_cpu, filename);
   } else {
     printf("Unkown file format\n");
     exit(1);
@@ -52,6 +55,24 @@ void Context::genGraph(LGraph& lg, Graph& g) {
     g.fixEndEdge(i, row_end);
     for (auto offset = row_begin; offset < row_end; offset++)
       g.constructEdge(offset, lg.get_dest(offset), 0);
+  }
+}
+
+void Context::add_selfloop(Graph og, Graph &g) {
+  g.allocateFrom(og.size(), og.size()+og.sizeEdges());
+  g.constructNodes();
+  for (size_t src = 0; src < og.size(); src++) {
+    g.getData(src) = 1;
+    auto row_end = og.edge_end(src);
+    g.fixEndEdge(src, row_end+src+1);
+    bool self_inserted = false;
+    for (auto e : og.edges(src)) {
+      auto dst = og.edgeDst(e);
+      if (!self_inserted && dst > src) {
+        g.constructEdge(e, src, 0);
+        self_inserted = true;
+      }
+      g.constructEdge(e, dst, 0);
   }
 }
 
