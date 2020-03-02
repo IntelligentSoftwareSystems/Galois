@@ -1,5 +1,7 @@
 #include "deepgalois/net.h"
 
+namespace deepgalois {
+
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
   context = new deepgalois::Context();
   // read graph, get num nodes
@@ -123,3 +125,5 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                              context->d_labels);
 #endif
 }
+
+} // namespace deepgalois

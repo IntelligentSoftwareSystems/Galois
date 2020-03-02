@@ -1,3 +1,5 @@
+// TODO if this code was based on something, get copyright/license and put here
+
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
@@ -11,6 +13,8 @@
 #include "deepgalois/optimizer.h"
 
 #define NUM_CONV_LAYERS 2
+
+namespace deepgalois {
 
 // N: number of vertices, D: feature vector dimentions,
 // E: number of distinct labels, i.e. number of vertex classes
@@ -113,5 +117,7 @@ protected:
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
 };
+
+} // namespace deepgalois
 
 #endif
