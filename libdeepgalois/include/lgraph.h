@@ -44,7 +44,7 @@ public:
     num_vertices_ = m;
     num_edges_    = 0;
     std::cout << "num_vertices " << num_vertices_ << "\n";
-    vertices.resize(m);
+    std::vector<std::set<IndexT> > vertices(m);
     for (size_t i = 0; i < n; i++) {
       std::set<IndexT> neighbors;
       if (add_self_loop) neighbors.insert(i);
@@ -71,7 +71,7 @@ private:
   IndexT* rowptr_;
   IndexT* colidx_;
 
-  void MakeCSR(std::vector<std::set<IndexT> > vertices, bool transpose) {
+  void MakeCSR(std::vector<std::set<IndexT> > vertices) {
     std::vector<IndexT> degrees;
     degrees.resize(num_vertices_);
     std::fill(degrees.begin(), degrees.end(), 0);
