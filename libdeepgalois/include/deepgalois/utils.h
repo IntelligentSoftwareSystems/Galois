@@ -15,6 +15,8 @@ const std::string path =
 
 enum class net_phase { train, test };
 
+//! tracks max mem usage with rusage
+// TODO use Galois's getrusage functionality
 class ResourceManager {
 public:
   ResourceManager() {}
@@ -41,6 +43,7 @@ private:
   }
 };
 
+// TODO don't need a separate timer: use Galois's regular timer
 class Timer {
 public:
   Timer() {}
