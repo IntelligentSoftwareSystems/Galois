@@ -81,8 +81,8 @@ void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
                 float_t* out_diff); // ReLU derivative
 void dropout_gpu(const int n, const float scale, const float dropout_rate,
                  const float_t* in, unsigned* masks, float_t* out); // dropout
-void d_dropout_gpu(const int n, const float scale, const float_t* in,
-                   const unsigned* masks, float_t* out); // dropout derivative
+void d_dropout_gpu(const int n, const float scale, const float dropout_rate,
+                   const float_t* in, const unsigned* masks, float_t* out); // dropout derivative
 void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
                const int M, const int N, const int K, const float alpha,
                const float* A, const float* B, const float beta, float* C);

@@ -87,43 +87,31 @@ __global__ void setup_curand_kernel(const int n, curandState* state) {
 }
 
 __global__ void dropout_kernel(const int n, const float scale,
-                               const float dropout_rate, const float_t* in,
-                               unsigned* masks, curandState* state, float_t* out) {
-  CUDA_KERNEL_LOOP(i, n) {
-    // curandState_t curand_state;
-    //curand_init(1234, i, 0, &state[i]); // Each thread gets same seed 1234
-    //masks[i] = curand_uniform(&state[i]) <= dropout_rate ? 1 : 0;
-    //masks[i] = 1.0 - dropout_rate;
-    //out[i]   = in[i] * masks[i] * scale;
-    masks[i] = 1.0;
-    out[i]   = in[i];
-  }
+                               const float threshold, const float_t* in,
+                               unsigned* masks, float_t* out) {
+  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * (masks[i] > threshold) * scale; }
 }
 
 void dropout_gpu(const int n, const float scale, const float dropout_rate,
                  const float_t* in, unsigned* masks, float_t* out) {
-  curandState* devStates;
-  CUDA_CHECK(cudaMalloc((void**)&devStates, n * sizeof(curandState)));
-  //std::cout << "[debug]: setup curand, n = " << n << "\n";
-  //setup_curand_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, devStates); 
-  //CudaTest("solving setup_curand kernel failed"); 
+  gpu_rng_uniform(n, masks);
   //std::cout << "[debug]: dropout_gpu\n";
   dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, scale, dropout_rate, in, masks, devStates, out);
+      n, scale, dropout_rate, in, masks, out);
   CudaTest("solving dropout kernel failed");
-  CUDA_CHECK(cudaFree(devStates));
   //std::cout << "[debug]: dropout_gpu done\n";
 }
 
-__global__ void d_dropout_kernel(const int n, const float scale, const float_t* in,
+__global__ void d_dropout_kernel(const int n, const float scale,
+                                 const float threshold, const float_t* in,
                                  const unsigned* masks, float_t* out) {
-  //CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * masks[i] * scale; }
-  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i]; }
+  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] * (masks[i] > threshold) * scale; }
 }
 
-void d_dropout_gpu(const int n, const float scale, const float_t* in,
-                   const unsigned* masks, float_t* out) {
-  d_dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, scale, in, masks, out);
+void d_dropout_gpu(const int n, const float scale, const float dropout_rate, 
+                   const float_t* in, const unsigned* masks, float_t* out) {
+  d_dropout_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      n, scale, dropout_rate, in, masks, out);
   CudaTest("solving d_dropout kernel failed");
 }
 
