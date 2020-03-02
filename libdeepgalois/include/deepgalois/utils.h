@@ -8,8 +8,11 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+namespace deepgalois {
+
 const std::string path =
     "/net/ohm/export/iss/inputs/Learning/"; // path to the input dataset
+
 enum class net_phase { train, test };
 
 class ResourceManager {
@@ -127,4 +130,6 @@ inline size_t read_masks(std::string dataset_str, std::string mask_type,
     << ") Number of valid samples: " << sample_count << "\n";
   in.close();
   return sample_count;
+}
+
 }

@@ -344,7 +344,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
   assert(masks.size() == out.size());
   // rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
   for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate);
   for (size_t i = 0; i < in.size(); ++i)
     out[i] = in[i] * masks[i] * scale;
 }
@@ -352,7 +352,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& masks, float_t* out) {
   for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate);
   for (size_t i = 0; i < in.size(); ++i)
     out[i] = in[i] * masks[i] * scale;
 }
@@ -360,7 +360,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
 void dropout(size_t n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* masks, float_t* out) {
   for (size_t i = 0; i < n; ++i)
-    masks[i] = bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate);
   for (size_t i = 0; i < n; ++i)
     out[i] = in[i] * masks[i] * scale;
 }

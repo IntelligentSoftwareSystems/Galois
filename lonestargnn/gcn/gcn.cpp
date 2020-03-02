@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
   network.construct_layers(); // default setting for now; can be customized by
                               // the user
   network.print_layers_info();
-  ResourceManager rm;
+  deepgalois::ResourceManager rm;
 
   // the optimizer used to update parameters, see optimizer.h for more details
   // optimizer *opt = new gradient_descent();
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
       for (size_t i = test_begin; i < test_end; i++)
         test_mask[i] = 1;
     } else
-      test_count = read_masks(dataset, "test", test_begin, test_end, test_mask);
+      test_count = deepgalois::read_masks(dataset, "test", test_begin, test_end, test_mask);
     galois::StatTimer Ttest("Test");
     Ttest.start();
     double test_time = network.evaluate(test_begin, test_end, test_count,
