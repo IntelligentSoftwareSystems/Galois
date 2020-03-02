@@ -8,6 +8,9 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+
+namespace deepgalois {
+
 typedef unsigned IndexT;
 typedef float ValueT;
 
@@ -97,4 +100,5 @@ private:
   }
 };
 
+} // namespace
 #endif
