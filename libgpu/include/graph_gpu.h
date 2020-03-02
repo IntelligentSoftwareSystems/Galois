@@ -105,8 +105,19 @@ struct CSRGraph {
 		check_cuda(cudaMemcpy(node_data, h_labels, m * sizeof(node_data_type), cudaMemcpyHostToDevice));
 		#endif
 	}
-
+	void print_neighbors(index_type vid) {
+		printf("Vertex %d neighbors: [ ", vid);
+		index_type start = row_start[vid];
+		index_type end = row_start[vid+1];
+		for (index_type e = start; e != end; e++) {
+			index_type dst = edge_dst[e];
+			printf("%d ",  dst);
+		}
+		printf("]\n");
+	}
 	void add_selfloop() {
+		print_neighbors(nnodes-1);
+		print_neighbors(0);
 		index_type *new_edge_dst = new index_type[nnodes+nedges];
 		for (index_type i = 0; i < nnodes; i++) {
 			index_type start = row_start[i];
@@ -127,9 +138,13 @@ struct CSRGraph {
 				} else new_edge_dst[e+i+1] = dst;
 			}
 		}
-		for (index_type i = 0; i < nnodes; i++) row_start[i] += i;
+		for (index_type i = 0; i <= nnodes; i++) row_start[i] += i;
 		delete edge_dst;
 		edge_dst = new_edge_dst;
+		nedges += nnodes;
+        printf("nnodes = %d, nedges = %d\n", nnodes, nedges);
+		print_neighbors(nnodes-1);
+		print_neighbors(0);
 	}
 
 	__device__ __host__ index_type getEdgeDst(unsigned edge) {
