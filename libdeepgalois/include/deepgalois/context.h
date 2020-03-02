@@ -11,14 +11,14 @@
 
 #include <string>
 #include <cassert>
-#include "types.h"
-#include "utils.h"
+#include "deepgalois/types.h"
+#include "deepgalois/utils.h"
 #ifdef CPU_ONLY
-#include "lgraph.h"
-#include "gtypes.h"
+#include "deepgalois/lgraph.h"
+#include "deepgalois/gtypes.h"
 #else
 #include "graph_gpu.h"
-#include "cutils.h"
+#include "deepgalois/cutils.h"
 #endif
 
 class Context {

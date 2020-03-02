@@ -1,4 +1,4 @@
-#include "optimizer.h"
+#include "deepgalois/optimizer.h"
 #include "galois/Galois.h"
 
 void adagrad::update(const vec_t& dW, vec_t& W, bool parallelize) {

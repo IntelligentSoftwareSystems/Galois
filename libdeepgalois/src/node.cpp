@@ -1,4 +1,4 @@
-#include "node.h"
+#include "deepgalois/node.h"
 #include <iostream>
 
 void edge::alloc() {

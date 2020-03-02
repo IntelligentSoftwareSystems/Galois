@@ -1,4 +1,4 @@
-#include "net.h"
+#include "deepgalois/net.h"
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
   context = new Context();

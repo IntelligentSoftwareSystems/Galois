@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include "deepgalois/types.h"
 #ifndef CPU_ONLY
-#include "math_functions.hh"
+#include "deepgalois/math_functions.hh"
 #endif
 
 // base class of optimizer

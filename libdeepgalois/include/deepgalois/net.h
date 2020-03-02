@@ -8,7 +8,7 @@
 #include "deepgalois/context.h"
 #include "deepgalois/layers/graph_conv_layer.h"
 #include "deepgalois/layers/softmax_loss_layer.h"
-#include "optimizer.h"
+#include "deepgalois/optimizer.h"
 
 #define NUM_CONV_LAYERS 2
 

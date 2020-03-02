@@ -106,4 +106,4 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
 
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
-#include "net.h"
+#include "deepgalois/net.h"

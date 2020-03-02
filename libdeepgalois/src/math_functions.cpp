@@ -1,4 +1,4 @@
-#include "math_functions.hh"
+#include "deepgalois/math_functions.hh"
 #include "galois/Timer.h"
 #include <immintrin.h>
 
