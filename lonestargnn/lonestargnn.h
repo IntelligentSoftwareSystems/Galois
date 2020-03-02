@@ -48,6 +48,7 @@ static cll::opt<unsigned> max_degree(
 static cll::opt<unsigned> do_validate("dv", cll::desc("enable validation"),
                                       cll::init(1));
 static cll::opt<unsigned> do_test("dt", cll::desc("enable test"), cll::init(1));
+static cll::opt<unsigned> add_selfloop("sl", cll::desc("add selfloop"), cll::init(0));
 
 //! standard global options to the benchmarks
 extern llvm::cl::opt<bool> skipVerify;

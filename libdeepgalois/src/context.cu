@@ -116,10 +116,11 @@ void Context::SetDevice(const int device_id) {
       curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
 }
 
-size_t Context::read_graph_gpu(std::string dataset_str) {
+size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
   std::string filename = path + dataset_str + ".csgr";
   CSRGraph g;
   g.read(filename.c_str(), false);
+  if (selfloop) g.add_selfloop();
   g.copy_to_gpu(graph_gpu);
   return graph_gpu.nnodes;
 }

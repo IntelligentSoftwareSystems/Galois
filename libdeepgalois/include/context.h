@@ -35,15 +35,15 @@ public:
   bool multiprocess() { return multiprocess_; }
   void set_multiprocess(bool val) { multiprocess_ = val; }
   bool root_solver() { return solver_rank_ == 0; }
-  size_t read_graph(std::string dataset_str);
+  size_t read_graph(std::string dataset_str, bool selfloop);
   size_t read_labels(std::string dataset_str);
   size_t read_features(std::string dataset_str);
   label_t get_label(size_t i) { return labels[i]; }
   label_t* get_labels_ptr(size_t i) { return &(labels[0]); }
   float_t* get_in_ptr();
 
-  size_t read_graph_cpu(std::string dataset_str, std::string filetype = "gr");
-  size_t read_graph_gpu(std::string dataset_str);
+  size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);
+  size_t read_graph_gpu(std::string dataset_str, bool selfloop);
   void copy_data_to_device(); // copy labels and input features
   void SetDevice(const int device_id);
   void DeviceQuery() {}

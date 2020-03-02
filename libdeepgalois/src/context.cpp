@@ -8,17 +8,17 @@ Context::Context()
 Context::~Context() {}
 #endif
 
-size_t Context::read_graph(std::string dataset_str) {
+size_t Context::read_graph(std::string dataset_str, bool selfloop) {
 #ifdef CPU_ONLY
-  n = read_graph_cpu(dataset_str, "gr");
+  n = read_graph_cpu(dataset_str, "gr", selfloop);
 #else
-  n = read_graph_gpu(dataset_str);
+  n = read_graph_gpu(dataset_str, selfloop);
 #endif
   return n;
 }
 
 #ifdef CPU_ONLY
-size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop = false) {
+size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
   if (filetype == "el") {
@@ -63,16 +63,23 @@ void Context::add_selfloop(Graph og, Graph &g) {
   g.constructNodes();
   for (size_t src = 0; src < og.size(); src++) {
     g.getData(src) = 1;
-    auto row_end = og.edge_end(src);
-    g.fixEndEdge(src, row_end+src+1);
+    auto begin = og.edge_begin(src);
+    auto end = og.edge_end(src);
+    g.fixEndEdge(src, end+src+1);
     bool self_inserted = false;
-    for (auto e : og.edges(src)) {
+    for (auto e = begin; e != end; e++) {
       auto dst = og.edgeDst(e);
-      if (!self_inserted && dst > src) {
-        g.constructEdge(e, src, 0);
-        self_inserted = true;
-      }
-      g.constructEdge(e, dst, 0);
+      if (!self_inserted) {
+        if (dst > src) {
+          g.constructEdge(e+src, src, 0);
+          g.constructEdge(e+src+1, dst, 0);
+          self_inserted = true;
+        else if (e+1 == end) {
+          g.constructEdge(e+src+1, src, 0);
+          g.constructEdge(e+src, dst, 0);
+          self_inserted = true;
+        } else g.constructEdge(e+src, dst, 0);
+      } else g.constructEdge(e+src+1, dst, 0);
   }
 }
 

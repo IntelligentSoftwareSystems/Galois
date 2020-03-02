@@ -104,10 +104,32 @@ struct CSRGraph {
 		check_cuda(cudaMalloc((void **)&node_data, m * sizeof(node_data_type)));
 		check_cuda(cudaMemcpy(node_data, h_labels, m * sizeof(node_data_type), cudaMemcpyHostToDevice));
 		#endif
-		//int *h_degrees = (int *)malloc(m * sizeof(int));
-		//for (int i = 0; i < m; i++) h_degrees[i] = h_row_offsets[i + 1] - h_row_offsets[i];
-		//check_cuda(cudaMalloc((void **)&d_degrees, m * sizeof(int)));
-		//check_cuda(cudaMemcpy(d_degrees, h_degrees, m * sizeof(int), cudaMemcpyHostToDevice));
+	}
+
+	void add_selfloop() {
+		index_type *new_edge_dst = new index_type[nnodes+nedges];
+		for (index_type i = 0; i < nnodes; i++) {
+			index_type start = row_start[i];
+			index_type end = row_start[i+1];
+			bool selfloop_inserted = false;
+			for (index_type e = start; e != end; e++) {
+				index_type dst = edge_dst[e];
+				if (!selfloop_inserted) {
+					if (i < dst) {
+						selfloop_inserted = true;
+						new_edge_dst[e+i] = i;
+						new_edge_dst[e+i+1] = dst;
+					} else if (e+1 == end) {
+						selfloop_inserted = true;
+						new_edge_dst[e+i+1] = i;
+						new_edge_dst[e+i] = dst;
+					} else new_edge_dst[e+i] = dst;
+				} else new_edge_dst[e+i+1] = dst;
+			}
+		}
+		for (index_type i = 0; i < nnodes; i++) row_start[i] += i;
+		delete edge_dst;
+		edge_dst = new_edge_dst;
 	}
 
 	__device__ __host__ index_type getEdgeDst(unsigned edge) {

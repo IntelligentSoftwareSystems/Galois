@@ -18,7 +18,7 @@
 class Net {
 public:
   Net() {}
-  void init(std::string dataset_str, unsigned epochs, unsigned hidden1);
+  void init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
