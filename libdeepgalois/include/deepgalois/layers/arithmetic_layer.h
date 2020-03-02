@@ -1,6 +1,7 @@
 #pragma once
 #include "layer.h"
 
+namespace deepgalois {
 // element-wise add N vectors ```y_i = x0_i + x1_i + ... + xnum_i```
 class elementwise_add_layer : public layer {
 public:
@@ -24,3 +25,4 @@ public:
     in_grad = out_grad;
   }
 };
+} // namespace

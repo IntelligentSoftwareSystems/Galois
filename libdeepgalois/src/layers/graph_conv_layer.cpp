@@ -1,5 +1,7 @@
 #include "deepgalois/layers/graph_conv_layer.h"
 
+namespace deepgalois {
+
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   update_all(len, g, in, out, true, context->norm_factor);
@@ -157,3 +159,5 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, d_weight_grad);
 }
 #endif
+
+} // namespace

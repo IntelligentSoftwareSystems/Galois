@@ -29,6 +29,9 @@
 #include "deepgalois/context.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/math_functions.hh"
+
+namespace deepgalois {
+
 /**
  * base class of all kind of NN layers
  *
@@ -42,7 +45,7 @@
  * Node inheritance is just to get accessed to linked-list semantics it
  * provides
  **/
-class layer : public node {
+class layer : public deepgalois::node {
 public:
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
@@ -92,14 +95,14 @@ public:
 
   //! set the data of the previous layer connected to this one
   void set_in_data(float_t* data) {
-    prev_ = std::make_shared<edge>(this, input_dims[0], input_dims[1]);
+    prev_ = std::make_shared<deepgalois::edge>(this, input_dims[0], input_dims[1]);
     prev_->set_data(data);
     // no need to allocate memory for gradients, since this is the input layer.
   }
 
   void add_edge() {
     // add an outgoing edge
-    next_ = std::make_shared<edge>(this, output_dims[0], output_dims[1]);
+    next_ = std::make_shared<deepgalois::edge>(this, output_dims[0], output_dims[1]);
     // allocate memory for intermediate feature vectors and gradients
     next_->alloc();
   }
@@ -161,6 +164,7 @@ protected:
   deepgalois::Context* context;
 };
 
+
 // head: layer i+1, tail: layer i
 inline void connect(layer* head, layer* tail, size_t head_index = 0,
                     size_t tail_index = 0) {
@@ -178,3 +182,5 @@ inline void connect(layer* head, layer* tail, size_t head_index = 0,
   tail->prev_ = head->next_;
   tail->prev_->add_next_node(tail);
 }
+
+} // namespace deepgalois

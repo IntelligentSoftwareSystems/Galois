@@ -1,6 +1,7 @@
 #pragma once
 #include "layer.h"
 
+namespace deepgalois {
 class softmax_loss_layer : public layer {
 public:
   softmax_loss_layer(unsigned level, std::vector<size_t> in_dims,
@@ -14,3 +15,4 @@ public:
                                 float_t* out_grad, float_t* in_grad);
   virtual acc_t get_masked_loss();
 };
+}

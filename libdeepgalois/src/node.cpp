@@ -1,6 +1,8 @@
 #include "deepgalois/node.h"
 #include <iostream>
 
+namespace deepgalois {
+
 void edge::alloc() {
   // std::cout << "Allocating memory for tensors (intermediate features and
   // gradients) ...\n";
@@ -38,3 +40,5 @@ void edge::clear_grads() {
   clear_grads_gpu();
 #endif
 }
+
+} // namespace deepgalois

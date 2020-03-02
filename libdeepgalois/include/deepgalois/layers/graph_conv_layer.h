@@ -2,7 +2,6 @@
 #include "layer.h"
 #include "deepgalois/aggregator.h"
 
-
 /**
  * GraphConv Layer; based on DGL implementation
  * https://docs.dgl.ai/en/0.4.x/_modules/dgl/nn/pytorch/conv/graphconv.html
@@ -20,6 +19,7 @@
  *          Default: ``False``.
  *   activation: default false
  */
+namespace deepgalois {
 class graph_conv_layer : public layer {
 public:
   graph_conv_layer(unsigned level, bool act, bool norm, bool bias, bool dropout,
@@ -84,3 +84,4 @@ private:
     }
   }
 };
+} // namespace

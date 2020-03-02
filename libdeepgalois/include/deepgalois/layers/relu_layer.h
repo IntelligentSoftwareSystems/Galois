@@ -1,6 +1,7 @@
 #pragma once
 #include "layer.h"
 
+namespace deepgalois {
 // ReLU Layer
 class relu_layer : public layer {
 public:
@@ -19,3 +20,4 @@ public:
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);
 };
+} // namespace

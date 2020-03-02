@@ -1,5 +1,7 @@
 #include "deepgalois/layers/relu_layer.h"
 
+namespace deepgalois {
+
 // 𝑦[𝑙] = max(0, 𝑦[𝑙−1])
 void relu_layer::forward_propagation(const tensor_t& in_data,
                                      tensor_t& out_data) {
@@ -43,3 +45,5 @@ void relu_layer::back_propagation(const float_t* in_data,
   const size_t count = input_dims[0] * input_dims[1];
   d_relu_gpu(count, out_grad, in_data, in_grad);
 }
+
+} // namespace

@@ -1,6 +1,7 @@
 #pragma once
 #include "layer.h"
 
+namespace deepgalois {
 class linear_layer : public layer {
 public:
   linear_layer(unsigned level, float_t scale, float_t bias,
@@ -30,3 +31,4 @@ public:
 protected:
   float_t scale_, bias_;
 };
+} // namespace

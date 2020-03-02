@@ -1,5 +1,7 @@
 #include "deepgalois/layers/softmax_loss_layer.h"
 
+namespace deepgalois {
+
 softmax_loss_layer::softmax_loss_layer(unsigned level,
                                        std::vector<size_t> in_dims,
                                        std::vector<size_t> out_dims)
@@ -85,3 +87,5 @@ acc_t softmax_loss_layer::get_masked_loss() {
   return masked_avg_loss(begin_, end_, count_, d_masks_, loss);
 }
 #endif
+
+} // namespace

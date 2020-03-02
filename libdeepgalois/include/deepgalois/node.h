@@ -13,6 +13,9 @@
 #include <memory>
 #include <cassert>
 #include "deepgalois/types.h"
+
+namespace deepgalois {
+
 class node;
 class layer;
 class edge;
@@ -69,3 +72,5 @@ private:
   node* prev_;         // previous node, "producer" of data
   node* next_;         // next node, "consumer" of data
 };
+
+} // namespace deepgalois
