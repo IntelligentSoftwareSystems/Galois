@@ -1,3 +1,6 @@
+// From Caffe library it seems
+// TODO get the license from it
+
 #ifndef RANDOM_H
 #define RANDOM_H
 typedef boost::mt19937 rng_t;
