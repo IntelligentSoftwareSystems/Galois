@@ -1,4 +1,4 @@
-#include "context.h"
+#include "deepgalois/context.h"
 #include "gtypes.h"
 
 #ifdef CPU_ONLY

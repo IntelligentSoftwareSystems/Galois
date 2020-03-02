@@ -26,7 +26,7 @@
 #include "../types.h"
 #include "../utils.h"
 #include "../gtypes.h"
-#include "../context.h"
+#include "deepgalois/context.h"
 #include "../optimizer.h"
 #include "../math_functions.hh"
 /**

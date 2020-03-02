@@ -4,7 +4,7 @@
 #include <random>
 #include "types.h"
 #include "gtypes.h"
-#include "context.h"
+#include "deepgalois/context.h"
 #include "galois/Timer.h"
 #include "layers.h"
 #include "optimizer.h"
