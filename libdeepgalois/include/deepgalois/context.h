@@ -1,12 +1,6 @@
 #pragma once
 /**
- * Code modified from below
- *
- * https://github.com/BVLC/caffe/blob/master/include/caffe/common.hpp
- *
- * Copyright (c) 2014-2017 The Regents of the University of California (Regents)
- * All rights reserved.
- * Reused/revised under BSD 2-Clause license
+ * TODO if used from somewhere, get copyright/licences
  */
 
 #include <string>
