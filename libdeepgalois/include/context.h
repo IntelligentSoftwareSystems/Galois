@@ -65,7 +65,7 @@ public:
 #ifdef CPU_ONLY
   Graph graph_cpu; // the input graph, |V| = N
   void genGraph(LGraph& lg, Graph& g);
-  void add_selfloop(Graph og, Graph &g);
+  void add_selfloop(Graph &og, Graph &g);
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }

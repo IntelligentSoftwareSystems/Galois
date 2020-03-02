@@ -32,6 +32,7 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());
     if (selfloop) {
+      Graph graph_temp;
       galois::graphs::readGraph(graph_temp, filename);
       add_selfloop(graph_temp, graph_cpu);
     } else galois::graphs::readGraph(graph_cpu, filename);
@@ -58,9 +59,10 @@ void Context::genGraph(LGraph& lg, Graph& g) {
   }
 }
 
-void Context::add_selfloop(Graph og, Graph &g) {
+void Context::add_selfloop(Graph &og, Graph &g) {
   g.allocateFrom(og.size(), og.size()+og.sizeEdges());
   g.constructNodes();
+  /*
   for (size_t src = 0; src < og.size(); src++) {
     g.getData(src) = 1;
     auto begin = og.edge_begin(src);
@@ -68,19 +70,21 @@ void Context::add_selfloop(Graph og, Graph &g) {
     g.fixEndEdge(src, end+src+1);
     bool self_inserted = false;
     for (auto e = begin; e != end; e++) {
-      auto dst = og.edgeDst(e);
+      auto dst = og.getEdgeDst(e);
       if (!self_inserted) {
         if (dst > src) {
           g.constructEdge(e+src, src, 0);
           g.constructEdge(e+src+1, dst, 0);
           self_inserted = true;
-        else if (e+1 == end) {
+        } else if (e+1 == end) {
           g.constructEdge(e+src+1, src, 0);
           g.constructEdge(e+src, dst, 0);
           self_inserted = true;
         } else g.constructEdge(e+src, dst, 0);
       } else g.constructEdge(e+src+1, dst, 0);
+    }
   }
+  */
 }
 
 float_t* Context::get_in_ptr() { return &h_feats[0]; }
