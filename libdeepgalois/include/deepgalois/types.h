@@ -3,6 +3,8 @@
 #include <vector>
 #include <stdint.h>
 
+// TODO namespace
+
 #ifdef CNN_USE_DOUBLE
 typedef double float_t;
 typedef double feature_t;

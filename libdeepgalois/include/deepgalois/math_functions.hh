@@ -16,6 +16,8 @@ extern "C" {
 //#include <clapack.h>
 }
 
+// TODO namespace
+
 const float negative_slope = 0;
 
 void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add

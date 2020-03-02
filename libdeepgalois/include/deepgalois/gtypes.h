@@ -2,6 +2,8 @@
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
 
+// TODO namespace
+
 typedef galois::GAccumulator<acc_t> AccumF;
 typedef galois::GAccumulator<size_t> AccumU;
 
