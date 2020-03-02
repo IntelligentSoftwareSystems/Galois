@@ -22,7 +22,7 @@
 #include <utility>
 #include <algorithm>
 #include <unordered_set>
-#include "deepgalois/node.h"
+#include "deepgalois/layers/node.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/gtypes.h"

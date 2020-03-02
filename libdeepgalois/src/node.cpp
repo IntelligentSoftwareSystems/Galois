@@ -1,4 +1,4 @@
-#include "deepgalois/node.h"
+#include "deepgalois/layers/node.h"
 #include <iostream>
 
 namespace deepgalois {
