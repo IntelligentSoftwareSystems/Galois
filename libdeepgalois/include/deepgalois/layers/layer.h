@@ -1,6 +1,6 @@
 #pragma once
 /**
- * Code from on below link. Modified under Galois.
+ * Code from on below link. Modified under Galois's license.
  *
  * https://github.com/tiny-dnn/tiny-dnn/blob/master/tiny_dnn/layers/layer.h
  *

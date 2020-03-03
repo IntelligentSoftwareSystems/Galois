@@ -46,8 +46,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
+  src/layers/aggregator.cpp
   src/math_functions.cpp
-  src/aggregator.cpp
   src/optimizer.cpp
   src/context.cpp
   src/node.cpp

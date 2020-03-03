@@ -1,9 +1,10 @@
 #pragma once
 #include "layer.h"
-#include "deepgalois/aggregator.h"
+#include "deepgalois/layers/aggregator.h"
 
 /**
- * GraphConv Layer; based on DGL implementation
+ * GraphConv Layer; based on DGL implementation + follows TinyDNN layer
+ * convention 
  * https://docs.dgl.ai/en/0.4.x/_modules/dgl/nn/pytorch/conv/graphconv.html
  *
  *   Parameters

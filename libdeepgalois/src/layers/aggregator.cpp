@@ -1,4 +1,4 @@
-#include "deepgalois/aggregator.h"
+#include "deepgalois/layers/aggregator.h"
 #include "deepgalois/math_functions.hh"
 
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
