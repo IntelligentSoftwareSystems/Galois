@@ -1,5 +1,14 @@
 #ifndef QUICK_PATTERN_HPP_
 #define QUICK_PATTERN_HPP_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/rstream-system/RStream/
+ *
+ * Copyright (c) 2018, Kai Wang and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
 
 #include "embedding.h"
 #include "equivalence.h"

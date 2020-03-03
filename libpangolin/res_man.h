@@ -1,5 +1,14 @@
 #ifndef RESOURCE_MANAGER_HPP_
 #define RESOURCE_MANAGER_HPP_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/rstream-system/RStream/
+ *
+ * Copyright (c) 2018, Kai Wang and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
 
 #include <sys/time.h>
 #include <sys/resource.h>

@@ -1,5 +1,15 @@
 #ifndef EDGE_MINER_H_
 #define EDGE_MINER_H_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/zakimjz/DistGraph
+ *
+ * Copyright (c) 2017 Nilothpal Talukder and Mohammed J. Zaki
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include "miner.h"
 #include "egonet.h"
 #include "dfscode.h"

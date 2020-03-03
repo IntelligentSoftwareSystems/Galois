@@ -1,5 +1,14 @@
 #ifndef __DFS_CODE_HPP__
 #define __DFS_CODE_HPP__
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/zakimjz/DistGraph
+ *
+ * Copyright (c) 2017 Nilothpal Talukder and Mohammed J. Zaki
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
 
 #include <set>
 #include <map>

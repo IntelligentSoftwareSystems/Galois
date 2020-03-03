@@ -1,5 +1,15 @@
 #ifndef EMBEDDING_HPP_
 #define EMBEDDING_HPP_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/rstream-system/RStream/
+ *
+ * Copyright (c) 2018, Kai Wang and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include <map>
 #include <set>
 #include <queue>

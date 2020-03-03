@@ -4,6 +4,16 @@
 // SimpleElement: vertex_id. Used for KCL and TC.
 #ifndef ELEMENT_HPP_
 #define ELEMENT_HPP_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/rstream-system/RStream/
+ *
+ * Copyright (c) 2018, Kai Wang and the respective contributors
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include "types.h"
 
 class EdgeComparator {

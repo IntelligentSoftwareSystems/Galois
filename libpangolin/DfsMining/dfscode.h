@@ -1,5 +1,15 @@
 #ifndef __DFSCODE_H__
 #define __DFSCODE_H__
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/zakimjz/DistGraph
+ *
+ * Copyright (c) 2017 Nilothpal Talukder and Mohammed J. Zaki
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 typedef unsigned VeridT;
 typedef unsigned LabelT;
 typedef std::vector<VeridT> RMPath;

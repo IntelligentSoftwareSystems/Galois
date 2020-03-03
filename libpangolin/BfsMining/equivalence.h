@@ -1,5 +1,14 @@
 #ifndef EQUIVALENCE_HPP_
 #define EQUIVALENCE_HPP_
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/qcri/Arabesque
+ *
+ * Copyright (c) 2015 Qatar Computing Research Institute
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
 
 typedef std::set<unsigned> UintSet;
 typedef std::vector<UintSet> UintSets;

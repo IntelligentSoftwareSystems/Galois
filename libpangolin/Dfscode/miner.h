@@ -1,5 +1,13 @@
-// Copyright 2019, University of Texas at Austin
-// Authors: Xuhao Chen <cxh@utexas.edu>
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/zakimjz/DistGraph
+ *
+ * Copyright (c) 2017 Nilothpal Talukder and Mohammed J. Zaki
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include <deque>
 #include <math.h>
 #include <unistd.h>

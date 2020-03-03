@@ -1,5 +1,15 @@
 #ifndef DOMAIN_SUPPORT_H
 #define DOMAIN_SUPPORT_H
+/**
+ * Code from on below link. Modified under Galois.
+ *
+ * https://github.com/qcri/Arabesque
+ *
+ * Copyright (c) 2015 Qatar Computing Research Institute
+ * All rights reserved.
+ * Reused/revised under 3-BSD
+ */
+
 #include "types.h"
 
 #ifdef USE_GSTL
