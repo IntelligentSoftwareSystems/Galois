@@ -34,15 +34,18 @@ public:
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_context(context);
   }
+  //! set netphases for all layers in this network
   void set_netphases(deepgalois::net_phase phase) {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_netphase(phase);
   }
+  //! print all layers
   void print_layers_info() {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->print_layer_info();
   }
 
+  //! Add a convolution layer to the network
   void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
                          bool bias = false, bool dropout = true,
                          float_t dropout_rate = 0.5) {
@@ -58,6 +61,7 @@ public:
       connect(layers[layer_id - 1], layers[layer_id]);
   }
 
+  //! Add an output layer to the network
   void append_out_layer(size_t layer_id) {
     assert(layer_id > 0); // can not be the first layer
     std::vector<size_t> in_dims(2), out_dims(2);
@@ -68,15 +72,16 @@ public:
     connect(layers[layer_id - 1], layers[layer_id]);
   }
 
-  // forward propagation: [begin, end) is the range of samples used.
+  //! forward propagation: [begin, end) is the range of samples used.
+  //! calls "forward" on the layers of the network and returns the loss of the
+  //! final layer
   acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
     // set mask for the last layer
     layers[num_layers - 1]->set_sample_mask(begin, end, count, masks);
     // layer0: from N x D to N x 16
     // layer1: from N x 16 to N x E
     // layer2: from N x E to N x E (normalize only)
-    for (size_t i = 0; i < num_layers; i++)
-      layers[i]->forward();
+    for (size_t i = 0; i < num_layers; i++) layers[i]->forward();
     return layers[num_layers - 1]->get_masked_loss();
   }
 

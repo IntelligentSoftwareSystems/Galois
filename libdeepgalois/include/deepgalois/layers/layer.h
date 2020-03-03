@@ -59,6 +59,7 @@ public:
   virtual void set_netphase(deepgalois::net_phase phase) {}
   //! save context
   virtual void set_context(deepgalois::Context* ctx) { context = ctx; }
+  //! return layer loss
   virtual acc_t get_masked_loss() { return acc_t(0); }
 
   // main functions for layer work
@@ -78,9 +79,9 @@ public:
   mask_t* get_device_masks() { return d_masks_; }
   //! debug print function
   void print_layer_info() {
-    std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
-              << input_dims[0] << "," << input_dims[1] << "] output["
-              << output_dims[0] << "," << output_dims[1] << "]\n";
+    galois::gPrint("Layer", level_, " type: ", layer_type(), " input[",
+                   input_dims[0], ",", input_dims[1], "] output[",
+                   output_dims[0], ",", output_dims[1], "]\n");
   }
   virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
                                size_t sample_count, mask_t* masks) {
@@ -124,7 +125,7 @@ public:
                      next()->get_gradient(), prev()->get_gradient());
   }
 
-  //! use optimizer to update weights given gradient
+  //! use optimizer to update weights given gradient (weight_grad)
   void update_weight(deepgalois::optimizer* opt) {
     // vec_t diff;
     // prev()->merge_grads(&diff);
