@@ -36,6 +36,21 @@ void clear(vec_t& in);
 //! clear n elements of a vector
 void clear(size_t n, float_t* in);
 
+// dropout functions apply a random scale to in vector
+void dropout(const float scale, const float dropout_rate, const vec_t& in,
+             std::vector<unsigned>& mask, vec_t& out); // dropout
+void dropout(const float scale, const float dropout_rate, const vec_t& in,
+             std::vector<unsigned>& mask, float_t* out);
+void dropout(size_t n, const float scale, const float dropout_rate,
+             const float_t* in, unsigned* mask, float_t* out);
+// dropout calls that use existing scales in masks instead of generating them
+void d_dropout(const float scale, const vec_t& in_diff,
+               std::vector<unsigned>& mask,
+               vec_t& out_diff); // dropout derivative
+void d_dropout(size_t n, const float scale, const float_t* in_diff,
+               unsigned* mask, float_t* out_diff);
+
+
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B,
                 float_t* C); // matrix multiply
@@ -71,17 +86,6 @@ void relu(const vec_t& in, vec_t& out);               // ReLU
 void relu(size_t n, const float_t* in, float_t* out); // ReLU
 void d_relu(const vec_t& in_diff, const vec_t& data,
             vec_t& out_diff); // ReLU derivative
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& mask, vec_t& out); // dropout
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& mask, float_t* out);
-void dropout(size_t n, const float scale, const float dropout_rate,
-             const float_t* in, unsigned* mask, float_t* out);
-void d_dropout(const float scale, const vec_t& in_diff,
-               std::vector<unsigned>& mask,
-               vec_t& out_diff); // dropout derivative
-void d_dropout(size_t n, const float scale, const float_t* in_diff,
-               unsigned* mask, float_t* out_diff);
 void softmax(const vec_t& input, vec_t& output);
 void softmax(size_t n, const float_t* input, float_t* output);
 void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);

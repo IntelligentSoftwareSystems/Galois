@@ -10,6 +10,16 @@ extern "C" {
 namespace deepgalois {
 namespace math {
 
+//! wrapper function to call cblas_sgemm
+void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
+               const int M, const int N, const int K, const float alpha,
+               const float* A, const float* B, const float beta, float* C) {
+  int lda = (TransA == CblasNoTrans) ? K : M;
+  int ldb = (TransB == CblasNoTrans) ? N : K;
+  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
+              beta, C, N);
+}
+
 // vector add
 #if defined(__AVX__) || defined(__AVX2__)
 void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
@@ -66,13 +76,42 @@ void clear(size_t n, float_t* in) {
     in[i] = 0;
 }
 
-void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
-               const int M, const int N, const int K, const float alpha,
-               const float* A, const float* B, const float beta, float* C) {
-  int lda = (TransA == CblasNoTrans) ? K : M;
-  int ldb = (TransB == CblasNoTrans) ? N : K;
-  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
-              beta, C, N);
+void dropout(const float scale, const float dropout_rate, const vec_t& in,
+             std::vector<unsigned>& masks, vec_t& out) {
+  assert(masks.size() == out.size());
+  // rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
+  for (size_t i = 0; i < in.size(); ++i)
+    masks[i] = deepgalois::bernoulli(dropout_rate);
+  for (size_t i = 0; i < in.size(); ++i)
+    out[i] = in[i] * masks[i] * scale;
+}
+
+void dropout(const float scale, const float dropout_rate, const vec_t& in,
+             std::vector<unsigned>& masks, float_t* out) {
+  for (size_t i = 0; i < in.size(); ++i)
+    masks[i] = deepgalois::bernoulli(dropout_rate);
+  for (size_t i = 0; i < in.size(); ++i)
+    out[i] = in[i] * masks[i] * scale;
+}
+
+void dropout(size_t n, const float scale, const float dropout_rate,
+             const float_t* in, unsigned* masks, float_t* out) {
+  for (size_t i = 0; i < n; ++i)
+    masks[i] = deepgalois::bernoulli(dropout_rate);
+  for (size_t i = 0; i < n; ++i)
+    out[i] = in[i] * masks[i] * scale;
+}
+
+void d_dropout(const float scale, const vec_t& in_diff,
+               std::vector<unsigned>& masks, vec_t& out_diff) {
+  for (size_t i = 0; i < in_diff.size(); ++i)
+    out_diff[i] = in_diff[i] * masks[i] * scale;
+}
+
+void d_dropout(size_t n, const float scale, const float_t* in_diff,
+               unsigned* masks, float_t* out_diff) {
+  for (size_t i = 0; i < n; ++i)
+    out_diff[i] = in_diff[i] * masks[i] * scale;
 }
 
 // num rows in A, C; num columns in B, C; num columns in A, rows in B
@@ -85,7 +124,6 @@ void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
   sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
   Tmatmul.stop();
 }
-
 
 } // deepgalois
 } // math
@@ -352,43 +390,7 @@ float reduce_mean(const vec_t& x) {
   return sum / (float)n;
 }
 
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& masks, vec_t& out) {
-  assert(masks.size() == out.size());
-  // rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
-  for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
-  for (size_t i = 0; i < in.size(); ++i)
-    out[i] = in[i] * masks[i] * scale;
-}
 
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& masks, float_t* out) {
-  for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
-  for (size_t i = 0; i < in.size(); ++i)
-    out[i] = in[i] * masks[i] * scale;
-}
-
-void dropout(size_t n, const float scale, const float dropout_rate,
-             const float_t* in, unsigned* masks, float_t* out) {
-  for (size_t i = 0; i < n; ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
-  for (size_t i = 0; i < n; ++i)
-    out[i] = in[i] * masks[i] * scale;
-}
-
-void d_dropout(const float scale, const vec_t& in_diff,
-               std::vector<unsigned>& masks, vec_t& out_diff) {
-  for (size_t i = 0; i < in_diff.size(); ++i)
-    out_diff[i] = in_diff[i] * masks[i] * scale;
-}
-
-void d_dropout(size_t n, const float scale, const float_t* in_diff,
-               unsigned* masks, float_t* out_diff) {
-  for (size_t i = 0; i < n; ++i)
-    out_diff[i] = in_diff[i] * masks[i] * scale;
-}
 
 float_t sigmoid_func(float_t x) { return 0.5 * tanh(0.5 * x) + 0.5; }
 

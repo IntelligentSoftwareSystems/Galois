@@ -71,7 +71,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   if (dropout_ && phase_ == deepgalois::net_phase::train) {
     galois::do_all(galois::iterate((size_t)0, x),
       [&](const auto& i) {
-        dropout(y, scale_, dropout_rate_, &in_data[i * y],
+        deepgalois::math::dropout(y, scale_, dropout_rate_, &in_data[i * y],
                 &dropout_mask[i * y], &in_temp[i * y]);
       }, galois::loopname("dropout"));
     deepgalois::math::matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
@@ -115,7 +115,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     if (dropout_) {
       galois::do_all(galois::iterate((size_t)0, x),
         [&](const auto& i) {
-          d_dropout(y, scale_, &in_grad[i * y],
+          deepgalois::math::d_dropout(y, scale_, &in_grad[i * y],
                     &dropout_mask[i * y], &in_grad[i * y]);
         }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
         galois::loopname("d_dropout"));
