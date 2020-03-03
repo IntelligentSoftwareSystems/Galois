@@ -107,9 +107,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     deepgalois::math::copy1D1D(x * z, out_grad, out_temp); // TODO: avoid copying
   }
 
+  // at this point, out_temp has the derivative of activation
+
+  // this calculates feature gradients
   if (level_ != 0) { // no need to calculate in_grad for the first layer
     vec_t trans_W(z * y);
-    transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
+    // derivative of matmul needs transposed matrix
+    deepgalois::math::transpose(y, z, W, trans_W);
     deepgalois::math::matmul1D1D(x, y, z, out_temp, &trans_W[0], in_temp); // x*z; z*y -> x*y
     // sgemm_cpu(x, y, z, 1.0, out_temp, trans_W, 0.0, in_temp); // x*z; z*y ->
     // x*y NOTE: since graph is symmetric, the derivative is the same
@@ -126,7 +130,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   }
 
   // calculate weight gradients
-  transpose(x, y, in_data, trans_data);                       // y*x
+  deepgalois::math::transpose(x, y, in_data, trans_data);                       // y*x
   deepgalois::math::matmul1D1D(y, z, x, trans_data, out_temp, &weight_grad[0]); // y*x; x*z; y*z
 }
 

@@ -69,6 +69,11 @@ void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B,
                 float_t* C); // matrix multiply
 
+//! transposes a matrix (vector)
+void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
+//! transposes a matrix (malloc'd array)
+void transpose(size_t x, size_t y, const float_t* in, float_t* out);
+
 } // deepgalois
 } // math
 
@@ -90,8 +95,6 @@ void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
                 vec_t& C);
 void transpose2D(const tensor_t& in, tensor_t& out);
 void transpose2D1D(const tensor_t& in, vec_t& out);
-void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
-void transpose(size_t x, size_t y, const float_t* in, float_t* out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
 int argmax(const size_t n, const float_t* x); // the arguments of the maxima
 void softmax(const vec_t& input, vec_t& output);
