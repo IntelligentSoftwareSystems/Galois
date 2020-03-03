@@ -2,6 +2,8 @@
 #include "deepgalois/types.h"
 #include "deepgalois/gtypes.h"
 namespace deepgalois {
+//! For each node in the graph, add the embeddings of all of its neighbors
+//! together (using norm_factor if specified)
 void update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor);
 }

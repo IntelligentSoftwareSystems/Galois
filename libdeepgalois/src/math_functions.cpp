@@ -7,6 +7,9 @@ extern "C" {
 //#include <clapack.h>
 }
 
+namespace deepgalois {
+namespace math {
+
 // vector add
 #if defined(__AVX__) || defined(__AVX2__)
 void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
@@ -40,6 +43,11 @@ void vadd(size_t n, const float_t* a, const float_t* b, float_t* out) {
     out[i] = a[i] + b[i];
 }
 #endif
+
+} // deepgalois
+} // math
+
+
 
 // vector subtract
 void vsub(const vec_t& in_a, const vec_t& in_b, vec_t& out) {

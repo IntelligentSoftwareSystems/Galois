@@ -20,8 +20,18 @@ extern "C" {
 
 const float negative_slope = 0;
 
+namespace deepgalois {
+namespace math {
+
+//! add two same size vectors into out
 void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add
+//! add 2 arrays for n elements
 void vadd(size_t n, const float_t* a, const float_t* b, float_t* out);
+
+} // deepgalois
+} // math
+
+
 void vsub(const vec_t& a, const vec_t& b, vec_t& out);
 void vmul(const vec_t& a, const vec_t& b, vec_t& out);
 void vdiv(const vec_t& a, const vec_t& b, vec_t& out);
@@ -50,7 +60,9 @@ void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
 void transpose(size_t x, size_t y, const float_t* in, float_t* out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
 int argmax(const size_t n, const float_t* x); // the arguments of the maxima
+//! clear entire vector
 void clear(vec_t& in);
+//! clear n elements of a vector
 void clear(size_t n, float_t* in);
 void relu(const vec_t& in, vec_t& out);               // ReLU
 void relu(size_t n, const float_t* in, float_t* out); // ReLU

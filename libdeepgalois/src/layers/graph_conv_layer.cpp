@@ -21,7 +21,7 @@ void graph_conv_layer::combine(const vec_t& self, const vec_t& neighbors, vec_t&
   vec_t b(out.size(), 0);
   mvmul(Q, self, a);
   mvmul(W, neighbors, b);
-  vadd(a, b, out); // out = W*self + Q*neighbors
+  deepgalois::math::vadd(a, b, out); // out = W*self + Q*neighbors
 }
 
 graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
