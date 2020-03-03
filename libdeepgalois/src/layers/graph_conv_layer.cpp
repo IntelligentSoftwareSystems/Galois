@@ -4,14 +4,14 @@ namespace deepgalois {
 
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
-  update_all(len, g, in, out, true, context->norm_factor);
+  deepgalois::update_all(len, g, in, out, true, context->norm_factor);
 }
 #else
 void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
   #ifdef USE_CUSPARSE
   update_all_cusparse(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
   #else
-  update_all(len, g, in, out, true, context->d_norm_factor);
+  deepgalois::update_all(len, g, in, out, true, context->d_norm_factor);
   #endif
 }
 #endif
@@ -81,10 +81,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 
   graph_conv_layer::aggregate(z, context->graph_cpu, out_temp, out_data);
 
+  // run relu activation on output if specified
   if (act_) {
     galois::do_all(
         galois::iterate((size_t)0, x),
-        [&](const auto& i) { relu(z, &out_data[i * z], &out_data[i * z]); },
+        [&](const auto& i) { deepgalois::math::relu(z, &out_data[i * z],
+                                                    &out_data[i * z]); },
         galois::loopname("relu"));
   }
 }
@@ -94,6 +96,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
   if (act_) {
+    // note; assumption here is that out_grad contains 1s or 0s via relu?
     galois::do_all(galois::iterate((size_t)0, x),
       [&](const auto& i) {
         for (size_t j = 0; j < z; ++j) // TODO: use in_data or out_data?
@@ -101,7 +104,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
                                 ? out_grad[i * z + j] : float_t(0);
       }, galois::loopname("d_relu"));
   } else {
-    copy1D1D(x * z, out_grad, out_temp); // TODO: avoid copying
+    deepgalois::math::copy1D1D(x * z, out_grad, out_temp); // TODO: avoid copying
   }
 
   if (level_ != 0) { // no need to calculate in_grad for the first layer
@@ -110,8 +113,8 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     deepgalois::math::matmul1D1D(x, y, z, out_temp, &trans_W[0], in_temp); // x*z; z*y -> x*y
     // sgemm_cpu(x, y, z, 1.0, out_temp, trans_W, 0.0, in_temp); // x*z; z*y ->
     // x*y NOTE: since graph is symmetric, the derivative is the same
-    update_all(y, context->graph_cpu, in_temp, in_grad, true,
-               context->norm_factor); // x*x; x*y -> x*y
+    deepgalois::update_all(y, context->graph_cpu, in_temp, in_grad, true,
+                           context->norm_factor); // x*x; x*y -> x*y
     if (dropout_) {
       galois::do_all(galois::iterate((size_t)0, x),
         [&](const auto& i) {

@@ -81,7 +81,10 @@ public:
     // layer0: from N x D to N x 16
     // layer1: from N x 16 to N x E
     // layer2: from N x E to N x E (normalize only)
-    for (size_t i = 0; i < num_layers; i++) layers[i]->forward();
+    for (size_t i = 0; i < num_layers; i++) {
+      layers[i]->forward();
+      // TODO need to sync model between layers here
+    }
     return layers[num_layers - 1]->get_masked_loss();
   }
 

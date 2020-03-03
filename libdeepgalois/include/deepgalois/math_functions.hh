@@ -18,10 +18,11 @@ extern "C" {
 
 // TODO namespace
 
-const float negative_slope = 0;
 
 namespace deepgalois {
 namespace math {
+
+const float negative_slope = 0;
 
 //! add two same size vectors into out
 void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add
@@ -36,20 +37,33 @@ void clear(vec_t& in);
 //! clear n elements of a vector
 void clear(size_t n, float_t* in);
 
-// dropout functions apply a random scale to in vector
+// dropout functions randomly remove weights
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, vec_t& out); // dropout
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, float_t* out);
 void dropout(size_t n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* mask, float_t* out);
-// dropout calls that use existing scales in masks instead of generating them
+// dropout calls that use existing dropouts in masks instead of generating them;
+// derivative
 void d_dropout(const float scale, const vec_t& in_diff,
                std::vector<unsigned>& mask,
                vec_t& out_diff); // dropout derivative
 void d_dropout(size_t n, const float scale, const float_t* in_diff,
                unsigned* mask, float_t* out_diff);
 
+//! relu = keep if positive
+void relu(const vec_t& in, vec_t& out);
+//! relu = keep if positive; first n units
+void relu(size_t n, const float_t* in, float_t* out);
+//! relu derivative; generally, 1 if x > 0, 0 otherwise
+void d_relu(const vec_t& in_diff, const vec_t& data,
+            vec_t& out_diff); // ReLU derivative
+
+//! copy vector from in -> out
+void copy1D1D(const vec_t& in, vec_t& out);
+//! copy vector from in -> out; first len elements
+void copy1D1D(size_t len, const float_t* in, float_t* out);
 
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B,
@@ -71,8 +85,6 @@ void vvmul(const vec_t& a, const vec_t& b, tensor_t& out);
 void matadd(size_t x, size_t y, const tensor_t& A, const tensor_t& B,
             tensor_t& C);
 void copy2D1D(const tensor_t& in, vec_t& out);
-void copy1D1D(const vec_t& in, vec_t& out);
-void copy1D1D(size_t len, const float_t* in, float_t* out);
 void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C);
 void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
                 vec_t& C);
@@ -82,10 +94,6 @@ void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
 void transpose(size_t x, size_t y, const float_t* in, float_t* out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
 int argmax(const size_t n, const float_t* x); // the arguments of the maxima
-void relu(const vec_t& in, vec_t& out);               // ReLU
-void relu(size_t n, const float_t* in, float_t* out); // ReLU
-void d_relu(const vec_t& in_diff, const vec_t& data,
-            vec_t& out_diff); // ReLU derivative
 void softmax(const vec_t& input, vec_t& output);
 void softmax(size_t n, const float_t* input, float_t* output);
 void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);

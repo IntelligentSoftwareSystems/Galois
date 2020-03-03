@@ -58,7 +58,7 @@ private:
   size_t x;
   size_t y;
   size_t z;
-  float_t* out_temp;
+  float_t* out_temp; //!< intermediate data temporary
   float_t* in_temp;
   float_t* trans_data;    // y*x
   unsigned* dropout_mask; // x*y

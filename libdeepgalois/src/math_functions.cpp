@@ -114,6 +114,33 @@ void d_dropout(size_t n, const float scale, const float_t* in_diff,
     out_diff[i] = in_diff[i] * masks[i] * scale;
 }
 
+void relu(const vec_t& in, vec_t& out) {
+  for (size_t i = 0; i < out.size(); ++i) {
+    out[i] = std::max(in[i], (float_t)0) +
+             negative_slope * std::min(in[i], (float_t)0);
+  }
+}
+
+void relu(size_t n, const float_t* in, float_t* out) {
+  for (size_t i = 0; i < n; ++i)
+    out[i] = std::max(in[i], float_t(0));
+}
+
+void d_relu(const vec_t& in_diff, const vec_t& fv, vec_t& out_diff) {
+  for (size_t i = 0; i < out_diff.size(); ++i) {
+    out_diff[i] = in_diff[i] * ((fv[i] > (float_t)0) +
+                                negative_slope * (fv[i] <= (float_t)0));
+  }
+}
+
+void copy1D1D(const vec_t& in, vec_t& out) {
+  std::copy(in.begin(), in.end(), &out[0]);
+}
+
+void copy1D1D(size_t len, const float_t* in, float_t* out) {
+  std::copy(in, in + len, out);
+}
+
 // num rows in A, C; num columns in B, C; num columns in A, rows in B
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B, float_t* C) {
@@ -226,13 +253,6 @@ void copy2D1D(const tensor_t& in, vec_t& out) {
   }
 }
 
-void copy1D1D(const vec_t& in, vec_t& out) {
-  std::copy(in.begin(), in.end(), &out[0]);
-}
-
-void copy1D1D(size_t len, const float_t* in, float_t* out) {
-  std::copy(in, in + len, out);
-}
 
 
 void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C) {
@@ -352,24 +372,6 @@ int argmax(const size_t n, const float_t* x) {
 }
 
 
-void relu(const vec_t& in, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i) {
-    out[i] = std::max(in[i], (float_t)0) +
-             negative_slope * std::min(in[i], (float_t)0);
-  }
-}
-
-void relu(size_t n, const float_t* in, float_t* out) {
-  for (size_t i = 0; i < n; ++i)
-    out[i] = std::max(in[i], float_t(0));
-}
-
-void d_relu(const vec_t& in_diff, const vec_t& fv, vec_t& out_diff) {
-  for (size_t i = 0; i < out_diff.size(); ++i) {
-    out_diff[i] = in_diff[i] * ((fv[i] > (float_t)0) +
-                                negative_slope * (fv[i] <= (float_t)0));
-  }
-}
 
 void d_mvmul(vec_t& in_diff, vec_t& h_in, tensor_t& out_diff) {
   vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff
