@@ -56,7 +56,7 @@ public:
   }
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
-  virtual void set_netphase(net_phase phase) {}
+  virtual void set_netphase(deepgalois::net_phase phase) {}
   //! save context
   virtual void set_context(deepgalois::Context* ctx) { context = ctx; }
   virtual acc_t get_masked_loss() { return acc_t(0); }

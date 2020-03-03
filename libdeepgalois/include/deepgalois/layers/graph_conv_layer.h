@@ -33,7 +33,7 @@ public:
   ~graph_conv_layer() {}
   void init();
   std::string layer_type() const override { return std::string("graph_conv"); }
-  void set_netphase(net_phase ctx) override { phase_ = ctx; }
+  void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
   // virtual void forward_propagation(const vec_t &in_data, vec_t &out_data);
   // virtual void back_propagation(const vec_t &in_data, const vec_t &out_data,
   // vec_t &out_grad, vec_t &in_grad);
@@ -57,7 +57,7 @@ private:
   bool dropout_; // whether to use dropout at first
   const float_t dropout_rate_;
   float_t scale_;
-  net_phase phase_;
+  deepgalois::net_phase phase_;
   size_t x;
   size_t y;
   size_t z;

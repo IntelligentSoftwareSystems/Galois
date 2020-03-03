@@ -68,7 +68,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
-  if (dropout_ && phase_ == net_phase::train) {
+  if (dropout_ && phase_ == deepgalois::net_phase::train) {
     galois::do_all(galois::iterate((size_t)0, x),
       [&](const auto& i) {
         dropout(y, scale_, dropout_rate_, &in_data[i * y],
@@ -133,7 +133,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
                                            float_t* out_data) {
   assert(y <= 128); // currently only support feature length <= 128
   init_const_gpu(x*z, 0.0, out_temp);
-  if (dropout_ && phase_ == net_phase::train) {
+  if (dropout_ && phase_ == deepgalois::net_phase::train) {
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
   } else sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, d_W, 0.0, out_temp);

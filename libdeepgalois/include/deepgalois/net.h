@@ -34,7 +34,7 @@ public:
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_context(context);
   }
-  void set_netphases(net_phase phase) {
+  void set_netphases(deepgalois::net_phase phase) {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_netphase(phase);
   }
