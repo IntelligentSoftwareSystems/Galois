@@ -34,7 +34,6 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
                                               &out[src * len]); // out[src] += in[dst]
                    }
                  },
-                 galois::chunk_size<CHUNK_SIZE>(),
                  galois::steal(),
                  galois::no_stats(),
                  galois::loopname("update_all"));
