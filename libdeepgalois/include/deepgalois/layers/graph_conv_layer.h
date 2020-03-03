@@ -34,9 +34,6 @@ public:
   void init();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
-  // virtual void forward_propagation(const vec_t &in_data, vec_t &out_data);
-  // virtual void back_propagation(const vec_t &in_data, const vec_t &out_data,
-  // vec_t &out_grad, vec_t &in_grad);
   virtual void forward_propagation(const float_t* in_data, float_t* out_data);
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);

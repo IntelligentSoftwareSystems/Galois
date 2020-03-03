@@ -44,16 +44,6 @@ void vadd(size_t n, const float_t* a, const float_t* b, float_t* out) {
 }
 #endif
 
-void clear(vec_t& in) {
-  for (size_t i = 0; i < in.size(); i++)
-    in[i] = 0;
-}
-
-void clear(size_t n, float_t* in) {
-  for (size_t i = 0; i < n; i++)
-    in[i] = 0;
-}
-
 // vector multiply scalar
 void mul_scalar(const float_t alpha, vec_t& Y) {
   for (size_t i = 0; i < Y.size(); ++i)
@@ -65,6 +55,38 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in,
   for (size_t i = 0; i < n; ++i)
     out[i] = alpha * in[i];
 }
+
+void clear(vec_t& in) {
+  for (size_t i = 0; i < in.size(); i++)
+    in[i] = 0;
+}
+
+void clear(size_t n, float_t* in) {
+  for (size_t i = 0; i < n; i++)
+    in[i] = 0;
+}
+
+void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
+               const int M, const int N, const int K, const float alpha,
+               const float* A, const float* B, const float beta, float* C) {
+  int lda = (TransA == CblasNoTrans) ? K : M;
+  int ldb = (TransB == CblasNoTrans) ? N : K;
+  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
+              beta, C, N);
+}
+
+// num rows in A, C; num columns in B, C; num columns in A, rows in B
+void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
+                const float_t* A, const float_t* B, float_t* C) {
+  galois::StatTimer Tmatmul("MatMul");
+  Tmatmul.start();
+  const CBLAS_TRANSPOSE TransA = CblasNoTrans;
+  const CBLAS_TRANSPOSE TransB = CblasNoTrans;
+  sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
+  Tmatmul.stop();
+}
+
+
 } // deepgalois
 } // math
 
@@ -174,14 +196,6 @@ void copy1D1D(size_t len, const float_t* in, float_t* out) {
   std::copy(in, in + len, out);
 }
 
-void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
-               const int M, const int N, const int K, const float alpha,
-               const float* A, const float* B, const float beta, float* C) {
-  int lda = (TransA == CblasNoTrans) ? K : M;
-  int ldb = (TransB == CblasNoTrans) ? N : K;
-  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
-              beta, C, N);
-}
 
 void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C) {
   // A: x*z; B: z*y; C: x*y
@@ -202,16 +216,6 @@ void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C) {
   }
 }
 
-// num rows in A, C; num columns in B, C; num columns in A, rows in B
-void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
-                const float_t* A, const float_t* B, float_t* C) {
-  galois::StatTimer Tmatmul("MatMul");
-  Tmatmul.start();
-  const CBLAS_TRANSPOSE TransA = CblasNoTrans;
-  const CBLAS_TRANSPOSE TransB = CblasNoTrans;
-  sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
-  Tmatmul.stop();
-}
 
 void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
                 vec_t& C) {
@@ -222,7 +226,7 @@ void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
   assert(C.size() == dim_x * dim_y);
   vec_t A1D(dim_x * dim_z);
   copy2D1D(A, A1D);
-  matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C[0]);
+  deepgalois::math::matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C[0]);
 }
 
 void matmul(const tensor_t& A, const vec_t& B, tensor_t& C) {
@@ -239,7 +243,7 @@ void matmul(const tensor_t& A, const vec_t& B, tensor_t& C) {
     std::copy(A[i].begin(), A[i].end(), ptr);
     ptr += dim_z;
   }
-  matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C1D[0]);
+  deepgalois::math::matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C1D[0]);
   for (size_t i = 0; i < dim_x; i++) {
     for (size_t j = 0; j < dim_y; ++j) {
       C[i][j] = C1D[i * dim_y + j];

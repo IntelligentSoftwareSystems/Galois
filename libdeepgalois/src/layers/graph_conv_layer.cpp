@@ -74,12 +74,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
         dropout(y, scale_, dropout_rate_, &in_data[i * y],
                 &dropout_mask[i * y], &in_temp[i * y]);
       }, galois::loopname("dropout"));
-    matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
+    deepgalois::math::matmul1D1D(x, z, y, in_temp, &W[0], out_temp); // x*y; y*z; x*z
   } else {
-    matmul1D1D(x, z, y, in_data, &W[0], out_temp); // x*y; y*z; x*z
+    deepgalois::math::matmul1D1D(x, z, y, in_data, &W[0], out_temp); // x*y; y*z; x*z
   }
 
-  aggregate(z, context->graph_cpu, out_temp, out_data);
+  graph_conv_layer::aggregate(z, context->graph_cpu, out_temp, out_data);
 
   if (act_) {
     galois::do_all(
@@ -107,7 +107,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   if (level_ != 0) { // no need to calculate in_grad for the first layer
     vec_t trans_W(z * y);
     transpose(y, z, W, trans_W); // derivative of matmul needs transposed matrix
-    matmul1D1D(x, y, z, out_temp, &trans_W[0], in_temp); // x*z; z*y -> x*y
+    deepgalois::math::matmul1D1D(x, y, z, out_temp, &trans_W[0], in_temp); // x*z; z*y -> x*y
     // sgemm_cpu(x, y, z, 1.0, out_temp, trans_W, 0.0, in_temp); // x*z; z*y ->
     // x*y NOTE: since graph is symmetric, the derivative is the same
     update_all(y, context->graph_cpu, in_temp, in_grad, true,
@@ -124,7 +124,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 
   // calculate weight gradients
   transpose(x, y, in_data, trans_data);                       // y*x
-  matmul1D1D(y, z, x, trans_data, out_temp, &weight_grad[0]); // y*x; x*z; y*z
+  deepgalois::math::matmul1D1D(y, z, x, trans_data, out_temp, &weight_grad[0]); // y*x; x*z; y*z
 }
 
 #else
@@ -137,7 +137,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
   } else sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, d_W, 0.0, out_temp);
-  aggregate(z, context->graph_gpu, out_temp, out_data);
+  graph_conv_layer::aggregate(z, context->graph_gpu, out_temp, out_data);
   if (act_) relu_gpu(x * z, out_data, out_data);
 }
 
