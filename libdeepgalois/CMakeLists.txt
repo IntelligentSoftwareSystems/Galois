@@ -28,11 +28,11 @@ else()
   link_directories(${CUDA_LIB})
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
   set(CUDA_SOURCES
+	  src/layers/aggregator.cu
     src/math_functions.cu
-	src/aggregator.cu
-	src/optimizer.cu
-	src/context.cu
-	src/node.cu
+	  src/optimizer.cu
+	  src/context.cu
+	  src/node.cu
   )
   cuda_add_library(dg_gpu ${CUDA_SOURCES})
   target_link_libraries(dg_gpu galois_gpu -lcudart -lcublas -lcurand)
