@@ -27,6 +27,14 @@ namespace math {
 void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add
 //! add 2 arrays for n elements
 void vadd(size_t n, const float_t* a, const float_t* b, float_t* out);
+//! multiply vector by scalar
+void mul_scalar(const float_t alpha, vec_t& Y);
+//! multiply n elements of vector by scalar
+void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
+//! clear entire vector
+void clear(vec_t& in);
+//! clear n elements of a vector
+void clear(size_t n, float_t* in);
 
 } // deepgalois
 } // math
@@ -37,8 +45,6 @@ void vmul(const vec_t& a, const vec_t& b, vec_t& out);
 void vdiv(const vec_t& a, const vec_t& b, vec_t& out);
 void add_scalar(const float_t alpha, vec_t& Y);
 void sub_scalar(const float_t alpha, vec_t& Y);
-void mul_scalar(const float_t alpha, vec_t& Y);
-void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
 void div_scalar(const float_t alpha, vec_t& Y);
 float_t dot(const vec_t& x, const vec_t& y);
 void mvmul(const vec_t& matrix, const vec_t& in_vector, vec_t& out_vector);
@@ -60,10 +66,6 @@ void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
 void transpose(size_t x, size_t y, const float_t* in, float_t* out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
 int argmax(const size_t n, const float_t* x); // the arguments of the maxima
-//! clear entire vector
-void clear(vec_t& in);
-//! clear n elements of a vector
-void clear(size_t n, float_t* in);
 void relu(const vec_t& in, vec_t& out);               // ReLU
 void relu(size_t n, const float_t* in, float_t* out); // ReLU
 void d_relu(const vec_t& in_diff, const vec_t& data,

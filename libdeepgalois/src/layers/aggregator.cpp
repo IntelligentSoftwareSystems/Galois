@@ -6,7 +6,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
   galois::do_all(galois::iterate(g),
                  [&](const GNode src) {
                    // zero out this node's out values
-                   clear(len, &out[src * len]);
+                   deepgalois::math::clear(len, &out[src * len]);
                    float_t a = 0.0;
                    float_t b = 0.0;
 
@@ -23,7 +23,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
                        vec_t neighbor(len);
                        // scale the neighbor's data  using the normalization
                        // factor
-                       mul_scalar(len, b, &in[dst * len], &neighbor[0]);
+                       deepgalois::math::mul_scalar(len, b, &in[dst * len], &neighbor[0]);
                        // use scaled data to update
                        deepgalois::math::vadd(len, &out[src * len], &neighbor[0],
                             &out[src * len]); // out[src] += in[dst]

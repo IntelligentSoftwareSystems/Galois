@@ -44,6 +44,27 @@ void vadd(size_t n, const float_t* a, const float_t* b, float_t* out) {
 }
 #endif
 
+void clear(vec_t& in) {
+  for (size_t i = 0; i < in.size(); i++)
+    in[i] = 0;
+}
+
+void clear(size_t n, float_t* in) {
+  for (size_t i = 0; i < n; i++)
+    in[i] = 0;
+}
+
+// vector multiply scalar
+void mul_scalar(const float_t alpha, vec_t& Y) {
+  for (size_t i = 0; i < Y.size(); ++i)
+    Y[i] *= alpha;
+}
+
+void mul_scalar(size_t n, const float_t alpha, const float_t* in,
+                float_t* out) {
+  for (size_t i = 0; i < n; ++i)
+    out[i] = alpha * in[i];
+}
 } // deepgalois
 } // math
 
@@ -81,17 +102,6 @@ void sub_scalar(const float_t alpha, vec_t& Y) {
     Y[i] -= alpha;
 }
 
-// vector multiply scalar
-void mul_scalar(const float_t alpha, vec_t& Y) {
-  for (size_t i = 0; i < Y.size(); ++i)
-    Y[i] *= alpha;
-}
-
-void mul_scalar(size_t n, const float_t alpha, const float_t* in,
-                float_t* out) {
-  for (size_t i = 0; i < n; ++i)
-    out[i] = alpha * in[i];
-}
 
 // vector divide scalar
 void div_scalar(const float_t alpha, vec_t& Y) {
@@ -299,15 +309,6 @@ int argmax(const size_t n, const float_t* x) {
   return max_ind;
 }
 
-void clear(vec_t& in) {
-  for (size_t i = 0; i < in.size(); i++)
-    in[i] = 0;
-}
-
-void clear(size_t n, float_t* in) {
-  for (size_t i = 0; i < n; i++)
-    in[i] = 0;
-}
 
 void relu(const vec_t& in, vec_t& out) {
   for (size_t i = 0; i < out.size(); ++i) {
