@@ -1,5 +1,5 @@
-#include "math_functions.hh"
-#include "context.h"
+#include "deepgalois/math_functions.hh"
+#include "deepgalois/context.h"
 #include "gg.h"
 #include "ggcuda.h"
 #include "cub/cub.cuh"
@@ -29,11 +29,11 @@ bool isnan_gpu(int n, const float_t *array) {
 }
 
 void gpu_rng_uniform(const int n, unsigned* r) {
-  CURAND_CHECK(curandGenerate(Context::curand_generator(), r, n));
+  CURAND_CHECK(curandGenerate(deepgalois::Context::curand_generator(), r, n));
 }
 
 void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) {
-  CURAND_CHECK(curandGenerateUniform(Context::curand_generator(), r, n));
+  CURAND_CHECK(curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
   const float range = b - a;
   if (range != float_t(1))
     scal_gpu(n, range, r);
@@ -42,7 +42,7 @@ void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) 
 }
 
 void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma, float_t* r) {
-  CURAND_CHECK(curandGenerateNormal(Context::curand_generator(), r, n, mu, sigma));
+  CURAND_CHECK(curandGenerateNormal(deepgalois::Context::curand_generator(), r, n, mu, sigma));
 }
 
 bool is_allocated_device(float_t* data) {
@@ -171,7 +171,7 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
       (TransA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
   cublasOperation_t cuTransB =
       (TransB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  CUBLAS_CHECK(cublasSgemm(Context::cublas_handle(), cuTransB, cuTransA,
+  CUBLAS_CHECK(cublasSgemm(deepgalois::Context::cublas_handle(), cuTransB, cuTransA,
                            N, M, K, &alpha, B, ldb, A, lda, &beta, C, N));
 }
 
@@ -189,14 +189,14 @@ void csrmm_gpu(const int M, const int N, const int K, const int nnz,
                const float* B, const float beta, float* C) {
   float *transpose_C;
   CUDA_CHECK(cudaMalloc((void**)&transpose_C, N * K * sizeof(float)));
-  CUSPARSE_CHECK(cusparseScsrmm2(Context::cusparse_handle(),
+  CUSPARSE_CHECK(cusparseScsrmm2(deepgalois::Context::cusparse_handle(),
                  CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                 M, N, K, nnz, &alpha, Context::cusparse_matdescr(), A_nonzeros, 
+                 M, N, K, nnz, &alpha, deepgalois::Context::cusparse_matdescr(), A_nonzeros, 
                  A_idx_ptr, A_nnz_idx, B, N, &beta, transpose_C, M)); 
   //transpose C
   const float one = 1.0;
   const float zero = 0.0; 
-  CUBLAS_CHECK(cublasSgeam(Context::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T,
+  CUBLAS_CHECK(cublasSgeam(deepgalois::Context::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T,
                            N, M, &one, transpose_C, M, &zero, transpose_C, M, C, N)); 
 }
 
@@ -205,25 +205,25 @@ void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N,
               const float beta, float* y) {
   cublasOperation_t cuTransA =
       (TransA == CblasNoTrans) ? CUBLAS_OP_T : CUBLAS_OP_N;
-  CUBLAS_CHECK(cublasSgemv(Context::cublas_handle(), cuTransA, N, M, &alpha, A,
+  CUBLAS_CHECK(cublasSgemv(deepgalois::Context::cublas_handle(), cuTransA, N, M, &alpha, A,
                            N, x, 1, &beta, y, 1));
 }
 
 void scal_gpu(const int N, const float alpha, float* X) {
-  CUBLAS_CHECK(cublasSscal(Context::cublas_handle(), N, &alpha, X, 1));
+  CUBLAS_CHECK(cublasSscal(deepgalois::Context::cublas_handle(), N, &alpha, X, 1));
 }
 
 void dot_gpu(const int n, const float* x, const float* y, float* out) {
-  CUBLAS_CHECK(cublasSdot(Context::cublas_handle(), n, x, 1, y, 1, out));
+  CUBLAS_CHECK(cublasSdot(deepgalois::Context::cublas_handle(), n, x, 1, y, 1, out));
 }
 
 void asum_gpu(const int n, const float* x, float* y) {
-  CUBLAS_CHECK(cublasSasum(Context::cublas_handle(), n, x, 1, y));
+  CUBLAS_CHECK(cublasSasum(deepgalois::Context::cublas_handle(), n, x, 1, y));
 }
 
 void scale_gpu(const int n, const float alpha, const float* x, float* y) {
-  CUBLAS_CHECK(cublasScopy(Context::cublas_handle(), n, x, 1, y, 1));
-  CUBLAS_CHECK(cublasSscal(Context::cublas_handle(), n, &alpha, y, 1));
+  CUBLAS_CHECK(cublasScopy(deepgalois::Context::cublas_handle(), n, x, 1, y, 1));
+  CUBLAS_CHECK(cublasSscal(deepgalois::Context::cublas_handle(), n, &alpha, y, 1));
 }
 
 __global__ void set_kernel(const int n, const float_t alpha, float_t* y) {

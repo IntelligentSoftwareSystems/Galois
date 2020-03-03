@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <sys/types.h>
-#include "context.h"
+#include "deepgalois/context.h"
 
 // random seeding
 int64_t cluster_seedgen(void) {

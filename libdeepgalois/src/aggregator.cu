@@ -1,9 +1,9 @@
 #include "gg.h"
 #include "ggcuda.h"
 #include "cub/cub.cuh"
-#include "cutils.h"
-#include "aggregator.h"
-#include "math_functions.hh"
+#include "deepgalois/cutils.h"
+#include "deepgalois/aggregator.h"
+#include "deepgalois/math_functions.hh"
 
 // TODO: use warp
 __device__ void scale_add(const int n, const float_t alpha, const float_t* a,

@@ -1,6 +1,6 @@
-#include "optimizer.h"
-#include "cutils.h"
-#include "math_functions.hh"
+#include "deepgalois/optimizer.h"
+#include "deepgalois/cutils.h"
+#include "deepgalois/math_functions.hh"
 
 __global__ void update_kernel(const int n, float_t alpha, float_t b1,
                          float_t b2, float_t b1_t, float_t b2_t,
@@ -14,7 +14,7 @@ __global__ void update_kernel(const int n, float_t alpha, float_t b1,
   }
 }
 
-void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+void deepgalois::adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
   //std::cout << "updating weights on GPU, n = " << n << "\n";
   //print_device_vector(10, dW, "dW");
   float_t* cache = get_gpu<0>(n, W);
