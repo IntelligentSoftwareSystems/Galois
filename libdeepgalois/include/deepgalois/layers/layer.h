@@ -134,7 +134,7 @@ public:
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
     bool parallel = (W.size() >= 512);
-    opt->update(weight_grad, W, parallel); // W += grad
+    opt->update(layer::weight_grad, layer::W, parallel); // W += grad
 #else
 	//std::cout << name_ << ": ";
     opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
@@ -166,20 +166,9 @@ protected:
 };
 
 
-// head: layer i+1, tail: layer i
-inline void connect(layer* head, layer* tail, size_t head_index = 0,
-                    size_t tail_index = 0) {
-  // auto out_shape = head->out_shape()[head_index];
-  // auto in_shape  = tail->in_shape()[tail_index];
-  // head->setup(false);
-  // if (in_shape.size() == 0) {
-  //	tail->set_in_shape(out_shape);
-  //	in_shape = out_shape;
-  //}
-  // if (out_shape.size() != in_shape.size())
-  //	connection_mismatch(*head, *tail);
-  // if (!head->next_[head_index])
-  //	throw nn_error("output edge must not be null");
+//! Connects tail to head's edge and sets that edge's target to tail
+//inline void connect(layer* head, layer* tail) {
+inline void connect(layer* head, layer* tail) {
   tail->prev_ = head->next_;
   tail->prev_->add_next_node(tail);
 }

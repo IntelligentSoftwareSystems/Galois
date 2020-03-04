@@ -49,8 +49,9 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::StatTimer Tfw("Train-Forward");
   galois::StatTimer Tbw("Train-Backward");
   galois::StatTimer Tval("Validation");
+
   Timer t_epoch;
-  // run epoches
+  // run epochs
   for (unsigned i = 0; i < num_epochs; i++) {
     std::cout << "Epoch " << std::setw(2) << i << std::fixed
               << std::setprecision(3) << ":";
@@ -59,18 +60,29 @@ void Net::train(optimizer* opt, bool need_validate) {
     // training steps
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
+
+    // forward: after this phase, layer edges will contain intermediate features
+    // for use during backprop
     Tfw.start();
     train_loss =
-        fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
+        Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
     train_acc = masked_accuracy(train_begin, train_end, train_count,
                                 &train_mask[0]); // predict
     Tfw.stop();
+
+    // backward: use intermediate features + ground truth to update layers
+    // with feature gradients whcih are then used to calculate weight gradients
     Tbw.start();
-    bprop(); // back propogation
+    Net::bprop();
     Tbw.stop();
+
+    // gradient update: use gradients stored on each layer to update model for
+    // next epoch
     Tupdate.start();
-    update_weights(opt); // update parameters
+    Net::update_weights(opt); // update parameters
     Tupdate.stop();
+
+    // validation / testing
     set_netphases(net_phase::test);
     std::cout << " train_loss = " << std::setw(5) << train_loss
               << " train_acc = " << std::setw(5) << train_acc;

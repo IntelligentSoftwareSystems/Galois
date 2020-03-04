@@ -36,6 +36,7 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
 void softmax_loss_layer::back_propagation(const float_t* in_data,
                                           const float_t* out_data,
                                           float_t* out_grad, float_t* in_grad) {
+  // note: out_grad is ignored because it shouldn't exist (this is output layer)
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_),
     [&](const auto& i) {

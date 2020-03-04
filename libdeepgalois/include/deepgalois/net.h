@@ -57,8 +57,7 @@ public:
     out_dims[1]              = get_out_dim(layer_id);
     layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                             dropout_rate, in_dims, out_dims);
-    if (layer_id > 0)
-      connect(layers[layer_id - 1], layers[layer_id]);
+    if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
   }
 
   //! Add an output layer to the network

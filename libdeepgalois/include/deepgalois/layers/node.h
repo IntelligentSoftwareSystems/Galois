@@ -34,8 +34,7 @@ public:
 
 protected:
   node() = delete;
-  friend void connect(layer* head, layer* tail, size_t head_index,
-                      size_t tail_index);
+  friend void connect(layer* head, layer* tail);
   mutable edgeptr_t prev_;
   mutable edgeptr_t next_;
 };
