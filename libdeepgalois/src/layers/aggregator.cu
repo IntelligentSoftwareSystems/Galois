@@ -2,7 +2,7 @@
 #include "ggcuda.h"
 #include "cub/cub.cuh"
 #include "deepgalois/cutils.h"
-#include "deepgalois/aggregator.h"
+#include "deepgalois/layers/aggregator.h"
 #include "deepgalois/math_functions.hh"
 
 // TODO: use warp
