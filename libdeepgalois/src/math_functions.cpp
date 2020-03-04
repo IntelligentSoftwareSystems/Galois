@@ -1,5 +1,6 @@
 #include "deepgalois/math_functions.hh"
 #include "galois/Timer.h"
+#include "galois/Galois.h"
 #include <immintrin.h>
 
 extern "C" {
@@ -14,10 +15,13 @@ namespace math {
 void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
                const int M, const int N, const int K, const float alpha,
                const float* A, const float* B, const float beta, float* C) {
+  galois::StatTimer Tmatmul("MatMul");
+  Tmatmul.start();
   int lda = (TransA == CblasNoTrans) ? K : M;
   int ldb = (TransB == CblasNoTrans) ? N : K;
   cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
               beta, C, N);
+  Tmatmul.stop();
 }
 
 // vector add
@@ -34,23 +38,20 @@ void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
     out[i] = a[i] + b[i];
 }
 
-void vadd(size_t n, const float_t* a, const float_t* b, float_t* out) {
+void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
   size_t vec_len        = 8;
   const size_t alignedN = n - n % vec_len;
   for (size_t i = 0; i < alignedN; i += vec_len)
-    _mm256_storeu_ps(
-        &out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
-  for (size_t i = alignedN; i < n; ++i)
-    out[i] = a[i] + b[i];
+    _mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
+  for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
 }
 #else
 void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
   for (size_t i = 0; i < out.size(); ++i)
     out[i] = a[i] + b[i];
 }
-void vadd(size_t n, const float_t* a, const float_t* b, float_t* out) {
-  for (size_t i = 0; i < n; ++i)
-    out[i] = a[i] + b[i];
+void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
+  for (size_t i = 0; i < n; ++i) out[i] = a[i] + b[i];
 }
 #endif
 
@@ -71,9 +72,9 @@ void clear(vec_t& in) {
     in[i] = 0;
 }
 
-void clear(size_t n, float_t* in) {
-  for (size_t i = 0; i < n; i++)
-    in[i] = 0;
+void clear_cpu(size_t n, float_t* in) {
+  for (size_t i = 0; i < n; i++) in[i] = 0;
+  // memset(in, 0, n*sizeof(float_t));
 }
 
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
@@ -94,12 +95,12 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
     out[i] = in[i] * masks[i] * scale;
 }
 
-void dropout(size_t n, const float scale, const float dropout_rate,
+void dropout_cpu(size_t n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* masks, float_t* out) {
-  for (size_t i = 0; i < n; ++i)
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
     masks[i] = deepgalois::bernoulli(dropout_rate);
-  for (size_t i = 0; i < n; ++i)
     out[i] = in[i] * masks[i] * scale;
+  }, galois::loopname("dropout"));
 }
 
 void d_dropout(const float scale, const vec_t& in_diff,
@@ -108,48 +109,46 @@ void d_dropout(const float scale, const vec_t& in_diff,
     out_diff[i] = in_diff[i] * masks[i] * scale;
 }
 
-void d_dropout(size_t n, const float scale, const float_t* in_diff,
-               unsigned* masks, float_t* out_diff) {
-  for (size_t i = 0; i < n; ++i)
-    out_diff[i] = in_diff[i] * masks[i] * scale;
+void d_dropout_cpu(size_t n, const float scale, const float_t* in,
+               unsigned* masks, float_t* out) {
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+    out[i] = in[i] * masks[i] * scale;
+  }, galois::loopname("d_dropout"));
 }
 
 void relu(const vec_t& in, vec_t& out) {
   for (size_t i = 0; i < out.size(); ++i) {
-    out[i] = std::max(in[i], (float_t)0) +
-             negative_slope * std::min(in[i], (float_t)0);
+    out[i] = std::max(in[i], (float_t)0);
   }
 }
 
-void relu(size_t n, const float_t* in, float_t* out) {
-  for (size_t i = 0; i < n; ++i)
+void relu_cpu(size_t n, const float_t* in, float_t* out) {
+  // TODO: vectorize
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
     out[i] = std::max(in[i], float_t(0));
+  }, galois::loopname("relu"));
 }
 
-void d_relu(const vec_t& in_diff, const vec_t& fv, vec_t& out_diff) {
-  for (size_t i = 0; i < out_diff.size(); ++i) {
-    out_diff[i] = in_diff[i] * ((fv[i] > (float_t)0) +
-                                negative_slope * (fv[i] <= (float_t)0));
-  }
+void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out) {
+  // TODO: vectorize
+  // check if original data greater than 0; if so keep grad
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+    out[i] = data[i] > float_t(0) ? in[i] : float_t(0);
+  }, galois::loopname("d_relu"));
 }
 
 void copy1D1D(const vec_t& in, vec_t& out) {
   std::copy(in.begin(), in.end(), &out[0]);
 }
 
-void copy1D1D(size_t len, const float_t* in, float_t* out) {
+void copy_cpu(size_t len, const float_t* in, float_t* out) {
   std::copy(in, in + len, out);
 }
 
 // num rows in A, C; num columns in B, C; num columns in A, rows in B
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B, float_t* C) {
-  galois::StatTimer Tmatmul("MatMul");
-  Tmatmul.start();
-  const CBLAS_TRANSPOSE TransA = CblasNoTrans;
-  const CBLAS_TRANSPOSE TransB = CblasNoTrans;
-  sgemm_cpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
-  Tmatmul.stop();
+  sgemm_cpu(CblasNoTrans, CblasNoTrans, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
 }
 
 // TODO make parallel

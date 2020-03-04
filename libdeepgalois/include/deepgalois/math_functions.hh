@@ -21,63 +21,61 @@ extern "C" {
 
 namespace deepgalois {
 namespace math {
-
-const float negative_slope = 0;
-
-//! add two same size vectors into out
-void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add
 //! add 2 arrays for n elements
-void vadd(size_t n, const float_t* a, const float_t* b, float_t* out);
-//! multiply vector by scalar
-void mul_scalar(const float_t alpha, vec_t& Y);
+void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
 //! multiply n elements of vector by scalar
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
+//! clear n elements of a vector
+void clear_cpu(size_t n, float_t* in);
+// dropout functions randomly remove weights
+void dropout_cpu(size_t n, const float scale, const float dropout_rate,
+             const float_t* in, unsigned* mask, float_t* out);
+// dropout derivative: use existing dropouts in masks instead of generating them;
+void d_dropout_cpu(size_t n, const float scale, const float_t* in_diff,
+               unsigned* mask, float_t* out_diff);
+//! ReLU = keep if positive
+void relu_cpu(size_t n, const float_t* in, float_t* out);
+//! ReLU derivative; generally, 1 if data > 0, 0 otherwise
+void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
+//! copy vector from in -> out; first len elements
+void copy_cpu(size_t len, const float_t* in, float_t* out);
+// single-precision dense matrix multiply
+void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
+               const int M, const int N, const int K, const float alpha,
+               const float* A, const float* B, const float beta, float* C);
+// single-precision sparse matrix dense matrix multiply, C = A * B, A is sparse
+void csrmm_cpu(const int M, const int N, const int K, const int nnz, 
+               const float alpha, const float* A_nonzeros, 
+	           const int* A_idx_ptr, const int* A_nonzero_idx,
+               const float* B, const float beta, float* C);
+} // deepgalois
+} // math
+
 //! clear entire vector
 void clear(vec_t& in);
-//! clear n elements of a vector
-void clear(size_t n, float_t* in);
-
+//! multiply vector by scalar
+void mul_scalar(const float_t alpha, vec_t& Y);
+//! add two same size vectors into out
+void vadd(const vec_t& a, const vec_t& b, vec_t& out); // vector add
 // dropout functions randomly remove weights
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, vec_t& out); // dropout
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& mask, float_t* out);
-void dropout(size_t n, const float scale, const float dropout_rate,
-             const float_t* in, unsigned* mask, float_t* out);
-// dropout calls that use existing dropouts in masks instead of generating them;
-// derivative
 void d_dropout(const float scale, const vec_t& in_diff,
-               std::vector<unsigned>& mask,
-               vec_t& out_diff); // dropout derivative
-void d_dropout(size_t n, const float scale, const float_t* in_diff,
-               unsigned* mask, float_t* out_diff);
-
-//! relu = keep if positive
+               std::vector<unsigned>& mask, vec_t& out_diff);
+//! ReLU = keep if positive
 void relu(const vec_t& in, vec_t& out);
-//! relu = keep if positive; first n units
-void relu(size_t n, const float_t* in, float_t* out);
-//! relu derivative; generally, 1 if x > 0, 0 otherwise
-void d_relu(const vec_t& in_diff, const vec_t& data,
-            vec_t& out_diff); // ReLU derivative
-
 //! copy vector from in -> out
 void copy1D1D(const vec_t& in, vec_t& out);
-//! copy vector from in -> out; first len elements
-void copy1D1D(size_t len, const float_t* in, float_t* out);
-
+//! matrix multiply
 void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                 const float_t* A, const float_t* B,
                 float_t* C); // matrix multiply
-
 //! transposes a matrix (vector)
 void transpose(size_t x, size_t y, const vec_t& in, vec_t& out);
 //! transposes a matrix (malloc'd array)
 void transpose(size_t x, size_t y, const float_t* in, float_t* out);
-
-} // deepgalois
-} // math
-
-
 void vsub(const vec_t& a, const vec_t& b, vec_t& out);
 void vmul(const vec_t& a, const vec_t& b, vec_t& out);
 void vdiv(const vec_t& a, const vec_t& b, vec_t& out);
