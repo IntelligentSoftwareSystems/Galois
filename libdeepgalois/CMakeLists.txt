@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
-SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS/build/include)
-SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS/build/lib)
+SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/include)
+SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/lib)
 set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
 set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
 SET(CUDA_INC /org/centers/cdgc/cuda/cuda-10.0/include)
@@ -16,7 +16,7 @@ include_directories("${MGPU_ROOT}/src")
 link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-set(USE_CPU OFF CACHE BOOL "Build DeepGalois without CUDA support")
+set(USE_CPU ON CACHE BOOL "Build DeepGalois without CUDA support")
 if(USE_CPU)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
 else()

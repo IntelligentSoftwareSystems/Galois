@@ -28,11 +28,11 @@ void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_
   deepgalois::update_all(len, g, in, out, true, context->norm_factor);
 }
 
-void graph_conv_layer::combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out) {
-  vec_t a(dim_y, 0);
-  vec_t b(dim_y, 0);
-  mvmul(dim_x, dim_y, Q, self, a);
-  mvmul(dim_x, dim_y, W, neighbors, b);
+void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {
+  float_t *a = new float_t[len];
+  float_t *b = new float_t[len];
+  mvmul(n, len, &Q[0], self, a);
+  mvmul(n, len, &W[0], neighbors, b);
   deepgalois::math::vadd(len, a, b, out); // out = W*self + Q*neighbors
 }
 
