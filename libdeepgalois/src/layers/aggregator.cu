@@ -68,7 +68,7 @@ void deepgalois::update_all(size_t len, CSRGraph& g, const float_t* in, float_t*
   CudaTest("solving update_all kernel failed");
 }
 
-void deepgalois::update_all_cusparse(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+void deepgalois::update_all_csrmm(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.nnodes;
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));

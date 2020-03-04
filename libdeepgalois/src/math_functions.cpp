@@ -8,6 +8,12 @@ extern "C" {
 //#include <clapack.h>
 }
 
+#define NOT_IMPLEMENTED                \
+  do {                                 \
+    std::cout << "Not Implemented Yet";\
+    exit(1);                           \
+  } while(0);
+
 namespace deepgalois {
 namespace math {
 
@@ -22,6 +28,21 @@ void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
   cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
               beta, C, N);
   Tmatmul.stop();
+}
+
+void csrmm_cpu(const int M, const int N, const int K, const int nnz, 
+               const float alpha, const float* A_nonzeros, 
+	           const int* A_idx_ptr, const int* A_nnz_idx,
+               const float* B, const float beta, float* C) {
+#ifdef USE_MKL
+  const char *matdescra = "GXXCX";//6 bytes
+  const char transa = 'N';
+  mkl_scsrmm (&transa, &M , &N, &K, &alpha , matdescra,
+    A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1,
+    B, &N, &beta , C, &N);
+#else
+  NOT_IMPLEMENTED;
+#endif
 }
 
 // vector add
