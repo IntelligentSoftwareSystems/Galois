@@ -231,9 +231,7 @@ float_t dot(size_t n, const float_t* x, const float_t* y) {
 }
 
 // matrix-vector multiply
-void mvmul(const vec_t& matrix, const vec_t& in_vector, vec_t& out_vector) {
-  size_t m = out_vector.size();
-  size_t n = in_vector.size();
+void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector) {
   for (size_t i = 0; i < m; ++i) {
     for (size_t j = 0; j < n; ++j) {
       out_vector[i] += matrix[i * n + j] * in_vector[j];

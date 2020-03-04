@@ -25,7 +25,6 @@
 #include "deepgalois/layers/node.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
-#include "deepgalois/gtypes.h"
 #include "deepgalois/context.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/math_functions.hh"
@@ -78,11 +77,7 @@ public:
 
   mask_t* get_device_masks() { return d_masks_; }
   //! debug print function
-  void print_layer_info() {
-    galois::gPrint("Layer", level_, " type: ", layer_type(), " input[",
-                   input_dims[0], ",", input_dims[1], "] output[",
-                   output_dims[0], ",", output_dims[1], "]\n");
-  }
+  void print_layer_info();
   virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
                                size_t sample_count, mask_t* masks) {
     begin_ = sample_begin;

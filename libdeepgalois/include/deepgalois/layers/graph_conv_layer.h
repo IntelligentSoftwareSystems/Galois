@@ -23,15 +23,15 @@
 namespace deepgalois {
 class graph_conv_layer : public layer {
 public:
-  graph_conv_layer(unsigned level, bool act, bool norm, bool bias, bool dropout,
-                   float_t dropout_rate, std::vector<size_t> in_dims,
-                   std::vector<size_t> out_dims);
+  graph_conv_layer(unsigned level, bool act, bool norm, bool bias,
+                   bool dropout, float_t dropout_rate,
+                   std::vector<size_t> in_dims, std::vector<size_t> out_dims);
   graph_conv_layer(unsigned level, std::vector<size_t> in_dims,
                    std::vector<size_t> out_dims)
-      : graph_conv_layer(level, false, true, false, true, 0.5, in_dims,
-                         out_dims) {}
+      : graph_conv_layer(level, false, true, false, true, 0.5, in_dims, out_dims) {}
   ~graph_conv_layer() {}
   void init();
+  void init_gpu();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
   //! Uses weights contained in this layer to update in_data (results from previous)
@@ -45,11 +45,10 @@ public:
 #ifdef CPU_ONLY
   virtual void aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
 #else
-  virtual void aggregate(size_t len, CSRGraph& g, const float_t* in,
-                         float_t* out);
+  virtual void aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
 #endif
   // user-defined combine function
-  virtual void combine(const vec_t& self, const vec_t& neighbors, vec_t& out);
+  virtual void combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out);
 
 private:
   bool act_;     // whether to use activation function at the end

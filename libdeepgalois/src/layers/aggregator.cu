@@ -59,7 +59,7 @@ __global__ void update_all_warp(size_t n, size_t len, CSRGraph g,
   }
 }
 
-void update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+void deepgalois::update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.nnodes;
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
@@ -68,7 +68,7 @@ void update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
   CudaTest("solving update_all kernel failed");
 }
 
-void update_all_cusparse(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+void deepgalois::update_all_cusparse(size_t len, CSRGraph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.nnodes;
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));

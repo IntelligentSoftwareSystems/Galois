@@ -2,28 +2,6 @@
 
 namespace deepgalois {
 
-#ifdef CPU_ONLY
-void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
-  deepgalois::update_all(len, g, in, out, true, context->norm_factor);
-}
-#else
-void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
-  #ifdef USE_CUSPARSE
-  update_all_cusparse(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
-  #else
-  deepgalois::update_all(len, g, in, out, true, context->d_norm_factor);
-  #endif
-}
-#endif
-
-void graph_conv_layer::combine(const vec_t& self, const vec_t& neighbors, vec_t& out) {
-  vec_t a(out.size(), 0);
-  vec_t b(out.size(), 0);
-  mvmul(Q, self, a);
-  mvmul(W, neighbors, b);
-  deepgalois::math::vadd(a, b, out); // out = W*self + Q*neighbors
-}
-
 graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
                                    bool bias, bool dropout, float_t dropout_rate,
                                    std::vector<size_t> in_dims,
@@ -36,16 +14,29 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
   z          = output_dims[1];
   trainable_ = true;
   name_      = layer_type() + "_" + std::to_string(level);
+#ifdef CPU_ONLY
   init();
+#else
+  init_gpu();
+#endif
   assert(dropout_rate_ < 1.);
   scale_ = 1. / (1. - dropout_rate_);
 }
 
-void graph_conv_layer::init() {
-  //std::cout << name_ << ": allocating memory for params and temp data... ";
-  Timer t_alloc;
-  t_alloc.Start();
 #ifdef CPU_ONLY
+void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
+  deepgalois::update_all(len, g, in, out, true, context->norm_factor);
+}
+
+void graph_conv_layer::combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out) {
+  vec_t a(dim_y, 0);
+  vec_t b(dim_y, 0);
+  mvmul(dim_x, dim_y, Q, self, a);
+  mvmul(dim_x, dim_y, W, neighbors, b);
+  deepgalois::math::vadd(len, a, b, out); // out = W*self + Q*neighbors
+}
+
+void graph_conv_layer::init() {
   rand_init_matrix(y, z, W); // randomly initialize trainable parameters
   // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);
@@ -55,25 +46,18 @@ void graph_conv_layer::init() {
   out_temp = new float_t[x * z]; // same as pre_sup in original GCN code:
                // https://github.com/chenxuhao/gcn/blob/master/gcn/layers.py
   trans_data = new float_t[y * x]; // y*x
-#else
-  gconv_malloc_device(x, y, z, dropout_, dropout_mask, in_temp, out_temp, d_W, layer::d_weight_grad);
-#endif
-  t_alloc.Stop();
-  std::cout << "Done, allocation time: " << t_alloc.Millisecs() << " ms\n";
 }
 
-#ifdef CPU_ONLY
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
   if (dropout_ && phase_ == deepgalois::net_phase::train) {
-    galois::do_all(galois::iterate((size_t)0, x),
-      [&](const auto& i) {
-        deepgalois::math::dropout(y, scale_, dropout_rate_, &in_data[i * y],
-                &dropout_mask[i * y], &in_temp[i * y]);
-      }, galois::loopname("dropout"));
+    galois::do_all(galois::iterate((size_t)0, x), [&](const auto& i) {
+      deepgalois::math::dropout(y, scale_, dropout_rate_, &in_data[i * y],
+                                &dropout_mask[i * y], &in_temp[i * y]);
+    }, galois::loopname("dropout"));
     deepgalois::math::matmul1D1D(x, z, y, in_temp, &layer::W[0], out_temp); // x*y; y*z; x*z
   } else {
     deepgalois::math::matmul1D1D(x, z, y, in_data, &layer::W[0], out_temp); // x*y; y*z; x*z
@@ -139,37 +123,6 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   deepgalois::math::matmul1D1D(y, z, x, trans_data, out_temp, &layer::weight_grad[0]); // y*x; x*z; y*z
 }
 
-#else
-// GPU forward: compute output features
-void graph_conv_layer::forward_propagation(const float_t* in_data,
-                                           float_t* out_data) {
-  assert(y <= 128); // currently only support feature length <= 128
-  init_const_gpu(x*z, 0.0, out_temp);
-  if (dropout_ && phase_ == deepgalois::net_phase::train) {
-    dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
-    sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
-  } else sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, d_W, 0.0, out_temp);
-  graph_conv_layer::aggregate(z, context->graph_gpu, out_temp, out_data);
-  if (act_) relu_gpu(x * z, out_data, out_data);
-}
-
-// GPU backward: compute input gradients (in_grad) and weight gradients (d_weight_grad)
-void graph_conv_layer::back_propagation(const float_t* in_data,
-                                        const float_t* out_data,
-                                        float_t* out_grad, float_t* in_grad) {
-  if (act_) d_relu_gpu(x * z, out_grad, out_data, out_temp);
-  else copy_gpu(x * z, out_grad, out_temp);
-  if (level_ != 0) {
-    sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
-#ifdef USE_CUSPARSE
-    update_all_cusparse(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
-#else
-    update_all(y, context->graph_gpu, in_temp, in_grad, true, context->d_norm_factor);
-#endif
-    if (dropout_) d_dropout_gpu(x * y, scale_, dropout_rate_, in_grad, dropout_mask, in_grad);
-  }
-  sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, layer::d_weight_grad);
-}
 #endif
 
 } // namespace

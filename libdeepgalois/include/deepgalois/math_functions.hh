@@ -85,7 +85,8 @@ void add_scalar(const float_t alpha, vec_t& Y);
 void sub_scalar(const float_t alpha, vec_t& Y);
 void div_scalar(const float_t alpha, vec_t& Y);
 float_t dot(const vec_t& x, const vec_t& y);
-void mvmul(const vec_t& matrix, const vec_t& in_vector, vec_t& out_vector);
+//void mvmul(const vec_t& matrix, const vec_t& in_vector, vec_t& out_vector);
+void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector);
 void vvmul(const vec_t& a, const vec_t& b, tensor_t& out);
 void matadd(size_t x, size_t y, const tensor_t& A, const tensor_t& B,
             tensor_t& C);
