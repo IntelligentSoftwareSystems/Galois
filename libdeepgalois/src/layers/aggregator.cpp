@@ -5,8 +5,8 @@
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   // zero out the output data
-  deepgalois::math::clear_cpu(g.size()*len, out);
   galois::do_all(galois::iterate(g), [&](const GNode src) {
+    deepgalois::math::clear_cpu(len , &out[src * len]);
     float_t a = 0.0;
     float_t b = 0.0;
     // get normalization factor if needed
