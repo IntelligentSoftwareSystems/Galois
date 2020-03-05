@@ -14,18 +14,15 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
   z          = output_dims[1];
   trainable_ = true;
   name_      = layer_type() + "_" + std::to_string(level);
-#ifdef CPU_ONLY
   init();
-#else
-  init_gpu();
-#endif
   assert(dropout_rate_ < 1.);
   scale_ = 1. / (1. - dropout_rate_);
+  if (norm_) norm_factor_counting(); // pre-compute normalizing factor
 }
 
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
-  deepgalois::update_all(len, g, in, out, true, context->norm_factor);
+  deepgalois::update_all(len, g, in, out, norm_, norm_factor);
 }
 
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {
@@ -44,6 +41,17 @@ void graph_conv_layer::init() {
   in_temp  = new float_t[x * y];
   out_temp = new float_t[x * z];
   trans_data = new float_t[y * x]; // y*x
+}
+
+void graph_conv_layer::norm_factor_counting() {
+  norm_factor = new float_t[n];
+  galois::do_all(galois::iterate((size_t)0, n),
+    [&](auto v) {
+      auto degree  = std::distance(context->graph_cpu.edge_begin(v), context->graph_cpu.edge_end(v));
+      float_t temp = std::sqrt(float_t(degree));
+      if (temp == 0.0) norm_factor[v] = 0.0;
+      else norm_factor[v] = 1.0 / temp;
+    }, galois::loopname("NormCounting"));
 }
 
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
@@ -78,7 +86,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     // derivative of matmul needs transposed matrix
     deepgalois::math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0], 0.0, in_temp); // x*z; z*y ->
     // x*y NOTE: since graph is symmetric, the derivative is the same
-    deepgalois::update_all(y, context->graph_cpu, in_temp, in_grad, true, context->norm_factor); // x*x; x*y -> x*y
+    deepgalois::update_all(y, context->graph_cpu, in_temp, in_grad, true, norm_factor); // x*x; x*y -> x*y
     if (dropout_) deepgalois::math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
   }
 

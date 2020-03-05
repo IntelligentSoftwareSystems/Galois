@@ -31,7 +31,7 @@ public:
       : graph_conv_layer(level, false, true, false, true, 0.5, in_dims, out_dims) {}
   ~graph_conv_layer() {}
   void init();
-  void init_gpu();
+  void norm_factor_counting();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
   //! Uses weights contained in this layer to update in_data (results from previous)
@@ -65,6 +65,7 @@ private:
   float_t* in_temp;
   float_t* trans_data;    // y*x
   unsigned* dropout_mask; // x*y
+  float_t* norm_factor;   // normalization constant based on graph structure, TODO: make it static
 
   // Glorot & Bengio (AISTATS 2010)
   inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix) {

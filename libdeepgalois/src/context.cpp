@@ -91,22 +91,6 @@ void Context::add_selfloop(Graph &og, Graph &g) {
 float_t* Context::get_in_ptr() { return &h_feats[0]; }
 #endif
 
-void Context::norm_factor_counting() {
-#ifdef CPU_ONLY
-  norm_factor = new float_t[n];
-  galois::do_all(galois::iterate((size_t)0, n),
-    [&](auto v) {
-      auto degree  = std::distance(graph_cpu.edge_begin(v),
-                                  graph_cpu.edge_end(v));
-      float_t temp = std::sqrt(float_t(degree));
-      if (temp == 0.0) norm_factor[v] = 0.0;
-      else norm_factor[v] = 1.0 / temp;
-    }, galois::loopname("NormCounting"));
-#else
-  norm_factor_counting_gpu();
-#endif
-}
-
 // labels contain the ground truth (e.g. vertex classes) for each example
 // (num_examples x 1). Note that labels is not one-hot encoded vector and it can
 // be computed as y.argmax(axis=1) from one-hot encoded vector (y) of labels if

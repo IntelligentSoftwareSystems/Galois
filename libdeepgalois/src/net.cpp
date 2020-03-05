@@ -7,7 +7,6 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool 
   // read graph, get num nodes
   num_samples = context->read_graph(dataset_str, selfloop);
   num_classes = context->read_labels(dataset_str);
-  context->norm_factor_counting(); // pre-compute normalizing factor
   num_epochs = epochs;
 
   //std::cout << "Reading label masks ... ";

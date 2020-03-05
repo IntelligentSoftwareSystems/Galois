@@ -22,56 +22,7 @@ int64_t cluster_seedgen(void) {
   return seed;
 }
 
-// computing normalization factor for each vertex
-__global__ void norm_factor_counting_node(int n, CSRGraph graph,
-                                            float_t* norm_fac) {
-  CUDA_KERNEL_LOOP(i, n) {
-    float_t temp = sqrt(float_t(graph.getOutDegree(i)));
-    if (temp == 0.0)
-      norm_fac[i] = 0.0;
-    else
-      norm_fac[i] = 1.0 / temp;
-  }
-}
-
-// TODO: make sure self-loop added for each vertex
-// computing normalization factor for each edge
-__global__ void norm_factor_counting_edge(int n, CSRGraph graph,
-                                            float_t* norm_fac) {
-  CUDA_KERNEL_LOOP(src, n) {
-    float_t d_src = float_t(graph.getOutDegree(src));
-    assert(d_src != 0.0); // should never be zero since self-loop added for each vertex
-    d_src = 1.0 / sqrt(d_src);
-    index_type start = graph.edge_begin(src);
-    index_type end = graph.edge_end(src);
-	for (index_type e = start; e != end; e++) {
-      index_type dst = graph.getEdgeDst(e);
-      float_t d_dst = float_t(graph.getOutDegree(dst));
-      assert(d_dst != 0.0);
-      d_dst = 1.0 / sqrt(d_dst);
-      norm_fac[e] = d_src * d_dst;
-    }
-  }
-}
-
 namespace deepgalois {
-
-void Context::norm_factor_counting_gpu() {
-  assert(graph_gpu.nnodes == n);
-  std::cout << "Pre-computing normalization factor (n=" << n << ")\n";
-#ifdef USE_CUSPARSE
-  int nnz = graph_gpu.nedges;
-  CUDA_CHECK(cudaMalloc((void**)&d_norm_factor, nnz * sizeof(float_t)));
-  init_const_kernel<<<CUDA_GET_BLOCKS(nnz), CUDA_NUM_THREADS>>>(nnz, 0.0, d_norm_factor);
-  norm_factor_counting_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, d_norm_factor);
-#else
-  CUDA_CHECK(cudaMalloc((void**)&d_norm_factor, n * sizeof(float_t)));
-  norm_factor_counting_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, d_norm_factor);
-#endif
-  CudaTest("solving norm_factor_counting kernel failed");
-}
 
 cublasHandle_t Context::cublas_handle_         = 0;
 cusparseHandle_t Context::cusparse_handle_     = 0;

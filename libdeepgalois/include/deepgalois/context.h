@@ -44,8 +44,6 @@ public:
   void DeviceQuery() {}
   bool CheckDevice(const int device_id) { return true; }
   int FindDevice(const int start_id = 0) { return 0; }
-  void norm_factor_counting();
-  void norm_factor_counting_gpu();
 
   size_t n;                    // number of samples: N
   size_t num_classes;          // number of classes: E
@@ -54,8 +52,6 @@ public:
   label_t* d_labels;           // labels on device
   vec_t h_feats;               // input features: N x D
   float_t* d_feats;            // input features on device
-  float_t* norm_factor;   // normalization constant based on graph structure
-  float_t* d_norm_factor; // norm_factor on device
 
 #ifdef CPU_ONLY
   Graph graph_cpu; // the input graph, |V| = N
