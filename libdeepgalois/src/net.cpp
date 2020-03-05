@@ -111,6 +111,7 @@ void Net::construct_layers() {
   append_conv_layer(1);                          // hidden1 layer
   append_out_layer(2);                           // output layer
   layers[0]->set_in_data(context->get_in_ptr()); // feed input data
+  context->norm_factor_counting();
   set_contexts();
 }
 

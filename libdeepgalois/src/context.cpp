@@ -7,18 +7,12 @@ Context::Context()
     : mode_(Context::CPU), solver_count_(1), solver_rank_(0),
       multiprocess_(false) {}
 Context::~Context() {}
-#endif
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
-#ifdef CPU_ONLY
   n = read_graph_cpu(dataset_str, "gr", selfloop);
-#else
-  n = read_graph_gpu(dataset_str, selfloop);
-#endif
   return n;
 }
 
-#ifdef CPU_ONLY
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
@@ -58,6 +52,17 @@ void Context::genGraph(LGraph& lg, Graph& g) {
     for (auto offset = row_begin; offset < row_end; offset++)
       g.constructEdge(offset, lg.get_dest(offset), 0);
   }
+}
+
+void Context::norm_factor_counting() {
+  norm_factor = new float_t[n];
+  galois::do_all(galois::iterate((size_t)0, n),
+    [&](auto v) {
+      auto degree  = std::distance(graph_cpu.edge_begin(v), graph_cpu.edge_end(v));
+      float_t temp = std::sqrt(float_t(degree));
+      if (temp == 0.0) norm_factor[v] = 0.0;
+      else norm_factor[v] = 1.0 / temp;
+    }, galois::loopname("NormCounting"));
 }
 
 void Context::add_selfloop(Graph &og, Graph &g) {
