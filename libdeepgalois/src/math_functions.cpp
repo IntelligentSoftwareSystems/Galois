@@ -45,48 +45,47 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 #endif
 }
 
+const size_t vec_len = 8;
 // vector add
 #if defined(__AVX__) || defined(__AVX2__)
-void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
-  // for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
-  size_t n              = out.size();
-  size_t vec_len        = 8;
-  const size_t alignedN = n - n % vec_len;
-  for (size_t i = 0; i < alignedN; i += vec_len)
-    _mm256_storeu_ps(
-        &out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
-  for (size_t i = alignedN; i < n; ++i)
-    out[i] = a[i] + b[i];
-}
-
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
-  size_t vec_len        = 8;
   const size_t alignedN = n - n % vec_len;
   for (size_t i = 0; i < alignedN; i += vec_len)
     _mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
   for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
 }
+
+void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
+  size_t n = out.size();
+  vadd_cpu(n, &a[0], &b[0], &out[0]);
+}
 #else
 void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i)
-    out[i] = a[i] + b[i];
+  for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
 }
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
   for (size_t i = 0; i < n; ++i) out[i] = a[i] + b[i];
 }
 #endif
 
+#if defined(__AVX__) || defined(__AVX2__)
+void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
+  const size_t alignedN = n - n % vec_len;
+  const __m256 scal = _mm256_set1_ps(alpha);
+  for (size_t i = 0; i < alignedN; i += vec_len)
+    _mm256_storeu_ps(&out[i], _mm256_mul_ps(_mm256_loadu_ps(&in[i]), scal));
+  for (size_t i = alignedN; i < n; ++i) out[i] = alpha * in[i];
+}
+#else
 // vector multiply scalar
 void mul_scalar(const float_t alpha, vec_t& Y) {
-  for (size_t i = 0; i < Y.size(); ++i)
-    Y[i] *= alpha;
+  for (size_t i = 0; i < Y.size(); ++i) Y[i] *= alpha;
 }
 
-void mul_scalar(size_t n, const float_t alpha, const float_t* in,
-                float_t* out) {
-  for (size_t i = 0; i < n; ++i)
-    out[i] = alpha * in[i];
+void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
+  for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
 }
+#endif
 
 void clear(vec_t& in) {
   for (size_t i = 0; i < in.size(); i++)
