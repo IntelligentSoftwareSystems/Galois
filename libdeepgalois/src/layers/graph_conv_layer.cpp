@@ -36,6 +36,17 @@ void graph_conv_layer::init() {
   rand_init_matrix(y, z, W); // randomly initialize trainable parameters
   // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);
+
+#ifdef GALOIS_USE_DIST
+  // setup gluon
+  layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad,
+                                                        y * z);
+  layer::syncSub =
+    new galois::graphs::GluonSubstrate<deepgalois::GluonGradients>(
+      *layer::gradientGraph, layer::gradientGraph->myHostID(),
+      layer::gradientGraph->numHosts(), false);
+#endif
+
   if (dropout_) dropout_mask = new unsigned[x * y];
   in_temp  = new float_t[x * y];
   out_temp = new float_t[x * z];

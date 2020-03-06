@@ -9,12 +9,16 @@
  * Reused/revised under 3-BSD
  */
 
-#include "deepgalois/layers/node.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/context.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/math_functions.hh"
+#include "deepgalois/layers/node.h"
+#ifdef GALOIS_USE_DIST
+#include "deepgalois/layers/GluonGradients.h"
+#include "galois/graphs/GluonSubstrate.h"
+#endif
 
 namespace deepgalois {
 
@@ -145,6 +149,12 @@ protected:
   mask_t* d_masks_;
   float_t* loss; // error for each vertex: N x 1
   deepgalois::Context* context;
+
+#ifdef GALOIS_USE_DIST
+  // Used for synchronization of weight gradients
+  deepgalois::GluonGradients* gradientGraph;
+  galois::graphs::GluonSubstrate<deepgalois::GluonGradients>* syncSub;
+#endif
 };
 
 
