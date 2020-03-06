@@ -33,17 +33,18 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
-  if (act_) d_relu_gpu(x * z, out_grad, out_data, out_temp);
-  else copy_gpu(x * z, out_grad, out_temp);
-  if (level_ != 0) {
-    sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_temp);
+  if (act_) d_relu_gpu(x * z, out_grad, out_data, out_grad);
 #ifdef USE_CUSPARSE
-    update_all_csrmm(y, context->graph_gpu, in_temp, in_grad, norm_, norm_factor);
+  update_all_csrmm(z, context->graph_gpu, out_grad, out_temp, norm_, norm_factor);
 #else
-    update_all(y, context->graph_gpu, in_temp, in_grad, norm_, norm_factor);
+  update_all(z, context->graph_gpu, out_grad, out_temp, norm_, norm_factor);
 #endif
+  if (level_ != 0) {
+    sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_grad);
     if (dropout_) d_dropout_gpu(x * y, scale_, dropout_rate_, in_grad, dropout_mask, in_grad);
   }
   sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, layer::d_weight_grad);
 }
+
 } // namespace
+

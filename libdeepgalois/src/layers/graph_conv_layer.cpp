@@ -67,12 +67,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   if (act_) deepgalois::math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
   //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
+  // x*y NOTE: since graph is symmetric, the derivative is the same
+  deepgalois::update_all(z, context->graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+
   // at this point, out_temp has the derivative of data from last step to
   // use for both updating gradients for features and gradients for weights
   // this calculates gradients for the node predictions
   if (level_ != 0) { // no need to calculate in_grad for the first layer
-    // x*y NOTE: since graph is symmetric, the derivative is the same
-    deepgalois::update_all(z, context->graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
     // derivative of matmul needs transposed matrix
     deepgalois::math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
     if (dropout_) deepgalois::math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
@@ -80,9 +81,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 
   // calculate weight gradients using input data
   // multiplied by gradients from last back prop step
-  //deepgalois::math::transpose(x, y, in_data, trans_data); // x*y -> y*x
-  //deepgalois::math::matmul1D1D(y, z, x, trans_data, out_temp, &layer::weight_grad[0]); // y*x; x*z; y*z
-  deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_grad, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+  deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
 }
 #endif
 } // namespace
