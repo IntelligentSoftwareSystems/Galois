@@ -2,6 +2,19 @@
 #include "gg.h"
 #include "ggcuda.h"
 
+// the arguments of the maxima
+__device__ int argmax_device(const int n, const float_t* x) {
+  float_t max    = x[0];
+  int max_ind = 0;
+  for (int i = 1; i < n; i++) {
+    if (x[i] > max) {
+      max_ind = i;
+      max     = x[i];
+    }
+  }
+  return max_ind;
+}
+
 __global__ void masked_accuracy_kernel(int num_classes, int begin,
                                        int end, mask_t* masks,
                                        float_t* preds, label_t* labels,
@@ -20,9 +33,9 @@ __global__ void masked_accuracy_kernel(int num_classes, int begin,
   total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_accuracy);
 }
 
-acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
-                          int count, mask_t* masks, float_t* preds,
-                          label_t* labels) {
+//acc_t masked_accuracy_gpu(int num_classes, int begin, int end, int count, mask_t* masks, float_t* preds, label_t* labels);
+acc_t masked_accuracy_gpu(int num_classes, int begin, int end, int count,
+                          mask_t* masks, float_t* preds, label_t* labels) {
   assert(count > 0);
   HGAccumulator<acc_t> accuracy_accum;
   Shared<acc_t> total_accuracy   = Shared<acc_t>(1);
@@ -35,6 +48,7 @@ acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
   return *(total_accuracy.cpu_rd_ptr()) / count;
 }
 
+namespace deepgalois {
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                            mask_t* masks) {
   return masked_accuracy_gpu(num_classes, begin, end, count,
@@ -42,4 +56,4 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                              layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
                              context->d_labels);
 }
-
+}

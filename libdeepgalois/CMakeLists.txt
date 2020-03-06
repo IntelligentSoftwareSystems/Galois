@@ -40,6 +40,7 @@ else()
     src/optimizer.cu
     src/context.cu
     src/node.cu
+    src/net.cu
   )
   cuda_add_library(dg_gpu ${CUDA_SOURCES})
   target_link_libraries(dg_gpu galois_gpu -lcudart -lcublas -lcusparse -lcurand)

@@ -115,9 +115,8 @@ void Net::construct_layers() {
   set_contexts();
 }
 
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
-                           mask_t* masks) {
 #ifdef CPU_ONLY
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
   AccumF accuracy_all;
   accuracy_all.reset();
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
@@ -130,12 +129,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
   },
   galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
   return accuracy_all.reduce() / (acc_t)count;
-#else
-  return masked_accuracy_gpu(num_classes, begin, end, count,
-                             layers[NUM_CONV_LAYERS]->get_device_masks(),
-                             layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
-                             context->d_labels);
-#endif
 }
+#endif
 
 } // namespace deepgalois
