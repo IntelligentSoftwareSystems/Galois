@@ -10,6 +10,10 @@
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include <boost/iterator/transform_iterator.hpp>
+#ifdef GALOIS_USE_DIST
+#include "galois/DistGalois.h"
+#include "galois/runtime/Network.h"
+#endif
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>
@@ -80,6 +84,11 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads);
   galois::runtime::setStatFile(statFile);
+
+#ifdef GALOIS_USE_DIST
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  if (net.ID == 0) {
+#endif
   LonestarGnnPrintVersion();
   std::cout << "Copyright (C) " << galois::getCopyrightYear()
             << " The University of Texas at Austin\n";
@@ -99,6 +108,10 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   }
   galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
   galois::runtime::reportParam("(NULL)", "Threads", numThreads);
+#ifdef GALOIS_USE_DIST
+  }
+#endif
+
   char name[256];
   gethostname(name, 256);
   galois::runtime::reportParam("(NULL)", "Hostname", name);

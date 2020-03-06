@@ -7,7 +7,12 @@ const char* desc = "Graph convolutional neural networks on an undirected graph";
 const char* url  = 0;
 
 int main(int argc, char** argv) {
+#ifndef GALOIS_USE_DIST
   galois::SharedMemSys G;
+#else
+  galois::DistMemSys G;
+#endif
+
   LonestarGnnStart(argc, argv, name, desc, url);
   deepgalois::Net network; // the neural network to train
   // read network, features, ground truth, initialize metadata
