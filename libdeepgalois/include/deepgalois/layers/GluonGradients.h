@@ -130,7 +130,7 @@ public:
   }
 
   //! Return local weight w
-  GradientType getData(uint32_t w) const {
+  GradientType& getData(uint32_t w) const {
     return _gradients[w];
   }
 

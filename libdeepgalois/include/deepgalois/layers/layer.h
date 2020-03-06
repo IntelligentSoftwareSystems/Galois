@@ -16,8 +16,9 @@
 #include "deepgalois/math_functions.hh"
 #include "deepgalois/layers/node.h"
 #ifdef GALOIS_USE_DIST
-#include "deepgalois/layers/GluonGradients.h"
 #include "galois/graphs/GluonSubstrate.h"
+#include "deepgalois/layers/GluonGradients.h"
+#include "deepgalois/layers/GradientSyncStructs.h"
 #endif
 
 namespace deepgalois {
