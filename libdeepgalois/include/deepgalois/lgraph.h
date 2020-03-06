@@ -4,10 +4,6 @@
 // defines the Learning Graph (LGraph) data structure
 #include <set>
 #include <string>
-#include <sstream>
-#include <fstream>
-#include <iostream>
-#include <algorithm>
 
 namespace deepgalois {
 

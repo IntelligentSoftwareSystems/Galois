@@ -9,19 +9,6 @@
  * Reused/revised under 3-BSD
  */
 
-#include <queue>
-#include <cmath>
-#include <vector>
-#include <limits>
-#include <memory>
-#include <string>
-#include <cassert>
-#include <iomanip>
-#include <numeric>
-#include <sstream>
-#include <utility>
-#include <algorithm>
-#include <unordered_set>
 #include "deepgalois/layers/node.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
