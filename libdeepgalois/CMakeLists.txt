@@ -1,26 +1,29 @@
 cmake_minimum_required(VERSION 2.8)
 
+# open blas
 SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/include)
 SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/lib)
-set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
-set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
-SET(CUDA_INC /org/centers/cdgc/cuda/cuda-10.0/include)
-SET(CUDA_LIB /org/centers/cdgc/cuda/cuda-10.0/lib64/)
 include_directories(${OPENBLAS_INC})
+link_directories(${OPENBLAS_LIB})
+
+# galois base libs
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CUDA_INC})
-include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
-include_directories("${CUB_ROOT}")
-include_directories("${MGPU_ROOT}/src")
-link_directories(${OPENBLAS_LIB})
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-set(USE_CPU ON CACHE BOOL "Build DeepGalois without CUDA support")
 if(NOT ENABLE_HETERO_GALOIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
 else()
-  #set( CMAKE_VERBOSE_MAKEFILE on )
+  # hetero path
+  set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
+  include_directories("${CUB_ROOT}")
+  set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
+  include_directories("${MGPU_ROOT}/src")
+
+  SET(CUDA_INC /org/centers/cdgc/cuda/cuda-10.0/include)
+  include_directories(${CUDA_INC})
+  include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
+
   find_package(CUDA REQUIRED)
   set(CUDA_SEPARABLE_COMPILATION ON)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
@@ -30,8 +33,10 @@ else()
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_70,code=sm_70)
   #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -G -Xcompiler -rdynamic)
   #set(CUDA_INCLUDE_DIRS /org/centers/cdgc/cuda/cuda-10.0/include ${CUDA_INCLUDE_DIRS})
+  SET(CUDA_LIB /org/centers/cdgc/cuda/cuda-10.0/lib64/)
   link_directories(${CUDA_LIB})
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
+
   set(CUDA_SOURCES
     src/layers/graph_conv_layer.cu
     src/layers/softmax_loss_layer.cu
@@ -70,13 +75,26 @@ endif()
 
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
 target_link_libraries(dg_cpu -lopenblas)
-target_link_libraries(dg_cpu -lcudart -lcublas -lcusparse -lcurand)
+
+if(ENABLE_HETERO_GALOIS)
+  target_link_libraries(dg_cpu -lcudart -lcublas -lcusparse -lcurand)
+endif()
 
 target_include_directories(dg_cpu PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# dist galois setup/linking to dg_cpu
+if(ENABLE_DIST_GALOIS)
+  target_link_libraries(dg_cpu galois_dist_async galois_cusp galois_gluon)
+  target_include_directories(dg_cpu PUBLIC
+    ${CMAKE_SOURCE_DIR}/libdist/include
+    ${CMAKE_SOURCE_DIR}/libcusp/include
+    ${CMAKE_SOURCE_DIR}/libgluon/include
+  )
+endif()
 
 set_target_properties(dg_cpu PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
