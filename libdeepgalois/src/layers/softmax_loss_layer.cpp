@@ -2,19 +2,16 @@
 
 namespace deepgalois {
 
+#ifdef CPU_ONLY
 softmax_loss_layer::softmax_loss_layer(unsigned level,
                                        std::vector<size_t> in_dims,
                                        std::vector<size_t> out_dims)
     : layer(level, in_dims, out_dims) {
   trainable_ = false;
   name_      = layer_type() + "_" + std::to_string(level);
-#ifdef CPU_ONLY
   loss = new float_t[in_dims[0]]; // error for each sample
-#else
-  float_malloc_device(in_dims[0], loss);
-#endif
 }
-#ifdef CPU_ONLY
+
 // TODO: need kernel fusion optimization
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
@@ -68,24 +65,6 @@ acc_t softmax_loss_layer::get_masked_loss() {
     galois::loopname("getMaskedLoss"));
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
-}
-#else // GPU implementation
-void softmax_loss_layer::forward_propagation(const float_t* in_data,
-                                             float_t* out_data) {
-  init_const_gpu(input_dims[0], 0.0, loss);
-  softmax_cross_entropy_gpu(input_dims[1], begin_, end_, in_data,
-                            d_masks_, context->d_labels, loss, out_data);
-}
-
-void softmax_loss_layer::back_propagation(const float_t* in_data,
-                                          const float_t* out_data,
-                                          float_t* out_grad, float_t* in_grad) {
-  d_softmax_cross_entropy_gpu(input_dims[1], begin_, end_, d_masks_,
-                              context->d_labels, out_data, in_grad);
-}
-
-acc_t softmax_loss_layer::get_masked_loss() {
-  return masked_avg_loss(begin_, end_, count_, d_masks_, loss);
 }
 #endif
 

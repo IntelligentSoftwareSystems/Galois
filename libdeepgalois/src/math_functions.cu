@@ -357,33 +357,6 @@ void d_softmax_cross_entropy_gpu(int len, int begin, int end,
   CudaTest("solving d_softmax_cross_entropy kernel failed");
 }
 
-__global__ void masked_avg_loss_kernel(int begin, int end, mask_t* masks,
-                                       float_t* loss,
-                                       HGAccumulator<acc_t> total) {
-  total.thread_entry();
-  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage local_loss;
-  CUDA_KERNEL_LOOP(i, end - begin) {
-    if (masks[begin + i] == 1)
-      // total += loss[begin+i];
-      total.reduce(loss[begin + i]);
-  }
-  total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_loss);
-}
-
-acc_t masked_avg_loss(int begin, int end, int count, mask_t* masks,
-                      float_t* loss) {
-  assert(count > 0);
-  HGAccumulator<acc_t> loss_accum;
-  Shared<acc_t> total_loss   = Shared<acc_t>(1);
-  *(total_loss.cpu_wr_ptr()) = 0;
-  loss_accum.rv              = total_loss.gpu_wr_ptr();
-  masked_avg_loss_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
-      begin, end, masks, loss, loss_accum);
-  CudaTest("solving masked_avg_loss kernel failed");
-  cudaDeviceSynchronize();
-  return *(total_loss.cpu_rd_ptr()) / count;
-}
-
 // the arguments of the maxima
 __device__ int argmax_device(const int n, const float_t* x) {
   float_t max    = x[0];
@@ -425,7 +398,7 @@ acc_t masked_accuracy_gpu(int num_classes, int begin, int end,
   accuracy_accum.rv              = total_accuracy.gpu_wr_ptr();
   masked_accuracy_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
       num_classes, begin, end, masks, preds, labels, accuracy_accum);
-  CudaTest("solving masked_avg_loss kernel failed");
+  CudaTest("solving masked_accuracy kernel failed");
   cudaDeviceSynchronize();
   return *(total_accuracy.cpu_rd_ptr()) / count;
 }
