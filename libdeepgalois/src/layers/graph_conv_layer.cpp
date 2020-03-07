@@ -86,13 +86,20 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // this calculates gradients for the node predictions
   if (level_ != 0) { // no need to calculate in_grad for the first layer
     // derivative of matmul needs transposed matrix
-    deepgalois::math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
-    if (dropout_) deepgalois::math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
+    deepgalois::math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0,
+                                out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
+    if (dropout_) {
+      deepgalois::math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask,
+                                      in_grad);
+    }
   }
 
   // calculate weight gradients using input data
   // multiplied by gradients from last back prop step
-  deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+  deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data,
+                              out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+  layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
+  //galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
 }
 #endif
 } // namespace

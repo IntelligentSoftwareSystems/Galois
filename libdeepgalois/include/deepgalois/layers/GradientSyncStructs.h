@@ -43,7 +43,6 @@ struct GradientSync {
     return false;
   }
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
-
 };
 
 // TODO bitset; might have to do it manually
