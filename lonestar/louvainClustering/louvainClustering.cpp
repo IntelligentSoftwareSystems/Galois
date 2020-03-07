@@ -25,6 +25,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
+#include "galois/AtomicHelpers.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -75,14 +76,14 @@ typedef galois::LargeArray<uint64_t> largeArray;
 
 //Maintain community information
 struct Comm {
-  uint64_t size;
-  uint64_t degree_wt;
+  std::atomic<uint64_t> size;
+  std::atomic<uint64_t> degree_wt;
 };
 
 typedef galois::LargeArray<Comm> CommArray;
 
 //Graph Node information
-struct Node {
+struct Node{
   uint64_t prev_comm_ass;
   uint64_t curr_comm_ass;
   uint64_t degree_wt;
@@ -153,7 +154,42 @@ double calConstantForSecondTerm(Graph& graph){
   return 1/(double)total_edge_weight_twice;
 }
 
+
+uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+
+  uint64_t max_index = sc; // Assign the intial value as self community
+  double cur_gain = 0;
+  double max_gain = 0;
+  double eix = counter[0] - self_loop_wt;
+  double ax = c_info[sc].degree_wt - degree_wt;
+  double eiy = 0;
+  double ay = 0;
+
+  auto stored_already = cluster_local_map.begin();
+  do {
+    if(sc != stored_already->first) {
+      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+      eiy = counter[stored_already->second]; // Total edges incident on cluster y
+      cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
+
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
+        max_gain = cur_gain;
+        max_index = stored_already->first; 
+      }
+    }
+    stored_already++; // Explore next cluster
+  } while (stored_already != cluster_local_map.end());
+
+  if(c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc ) {
+    max_index = sc;
+  }
+
+  return max_index;
+}
+
 double algoLouvainWithLocking(Graph& graph, largeArray& clusters, double curr_mod, double threshold, double lower) {
+  galois::gPrint("Inside algoLouvainWithLocking\n");
   CommArray c_info; // Community info
   CommArray c_update; // Used for updating community
 
@@ -170,6 +206,7 @@ double algoLouvainWithLocking(Graph& graph, largeArray& clusters, double curr_mo
   /*** Initialization ***/
   c_info.allocateBlocked(graph.size());
   c_update.allocateBlocked(graph.size());
+  cluster_wt_internal.allocateBlocked(graph.size()); 
 
   /* Initialization each node to its own cluster */
   galois::do_all(galois::iterate(graph),
@@ -194,36 +231,108 @@ double algoLouvainWithLocking(Graph& graph, largeArray& clusters, double curr_mo
                   c_update[n].size = 0;
                   });
 
-  galois::do_all(galois::iterate(graph),
-                [&](GNode n) {
+  galois::for_each(galois::iterate(graph),
+                [&](GNode n, auto& ctx) {
+                    auto n_data = graph.getData(n, flag_write_lock);
                     uint64_t degree = std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
                                                      graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
                     //TODO: Can we make it infinity??
                     uint64_t local_target = -1;
                     std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number
                     std::vector<uint64_t> counter; //Number of edges to each unique cluster
+                    uint64_t num_unique_clusters = 1;
+                    uint64_t self_loop_wt = 0;
 
                     if(degree > 0){
                       cluster_local_map[graph.getData(n).curr_comm_ass] = 0; // Add n's current cluster
                       counter.push_back(0); //Initialize the counter to zero (no edges incident yet)
 
-                      uint64_t num_unique_clusters = 1;
-                      uint64_t self_loop_wt = 0;
-                      //TODO: Make this cautious operator
+                      //TODO: Make this cautious operator; Find better way
                       //Grab lock on all the neighbors before making any changes
                       for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                        GNode dst = graph.getEdgeDst(ii, flag_read_lock);
-                        if(dst == n){
-                          self_loop_wt += graph.getEdgeData(ii, flag_no_lock); // Slef loop weights is recorded
-                        }
+                        graph.getData(graph.getEdgeDst(ii), flag_write_lock);
                       }
+
+                      //Assuming we have grabbed lock on all the neighbors
+                      for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+                        GNode dst = graph.getEdgeDst(ii);
+                        auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded
+                        if(dst == n){
+                          self_loop_wt += edge_wt; // Self loop weights is recorded
+                        }
+                        auto stored_already = cluster_local_map.find(graph.getData(dst).curr_comm_ass); // Check if it already exists
+                        if(stored_already != cluster_local_map.end()) {
+                          counter[stored_already->second] += edge_wt;
+                        } else {
+                         cluster_local_map[graph.getData(dst).curr_comm_ass] = num_unique_clusters;
+                         counter.push_back(edge_wt);
+                         num_unique_clusters++;
+                        }
+                      } // End edge loop
+
+                    // Find the max gain in modularity
+                    local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info,n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
 
                     } else {
                       local_target = -1;
                     }
-                });
-  }//end while
 
+                    /* Update cluster info */
+                    if(local_target != n_data.curr_comm_ass && local_target != -1) {
+                      galois::atomicAdd(c_update[local_target].degree_wt, n_data.degree_wt);
+                      galois::atomicAdd(c_update[local_target].size, (uint64_t)1);
+                      galois::atomicSubtract(c_update[n_data.curr_comm_ass].degree_wt, n_data.degree_wt);
+                      galois::atomicSubtract(c_update[n_data.curr_comm_ass].size, (uint64_t)1);
+                    }
+
+                    /* Set the new cluster id */
+                    n_data.curr_comm_ass = local_target;
+
+                    /* Update c info: Asynchronously TODO: Is this correct? */
+                    c_info[n].size += c_update[n].size;
+                    c_info[n].degree_wt += c_info[n].degree_wt;
+
+                }, galois::loopname("louvain algo: Phase 1"),
+                   galois::no_pushes());
+
+     /* Calculate the overall modularity */
+    double e_xx = 0;
+    double a2_x = 0;
+
+    galois::do_all(galois::iterate(graph),
+                  [&](GNode n) {
+                    cluster_wt_internal[n] = 0;
+                  });
+
+    galois::do_all(galois::iterate(graph),
+                  [&](GNode n) {
+                    auto n_data = graph.getData(n);
+                    for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+                      if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
+                        cluster_wt_internal[n] += graph.getEdgeData(ii);
+                      }
+                    }
+                  });
+
+    galois::do_all(galois::iterate(graph),
+                  [&](GNode n) {
+                    e_xx += cluster_wt_internal[n];
+                    a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                  });
+
+
+    curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
+
+    if((curr_mod - prev_mod) < threshold_mod){
+      break;
+    }
+
+    prev_mod = curr_mod;
+
+  //TODO: remove this
+  break;
+  }// End while
+  return prev_mod;
 }
 
 
@@ -251,6 +360,9 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, largeArray& clusters_orig, uint
     if(graph.size() > min_graph_size){
       curr_mod = algoLouvainWithLocking(graph, clusters_local, curr_mod, min_graph_size, c_threshold);
     }
+
+    //TODO:remove this
+    break;
 
   }
 
@@ -293,5 +405,9 @@ int main(int argc, char** argv) {
                   graph.getData(n).curr_comm_ass = INF_VAL;
                   clusters_orig[n] = INF_VAL;
                 });
+
+  double c_threshold = 0.0;
+  uint64_t min_graph_size = 100;
+  runMultiPhaseLouvainAlgorithm(graph, clusters_orig, min_graph_size, c_threshold);
   return 0;
 }
