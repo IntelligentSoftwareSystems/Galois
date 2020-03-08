@@ -199,6 +199,25 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
 uint64_t renumberClustersContiguously(Graph &graph) {
 
+  std::map<uint64_t, uint64_t> cluster_local_map;
+  uint64_t num_unique_clusters = 0;
+
+  for (GNode n = 0; n < graph.size(); ++n){
+    auto& n_data = graph.getData(n, flag_no_lock);
+    assert(n_data.curr_comm_ass < graph.size());
+    if(n_data.curr_comm_ass < INF_VAL) {
+      auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
+     if(stored_already != cluster_local_map.end()){
+      n_data.curr_comm_ass = stored_already->second;
+     } else {
+      cluster_local_map[n_data.curr_comm_ass] = num_unique_clusters;
+      n_data.curr_comm_ass = num_unique_clusters;
+      num_unique_clusters++;
+     }
+    }
+  }
+
+  return num_unique_clusters;
 }
 double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
   galois::gPrint("Inside algoLouvainWithLocking\n");
@@ -326,7 +345,6 @@ double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
                     cluster_wt_internal[n] = 0;
-                    //galois::gPrint("kk: ", n, " : ", graph.getData(n).curr_comm_ass, "\n");
                   });
 
     galois::GAccumulator<uint64_t> same_nodes, same_nodes2, num_edges;
@@ -343,14 +361,19 @@ double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, 
                   });
 
     galois::gPrint("same_nodes : ", same_nodes.reduce(), "\n");
-    galois::gPrint("edges : ", num_edges.reduce(), "\n");
+    galois::GAccumulator<uint64_t> acc_unique_clusters;
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
                     e_xx += cluster_wt_internal[n];
                     a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                    if(cluster_wt_internal[n] > 0)
+                      acc_unique_clusters += 1;
                   });
 
 
+    galois::gPrint("Number of unique clusters: ", acc_unique_clusters.reduce(), "\n");
+    uint64_t num_unique_clusters = renumberClustersContiguously(graph);
+    galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
     galois::gPrint("Mod : ", curr_mod, "\n");
@@ -364,8 +387,6 @@ double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, 
 
     prev_mod = curr_mod;
 
-  //TODO: remove this
-  //break;
   }// End while
   return prev_mod;
 }
