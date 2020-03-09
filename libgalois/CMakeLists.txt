@@ -86,6 +86,7 @@ endif()
 add_library(galois_shmem_obj OBJECT ${sources})
 target_include_directories(galois_shmem_obj PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/libtsuba/include>
   $<INSTALL_INTERFACE:${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}>
 )
 set_target_properties (galois_shmem_obj PROPERTIES 
