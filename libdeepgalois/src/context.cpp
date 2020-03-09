@@ -1,11 +1,13 @@
+/**
+ * Based on common.hpp file of the Caffe deep learning library.
+ */
+
 #include "deepgalois/context.h"
 
 namespace deepgalois {
 
 #ifdef CPU_ONLY
-Context::Context()
-    : mode_(Context::CPU), solver_count_(1), solver_rank_(0),
-      multiprocess_(false) {}
+Context::Context() {}
 Context::~Context() {}
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
