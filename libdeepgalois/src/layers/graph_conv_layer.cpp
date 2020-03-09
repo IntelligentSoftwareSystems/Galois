@@ -33,10 +33,6 @@ void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const 
 }
 
 void graph_conv_layer::init() {
-  rand_init_matrix(y, z, W); // randomly initialize trainable parameters
-  // rand_init_matrix(y, z, Q);
-  zero_init_matrix(y, z, layer::weight_grad);
-
 #ifdef GALOIS_USE_DIST
   // setup gluon
   layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad,
@@ -46,6 +42,16 @@ void graph_conv_layer::init() {
       *layer::gradientGraph, layer::gradientGraph->myHostID(),
       layer::gradientGraph->numHosts(), false);
 #endif
+
+#ifdef GALOIS_USE_DIST
+  // make sure seed consistent across all hosts for weight matrix
+  rand_init_matrix(y, z, W, 1);
+#else
+  rand_init_matrix(y, z, W);
+#endif
+
+  // rand_init_matrix(y, z, Q);
+  zero_init_matrix(y, z, layer::weight_grad);
 
   if (dropout_) dropout_mask = new unsigned[x * y];
   in_temp  = new float_t[x * y];
