@@ -10,6 +10,11 @@
 #include "tsuba_internal.h"
 #include "tsuba/tsuba.h"
 
+/* XXX our canonical dev region; must change if bucket is somewhere else */
+#define DEFAULT_S3_REGION "us-east-2"
+
+#define AWS_TAG "TsubaS3Client"
+
 int s3_uri_read(const char *uri, char *buf, char **bucket, char **object) {
 
   if (!tsuba_is_uri(uri))
@@ -30,9 +35,11 @@ int s3_uri_read(const char *uri, char *buf, char **bucket, char **object) {
 }
 
 int s3_open(const char *bucket, const char *object) {
-  auto s3_client = Aws::MakeShared<Aws::S3::S3Client>("TsubaS3Client");
+  Aws::Client::ClientConfiguration cfg;
+  cfg.region     = DEFAULT_S3_REGION;
+  auto s3_client = Aws::MakeShared<Aws::S3::S3Client>(AWS_TAG, cfg);
   auto executor  = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>(
-      "executor", n_cpus());
+      AWS_TAG, 1);
 
   Aws::Transfer::TransferManagerConfiguration transfer_config(executor.get());
   transfer_config.s3Client = s3_client;
