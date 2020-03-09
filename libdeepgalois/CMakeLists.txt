@@ -66,20 +66,9 @@ set(sources
   src/net.cpp
 )
 add_library(dg_cpu STATIC ${sources})
-
-if(NOT ENABLE_HETERO_GALOIS)
-  target_link_libraries(dg_cpu galois_shmem gllvm)
-else()
-  target_link_libraries(dg_cpu galois_shmem gllvm galois_gpu)
-endif()
-
+target_link_libraries(dg_cpu galois_shmem gllvm)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
 target_link_libraries(dg_cpu -lopenblas)
-
-if(ENABLE_HETERO_GALOIS)
-  target_link_libraries(dg_cpu -lcudart -lcublas -lcusparse -lcurand)
-endif()
-
 target_include_directories(dg_cpu PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
@@ -94,6 +83,15 @@ if(ENABLE_DIST_GALOIS)
     ${CMAKE_SOURCE_DIR}/libcusp/include
     ${CMAKE_SOURCE_DIR}/libgluon/include
   )
+
+  if(ENABLE_HETERO_GALOIS)
+    target_link_libraries(dg_gpu galois_dist_async galois_cusp galois_gluon)
+    target_include_directories(dg_gpu PUBLIC
+      ${CMAKE_SOURCE_DIR}/libdist/include
+      ${CMAKE_SOURCE_DIR}/libcusp/include
+      ${CMAKE_SOURCE_DIR}/libgluon/include
+    )
+  endif()
 endif()
 
 set_target_properties(dg_cpu PROPERTIES
