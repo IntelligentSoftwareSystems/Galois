@@ -75,6 +75,10 @@ void Context::add_selfloop(Graph &og, Graph &g) {
     auto end = og.edge_end(src);
     g.fixEndEdge(src, end+src+1);
     bool self_inserted = false;
+    if (begin == end) {
+      new_edge_dst[begin+i] = i;
+      continue;
+    }
     for (auto e = begin; e != end; e++) {
       auto dst = og.getEdgeDst(e);
       if (!self_inserted) {

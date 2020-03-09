@@ -36,6 +36,7 @@ __global__ void norm_factor_counting_node(int n, CSRGraph graph, float_t* norm_f
 // computing normalization factor for each edge
 __global__ void norm_factor_counting_edge(int n, CSRGraph graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(src, n) {
+    assert(src < n);
     float_t d_src = float_t(graph.getOutDegree(src));
     assert(d_src != 0.0); // should never be zero since self-loop added for each vertex
     d_src = 1.0 / sqrt(d_src);
@@ -43,6 +44,8 @@ __global__ void norm_factor_counting_edge(int n, CSRGraph graph, float_t* norm_f
     index_type end = graph.edge_end(src);
 	for (index_type e = start; e != end; e++) {
       index_type dst = graph.getEdgeDst(e);
+      if (dst >= n) printf("src=%d, dst=%d, e=%d, start=%d, end=%d\n", src, dst, e, start, end);
+      assert(dst < n);
       float_t d_dst = float_t(graph.getOutDegree(dst));
       assert(d_dst != 0.0);
       d_dst = 1.0 / sqrt(d_dst);

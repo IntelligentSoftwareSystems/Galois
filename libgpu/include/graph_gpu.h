@@ -123,6 +123,10 @@ struct CSRGraph {
 			index_type start = row_start[i];
 			index_type end = row_start[i+1];
 			bool selfloop_inserted = false;
+			if (start == end) {
+				new_edge_dst[start+i] = i;
+				continue;
+			}
 			for (index_type e = start; e != end; e++) {
 				index_type dst = edge_dst[e];
 				if (!selfloop_inserted) {
