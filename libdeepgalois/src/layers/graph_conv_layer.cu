@@ -8,7 +8,7 @@ void graph_conv_layer::init() {
 
 void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
   #ifdef USE_CUSPARSE
-  deepgalois::update_all_csrmm(y, context->graph_gpu, in_temp, in_grad, norm_, norm_factor);
+  deepgalois::update_all_csrmm(len, g, in, out, norm_, norm_factor);
   #else
   deepgalois::update_all(len, g, in, out, norm_, norm_factor);
   #endif

@@ -70,7 +70,7 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   g.constructNodes();
   /*
   for (size_t src = 0; src < og.size(); src++) {
-    g.getData(src) = 1;
+    //g.getData(src) = 1;
     auto begin = og.edge_begin(src);
     auto end = og.edge_end(src);
     g.fixEndEdge(src, end+src+1);
@@ -90,7 +90,7 @@ void Context::add_selfloop(Graph &og, Graph &g) {
       } else g.constructEdge(e+src+1, dst, 0);
     }
   }
-  */
+  //*/
 }
 
 float_t* Context::get_in_ptr() { return &h_feats[0]; }

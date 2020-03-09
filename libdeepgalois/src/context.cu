@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include "deepgalois/context.h"
+#include "deepgalois/math_functions.hh"
 
 // random seeding
 int64_t cluster_seedgen(void) {
@@ -90,7 +91,7 @@ void Context::norm_factor_counting() {
 #ifdef USE_CUSPARSE
   int nnz = graph_gpu.nedges;
   CUDA_CHECK(cudaMalloc((void**)&norm_factor, nnz * sizeof(float_t)));
-  init_const_kernel<<<CUDA_GET_BLOCKS(nnz), CUDA_NUM_THREADS>>>(nnz, 0.0, norm_factor);
+  init_const_gpu(nnz, 0.0, norm_factor);
   norm_factor_counting_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, graph_gpu, norm_factor);
 #else
