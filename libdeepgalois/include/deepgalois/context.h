@@ -43,7 +43,7 @@ public:
   float_t* norm_factor;        // normalization constant based on graph structure
 
 #ifdef CPU_ONLY
-  Graph graph_cpu; // the input graph, |V| = N
+  Graph* graph_cpu; // the input graph, |V| = N
   void genGraph(LGraph& lg, Graph& g);
   void add_selfloop(Graph &og, Graph &g);
 #else

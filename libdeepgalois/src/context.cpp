@@ -15,6 +15,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
+#ifndef GALOIS_USE_DIST
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
@@ -23,7 +24,7 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     printf("Reading .el file: %s\n", filename.c_str());
     LGraph lgraph;
     lgraph.read_edgelist(filename.c_str(), true); // symmetrize
-    genGraph(lgraph, graph_cpu);
+    genGraph(lgraph, *graph_cpu);
     lgraph.clean();
   } else if (filetype == "gr") {
     std::string filename = path + dataset_str + ".csgr";
@@ -31,16 +32,17 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     if (selfloop) {
       Graph graph_temp;
       galois::graphs::readGraph(graph_temp, filename);
-      add_selfloop(graph_temp, graph_cpu);
-    } else galois::graphs::readGraph(graph_cpu, filename);
+      add_selfloop(graph_temp, *graph_cpu);
+    } else galois::graphs::readGraph(*graph_cpu, filename);
+// TODO dist version of self loop
   } else {
     printf("Unkown file format\n");
     exit(1);
   }
   Tread.stop();
-  std::cout << "num_vertices " << graph_cpu.size() << " num_edges "
-            << graph_cpu.sizeEdges() << "\n";
-  return graph_cpu.size();
+  std::cout << "num_vertices " << graph_cpu->size() << " num_edges "
+            << graph_cpu->sizeEdges() << "\n";
+  return graph_cpu->size();
 }
 
 void Context::genGraph(LGraph& lg, Graph& g) {
@@ -55,12 +57,13 @@ void Context::genGraph(LGraph& lg, Graph& g) {
       g.constructEdge(offset, lg.get_dest(offset), 0);
   }
 }
+#endif
 
 void Context::norm_factor_counting() {
   norm_factor = new float_t[n];
   galois::do_all(galois::iterate((size_t)0, n),
     [&](auto v) {
-      auto degree  = std::distance(graph_cpu.edge_begin(v), graph_cpu.edge_end(v));
+      auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
       float_t temp = std::sqrt(float_t(degree));
       if (temp == 0.0) norm_factor[v] = 0.0;
       else norm_factor[v] = 1.0 / temp;

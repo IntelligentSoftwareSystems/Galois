@@ -70,7 +70,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   } else deepgalois::math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, &layer::W[0], 0.0, out_temp);
 
   // aggregate based on graph topology
-  graph_conv_layer::aggregate(z, context->graph_cpu, out_temp, out_data);
+  graph_conv_layer::aggregate(z, *(context->graph_cpu), out_temp, out_data);
   // TODO sync required here
 
   // run relu activation on output if specified
@@ -87,7 +87,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 
   // x*y NOTE: since graph is symmetric, the derivative is the same
   // this is the aggregate call
-  deepgalois::update_all(z, context->graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+  deepgalois::update_all(z, *(context->graph_cpu), out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
   // TODO sync required here
 
   // at this point, out_temp has the derivative of data from last step to
@@ -107,8 +107,10 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // multiplied by gradients from last back prop step
   deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data,
                               out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+#ifdef GALOIS_USE_DIST
   layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
   //galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
+#endif
 }
 #endif
 } // namespace
