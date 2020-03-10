@@ -8,10 +8,16 @@
 #include "galois/Timer.h"
 #include "deepgalois/types.h"
 #include "deepgalois/gtypes.h"
-#include "deepgalois/context.h"
 #include "deepgalois/layers/graph_conv_layer.h"
 #include "deepgalois/layers/softmax_loss_layer.h"
 #include "deepgalois/optimizer.h"
+#ifndef GALOIS_USE_DIST
+#include "deepgalois/context.h"
+#else
+#include "deepgalois/DistContext.h"
+#endif
+
+
 
 #define NUM_CONV_LAYERS 2
 
@@ -113,7 +119,11 @@ public:
   }
 
 protected:
+#ifndef GALOIS_USE_DIST
   deepgalois::Context* context;
+#else
+  deepgalois::DistContext* context;
+#endif
   size_t num_samples;               // number of samples: N
   size_t num_classes;               // number of vertex classes: E
   size_t num_layers;                // for now hard-coded: NUM_CONV_LAYERS + 1

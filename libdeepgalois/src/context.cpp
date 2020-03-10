@@ -15,7 +15,6 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
-#ifndef GALOIS_USE_DIST
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
@@ -57,18 +56,6 @@ void Context::genGraph(LGraph& lg, Graph& g) {
       g.constructEdge(offset, lg.get_dest(offset), 0);
   }
 }
-#endif
-
-void Context::norm_factor_counting() {
-  norm_factor = new float_t[n];
-  galois::do_all(galois::iterate((size_t)0, n),
-    [&](auto v) {
-      auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
-      float_t temp = std::sqrt(float_t(degree));
-      if (temp == 0.0) norm_factor[v] = 0.0;
-      else norm_factor[v] = 1.0 / temp;
-    }, galois::loopname("NormCounting"));
-}
 
 void Context::add_selfloop(Graph &og, Graph &g) {
   g.allocateFrom(og.size(), og.size()+og.sizeEdges());
@@ -103,6 +90,17 @@ void Context::add_selfloop(Graph &og, Graph &g) {
 }
 
 float_t* Context::get_in_ptr() { return &h_feats[0]; }
+
+void Context::norm_factor_counting() {
+  norm_factor = new float_t[n];
+  galois::do_all(galois::iterate((size_t)0, n),
+    [&](auto v) {
+      auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
+      float_t temp = std::sqrt(float_t(degree));
+      if (temp == 0.0) norm_factor[v] = 0.0;
+      else norm_factor[v] = 1.0 / temp;
+    }, galois::loopname("NormCounting"));
+}
 #endif
 
 // labels contain the ground truth (e.g. vertex classes) for each example

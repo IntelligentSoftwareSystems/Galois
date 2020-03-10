@@ -11,7 +11,11 @@
 
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
+#ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
+#else
+#include "deepgalois/DistContext.h"
+#endif
 #include "deepgalois/optimizer.h"
 #include "deepgalois/math_functions.hh"
 #include "deepgalois/layers/node.h"
@@ -38,6 +42,12 @@ namespace deepgalois {
  **/
 class layer : public deepgalois::node {
 public:
+#ifndef GALOIS_USE_DIST
+  using ContextType = deepgalois::Context;
+#else
+  using ContextType = deepgalois::DistContext;
+#endif
+
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
       : node(in_dims.size(), out_dims.size()), level_(level), begin_(0),
@@ -49,7 +59,7 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void set_netphase(deepgalois::net_phase phase) {}
   //! save context
-  virtual void set_context(deepgalois::Context* ctx) { context = ctx; }
+  virtual void set_context(ContextType* ctx) { context = ctx; }
   //! return layer loss
   virtual acc_t get_masked_loss() { return acc_t(0); }
 
@@ -149,7 +159,7 @@ protected:
   mask_t* masks_; // masks to show which samples are valid
   mask_t* d_masks_;
   float_t* loss; // error for each vertex: N x 1
-  deepgalois::Context* context;
+  ContextType* context;
 
 #ifdef GALOIS_USE_DIST
   // Used for synchronization of weight gradients

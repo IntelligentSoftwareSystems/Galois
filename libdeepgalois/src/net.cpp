@@ -7,9 +7,16 @@
 namespace deepgalois {
 
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
+  #ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
-  // read graph, get num nodes
   num_samples = context->read_graph(dataset_str, selfloop);
+  #else
+  context = new deepgalois::DistContext();
+  // TODO self loop?
+  // TODO num samples
+  #endif
+
+  // read graph, get num nodes
   num_classes = context->read_labels(dataset_str);
   num_epochs = epochs;
 

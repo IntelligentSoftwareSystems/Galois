@@ -54,6 +54,20 @@ else()
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+if(ENABLE_DIST_GALOIS)
+# do not link regular context.cpp; TODO do this conditional in cleaner way
+set(sources
+  src/layers/graph_conv_layer.cpp
+  src/layers/softmax_loss_layer.cpp
+  src/layers/aggregator.cpp
+  src/layers/layer.cpp
+  src/math_functions.cpp
+  src/optimizer.cpp
+  src/DistContext.cpp
+  src/node.cpp
+  src/net.cpp
+)
+else()
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
@@ -65,6 +79,8 @@ set(sources
   src/node.cpp
   src/net.cpp
 )
+endif()
+
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem gllvm)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
