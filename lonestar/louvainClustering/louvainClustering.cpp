@@ -64,6 +64,11 @@ static cll::opt<double> c_threshold("c_threshold",
   cll::desc("Threshold for modularity gain"),
   cll::init(0.01));
 
+static cll::opt<double> threshold("threshold",
+  cll::desc("Total threshold for modularity gain"),
+  cll::init(0.01));
+
+
 
 
 
@@ -521,6 +526,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   uint32_t iter = 0;
   while(true){
     iter++;
+    phase++;
     galois::gPrint("Starting Phase : ", phase, "\n");
     galois::gPrint("Graph size : ", (*graph_curr).size(), "\n");
     prev_mod = curr_mod;
@@ -548,6 +554,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 
     uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
     galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+    if( (curr_mod - prev_mod) > threshold ) {
     buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
     graph_curr = &graph_next;
 #if 0
@@ -559,10 +566,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
       }
     }
 #endif
-
-    //TODO:remove this
-    if(iter == 3)
-      break;
+    } else break;
   }
 }
 
