@@ -182,7 +182,36 @@ add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
 # Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
-  set(ENABLE_DIST_GALOIS ON)
+  if (NOT USE_DEEPGALOIS)
+    # do not turn on DIST_GALOIS by default if DEEP_GALOIS is enabled
+    # with HETERO galois
+    set(ENABLE_DIST_GALOIS ON)
+  endif()
+  if (USE_DEEPGALOIS)
+    SET(CUDA_SEPARABLE_COMPILATION ON)
+    find_package(CUDA REQUIRED)
+    set(CUDA_PROPAGATE_HOST_FLAGS off)
+    set(CUDA_SEPARABLE_COMPILATION on)
+    set(CUDA_HOST_COMPILER g++)
+
+    string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
+    string(REPLACE "," ";" GENCODES ${GENCODES})
+    foreach(GENCODE ${GENCODES})
+      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --expt-extended-lambda -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
+    endforeach()
+
+    cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
+
+    # MGPU v1.1
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
+    cuda_include_directories("${MGPU_ROOT}/src")
+
+    # CUB v1.6.4
+    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
+    cuda_include_directories("${CUB_ROOT}")
+
+    #find_package(OpenCL REQUIRED)
+  endif()
 endif()
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
@@ -509,10 +538,12 @@ if(ENABLE_DIST_GALOIS)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
-  if(ENABLE_HETERO_GALOIS)
-    add_subdirectory(libgpu)
-  endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
+
+if(ENABLE_HETERO_GALOIS)
+  add_subdirectory(libgpu)
+endif(ENABLE_HETERO_GALOIS)
+
 add_subdirectory(tools)
 add_subdirectory(scripts)
 
