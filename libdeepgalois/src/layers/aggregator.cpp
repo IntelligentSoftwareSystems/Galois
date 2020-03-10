@@ -6,7 +6,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
                 bool norm, const float_t* norm_factor) {
   // zero out the output data
   #ifndef GALOIS_USE_DIST
-  galois::do_all(g,
+  galois::do_all(galois::iterate(g),
   #else
   auto& rangeObj = g.allNodesRange();
   galois::do_all(galois::iterate(rangeObj),
