@@ -30,7 +30,12 @@ namespace deepgalois {
 class Net {
 public:
   Net() {}
+  #ifndef GALOIS_USE_DIST
   void init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop);
+  #else
+  void init(std::string dataset_str, unsigned epochs, unsigned hidden1,
+            bool selfloop, Graph* dGraph);
+  #endif
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
@@ -96,20 +101,24 @@ public:
 
   // back propogation
   void bprop() {
-    for (size_t i = num_layers; i != 0; i--)
+    for (size_t i = num_layers; i != 0; i--) {
       layers[i - 1]->backward();
+    }
   }
 
   // update trainable weights after back-propagation
   void update_weights(optimizer* opt) {
-    for (size_t i = 0; i < num_layers; i++)
-      if (layers[i]->trainable())
+    for (size_t i = 0; i < num_layers; i++) {
+      if (layers[i]->trainable()) {
         layers[i]->update_weight(opt);
+      }
+    }
   }
 
   // evaluate, i.e. inference or predict
   double evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
                   acc_t& loss, acc_t& acc) {
+    // TODO may need to do something for the dist case
     Timer t_eval;
     t_eval.Start();
     loss = fprop(begin, end, count, masks);

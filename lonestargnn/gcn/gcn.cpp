@@ -15,21 +15,23 @@ int main(int argc, char** argv) {
 #else
   galois::DistMemSys G;
 #endif
-
   LonestarGnnStart(argc, argv, name, desc, url);
   deepgalois::Net network; // the neural network to train
 
 #ifdef GALOIS_USE_DIST
-  std::vector<unsigned> dummy;
-  Graph* testing = galois::graphs::constructSymmetricGraph<char, void>(dummy);
+  std::vector<unsigned> dummyVec;
+  Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
 
+#ifndef GALOIS_USE_DIST
   // read network, features, ground truth, initialize metadata
   network.init(dataset, epochs, hidden1, add_selfloop);
+#else
+  network.init(dataset, epochs, hidden1, add_selfloop, dGraph);
+#endif
   network.construct_layers(); // default setting for now; can be customized by
                               // the user
   network.print_layers_info();
-
 
   // tracks peak memory usage
   deepgalois::ResourceManager rm;
@@ -54,10 +56,24 @@ int main(int argc, char** argv) {
       test_begin = 177262;
       test_count = 55703;
       test_end   = test_begin + test_count;
+#ifndef GALOIS_USE_DIST
       for (size_t i = test_begin; i < test_end; i++)
         test_mask[i] = 1;
-    } else
+#else
+      for (size_t i = test_begin; i < test_end; i++)  {
+        if (dGraph->isLocal(i)) {
+          test_mask[dGraph->getLID(i)] = 1;
+        }
+      }
+#endif
+    } else {
+#ifndef GALOIS_USE_DIST
       test_count = deepgalois::read_masks(dataset, "test", test_begin, test_end, test_mask);
+#else
+      test_count = deepgalois::read_masks(dataset, "test", test_begin, test_end,
+                                          test_mask, dGraph);
+#endif
+    }
     galois::StatTimer Ttest("Test");
     Ttest.start();
     double test_time = network.evaluate(test_begin, test_end, test_count,

@@ -6,15 +6,22 @@
 
 namespace deepgalois {
 
+#ifndef GALOIS_USE_DIST
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
-  #ifndef GALOIS_USE_DIST
+#else
+void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
+               bool selfloop, Graph* dGraph) {
+#endif
+#ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
   num_samples = context->read_graph(dataset_str, selfloop);
-  #else
+#else
   context = new deepgalois::DistContext();
+  num_samples = dGraph->size();
+  context->saveGraph(dGraph);
   // TODO self loop?
   // TODO num samples
-  #endif
+#endif
 
   // read graph, get num nodes
   num_classes = context->read_labels(dataset_str);
@@ -28,14 +35,35 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool 
     train_begin = 0, train_count = 153431,
     train_end = train_begin + train_count;
     val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
-    for (size_t i = train_begin; i < train_end; i++)
-      train_mask[i] = 1;
-    for (size_t i = val_begin; i < val_end; i++)
-      val_mask[i] = 1;
+    // TODO do all can be used below
+#ifndef GALOIS_USE_DIST
+    for (size_t i = train_begin; i < train_end; i++) train_mask[i] = 1;
+    for (size_t i = val_begin; i < val_end; i++) val_mask[i] = 1;
+#else
+    // find local ID from global ID, set if it exists
+    for (size_t i = train_begin; i < train_end; i++) {
+      if (dGraph->isLocal(i)) {
+        train_mask[dGraph->getLID(i)] = 1;
+      }
+    }
+    for (size_t i = val_begin; i < val_end; i++) {
+      if (dGraph->isLocal(i)) {
+        val_mask[dGraph->getLID(i)] = 1;
+      }
+    }
+#endif
   } else {
+#ifndef GALOIS_USE_DIST
     train_count =
         read_masks(dataset_str, "train", train_begin, train_end, train_mask);
     val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask);
+#else
+    train_count =
+        read_masks(dataset_str, "train", train_begin, train_end, train_mask,
+                   dGraph);
+    val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask,
+                           dGraph);
+#endif
   }
   //std::cout << "Done\n";
 
@@ -132,7 +160,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
   accuracy_all.reset();
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
     if (masks[i] == 1) {
-      int preds = argmax(num_classes, 
+      int preds = argmax(num_classes,
 	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[i * num_classes]));
       if ((label_t)preds == context->get_label(i))
         accuracy_all += 1.0;

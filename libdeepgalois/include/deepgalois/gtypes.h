@@ -1,6 +1,9 @@
-#pragma once
+#ifndef __DG_GTYPES__
+#define __DG_GTYPES__
+
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
+#include "deepgalois/types.h"
 #ifdef GALOIS_USE_DIST
 #include "galois/graphs/NewGeneric.h"
 #endif
@@ -23,3 +26,5 @@ using Graph = galois::graphs::DistGraph<char, void>;
 #endif
 
 typedef Graph::GraphNode GNode;
+
+#endif

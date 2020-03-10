@@ -7,6 +7,9 @@
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
+#ifdef GALOIS_USE_DIST
+#include "deepgalois/gtypes.h"
+#endif
 
 namespace deepgalois {
 
@@ -100,7 +103,9 @@ inline bool bernoulli(float_t p) {
   return uniform_rand(float_t(0), float_t(1)) <= p;
 }
 
-//! Get masks from datafile where first line tells range of 
+
+#ifndef GALOIS_USE_DIST
+//! Get masks from datafile where first line tells range of
 //! set to create mask from
 inline size_t read_masks(std::string dataset_str, std::string mask_type,
                          size_t& begin, size_t& end,
@@ -134,5 +139,44 @@ inline size_t read_masks(std::string dataset_str, std::string mask_type,
   in.close();
   return sample_count;
 }
+#else
+//! Get masks from datafile where first line tells range of
+//! set to create mask from; needs graph object due to local IDs
+inline size_t read_masks(std::string dataset_str, std::string mask_type,
+                         size_t& begin, size_t& end,
+                         std::vector<uint8_t>& masks, Graph* dGraph) {
+  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed") {
+    std::cout << "Dataset currently not supported\n";
+    exit(1);
+  }
+  size_t i             = 0;
+  size_t sample_count  = 0;
+  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
+
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  in >> begin >> end >> std::ws;
+  while (std::getline(in, line)) {
+    std::istringstream mask_stream(line);
+    if (i >= begin && i < end) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        // only bother if it's local
+        if (dGraph->isLocal(i)) {
+          masks[dGraph->getLID(i)] = 1;
+          sample_count++;
+        }
+      }
+    }
+    i++;
+  }
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << "\n";
+  in.close();
+  return sample_count;
+}
+#endif
 
 }

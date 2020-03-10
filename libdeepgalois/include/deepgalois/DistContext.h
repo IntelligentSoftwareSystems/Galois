@@ -20,7 +20,7 @@ public:
   DistContext();
   ~DistContext();
 
-  size_t saveGraph(Graph* dGraph);
+  void saveGraph(Graph* dGraph);
   size_t read_labels(std::string dataset_str);
   size_t read_features(std::string dataset_str);
   void norm_factor_counting();
@@ -29,7 +29,10 @@ public:
   float_t* norm_factor;        // normalization constant based on graph structure
   Graph* graph_cpu; // the input graph, |V| = N
 
-  label_t get_label(size_t i) { return labels[i]; }
+  label_t get_label(size_t i) {
+    // TODO global id only or lid only or both?
+    return labels[i];
+  }
   size_t read_graph_cpu(std::string dataset_str);
   float_t* get_in_ptr();
 };
