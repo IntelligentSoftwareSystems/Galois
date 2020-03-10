@@ -116,8 +116,8 @@ struct CSRGraph {
 		printf("]\n");
 	}
 	void add_selfloop() {
-		print_neighbors(nnodes-1);
-		print_neighbors(0);
+		//print_neighbors(nnodes-1);
+		//print_neighbors(0);
 		index_type *new_edge_dst = new index_type[nnodes+nedges];
 		for (index_type i = 0; i < nnodes; i++) {
 			index_type start = row_start[i];
@@ -147,8 +147,8 @@ struct CSRGraph {
 		edge_dst = new_edge_dst;
 		nedges += nnodes;
         printf("nnodes = %d, nedges = %d\n", nnodes, nedges);
-		print_neighbors(nnodes-1);
-		print_neighbors(0);
+		//print_neighbors(nnodes-1);
+		//print_neighbors(0);
 	}
 
 	__device__ __host__ index_type getEdgeDst(unsigned edge) {
