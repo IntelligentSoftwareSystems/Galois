@@ -6,7 +6,10 @@ DistContext::~DistContext() {}
 
 void DistContext::saveGraph(Graph* dGraph) {
   graph_cpu = dGraph;
+
+  localVertices = graph_cpu->size();
 }
+
 size_t DistContext::read_labels(std::string dataset_str) {
   Graph* dGraph = DistContext::graph_cpu;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
@@ -99,12 +102,23 @@ size_t DistContext::read_features(std::string dataset_str) {
 }
 
 float_t* DistContext::get_in_ptr() {
-  // TODO
-  return nullptr;
+  return &h_feats[0];
 }
 
 void DistContext::norm_factor_counting() {
-  // TODO
+  // TODO: this is a distributed operation
+
+  // create for now, TODO need to actually fill it in
+  norm_factor = new float_t[localVertices];
+  //galois::do_all(galois::iterate((size_t)0, localVertices),
+  //  [&](auto v) {
+  //    auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
+  //    float_t temp = std::sqrt(float_t(degree));
+  //    if (temp == 0.0) norm_factor[v] = 0.0;
+  //    else norm_factor[v] = 1.0 / temp;
+  //  }, galois::loopname("NormCounting"));
+
+  return;
 }
 
 }  // deepgalois
