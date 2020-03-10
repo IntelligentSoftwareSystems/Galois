@@ -144,6 +144,7 @@ bool is_allocated_device(float_t* data);
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
 void float_malloc_device(int n, float_t*& ptr);
 void float_free_device(float_t*& ptr);
+void float_copy_device(int n, float_t* h_ptr, float_t *d_ptr);
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad);

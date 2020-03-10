@@ -1,4 +1,5 @@
 #include "deepgalois/net.h"
+#include "deepgalois/cutils.h"
 #include "gg.h"
 #include "ggcuda.h"
 

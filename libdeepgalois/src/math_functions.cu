@@ -61,6 +61,10 @@ void float_free_device(float_t*& ptr) {
   CUDA_CHECK(cudaFree(ptr));
 }
 
+void float_copy_device(int n, float_t* h_ptr, float_t *d_ptr) {
+  CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, n * sizeof(float_t), cudaMemcpyHostToDevice));
+}
+
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   assert(h_masks != NULL);
   CUDA_CHECK(cudaMalloc((void**)&d_masks, n * sizeof(mask_t)));

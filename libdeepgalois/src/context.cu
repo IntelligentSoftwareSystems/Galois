@@ -136,5 +136,12 @@ void Context::copy_data_to_device() {
   //print_device_vector(10, d_feats, "d_feats");
 }
 
+//void Context::copy_data_to_device() {
+  //float_malloc_device(n, d_labels);
+  //float_copy_device(n, &labels[0], d_labels);
+  //float_malloc_device(n*feat_len, d_feats);
+  //float_copy_device(n*feat_len, &h_feats[0], d_feats);
+//}
+
 float_t* Context::get_in_ptr() { return d_feats; }
 } // namespace context
