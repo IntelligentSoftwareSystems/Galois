@@ -110,6 +110,11 @@ void DistContext::norm_factor_counting() {
 
   // create for now, TODO need to actually fill it in
   norm_factor = new float_t[localVertices];
+  galois::do_all(galois::iterate((size_t)0, localVertices),
+    [&](auto v) {
+      norm_factor[v] = 0.01;
+    }, galois::loopname("NormCounting"));
+
   //galois::do_all(galois::iterate((size_t)0, localVertices),
   //  [&](auto v) {
   //    auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
