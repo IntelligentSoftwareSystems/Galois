@@ -57,8 +57,45 @@ size_t DistContext::read_labels(std::string dataset_str) {
 }
 
 size_t DistContext::read_features(std::string dataset_str) {
-  // TODO
-  return 0;
+  Graph* dGraph = DistContext::graph_cpu;
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  galois::gPrint("[", myID, "] Reading features from disk...\n");
+
+  std::string filename = path + dataset_str + ".ft";
+  std::ifstream in;
+  std::string line;
+
+  in.open(filename, std::ios::in);
+  size_t m; // m = number of global vertices
+
+  // header read
+  in >> m >> feat_len >> std::ws;
+  // use local size, not global size
+  h_feats.resize(dGraph->size() * feat_len, 0);
+
+  // loop through all features
+  while (std::getline(in, line)) {
+    std::istringstream edge_stream(line);
+    unsigned u, v;
+    float_t w;
+    // vertex to set feature for
+    edge_stream >> u;
+    // only set if local
+    if (dGraph->isLocal(u)) {
+      // feature index
+      edge_stream >> v;
+      // actual feature
+      edge_stream >> w;
+
+      h_feats[dGraph->getLID(u) * feat_len + v] = w;
+    }
+  }
+  in.close();
+
+  galois::gPrint("[", myID, "] Done with features, feature length: ",
+                 feat_len, "\n");
+
+  return feat_len;
 }
 
 float_t* DistContext::get_in_ptr() {

@@ -20,7 +20,6 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   num_samples = dGraph->size();
   context->saveGraph(dGraph);
   // TODO self loop?
-  // TODO num samples
 #endif
 
   // read graph, get num nodes
