@@ -1,3 +1,7 @@
+/**
+ * Based on the net.hpp file from Caffe deep learning framework.
+ */
+
 #include "deepgalois/net.h"
 
 namespace deepgalois {

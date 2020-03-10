@@ -87,6 +87,21 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
 }
 #endif
 
+// dot product
+float_t dot(const vec_t& x, const vec_t& y) {
+  float_t sum = 0;
+  for (size_t i = 0; i < x.size(); ++i)
+    sum += x[i] * y[i];
+  return sum;
+}
+
+float_t dot(size_t n, const float_t* x, const float_t* y) {
+  float_t sum = 0;
+  for (size_t i = 0; i < n; ++i)
+    sum += x[i] * y[i];
+  return sum;
+}
+
 void clear(vec_t& in) {
   for (size_t i = 0; i < in.size(); i++)
     in[i] = 0;
@@ -157,6 +172,95 @@ void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out) 
   }, galois::loopname("d_relu"));
 }
 
+void softmax(const vec_t& input, vec_t& output) {
+  const float_t max = *std::max_element(input.begin(), input.end());
+  float_t denominator(0);
+  for (size_t i = 0; i < input.size(); i++) {
+    output[i] = std::exp(input[i] - max);
+    denominator += output[i];
+  }
+  for (size_t i = 0; i < input.size(); i++)
+    output[i] /= denominator;
+}
+
+void softmax(size_t n, const float_t* input, float_t* output) {
+  const float_t max = *std::max_element(input, input + n);
+  float_t denominator(0);
+  for (size_t i = 0; i < n; i++) {
+    output[i] = std::exp(input[i] - max);
+    denominator += output[i];
+  }
+  for (size_t i = 0; i < n; i++)
+    output[i] /= denominator;
+}
+
+void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp) {
+  auto n = y.size();
+  vec_t df(n, 0);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < n; j++) {
+      // float_t delta_ij = i == j? 1 : 0;
+      // df[i] += p[j] * (delta_ij - p[i]);
+      df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
+    }
+    // dy = dp * (gradient of softmax)
+    dy[i] = dot(dp, df);
+  }
+}
+
+void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
+               const float_t* dp) {
+  vec_t df(n, 0);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < n; j++) {
+      df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
+    }
+    dy[i] = dot(n, dp, &df[0]);
+  }
+}
+
+// cross-entropy loss function for multi-class classification
+// y: ground truth
+// p: predicted probability
+float_t cross_entropy(const vec_t& y, const vec_t& p) {
+  auto n = y.size();
+  assert(n > 0);
+  float_t loss = 0.0;
+  for (size_t i = 0; i < n; i++) {
+    if (y[i] == float_t(0))
+      continue;
+    if (p[i] == float_t(0))
+      loss -= y[i] * std::log(float_t(1e-10));
+    else loss -= y[i] * std::log(p[i]);
+  }
+  return loss;
+}
+
+float_t cross_entropy(size_t n, const float_t* y, const float_t* p) {
+  float_t loss = 0.0;
+  for (size_t i = 0; i < n; i++) {
+    if (y[i] == float_t(0))
+      continue;
+    if (p[i] == float_t(0))
+      loss -= y[i] * std::log(float_t(1e-10));
+    else
+      loss -= y[i] * std::log(p[i]);
+  }
+  return loss;
+}
+
+void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d) {
+  auto n = y.size();
+  for (size_t i = 0; i < n; i++) {
+    d[i] = -y[i] / (p[i] + float_t(1e-10));
+  }
+}
+
+void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d) {
+  for (size_t i = 0; i < n; i++) {
+    d[i] = -y[i] / (p[i] + float_t(1e-10));
+  }
+}
 void copy1D1D(const vec_t& in, vec_t& out) {
   std::copy(in.begin(), in.end(), &out[0]);
 }
@@ -188,7 +292,6 @@ void transpose(size_t x, size_t y, const float_t* in, float_t* out) {
     }
   }
 }
-
 } // deepgalois
 } // math
 
@@ -234,20 +337,6 @@ void div_scalar(const float_t alpha, vec_t& Y) {
     Y[i] /= alpha;
 }
 
-// dot product
-float_t dot(const vec_t& x, const vec_t& y) {
-  float_t sum = 0;
-  for (size_t i = 0; i < x.size(); ++i)
-    sum += x[i] * y[i];
-  return sum;
-}
-
-float_t dot(size_t n, const float_t* x, const float_t* y) {
-  float_t sum = 0;
-  for (size_t i = 0; i < n; ++i)
-    sum += x[i] * y[i];
-  return sum;
-}
 
 // matrix-vector multiply
 void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector) {
@@ -424,112 +513,5 @@ void sigmoid(vec_t& fv) {
   }
 }
 
-// Softmax function takes an N-dimensional vector (X) of real number,
-// and transforms it into a vector of real number in range (0,1) which add
-// upto 1. To make softmax func numerically stable, we simply normalize the
-// values in the vector, by multiplying the numerator and denominator with a
-// constant C, where log(C)=-max(X)
-//    exps = np.exp(X - np.max(X))
-//    exps / np.sum(exps)
-void softmax(const vec_t& input, vec_t& output) {
-  const float_t max = *std::max_element(input.begin(), input.end());
-  float_t denominator(0);
-  for (size_t i = 0; i < input.size(); i++) {
-    output[i] = std::exp(input[i] - max);
-    denominator += output[i];
-  }
-  for (size_t i = 0; i < input.size(); i++)
-    output[i] /= denominator;
-}
 
-void softmax(size_t n, const float_t* input, float_t* output) {
-  const float_t max = *std::max_element(input, input + n);
-  float_t denominator(0);
-  for (size_t i = 0; i < n; i++) {
-    output[i] = std::exp(input[i] - max);
-    denominator += output[i];
-  }
-  for (size_t i = 0; i < n; i++)
-    output[i] /= denominator;
-}
 
-void log_softmax(const vec_t& input, vec_t& output) {
-  const float_t max = *std::max_element(input.begin(), input.end());
-  float_t denominator(0);
-  for (size_t i = 0; i < input.size(); i++)
-    denominator += std::exp(input[i] - max);
-  for (size_t i = 0; i < input.size(); i++)
-    output[i] = input[i] - max - denominator;
-}
-
-// Due to the desirable property of softmax function outputting a probability
-// distribution, we often use it as the final layer in neural networks. For this
-// we need to calculate the derivative or gradient, and pass it back to the
-// previous layer during backpropagation.
-void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp) {
-  auto n = y.size();
-  vec_t df(n, 0);
-  for (size_t i = 0; i < n; i++) {
-    for (size_t j = 0; j < n; j++) {
-      // float_t delta_ij = i == j? 1 : 0;
-      // df[i] += p[j] * (delta_ij - p[i]);
-      df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
-    }
-    // dy = dp * (gradient of softmax)
-    dy[i] = dot(dp, df);
-  }
-}
-
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
-               const float_t* dp) {
-  vec_t df(n, 0);
-  for (size_t i = 0; i < n; i++) {
-    for (size_t j = 0; j < n; j++) {
-      df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
-    }
-    dy[i] = dot(n, dp, &df[0]);
-  }
-}
-
-// cross-entropy loss function for multi-class classification
-// y: ground truth
-// p: predicted probability
-float_t cross_entropy(const vec_t& y, const vec_t& p) {
-  auto n = y.size();
-  assert(n > 0);
-  float_t loss = 0.0;
-  for (size_t i = 0; i < n; i++) {
-    if (y[i] == float_t(0))
-      continue;
-    if (p[i] == float_t(0))
-      loss -= y[i] * std::log(float_t(1e-10));
-    else loss -= y[i] * std::log(p[i]);
-  }
-  return loss;
-}
-
-float_t cross_entropy(size_t n, const float_t* y, const float_t* p) {
-  float_t loss = 0.0;
-  for (size_t i = 0; i < n; i++) {
-    if (y[i] == float_t(0))
-      continue;
-    if (p[i] == float_t(0))
-      loss -= y[i] * std::log(float_t(1e-10));
-    else
-      loss -= y[i] * std::log(p[i]);
-  }
-  return loss;
-}
-
-void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d) {
-  auto n = y.size();
-  for (size_t i = 0; i < n; i++) {
-    d[i] = -y[i] / (p[i] + float_t(1e-10));
-  }
-}
-
-void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d) {
-  for (size_t i = 0; i < n; i++) {
-    d[i] = -y[i] / (p[i] + float_t(1e-10));
-  }
-}

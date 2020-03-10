@@ -1,5 +1,8 @@
 app(gcn gcn.cpp)
 target_link_libraries(gcn dg_cpu)
+if(ENABLE_DIST_GALOIS)
+  target_link_libraries(gcn distgraphloader)
+endif()
 if(ENABLE_HETERO_GALOIS)
   target_link_libraries(gcn dg_gpu)
   target_link_libraries(gcn -lcudart -lcublas -lcurand -lcudadevrt)

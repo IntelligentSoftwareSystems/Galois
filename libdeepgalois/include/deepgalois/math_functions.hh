@@ -25,6 +25,8 @@ namespace math {
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
 //! multiply n elements of vector by scalar
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
+//! do dot product of 2 vectors
+float_t dot(const vec_t& x, const vec_t& y);
 //! clear n elements of a vector
 void clear_cpu(size_t n, float_t* in);
 // dropout functions randomly remove weights
@@ -37,6 +39,15 @@ void d_dropout_cpu(size_t n, const float scale, const float_t* in_diff,
 void relu_cpu(size_t n, const float_t* in, float_t* out);
 //! ReLU derivative; generally, 1 if data > 0, 0 otherwise
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
+void softmax(const vec_t& input, vec_t& output);
+void softmax(size_t n, const float_t* input, float_t* output);
+void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
+void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
+               const float_t* dp);
+float_t cross_entropy(const vec_t& y, const vec_t& p);
+float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
+void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
+void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
 //! copy vector from in -> out; first len elements
 void copy_cpu(size_t len, const float_t* in, float_t* out);
 // single-precision dense matrix multiply
@@ -82,7 +93,6 @@ void vdiv(const vec_t& a, const vec_t& b, vec_t& out);
 void add_scalar(const float_t alpha, vec_t& Y);
 void sub_scalar(const float_t alpha, vec_t& Y);
 void div_scalar(const float_t alpha, vec_t& Y);
-float_t dot(const vec_t& x, const vec_t& y);
 //void mvmul(const vec_t& matrix, const vec_t& in_vector, vec_t& out_vector);
 void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector);
 void vvmul(const vec_t& a, const vec_t& b, tensor_t& out);
@@ -96,15 +106,6 @@ void transpose2D(const tensor_t& in, tensor_t& out);
 void transpose2D1D(const tensor_t& in, vec_t& out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
 int argmax(const size_t n, const float_t* x); // the arguments of the maxima
-void softmax(const vec_t& input, vec_t& output);
-void softmax(size_t n, const float_t* input, float_t* output);
-void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
-               const float_t* dp);
-float_t cross_entropy(const vec_t& y, const vec_t& p);
-float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
-void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
-void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
 
 // GPU operators
 bool isnan_gpu(int n, const float_t *array); // does array contain any 'nan' element

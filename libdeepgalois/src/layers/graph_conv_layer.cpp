@@ -33,10 +33,6 @@ void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const 
 }
 
 void graph_conv_layer::init() {
-  rand_init_matrix(y, z, W); // randomly initialize trainable parameters
-  // rand_init_matrix(y, z, Q);
-  zero_init_matrix(y, z, layer::weight_grad);
-
 #ifdef GALOIS_USE_DIST
   // setup gluon
   layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad,
@@ -46,6 +42,16 @@ void graph_conv_layer::init() {
       *layer::gradientGraph, layer::gradientGraph->myHostID(),
       layer::gradientGraph->numHosts(), false);
 #endif
+
+#ifdef GALOIS_USE_DIST
+  // make sure seed consistent across all hosts for weight matrix
+  rand_init_matrix(y, z, W, 1);
+#else
+  rand_init_matrix(y, z, W);
+#endif
+
+  // rand_init_matrix(y, z, Q);
+  zero_init_matrix(y, z, layer::weight_grad);
 
   if (dropout_) dropout_mask = new unsigned[x * y];
   in_temp  = new float_t[x * y];
@@ -65,6 +71,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 
   // aggregate based on graph topology
   graph_conv_layer::aggregate(z, context->graph_cpu, out_temp, out_data);
+  // TODO sync required here
 
   // run relu activation on output if specified
   if (act_) deepgalois::math::relu_cpu(x*z, out_data, out_data);
@@ -79,7 +86,9 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
   // x*y NOTE: since graph is symmetric, the derivative is the same
+  // this is the aggregate call
   deepgalois::update_all(z, context->graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+  // TODO sync required here
 
   // at this point, out_temp has the derivative of data from last step to
   // use for both updating gradients for features and gradients for weights

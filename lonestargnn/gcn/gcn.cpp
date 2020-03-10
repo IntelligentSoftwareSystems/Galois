@@ -1,6 +1,9 @@
 // Graph Neural Networks
 // Xuhao Chen <cxh@utexas.edu>
 #include "lonestargnn.h"
+#ifdef GALOIS_USE_DIST
+#include "DistributedGraphLoader.h"
+#endif
 
 const char* name = "Graph Convolutional Networks";
 const char* desc = "Graph convolutional neural networks on an undirected graph";
@@ -20,6 +23,11 @@ int main(int argc, char** argv) {
   network.construct_layers(); // default setting for now; can be customized by
                               // the user
   network.print_layers_info();
+
+#ifdef GALOIS_USE_DIST
+  std::vector<unsigned> dummy;
+  galois::graphs::constructSymmetricGraph<unsigned, void>(dummy);
+#endif
 
   // tracks peak memory usage
   deepgalois::ResourceManager rm;

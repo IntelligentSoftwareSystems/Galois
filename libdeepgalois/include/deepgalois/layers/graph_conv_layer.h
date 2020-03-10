@@ -68,9 +68,9 @@ private:
   float_t* norm_factor;   // normalization constant based on graph structure
 
   // Glorot & Bengio (AISTATS 2010)
-  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix) {
+  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed=1) {
     auto init_range = sqrt(6.0 / (dim_x + dim_y));
-    std::default_random_engine rng;
+    std::default_random_engine rng(seed);
     std::uniform_real_distribution<float_t> dist(-init_range, init_range);
     matrix.resize(dim_x * dim_y);
     for (size_t i = 0; i < dim_x; ++i) {

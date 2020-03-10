@@ -1,5 +1,6 @@
-// TODO if this code was based on something, get copyright/license and put here
-
+/**
+ * Based on the net.hpp file from Caffe deep learning framework.
+ */
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
