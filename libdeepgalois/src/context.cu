@@ -61,9 +61,7 @@ cusparseHandle_t Context::cusparse_handle_     = 0;
 cusparseMatDescr_t Context::cusparse_matdescr_ = 0;
 curandGenerator_t Context::curand_generator_   = 0;
 
-Context::Context()
-    : mode_(Context::GPU), solver_count_(1), solver_rank_(0),
-      multiprocess_(false) {
+Context::Context() {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -105,24 +103,19 @@ void Context::norm_factor_counting() {
   CudaTest("solving norm_factor_counting kernel failed");
   std::cout << "Done\n";
 }
-
+/*
 void Context::SetDevice(const int device_id) {
   int current_device;
   CUDA_CHECK(cudaGetDevice(&current_device));
-  if (current_device == device_id)
-    return;
+  if (current_device == device_id) return;
   CUDA_CHECK(cudaSetDevice(device_id));
-  if (cublas_handle_)
-    CUBLAS_CHECK(cublasDestroy(cublas_handle_));
-  if (curand_generator_)
-    CURAND_CHECK(curandDestroyGenerator(curand_generator_));
+  if (cublas_handle_) CUBLAS_CHECK(cublasDestroy(cublas_handle_));
+  if (curand_generator_) CURAND_CHECK(curandDestroyGenerator(curand_generator_));
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
-  CURAND_CHECK(
-      curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
-  CURAND_CHECK(
-      curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
+  CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
+  CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
 }
-
+*/
 size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
   std::string filename = path + dataset_str + ".csgr";
   CSRGraph g;

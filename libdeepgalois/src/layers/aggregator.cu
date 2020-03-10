@@ -74,5 +74,8 @@ void deepgalois::update_all_csrmm(size_t len, CSRGraph& g, const float_t* in, fl
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
   //print_device_vector(10, norm_factor, "norm_factor");
-  csrmm_gpu(n, len, n, g.nedges, 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, out);
+  float *temp;
+  float_malloc_device(n*len, temp); // TODO: avoid repetitive allocation
+  csrmm_gpu(n, len, n, g.nedges, 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, temp, out);
+  float_free_device(temp);
 }

@@ -53,8 +53,12 @@ bool is_allocated_device(float_t* data) {
   return false;
 }
 
-void float_malloc_device(int n, float_t*& loss) {
-  CUDA_CHECK(cudaMalloc((void**)&loss, n * sizeof(float_t)));
+void float_malloc_device(int n, float_t*& ptr) {
+  CUDA_CHECK(cudaMalloc((void**)&ptr, n * sizeof(float_t)));
+}
+
+void float_free_device(float_t*& ptr) {
+  CUDA_CHECK(cudaFree(ptr));
 }
 
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
@@ -186,9 +190,7 @@ void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
 void csrmm_gpu(const int M, const int N, const int K, const int nnz, 
                const float alpha, const float* A_nonzeros, 
 	           const int* A_idx_ptr, const int* A_nnz_idx,
-               const float* B, const float beta, float* C) {
-  float *transpose_C;
-  CUDA_CHECK(cudaMalloc((void**)&transpose_C, N * K * sizeof(float)));
+               const float* B, const float beta, float *transpose_C, float* C) {
   CUSPARSE_CHECK(cusparseScsrmm2(deepgalois::Context::cusparse_handle(),
                  CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
                  M, N, K, nnz, &alpha, deepgalois::Context::cusparse_matdescr(), A_nonzeros, 

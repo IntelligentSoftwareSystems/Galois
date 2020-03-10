@@ -131,7 +131,7 @@ void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
 void csrmm_gpu(const int M, const int N, const int K, const int nnz, 
                const float alpha, const float* A_nonzeros, 
 	           const int* A_idx_ptr, const int* A_nonzero_idx,
-               const float* B, const float beta, float* C);
+               const float* B, const float beta, float* trans_C, float* C);
 void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in_data,
                                const mask_t* masks, const label_t* labels,
                                float_t* loss, float_t* out_data);
@@ -142,7 +142,8 @@ void scal_gpu(const int N, const float alpha, float* X);
 void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
 bool is_allocated_device(float_t* data);
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
-void float_malloc_device(int n, float_t*& loss);
+void float_malloc_device(int n, float_t*& ptr);
+void float_free_device(float_t*& ptr);
 void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
                          unsigned*& masks, float_t*& in, float_t*& out,
                          float_t*& matrix, float_t*& grad);
