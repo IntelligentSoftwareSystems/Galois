@@ -68,6 +68,11 @@ static cll::opt<double> threshold("threshold",
   cll::desc("Total threshold for modularity gain"),
   cll::init(0.01));
 
+static cll::opt<uint32_t> max_iter("max_iter",
+  cll::desc("Maximum number of iterations to execute"),
+  cll::init(10));
+
+
 
 
 
@@ -141,8 +146,8 @@ uint64_t vertexFollowing(Graph& graph, largeArray& clusters){
 
 
 
-//void sumVertexDegreeWeight(Graph& graph, CommArray& c_info) {
-void sumVertexDegreeWeight(Graph& graph, std::vector<Comm>& c_info) {
+void sumVertexDegreeWeight(Graph& graph, CommArray& c_info) {
+//void sumVertexDegreeWeight(Graph& graph, std::vector<Comm>& c_info) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   uint64_t total_weight = 0;
@@ -170,8 +175,8 @@ double calConstantForSecondTerm(Graph& graph){
 
 
 uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
-                       std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       //CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
 
   uint64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
@@ -232,9 +237,9 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   galois::gPrint("Inside algoLouvainWithLocking\n");
 
-  //CommArray c_info; // Community info
-  //CommArray c_update; // Used for updating community
-  std::vector<Comm> c_info(graph.size()), c_update(graph.size());
+  CommArray c_info; // Community info
+  CommArray c_update; // Used for updating community
+  //std::vector<Comm> c_info(graph.size()), c_update(graph.size());
 
   /* Variables needed for Modularity calculation */
   uint64_t total_edge_wt_twice;
@@ -244,16 +249,14 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   double threshold_mod = threshold;
   uint32_t num_iter = 0;
 
-  //largeArray cluster_wt_internal;
-  std::vector<uint64_t> cluster_wt_internal(graph.size());
+  largeArray cluster_wt_internal;
+  //std::vector<uint64_t> cluster_wt_internal(graph.size());
 
 
-#if 0
   /*** Initialization ***/
   c_info.allocateBlocked(graph.size());
   c_update.allocateBlocked(graph.size());
   cluster_wt_internal.allocateBlocked(graph.size());
-#endif
 
   /* Initialization each node to its own cluster */
   galois::do_all(galois::iterate(graph),
@@ -403,7 +406,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
 
   }// End while
 
-#if 0
   c_info.destroy();
   c_info.deallocate();
 
@@ -412,20 +414,23 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
 
   cluster_wt_internal.destroy();
   cluster_wt_internal.deallocate();
-#endif
+
   return prev_mod;
 }
 
 
 void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_clusters) {
+  std::cerr << "Inside buildNextLevelGraph\n";
   uint32_t num_nodes_next = num_unique_clusters;
   uint64_t num_edges_next = 0; //Unknown right now
 
 
   //galois::LargeArray<galois::InsertBag<uint64_t>> cluster_bags;
   //cluster_bags.allocateBlocked(num_unique_clusters);
-  std::vector<galois::InsertBag<uint64_t>> cluster_bags(num_unique_clusters);
-
+  std::cerr << "Inside insertbags started allocated\n";
+  //std::vector<galois::InsertBag<uint64_t>> cluster_bags(num_unique_clusters);
+  std::vector<std::vector<GNode>> cluster_bags(num_unique_clusters);
+  std::cerr << "Inside insertbags allocated\n";
 #if 0
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -444,6 +449,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
       //else galois::gPrint("ISOLATED NODE : ", n, "\n");
   }
 
+  std::cerr << "Inside insertbags pushed\n";
 
   std::vector<std::vector<uint32_t>> edges_id(num_unique_clusters);
   std::vector<std::vector<EdgeTy>> edges_data(num_unique_clusters);
@@ -476,6 +482,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                 }, galois::steal(),
                    galois::loopname("Find edges"));
 
+  std::cerr << "Inside edges processed\n";
   /* Serial loop to reduce all the edge counts */
   std::vector<uint64_t> prefix_edges_count(num_unique_clusters);
   galois::GAccumulator<uint64_t> num_edges_acc;
@@ -501,7 +508,10 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
     }
   }
 #endif
+
+  std::cerr << "Graph construction started" << "\n";
   graph_next.constructFrom(num_nodes_next, num_edges_next, prefix_edges_count, edges_id, edges_data);
+  galois::gPrint("Graph construction done\n");
 }
 //void runMultiPhaseLouvainAlgorithm(Graph& graph, largeArray& clusters_orig, uint64_t min_graph_size, double c_threshold) {
 void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double c_threshold) {
@@ -554,7 +564,8 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 
     uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
     galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
-    if( (curr_mod - prev_mod) > threshold ) {
+    //if( (curr_mod - prev_mod) > threshold ) {
+    if(iter < max_iter && (curr_mod - prev_mod) > 0.0) {
     buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
     graph_curr = &graph_next;
 #if 0
@@ -576,6 +587,9 @@ int main(int argc, char** argv) {
 
   Graph graph;
   GNode source, report;
+
+  galois::StatTimer TEnd2End("Timer_end2end");
+  TEnd2End.start();
 
   std::cout << "Reading from file: " << filename << std::endl;
   std::cout << "[WARNING:] Make sure " << filename << " is symmetric graph without duplicate edges" << std::endl;
@@ -615,6 +629,11 @@ int main(int argc, char** argv) {
   uint64_t min_graph_size = 10;
   //runMultiPhaseLouvainAlgorithm(graph, clusters_orig, min_graph_size, c_threshold);
   galois::gPrint("GOING in \n");
+  galois::StatTimer Tmain("Timer_LC");
+  Tmain.start();
   runMultiPhaseLouvainAlgorithm(graph, min_graph_size, c_threshold);
+  Tmain.stop();
+
+  TEnd2End.stop();
   return 0;
 }
