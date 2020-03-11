@@ -36,6 +36,5 @@ add_subdirectory(surveypropagation)
 add_subdirectory(triangles)
 add_subdirectory(tutorial_examples)
 add_subdirectory(ktruss)
-add_subdirectory(hypartest)
 add_subdirectory(louvainClustering)
 
