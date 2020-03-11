@@ -322,8 +322,29 @@ void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in,
   CudaTest("solving softmax_cross_entropy kernel failed");
 }
 
+__device__ void d_cross_entropy_device(int n, const label_t idx, const float_t* p, float_t* d) {
+  for (int i = 0; i < n; i++) {
+    if (i == (int)idx) d[i] = -1.0 / (p[i] + 1e-10);
+    else d[i] = 0.0;
+  }
+}
+
+__global__ void d_cross_entropy_kernel(int len, int begin, int end,
+                                const mask_t* masks, const label_t* labels,
+                                const float_t* data, float_t* grad) {
+  int base = begin * len;
+  CUDA_KERNEL_LOOP(i, (end-begin)*len) {
+    int id = begin + i/len;
+    if (masks[id] == 1) { // masked
+      if (i%len == (int)labels[id]) grad[i] = -1.0 / (data[i+base] + 1e-10);
+      else grad[i] = 0.0;
+      //d_cross_entropy_device(len, labels[id], data + len*id, grad + len*i);
+    }
+  }
+} 
+
 // TODO: use warp
-__device__ void d_softmax(int n, const float_t* p, const float_t* dp, float_t* dy) {
+__device__ void d_softmax_device(int n, const float_t* p, const float_t* dp, float_t* dy) {
   for (int i = 0; i < n; i++) {
     dy[i] = 0;
     for (int j = 0; j < n; j++) {
@@ -333,14 +354,16 @@ __device__ void d_softmax(int n, const float_t* p, const float_t* dp, float_t* d
   }
 }
 
-__device__ void d_cross_entropy(int n, const label_t idx, const float_t* p, float_t* d) {
-  for (int i = 0; i < n; i++) {
-    //assert(p[i] >= 0.0);
-    //assert(p[i] >= 0.0 && p[i] <= 1.0);
-    if (i == (int)idx) d[i] = -1.0 / (p[i] + 1e-10);
-    else d[i] = 0.0;
+__global__ void d_softmax_kernel(int len, int begin, int end,
+                                const mask_t* masks, const float_t* data,
+                                const float_t* in_grad, float_t* out_grad) {
+  CUDA_KERNEL_LOOP(i, end-begin) {
+    int id = begin + i;
+    if (masks[id] == 1) { // masked
+      d_softmax_device(len, data + len*id, in_grad + len*i, out_grad + len*id);
+    }
   }
-}
+} 
 
 __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
                                const mask_t* masks, const label_t* labels,
@@ -349,8 +372,8 @@ __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
     int id = begin + i;
     if (masks[id] == 1) { // masked
 	  float_t out_grad[41]; // TODO
-      d_cross_entropy(len, labels[id], out + len*id, out_grad);
-      d_softmax(len, out + len*id, out_grad, diff + len*id);
+      d_cross_entropy_device(len, labels[id], out + len*id, out_grad);
+      d_softmax_device(len, out + len*id, out_grad, diff + len*id);
     }
   }
 }
@@ -358,8 +381,16 @@ __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
 void d_softmax_cross_entropy_gpu(int len, int begin, int end,
                                  const mask_t* masks, const label_t* labels,
                                  const float_t* out, float_t* diff) {
-  d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
-      len, begin, end, masks, labels, out, diff);
+//  d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+//      len, begin, end, masks, labels, out, diff);
+//  CudaTest("solving d_softmax_cross_entropy kernel failed");
+  float_t *grad;
+  float_malloc_device((end-begin)*len, grad);
+  d_cross_entropy_kernel<<<CUDA_GET_BLOCKS((end-begin)*len), CUDA_NUM_THREADS>>>(
+      len, begin, end, masks, labels, out, grad);
+  CudaTest("solving d_cross_entropy kernel failed");
+  d_softmax_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+      len, begin, end, masks, out, grad, diff);
   CudaTest("solving d_softmax_cross_entropy kernel failed");
 }
 
