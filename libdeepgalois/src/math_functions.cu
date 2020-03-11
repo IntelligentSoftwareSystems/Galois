@@ -343,6 +343,36 @@ __global__ void d_cross_entropy_kernel(int len, int begin, int end,
   }
 } 
 
+__global__ void d_cross_entropy_warp(int len, int begin, int end,
+                                const mask_t* masks, const label_t* labels,
+                                const float_t* data, float_t* grad) {
+  __shared__ float_t p[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
+  const int thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
+  const int warp_id     = thread_id   / WARP_SIZE;                // global warp index
+  const int warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
+  const int num_warps   = (BLOCK_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
+
+  for (int wid = warp_id; wid < end-begin; wid += num_warps) {
+    int id = begin + wid;
+    int base = id * len;	
+    if (masks[id] == 1) {
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) p[warp_lane][pid] = data[base+pid];
+      }
+      __syncthreads();
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          if (pid == (int)labels[id])
+            grad[wid*len+pid] = -1.0 / (p[warp_lane][pid] + 1e-10);
+          else grad[wid*len+pid] = 0.0;
+        }
+      }
+    }
+  }
+}
 // TODO: use warp
 __device__ void d_softmax_device(int n, const float_t* p, const float_t* dp, float_t* dy) {
   for (int i = 0; i < n; i++) {
@@ -365,6 +395,46 @@ __global__ void d_softmax_kernel(int len, int begin, int end,
   }
 } 
 
+__global__ void d_softmax_warp(int len, int begin, int end,
+                                const mask_t* masks, const float_t* data,
+                                const float_t* in_grad, float_t* out_grad) {
+  __shared__ float_t p[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  __shared__ float_t d[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
+  const int thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
+  const int warp_id     = thread_id   / WARP_SIZE;                // global warp index
+  const int warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
+  const int num_warps   = (BLOCK_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
+
+  for (int wid = warp_id; wid < end-begin; wid += num_warps) {
+    int id = begin + wid;
+    int base = id * len;	
+    if (masks[id] == 1) {
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          p[warp_lane][pid] = data[base+pid];
+          d[warp_lane][pid] = in_grad[wid*len+pid];
+        }
+      }
+      __syncthreads();
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          float_t sum = 0.0;
+          float_t self = p[warp_lane][pid];
+          for (int j = 0; j < len; j++) {
+            float_t df = (j == pid) ? self * (1.0 - self) : -p[warp_lane][j] * self;
+            sum += df * d[warp_lane][j];
+          }
+          out_grad[base+pid] = sum;
+        }
+      }
+      __syncthreads();
+    }
+  }
+}
+
 __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
                                const mask_t* masks, const label_t* labels,
                                const float_t* out, float_t* diff) {
@@ -378,19 +448,70 @@ __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
   }
 }
 
+__global__ void d_softmax_cross_entropy_warp(int len, int begin, int end,
+                                const mask_t* masks, const label_t* labels,
+                                const float_t* data, float_t* grad) {
+  __shared__ float_t p[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  __shared__ float_t d[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
+  const int thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
+  const int warp_id     = thread_id   / WARP_SIZE;                // global warp index
+  const int warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
+  const int num_warps   = (BLOCK_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
+
+  for (int wid = warp_id; wid < end-begin; wid += num_warps) {
+    int id = begin + wid;
+    int base = id * len;	
+    if (masks[id] == 1) {
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) p[warp_lane][pid] = data[base+pid];
+      }
+      __syncthreads();
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          if (pid == (int)labels[id])
+            d[warp_lane][pid] = -1.0 / (p[warp_lane][pid] + 1e-10);
+          else d[warp_lane][pid] = 0.0;
+        }
+      }
+      __syncthreads();
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          float_t sum = 0.0;
+          float_t self = p[warp_lane][pid];
+          for (int j = 0; j < len; j++) {
+            float_t df = (j == pid) ? self * (1.0 - self) : -p[warp_lane][j] * self;
+            sum += df * d[warp_lane][j];
+          }
+          grad[base+pid] = sum;
+        }
+      }
+      __syncthreads();
+    }
+  }
+}
+
 void d_softmax_cross_entropy_gpu(int len, int begin, int end,
                                  const mask_t* masks, const label_t* labels,
                                  const float_t* out, float_t* diff) {
 //  d_softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
 //      len, begin, end, masks, labels, out, diff);
 //  CudaTest("solving d_softmax_cross_entropy kernel failed");
-  float_t *grad;
-  float_malloc_device((end-begin)*len, grad);
-  d_cross_entropy_kernel<<<CUDA_GET_BLOCKS((end-begin)*len), CUDA_NUM_THREADS>>>(
-      len, begin, end, masks, labels, out, grad);
-  CudaTest("solving d_cross_entropy kernel failed");
-  d_softmax_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
-      len, begin, end, masks, out, grad, diff);
-  CudaTest("solving d_softmax_cross_entropy kernel failed");
+  //float_t *grad;
+  //float_malloc_device((end-begin)*len, grad);
+  //d_cross_entropy_kernel<<<CUDA_GET_BLOCKS((end-begin)*len), CUDA_NUM_THREADS>>>(
+  //d_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
+  //    len, begin, end, masks, labels, out, grad);
+  //CudaTest("solving d_cross_entropy kernel failed");
+  //d_softmax_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+  //d_softmax_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
+  //    len, begin, end, masks, out, grad, diff);
+  //CudaTest("solving d_softmax kernel failed");
+  d_softmax_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
+      len, begin, end, masks, labels, out, diff);
+  CudaTest("solving d_softmax_cross_entropy_warp kernel failed");
 }
 
