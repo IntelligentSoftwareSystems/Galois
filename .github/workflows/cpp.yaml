@@ -1,0 +1,35 @@
+name: C/C++ CI
+
+on: push
+
+jobs:
+  build_and_test:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os:
+        - ubuntu-18.04
+        - macOS-10.14
+        - ubuntu-16.04
+        build_type:
+        - Debug
+        - Release
+    steps:
+    - uses: actions/checkout@v2
+      submodules: true
+    - name: install dependencies
+      if: startsWith(${{matrix.os}}, "ubuntu-")
+      run: |
+        apt install -yq g++-9 libboost-all-dev libeigen3-dev libopenmpi-dev
+    - name: install dependencies
+      if: startsWith(${{matrix.os}}, "macOS-")
+      run: |
+        brew install openmpi boost eigen
+    - name: configure
+      run: mkdir -p /run/build && cmake -S . -B /run/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+    - name: build
+      run: cmake --build /run/build --parallel
+    - name: install
+      run: cmake --install /run/build --prefix /tmp
+    - name: test
+      run: make -C /run/build test

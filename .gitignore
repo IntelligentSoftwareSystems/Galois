@@ -14,6 +14,7 @@ tags
 .vscode
 .settings
 compile_commands.json
+.clangd/
 
 /GPATH
 /GRTAGS
@@ -26,5 +27,3 @@ compile_commands.json
 
 .clang-complete
 .ycm_extra_conf.py
-
-.*
