@@ -219,7 +219,11 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
 
      /* Calculate the overall modularity */
     double e_xx = 0;
+    galois::GAccumulator<double> acc_e_xx;
     double a2_x = 0;
+    galois::GAccumulator<double> acc_a2_x;
+
+
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
@@ -238,11 +242,13 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
-                    e_xx += cluster_wt_internal[n];
-                    a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                    acc_e_xx += cluster_wt_internal[n];
+                    acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
                   });
 
 
+    e_xx = acc_e_xx.reduce();
+    a2_x = acc_e_xx.reduce();
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
@@ -404,7 +410,11 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
 
      /* Calculate the overall modularity */
     double e_xx = 0;
+    galois::GAccumulator<double> acc_e_xx;
     double a2_x = 0;
+    galois::GAccumulator<double> acc_a2_x;
+
+
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
@@ -423,10 +433,12 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
-                    e_xx += cluster_wt_internal[n];
-                    a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                    acc_e_xx += cluster_wt_internal[n];
+                    acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
                   });
 
+    e_xx = acc_e_xx.reduce();
+    a2_x = acc_e_xx.reduce();
 
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
@@ -703,7 +715,11 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
 
      /* Calculate the overall modularity */
     double e_xx = 0;
+    galois::GAccumulator<double> acc_e_xx;
     double a2_x = 0;
+    galois::GAccumulator<double> acc_a2_x;
+
+
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
@@ -722,11 +738,13 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
 
     galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
-                    e_xx += cluster_wt_internal[n];
-                    a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                    acc_e_xx += cluster_wt_internal[n];
+                    acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
                   });
 
 
+    e_xx = acc_e_xx.reduce();
+    a2_x = acc_e_xx.reduce();
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
@@ -906,7 +924,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
     prev_mod = curr_mod;
     graph_curr = &graph_next;
     } else {
-     uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+      uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
       galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
       buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
       calModularity(graph_next);
@@ -919,6 +937,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
       non_color = true;
     }
     calModularity(graph_next);
+    calModularity(*graph_curr);
 }
 
 int main(int argc, char** argv) {
