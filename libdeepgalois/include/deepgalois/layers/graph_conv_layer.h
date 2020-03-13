@@ -49,6 +49,7 @@ public:
 #endif
   // user-defined combine function
   virtual void combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out);
+  void d_aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
 
 private:
   bool act_;     // whether to use activation function at the end
@@ -63,6 +64,7 @@ private:
   size_t z;
   float_t* out_temp; //!< intermediate data temporary
   float_t* in_temp;
+  float_t* in_temp1;
   float_t* trans_data;    // y*x
   unsigned* dropout_mask; // x*y
   float_t* norm_factor;   // normalization constant based on graph structure

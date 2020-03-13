@@ -32,7 +32,7 @@ void gpu_rng_uniform(const int n, unsigned* r) {
   CURAND_CHECK(curandGenerate(deepgalois::Context::curand_generator(), r, n));
 }
 
-void gpu_rng_uniform(const int n, const float_t a, const float_t b, float_t* r) {
+void rng_uniform_gpu(const int n, const float_t a, const float_t b, float_t* r) {
   CURAND_CHECK(curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
   const float range = b - a;
   if (range != float_t(1))
@@ -69,22 +69,6 @@ void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   assert(h_masks != NULL);
   CUDA_CHECK(cudaMalloc((void**)&d_masks, n * sizeof(mask_t)));
   CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
-}
-
-void gconv_malloc_device(size_t x, size_t y, size_t z, bool dropout,
-                         unsigned*& masks, float_t*& in, float_t*& out,
-                         float_t*& matrix, float_t*& grad) {
-  if (dropout) CUDA_CHECK(cudaMalloc((void**)&masks, x * y * sizeof(unsigned)));
-  CUDA_CHECK(cudaMalloc((void**)&in, x * y * sizeof(float_t)));
-  init_const_gpu(x*y, 0.0, in);
-  CUDA_CHECK(cudaMalloc((void**)&out, x * z * sizeof(float_t)));
-  init_const_gpu(x*z, 0.0, out);
-  CUDA_CHECK(cudaMalloc((void**)&matrix, y * z * sizeof(float_t)));
-  auto init_range = sqrt(6.0 / (y + z));
-  // Glorot & Bengio (AISTATS 2010)
-  gpu_rng_uniform(y * z, -init_range, init_range, matrix);
-  CUDA_CHECK(cudaMalloc((void**)&grad, y * z * sizeof(float_t)));
-  CUDA_CHECK(cudaMemset(grad, 0, y * z * sizeof(float_t)));
 }
 
 __global__ void setup_curand_kernel(const int n, curandState* state) {
@@ -185,16 +169,21 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
 
 void matmul1D1D_gpu(const size_t dim_x, const size_t dim_y, const size_t dim_z,
                     const float_t* A, const float_t* B, float_t* C) {
-  // std::cout << "[debug]: matmul1D1D_gpu\n";
   const CBLAS_TRANSPOSE TransA = CblasNoTrans;
   const CBLAS_TRANSPOSE TransB = CblasNoTrans;
   sgemm_gpu(TransA, TransB, dim_x, dim_y, dim_z, 1.0, A, B, 0.0, C);
 }
 
+// C = A x B, where A is a sparse matrix in CSR format, B is the dense matrix for vertex
+// feature tensor. However, since cusparse only supports column-major, while feature 
+// tensor is stored in row-major, the actual computation is: C = trans(A x trans(B)).
+// Currently, we use cublasSgeam to implement transposition and allocate intermediate
+// workspace memory (transpose_C) for this.
 void csrmm_gpu(const int M, const int N, const int K, const int nnz, 
                const float alpha, const float* A_nonzeros, 
 	           const int* A_idx_ptr, const int* A_nnz_idx,
                const float* B, const float beta, float *transpose_C, float* C) {
+  //std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K << ", nnz=" << nnz << "\n";
   CUSPARSE_CHECK(cusparseScsrmm2(deepgalois::Context::cusparse_handle(),
                  CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
                  M, N, K, nnz, &alpha, deepgalois::Context::cusparse_matdescr(), A_nonzeros, 
@@ -203,9 +192,41 @@ void csrmm_gpu(const int M, const int N, const int K, const int nnz,
   const float one = 1.0;
   const float zero = 0.0; 
   CUBLAS_CHECK(cublasSgeam(deepgalois::Context::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T,
-                           N, M, &one, transpose_C, M, &zero, transpose_C, M, C, N)); 
+                           N, M, &one, transpose_C, M, &zero, NULL, M, C, N)); 
 }
-
+/*
+void csrmm_gpu_new(const int M, const int N, const int K, const int nnz, 
+               const float alpha, const float* A_nonzeros, 
+	           const int* A_idx_ptr, const int* A_nnz_idx,
+               const float* B, const float beta, float *transpose_C, float* C) {
+  std::cout << "[debug]: csrmm_gpu\n";
+  cusparseSpMatDescr_t A_descr;
+  CUSPARSE_CHECK(cusparseCreateCsr(&A_descr, M, K, nnz, A_idx_ptr, A_nnz_idx, A_nonzeros,
+   	             CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));
+  cusparseDnMatDescr_t B_descr;
+  CUSPARSE_CHECK(cusparseCreateDnMat(&B_descr, K, N, K, B, CUDA_R_32F, CUSPARSE_ORDER_COL));
+  cusparseDnMatDescr_t C_descr;
+  CUSPARSE_CHECK(cusparseCreateDnMat(&C_descr, M, N, M, C, CUDA_R_32F, CUSPARSE_ORDER_COL));
+  size_t bufferSize;
+  CUSPARSE_CHECK(cusparseSpMM_bufferSize(deepgalois::Context::cusparse_handle(),
+                       CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                       (void*)&alpha, A_descr, B_descr, (void*)&beta, C_descr,
+                       CUDA_R_32F, CUSPARSE_COOMM_ALG1, &bufferSize));
+  cudaDeviceSynchronize();
+  void* buffer = NULL;
+  if (bufferSize > 0) CUDA_CHECK(cudaMalloc(&buffer, bufferSize));
+  CUSPARSE_CHECK(cusparseSpMM(deepgalois::Context::cusparse_handle(),
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                 (const void*)&alpha, A_descr, B_descr, (const void*)&beta, C_descr, 
+                 CUDA_R_32F, CUSPARSE_COOMM_ALG1, buffer));
+  cudaDeviceSynchronize();
+  //transpose C
+  const float one = 1.0;
+  const float zero = 0.0; 
+  CUBLAS_CHECK(cublasSgeam(deepgalois::Context::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_T,
+                           N, M, &one, transpose_C, M, &zero, NULL, M, C, N)); 
+}
+//*/
 void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N,
               const float alpha, const float* A, const float* x,
               const float beta, float* y) {
