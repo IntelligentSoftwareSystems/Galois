@@ -51,6 +51,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   init_const_gpu(x*z, 0.0, out_temp);
   if (dropout_ && phase_ == deepgalois::net_phase::train)
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
+  else copy_gpu(x*y, in_data, in_temp); 
   if (y > z) {
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
     graph_conv_layer::aggregate(z, context->graph_gpu, out_temp, out_data);
