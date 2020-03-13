@@ -45,6 +45,7 @@ set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(COMPILER_CACHE_PROGRAM "" CACHE STRING "Program to use to cache compiler outputs (e.g., ccache)")
 
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
@@ -163,6 +164,16 @@ endif(USE_GPROF)
 
 if(USE_SANITIZER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+endif()
+
+
+if(COMPILER_CACHE_PROGRAM)
+  find_program(CCACHE_PROGRAM ${COMPILER_CACHE_PROGRAM})
+  if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  else()
+    message(FATAL_ERROR "${COMPILER_CACHE_PROGRAM} not found")
+  endif()
 endif()
 
 set(CMAKE_CXX_STANDARD 14)

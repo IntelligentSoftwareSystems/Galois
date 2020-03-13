@@ -1,0 +1,78 @@
+name: C/C++ CI
+
+on: push
+
+jobs:
+  build_and_test:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os:
+        - ubuntu-18.04
+        - macOS-latest
+        build_type:
+        - Debug
+        - Release
+    steps:
+    - uses: actions/checkout@v2
+
+    ###
+    # Caching between builds
+    ###
+    - name: Cache conan packages
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-conan-${{hashFiles('config/conanfile.txt')}}
+        path: ~/.conan/data
+    - name: Cache ccache objects
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-ccache-${{matrix.build_type}}
+        restore-keys: |
+          ${{runner.os}}-ccache-
+        path: ~/.ccache
+
+    ###
+    # Install platform-level dependencies (OS-specific)
+    ###
+    - name: install dependencies
+      if: startsWith(matrix.os, 'ubuntu-')
+      run: |
+        sudo apt install -yq ccache curl gcc-9 g++-9 libopenmpi-dev
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 10
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 10
+
+        sudo -H pip3 install --upgrade pip setuptools
+        sudo -H pip3 install conan==1.22.3
+
+        conan profile new --detect --force default
+        conan profile update settings.compiler.libcxx=libstdc++11 default
+    - name: install dependencies
+      if: startsWith(matrix.os, 'macOS-')
+      run: |
+        brew install ccache conan openmpi
+        conan profile new --detect --force default
+
+    - name: pre-build
+      run: mkdir -p ~/build
+    - name: install C++ dependencies
+      run: |
+        conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
+        conan install -if ~/build --build=missing config
+
+    ###
+    # Standard CMake build process
+    ###
+    - name: configure
+      run: |
+        cmake -S . -B ~/build \
+          -DCMAKE_INSTALL_PREFIX=/tmp \
+          -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
+          -DCOMPILER_CACHE_PROGRAM=ccache \
+          -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake
+    - name: build
+      run: cmake --build ~/build --parallel 4
+    - name: install
+      run: cmake --install ~/build
+    - name: test
+      run: make -C ~/build test || true

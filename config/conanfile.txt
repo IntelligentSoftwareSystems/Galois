@@ -1,0 +1,12 @@
+[requires]
+aws-sdk-cpp/1.7.212@kmaragon/stable
+boost/1.71.0
+eigen/3.3.7
+
+[options]
+aws-sdk-cpp:build_transfer = True
+aws-sdk-cpp:build_s3 = True
+
+[generators]
+cmake_find_package
+cmake_paths
