@@ -620,7 +620,6 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
                   c_update[n].size = 0;
                   });
 
-
   while(true) {
     num_iter++;
 
@@ -703,9 +702,9 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
                   galois::do_all(galois::iterate(graph),
                                 [&](GNode n) {
                                   galois::atomicAdd(c_info[n].size,  c_update[n].size.load());
-                                  galois::atomicAdd(c_info[n].degree_wt, c_info[n].degree_wt.load());
+                                  galois::atomicAdd(c_info[n].degree_wt, c_update[n].degree_wt.load());
                                   //c_info[n].size += c_update[n].size.load();
-                                  //c_info[n].degree_wt += c_info[n].degree_wt.load();
+                                  //c_info[n].degree_wt += c_update[n].degree_wt.load();
 
                                   c_update[n].size = 0;
                                   c_update[n].degree_wt = 0;
