@@ -248,7 +248,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
 
 
     e_xx = acc_e_xx.reduce();
-    a2_x = acc_e_xx.reduce();
+    a2_x = acc_a2_x.reduce();
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
@@ -438,7 +438,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
                   });
 
     e_xx = acc_e_xx.reduce();
-    a2_x = acc_e_xx.reduce();
+    a2_x = acc_a2_x.reduce();
 
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
@@ -744,7 +744,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
 
 
     e_xx = acc_e_xx.reduce();
-    a2_x = acc_e_xx.reduce();
+    a2_x = acc_a2_x.reduce();
     //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
     curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
@@ -927,16 +927,17 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
       uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
       galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
       buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
-      calModularity(graph_next);
       break;
     }
   }
+#if 0
     if(!non_color && algo != delay) {
       galois::gPrint("Executing one non-foreach round\n");
       curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, prev_mod, c_threshold); //Run at least one non-foreach loop
       non_color = true;
     }
     calModularity(graph_next);
+#endif
     calModularity(*graph_curr);
 }
 

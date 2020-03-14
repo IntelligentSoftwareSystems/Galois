@@ -219,7 +219,7 @@ double calModularity(Graph& graph) {
 
 
   e_xx = acc_e_xx.reduce();
-  a2_x = acc_e_xx.reduce();
+  a2_x = acc_a2_x.reduce();
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
   mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
