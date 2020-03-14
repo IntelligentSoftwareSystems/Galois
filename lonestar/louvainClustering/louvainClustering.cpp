@@ -924,9 +924,9 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
     prev_mod = curr_mod;
     graph_curr = &graph_next;
     } else {
-      uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
-      galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
-      buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
+      //uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+      //galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+      //buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
       break;
     }
   }
