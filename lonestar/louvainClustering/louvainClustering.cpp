@@ -221,37 +221,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
      /* Calculate the overall modularity */
     double e_xx = 0;
     double a2_x = 0;
-#if 0
-    galois::GAccumulator<double> acc_e_xx;
-    galois::GAccumulator<double> acc_a2_x;
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    cluster_wt_internal[n] = 0;
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    auto n_data = graph.getData(n);
-                    for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                      if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
-                        cluster_wt_internal[n] += graph.getEdgeData(ii);
-                      }
-                    }
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    acc_e_xx += cluster_wt_internal[n];
-                    acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
-                  });
-
-
-    e_xx = acc_e_xx.reduce();
-    a2_x = acc_a2_x.reduce();
-    //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-    curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
-#endif
     curr_mod = calModularity(graph, c_info, e_xx, a2_x, constant_for_second_term);
 
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", lower, "      ", prev_mod, "       ", curr_mod, "\n");
@@ -414,40 +383,8 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
      /* Calculate the overall modularity */
     double e_xx = 0;
     double a2_x = 0;
-
-#if 0
-    galois::GAccumulator<double> acc_e_xx;
-    galois::GAccumulator<double> acc_a2_x;
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    cluster_wt_internal[n] = 0;
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    auto n_data = graph.getData(n);
-                    for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                      //if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
-                      if(local_target[graph.getEdgeDst(ii)] == local_target[n]) {
-                        cluster_wt_internal[n] += graph.getEdgeData(ii);
-                      }
-                    }
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    acc_e_xx += cluster_wt_internal[n];
-                    acc_a2_x += (c_info[n].degree_wt + c_update[n].degree_wt) * (c_info[n].degree_wt + c_update[n].degree_wt);
-                  });
-
-    e_xx = acc_e_xx.reduce();
-    a2_x = acc_a2_x.reduce();
-
-    //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-    curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
-    //galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
-#endif
     curr_mod = calModularity(graph, c_info, e_xx, a2_x, constant_for_second_term);
+
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", lower, "      ", prev_mod, "       ", curr_mod, "\n");
 
     if((curr_mod - prev_mod) < threshold_mod){
@@ -720,41 +657,8 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
      /* Calculate the overall modularity */
     double e_xx = 0;
     double a2_x = 0;
-
-
-#if 0
-    galois::GAccumulator<double> acc_e_xx;
-    galois::GAccumulator<double> acc_a2_x;
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    cluster_wt_internal[n] = 0;
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    auto n_data = graph.getData(n);
-                    for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                      if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
-                        cluster_wt_internal[n] += graph.getEdgeData(ii);
-                      }
-                    }
-                  });
-
-    galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    acc_e_xx += cluster_wt_internal[n];
-                    acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
-                  });
-
-
-    e_xx = acc_e_xx.reduce();
-    a2_x = acc_a2_x.reduce();
-    //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-    curr_mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
-#endif
-
     curr_mod = calModularity(graph, c_info, e_xx, a2_x, constant_for_second_term);
+
     galois::gPrint(num_iter, "        ", e_xx, "        ", a2_x, "        ", prev_mod, "       ", curr_mod, "\n");
 
     if((curr_mod - prev_mod) < threshold_mod){
