@@ -73,7 +73,7 @@ void printGraphCharateristics(Graph& graph) {
 
 }
 
-uint64_t vertexFollowing(Graph& graph, largeArray& clusters){
+uint64_t vertexFollowing(Graph& graph){
 
   //Initialize each node to its own cluster
   galois::do_all(galois::iterate(graph),
@@ -83,11 +83,12 @@ uint64_t vertexFollowing(Graph& graph, largeArray& clusters){
   galois::GAccumulator<uint64_t> isolatedNodes;
   galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
+                    auto& n_data = graph.getData(n);
                     uint64_t degree = std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
                                                      graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
                     if(degree == 0) {
                       isolatedNodes += 1;
-                      clusters[n] = -1;
+                      n_data.curr_comm_ass = -1;
                     } else {
                       if(degree == 1) {
                         //Check if the destination has degree greater than one
@@ -96,7 +97,7 @@ uint64_t vertexFollowing(Graph& graph, largeArray& clusters){
                                                          graph.edge_end(dst, galois::MethodFlag::UNPROTECTED));
                         if((dst_degree > 1 || (n > dst))){
                           isolatedNodes += 1;
-                          clusters[n] = graph.getData(dst).curr_comm_ass;
+                          n_data.curr_comm_ass = graph.getData(dst).curr_comm_ass;
                         }
                       }
                     }

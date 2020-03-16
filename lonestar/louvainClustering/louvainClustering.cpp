@@ -901,14 +901,12 @@ int main(int argc, char** argv) {
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges" << std::endl;
 
+   graph_curr = &graph;
   /*
    * Vertex following optimization
    */
   if (enable_VF){
-    largeArray clusters; // Cluster assignment
-    clusters.allocateBlocked(graph.size());
-
-    uint64_t num_nodes_to_fix = vertexFollowing(graph, clusters); // Find nodes that follow other nodes
+    uint64_t num_nodes_to_fix = vertexFollowing(graph); // Find nodes that follow other nodes
     galois::gPrint("Isolated nodes : ", num_nodes_to_fix, "\n");
 
 
