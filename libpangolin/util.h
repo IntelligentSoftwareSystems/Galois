@@ -1,6 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include "scan.h"
 #include "mgraph.h"
 #include "res_man.h"
 
@@ -11,17 +12,6 @@ void print_graph(Graph &graph) {
 			std::cout << graph.getEdgeDst(e) << " ";
 		std::cout << "]" << std::endl;
 	}
-}
-
-static std::vector<IndexT> PrefixSum(const std::vector<IndexT> &vec) {
-	std::vector<IndexT> sums(vec.size() + 1);
-	IndexT total = 0;
-	for (size_t n=0; n < vec.size(); n++) {
-		sums[n] = total;
-		total += vec[n];
-	}
-	sums[vec.size()] = total;
-	return sums;
 }
 
 void genGraph(MGraph &mg, Graph &g) {

@@ -1,11 +1,5 @@
 #ifndef TYPES_H
 #define TYPES_H
-
-#include "galois/Bag.h"
-#include "galois/Galois.h"
-#include "galois/substrate/PerThreadStorage.h"
-#include "galois/substrate/SimpleLock.h"
-
 typedef float Weight;
 typedef uint64_t Ulong;
 typedef unsigned ValueT;
@@ -14,24 +8,10 @@ typedef uint8_t BYTE;
 #ifdef LARGE_SIZE
 typedef uint64_t IndexT;
 typedef uint64_t IndexTy;
-typedef std::vector<BYTE> ByteList;
-typedef std::vector<unsigned> UintList;
-typedef std::vector<Ulong> UlongList;
-typedef std::vector<VertexId> VertexList;
 #else
 typedef unsigned IndexT;
 typedef unsigned IndexTy;
-typedef galois::gstl::Vector<BYTE> ByteList;
-typedef galois::gstl::Vector<unsigned> UintList;
-typedef galois::gstl::Vector<Ulong> UlongList;
-typedef galois::gstl::Vector<VertexId> VertexList;
 #endif
-typedef std::vector<UintList> IndexLists;
-typedef std::vector<ByteList> ByteLists;
-typedef std::vector<VertexList> VertexLists;
-typedef galois::gstl::Set<VertexId> VertexSet;
-typedef galois::substrate::PerThreadStorage<UintList> Lists;
-typedef galois::substrate::PerThreadStorage<unsigned> Counts;
 
 // We provide two types of 'support': frequency and domain support.
 // Frequency is used for counting, e.g. motif counting.
@@ -39,17 +19,11 @@ typedef galois::substrate::PerThreadStorage<unsigned> Counts;
 typedef float MatType;
 typedef unsigned Frequency;
 typedef std::vector<std::vector<MatType> > Matrix;
-typedef galois::GAccumulator<unsigned> UintAccu;
-typedef galois::GAccumulator<unsigned long> UlongAccu;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
-typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
-
 typedef std::pair<unsigned, unsigned> InitPattern;
 typedef std::unordered_map<unsigned, unsigned> FreqMap;
 typedef std::unordered_map<unsigned, bool> DomainMap;
 typedef std::map<unsigned, std::map<unsigned, unsigned> > Map2D;
-//typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
-//typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
 
 struct Edge {
 	VertexId src;

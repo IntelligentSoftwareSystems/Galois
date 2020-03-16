@@ -14,7 +14,7 @@
  * Reused/revised under 3-BSD
  */
 
-#include "types.h"
+#include "gtypes.h"
 
 class EdgeComparator {
 public:

@@ -10,17 +10,7 @@
  * Reused/revised under 3-BSD
  */
 
-#include "types.h"
-
-#ifdef USE_GSTL
-typedef galois::gstl::Set<int> IntSet;
-//typedef galois::gstl::Vector<bool> BoolVec;
-typedef galois::gstl::Vector<IntSet> IntSets;
-#else
-typedef std::set<int> IntSet;
-//typedef std::vector<bool> BoolVec;
-typedef std::vector<IntSet> IntSets;
-#endif
+#include "gtypes.h"
 typedef std::vector<bool> BoolVec;
 
 class DomainSupport {
