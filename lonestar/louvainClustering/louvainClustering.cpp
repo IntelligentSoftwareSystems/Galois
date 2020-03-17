@@ -80,7 +80,11 @@ static cll::opt<uint32_t> max_iter("max_iter",
 
 
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
-double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
+double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint32_t& iter) {
+
+  galois::StatTimer TimerClusteringTotal("Timer_Clustering_Total");
+  TimerClusteringTotal.start();
+
   galois::gPrint("Inside algoLouvainWithLocking\n");
 
   CommArray c_info; // Community info
@@ -88,7 +92,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   //std::vector<Comm> c_info(graph.size()), c_update(graph.size());
 
   /* Variables needed for Modularity calculation */
-  uint64_t total_edge_wt_twice;
   double constant_for_second_term;
   double prev_mod = lower;
   double curr_mod = -1;
@@ -115,7 +118,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   galois::gPrint("Init Done\n");
   /* Calculate the weighted degree sum for each vertex */
   sumVertexDegreeWeight(graph, c_info);
-  galois::gPrint("c_info[5] : ", c_info[0].degree_wt.load(), "\n");
+  galois::gPrint("c_info[0] : ", c_info[0].degree_wt.load(), "\n");
 
   /* Compute the total weight (2m) and 1/2m terms */
   constant_for_second_term = calConstantForSecondTerm(graph);
@@ -125,6 +128,8 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   galois::gPrint("Itr      Explore_xx            A_x2          Prev-Prev-Mod         Prev-Mod           Curr-Mod\n");
   galois::gPrint("========================================================================================================\n");
 
+  galois::StatTimer TimerClusteringWhile("Timer_Clustering_While");
+  TimerClusteringWhile.start();
   while(true) {
     num_iter++;
 
@@ -135,7 +140,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
                   c_update[n].size = 0;
                   });
 
-  galois::GAccumulator<uint32_t> syncRound;
   galois::for_each(galois::iterate(graph),
                 [&](GNode n, auto& ctx) {
 
@@ -143,7 +147,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
                     uint64_t degree = std::distance(graph.edge_begin(n, flag_write_lock),
                                                      graph.edge_end(n,  flag_write_lock));
                     //TODO: Can we make it infinity??
-                    uint64_t local_target = -1;
+                    int64_t local_target = -1;
                     std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
                     std::vector<uint64_t> counter; //Number of edges to each unique cluster
                     uint64_t num_unique_clusters = 1;
@@ -265,6 +269,9 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
     prev_mod = curr_mod;
 
   }// End while
+  TimerClusteringWhile.stop();
+
+  iter += num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -275,20 +282,23 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold) {
   cluster_wt_internal.destroy();
   cluster_wt_internal.deallocate();
 
+  TimerClusteringTotal.stop();
   return prev_mod;
 }
 
 
 
-double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double threshold) {
+double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double threshold, uint32_t iter) {
   galois::gPrint("Inside algoLouvainWithLockingDelay\n");
+
+  galois::StatTimer TimerClusteringTotal("Timer_Clustering_Total");
+  TimerClusteringTotal.start();
 
   CommArray c_info; // Community info
   CommArray c_update; // Used for updating community
   //std::vector<Comm> c_info(graph.size()), c_update(graph.size());
 
   /* Variables needed for Modularity calculation */
-  uint64_t total_edge_wt_twice;
   double constant_for_second_term;
   double prev_mod = -1; //lower;
   double curr_mod = -1;
@@ -324,6 +334,9 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   galois::gPrint("========================================================================================================\n");
   galois::gPrint("Itr      Explore_xx            A_x2          Prev-Prev-Mod         Prev-Mod           Curr-Mod\n");
   galois::gPrint("========================================================================================================\n");
+
+  galois::StatTimer TimerClusteringWhile("Timer_Clustering_While");
+  TimerClusteringWhile.start();
   while(true) {
     num_iter++;
 
@@ -444,6 +457,9 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
 
 
   }// End while
+  TimerClusteringWhile.stop();
+
+  iter += num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -454,6 +470,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   cluster_wt_internal.destroy();
   cluster_wt_internal.deallocate();
 
+  TimerClusteringTotal.stop();
   return prev_mod;
 }
 
@@ -472,7 +489,7 @@ uint64_t coloringDistanceOne(Graph& graph) {
                     int64_t max_color = -1;
                     int64_t my_color = 0;
                     //galois::DynamicBitSet isColorSet;
-                    uint64_t degree = std::distance(graph.edge_begin(n), graph.edge_end(n));
+                    int64_t degree = std::distance(graph.edge_begin(n), graph.edge_end(n));
                     if(degree > 0) {
                       std::vector<bool> isColorSet;
                       //std::vector<uint64_t> isColorSet;
@@ -529,7 +546,7 @@ uint64_t coloringDistanceOne(Graph& graph) {
 
     int64_t num_colors  = 0;
     for(GNode n = 0 ; n <  graph.size(); ++n) {
-      uint64_t color = graph.getData(n, flag_no_lock).colorId;
+      int64_t color = graph.getData(n, flag_no_lock).colorId;
       if( color > num_colors)
         num_colors = color;
     }
@@ -539,7 +556,11 @@ uint64_t coloringDistanceOne(Graph& graph) {
 
 
 //double algoLouvainWithColoring(Graph &graph, largeArray& clusters, double lower, double threshold) {
-double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
+double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uint32_t iter) {
+
+  galois::StatTimer TimerClusteringTotal("Timer_Clustering_Total");
+  TimerClusteringTotal.start();
+
   galois::gPrint("Inside algoLouvainWithColoring\n");
 
   CommArray c_info; // Community info
@@ -547,7 +568,6 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
   //std::vector<Comm> c_info(graph.size()), c_update(graph.size());
 
   /* Variables needed for Modularity calculation */
-  uint64_t total_edge_wt_twice;
   double constant_for_second_term;
   double prev_mod = lower;
   double curr_mod = -1;
@@ -592,6 +612,8 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
                   c_update[n].size = 0;
                   });
 
+  galois::StatTimer TimerClusteringWhile("Timer_Clustering_While");
+  TimerClusteringWhile.start();
   while(true) {
     num_iter++;
 
@@ -605,7 +627,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
                         uint64_t degree = std::distance(graph.edge_begin(n, flag_no_lock),
                                                          graph.edge_end(n,  flag_no_lock));
                         //TODO: Can we make it infinity??
-                        uint64_t local_target = -1;
+                        int64_t local_target = -1;
                         std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
                         std::vector<uint64_t> counter; //Number of edges to each unique cluster
                         uint64_t num_unique_clusters = 1;
@@ -700,6 +722,9 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
     prev_mod = curr_mod;
 
   }// End while
+  TimerClusteringWhile.stop();
+
+  iter += num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -710,12 +735,16 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold) {
   cluster_wt_internal.destroy();
   cluster_wt_internal.deallocate();
 
+  TimerClusteringTotal.stop();
   return prev_mod;
 }
 
 
 void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_clusters) {
   std::cerr << "Inside buildNextLevelGraph\n";
+
+  galois::StatTimer TimerGraphBuild("Timer_Graph_build");
+  TimerGraphBuild.start();
   uint32_t num_nodes_next = num_unique_clusters;
   uint64_t num_edges_next = 0; //Unknown right now
 
@@ -752,9 +781,8 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                     std::map<uint64_t, uint64_t> cluster_local_map;
                     uint64_t num_unique_clusters = 0;
                     for(auto cb_ii = cluster_bags[c].begin(); cb_ii != cluster_bags[c].end(); ++cb_ii) {
-                      auto& n_data = graph.getData(*cb_ii, flag_no_lock);
 
-                      assert(n_data.curr_comm_ass == c); // All nodes in this bag must have same cluster id
+                      assert(graph.getData(*cb_ii, flag_no_lock).curr_comm_ass == c); // All nodes in this bag must have same cluster id
 
                       for(auto ii = graph.edge_begin(*cb_ii); ii != graph.edge_end(*cb_ii); ++ii) {
                         GNode dst = graph.getEdgeDst(ii);
@@ -773,7 +801,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                       } // End edge loop
                     }
                 }, galois::steal(),
-                   galois::loopname("Find edges"));
+                   galois::loopname("BuildGrah: Find edges"));
 
   /* Serial loop to reduce all the edge counts */
   std::vector<uint64_t> prefix_edges_count(num_unique_clusters);
@@ -802,7 +830,13 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
 #endif
 
   std::cerr << "Graph construction started" << "\n";
+
+  galois::StatTimer TimerConstructFrom("Timer_Construct_From");
+  TimerConstructFrom.start();
   graph_next.constructFrom(num_nodes_next, num_edges_next, prefix_edges_count, edges_id, edges_data);
+  TimerConstructFrom.stop();
+
+  TimerGraphBuild.stop();
   galois::gPrint("Graph construction done\n");
 }
 //void runMultiPhaseLouvainAlgorithm(Graph& graph, largeArray& clusters_orig, uint64_t min_graph_size, double c_threshold) {
@@ -811,12 +845,12 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   galois::gPrint("Inside runMultiPhaseLouvainAlgorithm\n");
   double prev_mod = -1; //Previous modularity
   double curr_mod = -1; //Current modularity
-  uint32_t phase = 1;
+  uint32_t phase = 0;
 
   Graph* graph_curr = &graph;
   Graph graph_next;
   uint32_t iter = 0;
-  bool non_color = false;
+  //bool non_color = false;
   while(true){
     iter++;
     phase++;
@@ -843,13 +877,13 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 
         switch (algo) {
           case coloring:
-                curr_mod = algoLouvainWithColoring(*graph_curr, curr_mod, c_threshold);
+                curr_mod = algoLouvainWithColoring(*graph_curr, curr_mod, c_threshold, iter);
                 break;
           case foreach:
-                curr_mod = algoLouvainWithLocking(*graph_curr, curr_mod, c_threshold);
+                curr_mod = algoLouvainWithLocking(*graph_curr, curr_mod, c_threshold, iter);
                 break;
           case delay:
-                curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, curr_mod, c_threshold);
+                curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, curr_mod, c_threshold, iter);
                 break;
           default:
                 std::abort();
@@ -861,8 +895,8 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
     galois::gPrint("Prev_mod main: ", prev_mod, "\n");
     if(iter < max_iter && (curr_mod - prev_mod) > threshold) {
     buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
-    //printGraph(graph_next);
-    //break;
+    //TODO: if(iter > 1) graph_curr->deallocate(); // deallocate the previous graph except the input graph
+    //Can allocate the input graph as well and store communities in a largeArray
     prev_mod = curr_mod;
     graph_curr = &graph_next;
     printGraphCharateristics(*graph_curr);
@@ -881,7 +915,9 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
     }
     calModularity(graph_next);
 #endif
-    calModularityFinal(*graph_curr);
+    galois::gPrint("Phases : ", phase, "\n");
+    galois::gPrint("Iter : ", iter, "\n");
+    //calModularityFinal(*graph_curr);
 }
 
 int main(int argc, char** argv) {
@@ -890,7 +926,6 @@ int main(int argc, char** argv) {
 
   Graph graph, graph_next;
   Graph *graph_curr;
-  GNode source, report;
 
   galois::StatTimer TEnd2End("Timer_end2end");
   TEnd2End.start();

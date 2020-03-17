@@ -21,11 +21,6 @@
 #ifndef LOUVAIN_CLUSTERING_H
 #define LOUVAIN_CLUSTERING_H
 
-
-
-
-
-
 /*
  * Typedefs
  */
@@ -48,10 +43,10 @@ typedef galois::LargeArray<Comm> CommArray;
 
 //Graph Node information
 struct Node{
-  uint64_t prev_comm_ass;
-  uint64_t curr_comm_ass;
+  int64_t prev_comm_ass;
+  int64_t curr_comm_ass;
   uint64_t degree_wt;
-  uint64_t cluster_wt_internal;
+  //uint64_t cluster_wt_internal;
   int64_t colorId;
 };
 
@@ -200,7 +195,6 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
-                  auto n_data = graph.getData(n);
                   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
                     if(local_target[graph.getEdgeDst(ii)] == local_target[n]) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
@@ -286,7 +280,6 @@ double calModularityFinal(Graph& graph) {
   CommArray c_update; // Used for updating community
 
   /* Variables needed for Modularity calculation */
-  uint64_t total_edge_wt_twice;
   double constant_for_second_term;
   double mod = -1;
 
