@@ -122,7 +122,7 @@ void Net::train(optimizer* opt, bool need_validate) {
     // validation / testing
     set_netphases(net_phase::test);
     galois::gPrint("train_loss = ", std::setw(5), train_loss, " train_acc = ",
-                   std::setw(5), train_acc);
+                   std::setw(5), train_acc, "\n");
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
     if (need_validate) {
@@ -133,7 +133,7 @@ void Net::train(optimizer* opt, bool need_validate) {
                                  val_loss, val_acc);
       Tval.stop();
       galois::gPrint(" val_loss = ", std::setw(5), val_loss, " val_acc = ",
-                     std::setw(5), val_acc);
+                     std::setw(5), val_acc, "\n");
       galois::gPrint(" time = ", epoch_time + val_time, " ms (train_time = ",
                      epoch_time, " val_time = ", val_time, ")\n");
     } else {
