@@ -86,17 +86,6 @@ enable_testing()
 
 ###### Configure compiler ######
 
-#Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
-
-# Some apps break with -O3 on recent clang versions.
-# Tracking that down is a work in progress, so for the current release,
-# only use -O2 with clang.
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-endif()
-
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -107,6 +96,45 @@ set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
   set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
+endif()
+
+# Always include debug info and aggressive warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -Werror")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Wextra -Werror")
+
+# GCC
+if(CMAKE_COMPILER_IS_GNUCC)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
+                  OUTPUT_VARIABLE GCC_VERSION)
+  if(GCC_VERSION VERSION_LESS 5.2)
+    message(FATAL_ERROR "GCC must be 5.2 or higher")
+  endif()
+
+  # Some of our dependencies fail with -Wextra, so ignore the following for
+  # now:
+  # - Wno-deprecated-copy (boost::counting_iterator)
+  # - Wno-cast-functions (openmpi)
+  # - Wno-unused-parameter (conflicts with readability rules)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy -Wno-cast-function-type -Wno-unused-parameter")
+endif()
+
+# Clang
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  # Some apps break with -O3 on recent clang versions.
+  # Tracking that down is a work in progress, so for the current release,
+  # only use -O2 with clang.
+  if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+  endif()
+
+  if(CXX_TOOLCHAIN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
+  else()
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  endif()
+  
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
 endif()
 
 # ICC
@@ -125,28 +153,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
 endif()
 
-# Clang
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
-endif()
-
 if(CYGWIN)
   message(STATUS "On Cygwin")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
-endif()
-
-# check for incompatible GCC
-if(CMAKE_COMPILER_IS_GNUCC)
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 5.2)
-    message(FATAL_ERROR "GCC must be 5.2 or higher")
-  endif()
 endif()
 
 # Enable architecture-specific optimizations
@@ -169,7 +178,6 @@ endif(USE_GPROF)
 if(USE_SANITIZER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 endif()
-
 
 if(COMPILER_CACHE_PROGRAM)
   find_program(CCACHE_PROGRAM ${COMPILER_CACHE_PROGRAM})
