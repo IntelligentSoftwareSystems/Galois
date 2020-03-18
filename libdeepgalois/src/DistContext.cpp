@@ -112,7 +112,7 @@ void DistContext::norm_factor_counting() {
   norm_factor = new float_t[localVertices];
   galois::do_all(galois::iterate((size_t)0, localVertices),
     [&](auto v) {
-      norm_factor[v] = 0.01;
+      norm_factor[v] = 1;
     }, galois::loopname("NormCounting"));
 
   //galois::do_all(galois::iterate((size_t)0, localVertices),
