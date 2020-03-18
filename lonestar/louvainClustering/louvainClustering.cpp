@@ -96,7 +96,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
   double prev_mod = lower;
   double curr_mod = -1;
   double threshold_mod = threshold;
-  uint32_t num_iter = 0;
+  uint32_t num_iter = iter;
 
   largeArray cluster_wt_internal;
   //std::vector<uint64_t> cluster_wt_internal(graph.size());
@@ -303,7 +303,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   double prev_mod = -1; //lower;
   double curr_mod = -1;
   double threshold_mod = threshold;
-  uint32_t num_iter = 0;
+  uint32_t num_iter = iter;
 
   largeArray cluster_wt_internal;
   //std::vector<uint64_t> cluster_wt_internal(graph.size());
@@ -572,7 +572,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
   double prev_mod = lower;
   double curr_mod = -1;
   double threshold_mod = threshold;
-  uint32_t num_iter = 0;
+  uint32_t num_iter = iter;
 
   largeArray cluster_wt_internal;
   //std::vector<uint64_t> cluster_wt_internal(graph.size());
@@ -592,7 +592,11 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
                   });
 
   galois::gPrint("Coloring\n");
+  galois::StatTimer TimerColoring("Timer_Cloring");
+  TimerColoring.start();
   int64_t num_colors = coloringDistanceOne(graph);
+  TimerColoring.stop();
+
   /* Calculate the weighted degree sum for each vertex */
   sumVertexDegreeWeight(graph, c_info);
   galois::gPrint("c_info[5] : ", c_info[0].degree_wt.load(), "\n");
@@ -693,7 +697,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
                   }, galois::loopname("louvain algo: Phase 1")
                   );
 
-                  galois::do_all(galois::iterate(graph),
+          galois::do_all(galois::iterate(graph),
                                 [&](GNode n) {
                                   galois::atomicAdd(c_info[n].size,  c_update[n].size.load());
                                   galois::atomicAdd(c_info[n].degree_wt, c_update[n].degree_wt.load());
