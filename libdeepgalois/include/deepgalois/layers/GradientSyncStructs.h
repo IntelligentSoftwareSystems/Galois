@@ -13,10 +13,10 @@ struct GradientSync {
   static bool reduce(uint32_t node_id, float_t& weight, ValTy y) {
     // TODO merge function here
     // for now make sure the weights are close enough
-    if (std::abs(weight - y) > 0.00001) {
-      galois::gInfo("weight ", node_id, " not consistent with one received");
-    }
-
+    //if (std::abs(weight - y) > 0.00001) {
+    //  galois::gInfo("weight ", node_id, " not consistent with one received");
+    //}
+    weight += y;
     return true;
   }
 
