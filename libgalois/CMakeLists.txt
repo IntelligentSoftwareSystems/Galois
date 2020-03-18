@@ -52,7 +52,17 @@ else()
   list(APPEND sources src/HWTopoLinux.cpp)
 endif()
 
-add_library(galois_shmem ${sources})
+add_library(galois_shmem_obj OBJECT ${sources})
+target_include_directories(galois_shmem_obj PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}>
+)
+set_target_properties (galois_shmem_obj PROPERTIES
+  INTERFACE_POSITION_INDEPENDENT_CODE On
+  POSITION_INDEPENDENT_CODE On
+)
+
+add_library(galois_shmem $<TARGET_OBJECTS:galois_shmem_obj>)
 target_include_directories(galois_shmem PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${GALOIS_RELATIVE_INCLUDE_DIR}>
@@ -81,16 +91,6 @@ if (VTune_FOUND)
   target_link_libraries(galois_shmem ${VTune_LIBRARIES})
   target_link_libraries(galois_shmem dl)
 endif()
-
-add_library(galois_shmem_obj OBJECT ${sources})
-target_include_directories(galois_shmem_obj PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}>
-)
-set_target_properties (galois_shmem_obj PROPERTIES 
-  INTERFACE_POSITION_INDEPENDENT_CODE On 
-  POSITION_INDEPENDENT_CODE On
-)
 
 install(DIRECTORY include DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/.." COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
