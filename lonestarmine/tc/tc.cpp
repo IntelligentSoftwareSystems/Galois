@@ -1,18 +1,37 @@
-#define USE_DAG
+#include "../lonestarmine.h"
+#include "BfsMining/vertex_miner.h"
 #define TRIANGLE
-#define USE_SIMPLE
-#define USE_EMB_LIST
-#define USE_BASE_TYPES
-#define CHUNK_SIZE 256
-#include "pangolin.h"
+
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
 const char* url  = 0;
 
-class AppMiner : public VertexMiner {
+#include "BfsMining/vertex_miner_api.h"
+class MyAPI: public VertexMinerAPI<BaseEmbedding> {
 public:
-	AppMiner(Graph *g) : VertexMiner(g) {}
+	// toExtend (only extend the last vertex in the embedding)
+	static bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+		return pos == n-1;
+	}
+	// toAdd (only add vertex connected to all the vertices in the embedding)
+	static bool toAdd(unsigned n, Graph &g, const BaseEmbedding &emb, unsigned pos, VertexId dst) {
+		return true;
+	}
+};
+
+class AppMiner : public VertexMiner<SimpleElement, BaseEmbedding, MyAPI, true> {
+public:
+	AppMiner(unsigned ms, int nt) : 
+		VertexMiner<SimpleElement, BaseEmbedding, MyAPI, true>(ms, nt, nblocks) {
+		assert(ms == 3);
+		set_num_patterns(1);
+	}
 	~AppMiner() {}
+	void print_output() {
+		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
+	}
+};
+/*
 	void init() { set_num_patterns(1); }
 	// toExtend (only extend the last vertex in the embedding: fast)
 	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
@@ -26,6 +45,6 @@ public:
 		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
 	}
 };
-
+//*/
 #include "BfsMining/engine.h"
 

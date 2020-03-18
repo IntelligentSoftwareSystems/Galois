@@ -7,7 +7,7 @@
 #define EDGE_INDUCED
 #define ENABLE_LABEL
 #include <cub/cub.cuh>
-#include "gpu_mining/miner.cuh"
+#include "miner.cuh"
 #include "bitsets.h"
 #include <thrust/scan.h>
 #include <thrust/extrema.h>

@@ -9,9 +9,7 @@
  * All rights reserved.
  * Reused/revised under 3-BSD
  */
-
-typedef std::set<unsigned> UintSet;
-typedef std::vector<UintSet> UintSets;
+#include "types.h"
 
 class VertexPositionEquivalences {
 friend std::ostream & operator<<(std::ostream & strm, const VertexPositionEquivalences& equ);
@@ -52,21 +50,4 @@ private:
 	UintSets equivalences;
 	unsigned numVertices;
 };
-
-std::ostream & operator<<(std::ostream & strm, const VertexPositionEquivalences& equ) {
-	if(equ.get_size() == 0) {
-		strm << "(empty)";
-		return strm;
-	}
-	strm << "VertexPositionEquivalences{equivalences=[";
-	for (unsigned i = 0; i < equ.get_size(); ++i) {
-		strm << "[";
-		for (auto ele : equ.get_equivalent_set(i)) {
-			strm << ele << ", ";
-		}
-		strm << "], ";
-	}
-	strm << "]; size=" << equ.get_size() << "}\n";
-	return strm;
-}
 #endif // EQUIVALENCE_HPP_

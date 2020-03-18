@@ -5,7 +5,7 @@
 #define USE_SIMPLE
 #define USE_BASE_TYPES
 #include <cub/cub.cuh>
-#include "gpu_mining/miner.cuh"
+#include "miner.cuh"
 typedef cub::BlockReduce<unsigned long long, BLOCK_SIZE> BlockReduce;
 
 __global__ void warp_edge(int m, CSRGraph graph, EmbeddingList emb_list, unsigned long long *total) {

@@ -5,7 +5,7 @@
 #define USE_PID
 #define USE_SIMPLE
 #define VERTEX_INDUCED
-#include "gpu_mining/miner.cuh"
+#include "miner.cuh"
 #include <cub/cub.cuh>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>

@@ -1,35 +1,32 @@
-#define USE_PID // record pattern ID for the pattern-support map
-#define USE_GSTL // use Galois memory allocator for domain support
-#define USE_DOMAIN // use domain support
-#define LARGE_SIZE // for large number of embeddings
-#define USE_EMB_LIST // use embedding list (SoA)
-#define ENABLE_LABEL // enable vertex label
-#define EDGE_INDUCED
-#define CHUNK_SIZE 256
-#include "pangolin.h"
+#include "../lonestarmine.h"
+#include "BfsMining/edge_miner.h"
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS extension";
 const char* url  = 0;
 
-class AppMiner : public EdgeMiner {
+#include "BfsMining/edge_miner_api.h"
+class MyAPI: public EdgeMinerAPI<EdgeEmbedding> {
 public:
-	AppMiner(Graph *g) : EdgeMiner(g) {
-	}
-	~AppMiner() {}
-	void init() {
-		assert(k > 1);
-		set_max_size(k);
+};
+
+class AppMiner : public EdgeMiner<LabeledElement,EdgeEmbedding,MyAPI,true> {
+public:
+	AppMiner(unsigned ms, int nt) : 
+		EdgeMiner<LabeledElement,EdgeEmbedding,MyAPI,true>(ms, nt) {
+		assert(ms > 1);
+		if (filetype == "gr") {
+			printf("ERROR: gr is not acceptable for FSM. Use adj instead.\n");
+			exit(1);
+		}
 		set_threshold(minsup);
-		construct_edgemap();
 		total_num = 0;
 	}
+	~AppMiner() {}
 	void print_output() {
-		std::cout << "\n\tNumber of frequent patterns (minsup=" << minsup << "): " << total_num << "\n";
+		std::cout << "\n\tNumber of frequent patterns (minsup=" 
+			<< minsup << "): " << this->total_num << "\n";
 	}
-	void inc_total_num(int value) { total_num += value; }
-private:
-	int total_num;
 };
 
 #include "BfsMining/engine.h"

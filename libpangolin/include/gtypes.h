@@ -1,7 +1,9 @@
 #pragma once
+// Galois supported types
 #include "types.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/SimpleLock.h"
 
@@ -31,13 +33,13 @@ typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 //typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
 //typedef galois::gstl::UnorderedMap<unsigned, bool> DomainMap;
 
-#ifdef USE_GSTL
+// use Galois memory allocator for domain support
 typedef galois::gstl::Set<int> IntSet;
-//typedef galois::gstl::Vector<bool> BoolVec;
 typedef galois::gstl::Vector<IntSet> IntSets;
-#else
-typedef std::set<int> IntSet;
-//typedef std::vector<bool> BoolVec;
-typedef std::vector<IntSet> IntSets;
-#endif
+//typedef std::set<int> IntSet;
+//typedef std::vector<IntSet> IntSets;
+typedef std::vector<bool> BoolVec;
+
+typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
+typedef Graph::GraphNode GNode;
 

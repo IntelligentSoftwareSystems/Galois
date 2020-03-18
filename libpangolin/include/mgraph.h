@@ -128,9 +128,7 @@ public:
 			for(size_t i = 2; i < result.size(); i++) {
 				IndexT dst = atoi(result[i].c_str());
 				if (src == dst) continue; // remove self-loop
-#ifdef USE_ELABEL
-				elabel = atoi(result[i].c_str());
-#endif
+				//elabel = atoi(result[i].c_str());
 				neighbors.insert(std::pair<IndexT, ValueT>(dst, elabel)); // remove redundant edge
 			}
 			for (auto it = neighbors.begin(); it != neighbors.end(); ++it)

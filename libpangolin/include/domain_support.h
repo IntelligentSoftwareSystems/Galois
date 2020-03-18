@@ -1,7 +1,7 @@
 #ifndef DOMAIN_SUPPORT_H
 #define DOMAIN_SUPPORT_H
 /**
- * Code from on below link. Modified under Galois.
+ * Code ported from on below link. Modified under Galois.
  *
  * https://github.com/qcri/Arabesque
  *
@@ -11,7 +11,6 @@
  */
 
 #include "gtypes.h"
-typedef std::vector<bool> BoolVec;
 
 class DomainSupport {
 public:

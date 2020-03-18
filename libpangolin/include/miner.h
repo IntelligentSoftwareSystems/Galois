@@ -1,55 +1,57 @@
 #ifndef MINER_HPP_
 #define MINER_HPP_
 #include "scan.h"
-#include "embedding.h"
+#include "util.h"
+#include "embedding_queue.h"
+#include "bliss/uintseqhash.hh"
 
+template <typename ElementType,typename EmbeddingType> class EmbeddingList;
+
+template <typename ElementTy, typename EmbeddingTy, bool enable_dag>
 class Miner {
+typedef EmbeddingQueue<EmbeddingTy> EmbeddingQueueTy;
+
 public:
-	Miner() {}
-	virtual ~Miner() {}
-	// insert single-edge embeddings into the embedding queue (worklist)
-	inline void insert(EmbeddingQueueType &queue) {
-		galois::do_all(galois::iterate(graph->begin(), graph->end()),
-			[&](const GNode& src) {
-				#ifdef ENABLE_LABEL
-				auto& src_label = graph->getData(src);
-				#endif
-				for (auto e : graph->edges(src)) {
-					GNode dst = graph->getEdgeDst(e);
-					#ifndef USE_DAG
-					if(src >= dst) continue;
-					#endif
-					#ifdef ENABLE_LABEL
-					auto& dst_label = graph->getData(dst);
-					#endif
-					EmbeddingType new_emb;
-					#ifdef ENABLE_LABEL
-					new_emb.push_back(ElementType(src, 0, src_label));
-					new_emb.push_back(ElementType(dst, 0, dst_label));
-					#else
-					new_emb.push_back(ElementType(src));
-					new_emb.push_back(ElementType(dst));
-					#endif
-					queue.push_back(new_emb);
-				}
-			},
-			galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-			galois::loopname("InitEmbQueue")
-		);
-		if(show) queue.printout_embeddings(0);
+	Miner(unsigned max_sz, int nt) : max_size(max_sz), num_threads(nt) {
+		//std::cout << "max_size = " << max_sz << std::endl;
+		//std::cout << "num_threads = " << nt << std::endl;
 	}
+	virtual ~Miner() {}
+	inline void insert(EmbeddingQueueTy &queue, bool debug = false);
 	inline unsigned intersect(unsigned a, unsigned b) {
 		return intersect_merge(a, b);
 	}
 	inline unsigned intersect_dag(unsigned a, unsigned b) {
 		return intersect_dag_merge(a, b);
 	}
+	//unsigned read_graph(std::string filename);
+	unsigned read_graph(std::string filetype, std::string filename) {
+		util::read_graph(graph, filetype, filename, enable_dag);
+		/*
+		if (enable_dag) {
+			Graph g_temp;
+			galois::graphs::readGraph(g_temp, filename);
+			util::orientation(g_temp, graph);
+		} else {
+			galois::graphs::readGraph(graph, filename);
+			galois::do_all(galois::iterate(graph), [&](const auto& vid) {
+				graph.getData(vid) = 1;
+			}, galois::chunk_size<CHUNK_SIZE>(), galois::loopname("assignVertexLabels"));
+		}
+		*/
+		graph.degree_counting();
+		degrees = graph.degrees;
+		std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
+		//util::print_graph(graph);
+		return 0;
+	}
+	EmbeddingList<ElementTy,EmbeddingTy> emb_list;
 
 protected:
-	Graph *graph;
+	Graph graph;
 	unsigned max_size;
-	std::vector<unsigned> degrees;
-	std::vector<BYTE> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
+	int num_threads;
+	uint32_t *degrees;
 
 	#ifdef USE_QUERY_GRAPH
 	std::vector<VertexId> matching_order;
@@ -79,7 +81,6 @@ protected:
 		ifile.close();
 	}
 	#endif
-	template <typename EmbeddingTy = VertexEmbedding>
 	inline bool is_automorphism_dag(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
 		//if (dst <= emb.get_vertex(0)) return true;
 		for (unsigned i = 0; i < n; ++i) if (dst == emb.get_vertex(i)) return true;
@@ -87,7 +88,6 @@ protected:
 		//for (unsigned i = idx+1; i < n; ++i) if (dst < emb.get_vertex(i)) return true;
 		return false;
 	}
-	template <typename EmbeddingTy = VertexEmbedding>
 	inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
 		//unsigned n = emb.size();
 		// the new vertex id should be larger than the first vertex id
@@ -103,75 +103,15 @@ protected:
 			if (dst < emb.get_vertex(i)) return true;
 		return false;
 	}
-	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb, unsigned pos = 0) {
-		unsigned pid = 0;
-		if (n == 2) { // count 3-motifs
-			pid = 1; // 3-chain
-			if (idx == 0) {
-				if (is_connected(emb.get_vertex(1), dst)) pid = 0; // triangle
-				#ifdef USE_WEDGE
-				else if (max_size == 4) is_wedge[pos] = 1; // wedge; used for 4-motif
-				#endif
-			}
-		} else if (n == 3) { // count 4-motifs
-			unsigned num_edges = 1;
-			pid = emb.get_pid();
-			if (pid == 0) { // extending a triangle
-				for (unsigned j = idx+1; j < n; j ++)
-					if (is_connected(emb.get_vertex(j), dst)) num_edges ++;
-				pid = num_edges + 2; // p3: tailed-triangle; p4: diamond; p5: 4-clique
-			} else { // extending a 3-chain
-				assert(pid == 1);
-				std::vector<bool> connected(3, false);
-				connected[idx] = true;
-				for (unsigned j = idx+1; j < n; j ++) {
-					if (is_connected(emb.get_vertex(j), dst)) {
-						num_edges ++;
-						connected[j] = true;
-					}
-				}
-				if (num_edges == 1) {
-					pid = 0; // p0: 3-path
-					unsigned center = 1;
-					#ifdef USE_WEDGE
-					if (is_wedge[pos]) center = 0;
-					#else
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					#endif
-					if (idx == center) pid = 1; // p1: 3-star
-				} else if (num_edges == 2) {
-					pid = 2; // p2: 4-cycle
-					unsigned center = 1;
-					#ifdef USE_WEDGE
-					if (is_wedge[pos]) center = 0;
-					#else
-					center = is_connected(emb.get_vertex(1), emb.get_vertex(2)) ? 1 : 0;
-					#endif
-					if (connected[center]) pid = 3; // p3: tailed-triangle
-				} else {
-					pid = 4; // p4: diamond
-				}
-			}
-		} else { // count 5-motif and beyond
-			pid = find_motif_pattern_id_eigen(n, idx, dst, emb);
-		}
-		return pid;
-	}
 	unsigned get_degree(Graph *g, VertexId vid) {
 		return std::distance(g->edge_begin(vid), g->edge_end(vid));
 	}
-	void degree_counting() {
-		degrees.resize(graph->size());
-		galois::do_all(galois::iterate(graph->begin(), graph->end()), [&] (GNode v) {
-			degrees[v] = std::distance(graph->edge_begin(v), graph->edge_end(v));
-		}, galois::loopname("DegreeCounting"));
-	}
 	inline unsigned intersect_merge(unsigned src, unsigned dst) {
 		unsigned count = 0;
-		for (auto e : graph->edges(dst)) {
-			GNode dst_dst = graph->getEdgeDst(e);
-			for (auto e1 : graph->edges(src)) {
-				GNode to = graph->getEdgeDst(e1);
+		for (auto e : graph.edges(dst)) {
+			GNode dst_dst = graph.getEdgeDst(e);
+			for (auto e1 : graph.edges(src)) {
+				GNode to = graph.getEdgeDst(e1);
 				if (dst_dst == to) {
 					count += 1;
 					break;
@@ -183,17 +123,17 @@ protected:
 	}
 	inline unsigned intersect_dag_merge(unsigned p, unsigned q) {
 		unsigned count = 0;
-		auto p_start = graph->edge_begin(p);
-		auto p_end = graph->edge_end(p);
-		auto q_start = graph->edge_begin(q);
-		auto q_end = graph->edge_end(q);
+		auto p_start = graph.edge_begin(p);
+		auto p_end = graph.edge_end(p);
+		auto q_start = graph.edge_begin(q);
+		auto q_end = graph.edge_end(q);
 		auto p_it = p_start;
 		auto q_it = q_start;
 		int a;
 		int b;
 		while (p_it < p_end && q_it < q_end) {
-			a = graph->getEdgeDst(p_it);
-			b = graph->getEdgeDst(q_it);
+			a = graph.getEdgeDst(p_it);
+			b = graph.getEdgeDst(q_it);
 			int d = a - b;
 			if (d <= 0) p_it ++;
 			if (d >= 0) q_it ++;
@@ -210,15 +150,15 @@ protected:
 			lookup = b;
 			search = a;
 		} 
-		Graph::edge_iterator begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
-		Graph::edge_iterator end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
-		for (auto e : graph->edges(lookup)) {
-			GNode key = graph->getEdgeDst(e);
+		auto begin = graph.edge_begin(search);
+		auto end = graph.edge_end(search);
+		for (auto e : graph.edges(lookup)) {
+			GNode key = graph.getEdgeDst(e);
 			if(binary_search(key, begin, end)) count ++;
 		}
 		return count;
 	}
-	inline bool is_all_connected_except(unsigned dst, unsigned pos, const BaseEmbedding &emb) {
+	inline bool is_all_connected_except(unsigned dst, unsigned pos, const EmbeddingTy &emb) {
 		unsigned n = emb.size();
 		bool all_connected = true;
 		for(unsigned i = 0; i < n; ++i) {
@@ -231,7 +171,7 @@ protected:
 		}
 		return all_connected;
 	}
-	inline bool is_all_connected_except_dag(unsigned dst, unsigned pos, const BaseEmbedding &emb) {
+	inline bool is_all_connected_except_dag(unsigned dst, unsigned pos, const EmbeddingTy &emb) {
 		unsigned n = emb.size();
 		bool all_connected = true;
 		for(unsigned i = 0; i < n; ++i) {
@@ -244,7 +184,7 @@ protected:
 		}
 		return all_connected;
 	}
-	inline bool is_all_connected(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
+	inline bool is_all_connected(unsigned dst, const EmbeddingTy &emb, unsigned end, unsigned start = 0) {
 		assert(start >= 0 && end > 0);
 		bool all_connected = true;
 		for(unsigned i = start; i < end; ++i) {
@@ -256,23 +196,11 @@ protected:
 		}
 		return all_connected;
 	}
-	inline bool is_all_connected_dag(unsigned dst, const BaseEmbedding &emb, unsigned end, unsigned start = 0) {
+	inline bool is_all_connected_dag(unsigned dst, const EmbeddingTy &emb, unsigned end, unsigned start = 0) {
 		assert(start >= 0 && end > 0);
 		bool all_connected = true;
 		for(unsigned i = start; i < end; ++i) {
 			unsigned from = emb.get_vertex(i);
-			if (!is_connected_dag(dst, from)) {
-				all_connected = false;
-				break;
-			}
-		}
-		return all_connected;
-	}
-	inline bool is_all_connected_dag(unsigned dst, const std::vector<VertexId> &emb, unsigned end, unsigned start = 0) {
-		assert(start >= 0 && end > 0);
-		bool all_connected = true;
-		for(unsigned i = start; i < end; ++i) {
-			unsigned from = emb[i];
 			if (!is_connected_dag(dst, from)) {
 				all_connected = false;
 				break;
@@ -290,32 +218,32 @@ protected:
 			key = b;
 			search = a;
 		} 
-		auto begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
-		auto end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		auto begin = graph.edge_begin(search);
+		auto end = graph.edge_end(search);
 		//return serial_search(key, begin, end);
 		return binary_search(key, begin, end);
 	}
 	inline int is_connected_dag(unsigned key, unsigned search) {
 		if (degrees[search] == 0) return false;
-		auto begin = graph->edge_begin(search, galois::MethodFlag::UNPROTECTED);
-		auto end = graph->edge_end(search, galois::MethodFlag::UNPROTECTED);
+		auto begin = graph.edge_begin(search);
+		auto end = graph.edge_end(search);
 		//return serial_search(key, begin, end);
 		return binary_search(key, begin, end);
 	}
 	inline bool serial_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
 		for (auto offset = begin; offset != end; ++ offset) {
-			unsigned d = graph->getEdgeDst(offset);
+			unsigned d = graph.getEdgeDst(offset);
 			if (d == key) return true;
 			if (d > key) return false;
 		}
 		return false;
 	}
 	inline bool binary_search(unsigned key, Graph::edge_iterator begin, Graph::edge_iterator end) {
-		Graph::edge_iterator l = begin;
-		Graph::edge_iterator r = end-1;
+		auto l = begin;
+		auto r = end-1;
 		while (r >= l) { 
-			Graph::edge_iterator mid = l + (r - l) / 2; 
-			unsigned value = graph->getEdgeDst(mid);
+			auto mid = l + (r - l) / 2; 
+			unsigned value = graph.getEdgeDst(mid);
 			if (value == key) return true;
 			if (value < key) l = mid + 1; 
 			else r = mid - 1; 
@@ -328,7 +256,7 @@ protected:
 		int r = length-1;
 		while (r >= l) { 
 			int mid = l + (r - l) / 2; 
-			unsigned value = graph->getEdgeDst(begin+mid);
+			unsigned value = graph.getEdgeDst(begin+mid);
 			if (value == key) return mid;
 			if (value < key) l = mid + 1; 
 			else r = mid - 1; 
@@ -377,7 +305,7 @@ protected:
 			c[n-i] -= trace(n, C) / i;
 		}
 	}
-	inline void get_connectivity(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding &emb, std::vector<bool> &connected) {
+	inline void get_connectivity(unsigned n, unsigned idx, VertexId dst, const EmbeddingTy &emb, std::vector<bool> &connected) {
 		connected.push_back(true); // 0 and 1 are connected
 		for (unsigned i = 2; i < n; i ++)
 			for (unsigned j = 0; j < i; j++)
@@ -392,7 +320,7 @@ protected:
 		}
 	}
 	// eigenvalue based approach to find the pattern id for a given embedding
-	inline unsigned find_motif_pattern_id_eigen(unsigned n, unsigned idx, VertexId dst, const VertexEmbedding& emb) {
+	inline unsigned find_motif_pattern_id_eigen(unsigned n, unsigned idx, VertexId dst, const EmbeddingTy& emb) {
 		std::vector<bool> connected;
 		get_connectivity(n, idx, dst, emb, connected);
 		Matrix A(n+1, std::vector<MatType>(n+1, 0));
@@ -404,6 +332,8 @@ protected:
 			h.update((unsigned)c[i]);
 		return h.get_value();
 	}
+
+	//unsigned orientation(Graph &og, Graph &g);
 };
 
 #endif // MINER_HPP_

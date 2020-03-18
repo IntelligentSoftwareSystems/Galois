@@ -16,19 +16,6 @@
 
 #include "gtypes.h"
 
-class EdgeComparator {
-public:
-	int operator()(const Edge& oneEdge, const Edge& otherEdge) {
-		if(oneEdge.src == otherEdge.src) {
-			return oneEdge.dst > otherEdge.dst;
-		} else {
-			return oneEdge.src > otherEdge.src;
-		}
-	}
-};
-
-typedef std::pair<VertexId, VertexId> OrderedEdge;
-
 // This is the data structure used in RStream.
 // Each element contains 8 bytes, first 4 bytes is vertex id,
 // second 4 bytes contains edge label(1byte) + vertex label(1byte) + history info(1byte).
@@ -79,6 +66,7 @@ public:
 	BYTE get_elabel() const { return edge_label; }
 	BYTE get_vlabel() const { return vertex_label; }
 	BYTE get_his() const { return history_info; }
+	bool has_history() { return true; }
 	friend std::ostream & operator<<(std::ostream & strm, const LabeledElement& element) {
 		strm << "[" << element.get_vid() << ", " //<< (int)element.get_key() << ", " << (int)element.get_elabel() << ", "
 			<< (int)element.get_vlabel() << ", " << (int)element.get_his() << "]";
@@ -115,6 +103,7 @@ public:
 	BYTE get_his() const { return history_info; }
 	BYTE get_vlabel() const { return 0; }
 	BYTE get_key() const { return 0; }
+	bool has_history() { return true; }
 	friend std::ostream & operator<<(std::ostream & strm, const StructuralElement& element) {
 		strm << "[" << element.get_vid() << ", " << (int)element.get_his() << "]";
 		return strm;
@@ -137,6 +126,8 @@ public:
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return 0; }
 	BYTE get_key() const { return 0; }
+	BYTE get_vlabel() const { return 0; }
+	bool has_history() { return false; }
 	inline int cmp(const SimpleElement& other) const {
 		if(vertex_id < other.get_vid()) return -1;
 		if(vertex_id > other.get_vid()) return 1;
@@ -151,13 +142,4 @@ public:
 	}
 };
 
-#ifdef USE_SIMPLE
-typedef SimpleElement ElementType;
-#endif
-#ifdef USE_STRUCTURAL
-typedef StructuralElement ElementType;
-#endif
-#ifdef ENABLE_LABEL
-typedef LabeledElement ElementType;
-#endif
 #endif

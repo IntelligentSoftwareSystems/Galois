@@ -4,7 +4,7 @@
 #include "cutils.h"
 #define USE_SIMPLE
 #define USE_BASE_TYPES
-#include "gpu_mining/miner.cuh"
+#include "miner.cuh"
 #include <cub/cub.cuh>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>

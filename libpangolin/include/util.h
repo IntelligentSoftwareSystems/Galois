@@ -5,9 +5,14 @@
 #include "mgraph.h"
 #include "res_man.h"
 
+namespace util {
+
 void print_graph(Graph &graph) {
 	for (GNode n : graph) {
-		std::cout << "vertex " << n << ": label = " << graph.getData(n) << " edgelist = [ ";
+		std::cout << "vertex " << n 
+			<< ": label = " << graph.getData(n) 
+			<< ": degree = " << graph.get_degree(n) 
+			<< " edgelist = [ ";
 		for (auto e : graph.edges(n))
 			std::cout << graph.getEdgeDst(e) << " ";
 		std::cout << "]" << std::endl;
@@ -23,12 +28,7 @@ void genGraph(MGraph &mg, Graph &g) {
 		auto row_end = mg.get_offset(i+1);
 		g.fixEndEdge(i, row_end);
 		for (auto offset = row_begin; offset < row_end; offset ++) {
-			#ifdef ENABLE_LABEL
-				//g.constructEdge(offset, mg.get_dest(offset), mg.get_weight(offset));
-				g.constructEdge(offset, mg.get_dest(offset), 1); // do not consider edge labels currently
-			#else
-				g.constructEdge(offset, mg.get_dest(offset), 0);
-			#endif
+			g.constructEdge(offset, mg.get_dest(offset), 0);
 		}
 	}
 }
@@ -74,8 +74,9 @@ void DegreeRanking(Graph &og, Graph &g) {
 unsigned orientation(Graph &og, Graph &g) {
 	galois::StatTimer Tdag("DAG");
 	Tdag.start();
+	std::cout << "Orientation enabled, using DAG\n";
 	std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
-	std::cout << "num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
+	std::cout << "Before: num_vertices " << og.size() << " num_edges " << og.sizeEdges() << "\n";
 	std::vector<IndexT> degrees(og.size(), 0);
 
 	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
@@ -137,10 +138,6 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 		mgraph.read_mtx(filename.c_str(), true); //symmetrize
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
-		#ifdef EDGE_INDUCED
-		printf("ERROR: gr is not acceptable for an edge-induced app. Use adj instead.\n");
-		exit(1);
-		#endif
 		printf("Reading .gr file: %s\n", filename.c_str());
 		if(need_dag) {
 			Graph g_temp;
@@ -168,4 +165,5 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 	return max_degree;
 }
 
+} // namespace
 #endif

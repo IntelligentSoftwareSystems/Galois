@@ -10,9 +10,11 @@
  * Reused/revised under 3-BSD
  */
 
+#define USE_DOMAIN // use domain support
 #include "embedding.h"
+#include "edge_type.h"
+#include "bliss/graph.hh"
 
-typedef std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> EdgeHeap;
 typedef std::unordered_map<VertexId, BYTE> VertexMap;
 typedef std::vector<bliss::Graph::Vertex> BlissVertexList;
 
@@ -182,11 +184,9 @@ private:
 		std::unordered_map<VertexId, BYTE> vertices;
 		for(unsigned index = 0; index < qp.get_size(); ++index) {
 			auto element = qp.at(index);
-#ifdef ENABLE_LABEL
-			vertices[element.get_vid()] = element.get_vlabel();
-#else
-			vertices[element.get_vid()] = 0;
-#endif
+			if (std::is_same<ElementTy,LabeledElement>::value)
+				vertices[element.get_vid()] = element.get_vlabel();
+			else vertices[element.get_vid()] = 0;
 		}
 		//construct bliss graph
 		const unsigned number_vertices = vertices.size();
