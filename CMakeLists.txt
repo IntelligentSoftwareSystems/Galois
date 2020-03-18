@@ -85,17 +85,6 @@ enable_testing()
 
 ###### Configure compiler ######
 
-#Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
-
-# Some apps break with -O3 on recent clang versions.
-# Tracking that down is a work in progress, so for the current release,
-# only use -O2 with clang.
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-endif()
-
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -103,12 +92,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 
-# ICC
-if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
-    message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${ICC_VERSION}.")
+# Always include debug info and aggressive warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -Werror")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Wextra -Werror")
+
+# GCC
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
+
+  # Some of our dependencies fail with -Wextra, so ignore the following for
+  # now:
+  # - Wno-deprecated-copy (boost::counting_iterator)
+  # - Wno-cast-functions (openmpi)
+  # - Wno-unused-parameter (conflicts with readability rules)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy -Wno-cast-function-type -Wno-unused-parameter")
 endif()
 
 # Clang
@@ -116,19 +115,20 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics -Wno-unused-parameter")
+endif()
+
+# ICC
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
+    message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
+  endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
 endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
-endif()
-
-# check for incompatible GCC
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
-    message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
-  endif()
 endif()
 
 # Enable architecture-specific optimizations
@@ -329,7 +329,7 @@ add_definitions(-D__STDC_CONSTANT_MACROS)
 ###### Test Inputs ######
 if(GRAPH_LOCATION AND EXISTS "${GRAPH_LOCATION}")
   MESSAGE(STATUS "USING graph location ${GRAPH_LOCATION}")
-  set(BASEINPUT "${GRAPH_LOCATION}")
+  set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 elseif(EXISTS /net/ohm/export/iss/inputs)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
