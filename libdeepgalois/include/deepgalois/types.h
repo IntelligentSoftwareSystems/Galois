@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef _GNN_TYPES_H_
+#define _GNN_TYPES_H_
 #include <vector>
 #include <stdint.h>
 
@@ -30,4 +30,16 @@ typedef uint32_t VertexID;
 #define MAX_NUM_CLASSES 64
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
 #define USE_CUSPARSE
+
+
+#ifdef GALOIS_USE_DIST
+namespace deepgalois {
+  //! Set this to let sync struct know where to get data from
+  static float_t* _dataToSync = nullptr;
+  //! Set this to let sync struct know the size of the vector to use during
+  //! sync
+  static long unsigned _syncVectorSize = 0;
+}
+#endif
+
 #endif
