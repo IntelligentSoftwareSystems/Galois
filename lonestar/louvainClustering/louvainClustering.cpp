@@ -271,7 +271,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
   }// End while
   TimerClusteringWhile.stop();
 
-  iter += num_iter;
+  iter = num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -288,7 +288,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
 
 
 
-double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double threshold, uint32_t iter) {
+double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double threshold, uint32_t& iter) {
   galois::gPrint("Inside algoLouvainWithLockingDelay\n");
 
   galois::StatTimer TimerClusteringTotal("Timer_Clustering_Total");
@@ -459,7 +459,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   }// End while
   TimerClusteringWhile.stop();
 
-  iter += num_iter;
+  iter = num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -556,7 +556,7 @@ uint64_t coloringDistanceOne(Graph& graph) {
 
 
 //double algoLouvainWithColoring(Graph &graph, largeArray& clusters, double lower, double threshold) {
-double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uint32_t iter) {
+double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uint32_t& iter) {
 
   galois::StatTimer TimerClusteringTotal("Timer_Clustering_Total");
   TimerClusteringTotal.start();
@@ -728,7 +728,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
   }// End while
   TimerClusteringWhile.stop();
 
-  iter += num_iter;
+  iter = num_iter;
 
   c_info.destroy();
   c_info.deallocate();
@@ -854,7 +854,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   Graph* graph_curr = &graph;
   Graph graph_next;
   uint32_t iter = 0;
-  //bool non_color = false;
+  bool non_color = false;
   while(true){
     iter++;
     phase++;
@@ -911,17 +911,15 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
       break;
     }
   }
-#if 0
-    if(!non_color && algo != delay) {
-      galois::gPrint("Executing one non-foreach round\n");
-      curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, prev_mod, c_threshold); //Run at least one non-foreach loop
-      non_color = true;
-    }
-    calModularity(graph_next);
-#endif
-    galois::gPrint("Phases : ", phase, "\n");
-    galois::gPrint("Iter : ", iter, "\n");
-    //calModularityFinal(*graph_curr);
+  if(!non_color && algo != delay) {
+    iter++;
+    galois::gPrint("Executing one non-foreach round\n");
+    curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, prev_mod, c_threshold, iter); //Run at least one non-foreach loop
+    non_color = true;
+  }
+  galois::gPrint("Phases : ", phase, "\n");
+  galois::gPrint("Iter : ", iter, "\n");
+  //calModularityFinal(*graph_curr);
 }
 
 int main(int argc, char** argv) {
