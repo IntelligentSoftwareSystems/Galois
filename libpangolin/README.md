@@ -6,6 +6,8 @@ graph pattern mining based on the Galois programming system.
 It uses the bliss library [2][3] for graph isomorphism check. 
 The license for this library is in the bliss directory: 
 note that **it does not use the same license as the rest of Galois**.
+To run Pangolin applications, please go to ../lonestarmine/README.md
+for more details.
 
 [1] Xuhao Chen, Roshan Dathathri, Gurbinder Gill, Keshav Pingali, 
 Pangolin: An Efficient and Flexible Graph Pattern Mining System on CPU and GPU, arXiv:1911.06969
