@@ -71,12 +71,13 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 
   // aggregate based on graph topology
   graph_conv_layer::aggregate(z, *(context->graph_cpu), out_temp, out_data);
+#ifdef GALOIS_USE_DIST
   // TODO sync of out_data required here
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync = out_data;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny,
                                           GraphConvSync>("AggSync");
-
+#endif
   // run relu activation on output if specified
   if (act_) deepgalois::math::relu_cpu(x*z, out_data, out_data);
 }
@@ -92,11 +93,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // x*y NOTE: since graph is symmetric, the derivative is the same
   // this is the aggregate call
   deepgalois::update_all(z, *(context->graph_cpu), out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+#ifdef GALOIS_USE_DIST
   // sync agg
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync = out_temp;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny,
                                           GraphConvSync>("AggSyncBack");
+#endif
 
   // at this point, out_temp has the derivative of data from last step to
   // use for both updating gradients for features and gradients for weights
