@@ -19,7 +19,8 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   context = new deepgalois::DistContext();
   num_samples = dGraph->size();
   context->saveGraph(dGraph);
-  // TODO self loop?
+  // TODO self loop setup?
+  context->initializeSyncSubstrate();
 #endif
 
   // read graph, get num nodes
@@ -90,8 +91,7 @@ void Net::train(optimizer* opt, bool need_validate) {
   Timer t_epoch;
   // run epochs
   for (unsigned i = 0; i < num_epochs; i++) {
-    std::cout << "Epoch " << std::setw(2) << i << std::fixed
-              << std::setprecision(3) << ":";
+    galois::gPrint("Epoch ", std::setw(2), i, std::fixed, std::setprecision(3), ":");
     t_epoch.Start();
 
     // training steps
@@ -121,8 +121,8 @@ void Net::train(optimizer* opt, bool need_validate) {
 
     // validation / testing
     set_netphases(net_phase::test);
-    std::cout << " train_loss = " << std::setw(5) << train_loss
-              << " train_acc = " << std::setw(5) << train_acc;
+    galois::gPrint("train_loss = ", std::setw(5), train_loss, " train_acc = ",
+                   std::setw(5), train_acc);
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
     if (need_validate) {
@@ -132,13 +132,12 @@ void Net::train(optimizer* opt, bool need_validate) {
       double val_time = evaluate(val_begin, val_end, val_count, &val_mask[0],
                                  val_loss, val_acc);
       Tval.stop();
-      std::cout << " val_loss = " << std::setw(5) << val_loss
-                << " val_acc = " << std::setw(5) << val_acc;
-      std::cout << " time = " << epoch_time + val_time
-                << " ms (train_time = " << epoch_time
-                << " val_time = " << val_time << ")\n";
+      galois::gPrint(" val_loss = ", std::setw(5), val_loss, " val_acc = ",
+                     std::setw(5), val_acc);
+      galois::gPrint(" time = ", epoch_time + val_time, " ms (train_time = ",
+                     epoch_time, " val_time = ", val_time, ")\n");
     } else {
-      std::cout << " train_time = " << epoch_time << " ms\n";
+      galois::gPrint(" train_time = ", epoch_time, " ms\n");
     }
   }
 }

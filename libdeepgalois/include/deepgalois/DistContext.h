@@ -3,6 +3,7 @@
 /**
  * Based on common.hpp file of the Caffe deep learning library.
  */
+#include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/gtypes.h"
@@ -15,6 +16,7 @@ class DistContext {
   size_t feat_len;             // input feature length: D
   std::vector<label_t> labels; // labels for classification: N x 1
   vec_t h_feats;               // input features: N x D
+  galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
 public:
   // TODO why are these public
@@ -34,9 +36,12 @@ public:
   // TODO this is a distributed operation
   void norm_factor_counting();
 
+  void initializeSyncSubstrate();
+  galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
+
   //! return label for some node
+  //! NOTE: this is LID, not GID
   label_t get_label(size_t i) {
-    // TODO global id only or lid only or both?
     return labels[i];
   }
 

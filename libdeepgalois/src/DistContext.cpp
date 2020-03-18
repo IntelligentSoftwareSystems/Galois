@@ -126,4 +126,18 @@ void DistContext::norm_factor_counting() {
   return;
 }
 
+void DistContext::initializeSyncSubstrate() {
+  DistContext::syncSubstrate =
+    new galois::graphs::GluonSubstrate<Graph>(
+      *DistContext::graph_cpu,
+      galois::runtime::getSystemNetworkInterface().ID,
+      galois::runtime::getSystemNetworkInterface().Num,
+      false
+    );
+}
+
+galois::graphs::GluonSubstrate<Graph>* DistContext::getSyncSubstrate() {
+  return DistContext::syncSubstrate;
+};
+
 }  // deepgalois
