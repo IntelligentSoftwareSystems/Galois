@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2.0)
+cmake_minimum_required(VERSION 3.8)
 
 include(GNUInstallDirs)
 
@@ -100,6 +100,10 @@ endif()
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
+
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
   set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
@@ -176,18 +180,13 @@ if(COMPILER_CACHE_PROGRAM)
   endif()
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
-
-###### Configure features ######
-
 add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
 add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
 add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
+###### Configure features ######
 
 # Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
@@ -338,7 +337,6 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
 endif()
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 include_directories(${Boost_INCLUDE_DIR})
-add_definitions(-DBOOST_NO_AUTO_PTR)
 
 include(CheckEndian)
 
