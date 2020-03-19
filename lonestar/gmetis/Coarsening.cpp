@@ -27,19 +27,6 @@
 
 namespace {
 
-#ifndef NDEBUG
-void assertAllMatched(GNode node, GGraph* graph) {
-  for (auto jj : graph->edges(node))
-    assert(node == graph->getEdgeDst(jj) ||
-           graph->getData(graph->getEdgeDst(jj)).isMatched());
-}
-
-void assertNoMatched(GGraph* graph) {
-  for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
-    assert(!graph->getData(*nn).isMatched());
-}
-#endif
-
 using MatchingPolicy    = GNode(GNode, GGraph*);
 using MatchingSubPolicy = std::pair<GNode, int>(GNode, GGraph*, bool tag);
 
