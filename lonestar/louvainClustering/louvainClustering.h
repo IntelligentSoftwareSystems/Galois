@@ -336,8 +336,8 @@ double calModularityFinal(Graph& graph) {
                 [&](GNode n) {
                   auto n_data = graph.getData(n);
                   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                    //if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
-                    if(graph.getData(graph.getEdgeDst(ii)).prev_comm_ass == n_data.prev_comm_ass) {
+                    if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
+                    //if(graph.getData(graph.getEdgeDst(ii)).prev_comm_ass == n_data.prev_comm_ass) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
