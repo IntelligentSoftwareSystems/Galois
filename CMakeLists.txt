@@ -99,6 +99,10 @@ endif()
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
+
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
@@ -148,11 +152,14 @@ if(USE_SANITIZER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
-
-###### Configure features ######
+if(COMPILER_CACHE_PROGRAM)
+  find_program(CCACHE_PROGRAM ${COMPILER_CACHE_PROGRAM})
+  if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  else()
+    message(FATAL_ERROR "${COMPILER_CACHE_PROGRAM} not found")
+  endif()
+endif()
 
 add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
 add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
@@ -160,6 +167,7 @@ add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
+###### Configure features ######
 
 # Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
