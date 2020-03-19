@@ -45,6 +45,7 @@ set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
@@ -105,7 +106,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   add_compile_options(-Wno-deprecated-copy)
   # Avoid warnings from openmpi
   add_compile_options(-Wno-cast-function-type)
-
   # Removing unused parameters conflicts with readability rules
   add_compile_options(-Wno-unused-parameter)
 endif()
@@ -159,6 +159,14 @@ if(COMPILER_CACHE_PROGRAM)
   else()
     message(FATAL_ERROR "${COMPILER_CACHE_PROGRAM} not found")
   endif()
+endif()
+
+if(CXX_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY ${CXX_CLANG_TIDY} "-header-filter=.*${CMAKE_SOURCE_DIR}.*")
+  # Ignore warning flags intended for the CXX program. This only works because
+  # the two compilers we care about, clang and gcc, both understand
+  # -Wno-unknown-warning-option.
+  add_compile_options(-Wno-unknown-warning-option)
 endif()
 
 add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
