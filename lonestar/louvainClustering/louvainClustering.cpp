@@ -27,13 +27,14 @@
 #include "llvm/Support/CommandLine.h"
 #include "galois/AtomicHelpers.h"
 
+#include <iostream>
+#include <fstream>
+#include <deque>
+#include <type_traits>
+
 #include "Lonestar/BoilerPlate.h"
 #include "louvainClustering.h"
 #include "galois/DynamicBitset.h"
-
-#include <iostream>
-#include <deque>
-#include <type_traits>
 
 namespace cll = llvm::cl;
 
@@ -78,6 +79,15 @@ static cll::opt<uint32_t> max_iter("max_iter",
   cll::desc("Maximum number of iterations to execute"),
   cll::init(10));
 
+static cll::opt<bool> output_CID("output_CID",
+  cll::desc("Flag to enable cluster ID printing."),
+  cll::init(false));
+
+static cll::opt<std::string> output_CID_filename("output_CID_filename",
+  cll::desc("File name to output cluster IDs."),
+  cll::init("output_CID_filename"));
+
+
 
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
 double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint32_t& iter) {
@@ -98,14 +108,10 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
   double threshold_mod = threshold;
   uint32_t num_iter = iter;
 
-  largeArray cluster_wt_internal;
-  //std::vector<uint64_t> cluster_wt_internal(graph.size());
-
 
   /*** Initialization ***/
   c_info.allocateBlocked(graph.size());
   c_update.allocateBlocked(graph.size());
-  cluster_wt_internal.allocateBlocked(graph.size());
 
   /* Initialization each node to its own cluster */
   galois::do_all(galois::iterate(graph),
@@ -135,7 +141,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
-                  cluster_wt_internal[n] = 0;
                   c_update[n].degree_wt = 0;
                   c_update[n].size = 0;
                   });
@@ -279,8 +284,6 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
   c_update.destroy();
   c_update.deallocate();
 
-  cluster_wt_internal.destroy();
-  cluster_wt_internal.deallocate();
 
   TimerClusteringTotal.stop();
   return prev_mod;
@@ -305,14 +308,9 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   double threshold_mod = threshold;
   uint32_t num_iter = iter;
 
-  largeArray cluster_wt_internal;
-  //std::vector<uint64_t> cluster_wt_internal(graph.size());
-
-
   /*** Initialization ***/
   c_info.allocateBlocked(graph.size());
   c_update.allocateBlocked(graph.size());
-  cluster_wt_internal.allocateBlocked(graph.size());
 
   /* Initialization each node to its own cluster */
   galois::do_all(galois::iterate(graph),
@@ -342,7 +340,6 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
-                  cluster_wt_internal[n] = 0;
                   c_update[n].degree_wt = 0;
                   c_update[n].size = 0;
                   });
@@ -467,9 +464,6 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
   c_update.destroy();
   c_update.deallocate();
 
-  cluster_wt_internal.destroy();
-  cluster_wt_internal.deallocate();
-
   TimerClusteringTotal.stop();
   return prev_mod;
 }
@@ -574,14 +568,10 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
   double threshold_mod = threshold;
   uint32_t num_iter = iter;
 
-  largeArray cluster_wt_internal;
-  //std::vector<uint64_t> cluster_wt_internal(graph.size());
-
 
   /*** Initialization ***/
   c_info.allocateBlocked(graph.size());
   c_update.allocateBlocked(graph.size());
-  cluster_wt_internal.allocateBlocked(graph.size());
 
   /* Initialization each node to its own cluster */
   galois::do_all(galois::iterate(graph),
@@ -611,7 +601,6 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
 
    galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
-                  cluster_wt_internal[n] = 0;
                   c_update[n].degree_wt = 0;
                   c_update[n].size = 0;
                   });
@@ -736,9 +725,6 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
   c_update.destroy();
   c_update.deallocate();
 
-  cluster_wt_internal.destroy();
-  cluster_wt_internal.deallocate();
-
   TimerClusteringTotal.stop();
   return prev_mod;
 }
@@ -843,8 +829,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
   TimerGraphBuild.stop();
   galois::gPrint("Graph construction done\n");
 }
-//void runMultiPhaseLouvainAlgorithm(Graph& graph, largeArray& clusters_orig, uint64_t min_graph_size, double c_threshold) {
-void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double c_threshold) {
+void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double c_threshold, largeArray& clusters_orig) {
 
   galois::gPrint("Inside runMultiPhaseLouvainAlgorithm\n");
   double prev_mod = -1; //Previous modularity
@@ -855,26 +840,12 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   Graph graph_next;
   uint32_t iter = 0;
   bool non_color = false;
+  uint64_t num_nodes_orig = clusters_orig.size();
   while(true){
     iter++;
     phase++;
     galois::gPrint("Starting Phase : ", phase, "\n");
     galois::gPrint("Graph size : ", (*graph_curr).size(), "\n");
-
-#if 0
-    /*
-     *Initialize node cluster id locally.
-     */
-    galois::gPrint("Allocate local cluster\n");
-    largeArray clusters_local;
-    clusters_local.allocateBlocked((*graph_curr).size());
-    galois::gPrint("Starting loop\n");
-    galois::do_all(galois::iterate(*graph_curr),
-                  [&](GNode n){
-                    clusters_local[n] = INF_VAL;
-                  });
-    galois::gPrint("End loop\n");
-#endif
 
     //TODO: add to the if conditional
     if((*graph_curr).size() > min_graph_size){
@@ -896,14 +867,33 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 
     uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
     galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+
+    if(!enable_VF && phase == 1){
+      assert(num_nodes_orig == (*graph_curr).size());
+      galois::do_all(galois::iterate(*graph_curr),
+                    [&](GNode n) {
+                      clusters_orig[n] = (*graph_curr).getData(n, flag_no_lock).curr_comm_ass;
+                    });
+    } else {
+      galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
+                    [&](GNode n) {
+                      if(clusters_orig[n] > 0){
+                        assert(clusters_orig[n] < (*graph_curr).size());
+                        //galois::gPrint(clusters_orig[n],"\n");
+                        clusters_orig[n] = (*graph_curr).getData(clusters_orig[n], flag_no_lock).curr_comm_ass;
+                      }
+                    });
+
+      //galois::gPrint("ARRAY unique cluster: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
+    }
     galois::gPrint("Prev_mod main: ", prev_mod, "\n");
     if(iter < max_iter && (curr_mod - prev_mod) > threshold) {
-    buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
-    //TODO: if(iter > 1) graph_curr->deallocate(); // deallocate the previous graph except the input graph
-    //Can allocate the input graph as well and store communities in a largeArray
-    prev_mod = curr_mod;
-    graph_curr = &graph_next;
-    printGraphCharateristics(*graph_curr);
+      buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
+      //TODO: if(iter > 1) graph_curr->deallocate(); // deallocate the previous graph except the input graph
+      //Can allocate the input graph as well and store communities in a largeArray
+      prev_mod = curr_mod;
+      graph_curr = &graph_next;
+      printGraphCharateristics(*graph_curr);
     } else {
       //uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
       //galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
@@ -916,10 +906,11 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
     galois::gPrint("Executing one non-foreach round\n");
     curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, prev_mod, c_threshold, iter); //Run at least one non-foreach loop
     non_color = true;
+    uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+    galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
   }
   galois::gPrint("Phases : ", phase, "\n");
   galois::gPrint("Iter : ", iter, "\n");
-  //calModularityFinal(*graph_curr);
 }
 
 int main(int argc, char** argv) {
@@ -938,7 +929,15 @@ int main(int argc, char** argv) {
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges" << std::endl;
 
-   graph_curr = &graph;
+  graph_curr = &graph;
+
+  /*
+   * To keep track of communities for nodes in the original graph.
+   *Community will be set to -1 for isolated nodes
+   */
+  largeArray clusters_orig;
+  clusters_orig.allocateBlocked(graph_curr->size());
+
   /*
    * Vertex following optimization
    */
@@ -946,41 +945,50 @@ int main(int argc, char** argv) {
     uint64_t num_nodes_to_fix = vertexFollowing(graph); // Find nodes that follow other nodes
     galois::gPrint("Isolated nodes : ", num_nodes_to_fix, "\n");
 
-
     uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
     galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+    /*
+     *Initialize node cluster id.
+     */
+    galois::do_all(galois::iterate(*graph_curr),
+                  [&](GNode n){
+                    clusters_orig[n] = graph.getData(n, flag_no_lock).curr_comm_ass;
+                  });
+
     //Build new graph to remove the isolated nodes
     buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
     graph_curr = &graph_next;
     printGraphCharateristics(*graph_curr);
   } else {
-    graph_curr = &graph;
+
+    /*
+     *Initialize node cluster id.
+     */
+    galois::do_all(galois::iterate(*graph_curr),
+                  [&](GNode n){
+                    clusters_orig[n] = -1;
+                  });
+
     printGraphCharateristics(*graph_curr);
   }
 
-#if 0
-  largeArray clusters_orig;
-  clusters_orig.allocateBlocked(graph.size());
-
-  /*
-   *Initialize node cluster id.
-   */
-  galois::do_all(galois::iterate(graph),
-                [&](GNode n){
-                  graph.getData(n).curr_comm_ass = INF_VAL;
-                  clusters_orig[n] = INF_VAL;
-                });
-#endif
-
-  //double c_threshold = 0.01;
   uint64_t min_graph_size = 10;
   //runMultiPhaseLouvainAlgorithm(graph, clusters_orig, min_graph_size, c_threshold);
   galois::gPrint("GOING in \n");
   galois::StatTimer Tmain("Timer_LC");
   Tmain.start();
-  runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold);
+  runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold, clusters_orig);
   Tmain.stop();
 
   TEnd2End.stop();
+
+  /*
+   * Sanity check: Check modularity at the end
+   */
+
+  checkModularity(graph, clusters_orig);
+  if(output_CID){
+    printNodeClusterId(graph, output_CID_filename);
+  }
   return 0;
 }

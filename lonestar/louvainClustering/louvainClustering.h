@@ -31,7 +31,7 @@ constexpr galois::MethodFlag flag_no_lock = galois::MethodFlag::UNPROTECTED;
 constexpr galois::MethodFlag flag_read_lock = galois::MethodFlag::READ;
 constexpr galois::MethodFlag flag_write_lock = galois::MethodFlag::WRITE;
 
-typedef galois::LargeArray<uint64_t> largeArray;
+typedef galois::LargeArray<int64_t> largeArray;
 
 //Maintain community information
 struct Comm {
@@ -117,6 +117,28 @@ void sumVertexDegreeWeight(Graph& graph, CommArray& c_info) {
                   //galois::gPrint(n, " : ", c_info[n].degree_wt.load(), "\n");
                   c_info[n].size = 1;
                 });
+}
+
+void sumClusterWeight(Graph& graph, CommArray& c_info) {
+  galois::do_all(galois::iterate(graph),
+                [&](GNode n) {
+                  uint64_t total_weight = 0;
+                  auto &n_data = graph.getData(n);
+                  for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii){
+                     total_weight += graph.getEdgeData(ii, flag_no_lock);
+                  }
+                  n_data.degree_wt = total_weight;
+                  c_info[n].degree_wt = 0;
+                });
+
+  /*
+   * TODO: Parallelize this
+   */
+  for(GNode n = 0; n < graph.size(); ++n) {
+      auto &n_data = graph.getData(n);
+      if(n_data.curr_comm_ass > 0)
+        c_info[n_data.curr_comm_ass].degree_wt += n_data.degree_wt;
+    }
 }
 
 double calConstantForSecondTerm(Graph& graph){
@@ -293,7 +315,7 @@ double calModularityFinal(Graph& graph) {
   cluster_wt_internal.allocateBlocked(graph.size());
 
   /* Calculate the weighted degree sum for each vertex */
-  sumVertexDegreeWeight(graph, c_info);
+  sumClusterWeight(graph, c_info);
 
   /* Compute the total weight (2m) and 1/2m terms */
   constant_for_second_term = calConstantForSecondTerm(graph);
@@ -333,8 +355,6 @@ double calModularityFinal(Graph& graph) {
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
   mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
-  galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
-
   return mod;
 }
 
@@ -345,7 +365,6 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
-    //if(n_data.curr_comm_ass < INF_VAL) {
     if(n_data.curr_comm_ass != -1) {
       assert(n_data.curr_comm_ass < graph.size());
       auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
@@ -362,12 +381,60 @@ uint64_t renumberClustersContiguously(Graph &graph) {
   return num_unique_clusters;
 }
 
+uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
+
+  std::map<uint64_t, uint64_t> cluster_local_map;
+  uint64_t num_unique_clusters = 0;
+
+  for (GNode n = 0; n < arr.size(); ++n){
+    if(arr[n] != -1) {
+      assert(arr[n] < arr.size());
+      auto stored_already = cluster_local_map.find(arr[n]);
+     if(stored_already != cluster_local_map.end()){
+      arr[n] = stored_already->second;
+     } else {
+      cluster_local_map[arr[n]] = num_unique_clusters;
+      arr[n] = num_unique_clusters;
+      num_unique_clusters++;
+     }
+    }
+  }
+
+  return num_unique_clusters;
+}
+
+
+
+
 void printGraph(Graph& graph){
   for(GNode n = 0; n < graph.size(); ++n) {
     for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
       galois::gPrint(n, " --> ", graph.getEdgeDst(ii), " , ", graph.getEdgeData(ii), "\n");
     }
   }
+}
+
+void printNodeClusterId(Graph& graph, std::string output_CID_filename){
+  std::ofstream outputFile(output_CID_filename, std::ofstream::out);
+  for(GNode n = 0; n < graph.size(); ++n) {
+    outputFile << n << "  " << graph.getData(n).curr_comm_ass << "\n";
+    //outputFile << graph.getData(n).curr_comm_ass << "\n";
+  }
+}
+
+void checkModularity(Graph& graph, largeArray& clusters_orig) {
+  galois::gPrint("checkModularity\n");
+
+  //galois::gPrint("Number of unique clusters (renumber) ARR: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
+  galois::do_all(galois::iterate(graph),
+                [&](GNode n){
+                  graph.getData(n, flag_no_lock).curr_comm_ass = clusters_orig[n];
+                });
+
+  uint64_t num_unique_clusters = renumberClustersContiguously(graph);
+  galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+  auto mod = calModularityFinal(graph);
+  galois::gPrint("FINAL MOD: ", mod, "\n");
 }
 
 #endif //LOUVAIN_CLUSTERING_H

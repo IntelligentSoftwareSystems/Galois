@@ -559,6 +559,28 @@ public:
     }
   }
 
+  void destroyAndAllocateFrom(uint32_t nNodes, uint64_t nEdges) {
+    numNodes = nNodes;
+    numEdges = nEdges;
+
+    deallocate();
+    if (UseNumaAlloc) {
+      nodeData.allocateBlocked(numNodes);
+      edgeIndData.allocateBlocked(numNodes);
+      edgeDst.allocateBlocked(numEdges);
+      edgeData.allocateBlocked(numEdges);
+      this->outOfLineAllocateBlocked(numNodes);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+  }
+
+
+
   void constructNodes() {
 #ifndef GALOIS_GRAPH_CONSTRUCT_SERIAL
     for (uint32_t x = 0; x < numNodes; ++x) {
@@ -760,7 +782,11 @@ public:
    * TODO: Find better way to do this
    */
   void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, std::vector<std::vector<uint32_t>>& edges_id, std::vector<std::vector<EdgeTy>>& edges_data) {
-    allocateFrom(numNodes, numEdges);
+    //allocateFrom(numNodes, numEdges);
+    /*
+     * Deallocate if reusing the graph
+     */
+    destroyAndAllocateFrom(numNodes, numEdges);
     constructNodes();
 
     galois::do_all(galois::iterate((uint32_t)0, numNodes),
