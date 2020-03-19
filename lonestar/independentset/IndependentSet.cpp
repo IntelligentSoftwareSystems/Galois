@@ -470,12 +470,12 @@ struct EdgeTiledPrioAlgo {
             for (; beg + EDGE_TILE_SIZE < end;) {
               auto ne = beg + EDGE_TILE_SIZE;
               assert(ne < end);
-              works.push_back(EdgeTile{src, beg, ne});
+              works.push_back(EdgeTile{src, beg, ne, false});
               beg = ne;
             }
           }
           if ((end - beg) > 0) {
-            works.push_back(EdgeTile{src, beg, end});
+            works.push_back(EdgeTile{src, beg, end, false});
           }
         },
         galois::loopname("init-prio"), galois::steal());
