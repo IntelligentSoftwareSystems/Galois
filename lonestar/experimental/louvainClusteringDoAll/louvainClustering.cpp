@@ -47,7 +47,8 @@ static const char* url = "louvain_clustering";
 enum Algo {
   coloring,
   foreach,
-  delay
+  delay,
+	doAll
 };
 
 
@@ -59,7 +60,8 @@ static cll::opt<Algo> algo(
     cll::values(clEnumValN(Algo::coloring, "Coloring", "Using colors to mitigate conflicts"),
                 clEnumValN(Algo::foreach, "Foreach", "Using galois for_each for conflict mitigation"),
                 clEnumValN(Algo::delay, "Delay", "Using galois for_each for conflict mitigation but delay the updation"),
-                clEnumValEnd),
+        				clEnumValN(Algo::doAll, "Doall", "Using galois do_all and using tie-breaking via degree wt for conflict mitigation"),
+				        clEnumValEnd),
     cll::init(Algo::foreach));
 
 static cll::opt<bool> enable_VF("enable_VF",
@@ -1095,8 +1097,10 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
                 curr_mod = algoLouvainWithColoring(*graph_curr, curr_mod, c_threshold, iter);
                 break;
           case foreach:
- //               curr_mod = algoLouvainWithLocking(*graph_curr, curr_mod, c_threshold, iter);
-  							curr_mod = algoLouvainWithoutLocking(*graph_curr, curr_mod, c_threshold, iter); 
+                curr_mod = algoLouvainWithLocking(*graph_curr, curr_mod, c_threshold, iter);
+ 								break;
+					case doAll:
+	 							curr_mod = algoLouvainWithoutLocking(*graph_curr, curr_mod, c_threshold, iter); 
 	             break;
           case delay:
                 curr_mod = algoLouvainWithLockingDelayUpdate(*graph_curr, curr_mod, c_threshold, iter);
@@ -1187,7 +1191,7 @@ int main(int argc, char** argv) {
 #endif
 
   //double c_threshold = 0.01;
-  uint64_t min_graph_size = 10;
+  uint64_t min_graph_size = 2;
   //runMultiPhaseLouvainAlgorithm(graph, clusters_orig, min_graph_size, c_threshold);
   galois::gPrint("GOING in \n");
   galois::StatTimer Tmain("Timer_LC");

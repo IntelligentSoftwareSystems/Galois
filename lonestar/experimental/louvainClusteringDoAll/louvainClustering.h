@@ -191,7 +191,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 				stored_already++;	
 				continue;
 			}
-			else if (ay == (ax+degree_wt) && stored_already->first < sc)
+			else if (ay == (ax+degree_wt) && stored_already->first > sc)
 			{
 				stored_already++;
 				continue;
