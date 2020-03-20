@@ -7,8 +7,21 @@ set(sources
         src/NetworkIOMPI.cpp
         src/NetworkLCI.cpp
 )
+
+add_library(galois_dist_async_obj OBJECT ${sources})
+target_include_directories(galois_dist_async_obj PUBLIC
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libdist/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+set_target_properties (galois_dist_async_obj PROPERTIES
+  INTERFACE_POSITION_INDEPENDENT_CODE On
+  POSITION_INDEPENDENT_CODE On
+)
+
 # new galois net library; link to shared memory galois
-add_library(galois_dist_async STATIC ${sources})
+add_library(galois_dist_async STATIC $<TARGET_OBJECTS:galois_dist_async_obj>)
 target_link_libraries(galois_dist_async galois_shmem gllvm)
 
 if (USE_BARE_MPI)
@@ -35,18 +48,6 @@ if (USE_LCI)
 endif()
 
 set_target_properties (galois_dist_async PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
-
-add_library(galois_dist_async_obj OBJECT ${sources})
-target_include_directories(galois_dist_async_obj PUBLIC
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libdist/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-set_target_properties (galois_dist_async_obj PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )

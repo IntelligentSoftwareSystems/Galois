@@ -1,6 +1,11 @@
 name: C/C++ CI
 
-on: push
+on:
+  push:
+  pull_request:
+    types:
+    - created
+    - synchronize
 
 jobs:
   build_and_test:
