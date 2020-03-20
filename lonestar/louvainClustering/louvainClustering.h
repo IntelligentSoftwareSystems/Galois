@@ -192,6 +192,57 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   return max_index;
 }
 
+uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
+                       //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+
+  uint64_t max_index = sc; // Assign the intial value as self community
+  double cur_gain = 0;
+  double max_gain = 0;
+  double eix = counter[0] - self_loop_wt;
+  double ax = c_info[sc].degree_wt - degree_wt;
+  double eiy = 0;
+  double ay = 0;
+
+  auto stored_already = cluster_local_map.begin();
+  do {
+    if(sc != stored_already->first) {
+      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+
+			if(ay < (ax + degree_wt)){
+				stored_already++;	
+				continue;
+			}
+			else if (ay == (ax+degree_wt) && stored_already->first > sc)
+			{
+				stored_already++;
+				continue;
+			}
+
+      eiy = counter[stored_already->second]; // Total edges incident on cluster y
+      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
+      //From the paper: Verbatim
+      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * (ax - ay) * constant * constant;
+
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
+        max_gain = cur_gain;
+        max_index = stored_already->first;
+      }
+    }
+    stored_already++; // Explore next cluster
+  } while (stored_already != cluster_local_map.end());
+
+  //galois::gPrint("Max Gain : ", max_gain, "\n");
+  //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+    max_index = sc;
+  }
+
+  assert(max_gain >= 0);
+  return max_index;
+}
+
+
 double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, double& e_xx, double& a2_x, double& constant_for_second_term, std::vector<GNode>& local_target) {
 
   /* Variables needed for Modularity calculation */
