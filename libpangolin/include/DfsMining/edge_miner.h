@@ -14,8 +14,8 @@
 #include "egonet.h"
 #include "dfscode.h"
 #include "edgelist.h"
-#include "embedding_list.h"
 #include "domain_support.h"
+#include "embedding_list_dfs.h"
 
 //typedef galois::InsertBag<DFS> InitPatternQueue;
 typedef galois::gstl::Vector<DFS> InitPatternQueue;

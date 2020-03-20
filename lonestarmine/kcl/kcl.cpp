@@ -4,28 +4,6 @@
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
-/*
-class AppMiner : public VertexMiner<SimpleElement, BaseEmbedding, true> {
-public:
-	AppMiner(unsigned ms, int nt) : 
-		VertexMiner<SimpleElement, BaseEmbedding, true>(ms, nt) {
-		assert(ms > 2);
-	}
-	~AppMiner() {}
-	void init() { set_num_patterns(1); }
-	// toExtend (only extend the last vertex in the embedding)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
-		return pos == n-1;
-	}
-	// toAdd (only add vertex connected to all the vertices in the embedding)
-	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		return is_all_connected_dag(dst, emb, n-1);
-	}
-	void print_output() {
-		std::cout << "\n\ttotal_num_cliques = " << get_total_count() << "\n";
-	}
-};
-//*/
 
 #include "BfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI<BaseEmbedding> {

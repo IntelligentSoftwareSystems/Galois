@@ -38,6 +38,17 @@ typedef unsigned IndexTy;
 typedef std::set<unsigned> UintSet;
 typedef std::vector<UintSet> UintSets;
 
+#ifdef LARGE_SIZE
+typedef std::vector<BYTE> ByteList;
+typedef std::vector<unsigned> UintList;
+typedef std::vector<Ulong> UlongList;
+typedef std::vector<VertexId> VertexList;
+#endif
+typedef std::vector<UintList> IndexLists;
+typedef std::vector<ByteList> ByteLists;
+typedef std::vector<VertexList> VertexLists;
+typedef std::vector<bool> BoolVec;
+
 // We provide two types of 'support': frequency and domain support.
 // Frequency is used for counting, e.g. motif counting.
 // Domain support, a.k.a, the minimum image-based support, is used for FSM. It has the anti-monotonic property.

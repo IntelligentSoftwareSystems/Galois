@@ -31,20 +31,5 @@ public:
 		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
 	}
 };
-/*
-	void init() { set_num_patterns(1); }
-	// toExtend (only extend the last vertex in the embedding: fast)
-	bool toExtend(unsigned n, const BaseEmbedding &emb, VertexId src, unsigned pos) {
-		return pos == n-1;
-	}
-	// toAdd (only add vertex that is connected to all the vertices in the embedding)
-	bool toAdd(unsigned n, const BaseEmbedding &emb, VertexId dst, unsigned pos) {
-		return false;
-	}
-	void print_output() {
-		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
-	}
-};
-//*/
 #include "BfsMining/engine.h"
 

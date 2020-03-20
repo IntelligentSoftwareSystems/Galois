@@ -8,6 +8,7 @@
 
 template <typename ElementTy, typename EmbeddingTy, typename API, bool enable_dag=false, bool is_single=true, bool use_wedge=false>
 class VertexMiner : public Miner<ElementTy,EmbeddingTy,enable_dag> {
+typedef EmbeddingList<ElementTy,EmbeddingTy> EmbeddingListTy;
 public:
 	VertexMiner(unsigned max_sz, int nt, unsigned nb) : 
 		Miner<ElementTy,EmbeddingTy,enable_dag>(max_sz, nt), num_blocks(nb) {}
@@ -316,6 +317,7 @@ protected:
 	int npatterns;
 	UlongAccu total_num;
 	std::vector<UlongAccu> accumulators;
+	EmbeddingListTy emb_list;
 
 	inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst, const EmbeddingTy& emb, unsigned pos = 0) {
 		unsigned pid = 0;

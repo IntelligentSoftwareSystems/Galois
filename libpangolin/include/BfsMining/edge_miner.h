@@ -8,6 +8,7 @@
 
 template <typename ElementTy, typename EmbeddingTy, typename API, bool report_num_pattern>
 class EdgeMiner : public Miner<ElementTy,EmbeddingTy,false> {
+typedef EmbeddingList<ElementTy,EmbeddingTy> EmbeddingListTy;
 typedef QuickPattern<EmbeddingTy, ElementTy> QPattern;
 typedef CanonicalGraph<EmbeddingTy, ElementTy> CPattern;
 // quick pattern map (mapping quick pattern to its frequency)
@@ -445,6 +446,8 @@ public:
 protected:
 	int total_num; // total number of frequent patterns
 	unsigned threshold;
+	EmbeddingListTy emb_list;
+
 private:
 	InitMap init_map;
 	UintMap id_map;

@@ -52,6 +52,6 @@ protected:
 	unsigned cur_level;
 };
 
-typedef galois::substrate::PerThreadStorage<Egonet> Egonets;
+//typedef galois::substrate::PerThreadStorage<Egonet> Egonets;
 
 #endif

@@ -1,5 +1,5 @@
 mineApp(kcl)
 #app(kcl_naive kcl_naive.cpp)
 #app(kcl_queue kcl_queue.cpp)
-#app(kcl_dfs kcl_dfs.cpp)
+mineApp(kcl_dfs)
 #app(kcl_shrink kcl_shrink.cpp)

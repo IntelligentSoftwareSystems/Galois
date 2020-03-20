@@ -5,8 +5,6 @@
 #include "embedding_queue.h"
 #include "bliss/uintseqhash.hh"
 
-template <typename ElementType,typename EmbeddingType> class EmbeddingList;
-
 template <typename ElementTy, typename EmbeddingTy, bool enable_dag>
 class Miner {
 typedef EmbeddingQueue<EmbeddingTy> EmbeddingQueueTy;
@@ -26,7 +24,7 @@ public:
 	}
 	//unsigned read_graph(std::string filename);
 	unsigned read_graph(std::string filetype, std::string filename) {
-		util::read_graph(graph, filetype, filename, enable_dag);
+		max_degree = util::read_graph(graph, filetype, filename, enable_dag);
 		/*
 		if (enable_dag) {
 			Graph g_temp;
@@ -43,14 +41,14 @@ public:
 		degrees = graph.degrees;
 		std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 		//util::print_graph(graph);
-		return 0;
+		return max_degree;
 	}
-	EmbeddingList<ElementTy,EmbeddingTy> emb_list;
 
 protected:
 	Graph graph;
 	unsigned max_size;
 	int num_threads;
+	unsigned max_degree;
 	uint32_t *degrees;
 
 	#ifdef USE_QUERY_GRAPH
