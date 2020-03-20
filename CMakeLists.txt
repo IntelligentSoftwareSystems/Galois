@@ -99,8 +99,7 @@ if(NOT "$ENV{GCC_BIN}" STREQUAL "")
 endif()
 
 # Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -Werror")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Wextra -Werror")
+add_compile_options(-g -Wall -Wextra -Werror)
 
 # GCC
 if(CMAKE_COMPILER_IS_GNUCC)
@@ -110,12 +109,13 @@ if(CMAKE_COMPILER_IS_GNUCC)
     message(FATAL_ERROR "GCC must be 5.2 or higher")
   endif()
 
-  # Some of our dependencies fail with -Wextra, so ignore the following for
-  # now:
-  # - Wno-deprecated-copy (boost::counting_iterator)
-  # - Wno-cast-functions (openmpi)
-  # - Wno-unused-parameter (conflicts with readability rules)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy -Wno-cast-function-type -Wno-unused-parameter")
+  # Avoid warnings from boost::counting_iterator
+  add_compile_options(-Wno-deprecated-copy)
+  # Avoid warnings from openmpi
+  add_compile_options(-Wno-cast-function-type)
+
+  # Removing unused parameters conflicts with readability rules
+  add_compile_options(-Wno-unused-parameter)
 endif()
 
 # Clang
@@ -124,17 +124,17 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # Tracking that down is a work in progress, so for the current release,
   # only use -O2 with clang.
   if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+    add_compile_options(-O2)
   endif()
 
   if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
+    add_compile_options("-gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
   
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
+  add_compile_options(-fcolor-diagnostics)
+  add_compile_options(-Wno-unused-parameter)
 endif()
 
 # ICC
@@ -144,10 +144,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   if(ICC_VERSION VERSION_LESS 16.0)
     message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
+  add_compile_options(-wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373)
 
   if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
+    add_compile_options("-gxx-name=${CXX_TOOLCHAIN}/g++")
   else()
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
@@ -155,28 +155,26 @@ endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
+  add_definitions(-U__STRICT_ANSI__)
 endif()
 
 # Enable architecture-specific optimizations
 if(NOT ENABLE_HETERO_GALOIS)
   find_package(ArchFlags)
   if(ARCH_FLAGS_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}> $<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>)
+    add_link_options(${ARCH_EXE_FLAGS})
   endif()
 endif()
 
 # GNU profiling
 if(USE_GPROF)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+  add_compile_options(-pg)
+  add_link_options(-pg)
 endif(USE_GPROF)
 
 if(USE_SANITIZER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls)
 endif()
 
 if(COMPILER_CACHE_PROGRAM)
@@ -203,8 +201,8 @@ endif()
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS}")
-  set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS}")
+  add_compile_options(${MPI_COMPILE_FLAGS})
+  add_link_options(${MPI_LINK_FLAGS})
   include_directories(${MPI_INCLUDE_PATH})
 
   if (USE_LCI)
@@ -258,8 +256,7 @@ if(USE_EXP)
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>" "$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
   endif()
 
   find_package(TBB)
@@ -283,7 +280,7 @@ if(USE_EXP)
 
   if(USE_HTM)
     if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qtm -qsmp=speculative")
+      add_compile_options(-qtm -qsmp=speculative)
       set(GALOIS_USE_HTM on)
       set(GALOIS_USE_SEQ_ONLY on)
       set(USE_LONGJMP_ABORT on)
@@ -567,18 +564,17 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-#export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-#export(PACKAGE Galois)
 
 # Galois compiler definitions
 set(galois_defs)
+set(galois_options)
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
 foreach(d ${defs})
-  set(galois_defs "-D${d} ${galois_defs}")
+  set(galois_defs "${galois_defs} -D${d}")
 endforeach()
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
 foreach(d ${defs})
-  set(galois_defs "-D${d} ${galois_defs}")
+  set(galois_defs "${galois_defs} -D${d}")
 endforeach()
 string(TOUPPER ${CMAKE_BUILD_TYPE} upper_build_type)
 set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_build_type}}")
@@ -588,13 +584,11 @@ file(RELATIVE_PATH PATH_FROM_INSTALLED_CMAKE_FILE_TO_PREFIX "${INSTALL_CMAKE_DIR
 
 # Generate appropriate CMake files for installation and build trees
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/GaloisConfig.cmake" @ONLY)
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
-  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake" @ONLY)
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake" @ONLY)
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
-  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
