@@ -160,7 +160,7 @@ public:
   void degree_counting() {
     degrees = new uint32_t[numNodes];
     galois::do_all(galois::iterate(begin(), end()), [&] (auto v) {
-      degrees[v] = std::distance(edge_begin(v), edge_end(v));
+      degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
     }, galois::loopname("DegreeCounting"));
   }
   uint32_t get_degree(uint32_t n) { return degrees[n]; }
