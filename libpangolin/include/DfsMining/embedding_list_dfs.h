@@ -9,6 +9,7 @@ template <typename ElementType, typename EmbeddingType,
 	bool is_single=true, bool use_ccode=true, 
 	bool shrink=false, bool use_formula=false>
 class EmbeddingList {
+using edge_iterator = typename Graph::edge_iterator;
 public:
 	EmbeddingList() {}
 	~EmbeddingList() {}
@@ -154,31 +155,45 @@ public:
 		shrink_graph.set_degree(level, dst, 0);
 	}
 	void update_egonet(unsigned level);
+	inline VertexId getEdgeDst(VertexId vid) const { return getEdgeDstImpl<shrink>(vid); }
+	inline EdgeId edge_begin(unsigned level, VertexId vid) { return edge_begin_impl<shrink>(level, vid); }
+	inline EdgeId edge_end(unsigned level, VertexId vid) { return edge_end_impl<shrink>(level, vid); }
 
-	inline auto getEdgeDst(VertexId vid) const {
-		if constexpr (shrink) {
-			return shrink_graph.getEdgeDst(vid);
-		} else { 
-			return global_graph->getEdgeDst(vid);
-		}
+	template <bool en, typename std::enable_if<en>::type* = nullptr>
+	inline VertexId getEdgeDstImpl(VertexId vid) const {
+		return shrink_graph.getEdgeDst(vid);
 	}
 
-	inline auto edge_begin(unsigned level, VertexId vid) {
-		if constexpr (shrink) {
-			return shrink_graph.edge_begin(vid);
-		} else { 
-			return global_graph->edge_begin(vid); // TODO: maybe incorrect
-		}
+	template <bool en, typename std::enable_if<!en>::type* = nullptr>
+	inline GNode getEdgeDstImpl(VertexId vid) const {
+		return global_graph->getEdgeDst(vid);
 	}
 
-	inline auto edge_end(unsigned level, VertexId vid) {
-		if constexpr (shrink) {
-			return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid);
-		} else {
-			return global_graph->edge_begin(vid); // TODO: maybe incorrect
-		}
+	template <bool en, typename std::enable_if<en>::type* = nullptr>
+	inline EdgeId edge_begin_impl(unsigned level, VertexId vid) {
+		EdgeId eid = shrink_graph.edge_begin(vid);
+		std::cout << "\t using shrink graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
+		return eid;
 	}
 
+	template <bool en, typename std::enable_if<!en>::type* = nullptr>
+	inline EdgeId edge_begin_impl(unsigned level, VertexId vid) {
+		EdgeId eid = *(global_graph->edge_begin(vid));
+		//std::cout << "\t using global graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
+		return eid;
+	}
+
+	template <bool en, typename std::enable_if<en>::type* = nullptr>
+	inline EdgeId edge_end_impl(unsigned level, VertexId vid) {
+		return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid);
+	}
+
+	template <bool en, typename std::enable_if<!en>::type* = nullptr>
+	inline EdgeId edge_end_impl(unsigned level, VertexId vid) {
+		EdgeId eid = *(global_graph->edge_end(vid));
+		//std::cout << "\t using global graph, vertex_id=" << vid << ", end eid=" << eid << "\n";
+		return eid;
+	}
 
 protected:
 	unsigned length;

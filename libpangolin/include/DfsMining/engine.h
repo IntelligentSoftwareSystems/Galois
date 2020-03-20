@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
 	AppMiner miner(k,numThreads);
 	galois::StatTimer Tinitial("GraphReadingTime");
 	Tinitial.start();
-	unsigned max_degree = miner.read_graph(filetype, filename);
+	miner.read_graph(filetype, filename);
 	Tinitial.stop();
 	ResourceManager rm;
 	miner.init_edgelist();

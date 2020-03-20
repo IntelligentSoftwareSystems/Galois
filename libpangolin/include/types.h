@@ -24,24 +24,24 @@
 
 typedef float Weight;
 typedef uint64_t Ulong;
-typedef unsigned ValueT;
-typedef unsigned VertexId;
+typedef uint32_t ValueT;
+typedef uint32_t VertexId;
 typedef uint64_t EdgeId;
 typedef uint8_t BYTE;
 #ifdef LARGE_SIZE
 typedef uint64_t IndexT;
 typedef uint64_t IndexTy;
 #else
-typedef unsigned IndexT;
-typedef unsigned IndexTy;
+typedef uint32_t IndexT;
+typedef uint32_t IndexTy;
 #endif
 
-typedef std::set<unsigned> UintSet;
+typedef std::set<uint32_t> UintSet;
 typedef std::vector<UintSet> UintSets;
 
 #ifdef LARGE_SIZE
 typedef std::vector<BYTE> ByteList;
-typedef std::vector<unsigned> UintList;
+typedef std::vector<uint32_t> UintList;
 typedef std::vector<Ulong> UlongList;
 typedef std::vector<VertexId> VertexList;
 #endif

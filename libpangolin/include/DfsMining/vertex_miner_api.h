@@ -11,7 +11,7 @@ public:
 	static inline bool toExtend(unsigned level, unsigned pos, const EmbeddingTy *emb) {
 		return true;
 	}
-	static inline bool toAdd(unsigned level, VertexId vid, 
+	static inline bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
 		unsigned src_idx, BYTE ccode, const EmbeddingTy *emb) {
 		return !is_automorphism(level, vid, src_idx, ccode, emb);
 	}

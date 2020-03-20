@@ -214,7 +214,7 @@ update_egonet(unsigned level) {
 }
 
 template class EmbeddingList<SimpleElement, BaseEmbedding>; // KCL
-template class EmbeddingList<SimpleElement, BaseEmbedding, true, true, true, true>; // KCL
+template class EmbeddingList<SimpleElement, BaseEmbedding, true, true, true, false>; // KCL shrink
 template class EmbeddingList<SimpleElement, BaseEmbedding, false>; // Motif
 template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
 

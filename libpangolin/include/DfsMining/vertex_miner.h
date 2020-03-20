@@ -11,8 +11,8 @@ class VertexMinerDFS : public Miner<ElementTy,EmbeddingTy,enable_dag> {
 typedef EmbeddingList<ElementTy,EmbeddingTy,is_single,use_ccode,shrink,use_formula> EmbeddingListTy;
 typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 public:
-	VertexMinerDFS(unsigned max_sz, int nt) : 
-		Miner<ElementTy,EmbeddingTy,enable_dag>(max_sz, nt), npatterns(1) {
+	VertexMinerDFS(unsigned max_sz, int nt, unsigned slevel = 1) : 
+		Miner<ElementTy,EmbeddingTy,enable_dag>(max_sz, nt), npatterns(1), starting_level(slevel) {
 		init_counter();
 		if (is_single) {
 			accumulators.resize(1);
@@ -79,7 +79,7 @@ public:
 	//*/
 	void edge_parallel_solver() {
 		std::cout << "DFS edge processing without advanced optimization\n";
-		std::cout << "Number of single-edge embeddings: " << edge_list.size() << "\n";
+		std::cout << "Number of single-edge embeddings: " << edge_list.size() << ", staring from level " << starting_level << "\n";
 		galois::do_all(galois::iterate(edge_list), [&](const SEdge &edge) {
 			//std::cout << "Processing edge: " << edge.to_string() << "\n";
 			EmbeddingListTy *emb_list = emb_lists.getLocal();
@@ -87,7 +87,7 @@ public:
 				if (!degree_filter(edge.src, edge.dst)) {
 					emb_list->init_edge(edge);
 					if (use_ccode) {
-						extend_single(1, *emb_list);
+						extend_single(starting_level, *emb_list);
 						emb_list->clear_labels(edge.src);
 					} else {
 						//ego_extend_single_no_labeling(1, *emb_list);
@@ -180,16 +180,19 @@ public:
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				auto vid = emb_list.get_vertex(level, emb_id);
-				//auto begin = emb_list.edge_begin(level, vid);
-				//auto end = emb_list.edge_end(level, vid);
-				auto begin = this->graph.edge_begin(vid);
-				auto end = this->graph.edge_end(vid);
+				auto begin = emb_list.edge_begin(level, vid);
+				auto end = emb_list.edge_end(level, vid);
+				//auto begin = this->graph.edge_begin(vid);
+				//auto end = this->graph.edge_end(vid);
+				EmbeddingTy emb(level+1);
+				emb_list.get_embedding(level, emb);
+				std::cout << "emb_id=" << emb_id << ", emb=" << emb << ", vid=" << vid << ", begin=" << begin << ", end=" << end << "\n";
 				for (auto e = begin; e < end; e ++) {
-					auto dst = this->graph.getEdgeDst(e);
-					//auto dst = emb_list.getEdgeDst(e);
+					//auto dst = this->graph.getEdgeDst(e);
+					auto dst = emb_list.getEdgeDst(e);
 					auto ccode = emb_list.get_label(dst);
-					if (API::toAdd(level, dst, level, ccode, NULL))
-					//if (level == ccode)
+					std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+					if (API::toAdd(level, this->max_size, dst, level, ccode, NULL))
 						API::reduction(accumulators[0]);
 				}
 			}
@@ -197,23 +200,25 @@ public:
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			auto vid = emb_list.get_vertex(level, emb_id);
-			//auto begin = emb_list.edge_begin(level, vid);
-			//auto end = emb_list.edge_end(level, vid);
-			auto begin = this->graph.edge_begin(vid);
-			auto end = this->graph.edge_end(vid);
+			auto begin = emb_list.edge_begin(level, vid);
+			auto end = emb_list.edge_end(level, vid);
+			//auto begin = this->graph.edge_begin(vid);
+			//auto end = this->graph.edge_end(vid);
 			emb_list.set_size(level+1, 0);
+			std::cout << "emb_id=" << emb_id << ", src=" << vid << "\n";
 			for (auto e = begin; e < end; e ++) {
-				auto dst = this->graph.getEdgeDst(e);
-				//auto dst = emb_list.getEdgeDst(e);
+				//auto dst = this->graph.getEdgeDst(e);
+				auto dst = emb_list.getEdgeDst(e);
 				auto ccode = emb_list.get_label(dst);
-				if (API::toAdd(level, dst, level, ccode, NULL)) {
-				//if (level == ccode) {
+				std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+				if (API::toAdd(level, this->max_size, dst, level, ccode, NULL)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
 					emb_list.set_size(level+1, start+1);
 				}
 			}
+			if (shrink) emb_list.update_egonet(level);
 			extend_single(level+1, emb_list);
 			emb_list.reset_labels(level);
 		}
@@ -237,8 +242,8 @@ public:
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			auto vid = emb_list.get_vertex(level, emb_id);
-			auto begin = emb_list.edge_begin(level, vid);
-			auto end = emb_list.edge_end(level, vid);
+			auto begin = emb_list.edge_begin<shrink>(level, vid);
+			auto end = emb_list.edge_end<shrink>(level, vid);
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = emb_list.getEdgeDst(e);
@@ -473,7 +478,7 @@ public:
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
 						//std::cout << "\t idx=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
-						if (API::toAdd(level, dst, element_id, ccode, &emb)) {
+						if (API::toAdd(level, this->max_size, dst, element_id, ccode, &emb)) {
 							//unsigned pid = getPattern(level, 
 								//dst, emb_list, previous_pid, src_idx);
 							// get pattern id using the labels
@@ -510,7 +515,7 @@ public:
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = this->graph.getEdgeDst(edge);
 					auto ccode = emb_list.get_label(dst);
-					if (API::toAdd(level, dst, element_id, ccode, &emb)) {
+					if (API::toAdd(level, this->max_size, dst, element_id, ccode, &emb)) {
 						auto start = emb_list.size(level+1);
 						assert(start < this->max_degree);
 						emb_list.set_vid(level+1, start, dst);
@@ -742,13 +747,17 @@ public:
 	Ulong get_total_count() { return accumulators[0].reduce(); }
 
 protected:
-	int npatterns;
-	bool is_directed;
-	unsigned core;
-	UlongAccu removed_edges;
-	std::vector<UlongAccu> accumulators;
-	EmbeddingLists emb_lists;
-	EdgeList edge_list;
+	int npatterns;           // number of patterns; 1 for single-pattern problem
+	bool is_directed;        // is the input graph a directed graph (true for a DAG)
+	unsigned core;           // the core value of the input graph; for estimating and pre-allocating memory
+	unsigned nedges_pattern; // number of edges in the pattern (used for single-pattern problem only)
+	unsigned starting_level; // in which level the search starts from 
+	UlongAccu removed_edges; // number of edges removed by degree filtering
+	EmbeddingLists emb_lists;// the embedding lists; one list for each thread
+	EdgeList edge_list;      // the edge list to hold the single-edge embeddings
+	std::vector<UlongAccu> accumulators; // counters for counting embeddings of each pattern
+
+	// dedicated counters for 4-motifs
 	Ulong total_3_tris;
 	Ulong total_3_path;
 	Ulong total_4_clique;
@@ -758,12 +767,13 @@ protected:
 	Ulong total_3_star;
 	Ulong total_4_path;
 
+	// generated functions for subgraph counting/listing 
+	// they are currently writtern by hand. Should be easy to generated automatically
 	inline bool is_diamond(unsigned previous_pid, unsigned qcode) {
 		if ((previous_pid == 0 && (qcode == 3 || qcode == 5 || qcode == 6)) ||
 			(previous_pid == 1 && qcode == 7)) return true;
 		return false;
 	}
-
 	inline bool is_4cycle(unsigned previous_pid, unsigned src_idx, unsigned qcode) {
 		if (previous_pid == 1) {
 			if (src_idx == 0) {
@@ -774,7 +784,6 @@ protected:
 		}
 		return false;
 	}
-
 	inline bool is_tailed_triangle(unsigned previous_pid, unsigned src_idx, unsigned qcode) {
 		if (previous_pid == 0 && qcode < 5 && qcode != 3) return true; 
 		if (previous_pid == 1) {

@@ -22,8 +22,8 @@ public:
 	bool toExtend(unsigned level, unsigned v_idx, BaseEmbedding *emb) { 
 		return v_idx == level; 
 	}
-	bool toAdd(unsigned level, VertexId vid, unsigned src_idx, 
-		BYTE ccode, BaseEmbedding *emb) { 
+	bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
+		unsigned src_idx, BYTE ccode, BaseEmbedding *emb) { 
 		return vid != emb_list.get_vid(0, 0);
 	}
 	void reduction(unsigned level, VertexId src, VertexId dst, 
