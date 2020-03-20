@@ -34,7 +34,7 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 			for (auto e : graph.edges(src)) {
 				auto dst = graph.getEdgeDst(e);
 				if (src < dst) {
-					add_edge(start, src, dst);
+					this->add_edge(start, src, dst);
 					start ++;
 				}
 			}
