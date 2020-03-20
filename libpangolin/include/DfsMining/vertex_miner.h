@@ -48,7 +48,7 @@ public:
 	}
 
 	void init_emb_list() {
-		for (int i = 0; i < numThreads; i++) {
+		for (int i = 0; i < this->num_threads; i++) {
 			if (shrink) {
 				emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core);
 			} else
