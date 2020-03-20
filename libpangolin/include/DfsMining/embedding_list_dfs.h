@@ -17,10 +17,7 @@ public:
 	void construct_local_graph_from_vertex(const VertexId vid);
 	void init_edge(const SEdge &edge);
 	void construct_local_graph_from_edge(const SEdge &edge);
-	void update_egonet(unsigned level);
-	void init_egonet_degree(unsigned level, VertexId dst) {
-		shrink_graph.set_degree(level, dst, 0);
-	}
+
 	void update_labels(unsigned level, VertexId src) {
 		for (auto e : global_graph->edges(src)) {
 			auto dst = global_graph->getEdgeDst(e);
@@ -112,12 +109,15 @@ public:
 			emb.set_element(level, ele);
 		}
 	}
+	/*
 	bool is_connected (unsigned level, VertexId vid, unsigned element_id) const {
 		if (level == 1) return (get_label(vid) == element_id + 1) || (get_label(vid) == 3);
 		else if (level == 2) {
 			return (get_label(vid) & (1 << element_id));
 		} else return false;
 	}
+	//*/
+
 	size_t size() const { return sizes[cur_level]; }
 	size_t size(unsigned level) const { return sizes[level]; }
 	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
@@ -138,9 +138,6 @@ public:
 	void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
 	//void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
 	void set_level(unsigned level) { cur_level = level; }
-	VertexId edge_begin(unsigned level, VertexId vid) { return shrink_graph.edge_begin(vid); }
-	VertexId edge_end(unsigned level, VertexId vid) { return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid); }
-	VertexId getEdgeDst(VertexId vid) const { return shrink_graph.getEdgeDst(vid); }
 	Ulong get_tri_count() { return tri_count; }
 	Ulong get_wed_count() { return wed_count; }
 	Ulong get_cycle4_count() { return cycle4_count; }
@@ -151,23 +148,58 @@ public:
 	void inc_wed_count() { wed_count ++; }
 	void inc_cycle4_count() { cycle4_count ++; }
 	void inc_clique4_count() { clique4_count ++; }
-	Egonet shrink_graph;
+
+	// egonet operations
+	void init_egonet_degree(unsigned level, VertexId dst) {
+		shrink_graph.set_degree(level, dst, 0);
+	}
+	void update_egonet(unsigned level);
+
+	inline auto getEdgeDst(VertexId vid) const {
+		if constexpr (shrink) {
+			return shrink_graph.getEdgeDst(vid);
+		} else { 
+			return global_graph->getEdgeDst(vid);
+		}
+	}
+
+	inline auto edge_begin(unsigned level, VertexId vid) {
+		if constexpr (shrink) {
+			return shrink_graph.edge_begin(vid);
+		} else { 
+			return global_graph->edge_begin(vid); // TODO: maybe incorrect
+		}
+	}
+
+	inline auto edge_end(unsigned level, VertexId vid) {
+		if constexpr (shrink) {
+			return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid);
+		} else {
+			return global_graph->edge_begin(vid); // TODO: maybe incorrect
+		}
+	}
+
 
 protected:
-	std::vector<VertexId> history; 
-	ByteLists src_indices;
-	VertexLists vid_lists;
-	IndexLists idx_lists;
-	ByteLists pid_lists; //pid[i] is the pattern id of each embedding
-	UintList sizes; //sizes[level]: no. of embeddings (i.e. no. of vertices in the the current level)
-	ByteList labels; //labels[i] is the label of each vertex i; it is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
+	unsigned length;
 	unsigned max_level;
 	unsigned cur_level;
-	unsigned length;
+
+	UintList sizes;        // sizes[level]: no. of embeddings (i.e. no. of vertices in the the current level)
+	ByteList labels;       // labels[i] is the label of each vertex i; it is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
+	ByteLists pid_lists;   // pid[i] is the pattern id of each embedding
+	IndexLists idx_lists;  // list of indices
+	VertexLists vid_lists; // list of vertex ID
+	ByteLists src_indices; // list of source indices
+	std::vector<VertexId> history; 
+
 	UintList ids;
 	UintList old_ids;
+
 	Graph *global_graph; // original input graph
 	Graph *local_graph; // shrinking graph 
+	Egonet shrink_graph;
+
 	UintList T_vu; // T_vu is an array containing all the third vertex of each triangle
 	UintList W_u;
 	Ulong tri_count; // number of triangles incident to this edge

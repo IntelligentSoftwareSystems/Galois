@@ -1,5 +1,5 @@
 #include "DfsMining/embedding_list_dfs.h"
- 
+
 template <typename ElementType, typename EmbeddingType,
 	bool is_single, bool use_ccode, bool shrink, bool use_formula>
 void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
@@ -143,6 +143,7 @@ init_edge(const SEdge &edge) {
 	} else { // non-shrink
 		if (use_ccode) {
 			if (!is_single) {
+				//std::cout << "initializing ccode for multi-pattern solver\n";
 				for (auto e : global_graph->edges(edge.dst)) {
 					auto dst = global_graph->getEdgeDst(e);
 					labels[dst] = 2;
@@ -213,6 +214,7 @@ update_egonet(unsigned level) {
 }
 
 template class EmbeddingList<SimpleElement, BaseEmbedding>; // KCL
+template class EmbeddingList<SimpleElement, BaseEmbedding, true, true, true, true>; // KCL
 template class EmbeddingList<SimpleElement, BaseEmbedding, false>; // Motif
 template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
 

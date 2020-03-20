@@ -93,16 +93,16 @@ protected:
 	static inline bool is_automorphism(unsigned level, 
 		VertexId dst, unsigned idx, BYTE ccode, const EmbeddingTy *emb) {
 		// the new vertex id should be larger than the first vertex id
-		if (dst <= emb->get_history(0)) return true;
+		if (dst <= emb->get_vertex(0)) return true;
 		// the new vertex should not already exist in the embedding
 		for (unsigned i = 1; i < level+1; ++i)
-			if (dst == emb->get_history(i)) return true;
+			if (dst == emb->get_vertex(i)) return true;
 		// the new vertex should not already be extended by any previous vertex in the embedding
 		for (unsigned i = 0; i < idx; ++i)
 			if (is_connected(level, dst, i, ccode)) return true;
 		// the new vertex id should be larger than any vertex id after its source vertex in the embedding
 		for (unsigned i = idx+1; i < level+1; ++i)
-			if (dst < emb->get_history(i)) return true;
+			if (dst < emb->get_vertex(i)) return true;
 		return false;
 	}
 	static inline bool is_connected(unsigned level, VertexId vid, unsigned element_id, BYTE ccode) {

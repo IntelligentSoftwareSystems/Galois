@@ -26,6 +26,7 @@ typedef float Weight;
 typedef uint64_t Ulong;
 typedef unsigned ValueT;
 typedef unsigned VertexId;
+typedef uint64_t EdgeId;
 typedef uint8_t BYTE;
 #ifdef LARGE_SIZE
 typedef uint64_t IndexT;

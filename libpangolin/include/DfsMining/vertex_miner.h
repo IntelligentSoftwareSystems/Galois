@@ -87,7 +87,7 @@ public:
 				if (!degree_filter(edge.src, edge.dst)) {
 					emb_list->init_edge(edge);
 					if (use_ccode) {
-						ego_extend_single(1, *emb_list);
+						extend_single(1, *emb_list);
 						emb_list->clear_labels(edge.src);
 					} else {
 						//ego_extend_single_no_labeling(1, *emb_list);
@@ -101,7 +101,8 @@ public:
 					//if (this->max_size == 4)
 					//	emb_list->clear_labels(edge.dst);
 				} else {
-					ego_extend_multi(1, *emb_list); // egonet DFS
+					//std::cout << "multi-pattern extension without using formula\n";
+					extend_multi(1, *emb_list); // egonet DFS
 					//ego_extend_multi_non_canonical(1, *emb_list); // egonet DFS
 					//ego_extend_sgl(1, *emb_list);
 					//ego_extend_sgl_auto(1, *emb_list);
@@ -175,17 +176,20 @@ public:
 	}
 	*/
 	// DFS extension for k-cliques
-	void ego_extend_single(unsigned level, EmbeddingListTy &emb_list) {
+	void extend_single(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				auto vid = emb_list.get_vertex(level, emb_id);
+				//auto begin = emb_list.edge_begin(level, vid);
+				//auto end = emb_list.edge_end(level, vid);
 				auto begin = this->graph.edge_begin(vid);
 				auto end = this->graph.edge_end(vid);
 				for (auto e = begin; e < end; e ++) {
 					auto dst = this->graph.getEdgeDst(e);
-					//auto ccode = emb_list.get_label(dst);
-					//if (API::toAdd(level, dst, level, ccode, NULL))
-					if (level == emb_list.get_label(dst))
+					//auto dst = emb_list.getEdgeDst(e);
+					auto ccode = emb_list.get_label(dst);
+					if (API::toAdd(level, dst, level, ccode, NULL))
+					//if (level == ccode)
 						API::reduction(accumulators[0]);
 				}
 			}
@@ -193,21 +197,24 @@ public:
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			auto vid = emb_list.get_vertex(level, emb_id);
+			//auto begin = emb_list.edge_begin(level, vid);
+			//auto end = emb_list.edge_end(level, vid);
 			auto begin = this->graph.edge_begin(vid);
 			auto end = this->graph.edge_end(vid);
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = this->graph.getEdgeDst(e);
-				//auto ccode = emb_list.get_label(dst);
-				//if (API::toAdd(level, dst, level, ccode, NULL)) {
-				if (level == emb_list.get_label(dst)) {
+				//auto dst = emb_list.getEdgeDst(e);
+				auto ccode = emb_list.get_label(dst);
+				if (API::toAdd(level, dst, level, ccode, NULL)) {
+				//if (level == ccode) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
 					emb_list.set_size(level+1, start+1);
 				}
 			}
-			ego_extend_single(level+1, emb_list);
+			extend_single(level+1, emb_list);
 			emb_list.reset_labels(level);
 		}
 	}
@@ -235,9 +242,9 @@ public:
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = emb_list.getEdgeDst(e);
-				//auto ccode = emb_list.get_label(dst);
+				auto ccode = emb_list.get_label(dst);
 				//if (API::toAdd(level, dst, level, ccode, NULL)) {
-				if (emb_list.get_label(dst) == level) { 
+				if (ccode == level) { 
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
@@ -442,7 +449,7 @@ public:
 	}
 	//*/
 
-	void ego_extend_multi(unsigned level, EmbeddingListTy &emb_list) {
+	void extend_multi(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
 				unsigned last_vid = 0;
@@ -453,24 +460,26 @@ public:
 				}
 				EmbeddingTy emb(level+1);
 				emb_list.get_embedding(level, emb);
+				//std::cout << "emb: " << emb << "\n";
 				unsigned previous_pid = 0, src_idx = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
 				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 					if (!API::toExtend(level, element_id, &emb)) continue; // extend all
 					auto src = emb.get_vertex(element_id);
-					//auto src = emb_list.get_history(element_id);
 					auto begin = this->graph.edge_begin(src);
 					auto end = this->graph.edge_end(src);
 					for (auto e = begin; e < end; e ++) {
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
+						//std::cout << "\t idx=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 						if (API::toAdd(level, dst, element_id, ccode, &emb)) {
 							//unsigned pid = getPattern(level, 
 								//dst, emb_list, previous_pid, src_idx);
 							// get pattern id using the labels
 							unsigned pid = find_pattern_id_dfs(
 								level, dst, emb_list, previous_pid, src_idx);
+							//std::cout << "\t\t pid = " << pid << "\n";
 							API::reduction(accumulators[pid]);
 						}
 					}
@@ -488,6 +497,7 @@ public:
 			}
 			EmbeddingTy emb(level+1);
 			emb_list.get_embedding(level, emb);
+			//std::cout << "emb: " << emb << "\n";
 			unsigned previous_pid = 0;
 			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 			emb_list.set_size(level+1, 0);
@@ -514,7 +524,7 @@ public:
 					}
 				}
 			}
-			ego_extend_multi(level+1, emb_list);
+			extend_multi(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
 	}
