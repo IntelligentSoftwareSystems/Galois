@@ -42,6 +42,8 @@ struct CUDA_Context* cuda_ctx;
 #else
 // type of the num shortest paths variable
 using ShortPathType = double;
+enum { CPU, GPU_CUDA };
+int personality = CPU;
 #endif
 
 /******************************************************************************/
@@ -125,8 +127,8 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("InitializeGraph")
             "InitializeGraph");
@@ -134,13 +136,16 @@ struct InitializeGraph {
         StatTimer_cuda.start();
         InitializeGraph_allNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-          // pass in begin/end to not use local thread ranges
-          galois::iterate(allNodes.begin(), allNodes.end()),
-          InitializeGraph{&_graph}, galois::no_stats(),
-          galois::loopname("InitializeGraph"));
+      } else if (personality == CPU) {
+        galois::do_all(
+            // pass in begin/end to not use local thread ranges
+            galois::iterate(allNodes.begin(), allNodes.end()),
+            InitializeGraph{&_graph}, galois::no_stats(),
+            galois::loopname("InitializeGraph"));
+      }
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -169,8 +174,8 @@ struct InitializeIteration {
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("InitializeIteration")
             "InitializeIteration");
@@ -178,13 +183,18 @@ struct InitializeIteration {
         StatTimer_cuda.start();
         InitializeIteration_allNodes_cuda(infinity, current_src_node, cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-          galois::iterate(allNodes.begin(), allNodes.end()),
-          InitializeIteration{infinity, current_src_node, &_graph},
-          galois::loopname(syncSubstrate->get_run_identifier("InitializeIteration").c_str()),
-          galois::no_stats());
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(allNodes.begin(), allNodes.end()),
+            InitializeIteration{infinity, current_src_node, &_graph},
+            galois::loopname(
+                syncSubstrate->get_run_identifier("InitializeIteration")
+                    .c_str()),
+            galois::no_stats());
+      }
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -235,8 +245,8 @@ struct ForwardPass {
     do {
       _dga.reset();
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("ForwardPass")
             "ForwardPass");
@@ -246,15 +256,17 @@ struct ForwardPass {
         ForwardPass_nodesWithEdges_cuda(__retval, globalRoundNumber, cuda_ctx);
         _dga += __retval;
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-        galois::iterate(nodesWithEdges),
-        ForwardPass(&_graph, _dga, globalRoundNumber),
-        galois::loopname(syncSubstrate->get_run_identifier("ForwardPass").c_str()),
-        galois::steal(),
-        galois::no_stats()
-      );
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(nodesWithEdges),
+            ForwardPass(&_graph, _dga, globalRoundNumber),
+            galois::loopname(
+                syncSubstrate->get_run_identifier("ForwardPass").c_str()),
+            galois::steal(), galois::no_stats());
+      }
 
       // synchronize distances and shortest paths
       // read any because a destination node without the correct distance
@@ -322,8 +334,8 @@ struct MiddleSync {
     if (galois::runtime::getSystemNetworkInterface().Num > 1) {
       const auto& masters = _graph.masterNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("MiddleSync")
             "MiddleSync");
@@ -331,14 +343,17 @@ struct MiddleSync {
         StatTimer_cuda.start();
         MiddleSync_masterNodes_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-        galois::iterate(masters.begin(), masters.end()),
-        MiddleSync(&_graph, _li),
-        galois::loopname(syncSubstrate->get_run_identifier("MiddleSync").c_str()),
-        galois::no_stats()
-      );
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(masters.begin(), masters.end()),
+            MiddleSync(&_graph, _li),
+            galois::loopname(
+                syncSubstrate->get_run_identifier("MiddleSync").c_str()),
+            galois::no_stats());
+      }
 
       syncSubstrate->sync<writeSource, readAny, Reduce_set_num_shortest_paths>("MiddleSync");
     }
@@ -373,8 +388,8 @@ struct BackwardPass {
     backRoundCount = roundNumber - 1;
 
     for (; backRoundCount > 0; backRoundCount--) {
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("BackwardPass")
             "BackwardPass");
@@ -382,15 +397,17 @@ struct BackwardPass {
         StatTimer_cuda.start();
         BackwardPass_nodesWithEdges_cuda(backRoundCount, cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-        galois::iterate(nodesWithEdges),
-        BackwardPass(&_graph, backRoundCount),
-        galois::loopname(syncSubstrate->get_run_identifier("BackwardPass").c_str()),
-        galois::steal(),
-        galois::no_stats()
-      );
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(nodesWithEdges),
+            BackwardPass(&_graph, backRoundCount),
+            galois::loopname(
+                syncSubstrate->get_run_identifier("BackwardPass").c_str()),
+            galois::steal(), galois::no_stats());
+      }
 
       if (moreThanOne) {
         syncSubstrate->sync<writeSource, readDestination, Reduce_add_dependency,
@@ -445,8 +462,8 @@ struct BC {
       const auto& masters = _graph.masterNodesRange();
       // finally, since dependencies are finalized for this round at this
       // point, add them to the betweeness centrality measure on each node
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str(
             //syncSubstrate->get_run_identifier("BC")
             "BC");
@@ -454,14 +471,15 @@ struct BC {
         StatTimer_cuda.start();
         BC_masterNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(
-        galois::iterate(masters.begin(), masters.end()),
-        BC(&_graph),
-        galois::no_stats(),
-        galois::loopname(syncSubstrate->get_run_identifier("BC").c_str())
-      );
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(masters.begin(), masters.end()), BC(&_graph),
+            galois::no_stats(),
+            galois::loopname(syncSubstrate->get_run_identifier("BC").c_str()));
+      }
     }
   }
 
@@ -503,8 +521,8 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       // std::string impl_str(syncSubstrate->get_run_identifier("Sanity"));
       std::string impl_str("Sanity");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -515,12 +533,15 @@ struct Sanity {
       DGA_max.update(max);
       DGA_min.update(min);
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+      abort();
 #endif
-    galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
-                                   _graph.masterNodesRange().end()),
-                   Sanity(&_graph, DGA_max, DGA_min, DGA_sum),
-                   galois::no_stats(), galois::loopname("Sanity"));
+    } else if (personality == CPU) {
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
+                                     _graph.masterNodesRange().end()),
+                     Sanity(&_graph, DGA_max, DGA_min, DGA_sum),
+                     galois::no_stats(), galois::loopname("Sanity"));
+    }
 
     float max_bc = DGA_max.reduce();
     float min_bc = DGA_min.reduce();
@@ -670,13 +691,15 @@ int main(int argc, char** argv) {
       (*syncSubstrate).set_num_run(run + 1);
 
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         bitset_num_shortest_paths_reset_cuda(cuda_ctx);
         bitset_current_length_reset_cuda(cuda_ctx);
         bitset_dependency_reset_cuda(cuda_ctx);
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
+      } else if (personality == CPU)
       {
         bitset_num_shortest_paths.reset();
         bitset_current_length.reset();
@@ -692,8 +715,8 @@ int main(int argc, char** argv) {
 
   // Verify, i.e. print out graph data for examination
   if (verify) {
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       for (auto ii = (*h_graph).masterNodesRange().begin();
           ii != (*h_graph).masterNodesRange().end(); ++ii) {
         std::stringstream out;
@@ -704,8 +727,10 @@ int main(int argc, char** argv) {
           << "\n";
         galois::runtime::printOutput(out.str().c_str());
       }
-    } else if (personality == CPU)
+#else
+      abort();
 #endif
+    } else if (personality == CPU)
     {
       for (auto ii = (*h_graph).masterNodesRange().begin();
            ii != (*h_graph).masterNodesRange().end(); ++ii) {

@@ -14,7 +14,8 @@ static inline T ERRNO_RET(int errno_val, T ret) {
 
 /* get how many threads this machine has */
 static inline unsigned n_cpus() {
-   return std::thread::hardware_concurrency() ?: 1;
+  auto c = std::thread::hardware_concurrency(); 
+  return c != 0 ? c : 1;
 }
 
 #endif

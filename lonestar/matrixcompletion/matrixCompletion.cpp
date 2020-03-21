@@ -377,7 +377,7 @@ struct SGDBlockJumpAlgo {
     SpinLock *xLocks, *yLocks;
     BlockInfo* blocks;
     size_t numXBlocks, numYBlocks;
-    LatentValue* steps;
+    const LatentValue* steps;
     size_t maxUpdates;
     galois::GAccumulator<double>* errorAccum;
 
