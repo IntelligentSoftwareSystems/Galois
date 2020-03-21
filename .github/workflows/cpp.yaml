@@ -83,7 +83,8 @@ jobs:
         cmake -S . -B ~/build \
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
-          -DCOMPILER_CACHE_PROGRAM=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
           -DCXX_CLANG_TIDY=clang-tidy \
           -DENABLE_DIST_GALOIS=on
@@ -156,10 +157,10 @@ jobs:
     - name: configure
       run: |
         cmake -S . -B ~/build \
-          -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
-          -DCOMPILER_CACHE_PROGRAM=ccache \
+          -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DENABLE_DIST_GALOIS=on
     - name: build
       run: cmake --build ~/build --parallel 4

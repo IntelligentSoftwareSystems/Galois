@@ -46,6 +46,7 @@ set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
+set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
@@ -174,15 +175,6 @@ endif(USE_GPROF)
 
 if(USE_SANITIZER)
   add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls)
-endif()
-
-if(COMPILER_CACHE_PROGRAM)
-  find_program(CCACHE_PROGRAM ${COMPILER_CACHE_PROGRAM})
-  if(CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  else()
-    message(FATAL_ERROR "${COMPILER_CACHE_PROGRAM} not found")
-  endif()
 endif()
 
 if(CXX_CLANG_TIDY)
