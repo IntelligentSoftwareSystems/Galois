@@ -10,7 +10,7 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 		for (GNode src : graph) {
 			for (auto e : graph.edges(src)) {
 				auto dst = graph.getEdgeDst(e);
-				add_edge(*e, src, dst);
+				this->add_edge(*e, src, dst);
 			}
 		}//, galois::chunk_size<256>(), galois::steal(), galois::loopname("Init-edgelist"));
 	} else {

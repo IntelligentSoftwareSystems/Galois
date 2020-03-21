@@ -50,7 +50,7 @@ public:
 	void init_emb_list() {
 		for (int i = 0; i < this->num_threads; i++) {
 			if (shrink) {
-				emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core);
+				//emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core);
 			} else
 				emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, this->max_degree);
 		}
@@ -83,14 +83,16 @@ public:
 		galois::do_all(galois::iterate(edge_list), [&](const SEdge &edge) {
 			//std::cout << "Processing edge: " << edge.to_string() << "\n";
 			EmbeddingListTy *emb_list = emb_lists.getLocal();
+			if (!emb_list->is_allocated())
+				emb_list->allocate(&(this->graph), this->max_size, core);
 			if (is_single) {
 				if (!degree_filter(edge.src, edge.dst)) {
 					emb_list->init_edge(edge);
 					if (use_ccode) {
 						extend_single(starting_level, *emb_list);
-						emb_list->clear_labels(edge.src);
+						if (!shrink) emb_list->clear_labels(edge.src);
 					} else {
-						//ego_extend_single_no_labeling(1, *emb_list);
+						//extend_single_naive(starting_level, *emb_list);
 					}
 				}
 			} else {
@@ -137,8 +139,7 @@ public:
 	}
 	//*/
 	/*
-	// DFS extension for k-cliques
-	void ego_extend_single_no_labeling(unsigned level, EmbeddingListTy &emb_list) {
+	void extend_single_naive(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				auto vid = emb_list.get_vertex(level, emb_id);
@@ -170,7 +171,7 @@ public:
 					emb_list.set_size(level+1, start+1);
 				}
 			}
-			ego_extend_single_no_labeling(level+1, emb_list);
+			extend_single_naive(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
 	}
@@ -184,8 +185,8 @@ public:
 				auto end = emb_list.edge_end(level, vid);
 				//auto begin = this->graph.edge_begin(vid);
 				//auto end = this->graph.edge_end(vid);
-				EmbeddingTy emb(level+1);
-				emb_list.get_embedding(level, emb);
+				//EmbeddingTy emb(level+1);
+				//emb_list.get_embedding(level, emb);
 				//std::cout << "emb_id=" << emb_id << ", emb=" << emb << ", vid=" << vid << ", begin=" << begin << ", end=" << end << "\n";
 				for (auto e = begin; e < end; e ++) {
 					//auto dst = this->graph.getEdgeDst(e);
@@ -216,6 +217,7 @@ public:
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
 					emb_list.set_size(level+1, start+1);
+					if (shrink) emb_list.init_egonet_degree(level+1, dst);
 				}
 			}
 			if (shrink) emb_list.update_egonet(level);

@@ -7,12 +7,14 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
 	global_graph = graph;
 	max_level = max_size;
 	length = max_degree;
+	//std::cout << "max_level=" << max_level << ", length=" << length << "\n";
 
 	vid_lists.resize(max_level);
 	vid_lists[0].resize(1);
 	vid_lists[1].resize(1);
 	if (is_single) {
-		for (unsigned i = 2; i < max_level; i ++)
+		//std::cout << "allocating vertex list\n";
+		for (unsigned i = 2; i < max_level-1; i ++)
 			vid_lists[i].resize(length);
 	} else {
 		if (!use_formula) {
@@ -24,7 +26,7 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
 		}
 	}
 
-	if (use_ccode) {
+	if (use_ccode) { // TODO: maybe useful for subgraph listing
 		pid_lists.resize(max_level);
 		if (use_formula) {
 			for (unsigned i = 2; i < max_level; i ++)
@@ -40,12 +42,14 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
 	sizes[1] = 1;
 
 	if (shrink) {
+		//std::cout << "allocating shrink_graph, length=" << length << ", max_level=" << max_level << "\n";
 		labels.resize(length);
 		shrink_graph.allocate(length, max_level);
 	} else {
 		labels.resize(graph->size());
 		std::fill(labels.begin(), labels.end(), 0);
 	}
+	allocated = true;
 }
 
 template <typename ElementType,typename EmbeddingType,
@@ -138,6 +142,7 @@ init_edge(const SEdge &edge) {
 				index ++;
 			}
 		}
+		//std::cout << "number of vertices in the list: " << index << "\n";
 		set_size(2, index); // number of neighbors of src. 
 		if (max_level > 3) construct_local_graph_from_edge(edge);
 	} else { // non-shrink

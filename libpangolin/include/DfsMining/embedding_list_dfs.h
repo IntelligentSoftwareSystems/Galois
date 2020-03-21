@@ -1,5 +1,5 @@
-#ifndef EMBEDDING_LIST_H
-#define EMBEDDING_LIST_H
+#pragma once
+
 #include "edge.h"
 #include "egonet.h"
 #include "base_embedding.h"
@@ -11,13 +11,47 @@ template <typename ElementType, typename EmbeddingType,
 class EmbeddingList {
 using edge_iterator = typename Graph::edge_iterator;
 public:
-	EmbeddingList() {}
+	EmbeddingList() : allocated(0), length(0), max_level(0), cur_level(0), global_graph(NULL) {}
 	~EmbeddingList() {}
+	bool is_allocated() { return allocated; }
 	void allocate(Graph *graph, unsigned max_size, unsigned max_degree);
 	void init_vertex(const VertexId vid);
 	void construct_local_graph_from_vertex(const VertexId vid);
 	void init_edge(const SEdge &edge);
 	void construct_local_graph_from_edge(const SEdge &edge);
+
+	size_t size() const { return sizes[cur_level]; }
+	size_t size(unsigned level) const { return sizes[level]; }
+	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
+	VertexId get_vid(unsigned level, size_t i) const { return vid_lists[level][i]; }
+	std::vector<VertexId> get_history() const { return history; }
+	VertexId get_history(unsigned level) const { return history[level]; }
+	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
+	BYTE get_pid(unsigned level, size_t i) const { return pid_lists[level][i]; }
+	BYTE get_src(unsigned level, size_t i) const { return src_indices[level][i]; }
+	BYTE get_label(VertexId vid) const { return labels[vid]; }
+	//unsigned get_label(VertexId vid) const { return labels[vid]; }
+
+	unsigned get_level() const { return cur_level; }
+	void set_size(unsigned level, size_t size) { sizes[level] = size; }
+	void set_vid(unsigned level, size_t id, VertexId vid) { vid_lists[level][id] = vid; }
+	void set_idx(unsigned level, size_t id, IndexTy idx) { idx_lists[level][id] = idx; }
+	void set_pid(unsigned level, size_t id, BYTE pid) { pid_lists[level][id] = pid; }
+	void set_src(unsigned level, size_t id, BYTE src) { src_indices[level][id] = src; }
+	void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
+	//void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
+	void set_level(unsigned level) { cur_level = level; }
+
+	Ulong get_tri_count() { return tri_count; }
+	Ulong get_wed_count() { return wed_count; }
+	Ulong get_cycle4_count() { return cycle4_count; }
+	Ulong get_clique4_count() { return clique4_count; }
+	void push_history(VertexId vid) { history.push_back(vid); }
+	void pop_history() { history.pop_back(); }
+	void inc_tri_count() { tri_count ++; }
+	void inc_wed_count() { wed_count ++; }
+	void inc_cycle4_count() { cycle4_count ++; }
+	void inc_clique4_count() { clique4_count ++; }
 
 	void update_labels(unsigned level, VertexId src) {
 		for (auto e : global_graph->edges(src)) {
@@ -119,37 +153,6 @@ public:
 	}
 	//*/
 
-	size_t size() const { return sizes[cur_level]; }
-	size_t size(unsigned level) const { return sizes[level]; }
-	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
-	VertexId get_vid(unsigned level, size_t i) const { return vid_lists[level][i]; }
-	std::vector<VertexId> get_history() const { return history; }
-	VertexId get_history(unsigned level) const { return history[level]; }
-	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
-	BYTE get_pid(unsigned level, size_t i) const { return pid_lists[level][i]; }
-	BYTE get_src(unsigned level, size_t i) const { return src_indices[level][i]; }
-	BYTE get_label(VertexId vid) const { return labels[vid]; }
-	//unsigned get_label(VertexId vid) const { return labels[vid]; }
-	unsigned get_level() const { return cur_level; }
-	void set_size(unsigned level, size_t size) { sizes[level] = size; }
-	void set_vid(unsigned level, size_t id, VertexId vid) { vid_lists[level][id] = vid; }
-	void set_idx(unsigned level, size_t id, IndexTy idx) { idx_lists[level][id] = idx; }
-	void set_pid(unsigned level, size_t id, BYTE pid) { pid_lists[level][id] = pid; }
-	void set_src(unsigned level, size_t id, BYTE src) { src_indices[level][id] = src; }
-	void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
-	//void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
-	void set_level(unsigned level) { cur_level = level; }
-	Ulong get_tri_count() { return tri_count; }
-	Ulong get_wed_count() { return wed_count; }
-	Ulong get_cycle4_count() { return cycle4_count; }
-	Ulong get_clique4_count() { return clique4_count; }
-	void push_history(VertexId vid) { history.push_back(vid); }
-	void pop_history() { history.pop_back(); }
-	void inc_tri_count() { tri_count ++; }
-	void inc_wed_count() { wed_count ++; }
-	void inc_cycle4_count() { cycle4_count ++; }
-	void inc_clique4_count() { clique4_count ++; }
-
 	// egonet operations
 	void init_egonet_degree(unsigned level, VertexId dst) {
 		shrink_graph.set_degree(level, dst, 0);
@@ -172,7 +175,7 @@ public:
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
 	inline EdgeId edge_begin_impl(unsigned level, VertexId vid) {
 		EdgeId eid = shrink_graph.edge_begin(vid);
-		std::cout << "\t using shrink graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
+		//std::cout << "\t using shrink graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
 		return eid;
 	}
 
@@ -191,11 +194,11 @@ public:
 	template <bool en, typename std::enable_if<!en>::type* = nullptr>
 	inline EdgeId edge_end_impl(unsigned level, VertexId vid) {
 		EdgeId eid = *(global_graph->edge_end(vid));
-		//std::cout << "\t using global graph, vertex_id=" << vid << ", end eid=" << eid << "\n";
 		return eid;
 	}
 
 protected:
+	bool allocated;
 	unsigned length;
 	unsigned max_level;
 	unsigned cur_level;
@@ -212,15 +215,14 @@ protected:
 	UintList old_ids;
 
 	Graph *global_graph; // original input graph
-	Graph *local_graph; // shrinking graph 
-	Egonet shrink_graph;
+	//Graph *local_graph;  // shrinking graph 
+	Egonet shrink_graph; // shrinking graph
 
-	UintList T_vu; // T_vu is an array containing all the third vertex of each triangle
-	UintList W_u;
-	Ulong tri_count; // number of triangles incident to this edge
-	Ulong wed_count; // number of wedges incident to this edge
-	Ulong clique4_count;
-	Ulong cycle4_count;
+	UintList T_vu;       // T_vu is an array containing all the third vertex of each triangle
+	UintList W_u;        // W_u is an array containing all the third vertex of each wedge
+	Ulong tri_count;     // number of triangles incident to this edge
+	Ulong wed_count;     // number of wedges incident to this edge
+	Ulong clique4_count; // number of 4-cliques
+	Ulong cycle4_count;  // number of 4-cycles
 };
 
-#endif

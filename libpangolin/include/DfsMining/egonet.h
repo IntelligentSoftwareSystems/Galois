@@ -9,7 +9,7 @@ public:
 	~Egonet() {}
 
 	void allocate(unsigned c, unsigned k) {
-		//std::cout << "Allocating memory for egonet...\n";
+		//std::cout << "Allocating memory for egonet: c=" << c << ", k=" << k << "\n";
 		length = c;
 		max_level = k;
 		cur_level = 1;
