@@ -186,12 +186,12 @@ public:
 				//auto end = this->graph.edge_end(vid);
 				EmbeddingTy emb(level+1);
 				emb_list.get_embedding(level, emb);
-				std::cout << "emb_id=" << emb_id << ", emb=" << emb << ", vid=" << vid << ", begin=" << begin << ", end=" << end << "\n";
+				//std::cout << "emb_id=" << emb_id << ", emb=" << emb << ", vid=" << vid << ", begin=" << begin << ", end=" << end << "\n";
 				for (auto e = begin; e < end; e ++) {
 					//auto dst = this->graph.getEdgeDst(e);
 					auto dst = emb_list.getEdgeDst(e);
 					auto ccode = emb_list.get_label(dst);
-					std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+					//std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 					if (API::toAdd(level, this->max_size, dst, level, ccode, NULL))
 						API::reduction(accumulators[0]);
 				}
@@ -205,12 +205,12 @@ public:
 			//auto begin = this->graph.edge_begin(vid);
 			//auto end = this->graph.edge_end(vid);
 			emb_list.set_size(level+1, 0);
-			std::cout << "emb_id=" << emb_id << ", src=" << vid << "\n";
+			//std::cout << "emb_id=" << emb_id << ", src=" << vid << "\n";
 			for (auto e = begin; e < end; e ++) {
 				//auto dst = this->graph.getEdgeDst(e);
 				auto dst = emb_list.getEdgeDst(e);
 				auto ccode = emb_list.get_label(dst);
-				std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+				//std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 				if (API::toAdd(level, this->max_size, dst, level, ccode, NULL)) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
