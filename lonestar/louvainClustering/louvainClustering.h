@@ -136,7 +136,7 @@ void sumClusterWeight(Graph& graph, CommArray& c_info) {
    */
   for(GNode n = 0; n < graph.size(); ++n) {
       auto &n_data = graph.getData(n);
-      if(n_data.curr_comm_ass > 0)
+      if(n_data.curr_comm_ass >= 0)
         c_info[n_data.curr_comm_ass].degree_wt += n_data.degree_wt;
     }
 }
@@ -172,7 +172,7 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * (ax - ay) * constant * constant;
+      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
         max_gain = cur_gain;
@@ -222,7 +222,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * (ax - ay) * constant * constant;
+      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
         max_gain = cur_gain;
@@ -278,7 +278,7 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (c_info[n].degree_wt + c_update[n].degree_wt) * (c_info[n].degree_wt + c_update[n].degree_wt);
+                  acc_a2_x += (double) (c_info[n].degree_wt + c_update[n].degree_wt) * ((double) (c_info[n].degree_wt + c_update[n].degree_wt) * (double)constant_for_second_term);
                 });
 
 
@@ -286,7 +286,7 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
   a2_x = acc_a2_x.reduce();
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
+  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
   //galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
 
   return mod;
@@ -330,7 +330,7 @@ double calModularity(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                  acc_a2_x += (double) (c_info[n].degree_wt) * ((double) (c_info[n].degree_wt) * (double)constant_for_second_term);
                 });
 
 
@@ -338,7 +338,7 @@ double calModularity(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
   a2_x = acc_a2_x.reduce();
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
+  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
   //galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
 
   return mod;
@@ -397,7 +397,7 @@ double calModularityFinal(Graph& graph) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (c_info[n].degree_wt) * (c_info[n].degree_wt);
+                  acc_a2_x += (double) (c_info[n].degree_wt) * ((double) (c_info[n].degree_wt)* (double)constant_for_second_term);
                 });
 
 
@@ -405,7 +405,7 @@ double calModularityFinal(Graph& graph) {
   a2_x = acc_a2_x.reduce();
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
-  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term * (double)constant_for_second_term;
+  mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
   return mod;
 }
 
