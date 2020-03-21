@@ -806,7 +806,7 @@ private:
     }
   }
 
-  Pow_2_BlockHeap(void) throw();
+  Pow_2_BlockHeap() noexcept; // NOLINT(modernize-use-equals-delete)
 
 public:
   void* allocateBlock(const size_t allocSize) {

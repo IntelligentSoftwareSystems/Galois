@@ -266,8 +266,8 @@ struct SparseBitVector {
       : public boost::iterator_facade<SBVIterator, const unsigned,
                                       boost::forward_traversal_tag> {
     Node* currentHead;
-    unsigned currentBit;
-    unsigned currentValue;
+    unsigned currentBit{0};
+    unsigned currentValue{~0U};
 
     void advanceToNextBit(bool inclusive) {
       if (!inclusive) {

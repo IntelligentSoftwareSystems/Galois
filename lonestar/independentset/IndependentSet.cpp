@@ -549,8 +549,8 @@ struct EdgeTiledPrioAlgo {
           [&](const GNode& src) {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
-            if ((nodedata.flag & (unsigned char)0x01)) { // undecided
-              if (nodedata.flag & (unsigned char)0x02) { // temporary yes
+            if ((nodedata.flag & (unsigned char)0x01) != 0) { // undecided
+              if ((nodedata.flag & (unsigned char)0x02) != 0) { // temporary yes
                 nodedata.flag =
                     (unsigned char)0xfe; // 0x1111 1110, permanent yes
                 for (auto edge :

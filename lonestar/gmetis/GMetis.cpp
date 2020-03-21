@@ -309,10 +309,12 @@ int main(int argc, char** argv) {
       galois::LargeArray<uint64_t> transpose;
       transpose.create(g.size());
       uint64_t id = 0;
-      for (auto ii = perm2.begin(), ei = perm2.end(); ii != ei; ++ii)
-        transpose[*ii] = id++;
-      for (auto ii = transpose.begin(), ei = transpose.end(); ii != ei; ++ii)
-        file << *ii << "\n";
+      for (auto& ii : perm2) {
+        transpose[ii] = id++;
+      }
+      for (auto& ii : transpose) {
+        file << ii << "\n";
+      }
     }
   }
   return 0;
