@@ -80,7 +80,7 @@ public:
     }
     ++galois::runtime::evilPhase;
     if (galois::runtime::evilPhase >=
-        std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
+        static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
     }
   }

@@ -314,7 +314,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           // do not let it go over the integer limit because MPI_Isend cannot
           // deal with it
           if ((m.data.size() + sizeof(uint32_t) + len + num) >
-              std::numeric_limits<int>::max()) {
+              static_cast<size_t>(std::numeric_limits<int>::max())) {
             break;
           }
           len += m.data.size();

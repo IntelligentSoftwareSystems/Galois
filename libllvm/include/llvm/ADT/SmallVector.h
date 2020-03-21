@@ -241,7 +241,7 @@ public:
     // Use memcpy for PODs iterated by pointers (which includes SmallVector
     // iterators): std::uninitialized_copy optimizes to memmove, but we can
     // use memcpy here.
-    memcpy(Dest, I, (E - I) * sizeof(T));
+    memcpy(reinterpret_cast<void*>(Dest), I, (E - I) * sizeof(T));
   }
 
   /// grow - double the size of the allocated memory, guaranteeing space for at

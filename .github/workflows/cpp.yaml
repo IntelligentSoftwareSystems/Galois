@@ -74,7 +74,8 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
           -DCOMPILER_CACHE_PROGRAM=ccache \
-          -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake
+          -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
+          -DENABLE_DIST_GALOIS=on
     - name: build
       run: cmake --build ~/build --parallel 4
     - name: install
