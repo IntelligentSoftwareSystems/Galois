@@ -14,7 +14,7 @@ public:
 	EmbeddingList() : allocated(0), length(0), max_level(0), cur_level(0), global_graph(NULL) {}
 	~EmbeddingList() {}
 	bool is_allocated() { return allocated; }
-	void allocate(Graph *graph, unsigned max_size, unsigned max_degree);
+	void allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns);
 	void init_vertex(const VertexId vid);
 	void construct_local_graph_from_vertex(const VertexId vid);
 	void init_edge(const SEdge &edge);
@@ -24,6 +24,7 @@ public:
 	size_t size(unsigned level) const { return sizes[level]; }
 	VertexId get_vertex(unsigned level, size_t i) const { return vid_lists[level][i]; }
 	VertexId get_vid(unsigned level, size_t i) const { return vid_lists[level][i]; }
+	const std::vector<VertexId>* get_history_ptr() const { return &history; }
 	std::vector<VertexId> get_history() const { return history; }
 	VertexId get_history(unsigned level) const { return history[level]; }
 	IndexTy get_idx(unsigned level, IndexTy id) const { return idx_lists[level][id]; }
@@ -48,10 +49,10 @@ public:
 	Ulong get_clique4_count() { return clique4_count; }
 	void push_history(VertexId vid) { history.push_back(vid); }
 	void pop_history() { history.pop_back(); }
-	void inc_tri_count() { tri_count ++; }
-	void inc_wed_count() { wed_count ++; }
-	void inc_cycle4_count() { cycle4_count ++; }
-	void inc_clique4_count() { clique4_count ++; }
+	//void inc_tri_count() { tri_count ++; }
+	//void inc_wed_count() { wed_count ++; }
+	//void inc_cycle4_count() { cycle4_count ++; }
+	//void inc_clique4_count() { clique4_count ++; }
 
 	void update_labels(unsigned level, VertexId src) {
 		for (auto e : global_graph->edges(src)) {
@@ -131,12 +132,14 @@ public:
 			T_vu[tr_i] = 0;
 		}
 	}
+	// TODO: this is expensive
 	inline void get_embedding(unsigned level, EmbeddingType &emb) {
 		for (unsigned l = 0; l < level+1; l ++) {
 			ElementType ele(history[l]);
 			emb.set_element(l, ele);
 		}
 	}
+	/*
 	inline void get_embedding(unsigned level, unsigned pos, EmbeddingType &emb) {
 		//std::cout << ", get_embedding: level = " << level << ", pos = " << pos;
 		for (unsigned l = 0; l < level+1; l ++) {
@@ -144,7 +147,6 @@ public:
 			emb.set_element(level, ele);
 		}
 	}
-	/*
 	bool is_connected (unsigned level, VertexId vid, unsigned element_id) const {
 		if (level == 1) return (get_label(vid) == element_id + 1) || (get_label(vid) == 3);
 		else if (level == 2) {
@@ -202,6 +204,7 @@ protected:
 	unsigned length;
 	unsigned max_level;
 	unsigned cur_level;
+	int npatterns;
 
 	UintList sizes;        // sizes[level]: no. of embeddings (i.e. no. of vertices in the the current level)
 	ByteList labels;       // labels[i] is the label of each vertex i; it is the perfect hash table for checking in O(1) time if edge (triangle, etc) exists
@@ -224,5 +227,7 @@ protected:
 	Ulong wed_count;     // number of wedges incident to this edge
 	Ulong clique4_count; // number of 4-cliques
 	Ulong cycle4_count;  // number of 4-cycles
+public:
+	std::vector<Ulong> local_counters;
 };
 

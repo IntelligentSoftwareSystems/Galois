@@ -3,10 +3,11 @@
 template <typename ElementType, typename EmbeddingType,
 	bool is_single, bool use_ccode, bool shrink, bool use_formula>
 void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
-allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
+allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns) {
 	global_graph = graph;
 	max_level = max_size;
 	length = max_degree;
+	npatterns = num_patterns;
 	//std::cout << "max_level=" << max_level << ", length=" << length << "\n";
 
 	vid_lists.resize(max_level);
@@ -17,7 +18,10 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
 		for (unsigned i = 2; i < max_level-1; i ++)
 			vid_lists[i].resize(length);
 	} else {
-		if (!use_formula) {
+		if (use_formula) {
+			for (unsigned i = 2; i < max_level; i ++)
+				vid_lists[i].resize(length);
+		} else {
 			for (unsigned i = 2; i < max_level; i ++) 
 				vid_lists[i].resize(i*length);
 			src_indices.resize(max_level);
@@ -49,6 +53,7 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree) {
 		labels.resize(graph->size());
 		std::fill(labels.begin(), labels.end(), 0);
 	}
+	local_counters.resize(num_patterns); // for local counts of tri, 4-cycle and 4-clique
 	allocated = true;
 }
 
@@ -111,14 +116,18 @@ void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_form
 init_edge(const SEdge &edge) {
 	//std::cout << "Insert edge: " << edge.to_string() << "\n";
 	cur_level = 1;
-	wed_count = 0, tri_count = 0;
-	clique4_count = 0, cycle4_count = 0;
 	history.clear();
 	history.push_back(edge.src);
 	history.push_back(edge.dst);
 	vid_lists[1][0] = edge.dst;
 	vid_lists[0][0] = edge.src;
 	set_size(1, 1);
+
+	if (use_formula) {
+		wed_count = 0, tri_count = 0;
+		clique4_count = 0, cycle4_count = 0;
+		for (int i = 0; i < npatterns; i++) local_counters[i] = 0;
+	}
 
 	if (shrink) {
 		if (ids.empty()) {
@@ -151,6 +160,7 @@ init_edge(const SEdge &edge) {
 				//std::cout << "initializing ccode for multi-pattern solver\n";
 				for (auto e : global_graph->edges(edge.dst)) {
 					auto dst = global_graph->getEdgeDst(e);
+					if (dst == edge.src) continue;
 					labels[dst] = 2;
 				}
 			}
@@ -221,5 +231,6 @@ update_egonet(unsigned level) {
 template class EmbeddingList<SimpleElement, BaseEmbedding>; // KCL
 template class EmbeddingList<SimpleElement, BaseEmbedding, true, true, true, false>; // KCL shrink
 template class EmbeddingList<SimpleElement, BaseEmbedding, false>; // Motif
+template class EmbeddingList<SimpleElement, BaseEmbedding, false, true, false, true>; // Motif
 template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
 

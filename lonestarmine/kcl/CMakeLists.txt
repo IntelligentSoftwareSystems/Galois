@@ -1,5 +1,3 @@
 mineApp(kcl)
-#app(kcl_naive kcl_naive.cpp)
-#app(kcl_queue kcl_queue.cpp)
 mineApp(kcl_dfs)
 mineApp(kcl_shrink)

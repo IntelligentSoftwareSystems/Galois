@@ -12,7 +12,8 @@ public:
 		return pos == level;
 	}
 	static inline bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
-		unsigned src_idx, BYTE ccode, BaseEmbedding *emb) {
+		//unsigned src_idx, BYTE ccode, BaseEmbedding *emb) {
+		unsigned src_idx, BYTE ccode, const std::vector<VertexId> *emb) { 
 		return ccode == level; 
 	}
 };

@@ -1,4 +1,4 @@
 mineApp(motif)
 mineApp(motif_dfs)
+mineApp(motif_formula)
 #app(motif_queue motif_queue.cpp)
-#app(motif_adhoc motif_adhoc.cpp)

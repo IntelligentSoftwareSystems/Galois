@@ -206,7 +206,18 @@ protected:
 		}
 		return all_connected;
 	}
-
+	inline bool is_all_connected_dag(unsigned dst, const std::vector<VertexId> &emb, unsigned end, unsigned start = 0) {
+		assert(start >= 0 && end > 0);
+		bool all_connected = true;
+		for(unsigned i = start; i < end; ++i) {
+			unsigned from = emb[i];
+			if (!is_connected_dag(dst, from)) {
+				all_connected = false;
+				break;
+			}
+		}
+		return all_connected;
+	}
 	// check if vertex a is connected to vertex b in a undirected graph
 	inline bool is_connected(unsigned a, unsigned b) {
 		if (degrees[a] == 0 || degrees[b] == 0) return false;
