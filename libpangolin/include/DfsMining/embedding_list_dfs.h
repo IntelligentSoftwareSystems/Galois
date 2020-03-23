@@ -42,13 +42,13 @@ public:
 	void set_label(VertexId vid, BYTE value) { labels[vid] = value; }
 	//void set_label(VertexId vid, unsigned value) { labels[vid] = value; }
 	void set_level(unsigned level) { cur_level = level; }
-
-	Ulong get_tri_count() { return tri_count; }
-	Ulong get_wed_count() { return wed_count; }
-	Ulong get_cycle4_count() { return cycle4_count; }
-	Ulong get_clique4_count() { return clique4_count; }
 	void push_history(VertexId vid) { history.push_back(vid); }
 	void pop_history() { history.pop_back(); }
+
+	//Ulong get_tri_count() { return tri_count; }
+	//Ulong get_wed_count() { return wed_count; }
+	//Ulong get_cycle4_count() { return cycle4_count; }
+	//Ulong get_clique4_count() { return clique4_count; }
 	//void inc_tri_count() { tri_count ++; }
 	//void inc_wed_count() { wed_count ++; }
 	//void inc_cycle4_count() { cycle4_count ++; }
@@ -84,6 +84,7 @@ public:
 			ids[dst] = (unsigned)-1;
 		}
 	}
+	/*
 	void mark_neighbors() {
 		VertexId src = get_vid(0, 0);
 		VertexId dst = get_vid(1, 0);
@@ -132,6 +133,7 @@ public:
 			T_vu[tr_i] = 0;
 		}
 	}
+	*/
 	// TODO: this is expensive
 	inline void get_embedding(unsigned level, EmbeddingType &emb) {
 		for (unsigned l = 0; l < level+1; l ++) {

@@ -19,12 +19,17 @@ public:
 		return level == max_level-2 || ccode == level; 
 	}
 };
-
-class AppMiner : public VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, true, true, true, true> {
+#define START_LEVEL 1
+class AppMiner : public VertexMinerDFS<SimpleElement, BaseEmbedding, 
+	MyAPI, true, true, true, true, false, false, false> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, true, true, true, true>(ms, nt, 2) {
-		assert(ms > 3);
+		VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, 
+			true, true, true, true, false, false, false>(ms, nt, START_LEVEL) {
+		if (ms < START_LEVEL+2) {
+			std::cout << "k should be at least " << START_LEVEL+2 << "\n";
+			exit(1);
+		}
 	}
 	~AppMiner() {}
 	void print_output() {

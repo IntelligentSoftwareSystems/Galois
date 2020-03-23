@@ -41,27 +41,29 @@ public:
 		total_3_star = 0;
 		total_4_path = 0;
 	}
-
+	void initialize() {
+		core = this->max_degree;
+		//if (edge_par) 
+		init_edgelist(); // TODO: use core value to save memory for vertex-parallel kcl_shrink
+		init_emb_list();
+	}
 	void init_edgelist(bool symmetrize = false) {
 		edge_list.init(this->graph, enable_dag, symmetrize);
 		if (shrink) { // TODO: use constexpr
-			core = edge_list.get_core();
+			core = edge_list.generate_graph(this->graph); // rebuild the graph to minimize the max_degree to save memory for the egonet
+			//core = edge_list.get_core();
 		}
 	}
-
 	void init_emb_list() {
 		for (int i = 0; i < this->num_threads; i++) {
-			if (shrink) { // TODO: use constexpr
-				emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core, npatterns);
-			} else {
-				emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, this->max_degree, npatterns);
-			}
+			emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core, npatterns);
 		}
 	}
-
 	void solver () {
-		edge_parallel_solver();
-		//vertex_parallel_solver();
+		if (edge_par)
+			edge_parallel_solver();
+		else
+			vertex_parallel_solver();
 	}
 
 	void vertex_parallel_solver() {
@@ -76,7 +78,7 @@ public:
 			} else {
 				extend_multi(starting_level, *emb_list);
 			}
-			emb_list->clear_labels(vid);
+			if (!shrink) emb_list->clear_labels(vid);
 		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("VertexParallelSolver"));
 		if (!is_single) motif_count();
 	}
@@ -118,7 +120,7 @@ public:
 					emb_list->clear_labels(edge.src);
 				}
 			}
-		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("EdgeSolver"));
+		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("EdgeParallelSolver"));
 		if (!is_single) motif_count();
 	}
 
@@ -131,6 +133,7 @@ public:
 		return false;
 	}
 	///*
+	// do not use ccode, need check the input graph for connectivity
 	void extend_single_naive(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
@@ -231,8 +234,8 @@ public:
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 			auto vid = emb_list.get_vertex(level, emb_id);
-			auto begin = emb_list.edge_begin<shrink>(level, vid);
-			auto end = emb_list.edge_end<shrink>(level, vid);
+			auto begin = emb_list.edge_begin(level, vid);
+			auto end = emb_list.edge_end(level, vid);
 			emb_list.set_size(level+1, 0);
 			for (auto e = begin; e < end; e ++) {
 				auto dst = emb_list.getEdgeDst(e);

@@ -1,7 +1,6 @@
 #pragma once
 #include "edge.h" // had a bug when using edge_type.h
 #include "gtypes.h"
-//#include "core.h"
 
 class EdgeList : public std::vector<SEdge> {
 //using iterator = typename galois::gstl::Vector<Edge>::iterator;
@@ -26,6 +25,9 @@ public:
 	//Edge& get_edge(size_t i) { return all_edges[i]; }
 	//Edge* get_edge_ptr(size_t i) { return &(all_edges[i]); }
 	unsigned get_core();
+	void ord_core();
+	void relabel();
+	unsigned generate_graph(Graph &graph);
 private:
 	size_t num_vertices;
 	size_t num_edges;
@@ -35,6 +37,6 @@ private:
 	//	all_edges[pos] = Edge(src, dst);
 		(*this)[pos] = SEdge(src,dst);
 	}
-	//std::vector<int> rank;
+	std::vector<int> rank;
 };
 

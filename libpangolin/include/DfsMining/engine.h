@@ -11,8 +11,7 @@ int main(int argc, char** argv) {
 	miner.read_graph(filetype, filename);
 	Tinitial.stop();
 	ResourceManager rm;
-	miner.init_edgelist();
-	miner.init_emb_list();
+	miner.initialize();
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	miner.solver();

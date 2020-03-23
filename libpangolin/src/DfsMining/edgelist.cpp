@@ -1,4 +1,6 @@
 #include "DfsMining/edgelist.h"
+#include "scan.h"
+#include "core.h"
 
 void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 	num_vertices = graph.size();
@@ -58,16 +60,16 @@ unsigned EdgeList::get_core() {
 	return max;
 }
 
-/*
 //computing degeneracy ordering and core value
-void ord_core() {
+void EdgeList::ord_core() {
+	std::cout << "Computing vertex rank using core value\n";
 	rank.resize(num_vertices);
 	std::vector<IndexT> d0(num_vertices, 0);
 	std::vector<IndexT> cd0(num_vertices+1);
 	std::vector<IndexT> adj0(2*num_edges);
 	for (size_t i = 0; i < num_edges; i ++) {
-		d0[edges[i].src]++;
-		d0[edges[i].dst]++;
+		d0[(*this)[i].src]++;
+		d0[(*this)[i].dst]++;
 	}
 	cd0[0] = 0;
 	for (size_t i = 1; i < num_vertices+1; i ++) {
@@ -75,8 +77,8 @@ void ord_core() {
 		d0[i-1] = 0;
 	}
 	for (size_t i = 0; i < num_edges; i ++) {
-		adj0[cd0[edges[i].src] + d0[edges[i].src]++] = edges[i].dst;
-		adj0[cd0[edges[i].dst] + d0[edges[i].dst]++] = edges[i].src;
+		adj0[cd0[(*this)[i].src] + d0[(*this)[i].src]++] = (*this)[i].dst;
+		adj0[cd0[(*this)[i].dst] + d0[(*this)[i].dst]++] = (*this)[i].src;
 	}
 	bheap heap;
 	heap.mkheap(num_vertices, d0);
@@ -89,23 +91,52 @@ void ord_core() {
 		}
 	}
 }
-void RelabelEdges() {
+
+void EdgeList::relabel() {
 	std::cout << "Relabeling edges\n";
 	ord_core();
 	for (size_t i = 0; i < num_edges; i ++) {
-		int source = rank[edges[i].src];
-		int target = rank[edges[i].dst];
+		int source = rank[(*this)[i].src];
+		int target = rank[(*this)[i].dst];
 		if (source < target) {
 			int tmp = source;
 			source = target;
 			target = tmp;
 		}
-		edges[i].src = source;
-		edges[i].dst = target;
+		(*this)[i].src = source;
+		(*this)[i].dst = target;
 	}
-	//std::vector<ValueT> new_labels(num_vertices);
-	//for (int i = 0; i < num_vertices; i ++) new_labels[rank[i]] = labels[i];
-	//for (int i = 0; i < num_vertices; i ++) labels[i] = new_labels[i];
 }
-//*/
+
+unsigned EdgeList::generate_graph(Graph &g) {
+	relabel();
+	std::vector<IndexT> degrees(num_vertices, 0);
+	for (size_t i = 0; i < num_edges; i ++) {
+		degrees[(*this)[i].src]++;
+	}
+	std::vector<IndexT> offsets(num_vertices+1);
+	offsets[0] = 0;
+	unsigned max = 0;
+	for (size_t i = 1; i < num_vertices+1; i++) {
+		offsets[i] = offsets[i-1] + degrees[i-1];
+		max = (max > degrees[i-1]) ? max : degrees[i-1];
+		//degrees[i-1] = 0;
+	}
+	printf("core value (max truncated degree) = %u\n", max);
+	std::vector<std::vector<VertexId> > vertices(num_vertices);
+	for (size_t i = 0; i < num_edges; i++) {
+		vertices[(*this)[i].src].push_back((*this)[i].dst);
+	}
+	g.allocateFrom(num_vertices, num_edges);
+	g.constructNodes();
+	for (size_t v = 0; v < num_vertices; v++) {
+		auto row_begin = offsets[v];
+		auto row_end = offsets[v+1];
+		g.fixEndEdge(v, row_end);
+		for (auto offset = row_begin; offset < row_end; offset ++) {
+			g.constructEdge(offset, vertices[v][offset-row_begin], 0);
+		}
+	}
+	return max;
+}
 

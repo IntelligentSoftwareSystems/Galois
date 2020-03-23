@@ -61,6 +61,7 @@ template <typename ElementType,typename EmbeddingType,
 	bool is_single, bool use_ccode, bool shrink, bool use_formula>
 void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
 init_vertex(const VertexId vid) {
+	//std::cout << "Insert vertex: " <<  vid << "\n";
 	cur_level = 0;
 	sizes[0] = 1;
 	vid_lists[0][0] = vid;
@@ -76,13 +77,15 @@ init_vertex(const VertexId vid) {
 	size_t index = 0;
 	for (auto e : global_graph->edges(vid)) {
 		auto dst = global_graph->getEdgeDst(e);
-		labels[dst] = 1; // mark the neighbors of edge.src
-		set_vid(1, index, dst);
 		if (shrink) {
 			ids[dst] = index;
 			old_ids[index] = dst;
-			set_vid(1, index, index);
+			set_vid(1, index, index); // use local vertex ID
+			labels[index] = 1; // mark the neighbors of edge.src
 			shrink_graph.set_degree(1, index, 0);//new degrees
+		} else {
+			set_vid(1, index, dst); // use global vertex ID
+			labels[dst] = 1; // mark the neighbors of edge.src
 		}
 		index ++;
 	}
@@ -124,8 +127,8 @@ init_edge(const SEdge &edge) {
 	set_size(1, 1);
 
 	if (use_formula) {
-		wed_count = 0, tri_count = 0;
-		clique4_count = 0, cycle4_count = 0;
+		//wed_count = 0, tri_count = 0;
+		//clique4_count = 0, cycle4_count = 0;
 		for (int i = 0; i < npatterns; i++) local_counters[i] = 0;
 	}
 
@@ -168,15 +171,15 @@ init_edge(const SEdge &edge) {
 				auto dst = global_graph->getEdgeDst(e);
 				if (dst == edge.dst) continue;
 				if (!is_single) {
-					#ifndef MOTIF_ADHOC
+					//#ifndef MOTIF_ADHOC
 					if (labels[dst] == 2) labels[dst] = 3;
 					else labels[dst] = 1; // mark the neighbors of edge.src
-					#endif
+					//#endif
 				} else labels[dst] = 1; // mark the neighbors of edge.src
 			}
 		}
 	} // end shrink
-	
+/*	
 	#ifdef MOTIF_ADHOC
 	if (W_u.empty()) {
 		T_vu.resize(length+1); // hold the vertices that form a triangle with u and v
@@ -185,6 +188,7 @@ init_edge(const SEdge &edge) {
 		std::fill(W_u.begin(), W_u.end(), 0);
 	}
 	#endif
+//*/
 }
 
 // construct the subgraph induced by vertex src's neighbors
