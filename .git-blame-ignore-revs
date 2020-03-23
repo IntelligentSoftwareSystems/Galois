@@ -1,0 +1,18 @@
+# Bulk-change revisions to ignore in git blame
+#
+# Requires git v2.23
+#
+# To use:
+#
+#   git blame --ignore-revs-file .git-blame-ignore-revs
+#
+# or more permanently:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Run clang-format.
+02ecf4f4ea6ed8618a3826f98c3ea192ee38ca2d
+
+# Re-run clang-format.
+47ddbe14de2e61b87749cd20bd368f07ef3c322f
+
