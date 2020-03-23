@@ -154,7 +154,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
                     uint64_t degree = std::distance(graph.edge_begin(n, flag_write_lock),
                                                      graph.edge_end(n,  flag_write_lock));
                     //TODO: Can we make it infinity??
-                    int64_t local_target = -1;
+                    uint64_t local_target = UNASSIGNED;
                     std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
                     std::vector<uint64_t> counter; //Number of edges to each unique cluster
                     uint64_t num_unique_clusters = 1;
@@ -192,11 +192,11 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
                     local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
 
                     } else {
-                      local_target = -1;
+                      local_target = UNASSIGNED;
                     }
 
                     /* Update cluster info */
-                    if(local_target != n_data.curr_comm_ass && local_target != -1) {
+                    if(local_target != n_data.curr_comm_ass && local_target != UNASSIGNED) {
 
                       galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
                       galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
@@ -353,7 +353,7 @@ double algoLouvainWithoutLockingDoAll(Graph &graph, double lower, double thresho
                     uint64_t degree = std::distance(graph.edge_begin(n, flag_no_lock),
                                                      graph.edge_end(n,  flag_no_lock));
                     //TODO: Can we make it infinity??
-                    int64_t local_target = -1;
+                    uint64_t local_target = UNASSIGNED;
                     std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
                     std::vector<uint64_t> counter; //Number of edges to each unique cluster
                     uint64_t num_unique_clusters = 1;
@@ -393,11 +393,11 @@ double algoLouvainWithoutLockingDoAll(Graph &graph, double lower, double thresho
                     local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
 
                     } else {
-                      local_target = -1;
+                      local_target = UNASSIGNED;
                     }
 
                     /* Update cluster info */
-                    if(local_target != n_data.curr_comm_ass && local_target != -1) {
+                    if(local_target != n_data.curr_comm_ass && local_target != UNASSIGNED) {
 
                       galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
                       galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
@@ -517,7 +517,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
                   c_update[n].size = 0;
                   });
 
-  std::vector<GNode> local_target(graph.size(), -1);
+  std::vector<uint64_t> local_target(graph.size(), UNASSIGNED);
   galois::GAccumulator<uint32_t> syncRound;
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -565,11 +565,11 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
                     local_target[n] = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
 
                     } else {
-                      local_target[n] = -1;
+                      local_target[n] = UNASSIGNED;
                     }
 
                     /* Update cluster info */
-                    if(local_target[n] != n_data.curr_comm_ass && local_target[n] != -1) {
+                    if(local_target[n] != n_data.curr_comm_ass && local_target[n] != UNASSIGNED) {
 
                       galois::atomicAdd(c_update[local_target[n]].degree_wt, n_data.degree_wt);
                       galois::atomicAdd(c_update[local_target[n]].size, (uint64_t)1);
@@ -652,7 +652,7 @@ uint64_t coloringDistanceOne(Graph& graph) {
 
                     /* Grab lock on neighbours: Cautious operator */
                     for(auto ii = graph.edge_begin(n, flag_write_lock); ii != graph.edge_end(n, flag_write_lock); ++ii) {
-                      auto& dst_data = graph.getData(graph.getEdgeDst(ii), flag_write_lock); //TODO: Can we use read lock?
+                      graph.getData(graph.getEdgeDst(ii), flag_write_lock); //TODO: Can we use read lock?
                     }
 
                     int64_t max_color = -1;
@@ -795,7 +795,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
                         uint64_t degree = std::distance(graph.edge_begin(n, flag_no_lock),
                                                          graph.edge_end(n,  flag_no_lock));
                         //TODO: Can we make it infinity??
-                        int64_t local_target = -1;
+                        uint64_t local_target = UNASSIGNED;
                         std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
                         std::vector<uint64_t> counter; //Number of edges to each unique cluster
                         uint64_t num_unique_clusters = 1;
@@ -834,11 +834,11 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
                         local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
 
                         } else {
-                          local_target = -1;
+                          local_target = UNASSIGNED;
                         }
 
                         /* Update cluster info */
-                        if(local_target != n_data.curr_comm_ass && local_target != -1) {
+                        if(local_target != n_data.curr_comm_ass && local_target != UNASSIGNED) {
 
                           //galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
                           //galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
@@ -931,7 +931,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
   // Comment: Serial separation is better than do_all due to contention
   for(GNode n = 0; n < graph.size(); ++n) {
       auto n_data = graph.getData(n, flag_no_lock);
-      if(n_data.curr_comm_ass != -1)
+      if(n_data.curr_comm_ass != UNASSIGNED)
         cluster_bags[n_data.curr_comm_ass].push_back(n);
       //else galois::gPrint("ISOLATED NODE : ", n, "\n");
   }
@@ -953,7 +953,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                         GNode dst = graph.getEdgeDst(ii);
                         auto dst_data = graph.getData(dst, flag_no_lock);
                         //assert(dst_data.curr_comm_ass < INF_VAL);
-                        assert(dst_data.curr_comm_ass !=  -1);
+                        assert(dst_data.curr_comm_ass !=  UNASSIGNED);
                         auto stored_already = cluster_local_map.find(dst_data.curr_comm_ass); // Check if it already exists
                         if(stored_already != cluster_local_map.end()) {
                           edges_data[c][stored_already->second] += graph.getEdgeData(ii);
@@ -1014,7 +1014,6 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   Graph* graph_curr = &graph;
   Graph graph_next;
   uint32_t iter = 0;
-  bool non_color = false;
   uint64_t num_nodes_orig = clusters_orig.size();
   while(true){
     iter++;
@@ -1056,7 +1055,7 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
       galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
                     [&](GNode n) {
                       if(clusters_orig[n] > 0){
-                        assert(clusters_orig[n] < (*graph_curr).size());
+                        assert(clusters_orig[n] < graph_curr->size());
                         //galois::gPrint(clusters_orig[n],"\n");
                         clusters_orig[n] = (*graph_curr).getData(clusters_orig[n], flag_no_lock).curr_comm_ass;
                       }
