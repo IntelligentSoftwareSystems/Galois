@@ -26,12 +26,13 @@
  */
 
 constexpr static const uint64_t INF_VAL = std::numeric_limits<uint64_t>::max() / 2 - 1;
+constexpr static const uint64_t UNASSIGNED = std::numeric_limits<uint64_t>::max();
 
 constexpr galois::MethodFlag flag_no_lock = galois::MethodFlag::UNPROTECTED;
 constexpr galois::MethodFlag flag_read_lock = galois::MethodFlag::READ;
 constexpr galois::MethodFlag flag_write_lock = galois::MethodFlag::WRITE;
 
-typedef galois::LargeArray<int64_t> largeArray;
+typedef galois::LargeArray<uint64_t> largeArray;
 
 //Maintain community information
 struct Comm {
@@ -43,8 +44,8 @@ typedef galois::LargeArray<Comm> CommArray;
 
 //Graph Node information
 struct Node{
-  int64_t prev_comm_ass;
-  int64_t curr_comm_ass;
+  uint64_t prev_comm_ass;
+  uint64_t curr_comm_ass;
   uint64_t degree_wt;
   //uint64_t cluster_wt_internal;
   int64_t colorId;
@@ -55,8 +56,6 @@ using Graph =
     galois::graphs::LC_CSR_Graph<Node, EdgeTy>::with_no_lockable<false>::type::with_numa_alloc<true>::type;
 
 using GNode = Graph::GraphNode;
-
-
 
 void printGraphCharateristics(Graph& graph) {
 
@@ -83,7 +82,7 @@ uint64_t vertexFollowing(Graph& graph){
                                                      graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
                     if(degree == 0) {
                       isolatedNodes += 1;
-                      n_data.curr_comm_ass = -1;
+                      n_data.curr_comm_ass = UNASSIGNED;
                     } else {
                       if(degree == 1) {
                         //Check if the destination has degree greater than one
@@ -136,7 +135,7 @@ void sumClusterWeight(Graph& graph, CommArray& c_info) {
    */
   for(GNode n = 0; n < graph.size(); ++n) {
       auto &n_data = graph.getData(n);
-      if(n_data.curr_comm_ass >= 0)
+      if(n_data.curr_comm_ass != UNASSIGNED)
         c_info[n_data.curr_comm_ass].degree_wt += n_data.degree_wt;
     }
 }
@@ -243,7 +242,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 }
 
 
-double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, double& e_xx, double& a2_x, double& constant_for_second_term, std::vector<GNode>& local_target) {
+double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, double& e_xx, double& a2_x, double& constant_for_second_term, std::vector<uint64_t>& local_target) {
 
   /* Variables needed for Modularity calculation */
   double mod = -1;
@@ -416,7 +415,7 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
-    if(n_data.curr_comm_ass != -1) {
+    if(n_data.curr_comm_ass != UNASSIGNED) {
       assert(n_data.curr_comm_ass < graph.size());
       auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
      if(stored_already != cluster_local_map.end()){
@@ -438,7 +437,7 @@ uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
   uint64_t num_unique_clusters = 0;
 
   for (GNode n = 0; n < arr.size(); ++n){
-    if(arr[n] != -1) {
+    if(arr[n] != UNASSIGNED) {
       assert(arr[n] < arr.size());
       auto stored_already = cluster_local_map.find(arr[n]);
      if(stored_already != cluster_local_map.end()){
