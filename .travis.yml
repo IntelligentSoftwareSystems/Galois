@@ -226,7 +226,11 @@ matrix:
             - libopenmpi-dev
     - env:
         - CLANG_VER=9
-        - CXXFLAGS="-stdlib=libc++ -DBOOST_NO_AUTO_PTR"
+        # set -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR to avoid compiler errors in boost headers.
+        # This comes from using a boost built with libstdc++ with libc++. None of the APIs we
+        # use expose stdlib objects directly though, so the build still works in-spite of the
+        # different standard libraries and this is easier than getting a libc++ build of boost.
+        - CXXFLAGS="-stdlib=libc++ -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR"
       addons:
         apt:
           sources:
@@ -247,7 +251,9 @@ matrix:
     - env:
         - CLANG_VER=9
         - BUILD_TYPE=Debug
-        - CXXFLAGS="-stdlib=libc++ -DBOOST_NO_AUTO_PTR"
+        # -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR work around to avoid compiler errors
+        # when using libc++ and boost together. See above.
+        - CXXFLAGS="-stdlib=libc++ -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR"
       addons:
         apt:
           sources:
