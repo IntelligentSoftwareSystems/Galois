@@ -128,7 +128,6 @@ loadDGraph(std::vector<unsigned>& scaleFactor, bool loadProxyEdges,
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
 
   dGraphTimer.start();
-  typedef galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees> Graph;
   const auto& net = galois::runtime::getSystemNetworkInterface();
   Graph* loadedGraph = new galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>(inputFile,
                            net.ID, net.Num, loadProxyEdges, loadProxyEdges);

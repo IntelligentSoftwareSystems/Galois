@@ -323,14 +323,6 @@ public:
   equal_range(const key_type& __x) const {
     return std::make_pair(lower_bound(__x), upper_bound(__x));
   }
-
-  template <typename _K1, typename _T1, typename _C1, typename _A1>
-  friend bool operator==(const flat_map<_K1, _T1, _C1, _A1>&,
-                         const flat_map<_K1, _T1, _C1, _A1>&);
-
-  template <typename _K1, typename _T1, typename _C1, typename _A1>
-  friend bool operator<(const flat_map<_K1, _T1, _C1, _A1>&,
-                        const flat_map<_K1, _T1, _C1, _A1>&);
 };
 
 template <typename _Key, typename _Tp, typename _Compare, typename _Alloc>

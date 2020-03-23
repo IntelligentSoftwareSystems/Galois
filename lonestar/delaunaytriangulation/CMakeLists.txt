@@ -1,5 +1,5 @@
 if(CMAKE_COMPILER_IS_GNUCC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
+  add_compile_options(-ffast-math)
 endif()
 
 app(delaunaytriangulation DelaunayTriangulation.cpp Element.cpp)
