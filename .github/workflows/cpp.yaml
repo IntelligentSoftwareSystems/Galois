@@ -3,9 +3,6 @@ name: C/C++ CI
 on:
   push:
   pull_request:
-    types:
-    - created
-    - synchronize
 
 jobs:
   ###################################################################
