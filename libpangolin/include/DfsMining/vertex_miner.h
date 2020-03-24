@@ -5,10 +5,10 @@
 #include "embedding_list_dfs.h"
 
 template <typename API, bool enable_dag=false, bool is_single=true, 
-	bool use_ccode=true, bool shrink=false, bool use_pcode=false, 
+	bool use_ccode=true, bool use_local_graph=false, bool use_pcode=false, 
 	bool use_formula=false, bool edge_par=true, bool is_clique=true>
 class VertexMinerDFS : public Miner<SimpleElement,BaseEmbedding,enable_dag> {
-typedef EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula> EmbeddingListTy;
+typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,use_formula> EmbeddingListTy;
 typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 public:
 	VertexMinerDFS(unsigned max_sz, int nt, unsigned slevel = 1) : 
@@ -43,7 +43,7 @@ public:
 	}
 	void initialize(std::string pattern_filename) {
 		core = this->max_degree;
-		//if (edge_par || shrink) 
+		//if (edge_par || use_local_graph) 
 		init_edgelist();
 		init_emb_list();
 		if (is_single && !is_clique) {
@@ -60,7 +60,7 @@ public:
 	} 
 	void init_edgelist(bool symmetrize = false) {
 		edge_list.init(this->graph, enable_dag, symmetrize);
-		if (shrink) { // TODO: use constexpr
+		if (use_local_graph) { // TODO: use constexpr
 			// rebuild the graph to minimize the max_degree to save memory for the local graph
 			core = edge_list.generate_graph(this->graph);
 		}
@@ -89,7 +89,7 @@ public:
 			} else {
 				extend_multi(starting_level, *emb_list);
 			}
-			if (!shrink) emb_list->clear_labels(vid);
+			if (!use_local_graph) emb_list->clear_labels(vid);
 		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("VertexParallelSolver"));
 		//}, galois::chunk_size<1>(), galois::steal(), galois::no_conflicts(), galois::loopname("VertexParallelSolver"));
 		if (!is_single) motif_count();
@@ -113,8 +113,8 @@ public:
 							//ego_extend_sgl_auto(1, *emb_list);
 							//ego_extend_sgl_naive(1, *emb_list);
 						}
-						if (!shrink) emb_list->clear_labels(edge.src);
-						if (!shrink && !is_clique) emb_list->clear_labels(edge.dst);
+						if (!use_local_graph) emb_list->clear_labels(edge.src);
+						if (!use_local_graph && !is_clique) emb_list->clear_labels(edge.dst);
 					} else {
 						extend_single_naive(starting_level, *emb_list);
 					}
@@ -222,10 +222,10 @@ public:
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_label(dst, level+1);
 					emb_list.set_size(level+1, start+1);
-					if (shrink) emb_list.init_egonet_degree(level+1, dst);
+					if (use_local_graph) emb_list.init_egonet_degree(level+1, dst);
 				}
 			}
-			if (shrink) emb_list.update_egonet(level);
+			if (use_local_graph) emb_list.update_egonet(level);
 			extend_clique(level+1, emb_list);
 			emb_list.reset_labels(level);
 		}
