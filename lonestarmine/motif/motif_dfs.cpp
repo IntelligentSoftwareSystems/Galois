@@ -21,10 +21,10 @@ public:
 	}
 };
 
-class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, false> {
+class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, false, true, false> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<MyAPI, false, false, true, false, true, false>(ms, nt) {
+		VertexMinerDFS<MyAPI, false, false, true, false, true, false, true, false>(ms, nt) {
 		assert(k > 2);
 		set_num_patterns(num_patterns[k-3]);
 	}

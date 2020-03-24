@@ -204,6 +204,14 @@ public:
 		return eid;
 	}
 
+	void print_history() {
+		std::cout << "(";
+		for(unsigned i = 0; i < history.size() - 1; ++i)
+			std::cout << history[i] << ", ";
+		std::cout << history[history.size()-1];
+		std::cout << ")";
+	}
+
 protected:
 	bool allocated;
 	unsigned length;

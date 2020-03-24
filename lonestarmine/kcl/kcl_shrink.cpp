@@ -20,10 +20,10 @@ public:
 };
 #define EDGE_PAR 0
 #define START_LEVEL (EDGE_PAR+1)
-class AppMiner : public VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR> {
+class AppMiner : public VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR, true> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR>(ms, nt, START_LEVEL) {
+		VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR, true>(ms, nt, START_LEVEL) {
 		if (ms < START_LEVEL+2) {
 			std::cout << "k should be at least " << START_LEVEL+2 << "\n";
 			exit(1);

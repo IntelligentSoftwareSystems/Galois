@@ -160,7 +160,7 @@ init_edge(const SEdge &edge) {
 		if (max_level > 3) construct_local_graph_from_edge(edge);
 	} else { // use global graph
 		if (use_ccode) {
-			if (!is_single) {
+			if (!is_single || !is_clique) {
 				//std::cout << "initializing ccode for multi-pattern solver\n";
 				for (auto e : global_graph->edges(edge.dst)) {
 					auto dst = global_graph->getEdgeDst(e);
@@ -171,25 +171,13 @@ init_edge(const SEdge &edge) {
 			for (auto e : global_graph->edges(edge.src)) {
 				auto dst = global_graph->getEdgeDst(e);
 				if (dst == edge.dst) continue;
-				if (!is_single) {
-					//#ifndef MOTIF_ADHOC
+				if (!is_single || !is_clique) {
 					if (labels[dst] == 2) labels[dst] = 3;
 					else labels[dst] = 1; // mark the neighbors of edge.src
-					//#endif
 				} else labels[dst] = 1; // mark the neighbors of edge.src
 			}
 		}
 	} // end if use_local_graph 
-/*	
-	#ifdef MOTIF_ADHOC
-	if (W_u.empty()) {
-		T_vu.resize(length+1); // hold the vertices that form a triangle with u and v
-		W_u.resize(length+1); // hold the vertices that form a wedge with u and v
-		std::fill(T_vu.begin(), T_vu.end(), 0);
-		std::fill(W_u.begin(), W_u.end(), 0);
-	}
-	#endif
-//*/
 }
 
 // construct the subgraph induced by vertex src's neighbors
@@ -231,10 +219,10 @@ update_egonet(unsigned level) {
 	local_graph.set_cur_level(level+1);
 }
 
-template class EmbeddingList<true,  true, false, false, false>; // K-cliques
-template class EmbeddingList<true,  true, false, true,  false>; // K-cliques using local graph
-template class EmbeddingList<true,  true, true,  false, false>; // Subgraph Listing
-template class EmbeddingList<false, true, true,  false, false>; // Motif
-template class EmbeddingList<false, true, true,  false, true>;  // Motif using formula
+template class EmbeddingList<true,  true, false, false, false, true>;  // K-cliques
+template class EmbeddingList<true,  true, false, true,  false, true>;  // K-cliques using local graph
+template class EmbeddingList<true,  true, true,  false, false, false>; // Subgraph Listing
+template class EmbeddingList<false, true, true,  false, false, false>; // Motif
+template class EmbeddingList<false, true, true,  false, true,  false>; // Motif using formula
 //template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
 

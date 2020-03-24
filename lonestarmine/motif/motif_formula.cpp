@@ -48,10 +48,10 @@ public:
 	} 
 };
 
-class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, true> {
+class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, true, true, false> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<MyAPI, false, false, true, false, true, true>(ms, nt) {
+		VertexMinerDFS<MyAPI, false, false, true, false, true, true, true, false>(ms, nt) {
 		if (ms < 3 || ms > 4) {
 			std::cout << "Only 3 and 4-motif are supported for now\n";
 		}

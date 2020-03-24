@@ -8,7 +8,7 @@ template <typename API, bool enable_dag=false, bool is_single=true,
 	bool use_ccode=true, bool use_local_graph=false, bool use_pcode=false, 
 	bool do_local_counting=false, bool edge_par=true, bool is_clique=true>
 class VertexMinerDFS : public Miner<SimpleElement,BaseEmbedding,enable_dag> {
-typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,do_local_counting> EmbeddingListTy;
+typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,do_local_counting,is_clique> EmbeddingListTy;
 typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 public:
 	VertexMinerDFS(unsigned max_sz, int nt, unsigned slevel = 1) : 
@@ -52,7 +52,8 @@ public:
 				exit(1);
 			}
 			unsigned pid = this->read_pattern(pattern_filename);
-			set_input_pattern(pid); // TODO: read from file
+			std::cout << "pattern id = " << pid << "\n";
+			set_input_pattern(pid);
 		}
 	}
 	void set_input_pattern(unsigned pid) {
@@ -243,6 +244,7 @@ public:
 				unsigned previous_pid = 0, src_idx = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
+				//std::cout << "\t\t"; emb_list.print_history(); std::cout << "\n";
 				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 					if (!API::toExtend(level, element_id, NULL)) continue;
 					auto src = emb_list.get_history(element_id);
@@ -251,11 +253,13 @@ public:
 					for (auto e = begin; e < end; e ++) {
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
+						//std::cout << "\t\t\t pos=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 						if (API::toAdd(level, this->max_size, dst, element_id, 
 								ccode, emb_list.get_history_ptr())) {
 							unsigned pid = API::getPattern(level, this->max_size,
 								src, dst, ccode, previous_pid, src_idx, NULL);
-							if (is_single && pid == input_pid)
+							//std::cout << "\t\t\t\t pcode=" << previous_pid << ", pid=" << pid << "\n";
+							if (pid == input_pid)
 								API::reduction(accumulators[0]);
 						}
 					}
@@ -274,6 +278,7 @@ public:
 			unsigned previous_pid = 0;
 			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 			emb_list.set_size(level+1, 0);
+			//emb_list.print_history(); std::cout << "\n";
 			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 				if (!API::toExtend(level, element_id, NULL)) continue;
 				auto src = emb_list.get_history(element_id);
@@ -282,6 +287,7 @@ public:
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = this->graph.getEdgeDst(edge);
 					auto ccode = emb_list.get_label(dst);
+					//std::cout << "\t pos=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 					if (API::toAdd(level, this->max_size, dst, element_id, 
 							ccode, emb_list.get_history_ptr())) {
 						auto start = emb_list.size(level+1);
@@ -290,6 +296,7 @@ public:
 						emb_list.set_size(level+1, start+1);
 						unsigned pid = API::getPattern(level, this->max_size,
 								src, dst, ccode, previous_pid, element_id, NULL);
+						//std::cout << "\t level=" << level << ", pcode=" << previous_pid << ", pid=" << pid << "\n";
 						emb_list.set_pid(level+1, start, pid);
 						emb_list.set_src(level+1, start, element_id);
 					}
