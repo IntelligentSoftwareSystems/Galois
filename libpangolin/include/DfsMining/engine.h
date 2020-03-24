@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
 	miner.read_graph(filetype, filename);
 	Tinitial.stop();
 	ResourceManager rm;
-	miner.initialize();
+	miner.initialize(pattern_filename);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	miner.solver();

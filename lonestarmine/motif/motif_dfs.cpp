@@ -7,12 +7,11 @@ const char* url  = 0;
 int num_patterns[3] = {2, 6, 21};
 
 #include "DfsMining/vertex_miner_api.h"
-class MyAPI: public VertexMinerAPI<BaseEmbedding> {
-typedef EmbeddingList<SimpleElement, BaseEmbedding> MyEmbeddingList;
+class MyAPI: public VertexMinerAPI {
 public:
 	// customized pattern classification method
 	static inline unsigned getPattern(unsigned level, unsigned max_level, VertexId src, 
-		VertexId dst, BYTE ccode, unsigned pcode, BYTE src_idx, BaseEmbedding *emb) { 
+		VertexId dst, BYTE ccode, unsigned pcode, BYTE src_idx, const std::vector<VertexId> *emb) { 
 		if (level < 3) {
 			return get_pattern_id(level, dst, ccode, pcode, src_idx);
 		} else {
@@ -22,10 +21,10 @@ public:
 	}
 };
 
-class AppMiner : public VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, false, false, true, false, true, false> {
+class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, false> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, false, false, true, false, true, false>(ms, nt) {
+		VertexMinerDFS<MyAPI, false, false, true, false, true, false>(ms, nt) {
 		assert(k > 2);
 		set_num_patterns(num_patterns[k-3]);
 	}

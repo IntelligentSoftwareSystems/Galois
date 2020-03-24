@@ -12,11 +12,9 @@ static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
 static cll::opt<unsigned> num_trials("n", cll::desc("perform n trials (default value 1)"), cll::init(1));
 static cll::opt<unsigned> nblocks("b", cll::desc("edge blocking to b blocks (default value 1)"), cll::init(1));
-#ifdef USE_QUERY_GRAPH
-static cll::opt<std::string> query_graph_filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
-static cll::opt<std::string> preset_filename("pf", cll::desc("<filename: preset matching order>"), cll::init("default"));
+static cll::opt<std::string> pattern_filename("p", cll::desc("<pattern graph filename: unsymmetrized graph>"), cll::init(""));
+static cll::opt<std::string> morder_filename("mo", cll::desc("<filename: pre-defined matching order>"), cll::init(""));
 static cll::opt<unsigned> fv("fv", cll::desc("first vertex is special"), cll::init(0));
-#endif
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));

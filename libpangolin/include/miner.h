@@ -39,13 +39,55 @@ public:
 		*/
 		graph.degree_counting();
 		degrees = graph.degrees;
-		std::cout << "num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
+		std::cout << "Input graph: num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 		//util::print_graph(graph);
 		return max_degree;
+	}
+	unsigned read_pattern(std::string filename, std::string filetype="gr") {
+		unsigned max_deg = util::read_graph(pattern, filetype, filename, false);
+		auto nv = pattern.size();
+		auto ne = pattern.sizeEdges();
+		std::cout << "Pattern graph: num_vertices " << nv << " num_edges " << ne << "\n";
+		if (nv == 4) {
+			if (ne == 6) {
+				std::cout << "Input pattern: 4-clique, please use kcl\n";
+				exit(1);
+			} else if (ne == 5) { 
+				std::cout << "Input pattern: diamond\n";
+				return 4;
+			} else if (ne == 4) {
+				if (max_deg == 3) {
+					std::cout << "Input pattern: tailed-triangle\n";
+					return 3;
+				} else {
+					assert(max_deg == 2);
+					std::cout << "Input pattern: 4-cycle\n";
+					return 2;
+				}
+			} else if (ne == 3) {
+				if (max_deg == 3) {
+					std::cout << "Input pattern: 3-star\n";
+					return 1;
+				} else {
+					assert(max_deg == 2);
+					std::cout << "Input pattern: 4-path\n";
+					return 0;
+				}
+			} else {
+				std::cout << "Error: the unmber of edges is invalid\n";
+				exit(1);
+			}
+		} else if (nv == 5) {
+		} else {
+			std::cout << "pattern size currently not supported\n";
+			exit(1);
+		}
+		return 0;
 	}
 
 protected:
 	Graph graph;
+	Graph pattern;
 	unsigned max_size;
 	int num_threads;
 	unsigned max_degree;

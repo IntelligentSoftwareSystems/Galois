@@ -1,8 +1,7 @@
 #include "DfsMining/embedding_list_dfs.h"
 
-template <typename ElementType, typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns) {
 	global_graph = graph;
 	max_level = max_size;
@@ -30,7 +29,7 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns)
 		}
 	}
 
-	if (use_ccode) { // TODO: maybe useful for subgraph listing
+	if (use_pcode) { // TODO: maybe useful for subgraph listing
 		pid_lists.resize(max_level);
 		if (use_formula) {
 			for (unsigned i = 2; i < max_level; i ++)
@@ -57,9 +56,8 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns)
 	allocated = true;
 }
 
-template <typename ElementType,typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 init_vertex(const VertexId vid) {
 	//std::cout << "Insert vertex: " <<  vid << "\n";
 	cur_level = 0;
@@ -93,9 +91,8 @@ init_vertex(const VertexId vid) {
 	if (shrink) construct_local_graph_from_vertex(vid);
 }
 
-template <typename ElementType,typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 construct_local_graph_from_vertex(const VertexId vid) {
 	for (size_t i = 0; i < size(1); i ++) {
 		auto src = old_ids[i];
@@ -113,9 +110,8 @@ construct_local_graph_from_vertex(const VertexId vid) {
 	reset_ids(vid);
 }
 
-template <typename ElementType,typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 init_edge(const SEdge &edge) {
 	//std::cout << "Insert edge: " << edge.to_string() << "\n";
 	cur_level = 1;
@@ -192,9 +188,8 @@ init_edge(const SEdge &edge) {
 }
 
 // construct the subgraph induced by vertex src's neighbors
-template <typename ElementType,typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 construct_local_graph_from_edge(const SEdge &edge) {
 	for (size_t emb_id = 0; emb_id < size(2); emb_id ++) {
 		auto x = old_ids[emb_id];
@@ -211,9 +206,8 @@ construct_local_graph_from_edge(const SEdge &edge) {
 	reset_ids(edge.dst);
 }
 
-template <typename ElementType,typename EmbeddingType,
-	bool is_single, bool use_ccode, bool shrink, bool use_formula>
-void EmbeddingList<ElementType,EmbeddingType,is_single,use_ccode,shrink,use_formula>::
+template <bool is_single, bool use_ccode, bool use_pcode, bool shrink, bool use_formula>
+void EmbeddingList<is_single,use_ccode,use_pcode,shrink,use_formula>::
 update_egonet(unsigned level) {
 	for (size_t new_emb_id = 0; new_emb_id < size(level+1); new_emb_id ++) {
 		auto src = get_vertex(level+1, new_emb_id);
@@ -232,9 +226,10 @@ update_egonet(unsigned level) {
 	shrink_graph.set_cur_level(level+1);
 }
 
-template class EmbeddingList<SimpleElement, BaseEmbedding>; // KCL
-template class EmbeddingList<SimpleElement, BaseEmbedding, true, true, true, false>; // KCL shrink
-template class EmbeddingList<SimpleElement, BaseEmbedding, false>; // Motif
-template class EmbeddingList<SimpleElement, BaseEmbedding, false, true, false, true>; // Motif
-template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
+template class EmbeddingList<true,  true, false, false, false>; // K-cliques
+template class EmbeddingList<true,  true, false, true,  false>; // K-cliques using local graph (shrink)
+template class EmbeddingList<true,  true, true,  false, false>; // Subgraph Listing
+template class EmbeddingList<false, true, true,  false, false>; // Motif
+template class EmbeddingList<false, true, true,  false, true>;  // Motif using formula
+//template class EmbeddingList<SimpleElement, VertexEmbedding, false>; // Motif
 

@@ -8,25 +8,22 @@ const char* desc = "Counts the K-Cliques in a graph using DFS traversal with shr
 const char* url  = 0;
 
 #include "DfsMining/vertex_miner_api.h"
-class MyAPI: public VertexMinerAPI<BaseEmbedding> {
+class MyAPI: public VertexMinerAPI {
 public:
-	static inline bool toExtend(unsigned level, unsigned pos, BaseEmbedding *emb) {
+	static inline bool toExtend(unsigned level, unsigned pos, std::vector<VertexId> *emb) {
 		return pos == level;
 	}
 	static inline bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
-		//unsigned src_idx, BYTE ccode, BaseEmbedding *emb) {
 		unsigned src_idx, BYTE ccode, const std::vector<VertexId> *emb) { 
 		return level == max_level-2 || ccode == level; 
 	}
 };
 #define EDGE_PAR 0
 #define START_LEVEL (EDGE_PAR+1)
-class AppMiner : public VertexMinerDFS<SimpleElement, BaseEmbedding, 
-	MyAPI, true, true, true, true, false, false, EDGE_PAR> {
+class AppMiner : public VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, 
-			true, true, true, true, false, false, EDGE_PAR>(ms, nt, START_LEVEL) {
+		VertexMinerDFS<MyAPI, true, true, true, true, false, false, EDGE_PAR>(ms, nt, START_LEVEL) {
 		if (ms < START_LEVEL+2) {
 			std::cout << "k should be at least " << START_LEVEL+2 << "\n";
 			exit(1);

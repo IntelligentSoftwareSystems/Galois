@@ -5,9 +5,11 @@
 #include "base_embedding.h"
 #include "vertex_embedding.h"
 
-template <typename ElementType, typename EmbeddingType,
-	bool is_single=true, bool use_ccode=true, 
-	bool shrink=false, bool use_formula=false>
+template <bool is_single=true, 
+		bool use_ccode=true, 
+		bool use_pcode=false, 
+		bool shrink=false, 
+		bool use_formula=false>
 class EmbeddingList {
 using edge_iterator = typename Graph::edge_iterator;
 public:
@@ -134,6 +136,7 @@ public:
 		}
 	}
 	*/
+	/*
 	// TODO: this is expensive
 	inline void get_embedding(unsigned level, EmbeddingType &emb) {
 		for (unsigned l = 0; l < level+1; l ++) {
@@ -141,7 +144,6 @@ public:
 			emb.set_element(l, ele);
 		}
 	}
-	/*
 	inline void get_embedding(unsigned level, unsigned pos, EmbeddingType &emb) {
 		//std::cout << ", get_embedding: level = " << level << ", pos = " << pos;
 		for (unsigned l = 0; l < level+1; l ++) {

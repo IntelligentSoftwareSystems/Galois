@@ -9,10 +9,9 @@ const char* url  = 0;
 int num_patterns[3] = {2, 6, 21};
 
 #include "DfsMining/vertex_miner_api.h"
-class MyAPI: public VertexMinerAPI<BaseEmbedding> {
-typedef EmbeddingList<SimpleElement, BaseEmbedding> MyEmbeddingList;
+class MyAPI: public VertexMinerAPI {
 public:
-	static inline bool toExtend(unsigned level, unsigned v_idx, BaseEmbedding *emb) { 
+	static inline bool toExtend(unsigned level, unsigned v_idx, const std::vector<VertexId> *emb) { 
 		return v_idx == level; // only extend the last vertex
 	}
 	static inline bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
@@ -23,7 +22,7 @@ public:
 		return true;
 	}
 	static inline unsigned getPattern(unsigned level, unsigned max_level, VertexId src, 
-		VertexId dst, BYTE ccode, unsigned pcode, BYTE src_idx, BaseEmbedding *emb) { 
+		VertexId dst, BYTE ccode, unsigned pcode, BYTE src_idx, const std::vector<VertexId> *emb) { 
 		if (level == 1) { // for 3-motif 
 			if (ccode == 3) return 0; // triangle
 			else return 1; // wedge
@@ -49,10 +48,10 @@ public:
 	} 
 };
 
-class AppMiner : public VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, false, false, true, false, true, true> {
+class AppMiner : public VertexMinerDFS<MyAPI, false, false, true, false, true, true> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<SimpleElement, BaseEmbedding, MyAPI, false, false, true, false, true, true>(ms, nt) {
+		VertexMinerDFS<MyAPI, false, false, true, false, true, true>(ms, nt) {
 		if (ms < 3 || ms > 4) {
 			std::cout << "Only 3 and 4-motif are supported for now\n";
 		}
