@@ -1,4 +1,4 @@
-app(dist-graph-convert dist-graph-convert.cpp DISTSAFE)
+app(dist-graph-convert dist-graph-convert.cpp)
 add_library(dist-graph-convert-help STATIC dist-graph-convert-helpers.cpp)
 
 target_include_directories(dist-graph-convert-help PUBLIC
