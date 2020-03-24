@@ -374,7 +374,7 @@ function(add_test_scale type app)
 endfunction(add_test_scale)
 
 function(add_test_unit)
-  set(options DISTSAFE ADD_TARGET TARGET EXP_OPT)
+  set(options ADD_TARGET)
   set(oneValueArgs)
   set(multiValueArgs REQUIRES COMMAND_PREFIX)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -454,7 +454,6 @@ endfunction(linkApp)
 # TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
 function(app name)
-  set(options DISTSAFE EXP_OPT)
   set(oneValueArgs)
   set(multiValueArgs REQUIRES EXTLIBS)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})

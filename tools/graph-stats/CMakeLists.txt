@@ -1,1 +1,1 @@
-app(graph-stats)
+app(graph-stats graph-stats.cpp)

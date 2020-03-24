@@ -4,4 +4,3 @@ if(CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 add_test_scale(small barneshut -n 10000 -steps 1 -seed 0)
-#add_test_scale(web barneshut -n 100000 -steps 1 -seed 0)

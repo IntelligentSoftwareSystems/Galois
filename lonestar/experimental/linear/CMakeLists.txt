@@ -1,1 +1,1 @@
-app(linear)
+app(linear linear.cpp)
