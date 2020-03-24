@@ -140,10 +140,10 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 zlib eigen
+          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++ -DBOOST_NO_AUTO_PTR" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j2
           make test || :
