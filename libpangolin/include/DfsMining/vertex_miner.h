@@ -457,29 +457,21 @@ public:
 					emb_list.push_history(last_vid);
 					emb_list.update_labels(level, last_vid);
 				}
-				//EmbeddingTy emb(level+1);
-				//emb_list.get_embedding(level, emb);
-				//std::cout << "emb: " << emb << "\n";
 				unsigned previous_pid = 0, src_idx = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
 				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
-					if (!API::toExtend(level, element_id, NULL)) continue; // extend all
-					//auto src = emb.get_vertex(element_id);
+					if (!API::toExtend(level, element_id, NULL)) continue;
 					auto src = emb_list.get_history(element_id);
 					auto begin = this->graph.edge_begin(src);
 					auto end = this->graph.edge_end(src);
 					for (auto e = begin; e < end; e ++) {
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
-						//std::cout << "\t idx=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
-						//if (API::toAdd(level, this->max_size, dst, element_id, ccode, &emb)) {
-						if (API::toAdd(level, this->max_size, dst, element_id, ccode, emb_list.get_history_ptr())) {
-							unsigned pid = API::getPattern(level, this->max_size, src, dst,
-								ccode, previous_pid, src_idx, NULL);
-							//unsigned pid = find_pattern_id_dfs(
-							//	level, dst, emb_list, previous_pid, src_idx);
-							//std::cout << "\t\t pid = " << pid << "\n";
+						if (API::toAdd(level, this->max_size, dst, element_id, 
+								ccode, emb_list.get_history_ptr())) {
+							unsigned pid = API::getPattern(level, this->max_size,
+								src, dst, ccode, previous_pid, src_idx, NULL);
 							API::reduction(accumulators[pid]);
 						}
 					}
@@ -495,31 +487,25 @@ public:
 				emb_list.push_history(last_vid);
 				emb_list.update_labels(level, last_vid);
 			}
-			//EmbeddingTy emb(level+1);
-			//emb_list.get_embedding(level, emb);
-			//std::cout << "emb: " << emb << "\n";
 			unsigned previous_pid = 0;
 			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 			emb_list.set_size(level+1, 0);
 			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 				if (!API::toExtend(level, element_id, NULL)) continue;
-				//auto src = emb.get_vertex(element_id);
 				auto src = emb_list.get_history(element_id);
 				auto begin = this->graph.edge_begin(src);
 				auto end = this->graph.edge_end(src);
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = this->graph.getEdgeDst(edge);
 					auto ccode = emb_list.get_label(dst);
-					//if (API::toAdd(level, this->max_size, dst, element_id, ccode, &emb)) {
-					if (API::toAdd(level, this->max_size, dst, element_id, ccode, emb_list.get_history_ptr())) {
+					if (API::toAdd(level, this->max_size, dst, element_id, 
+							ccode, emb_list.get_history_ptr())) {
 						auto start = emb_list.size(level+1);
 						assert(start < this->max_degree);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_size(level+1, start+1);
-						unsigned pid = API::getPattern(level, this->max_size, src, dst,
-							ccode, previous_pid, element_id, NULL);
-						//unsigned pid = find_pattern_id_dfs(
-						//	level, dst, emb_list, previous_pid, element_id);
+						unsigned pid = API::getPattern(level, this->max_size,
+							src, dst, ccode, previous_pid, element_id, NULL);
 						emb_list.set_pid(level+1, start, pid);
 						emb_list.set_src(level+1, start, element_id);
 					}
