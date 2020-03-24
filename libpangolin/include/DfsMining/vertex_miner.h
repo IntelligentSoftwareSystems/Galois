@@ -6,9 +6,9 @@
 
 template <typename API, bool enable_dag=false, bool is_single=true, 
 	bool use_ccode=true, bool use_local_graph=false, bool use_pcode=false, 
-	bool use_formula=false, bool edge_par=true, bool is_clique=true>
+	bool do_local_counting=false, bool edge_par=true, bool is_clique=true>
 class VertexMinerDFS : public Miner<SimpleElement,BaseEmbedding,enable_dag> {
-typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,use_formula> EmbeddingListTy;
+typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,do_local_counting> EmbeddingListTy;
 typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 public:
 	VertexMinerDFS(unsigned max_sz, int nt, unsigned slevel = 1) : 
@@ -121,8 +121,8 @@ public:
 				}
 			} else {
 				emb_list->init_edge(edge);
-				if (use_formula) {
-					extend_multi_formula(1, *emb_list);
+				if (do_local_counting) {
+					extend_multi_local(1, *emb_list);
 					solve_motif_equations(*emb_list);
 					if (this->max_size > 3) {
 						emb_list->clear_labels(edge.dst);
@@ -494,7 +494,7 @@ public:
 		}
 	}
 
-	void extend_multi_formula(unsigned level, EmbeddingListTy &emb_list) {
+	void extend_multi_local(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
 				auto src = emb_list.get_vid(level, emb_id);
@@ -538,7 +538,7 @@ public:
 					//emb_list.set_label(dst, 3-pid);
 				}
 			}
-			extend_multi_formula(level+1, emb_list);
+			extend_multi_local(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
 	}
@@ -569,7 +569,7 @@ public:
 	}
 
 	void motif_count() {
-		if (use_formula) {
+		if (do_local_counting) {
 			if (accumulators.size() == 2) {
 				if (is_directed) {
 					total_3_tris = accumulators[0].reduce();
