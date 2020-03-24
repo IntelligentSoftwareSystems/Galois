@@ -8,8 +8,9 @@
 template <bool is_single=true, 
 		bool use_ccode=true, 
 		bool use_pcode=false, 
-		bool shrink=false, 
-		bool use_formula=false>
+		bool use_local_graph=false, 
+		bool do_local_counting=false,
+		bool is_clique=false>
 class EmbeddingList {
 using edge_iterator = typename Graph::edge_iterator;
 public:
@@ -161,16 +162,16 @@ public:
 
 	// egonet operations
 	void init_egonet_degree(unsigned level, VertexId dst) {
-		shrink_graph.set_degree(level, dst, 0);
+		local_graph.set_degree(level, dst, 0);
 	}
 	void update_egonet(unsigned level);
-	inline VertexId getEdgeDst(VertexId vid) const { return getEdgeDstImpl<shrink>(vid); }
-	inline EdgeId edge_begin(unsigned level, VertexId vid) { return edge_begin_impl<shrink>(level, vid); }
-	inline EdgeId edge_end(unsigned level, VertexId vid) { return edge_end_impl<shrink>(level, vid); }
+	inline VertexId getEdgeDst(VertexId vid) const { return getEdgeDstImpl<use_local_graph>(vid); }
+	inline EdgeId edge_begin(unsigned level, VertexId vid) { return edge_begin_impl<use_local_graph>(level, vid); }
+	inline EdgeId edge_end(unsigned level, VertexId vid) { return edge_end_impl<use_local_graph>(level, vid); }
 
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
 	inline VertexId getEdgeDstImpl(VertexId vid) const {
-		return shrink_graph.getEdgeDst(vid);
+		return local_graph.getEdgeDst(vid);
 	}
 
 	template <bool en, typename std::enable_if<!en>::type* = nullptr>
@@ -180,8 +181,8 @@ public:
 
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
 	inline EdgeId edge_begin_impl(unsigned level, VertexId vid) {
-		EdgeId eid = shrink_graph.edge_begin(vid);
-		//std::cout << "\t using shrink graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
+		EdgeId eid = local_graph.edge_begin(vid);
+		//std::cout << "\t using local graph, vertex_id=" << vid << ", begin eid=" << eid << "\n";
 		return eid;
 	}
 
@@ -194,7 +195,7 @@ public:
 
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
 	inline EdgeId edge_end_impl(unsigned level, VertexId vid) {
-		return shrink_graph.edge_begin(vid) + shrink_graph.get_degree(level, vid);
+		return local_graph.edge_begin(vid) + local_graph.get_degree(level, vid);
 	}
 
 	template <bool en, typename std::enable_if<!en>::type* = nullptr>
@@ -222,8 +223,8 @@ protected:
 	UintList old_ids;
 
 	Graph *global_graph; // original input graph
-	//Graph *local_graph;  // shrinking graph 
-	Egonet shrink_graph; // shrinking graph
+	//Graph *local_graph;  // local graph 
+	Egonet local_graph; // local graph
 
 	UintList T_vu;       // T_vu is an array containing all the third vertex of each triangle
 	UintList W_u;        // W_u is an array containing all the third vertex of each wedge

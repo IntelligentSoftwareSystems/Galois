@@ -3,7 +3,6 @@
 #include "embedding_list_dfs.h"
 
 // Sandslash APIs
-//template <bool use_formula=false>
 class VertexMinerAPI {
 public:
 	VertexMinerAPI() {}

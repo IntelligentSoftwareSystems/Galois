@@ -251,7 +251,8 @@ public:
 					for (auto e = begin; e < end; e ++) {
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
-						if (API::toAdd(level, this->max_size, dst, element_id, ccode, NULL)) {
+						if (API::toAdd(level, this->max_size, dst, element_id, 
+								ccode, emb_list.get_history_ptr())) {
 							unsigned pid = API::getPattern(level, this->max_size,
 								src, dst, ccode, previous_pid, src_idx, NULL);
 							if (is_single && pid == input_pid)
@@ -281,15 +282,14 @@ public:
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = this->graph.getEdgeDst(edge);
 					auto ccode = emb_list.get_label(dst);
-					if (API::toAdd(level, this->max_size, dst, element_id, ccode, NULL)) {
+					if (API::toAdd(level, this->max_size, dst, element_id, 
+							ccode, emb_list.get_history_ptr())) {
 						auto start = emb_list.size(level+1);
 						assert(start < this->max_degree);
 						emb_list.set_vid(level+1, start, dst);
 						emb_list.set_size(level+1, start+1);
 						unsigned pid = API::getPattern(level, this->max_size,
-								src, dst, ccode, previous_pid, 0, NULL);
-						//unsigned pid = find_pattern_id_dfs(
-						//	level, dst, emb_list, previous_pid, element_id);
+								src, dst, ccode, previous_pid, element_id, NULL);
 						emb_list.set_pid(level+1, start, pid);
 						emb_list.set_src(level+1, start, element_id);
 					}
@@ -505,9 +505,10 @@ public:
 				for (auto e = begin; e < end; e ++) {
 					auto dst = this->graph.getEdgeDst(e);
 					auto ccode = emb_list.get_label(dst);
-					if (API::toAdd(level, this->max_size, dst, level, ccode, emb_list.get_history_ptr())) {
-						unsigned pid = API::getPattern(level, this->max_size, src, dst,
-								ccode, previous_pid, level, NULL);
+					if (API::toAdd(level, this->max_size, dst, level, 
+							ccode, emb_list.get_history_ptr())) {
+						unsigned pid = API::getPattern(level, this->max_size, 
+							src, dst, ccode, previous_pid, level, NULL);
 						API::local_reduction(level, pid, emb_list.local_counters[pid]);
 					}
 				}
@@ -527,15 +528,15 @@ public:
 			for (auto e = begin; e < end; e ++) {
 				auto dst = this->graph.getEdgeDst(e);
 				auto ccode = emb_list.get_label(dst);
-				if (API::toAdd(level, this->max_size, dst, level, ccode, emb_list.get_history_ptr())) {
+				if (API::toAdd(level, this->max_size, dst, level, 
+						ccode, emb_list.get_history_ptr())) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_size(level+1, start+1);
-					unsigned pid = API::getPattern(level, this->max_size, src, dst,
-							ccode, previous_pid, level, NULL);
+					unsigned pid = API::getPattern(level, this->max_size,
+							src, dst, ccode, previous_pid, level, NULL);
 					emb_list.set_pid(level+1, start, pid);
 					API::local_reduction(level, pid, emb_list.local_counters[pid]);
-					//emb_list.set_label(dst, 3-pid);
 				}
 			}
 			extend_multi_local(level+1, emb_list);
