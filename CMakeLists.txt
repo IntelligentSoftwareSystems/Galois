@@ -373,10 +373,6 @@ endif()
 
 ###### Global Functions ######
 
-function(add_internal_library name)
-  add_library(${name} OBJECT ${ARGN})
-endfunction()
-
 function(add_test_scale type app)
   if(NUM_TEST_THREADS)
     set(N ${NUM_TEST_THREADS})
@@ -400,6 +396,56 @@ function(add_test_scale type app)
     endforeach(part)
   endif()
 endfunction(add_test_scale)
+
+function(add_test_unit)
+  set(options DISTSAFE ADD_TARGET TARGET EXP_OPT)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES COMMAND_PREFIX)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  list(GET APP_UNPARSED_ARGUMENTS 0 name)
+  list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
+
+  foreach(required ${APP_REQUIRES})
+    if(${${required}} MATCHES "TRUE")
+    else()
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+  set(commandline)
+  foreach(f ${APP_COMMAND_PREFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+
+  if(${APP_ADD_TARGET})
+    add_executable(test-${name} ${name}.cpp)
+    linkApp(test-${name} "")
+
+    list(APPEND commandline "$<TARGET_FILE:test-${name}>")
+  elseif(${APP_TARGET})
+    get_filename_component(base ${name} NAME)
+    if(TARGET ${base})
+      list(APPEND commandline "$<TARGET_FILE:${base}>")
+    else()
+      message(STATUS "NOT adding test ${name} (missing target: ${base})")
+      return()
+    endif()
+  else()
+    list(APPEND commandline ${name})
+  endif()
+
+  foreach(f ${APP_UNPARSED_ARGUMENTS})
+    list(APPEND commandline ${f})
+  endforeach()
+
+  add_test(NAME ${name} COMMAND ${commandline})
+
+  # Allow parallel tests
+  set_tests_properties(${name} PROPERTIES ENVIRONMENT
+    GALOIS_DO_NOT_BIND_THREADS=1)
+endfunction()
 
 function(compileApp name)
   if(ARGN)
@@ -452,56 +498,6 @@ function(app name)
     install(TARGETS ${name} DESTINATION bin)
   endif()
 endfunction(app)
-
-function(makeTest)
-  set(options DISTSAFE ADD_TARGET TARGET EXP_OPT)
-  set(oneValueArgs)
-  set(multiValueArgs REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-  list(GET APP_UNPARSED_ARGUMENTS 0 name)
-  list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
-
-  foreach(required ${APP_REQUIRES})
-    if(${${required}} MATCHES "TRUE")
-    else()
-      message(STATUS "NOT compiling ${name} (missing: ${required})")
-      return()
-    endif()
-  endforeach()
-
-  set(commandline)
-  foreach(f ${APP_COMMAND_PREFIX})
-    list(APPEND commandline ${f})
-  endforeach()
-
-  if(${APP_ADD_TARGET})
-    add_executable(test-${name} ${name}.cpp)
-    linkApp(test-${name} "")
-
-    list(APPEND commandline "$<TARGET_FILE:test-${name}>")
-  elseif(${APP_TARGET})
-    get_filename_component(base ${name} NAME)
-    if(TARGET ${base})
-      list(APPEND commandline "$<TARGET_FILE:${base}>")
-    else()
-      message(STATUS "NOT adding test ${name} (missing target: ${base})")
-      return()
-    endif()
-  else()
-    list(APPEND commandline ${name})
-  endif()
-
-  foreach(f ${APP_UNPARSED_ARGUMENTS})
-    list(APPEND commandline ${f})
-  endforeach()
-
-  add_test(NAME ${name} COMMAND ${commandline})
-
-  # Allow parallel tests
-  set_tests_properties(${name} PROPERTIES ENVIRONMENT
-    GALOIS_DO_NOT_BIND_THREADS=1)
-endfunction()
 
 ###### Source finding ######
 #include_directories(include)
