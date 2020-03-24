@@ -1,3 +1,4 @@
+#pragma once
 
 typedef struct {
 	unsigned key;
@@ -10,10 +11,10 @@ public:
 	unsigned n;	// number of nodes.
 	unsigned *pt;	// pointers to nodes.
 	keyvalue *kv; // nodes.
-	bheap() {}
+	bheap() { pt = NULL; kv = NULL; }
 	~bheap() {
-		free(pt);
-		free(kv);
+		if (pt) free(pt);
+		if (kv) free(kv);
 	}
 	void construct(size_t n_max) {
 		n_max = n_max;
@@ -76,7 +77,7 @@ public:
 		return min;
 	}
 	//Building the heap structure with (key,value)=(node,degree) for each node
-	void mkheap(size_t n, std::vector<IndexT> v) {
+	void mkheap(size_t n, std::vector<VertexId> v) {
 		construct(n);
 		for (size_t i = 0; i < n; i ++) {
 			keyvalue item;

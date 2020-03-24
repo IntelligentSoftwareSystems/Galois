@@ -64,38 +64,60 @@ unsigned EdgeList::get_core() {
 void EdgeList::ord_core() {
 	std::cout << "Computing vertex rank using core value\n";
 	rank.resize(num_vertices);
-	std::vector<IndexT> d0(num_vertices, 0);
+	std::vector<VertexId> d0(num_vertices, 0);
+	//for (size_t i = 0; i < num_edges; i ++) {
+	galois::do_all(galois::iterate((size_t)0, num_edges), [&](const auto& i) {
+		//d0[(*this)[i].src]++;
+		//d0[(*this)[i].dst]++;
+		__sync_fetch_and_add(&d0[(*this)[i].src], 1);
+		__sync_fetch_and_add(&d0[(*this)[i].dst], 1);
+	//}
+	}, galois::chunk_size<256>(), galois::loopname("DegreesForCoreOrder"));
+	/*
 	std::vector<IndexT> cd0(num_vertices+1);
-	std::vector<IndexT> adj0(2*num_edges);
-	for (size_t i = 0; i < num_edges; i ++) {
-		d0[(*this)[i].src]++;
-		d0[(*this)[i].dst]++;
-	}
 	cd0[0] = 0;
 	for (size_t i = 1; i < num_vertices+1; i ++) {
 		cd0[i] = cd0[i-1] + d0[i-1];
 		d0[i-1] = 0;
 	}
-	for (size_t i = 0; i < num_edges; i ++) {
-		adj0[cd0[(*this)[i].src] + d0[(*this)[i].src]++] = (*this)[i].dst;
-		adj0[cd0[(*this)[i].dst] + d0[(*this)[i].dst]++] = (*this)[i].src;
-	}
+	*/
+	std::vector<VertexId> cd0 = parallel_prefix_sum<VertexId,VertexId>(d0);
+	std::fill(d0.begin(), d0.end(), 0);
+
+	galois::gstl::Vector<VertexId> adj0(2*num_edges); // TODO: use 64-bit for GSH
+	//for (size_t i = 0; i < num_edges; i ++) {
+	//	adj0[cd0[(*this)[i].src] + d0[(*this)[i].src]++] = (*this)[i].dst;
+	//	adj0[cd0[(*this)[i].dst] + d0[(*this)[i].dst]++] = (*this)[i].src;
+	//}
+	galois::do_all(galois::iterate((size_t)0, num_edges), [&](const auto& i) {
+		VertexId u = (*this)[i].src;
+		VertexId v = (*this)[i].dst;
+		VertexId u_idx = __sync_fetch_and_add(&d0[u], 1);
+		VertexId v_idx = __sync_fetch_and_add(&d0[v], 1);
+		adj0[cd0[u] + u_idx] = v;
+		adj0[cd0[v] + v_idx] = u;
+	}, galois::chunk_size<256>(), galois::loopname("ConstructAdjForCoreOrder"));
+	
+	galois::StatTimer Theap("HeapGen");
+	Theap.start();
 	bheap heap;
 	heap.mkheap(num_vertices, d0);
+	d0.clear();
 	size_t r = 0;
 	for (size_t i = 0; i < num_vertices; i ++) {
 		keyvalue kv = heap.popmin();
 		rank[kv.key] = num_vertices - (++r);
-		for (IndexT j = cd0[kv.key]; j < cd0[kv.key + 1]; j ++) {
+		for (auto j = cd0[kv.key]; j < cd0[kv.key + 1]; j ++) {
 			heap.update(adj0[j]);
 		}
 	}
+	Theap.stop();
 }
 
 void EdgeList::relabel() {
 	std::cout << "Relabeling edges\n";
-	ord_core();
-	for (size_t i = 0; i < num_edges; i ++) {
+	//for (size_t i = 0; i < num_edges; i ++) {
+	galois::do_all(galois::iterate((size_t)0, num_edges), [&](const auto& i) {
 		int source = rank[(*this)[i].src];
 		int target = rank[(*this)[i].dst];
 		if (source < target) {
@@ -105,38 +127,65 @@ void EdgeList::relabel() {
 		}
 		(*this)[i].src = source;
 		(*this)[i].dst = target;
-	}
+	//}
+	}, galois::chunk_size<256>(), galois::loopname("RelabelEdge"));
 }
 
 unsigned EdgeList::generate_graph(Graph &g) {
+	galois::StatTimer Tadj("RegenerateGraphWithCoreOrdering");
+	Tadj.start();
+	galois::StatTimer Tcore("OrderingCore");
+	Tcore.start();
+	ord_core();
+	Tcore.stop();
 	relabel();
-	std::vector<IndexT> degrees(num_vertices, 0);
-	for (size_t i = 0; i < num_edges; i ++) {
-		degrees[(*this)[i].src]++;
-	}
+	rank.clear();
+	std::vector<unsigned> degrees(num_vertices, 0);
+	//for (size_t i = 0; i < num_edges; i ++) {
+	galois::do_all(galois::iterate((size_t)0, num_edges), [&](const auto& i) {
+		//degrees[(*this)[i].src]++;
+		__sync_fetch_and_add(&degrees[(*this)[i].src], 1);
+	//}
+	}, galois::chunk_size<256>(), galois::loopname("ComputeDegreesFromEdgelist"));
+	/*
 	std::vector<IndexT> offsets(num_vertices+1);
 	offsets[0] = 0;
 	unsigned max = 0;
 	for (size_t i = 1; i < num_vertices+1; i++) {
 		offsets[i] = offsets[i-1] + degrees[i-1];
 		max = (max > degrees[i-1]) ? max : degrees[i-1];
-		//degrees[i-1] = 0;
 	}
+	*/
+	//std::vector<IndexT> offsets = PrefixSum(degrees);
+	std::vector<VertexId> offsets = parallel_prefix_sum<VertexId,VertexId>(degrees);
+	unsigned max = *(std::max_element(degrees.begin(), degrees.end()));
 	printf("core value (max truncated degree) = %u\n", max);
-	std::vector<std::vector<VertexId> > vertices(num_vertices);
-	for (size_t i = 0; i < num_edges; i++) {
-		vertices[(*this)[i].src].push_back((*this)[i].dst);
-	}
+	std::vector<galois::gstl::Vector<VertexId> > vertices(num_vertices);
+	galois::do_all(galois::iterate((size_t)0, num_vertices), [&](const auto& v) {
+		vertices[v].resize(degrees[v]);
+		degrees[v] = 0;
+	}, galois::chunk_size<256>(), galois::loopname("AdjResize"));
+	//for (size_t i = 0; i < num_edges; i++) {
+	galois::do_all(galois::iterate((size_t)0, num_edges), [&](const auto& i) {
+		//vertices[(*this)[i].src].push_back((*this)[i].dst);
+		VertexId v = (*this)[i].src;
+		unsigned idx = __sync_fetch_and_add(&degrees[v], 1);
+		vertices[v][idx] = (*this)[i].dst;
+	}, galois::chunk_size<256>(), galois::loopname("ConstructAdj"));
+	//}
 	g.allocateFrom(num_vertices, num_edges);
 	g.constructNodes();
-	for (size_t v = 0; v < num_vertices; v++) {
+	//for (size_t v = 0; v < num_vertices; v++) {
+	galois::do_all(galois::iterate((size_t)0, num_vertices), [&](const auto& v) {
 		auto row_begin = offsets[v];
 		auto row_end = offsets[v+1];
 		g.fixEndEdge(v, row_end);
 		for (auto offset = row_begin; offset < row_end; offset ++) {
 			g.constructEdge(offset, vertices[v][offset-row_begin], 0);
 		}
-	}
+	//}
+	}, galois::chunk_size<256>(), galois::loopname("RegenerateGraph"));
+	Tadj.stop();
 	return max;
 }
 

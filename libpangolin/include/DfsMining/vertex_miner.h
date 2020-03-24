@@ -50,7 +50,8 @@ public:
 	void init_edgelist(bool symmetrize = false) {
 		edge_list.init(this->graph, enable_dag, symmetrize);
 		if (shrink) { // TODO: use constexpr
-			core = edge_list.generate_graph(this->graph); // rebuild the graph to minimize the max_degree to save memory for the egonet
+			// rebuild the graph to minimize the max_degree to save memory for the local graph
+			core = edge_list.generate_graph(this->graph);
 			//core = edge_list.get_core();
 		}
 	}
@@ -80,6 +81,7 @@ public:
 			}
 			if (!shrink) emb_list->clear_labels(vid);
 		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("VertexParallelSolver"));
+		//}, galois::chunk_size<1>(), galois::steal(), galois::no_conflicts(), galois::loopname("VertexParallelSolver"));
 		if (!is_single) motif_count();
 	}
 
