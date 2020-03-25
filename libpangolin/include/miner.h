@@ -56,11 +56,11 @@ public:
 				std::cout << "Input pattern: diamond\n";
 				return 4;
 			} else if (ne == 4) {
-				if (max_deg == 3) {
+				if (max_deg == 2) {
 					std::cout << "Input pattern: tailed-triangle\n";
 					return 3;
 				} else {
-					assert(max_deg == 2);
+					//assert(max_deg == 1);
 					std::cout << "Input pattern: 4-cycle\n";
 					return 2;
 				}
@@ -69,7 +69,7 @@ public:
 					std::cout << "Input pattern: 3-star\n";
 					return 1;
 				} else {
-					assert(max_deg == 2);
+					//assert(max_deg == 2);
 					std::cout << "Input pattern: 4-path\n";
 					return 0;
 				}

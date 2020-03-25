@@ -111,7 +111,7 @@ public:
 							extend_clique(starting_level, *emb_list);
 						} else {
 							extend_single(starting_level, *emb_list);
-							//ego_extend_sgl_auto(1, *emb_list);
+							//extend_single_nc(starting_level, *emb_list);
 							//ego_extend_sgl_naive(1, *emb_list);
 						}
 						if (!use_local_graph) emb_list->clear_labels(edge.src);
@@ -244,7 +244,6 @@ public:
 				unsigned previous_pid = 0, src_idx = 0;
 				if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 				if (level > 1) src_idx = emb_list.get_src(level, emb_id);
-				//std::cout << "\t\t"; emb_list.print_history(); std::cout << "\n";
 				for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 					if (!API::toExtend(level, element_id, NULL)) continue;
 					auto src = emb_list.get_history(element_id);
@@ -253,7 +252,6 @@ public:
 					for (auto e = begin; e < end; e ++) {
 						auto dst = this->graph.getEdgeDst(e);
 						auto ccode = emb_list.get_label(dst);
-						//std::cout << "\t\t\t pos=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 						if (API::toAdd(level, this->max_size, dst, element_id, 
 								ccode, emb_list.get_history_ptr())) {
 							unsigned pid = API::getPattern(level, this->max_size,
@@ -278,7 +276,6 @@ public:
 			unsigned previous_pid = 0;
 			if (level > 1) previous_pid = emb_list.get_pid(level, emb_id);
 			emb_list.set_size(level+1, 0);
-			//emb_list.print_history(); std::cout << "\n";
 			for (unsigned element_id = 0; element_id < level+1; ++ element_id) {
 				if (!API::toExtend(level, element_id, NULL)) continue;
 				auto src = emb_list.get_history(element_id);
@@ -287,7 +284,6 @@ public:
 				for (auto edge = begin; edge < end; edge ++) {
 					auto dst = this->graph.getEdgeDst(edge);
 					auto ccode = emb_list.get_label(dst);
-					//std::cout << "\t pos=" << element_id << ", src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 					if (API::toAdd(level, this->max_size, dst, element_id, 
 							ccode, emb_list.get_history_ptr())) {
 						auto start = emb_list.size(level+1);
@@ -306,8 +302,8 @@ public:
 			if (level > 1) emb_list.pop_history();
 		}
 	}
-	/*
-	void ego_extend_sgl_auto(unsigned level, EmbeddingListTy &emb_list) {
+	
+	void extend_single_nc(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
 				unsigned last_vid = 0;
@@ -316,24 +312,25 @@ public:
 					emb_list.push_history(last_vid);
 					emb_list.update_labels(level, last_vid);
 				}
+				//std::cout << "\t\t"; emb_list.print_history(); std::cout << "\n";
 				auto src = emb_list.get_history(level);
-				#ifdef DIAMOND
-				for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
-					auto dst = emb_list.get_vertex(level, emb_id);
-					if (dst != src && emb_list.get_label(dst) == 3)
-						accumulators[0] += 1;
-				}
-				#else
+				//#ifdef DIAMOND
+				//for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
+				//	auto dst = emb_list.get_vertex(level, emb_id);
+				//#else
 				auto begin = this->graph.edge_begin(src);
 				auto end = this->graph.edge_end(src);
 				for (auto e = begin; e < end; e ++) {
 					auto dst = this->graph.getEdgeDst(e);
-					if (dst == emb_list.get_history(0) || dst == emb_list.get_history(1)) continue;
-					//if (level > 1 && dst == emb_list.get_history(2)) continue;
-					if (emb_list.get_label(dst) == 4) // tailed_triangle
-						accumulators[0] += 1;
+				//#endif
+					auto ccode = emb_list.get_label(dst);
+					//std::cout << "\t\t\t src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+					if (API::toAdd(level, this->max_size, dst, level, 
+						ccode, emb_list.get_history_ptr())) {
+						//std::cout << "\t\t\t\t found\n";
+						API::reduction(accumulators[0]);
+					}
 				}
-				#endif
 				if (level > 1) emb_list.resume_labels(level, last_vid);
 				if (level > 1) emb_list.pop_history();
 			}
@@ -346,26 +343,26 @@ public:
 				emb_list.update_labels(level, last_vid);
 			}
 			emb_list.set_size(level+1, 0);
+			//emb_list.print_history(); std::cout << "\n";
 			auto src = emb_list.get_history(level);
 			auto begin = this->graph.edge_begin(src);
 			auto end = this->graph.edge_end(src);
 			for (auto edge = begin; edge < end; edge ++) {
 				auto dst = this->graph.getEdgeDst(edge);
-				//#ifdef DIAMOND
-				if (emb_list.get_label(dst) == 3) { // triangles
-				//#else // cycle
-				//if (emb_list.get_label(dst) != 3) { // wedges
-				//#endif
+				auto ccode = emb_list.get_label(dst);
+				//std::cout << "\t src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+				if (API::toAdd(level, this->max_size, dst, level, 
+						ccode, emb_list.get_history_ptr())) {
 					auto start = emb_list.size(level+1);
 					emb_list.set_vid(level+1, start, dst);
 					emb_list.set_size(level+1, start+1);
 				}
 			}
-			ego_extend_sgl_auto(level+1, emb_list);
+			extend_single_nc(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
 	}
-
+	/*
 	void ego_extend_sgl_naive(unsigned level, EmbeddingListTy &emb_list) {
 		if (level == this->max_size-2) {
 			for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id++) {
