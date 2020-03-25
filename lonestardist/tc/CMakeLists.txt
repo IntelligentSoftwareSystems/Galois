@@ -1,2 +1,1 @@
-distApp(tc)
-#distAppNoGPU(cvc_tc)
+app_dist(tc)

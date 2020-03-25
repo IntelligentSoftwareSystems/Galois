@@ -360,15 +360,6 @@ else()
   MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
 
-###### Test Outputs ######
-if(EXISTS /net/ohm/export/iss/dist-outputs)
-  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
-elseif(EXISTS /net/ohm/export/cdgc/dist-outputs)
-  set(BASEOUTPUT /net/ohm/export/cdgc/dist-outputs)
-elseif(EXISTS /workspace/dist-outputs)
-  set(BASEOUTPUT /workspace/dist-outputs)
-endif()
-
 ###### Global Functions ######
 
 function(add_test_scale type app)
@@ -467,9 +458,10 @@ endfunction(linkApp)
 # TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
 function(app name)
-  set(oneValueArgs)
-  set(multiValueArgs REQUIRES EXTLIBS)
-  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  set(options)
+  set(one_value_args)
+  set(multi_value_args REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
