@@ -80,10 +80,10 @@ function(add_test_dist_and_verify app input type part N np)
   set(OUTPUT ${BASEOUTPUT}/${input}.${app_id})
 
   if (EXISTS ${OUTPUT})
-    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
+    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
     add_test(verify-${app}-${type}-${input}-${part}-${np} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${OUTPUT} output_${HOSTNAME}_*.log)
   else()
-    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
+    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
   endif()
 
   if (${X_GPU})
