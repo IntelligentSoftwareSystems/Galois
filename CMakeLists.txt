@@ -106,8 +106,8 @@ add_compile_options(-g -Wall -Wextra -Werror)
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 5.2)
-    message(FATAL_ERROR "GCC must be 5.2 or higher")
+  if(GCC_VERSION VERSION_LESS 9.0)
+    message(FATAL_ERROR "GCC must be 9.0 or higher")
   endif()
 
   # Avoid warnings from boost::counting_iterator
