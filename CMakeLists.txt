@@ -356,16 +356,14 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
-if(GRAPH_LOCATION AND EXISTS "${GRAPH_LOCATION}")
-  MESSAGE(STATUS "USING graph location ${GRAPH_LOCATION}")
+
+if(GRAPH_LOCATION)
+  MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}")
-elseif(EXISTS /net/ohm/export/iss/inputs)
-  set(BASEINPUT /net/ohm/export/iss/inputs)
-  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
-  MESSAGE(STATUS "use make input to download inputs in the build directory")
+  MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 
 ###### Global Functions ######
