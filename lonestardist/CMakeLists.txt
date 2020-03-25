@@ -69,7 +69,7 @@ set(RESULT_CHECKER ${CMAKE_SOURCE_DIR}/scripts/result_checker.py)
 cmake_host_system_information(RESULT HOSTNAME QUERY HOSTNAME)
 
 function(add_test_dist_and_verify app input type part N np)
-  set(options GPU)
+  set(options GPU NOT_QUICK)
   set(one_value_args)
   set(multi_value_args)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
@@ -86,10 +86,13 @@ function(add_test_dist_and_verify app input type part N np)
     add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
   endif()
 
-  if (NOT ${X_GPU})
-    set_tests_properties(run-${app}-${type}-${input}-${part}-${np} PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1)
-  else()
+  if (${X_GPU})
     set_tests_properties(run-${app}-${type}-${input}-${part}-${np} PROPERTIES RUN_SERIAL true)
+  endif()
+
+  if (NOT ${X_NOT_QUICK})
+    set_tests_properties(run-${app}-${type}-${input}-${part}-${np}
+      PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
   endif()
 endfunction()
 
