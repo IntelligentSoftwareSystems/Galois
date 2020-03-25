@@ -90,7 +90,8 @@ endif()
 
 ###### Configure (users don't need to go beyond here) ######
 
-enable_testing()
+# Enable testing and ctest integration
+include(CTest)
 
 ###### Configure compiler ######
 
@@ -344,6 +345,11 @@ endif()
 ###### Global Functions ######
 
 function(add_test_scale type app)
+  set(options NOT_QUICK)
+  set(one_value_args)
+  set(multi_value_args REQUIRES COMMAND_PREFIX)
+  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
   set(threads)
   set(thr 1)
   while (${thr} LESS ${NUM_TEST_THREADS})
@@ -355,20 +361,27 @@ function(add_test_scale type app)
   endif()
 
   foreach (thr ${threads})
-    add_test(test-${type}-${app}-${thr} ${app} ${ARGN} -t ${thr})
+    set(name run-${type}-${app}-${thr})
+    add_test(NAME ${name} COMMAND ${app} ${X_UNPARSED_ARGUMENTS} -t ${thr})
+    if (NOT ${X_NOT_QUICK})
+      # Allow parallel tests
+      set_tests_properties(${name}
+        PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
+    endif()
   endforeach()
 endfunction(add_test_scale)
 
 function(add_test_unit)
-  set(options ADD_TARGET)
-  set(oneValueArgs)
-  set(multiValueArgs REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  set(options)
+  set(one_value_args ADD_TARGET)
+  set(multi_value_args REQUIRES COMMAND_PREFIX)
+  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
-  list(GET APP_UNPARSED_ARGUMENTS 0 name)
-  list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
+  if(NOT ${APP_ADD_TARGET})
+    message(FATAL_ERROR "Missing required option ADD_TARGET to add_test_unit")
+  endif()
 
-  foreach(required ${APP_REQUIRES})
+  foreach(required ${X_REQUIRES})
     if(${${required}} MATCHES "TRUE")
     else()
       message(STATUS "NOT compiling ${name} (missing: ${required})")
@@ -376,42 +389,30 @@ function(add_test_unit)
     endif()
   endforeach()
 
-  set(commandline)
-  foreach(f ${APP_COMMAND_PREFIX})
-    list(APPEND commandline ${f})
-  endforeach()
 
-  if(${APP_ADD_TARGET})
-    add_executable(test-${name} ${name}.cpp)
-    linkApp(test-${name} "")
+  set(name ${X_ADD_TARGET})
+  set(test_name unit-${name})
 
-    list(APPEND commandline "$<TARGET_FILE:test-${name}>")
-  elseif(${APP_TARGET})
-    get_filename_component(base ${name} NAME)
-    if(TARGET ${base})
-      list(APPEND commandline "$<TARGET_FILE:${base}>")
-    else()
-      message(STATUS "NOT adding test ${name} (missing target: ${base})")
-      return()
-    endif()
-  else()
-    list(APPEND commandline ${name})
-  endif()
+  add_executable(${test_name} ${name}.cpp)
+  link_app(${test_name})
 
-  foreach(f ${APP_UNPARSED_ARGUMENTS})
-    list(APPEND commandline ${f})
-  endforeach()
+  set(commandline ${X_COMMAND_PREFIX})
+  list(APPEND commandline "$<TARGET_FILE:${test_name}>")
+  list(APPEND commandline ${X_UNPARSED_ARGUMENTS})
 
-  add_test(NAME ${name} COMMAND ${commandline})
+  add_test(NAME ${test_name} COMMAND ${commandline})
 
   # Allow parallel tests
-  set_tests_properties(${name} PROPERTIES ENVIRONMENT
-    GALOIS_DO_NOT_BIND_THREADS=1)
+  set_tests_properties(${test_name}
+    PROPERTIES
+      ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1
+      LABELS quick
+    )
 endfunction()
 
-function(linkApp name extlibs)
-  if (NOT extlibs STREQUAL "")
-    target_link_libraries(${name} ${extlibs})
+function(link_app name)
+  if (ARGN)
+    target_link_libraries(${name} ${ARGN})
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
@@ -426,7 +427,7 @@ function(linkApp name extlibs)
     target_link_libraries(${name} ${PAPI_LIBRARIES})
   endif()
 
-endfunction(linkApp)
+endfunction()
 
 # TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
@@ -445,7 +446,7 @@ function(app name)
   endforeach()
 
   add_executable(${name} ${APP_UNPARSED_ARGUMENTS})
-  linkApp(${name} "${APP_EXTLIBS}")
+  link_app(${name} ${APP_EXTLIBS})
 
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
