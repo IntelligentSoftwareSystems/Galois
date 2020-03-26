@@ -360,7 +360,7 @@ add_definitions(-D__STDC_CONSTANT_MACROS)
 
 if(GRAPH_LOCATION)
   MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
-  set(BASEINPUT "${GRAPH_LOCATION}")
+  set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)

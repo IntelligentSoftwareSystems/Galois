@@ -119,6 +119,12 @@ jobs:
         restore-keys: |
           ${{runner.os}}-ccache-
         path: ~/.ccache
+    - name: Cache graph inputs
+      uses: actions/cache@v1
+      with:
+        key: generic-cache-graph
+        path: ~/.cache/graph
+
 
     ###
     # Install platform-level dependencies (OS-specific)
@@ -142,7 +148,14 @@ jobs:
         conan profile new --detect --force default
 
     - name: pre-build
-      run: mkdir -p ~/build
+      run: |
+        mkdir -p ~/build
+
+        GRAPH_LOCATION=$HOME/.cache/graph
+        if [[ ! -d "$GRAPH_LOCATION" ]]; then
+          mkdir -p "$GRAPH_LOCATION"
+          curl -fL http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz | tar -C "$GRAPH_LOCATION" -xz -f -
+        fi
     - name: install C++ dependencies
       run: |
         conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
@@ -158,10 +171,21 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DENABLE_DIST_GALOIS=on
+          -DENABLE_DIST_GALOIS=on \
+          -DGRAPH_LOCATION=$HOME/.cache/graph
     - name: build
       run: cmake --build ~/build --parallel 4
     - name: install
       run: cmake --install ~/build
+
     - name: test
-      run: make -C ~/build test || true  # Ignore test errors for now.
+      if: startsWith(matrix.os, 'ubuntu-')
+      run: |
+        cd ~/build && ctest -V --label-regex quick --parallel 4
+
+    # MacOS tests seem to run into CI host level failures that are hard to
+    # reproduce locally. Rerun them for now.
+    - name: test
+      if: startsWith(matrix.os, 'macOS-')
+      run: |
+        cd ~/build && ctest -V --label-regex quick --parallel 1 --repeat until-pass:2

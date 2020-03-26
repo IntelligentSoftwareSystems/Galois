@@ -36,9 +36,8 @@ ctest --test-action memcheck
 find Testing/ -type f | xargs cat
 ```
 
-Tests are divided into several major labels:
+Tests are divided into groups by label. So far there is only one useful label:
+
 - **quick**: Quick tests have no external dependencies and can be run in parallel
   with other quick tests. Each quick test should run in a second or less. These
   tests are run as part of our continuous integration pipeline.
-- **nightly**: Nightly tests are tests that take longer (e.g., scalability tests).
-  They are run every night on the current master commit.
