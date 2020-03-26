@@ -50,7 +50,10 @@ enum Algo {
   blockedasync,
   labelProp,
   serial,
-  synchronous
+  synchronous,
+  afforest,
+  edgeafforest,
+  edgetiledafforest,
 };
 
 enum OutputEdgeType { void_, int32_, int64_ };
@@ -90,6 +93,12 @@ static cll::opt<Algo> algo(
                            "Using label propagation algorithm"),
                 clEnumValN(Algo::serial, "Serial", "Serial"),
                 clEnumValN(Algo::synchronous, "Sync", "Synchronous"),
+                clEnumValN(Algo::afforest, "Afforest",
+                           "Using Afforest sampling"),
+                clEnumValN(Algo::edgeafforest, "EdgeAfforest",
+                           "Using Afforest sampling, Edge-wise"),
+                clEnumValN(Algo::edgetiledafforest, "EdgetiledAfforest",
+                           "Using Afforest sampling, EdgeTiled"),
 
                 clEnumValEnd),
     cll::init(Algo::edgetiledasync));
@@ -136,6 +145,11 @@ struct SerialAlgo {
         Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sdata.merge(&ddata);
       }
+    }
+
+    for (const GNode& src : graph) {
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      sdata.compress();
     }
   }
 };
@@ -229,6 +243,16 @@ struct SynchronousAlgo {
       std::swap(cur, next);
       rounds += 1;
     }
+
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("Compress")
+    );
 
     galois::runtime::reportStat_Single("CC-Sync", "rounds", rounds);
     galois::runtime::reportStat_Single("CC-Sync", "emptyMerges",
@@ -411,10 +435,6 @@ struct EdgeTiledAsyncAlgo {
               continue;
 
             Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-
-            if (src >= dst)
-              continue;
-
             if (!sdata.merge(&ddata))
               emptyMerges += 1;
           }
@@ -578,6 +598,10 @@ struct BlockedAsyncAlgo {
   }
 };
 
+#include "experimental/Afforest.hh"
+#include "experimental/EdgeAfforest.hh"
+#include "experimental/EdgetiledAfforest.hh"
+
 template <typename Graph>
 bool verify(
     Graph& graph,
@@ -599,7 +623,7 @@ bool verify(Graph& graph,
       GNode dst  = graph.getEdgeDst(ii);
       auto& data = graph.getData(dst);
       if (data.component() != me.component()) {
-        std::cerr << "not in same component: " << (unsigned int)n << " ("
+        std::cerr << std::dec << "not in same component: " << (unsigned int)n << " ("
                   << me.component() << ")"
                   << " and " << (unsigned int)dst << " (" << data.component()
                   << ")"
@@ -758,6 +782,15 @@ int main(int argc, char** argv) {
     break;
   case Algo::synchronous:
     run<SynchronousAlgo>();
+    break;
+  case Algo::afforest:
+    run<AfforestAlgo>();
+    break;
+  case Algo::edgeafforest:
+    run<EdgeAfforestAlgo>();
+    break;
+  case Algo::edgetiledafforest:
+    run<EdgeTiledAfforestAlgo>();
     break;
 
   default:
