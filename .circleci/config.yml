@@ -10,6 +10,21 @@ version: 2
 # during the actual CI testing is no longer necessary.
 
 jobs:
+  "clang-format":
+    docker:
+      - image: debian:10
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+          apt-add-repository 'deb http://apt.llvm.org/buster/ llvm-toolchain-buster-9 main'
+          apt-get -q update -y
+          apt-get -q install -y clang-format-9
+          ln -s /usr/bin/clang-format-9 /usr/bin/clang-format
+          clang-format --version
+          scripts/check_format.sh .
   "Debian":
     docker:
       - image: debian:10
@@ -231,6 +246,7 @@ workflows:
   version: 2
   build:
     jobs:
+      - "clang-format"
       - "Debian"
       - "Ubuntu-18.04"
       - "Ubuntu-16.04"
