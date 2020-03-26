@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -170,8 +170,7 @@ protected:
     FunctionTy function;
     SimpleRuntimeContext ctx;
 
-    explicit ThreadLocalBasics(FunctionTy fn)
-        : facing(), function(fn), ctx() {}
+    explicit ThreadLocalBasics(FunctionTy fn) : facing(), function(fn), ctx() {}
   };
 
   using LoopStat = LoopStatistics<needStats>;
@@ -366,13 +365,13 @@ protected:
         execTime(loopname, "Execute") {}
 
   template <typename WArgsTy, int... Is>
-  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
-                  const WArgsTy& wlargs, int_seq<Is...>)
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args, const WArgsTy& wlargs,
+                  int_seq<Is...>)
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
-                  const WArgsTy& wlargs, int_seq<>)
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args, const WArgsTy& wlargs,
+                  int_seq<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:
@@ -502,8 +501,7 @@ struct reiterator<WLTy, IterTy,
 
 // TODO(ddn): Think about folding in range into args too
 template <typename RangeTy, typename FunctionTy, typename ArgsTy>
-void for_each_impl(const RangeTy& range, FunctionTy&& fn,
-                   const ArgsTy& args) {
+void for_each_impl(const RangeTy& range, FunctionTy&& fn, const ArgsTy& args) {
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type
       value_type;
   typedef
@@ -512,16 +510,17 @@ void for_each_impl(const RangeTy& range, FunctionTy&& fn,
       type ::template retype<value_type>
           WorkListTy;
   // typedef typename WorkListTy::value_type g;
-  using FuncRefType = OperatorReferenceType<decltype(std::forward<FunctionTy>(fn))>;
+  using FuncRefType =
+      OperatorReferenceType<decltype(std::forward<FunctionTy>(fn))>;
   typedef ForEachExecutor<WorkListTy, FuncRefType, ArgsTy> WorkTy;
 
-  auto& barrier = getBarrier(activeThreads);
+  auto& barrier      = getBarrier(activeThreads);
   FuncRefType fn_ref = fn;
   WorkTy W(fn_ref, args);
   W.init(range);
-  substrate::getThreadPool().run(activeThreads,
-                                 [&W, &range]() { W.initThread(range); },
-                                 std::ref(barrier), std::ref(W));
+  substrate::getThreadPool().run(
+      activeThreads, [&W, &range]() { W.initThread(range); }, std::ref(barrier),
+      std::ref(W));
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
 
@@ -530,7 +529,7 @@ void for_each_impl(const RangeTy& range, FunctionTy&& fn,
 
 //! Normalize arguments to for_each
 template <typename RangeTy, typename FunctionTy, typename TupleTy>
-void for_each_gen(const RangeTy& r, FunctionTy &&fn, const TupleTy& tpl) {
+void for_each_gen(const RangeTy& r, FunctionTy&& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const*, TupleTy>::value,
                 "old loopname");

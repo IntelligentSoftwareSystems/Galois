@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -191,32 +191,33 @@ struct Process {
 
   void generateMesh() {
     typedef galois::worklists::PerThreadChunkLIFO<32> CA;
-    galois::for_each(galois::iterate(ptrPoints),
-                     [&, self = this](Point* p, auto& ctx) {
-                       p->get(galois::MethodFlag::WRITE);
-                       assert(!p->inMesh());
+    galois::for_each(
+        galois::iterate(ptrPoints),
+        [&, self = this](Point* p, auto& ctx) {
+          p->get(galois::MethodFlag::WRITE);
+          assert(!p->inMesh());
 
-                       GNode node;
-                       if (!self->findContainingElement(p, node)) {
-                         // Someone updated an element while we were searching,
-                         // producing a semi-consistent state ctx.push(p);
-                         // Current version is safe with locking so this
-                         // shouldn't happen
-                         GALOIS_DIE("unreachable");
-                         return;
-                       }
+          GNode node;
+          if (!self->findContainingElement(p, node)) {
+            // Someone updated an element while we were searching,
+            // producing a semi-consistent state ctx.push(p);
+            // Current version is safe with locking so this
+            // shouldn't happen
+            GALOIS_DIE("unreachable");
+            return;
+          }
 
-                       assert(self->graph.getData(node).inTriangle(p->t()));
-                       assert(self->graph.containsNode(node));
+          assert(self->graph.getData(node).inTriangle(p->t()));
+          assert(self->graph.containsNode(node));
 
-                       Cavity<Alloc> cav(self->graph, ctx.getPerIterAlloc());
-                       cav.init(node, p);
-                       cav.build();
-                       cav.update();
-                       self->tree.insert(p->t().x(), p->t().y(), p);
-                     },
-                     galois::no_pushes(), galois::per_iter_alloc(),
-                     galois::loopname("Main"), galois::wl<CA>());
+          Cavity<Alloc> cav(self->graph, ctx.getPerIterAlloc());
+          cav.init(node, p);
+          cav.build();
+          cav.update();
+          self->tree.insert(p->t().x(), p->t().y(), p);
+        },
+        galois::no_pushes(), galois::per_iter_alloc(), galois::loopname("Main"),
+        galois::wl<CA>());
   }
 };
 

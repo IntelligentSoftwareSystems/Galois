@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -50,12 +50,13 @@ static cll::opt<unsigned long long>
 
 enum Exec { Sync, Async };
 
-static cll::opt<Exec> execution(
-    "exec",
-    cll::desc("Distributed Execution Model (default value Async):"),
-    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
-    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
-    cll::init(Async));
+static cll::opt<Exec>
+    execution("exec",
+              cll::desc("Distributed Execution Model (default value Async):"),
+              cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"),
+                          clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"),
+                          clEnumValEnd),
+              cll::init(Async));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -93,7 +94,8 @@ struct InitializeGraph {
     const auto& allNodes = _graph.allNodesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
+      std::string impl_str("InitializeGraph_" +
+                           (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
@@ -101,26 +103,27 @@ struct InitializeGraph {
     } else if (personality == CPU)
 #endif
     {
-      galois::do_all(galois::iterate(allNodes),
-                     InitializeGraph(src_node, infinity, &_graph),
-                     galois::no_stats(),
-                     galois::loopname(
-                         syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
+      galois::do_all(
+          galois::iterate(allNodes),
+          InitializeGraph(src_node, infinity, &_graph), galois::no_stats(),
+          galois::loopname(
+              syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current =
+        (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
 template <bool async>
 struct BFS {
   Graph* graph;
-  using DGTerminatorDetector = typename std::conditional<async, 
-          galois::DGTerminator<unsigned int>,
-          galois::DGAccumulator<unsigned int>>::type;
+  using DGTerminatorDetector =
+      typename std::conditional<async, galois::DGTerminator<unsigned int>,
+                                galois::DGAccumulator<unsigned int>>::type;
 
   DGTerminatorDetector& active_vertices;
 
@@ -159,13 +162,13 @@ struct BFS {
           regionname, syncSubstrate->get_run_identifier("NumWorkItems"),
           (unsigned long)dga.read_local());
       ++_num_iterations;
-    } while (
-             (async || (_num_iterations < maxIterations)) &&
+    } while ((async || (_num_iterations < maxIterations)) &&
              dga.reduce(syncSubstrate->get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          regionname, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
+          regionname,
+          "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
           (unsigned long)_num_iterations);
     }
   }
@@ -272,10 +275,11 @@ int main(int argc, char** argv) {
 
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
+  std::tie(hg, syncSubstrate) =
+      distGraphInitialization<NodeData, void, false>(&cuda_ctx);
 #else
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void,
-                                                        false>();
+  std::tie(hg, syncSubstrate) =
+      distGraphInitialization<NodeData, void, false>();
 #endif
 
   bitset_dist_current.resize(hg->size());

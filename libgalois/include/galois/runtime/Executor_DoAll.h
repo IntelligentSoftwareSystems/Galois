@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -532,15 +532,17 @@ template <bool _STEAL>
 struct ChooseDoAllImpl {
 
   template <typename R, typename F, typename ArgsT>
-  static void call(const R& range, F &&func, const ArgsT& argsTuple) {
+  static void call(const R& range, F&& func, const ArgsT& argsTuple) {
 
-    internal::DoAllStealingExec<R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT> exec(range, std::forward<F>(func), argsTuple);
+    internal::DoAllStealingExec<
+        R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT>
+        exec(range, std::forward<F>(func), argsTuple);
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
-    substrate::getThreadPool().run(activeThreads,
-                                   [&exec](void) { exec.initThread(); },
-                                   std::ref(barrier), std::ref(exec));
+    substrate::getThreadPool().run(
+        activeThreads, [&exec](void) { exec.initThread(); }, std::ref(barrier),
+        std::ref(exec));
   }
 };
 

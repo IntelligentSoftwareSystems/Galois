@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -117,9 +117,7 @@ public:
     TimeAccumulator::stop();
   }
 
-  unsigned long get_usec() const {
-    return TimeAccumulator::get_usec();
-  }
+  unsigned long get_usec() const { return TimeAccumulator::get_usec(); }
 };
 
 template <bool Enable>
@@ -205,8 +203,8 @@ protected:
 
     std::string timeCat = category + std::string("PerThreadTimes");
     std::string lagCat  = category + std::string("PerThreadLag");
-    on_each([&] (auto a, auto b) {
-      auto ns = timers.getLocal()->get_nsec();
+    on_each([&](auto a, auto b) {
+      auto ns  = timers.getLocal()->get_nsec();
       auto lag = ns - minTime;
       assert(lag > 0 && "negative time lag from min is impossible");
 

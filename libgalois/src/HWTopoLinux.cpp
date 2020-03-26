@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -66,12 +66,12 @@ static bool operator<(const cpuinfo& lhs, const cpuinfo& rhs) {
 }
 
 static unsigned getNumaNode(cpuinfo& c) {
-  static bool warnOnce  = false;
+  static bool warnOnce = false;
 #ifdef GALOIS_USE_NUMA
   static bool numaAvail = false;
 
   if (!warnOnce) {
-    warnOnce = true;
+    warnOnce  = true;
     numaAvail = numa_available() >= 0;
     if (!numaAvail)
       galois::gWarn("Numa support configured but not present at runtime.  "
@@ -314,7 +314,8 @@ bool galois::substrate::bindThreadSelf(unsigned osContext) {
   }
   return true;
 #else
-  galois::gWarn("Cannot set cpu affinity on this platform.  Performance will be bad.");
+  galois::gWarn(
+      "Cannot set cpu affinity on this platform.  Performance will be bad.");
   return false;
 #endif
 }

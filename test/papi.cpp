@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -77,7 +77,8 @@ int main(int argc, char* argv[]) {
   } else if (argc == 2) {
     numThreads = galois::setActiveThreads(std::stoull(argv[1]));
   } else {
-    throw std::invalid_argument("Test received too many command line arguments");
+    throw std::invalid_argument(
+        "Test received too many command line arguments");
   }
 
   galois::runtime::reportParam("NULL", "Threads", numThreads);

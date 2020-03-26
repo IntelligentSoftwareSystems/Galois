@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -48,20 +48,20 @@ enum Algo {
 namespace cll = llvm::cl;
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<Algo> algo(
-    "algo", cll::desc("Choose an algorithm:"),
-    cll::values(clEnumValN(Algo::nodeiteratorpre, "nodeiteratorpre", "Node Iterator (default)"),
-                clEnumValEnd),
-    cll::init(Algo::nodeiteratorpre));
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
+                           cll::values(clEnumValN(Algo::nodeiteratorpre,
+                                                  "nodeiteratorpre",
+                                                  "Node Iterator (default)"),
+                                       clEnumValEnd),
+                           cll::init(Algo::nodeiteratorpre));
 
-struct NodeData{
+struct NodeData {
   uint64_t ea;
   uint64_t bb;
 };
 
-
 typedef galois::graphs::LC_CSR_Graph<NodeData, void>::with_numa_alloc<
-true>::type ::with_no_lockable<true>::type Graph;
+    true>::type ::with_no_lockable<true>::type Graph;
 // typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
 // typedef galois::graphs::LC_Linear_Graph<uint32_t,void> Graph;
 
@@ -166,7 +166,6 @@ struct IdLess {
   }
 };
 
-
 /**
  * Edge Iterator algorithm for counting triangles.
  * <code>
@@ -184,63 +183,65 @@ typedef galois::gstl::Vector<GNode> VecTy;
 void nodeIteratingAlgoPre(Graph& graph) {
 
   galois::GAccumulator<size_t> numTriangles;
-  //galois::GAccumulator<size_t> numItems;
-  //numItems.reset();
-  //3-motif
+  // galois::GAccumulator<size_t> numItems;
+  // numItems.reset();
+  // 3-motif
   std::map<uint32_t, VecTy> kmap;
 
-    galois::do_all(galois::iterate(graph),//galois::iterate(graph.begin() + i, graph.begin() + i + delta ),
-                 [&](GNode n) {
+  galois::do_all(
+      galois::iterate(graph), // galois::iterate(graph.begin() + i,
+                              // graph.begin() + i + delta ),
+      [&](GNode n) {
+        // Partition neighbors
+        // [first, ea) [n] [bb, last)
+        auto& ndata = graph.getData(n);
+        Graph::edge_iterator first =
+            graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator last =
+            graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator ea =
+            lowerBound(first, last, LessThan<Graph>(graph, n));
+        Graph::edge_iterator bb =
+            lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
-                // Partition neighbors
-                // [first, ea) [n] [bb, last)
-                auto& ndata = graph.getData(n);
-                Graph::edge_iterator first =
-                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-                Graph::edge_iterator last =
-                    graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-                Graph::edge_iterator ea =
-                    lowerBound(first, last, LessThan<Graph>(graph, n));
-                Graph::edge_iterator bb =
-                    lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
+        ndata.ea = std::abs(std::distance(first, ea));
+        ndata.bb = std::abs(std::distance(first, bb));
+      },
+      galois::loopname("Initialize"));
 
-                  ndata.ea = std::abs(std::distance(first, ea));
-                  ndata.bb = std::abs(std::distance(first, bb));
+  // std::cout << "numItems: " << numItems.reduce() << "\n";
+  std::cout << "Done Initializing\n";
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& n) {
+        auto& ndata = graph.getData(n);
+        Graph::edge_iterator first =
+            graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator last =
+            graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator ea =
+            first + ndata.ea; // std::advance(first, ndata.ea);
+        Graph::edge_iterator bb =
+            first + ndata.bb; // std::advance(first, ndata.bb);
 
-                 },
-                 galois::loopname("Initialize"));
-
-    //std::cout << "numItems: " << numItems.reduce() << "\n";
-    std::cout << "Done Initializing\n";
-       galois::do_all(
-            galois::iterate(graph),
-            [&](const GNode& n) {
-              auto& ndata = graph.getData(n);
-              Graph::edge_iterator first =
-                  graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-              Graph::edge_iterator last =
-                  graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-              Graph::edge_iterator ea = first + ndata.ea; // std::advance(first, ndata.ea);
-              Graph::edge_iterator bb = first + ndata.bb; //std::advance(first, ndata.bb);
-
-              for (; bb != last; ++bb) {
-                GNode B = graph.getEdgeDst(bb);
-                for (auto aa = first; aa != ea; ++aa) {
-                  GNode A = graph.getEdgeDst(aa);
-                  Graph::edge_iterator vv =
-                      graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
-                  Graph::edge_iterator ev =
-                      graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
-                  Graph::edge_iterator it =
-                      lowerBound(vv, ev, LessThan<Graph>(graph, B));
-                  if (it != ev && graph.getEdgeDst(it) == B) {
-                    numTriangles += 1;
-                  }
-                }
-              }
-            },
-            galois::chunk_size<512>(), galois::steal(),
-            galois::loopname("nodeIteratingAlgoPre"));
+        for (; bb != last; ++bb) {
+          GNode B = graph.getEdgeDst(bb);
+          for (auto aa = first; aa != ea; ++aa) {
+            GNode A = graph.getEdgeDst(aa);
+            Graph::edge_iterator vv =
+                graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator ev =
+                graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator it =
+                lowerBound(vv, ev, LessThan<Graph>(graph, B));
+            if (it != ev && graph.getEdgeDst(it) == B) {
+              numTriangles += 1;
+            }
+          }
+        }
+      },
+      galois::chunk_size<512>(), galois::steal(),
+      galois::loopname("nodeIteratingAlgoPre"));
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
@@ -275,7 +276,7 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   permuted.toFile(triangleFilename);
   galois::gPrint("loading file after creating triangleFilename\n");
   galois::graphs::readGraph(graph, permuted);
-  //graph.allocateAndLoadGraph(triangleFilename);
+  // graph.allocateAndLoadGraph(triangleFilename);
 }
 
 void readGraph(Graph& graph) {
@@ -293,13 +294,13 @@ void readGraph(Graph& graph) {
       // triangles does exist, load it
       galois::gPrint("Start loading", triangleFilename, "\n");
       galois::graphs::readGraph(graph, triangleFilename);
-      //graph.allocateAndLoadGraph(triangleFilename);
+      // graph.allocateAndLoadGraph(triangleFilename);
       galois::gPrint("Done loading", triangleFilename, "\n");
     }
   } else {
     galois::gPrint("Start loading", inputFilename, "\n");
     galois::graphs::readGraph(graph, inputFilename);
-    //graph.allocateAndLoadGraph(inputFilename);
+    // graph.allocateAndLoadGraph(inputFilename);
     galois::gPrint("Done loading", inputFilename, "\n");
   }
 }
@@ -317,9 +318,9 @@ int main(int argc, char** argv) {
   Tinitial.stop();
   galois::gPrint("Done readGraph\n");
 
-  //galois::preAlloc(500);
-  //galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
-                                    //galois::runtime::pagePoolSize());
+  // galois::preAlloc(500);
+  // galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
+  // galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -103,7 +103,8 @@ private:
       numBytesReadEdgeData;
 
   /**
-   * Construct a file graph by moving in structures from the passed in file graph.
+   * Construct a file graph by moving in structures from the passed in file
+   * graph.
    */
   void move_assign(FileGraph&&);
   /**
@@ -196,9 +197,9 @@ protected:
    * @param sizeofEdgeData The size of the edge data
    * @param nodeOffset how many nodes from the beginning will this graph start
    * from
-   * @param edgeOffset how many edges from the beginning will this edge start 
+   * @param edgeOffset how many edges from the beginning will this edge start
    * from
-   * @param converted whether values in arrays are in host byte ordering 
+   * @param converted whether values in arrays are in host byte ordering
    * (false) or in FileGraph byte ordering (true)
    * @param oGraphVersion Galois graph version to use
    * @return pointer to begining of edgeData in graph
@@ -408,7 +409,7 @@ public:
 
   /**
    * Gets an iterator to the first neighbor of node N
-   * 
+   *
    * @warning only version 1 support, do not use with version 2
    */
   neighbor_iterator neighbor_begin(GraphNode N) {
@@ -418,7 +419,7 @@ public:
 
   /**
    * Gets an iterator to the end of node N's neighbors
-   * 
+   *
    * @warning only version 1 support, do not use with version 2
    */
   neighbor_iterator neighbor_end(GraphNode N) {
@@ -443,7 +444,8 @@ public:
   /**
    * Gets the first node of the loaded graph.
    *
-   * @returns An iterator to the first node of the graph. Note it is a GLOBAL id.
+   * @returns An iterator to the first node of the graph. Note it is a GLOBAL
+   * id.
    */
   iterator begin() const;
   /**
@@ -595,7 +597,7 @@ public:
    * @param filename File to load
    * @param nrange Node range to load
    * @param erange Edge range to load
-   * @param numaMap if true, does interleaved numa allocation for data 
+   * @param numaMap if true, does interleaved numa allocation for data
    * structures
    */
   void partFromFile(const std::string& filename, NodeRange nrange,
@@ -667,6 +669,7 @@ class FileGraphWriter : public FileGraph {
   size_t sizeofEdgeData;
   size_t numNodes;
   size_t numEdges;
+
 public:
   //! Constructor: initializes nodes, edges, and edge data to 0
   FileGraphWriter() : sizeofEdgeData(0), numNodes(0), numEdges(0) {}

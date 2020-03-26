@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -403,20 +403,20 @@ struct MatchingFF {
 
     galois::setActiveThreads(Concurrent ? numThreads : 1);
 
-    galois::for_each(galois::iterate(g.A),
-                     [&, this](const GraphNode& node, auto& ctx) {
-                       if (!g.getData(node, flag).free)
-                         return;
+    galois::for_each(
+        galois::iterate(g.A),
+        [&, this](const GraphNode& node, auto& ctx) {
+          if (!g.getData(node, flag).free)
+            return;
 
-                       ParallelRevs parallelRevs(ctx.getPerIterAlloc());
-                       ParallelReached parallelReached(ctx.getPerIterAlloc());
+          ParallelRevs parallelRevs(ctx.getPerIterAlloc());
+          ParallelReached parallelReached(ctx.getPerIterAlloc());
 
-                       this->propagate(
-                           g, node, ctx, RevsWrapper(revs, parallelRevs).get(),
-                           ReachedWrapper(reached, parallelReached).get());
-                     },
-                     galois::loopname("MatchingFF"), galois::per_iter_alloc(),
-                     galois::wl<galois::worklists::PerSocketChunkFIFO<32>>());
+          this->propagate(g, node, ctx, RevsWrapper(revs, parallelRevs).get(),
+                          ReachedWrapper(reached, parallelReached).get());
+        },
+        galois::loopname("MatchingFF"), galois::per_iter_alloc(),
+        galois::wl<galois::worklists::PerSocketChunkFIFO<32>>());
   }
 };
 
@@ -557,26 +557,26 @@ struct MatchingABMP {
     typedef PerSocketChunkFIFO<1024> PSchunk;
     typedef OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
-    galois::for_each(galois::iterate(initial),
-                     [&, this](const WorkItem& item, auto& ctx) {
-                       unsigned curLayer = item.second;
-                       if (curLayer > maxLayer) {
-                         // std::cout << "Reached max layer: " << curLayer <<
-                         // "\n";
-                         ctx.breakLoop();
-                         return;
-                       }
-                       // if (size <= 50 * curLayer) {
-                       //  std::cout << "Reached min size: " << size << "\n";
-                       //  ctx.breakLoop();
-                       //}
-                       if (!this->propagate(g, item.first, ctx)) {
-                         //__sync_fetch_and_add(&size, -1);
-                       }
-                     },
-                     galois::per_iter_alloc(), galois::parallel_break(),
-                     galois::loopname("MatchingABMP"),
-                     galois::wl<OBIM>(indexer));
+    galois::for_each(
+        galois::iterate(initial),
+        [&, this](const WorkItem& item, auto& ctx) {
+          unsigned curLayer = item.second;
+          if (curLayer > maxLayer) {
+            // std::cout << "Reached max layer: " << curLayer <<
+            // "\n";
+            ctx.breakLoop();
+            return;
+          }
+          // if (size <= 50 * curLayer) {
+          //  std::cout << "Reached min size: " << size << "\n";
+          //  ctx.breakLoop();
+          //}
+          if (!this->propagate(g, item.first, ctx)) {
+            //__sync_fetch_and_add(&size, -1);
+          }
+        },
+        galois::per_iter_alloc(), galois::parallel_break(),
+        galois::loopname("MatchingABMP"), galois::wl<OBIM>(indexer));
 
     t.start();
     MatchingFF<G, false> algo;

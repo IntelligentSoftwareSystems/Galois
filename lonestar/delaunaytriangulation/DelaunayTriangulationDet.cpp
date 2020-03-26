@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -262,23 +262,24 @@ struct ReadInput {
   template <typename L>
   void generateRoundsImpl(const L& loop, size_t size, PointList& points,
                           size_t log2) {
-    loop(galois::iterate(size_t{0}, size),
-         [&, this](size_t index) {
-           const Point& p = points[index];
+    loop(
+        galois::iterate(size_t{0}, size),
+        [&, this](size_t index) {
+          const Point& p = points[index];
 
-           Point* ptr = &(basePoints.push(p));
-           int r      = 0;
-           for (size_t i = 0; i < log2; ++i) {
-             size_t mask = (1UL << (i + 1)) - 1;
-             if ((index & mask) == (1UL << i)) {
-               r = i;
-               break;
-             }
-           }
+          Point* ptr = &(basePoints.push(p));
+          int r      = 0;
+          for (size_t i = 0; i < log2; ++i) {
+            size_t mask = (1UL << (i + 1)) - 1;
+            if ((index & mask) == (1UL << i)) {
+              r = i;
+              break;
+            }
+          }
 
-           rounds[r / roundShift]->push(ptr);
-         },
-         galois::loopname("generateRoundsImpl"));
+          rounds[r / roundShift]->push(ptr);
+        },
+        galois::loopname("generateRoundsImpl"));
   }
 
   //! Blocked point distribution (exponentially increasing block size) with

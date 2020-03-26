@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -95,25 +95,27 @@ int main(int argc, char** argv) {
   constructTorus(graph, N, N);
 
   // read/write only a node itself
-  galois::do_all(galois::iterate(graph),
-                 [&](GNode n) {
-                   graph.getData(n) =
-                       std::distance(graph.edge_begin(n), graph.edge_end(n));
-                 },
-                 galois::loopname("do_all"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](GNode n) {
+        graph.getData(n) =
+            std::distance(graph.edge_begin(n), graph.edge_end(n));
+      },
+      galois::loopname("do_all"));
   verify(graph, N);
 
   // push operator with Galois synchronization
   initialize(graph);
-  galois::for_each(galois::iterate(graph),
-                   [&](GNode n, auto& ctx) {
-                     for (auto ii : graph.edges(n)) {
-                       GNode dst  = graph.getEdgeDst(ii);
-                       auto& data = graph.getData(dst);
-                       data += 1;
-                     }
-                   },
-                   galois::loopname("for_each"), galois::no_pushes());
+  galois::for_each(
+      galois::iterate(graph),
+      [&](GNode n, auto& ctx) {
+        for (auto ii : graph.edges(n)) {
+          GNode dst  = graph.getEdgeDst(ii);
+          auto& data = graph.getData(dst);
+          data += 1;
+        }
+      },
+      galois::loopname("for_each"), galois::no_pushes());
   verify(graph, N);
 
   auto incrementNeighborsAtomically = [&](GNode n) {
@@ -135,10 +137,11 @@ int main(int argc, char** argv) {
 
   // push operator with self synchronization in optimized for_each
   initialize(graph);
-  galois::for_each(galois::iterate(graph),
-                   [&](GNode n, auto& ctx) { incrementNeighborsAtomically(n); },
-                   galois::loopname("for_each_self_sync"),
-                   galois::no_conflicts(), galois::no_pushes());
+  galois::for_each(
+      galois::iterate(graph),
+      [&](GNode n, auto& ctx) { incrementNeighborsAtomically(n); },
+      galois::loopname("for_each_self_sync"), galois::no_conflicts(),
+      galois::no_pushes());
   verify(graph, N);
 
   return 0;

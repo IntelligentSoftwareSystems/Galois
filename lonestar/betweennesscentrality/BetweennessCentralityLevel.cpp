@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -81,9 +81,9 @@ struct NodeData {
 std::ifstream sourceFile;
 std::vector<uint64_t> sourceVector;
 
-using Graph = galois::graphs::LC_CSR_Graph<NodeData, void>::
-                with_no_lockable<true>::type::with_numa_alloc<true>::type;
-using GNode = Graph::GraphNode;
+using Graph = galois::graphs::LC_CSR_Graph<NodeData, void>::with_no_lockable<
+    true>::type::with_numa_alloc<true>::type;
+using GNode        = Graph::GraphNode;
 using WorklistType = galois::InsertBag<GNode, 4096>;
 
 constexpr static const unsigned CHUNK_SIZE = 256u;
@@ -97,17 +97,15 @@ constexpr static const unsigned CHUNK_SIZE = 256u;
  */
 void InitializeGraph(Graph& graph) {
   galois::do_all(
-    galois::iterate(graph),
-    [&] (GNode n) {
-      NodeData& nodeData = graph.getData(n);
-      nodeData.currentDistance    = 0;
-      nodeData.numShortestPaths   = 0;
-      nodeData.dependency         = 0;
-      nodeData.bc                 = 0;
-    },
-    galois::no_stats(),
-    galois::loopname("InitializeGraph")
-  );
+      galois::iterate(graph),
+      [&](GNode n) {
+        NodeData& nodeData        = graph.getData(n);
+        nodeData.currentDistance  = 0;
+        nodeData.numShortestPaths = 0;
+        nodeData.dependency       = 0;
+        nodeData.bc               = 0;
+      },
+      galois::no_stats(), galois::loopname("InitializeGraph"));
 }
 
 /**
@@ -117,25 +115,23 @@ void InitializeGraph(Graph& graph) {
  */
 void InitializeIteration(Graph& graph) {
   galois::do_all(
-    galois::iterate(graph),
-    [&] (GNode n) {
-      NodeData& nodeData = graph.getData(n);
-      bool isSource = (n == currentSrcNode);
-      // source nodes have distance 0 and initialize short paths to 1, else
-      // distance is infinity with 0 short paths
-      if (!isSource) {
-        nodeData.currentDistance    = infinity;
-        nodeData.numShortestPaths   = 0;
-      } else {
-        nodeData.currentDistance    = 0;
-        nodeData.numShortestPaths   = 1;
-      }
-      // dependency reset for new source
-      nodeData.dependency         = 0;
-    },
-    galois::no_stats(),
-    galois::loopname("InitializeIteration")
-  );
+      galois::iterate(graph),
+      [&](GNode n) {
+        NodeData& nodeData = graph.getData(n);
+        bool isSource      = (n == currentSrcNode);
+        // source nodes have distance 0 and initialize short paths to 1, else
+        // distance is infinity with 0 short paths
+        if (!isSource) {
+          nodeData.currentDistance  = infinity;
+          nodeData.numShortestPaths = 0;
+        } else {
+          nodeData.currentDistance  = 0;
+          nodeData.numShortestPaths = 1;
+        }
+        // dependency reset for new source
+        nodeData.dependency = 0;
+      },
+      galois::no_stats(), galois::loopname("InitializeIteration"));
 };
 
 /**
@@ -159,37 +155,33 @@ galois::gstl::Vector<WorklistType> SSSP(Graph& graph) {
     uint32_t nextLevel = currentLevel + 1;
 
     galois::do_all(
-      galois::iterate(stackOfWorklists[currentLevel]),
-      [&] (GNode n) {
-        NodeData& curData = graph.getData(n);
-        GALOIS_ASSERT(curData.currentDistance == currentLevel);
+        galois::iterate(stackOfWorklists[currentLevel]),
+        [&](GNode n) {
+          NodeData& curData = graph.getData(n);
+          GALOIS_ASSERT(curData.currentDistance == currentLevel);
 
-        for (auto e : graph.edges(n)) {
-          GNode dest = graph.getEdgeDst(e);
-          NodeData& destData = graph.getData(dest);
+          for (auto e : graph.edges(n)) {
+            GNode dest         = graph.getEdgeDst(e);
+            NodeData& destData = graph.getData(dest);
 
-          if (destData.currentDistance == infinity) {
-            uint32_t oldVal =
-              __sync_val_compare_and_swap(&(destData.currentDistance), infinity,
-                                          nextLevel);
-            // only 1 thread should add to worklist
-            if (oldVal == infinity) {
-              stackOfWorklists[nextLevel].emplace(dest);
+            if (destData.currentDistance == infinity) {
+              uint32_t oldVal = __sync_val_compare_and_swap(
+                  &(destData.currentDistance), infinity, nextLevel);
+              // only 1 thread should add to worklist
+              if (oldVal == infinity) {
+                stackOfWorklists[nextLevel].emplace(dest);
+              }
+
+              galois::atomicAdd(destData.numShortestPaths,
+                                curData.numShortestPaths.load());
+            } else if (destData.currentDistance == nextLevel) {
+              galois::atomicAdd(destData.numShortestPaths,
+                                curData.numShortestPaths.load());
             }
-
-            galois::atomicAdd(destData.numShortestPaths,
-                              curData.numShortestPaths.load());
-          } else if (destData.currentDistance == nextLevel) {
-            galois::atomicAdd(destData.numShortestPaths,
-                              curData.numShortestPaths.load());
           }
-        }
-      },
-      galois::steal(),
-      galois::chunk_size<CHUNK_SIZE>(),
-      galois::no_stats(),
-      galois::loopname("SSSP")
-    );
+        },
+        galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::no_stats(),
+        galois::loopname("SSSP"));
 
     // move on to next level
     currentLevel++;
@@ -213,36 +205,33 @@ void BackwardBrandes(Graph& graph,
     // last level is ignored since it's just the source
     while (currentLevel > 0) {
       WorklistType& currentWorklist = stackOfWorklists[currentLevel];
-      uint32_t succLevel = currentLevel + 1;
+      uint32_t succLevel            = currentLevel + 1;
 
       galois::do_all(
-        galois::iterate(currentWorklist),
-        [&] (GNode n) {
-          NodeData& curData = graph.getData(n);
-          GALOIS_ASSERT(curData.currentDistance == currentLevel);
+          galois::iterate(currentWorklist),
+          [&](GNode n) {
+            NodeData& curData = graph.getData(n);
+            GALOIS_ASSERT(curData.currentDistance == currentLevel);
 
-          for (auto e : graph.edges(n)) {
-            GNode dest = graph.getEdgeDst(e);
-            NodeData& destData = graph.getData(dest);
+            for (auto e : graph.edges(n)) {
+              GNode dest         = graph.getEdgeDst(e);
+              NodeData& destData = graph.getData(dest);
 
-            if (destData.currentDistance == succLevel) {
-              // grab dependency, add to self
-              float contrib = ((float)1 + destData.dependency) /
-                              destData.numShortestPaths;
-              curData.dependency = curData.dependency + contrib;
+              if (destData.currentDistance == succLevel) {
+                // grab dependency, add to self
+                float contrib = ((float)1 + destData.dependency) /
+                                destData.numShortestPaths;
+                curData.dependency = curData.dependency + contrib;
+              }
             }
-          }
 
-          // multiply at end to get final dependency value
-          curData.dependency *= curData.numShortestPaths;
-          // accumulate dependency into bc
-          curData.bc += curData.dependency;
-        },
-        galois::steal(),
-        galois::chunk_size<CHUNK_SIZE>(),
-        galois::no_stats(),
-        galois::loopname("Brandes")
-      );
+            // multiply at end to get final dependency value
+            curData.dependency *= curData.numShortestPaths;
+            // accumulate dependency into bc
+            curData.bc += curData.dependency;
+          },
+          galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::no_stats(),
+          galois::loopname("Brandes"));
 
       // move on to next level lower
       currentLevel--;
@@ -269,16 +258,14 @@ void Sanity(Graph& graph) {
 
   // get max, min, sum of BC values using accumulators and reducers
   galois::do_all(
-    galois::iterate(graph),
-    [&] (GNode n) {
-      NodeData& nodeData = graph.getData(n);
-      accumMax.update(nodeData.bc);
-      accumMin.update(nodeData.bc);
-      accumSum += nodeData.bc;
-    },
-    galois::no_stats(),
-    galois::loopname("Sanity")
-  );
+      galois::iterate(graph),
+      [&](GNode n) {
+        NodeData& nodeData = graph.getData(n);
+        accumMax.update(nodeData.bc);
+        accumMin.update(nodeData.bc);
+        accumSum += nodeData.bc;
+      },
+      galois::no_stats(), galois::loopname("Sanity"));
 
   galois::gPrint("Max BC is ", accumMax.reduce(), "\n");
   galois::gPrint("Min BC is ", accumMin.reduce(), "\n");
@@ -288,7 +275,8 @@ void Sanity(Graph& graph) {
 /******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
-constexpr static const char* const name = "Betweeness Centrality Level by Level";
+constexpr static const char* const name =
+    "Betweeness Centrality Level by Level";
 constexpr static const char* const desc =
     "Betweeness Centrality, level by level, using synchronous BFS and Brandes "
     "backward dependency propagation.";
@@ -298,7 +286,8 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, NULL);
 
   // some initial stat reporting
-  galois::gInfo("Worklist chunk size of ", CHUNK_SIZE, ": best size may depend"
+  galois::gInfo("Worklist chunk size of ", CHUNK_SIZE,
+                ": best size may depend"
                 " on input.");
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize", CHUNK_SIZE);
   galois::reportPageAlloc("MemAllocPre");
@@ -317,13 +306,11 @@ int main(int argc, char** argv) {
   // preallocate pages in memory so allocation doesn't occur during compute
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
-  galois::preAlloc(std::max(
-    (size_t)galois::getActiveThreads() * (graph.size() / 2000000),
-    std::max(10u, galois::getActiveThreads()) * (size_t)10
-  ));
+  galois::preAlloc(
+      std::max((size_t)galois::getActiveThreads() * (graph.size() / 2000000),
+               std::max(10u, galois::getActiveThreads()) * (size_t)10));
   preallocTime.stop();
   galois::reportPageAlloc("MemAllocMid");
-
 
   // If particular set of sources was specified, use them
   if (sourcesToUse != "") {
@@ -336,7 +323,7 @@ int main(int argc, char** argv) {
 
   // determine how many sources to loop over based on command line args
   uint64_t loop_end = 1;
-  bool sSources = false;
+  bool sSources     = false;
   if (!singleSourceBC) {
     if (!numberOfSources) {
       loop_end = graph.size();

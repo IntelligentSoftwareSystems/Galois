@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,14 +37,14 @@ struct OperatorReferenceType_impl;
 // If a user supplies a const reference the operator() on the
 // given object must be callable with *this passed as const as well.
 template <typename FuncNoRef>
-struct OperatorReferenceType_impl<FuncNoRef const &> {
-  using type = FuncNoRef const &;
+struct OperatorReferenceType_impl<FuncNoRef const&> {
+  using type = FuncNoRef const&;
 };
 
 // Non-const references continue to be non-const.
 template <typename FuncNoRef>
-struct OperatorReferenceType_impl<FuncNoRef &> {
-  using type = FuncNoRef &;
+struct OperatorReferenceType_impl<FuncNoRef&> {
+  using type = FuncNoRef&;
 };
 
 // Inside each executor store a reference to a received rvalue reference
@@ -53,14 +53,15 @@ struct OperatorReferenceType_impl<FuncNoRef &> {
 // the parallel loop (as long as the resulting lvalue reference is used
 // anywhere).
 template <typename FuncNoRef>
-struct OperatorReferenceType_impl<FuncNoRef &&> {
-  using type = FuncNoRef &;
+struct OperatorReferenceType_impl<FuncNoRef&&> {
+  using type = FuncNoRef&;
 };
 
 } // namespace internal
 
 template <typename T>
-using OperatorReferenceType = typename internal::OperatorReferenceType_impl<T>::type;
+using OperatorReferenceType =
+    typename internal::OperatorReferenceType_impl<T>::type;
 
 } // namespace runtime
 } // namespace galois

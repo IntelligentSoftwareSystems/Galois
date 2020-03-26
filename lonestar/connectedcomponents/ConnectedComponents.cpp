@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -83,24 +83,23 @@ static cll::opt<OutputEdgeType> writeEdgeType(
     cll::init(OutputEdgeType::void_));
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
-    cll::values(clEnumValN(Algo::async, "Async", "Asynchronous"),
-                clEnumValN(Algo::edgeasync, "EdgeAsync", "Edge-Asynchronous"),
-                clEnumValN(Algo::edgetiledasync, "EdgetiledAsync",
-                           "EdgeTiled-Asynchronous (default)"),
-                clEnumValN(Algo::blockedasync, "BlockedAsync",
-                           "Blocked asynchronous"),
-                clEnumValN(Algo::labelProp, "LabelProp",
-                           "Using label propagation algorithm"),
-                clEnumValN(Algo::serial, "Serial", "Serial"),
-                clEnumValN(Algo::synchronous, "Sync", "Synchronous"),
-                clEnumValN(Algo::afforest, "Afforest",
-                           "Using Afforest sampling"),
-                clEnumValN(Algo::edgeafforest, "EdgeAfforest",
-                           "Using Afforest sampling, Edge-wise"),
-                clEnumValN(Algo::edgetiledafforest, "EdgetiledAfforest",
-                           "Using Afforest sampling, EdgeTiled"),
+    cll::values(
+        clEnumValN(Algo::async, "Async", "Asynchronous"),
+        clEnumValN(Algo::edgeasync, "EdgeAsync", "Edge-Asynchronous"),
+        clEnumValN(Algo::edgetiledasync, "EdgetiledAsync",
+                   "EdgeTiled-Asynchronous (default)"),
+        clEnumValN(Algo::blockedasync, "BlockedAsync", "Blocked asynchronous"),
+        clEnumValN(Algo::labelProp, "LabelProp",
+                   "Using label propagation algorithm"),
+        clEnumValN(Algo::serial, "Serial", "Serial"),
+        clEnumValN(Algo::synchronous, "Sync", "Synchronous"),
+        clEnumValN(Algo::afforest, "Afforest", "Using Afforest sampling"),
+        clEnumValN(Algo::edgeafforest, "EdgeAfforest",
+                   "Using Afforest sampling, Edge-wise"),
+        clEnumValN(Algo::edgetiledafforest, "EdgetiledAfforest",
+                   "Using Afforest sampling, EdgeTiled"),
 
-                clEnumValEnd),
+        clEnumValEnd),
     cll::init(Algo::edgetiledasync));
 
 struct Node : public galois::UnionFindNode<Node> {
@@ -204,14 +203,15 @@ struct SynchronousAlgo {
     });
 
     while (!cur->empty()) {
-      galois::do_all(galois::iterate(*cur),
-                     [&](const Edge& edge) {
-                       Node& sdata = graph.getData(
-                           edge.src, galois::MethodFlag::UNPROTECTED);
-                       if (!sdata.merge(edge.ddata))
-                         emptyMerges += 1;
-                     },
-                     galois::loopname("Merge"));
+      galois::do_all(
+          galois::iterate(*cur),
+          [&](const Edge& edge) {
+            Node& sdata =
+                graph.getData(edge.src, galois::MethodFlag::UNPROTECTED);
+            if (!sdata.merge(edge.ddata))
+              emptyMerges += 1;
+          },
+          galois::loopname("Merge"));
 
       galois::do_all(
           galois::iterate(*cur),
@@ -250,9 +250,7 @@ struct SynchronousAlgo {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           sdata.compress();
         },
-        galois::steal(),
-        galois::loopname("Compress")
-    );
+        galois::steal(), galois::loopname("Compress"));
 
     galois::runtime::reportStat_Single("CC-Sync", "rounds", rounds);
     galois::runtime::reportStat_Single("CC-Sync", "emptyMerges",
@@ -352,9 +350,7 @@ struct AsyncAlgo {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           sdata.compress();
         },
-        galois::steal(),
-        galois::loopname("CC-Async-Compress")
-    );
+        galois::steal(), galois::loopname("CC-Async-Compress"));
 
     galois::runtime::reportStat_Single("CC-Async", "emptyMerges",
                                        emptyMerges.reduce());
@@ -397,30 +393,29 @@ struct EdgeTiledAsyncAlgo {
     std::cout
         << "WARNING: Do not expect the default to be good for your graph.\n";
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     // Node& sdata=graph.getData(src,
-                     // galois::MethodFlag::UNPROTECTED);
-                     auto beg =
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-                     const auto end =
-                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          // Node& sdata=graph.getData(src,
+          // galois::MethodFlag::UNPROTECTED);
+          auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
-                     assert(beg <= end);
-                     if ((end - beg) > EDGE_TILE_SIZE) {
-                       for (; beg + EDGE_TILE_SIZE < end;) {
-                         auto ne = beg + EDGE_TILE_SIZE;
-                         assert(ne < end);
-                         works.push_back(EdgeTile{src, beg, ne});
-                         beg = ne;
-                       }
-                     }
+          assert(beg <= end);
+          if ((end - beg) > EDGE_TILE_SIZE) {
+            for (; beg + EDGE_TILE_SIZE < end;) {
+              auto ne = beg + EDGE_TILE_SIZE;
+              assert(ne < end);
+              works.push_back(EdgeTile{src, beg, ne});
+              beg = ne;
+            }
+          }
 
-                     if ((end - beg) > 0) {
-                       works.push_back(EdgeTile{src, beg, end});
-                     }
-                   },
-                   galois::loopname("CC-EdgeTiledAsyncInit"), galois::steal());
+          if ((end - beg) > 0) {
+            works.push_back(EdgeTile{src, beg, end});
+          }
+        },
+        galois::loopname("CC-EdgeTiledAsyncInit"), galois::steal());
 
     galois::do_all(
         galois::iterate(works),
@@ -449,9 +444,7 @@ struct EdgeTiledAsyncAlgo {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           sdata.compress();
         },
-        galois::steal(),
-        galois::loopname("CC-Async-Compress")
-    );
+        galois::steal(), galois::loopname("CC-Async-Compress"));
 
     galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges",
                                        emptyMerges.reduce());
@@ -474,16 +467,16 @@ struct EdgeAsyncAlgo {
 
     galois::InsertBag<Edge> works;
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     for (auto ii :
-                          graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-                       if (src < graph.getEdgeDst(ii)) {
-                         works.push_back(std::make_pair(src, ii));
-                       }
-                     }
-                   },
-                   galois::loopname("CC-EdgeAsyncInit"), galois::steal());
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            if (src < graph.getEdgeDst(ii)) {
+              works.push_back(std::make_pair(src, ii));
+            }
+          }
+        },
+        galois::loopname("CC-EdgeAsyncInit"), galois::steal());
 
     galois::do_all(
         galois::iterate(works),
@@ -507,9 +500,7 @@ struct EdgeAsyncAlgo {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           sdata.compress();
         },
-        galois::steal(),
-        galois::loopname("CC-Async-Compress")
-    );
+        galois::steal(), galois::loopname("CC-Async-Compress"));
 
     galois::runtime::reportStat_Single("CC-Async", "emptyMerges",
                                        emptyMerges.reduce());
@@ -567,24 +558,26 @@ struct BlockedAsyncAlgo {
   void operator()(Graph& graph) {
     galois::InsertBag<WorkItem> items;
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     Graph::edge_iterator start =
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-                     if (galois::substrate::ThreadPool::getSocket() == 0) {
-                       process<true, 0>(graph, src, start, items);
-                     } else {
-                       process<true, 1>(graph, src, start, items);
-                     }
-                   },
-                   galois::loopname("Initialize"));
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Graph::edge_iterator start =
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          if (galois::substrate::ThreadPool::getSocket() == 0) {
+            process<true, 0>(graph, src, start, items);
+          } else {
+            process<true, 1>(graph, src, start, items);
+          }
+        },
+        galois::loopname("Initialize"));
 
-    galois::for_each(galois::iterate(items),
-                     [&](const WorkItem& item, auto& ctx) {
-                       process<true, 0>(graph, item.src, item.start, ctx);
-                     },
-                     galois::loopname("Merge"),
-                     galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
+    galois::for_each(
+        galois::iterate(items),
+        [&](const WorkItem& item, auto& ctx) {
+          process<true, 0>(graph, item.src, item.start, ctx);
+        },
+        galois::loopname("Merge"),
+        galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
 
     galois::do_all(
         galois::iterate(graph),
@@ -592,9 +585,7 @@ struct BlockedAsyncAlgo {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           sdata.compress();
         },
-        galois::steal(),
-        galois::loopname("CC-Async-Compress")
-    );
+        galois::steal(), galois::loopname("CC-Async-Compress"));
   }
 };
 
@@ -623,8 +614,8 @@ bool verify(Graph& graph,
       GNode dst  = graph.getEdgeDst(ii);
       auto& data = graph.getData(dst);
       if (data.component() != me.component()) {
-        std::cerr << std::dec << "not in same component: " << (unsigned int)n << " ("
-                  << me.component() << ")"
+        std::cerr << std::dec << "not in same component: " << (unsigned int)n
+                  << " (" << me.component() << ")"
                   << " and " << (unsigned int)dst << " (" << data.component()
                   << ")"
                   << "\n";
@@ -653,27 +644,28 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   ReducerMap accumMap;
   galois::GAccumulator<size_t> accumReps;
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& x) {
-                   auto& n = graph.getData(x, galois::MethodFlag::UNPROTECTED);
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& x) {
+        auto& n = graph.getData(x, galois::MethodFlag::UNPROTECTED);
 
-                   if (std::is_same<Algo, LabelPropAlgo>::value) {
-                     if (n.isRepComp((unsigned int)x)) {
-                       accumReps += 1;
-                       return;
-                     }
-                   } else {
-                     if (n.isRep()) {
-                       accumReps += 1;
-                       return;
-                     }
-                   }
+        if (std::is_same<Algo, LabelPropAlgo>::value) {
+          if (n.isRepComp((unsigned int)x)) {
+            accumReps += 1;
+            return;
+          }
+        } else {
+          if (n.isRep()) {
+            accumReps += 1;
+            return;
+          }
+        }
 
-                   // Don't add reps to table to avoid adding components of size
-                   // 1
-                   accumMap.update(n.component(), 1);
-                 },
-                 galois::loopname("CountLargest"));
+        // Don't add reps to table to avoid adding components of size
+        // 1
+        accumMap.update(n.component(), 1);
+      },
+      galois::loopname("CountLargest"));
 
   Map& map    = accumMap.reduce();
   size_t reps = accumReps.reduce();

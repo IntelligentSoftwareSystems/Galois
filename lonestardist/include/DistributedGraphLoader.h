@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,18 +38,18 @@ namespace graphs {
 
 //! enums of partitioning schemes supported
 enum PARTITIONING_SCHEME {
-  OEC,                   //!< outgoing edge cut
-  IEC,                   //!< incoming edge cut
-  HOVC,                  //!< outgoing hybrid vertex cut
-  HIVC,                  //!< incoming hybrid vertex cut
-  CART_VCUT,             //!< cartesian vertex cut
-  CART_VCUT_IEC,         //!< cartesian vertex cut using iec
-  //CEC,                   //!< custom edge cut
-  GINGER_O,              //!< Ginger, outgoing
-  GINGER_I,              //!< Ginger, incoming
-  FENNEL_O,              //!< Fennel, oec
-  FENNEL_I,              //!< Fennel, iec
-  SUGAR_O                //!< Sugar, oec
+  OEC,           //!< outgoing edge cut
+  IEC,           //!< incoming edge cut
+  HOVC,          //!< outgoing hybrid vertex cut
+  HIVC,          //!< incoming hybrid vertex cut
+  CART_VCUT,     //!< cartesian vertex cut
+  CART_VCUT_IEC, //!< cartesian vertex cut using iec
+  // CEC,                   //!< custom edge cut
+  GINGER_O, //!< Ginger, outgoing
+  GINGER_I, //!< Ginger, incoming
+  FENNEL_O, //!< Fennel, oec
+  FENNEL_I, //!< Fennel, iec
+  SUGAR_O   //!< Sugar, oec
 };
 
 /**
@@ -72,7 +72,7 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "cvc";
   case CART_VCUT_IEC:
     return "cvc_iec";
-  //case CEC:
+  // case CEC:
   //  return "cec";
   case GINGER_O:
     return "ginger-oec";
@@ -105,7 +105,7 @@ extern cll::opt<bool> inputFileSymmetric;
 //! partitioning scheme to use
 extern cll::opt<galois::graphs::PARTITIONING_SCHEME> partitionScheme;
 ////! path to vertex id map for custom edge cut
-//extern cll::opt<std::string> vertexIDMapFileName;
+// extern cll::opt<std::string> vertexIDMapFileName;
 //! true if you want to read graph structure from a file
 extern cll::opt<bool> readFromFile;
 //! path to local graph structure to read
@@ -144,40 +144,40 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case OEC:
   case IEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
   case HOVC:
   case HIVC:
     return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
 
   case CART_VCUT:
   case CART_VCUT_IEC:
     return cuspPartitionGraph<GenericCVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
 
-  //case CEC:
-  //  return new Graph_customEdgeCut(inputFile, "", net.ID, net.Num,
-  //                                 scaleFactor, vertexIDMapFileName, false);
+    // case CEC:
+    //  return new Graph_customEdgeCut(inputFile, "", net.ID, net.Num,
+    //                                 scaleFactor, vertexIDMapFileName, false);
 
   case GINGER_O:
   case GINGER_I:
     return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
 
   case FENNEL_O:
   case FENNEL_I:
     return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
 
   case SUGAR_O:
     return cuspPartitionGraph<SugarP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
+        inputFileTranspose);
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -205,20 +205,20 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.Num == 1) {
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
   }
 
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "
                  "graph");
@@ -227,13 +227,13 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case HOVC:
     return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
   case HIVC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting incoming hybrid cut without transpose "
                  "graph");
@@ -242,33 +242,33 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case CART_VCUT:
     return cuspPartitionGraph<GenericCVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
 
   case CART_VCUT_IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GenericCVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting cvc incoming cut without "
                  "transpose graph");
       break;
     }
 
-  //case CEC:
-  //  return new Graph_customEdgeCut(inputFile, "", net.ID, net.Num,
-  //                                 scaleFactor, vertexIDMapFileName, false);
+    // case CEC:
+    //  return new Graph_customEdgeCut(inputFile, "", net.ID, net.Num,
+    //                                 scaleFactor, vertexIDMapFileName, false);
 
   case GINGER_O:
     return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
   case GINGER_I:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
@@ -276,13 +276,13 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case FENNEL_O:
     return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
   case FENNEL_I:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
       break;
@@ -290,8 +290,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case SUGAR_O:
     return cuspPartitionGraph<SugarP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false,
+        inputFileTranspose);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -323,29 +323,29 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   if (net.Num == 1) {
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       fprintf(stderr, "WARNING: Loading transpose graph through in-memory "
                       "transpose to iterate over in-edges: pass in transpose "
                       "graph with -graphTranspose to avoid unnecessary "
                       "overhead.\n");
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+          inputFileTranspose);
     }
   }
 
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "
                  "graph");
@@ -354,13 +354,13 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case HOVC:
     return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
   case HIVC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
       break;
@@ -368,37 +368,37 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case CART_VCUT:
     return cuspPartitionGraph<GenericCVCColumnFlip, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
   case CART_VCUT_IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GenericCVCColumnFlip, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
       break;
     }
 
-  //case CEC:
-  //  if (inputFileTranspose.size()) {
-  //    return new Graph_customEdgeCut(inputFileTranspose, "", net.ID,
-  //                                   net.Num, scaleFactor, vertexIDMapFileName,
-  //                                   false);
-  //  } else {
-  //    GALOIS_DIE("Error: (cec) iterate over in-edges without transpose graph");
-  //    break;
-  //  }
+    // case CEC:
+    //  if (inputFileTranspose.size()) {
+    //    return new Graph_customEdgeCut(inputFileTranspose, "", net.ID,
+    //                                   net.Num, scaleFactor,
+    //                                   vertexIDMapFileName, false);
+    //  } else {
+    //    GALOIS_DIE("Error: (cec) iterate over in-edges without transpose
+    //    graph"); break;
+    //  }
 
   case GINGER_O:
     return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
   case GINGER_I:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
@@ -406,13 +406,13 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case FENNEL_O:
     return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
   case FENNEL_I:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
-      );
+          inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
+          inputFileTranspose);
     } else {
       GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
       break;
@@ -420,8 +420,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case SUGAR_O:
     return cuspPartitionGraph<SugarColumnFlipP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false,
+        inputFileTranspose);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -242,13 +242,14 @@ void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
   std::cout << "[" << hostID << "] Finding unique chunks\n";
   uniqueChunkBitset.reset();
 
-  galois::do_all(galois::iterate((size_t)0, uniqueNodeBitset.size()),
-                 [&](auto nodeIndex) {
-                   if (uniqueNodeBitset.test(nodeIndex)) {
-                     uniqueChunkBitset.set(findOwner(nodeIndex, chunkToNode));
-                   }
-                 },
-                 galois::loopname("FindUniqueChunks"));
+  galois::do_all(
+      galois::iterate((size_t)0, uniqueNodeBitset.size()),
+      [&](auto nodeIndex) {
+        if (uniqueNodeBitset.test(nodeIndex)) {
+          uniqueChunkBitset.set(findOwner(nodeIndex, chunkToNode));
+        }
+      },
+      galois::loopname("FindUniqueChunks"));
 
   freeVector(uniqueNodeBitset.get_vec());
 
@@ -321,12 +322,9 @@ getChunkToHostMapping(const std::vector<uint64_t>& chunkCountsPrefixSum,
         edgeCount = chunkCountsPrefixSum[upperChunk - 1] -
                     chunkCountsPrefixSum[lowerChunk - 1];
       }
-      std::cout << "Host " << h << " gets nodes "
-        << lowerNode << " to "
-        << upperNode << " (count "
-        << (upperNode - lowerNode)
-        << "), with "
-        << edgeCount << " edges\n";
+      std::cout << "Host " << h << " gets nodes " << lowerNode << " to "
+                << upperNode << " (count " << (upperNode - lowerNode)
+                << "), with " << edgeCount << " edges\n";
     }
 
     finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
@@ -442,12 +440,9 @@ getChunkToHostMappingLinear(const std::vector<uint64_t>& chunkCountsPrefixSum,
         edgeCount = chunkCountsPrefixSum[upperChunk - 1] -
                     chunkCountsPrefixSum[lowerChunk - 1];
       }
-      std::cout << "Host " << h << " gets nodes "
-        << lowerNode << " to "
-        << upperNode << " (count "
-        << (upperNode - lowerNode)
-        << "), with "
-        << edgeCount << " edges\n";
+      std::cout << "Host " << h << " gets nodes " << lowerNode << " to "
+                << upperNode << " (count " << (upperNode - lowerNode)
+                << "), with " << edgeCount << " edges\n";
     }
 
     finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
@@ -469,10 +464,11 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
   return DoubleUint64Pair(nodePair, edgePair);
 }
 
-std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
-    const std::string& inputFile, Uint64Pair nodesToRead,
-    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
-    bool keepSelfLoops) {
+std::vector<uint32_t>
+loadCleanEdgesFromBufferedGraph(const std::string& inputFile,
+                                Uint64Pair nodesToRead, Uint64Pair edgesToRead,
+                                uint64_t totalNumNodes, uint64_t totalNumEdges,
+                                bool keepSelfLoops) {
   galois::graphs::BufferedGraph<void> bufGraph;
   bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second,
@@ -481,22 +477,23 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
   std::vector<std::set<uint32_t>> nonDupSets(numNodesToRead);
 
   // insert edge destinations of each node into a set (i.e. no duplicates)
-  galois::do_all(galois::iterate(nodesToRead.first, nodesToRead.second),
-                 [&](uint32_t gID) {
-                   size_t vectorIndex = gID - nodesToRead.first;
+  galois::do_all(
+      galois::iterate(nodesToRead.first, nodesToRead.second),
+      [&](uint32_t gID) {
+        size_t vectorIndex = gID - nodesToRead.first;
 
-                   uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
-                   uint64_t edgeEnd   = *bufGraph.edgeEnd(gID);
+        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+        uint64_t edgeEnd   = *bufGraph.edgeEnd(gID);
 
-                   for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-                     uint32_t edgeDest = bufGraph.edgeDestination(i);
-                     // checking if this is a self edge
-                     if ((edgeDest != gID) || keepSelfLoops) {
-                       nonDupSets[vectorIndex].insert(edgeDest);
-                     }
-                   }
-                 },
-                 galois::steal(), galois::loopname("FindCleanEdges"));
+        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+          uint32_t edgeDest = bufGraph.edgeDestination(i);
+          // checking if this is a self edge
+          if ((edgeDest != gID) || keepSelfLoops) {
+            nonDupSets[vectorIndex].insert(edgeDest);
+          }
+        }
+      },
+      galois::steal(), galois::loopname("FindCleanEdges"));
 
   // get total num edges remaining
   uint64_t edgesRemaining = 0;
@@ -625,7 +622,8 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
   uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
-  std::cout << "[" << hostID << "] Informing other hosts about number of edges\n";
+  std::cout << "[" << hostID
+            << "] Informing other hosts about number of edges\n";
 
   std::vector<uint64_t> edgesPerHost(totalNumHosts);
 
@@ -875,7 +873,7 @@ void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
     // cast down the node data
     uint32_t castDown = totalNumNodes;
     MPICheck(MPI_File_write_at(newGR, 0, &castDown, 1, MPI_UINT32_T,
-             MPI_STATUS_IGNORE));
+                               MPI_STATUS_IGNORE));
     MPICheck(MPI_File_write_at(newGR, sizeof(uint32_t), &totalNumEdges, 1,
                                MPI_UINT64_T, MPI_STATUS_IGNORE));
   }

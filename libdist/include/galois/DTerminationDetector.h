@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -68,10 +68,10 @@ public:
   }
 
   void reinitialize() {
-    prev_snapshot = 0;
-    snapshot = 1; 
+    prev_snapshot   = 0;
+    snapshot        = 1;
     global_snapshot = 1;
-    work_done = false;
+    work_done       = false;
   }
 
   /**
@@ -140,19 +140,20 @@ public:
   void initiate_snapshot() {
 #ifdef GALOIS_USE_LWCI
     lc_ialreduce(&snapshot, &global_snapshot, sizeof(Ty),
-                 &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep, &snapshot_request);
+                 &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep,
+                 &snapshot_request);
 #else
     MPI_Iallreduce(&snapshot, &global_snapshot, 1, MPI_UNSIGNED_LONG, MPI_MAX,
-                  MPI_COMM_WORLD, &snapshot_request);
+                   MPI_COMM_WORLD, &snapshot_request);
 #endif
   }
 
   bool terminate() {
     bool active = (local_mdata != 0);
-    //if (active) galois::gDebug("[", net.ID, "] local work done \n");
+    // if (active) galois::gDebug("[", net.ID, "] local work done \n");
     if (!active) {
       active = net.anyPendingSends();
-      //if (active) galois::gDebug("[", net.ID, "] pending send \n");
+      // if (active) galois::gDebug("[", net.ID, "] pending send \n");
     }
     int snapshot_ended = 0;
     if (!active) {
@@ -165,7 +166,8 @@ public:
     }
     if (!active) { // check pending receives after checking snapshot
       active = net.anyPendingReceives();
-      if (active) galois::gDebug("[", net.ID, "] pending receive");
+      if (active)
+        galois::gDebug("[", net.ID, "] pending receive");
     }
     if (active) {
       work_done = true;
@@ -173,14 +175,16 @@ public:
       if (snapshot_ended != 0) {
         snapshot = global_snapshot;
         if (work_done) {
-          work_done = false;
+          work_done     = false;
           prev_snapshot = snapshot;
           ++snapshot;
-          galois::gDebug("[", net.ID, "] work done, taking snapshot ", snapshot);
+          galois::gDebug("[", net.ID, "] work done, taking snapshot ",
+                         snapshot);
           initiate_snapshot();
         } else if (prev_snapshot != snapshot) {
           prev_snapshot = snapshot;
-          galois::gDebug("[", net.ID, "] no work done, taking snapshot ", snapshot);
+          galois::gDebug("[", net.ID, "] no work done, taking snapshot ",
+                         snapshot);
           initiate_snapshot();
         } else {
           galois::gDebug("[", net.ID, "] terminating ", snapshot);
@@ -211,7 +215,7 @@ public:
     if (local_mdata == 0)
       local_mdata = mdata.reduce();
 
-    bool halt = terminate();
+    bool halt    = terminate();
     global_mdata = !halt;
     if (halt) {
       galois::runtime::evilPhase += 2; // one for reduce and one for broadcast

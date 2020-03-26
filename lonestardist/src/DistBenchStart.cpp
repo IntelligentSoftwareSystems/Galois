@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,12 +31,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 cll::opt<int> numThreads("t", cll::desc("Number of threads (default 1)"),
-                              cll::init(1));
+                         cll::init(1));
 cll::opt<int> numRuns("runs", cll::desc("Number of runs (default 3)"),
-                                        cll::init(3));
-cll::opt<std::string> statFile("statFile",
-                               cll::desc("optional output file to print stats to"),
-                               cll::init(""));
+                      cll::init(3));
+cll::opt<std::string>
+    statFile("statFile", cll::desc("optional output file to print stats to"),
+             cll::init(""));
 cll::opt<bool> verify("verify",
                       cll::desc("Verify results by outputting results "
                                 "to file (default false)"),
@@ -189,7 +189,9 @@ void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
       }
     }
   } else {
-    galois::gWarn("Command line option -pset ignored because its string length is not equal to the number of processes/hosts on each physical node");
-  } 
+    galois::gWarn(
+        "Command line option -pset ignored because its string length is not "
+        "equal to the number of processes/hosts on each physical node");
+  }
 }
 #endif

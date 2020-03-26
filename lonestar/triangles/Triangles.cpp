@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -40,12 +40,8 @@ const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
 const char* url  = 0;
 
-constexpr static const unsigned CHUNK_SIZE  = 64u;
-enum Algo {
-  nodeiterator,
-  edgeiterator,
-  orderedCount
-};
+constexpr static const unsigned CHUNK_SIZE = 64u;
+enum Algo { nodeiterator, edgeiterator, orderedCount };
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>
@@ -53,8 +49,7 @@ static cll::opt<std::string>
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-                clEnumValN(Algo::edgeiterator, "edgeiterator",
-                           "Edge Iterator"),
+                clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"),
                 clEnumValN(Algo::orderedCount, "orderedCount",
                            "Ordered Simple Count (default)"),
                 clEnumValEnd),
@@ -145,8 +140,9 @@ struct DegreeLess : public std::binary_function<typename G::GraphNode,
   }
 };
 template <typename G>
-struct DegreeGreater : public std::binary_function<typename G::GraphNode,
-                                                typename G::GraphNode, bool> {
+struct DegreeGreater
+    : public std::binary_function<typename G::GraphNode, typename G::GraphNode,
+                                  bool> {
   typedef typename G::GraphNode N;
   G* g;
   DegreeGreater(G& g) : g(&g) {}
@@ -241,32 +237,31 @@ void nodeIteratingAlgo(Graph& graph) {
 void orderedCountAlgo(Graph& graph) {
 
   galois::GAccumulator<size_t> numTriangles;
-        galois::do_all(
-            galois::iterate(graph),
-            [&](const GNode& n) {
-              for(auto it_v : graph.edges(n)){
-                auto v = graph.getEdgeDst(it_v);
-                if( v > n)
-                  break;
-                Graph::edge_iterator it_n =
-                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& n) {
+        for (auto it_v : graph.edges(n)) {
+          auto v = graph.getEdgeDst(it_v);
+          if (v > n)
+            break;
+          Graph::edge_iterator it_n =
+              graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
 
-                for(auto it_vv : graph.edges(v)){
-                  auto vv = graph.getEdgeDst(it_vv);
-                  //std::cout << "-- vv : " << vv << "\n";
-                  if( vv > v)
-                    break;
-                  while(graph.getEdgeDst(it_n) < vv)
-                    it_n++;
-                  if(vv == graph.getEdgeDst(it_n)) {
-                    numTriangles += 1;
-                  }
-                }
-              }
-            },
-            galois::chunk_size<CHUNK_SIZE>(),
-            galois::steal(),
-            galois::loopname("orderedCountAlgo"));
+          for (auto it_vv : graph.edges(v)) {
+            auto vv = graph.getEdgeDst(it_vv);
+            // std::cout << "-- vv : " << vv << "\n";
+            if (vv > v)
+              break;
+            while (graph.getEdgeDst(it_n) < vv)
+              it_n++;
+            if (vv == graph.getEdgeDst(it_n)) {
+              numTriangles += 1;
+            }
+          }
+        }
+      },
+      galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+      galois::loopname("orderedCountAlgo"));
 
   std::cout << "Num Triangles: " << numTriangles.reduce() << "\n";
 }
@@ -295,16 +290,17 @@ void edgeIteratingAlgo(Graph& graph) {
   galois::InsertBag<WorkItem> items;
   galois::GAccumulator<size_t> numTriangles;
 
-  galois::do_all(galois::iterate(graph),
-                 [&](GNode n) {
-                   for (Graph::edge_iterator edge :
-                        graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-                     GNode dst = graph.getEdgeDst(edge);
-                     if (n < dst)
-                       items.push(WorkItem(n, dst));
-                   }
-                 },
-                 galois::loopname("Initialize"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](GNode n) {
+        for (Graph::edge_iterator edge :
+             graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
+          GNode dst = graph.getEdgeDst(edge);
+          if (n < dst)
+            items.push(WorkItem(n, dst));
+        }
+      },
+      galois::loopname("Initialize"));
 
   //  galois::runtime::profileVtune(
   //! [profile w/ papi]
@@ -336,8 +332,7 @@ void edgeIteratingAlgo(Graph& graph) {
               numTriangles += countEqual(graph, aa, ea, bb, eb);
             },
             galois::loopname("edgeIteratingAlgo"),
-            galois::chunk_size<CHUNK_SIZE>(),
-            galois::steal());
+            galois::chunk_size<CHUNK_SIZE>(), galois::steal());
       },
       "edgeIteratorAlgo");
   //! [profile w/ papi]
@@ -357,16 +352,16 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   std::deque<N> nodes;
   std::copy(initial.begin(), initial.end(), std::back_inserter(nodes));
 
-
   /* Sort by degree:
    *  DegreeLess: Sorts in the ascending order of node degrees
    *  DegreeGreater: Sorts in the descending order of the node degrees
    *
    *  The order of sorting has a huge impact on performance
-   *  For this algorithm, sorting in descending order delivers the 
+   *  For this algorithm, sorting in descending order delivers the
    *  best performance due to the way ties are broken.
    */
-  galois::ParallelSTL::sort(nodes.begin(), nodes.end(), DegreeGreater<G>(initial));
+  galois::ParallelSTL::sort(nodes.begin(), nodes.end(),
+                            DegreeGreater<G>(initial));
 
   std::deque<N> p;
   std::copy(nodes.begin(), nodes.end(), std::back_inserter(p));

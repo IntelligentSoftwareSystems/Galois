@@ -15,20 +15,19 @@ private:
 
 private:
   void reset() {
-    bag.clear();    
+    bag.clear();
     for (unsigned i = 0; i < ctxPtr.size(); i++) {
       *(ctxPtr.getRemote(i)) = nullptr;
     }
   }
 
 public:
-  ExampleWrappedWorklist(): inParallelPhase(false) { reset(); }
+  ExampleWrappedWorklist() : inParallelPhase(false) { reset(); }
 
   void enqueue(int item) {
     if (inParallelPhase) {
       (*(ctxPtr.getLocal()))->push(item);
-    }
-    else {
+    } else {
       bag.push(item);
     }
   }
@@ -38,7 +37,7 @@ public:
 
     galois::for_each(
         galois::iterate(bag),
-        [&] (int item, auto& ctx) {
+        [&](int item, auto& ctx) {
           if (nullptr == *(ctxPtr.getLocal())) {
             *(ctxPtr.getLocal()) = &ctx;
           }
@@ -48,10 +47,8 @@ public:
           if (item < 2000) {
             this->enqueue(item + item);
           }
-        }
-        , galois::loopname("execute")
-        , galois::no_conflicts()
-    );
+        },
+        galois::loopname("execute"), galois::no_conflicts());
 
     inParallelPhase = false;
     reset();
@@ -64,7 +61,7 @@ int main(int argc, char* argv[]) {
 
   ExampleWrappedWorklist q;
   for (unsigned i = 0; i < galois::getActiveThreads(); i++) {
-    q.enqueue(i+1);
+    q.enqueue(i + 1);
   }
   q.execute();
 

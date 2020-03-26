@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -124,51 +124,51 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
   galois::InsertBag<T> initBag;
   pushWrap(initBag, source, 0, "parallel");
 
-  galois::for_each(galois::iterate(initBag),
-                   [&](const T& item, auto& ctx) {
-                     constexpr galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
-                     const auto& sdata = graph.getData(item.src, flag);
+  galois::for_each(
+      galois::iterate(initBag),
+      [&](const T& item, auto& ctx) {
+        constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+        const auto& sdata                 = graph.getData(item.src, flag);
 
-                     if (sdata < item.dist) {
-                       if (TRACK_WORK)
-                         WLEmptyWork += 1;
-                       return;
-                     }
+        if (sdata < item.dist) {
+          if (TRACK_WORK)
+            WLEmptyWork += 1;
+          return;
+        }
 
-                     for (auto ii : edgeRange(item)) {
+        for (auto ii : edgeRange(item)) {
 
-                       GNode dst          = graph.getEdgeDst(ii);
-                       auto& ddist        = graph.getData(dst, flag);
-                       Dist ew            = graph.getEdgeData(ii, flag);
-                       const Dist newDist = sdata + ew;
+          GNode dst          = graph.getEdgeDst(ii);
+          auto& ddist        = graph.getData(dst, flag);
+          Dist ew            = graph.getEdgeData(ii, flag);
+          const Dist newDist = sdata + ew;
 
-                       while (true) {
-                         Dist oldDist = ddist;
+          while (true) {
+            Dist oldDist = ddist;
 
-                         if (oldDist <= newDist) {
-                           break;
-                         }
+            if (oldDist <= newDist) {
+              break;
+            }
 
-                         if (ddist.compare_exchange_weak(
-                                 oldDist, newDist, std::memory_order_relaxed)) {
+            if (ddist.compare_exchange_weak(oldDist, newDist,
+                                            std::memory_order_relaxed)) {
 
-                           if (TRACK_WORK) {
-                             //! [per-thread contribution of self-defined stats]
-                             if (oldDist != SSSP::DIST_INFINITY) {
-                               BadWork += 1;
-                             }
-                             //! [per-thread contribution of self-defined stats]
-                           }
+              if (TRACK_WORK) {
+                //! [per-thread contribution of self-defined stats]
+                if (oldDist != SSSP::DIST_INFINITY) {
+                  BadWork += 1;
+                }
+                //! [per-thread contribution of self-defined stats]
+              }
 
-                           pushWrap(ctx, dst, newDist);
-                           break;
-                         }
-                       }
-                     }
-                   },
-                   galois::wl<OBIM>(UpdateRequestIndexer{stepShift}),
-                   galois::no_conflicts(), galois::loopname("SSSP"));
+              pushWrap(ctx, dst, newDist);
+              break;
+            }
+          }
+        }
+      },
+      galois::wl<OBIM>(UpdateRequestIndexer{stepShift}), galois::no_conflicts(),
+      galois::loopname("SSSP"));
 
   if (TRACK_WORK) {
     //! [report self-defined stats]
@@ -273,9 +273,10 @@ void topoAlgo(Graph& graph, const GNode& source) {
   oldDist.allocateInterleaved(graph.size());
 
   constexpr Dist INFTY = SSSP::DIST_INFINITY;
-  galois::do_all(galois::iterate(size_t{0}, graph.size()),
-                 [&](size_t i) { oldDist.constructAt(i, INFTY); },
-                 galois::no_stats(), galois::loopname("initDistArray"));
+  galois::do_all(
+      galois::iterate(size_t{0}, graph.size()),
+      [&](size_t i) { oldDist.constructAt(i, INFTY); }, galois::no_stats(),
+      galois::loopname("initDistArray"));
 
   graph.getData(source) = 0;
 
@@ -287,24 +288,25 @@ void topoAlgo(Graph& graph, const GNode& source) {
     ++rounds;
     changed.reset();
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& n) {
-                     const auto& sdata = graph.getData(n);
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& n) {
+          const auto& sdata = graph.getData(n);
 
-                     if (oldDist[n] > sdata) {
+          if (oldDist[n] > sdata) {
 
-                       oldDist[n] = sdata;
-                       changed.update(true);
+            oldDist[n] = sdata;
+            changed.update(true);
 
-                       for (auto e : graph.edges(n)) {
-                         const auto newDist = sdata + graph.getEdgeData(e);
-                         auto dst           = graph.getEdgeDst(e);
-                         auto& ddata        = graph.getData(dst);
-                         galois::atomicMin(ddata, newDist);
-                       }
-                     }
-                   },
-                   galois::steal(), galois::loopname("Update"));
+            for (auto e : graph.edges(n)) {
+              const auto newDist = sdata + graph.getEdgeData(e);
+              auto dst           = graph.getEdgeDst(e);
+              auto& ddata        = graph.getData(dst);
+              galois::atomicMin(ddata, newDist);
+            }
+          }
+        },
+        galois::steal(), galois::loopname("Update"));
 
   } while (changed.reduce());
 
@@ -317,13 +319,13 @@ void topoTileAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& n) {
-                   SSSP::pushEdgeTiles(
-                       tiles, graph, n,
-                       SrcEdgeTileMaker{n, SSSP::DIST_INFINITY});
-                 },
-                 galois::steal(), galois::loopname("MakeTiles"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& n) {
+        SSSP::pushEdgeTiles(tiles, graph, n,
+                            SrcEdgeTileMaker{n, SSSP::DIST_INFINITY});
+      },
+      galois::steal(), galois::loopname("MakeTiles"));
 
   galois::GReduceLogicalOR changed;
   size_t rounds = 0;
@@ -332,24 +334,25 @@ void topoTileAlgo(Graph& graph, const GNode& source) {
     ++rounds;
     changed.reset();
 
-    galois::do_all(galois::iterate(tiles),
-                   [&](SrcEdgeTile& t) {
-                     const auto& sdata = graph.getData(t.src);
+    galois::do_all(
+        galois::iterate(tiles),
+        [&](SrcEdgeTile& t) {
+          const auto& sdata = graph.getData(t.src);
 
-                     if (t.dist > sdata) {
+          if (t.dist > sdata) {
 
-                       t.dist = sdata;
-                       changed.update(true);
+            t.dist = sdata;
+            changed.update(true);
 
-                       for (auto e = t.beg; e != t.end; ++e) {
-                         const auto newDist = sdata + graph.getEdgeData(e);
-                         auto dst           = graph.getEdgeDst(e);
-                         auto& ddata        = graph.getData(dst);
-                         galois::atomicMin(ddata, newDist);
-                       }
-                     }
-                   },
-                   galois::steal(), galois::loopname("Update"));
+            for (auto e = t.beg; e != t.end; ++e) {
+              const auto newDist = sdata + graph.getEdgeData(e);
+              auto dst           = graph.getEdgeDst(e);
+              auto& ddata        = graph.getData(dst);
+              galois::atomicMin(ddata, newDist);
+            }
+          }
+        },
+        galois::steal(), galois::loopname("Update"));
 
   } while (changed.reduce());
 
@@ -459,19 +462,17 @@ int main(int argc, char** argv) {
   visitedNode.reset();
 
   galois::do_all(
-    galois::iterate(graph),
-    [&] (uint64_t i) {
-      uint32_t myDistance = graph.getData(i);
+      galois::iterate(graph),
+      [&](uint64_t i) {
+        uint32_t myDistance = graph.getData(i);
 
-      if (myDistance != SSSP::DIST_INFINITY) {
-        maxDistance.update(myDistance);
-        distanceSum += myDistance;
-        visitedNode += 1;
-      }
-    },
-    galois::loopname("Sanity check"),
-    galois::no_stats()
-  );
+        if (myDistance != SSSP::DIST_INFINITY) {
+          maxDistance.update(myDistance);
+          distanceSum += myDistance;
+          visitedNode += 1;
+        }
+      },
+      galois::loopname("Sanity check"), galois::no_stats());
 
   // report sanity stats
   uint64_t rMaxDistance = maxDistance.reduce();

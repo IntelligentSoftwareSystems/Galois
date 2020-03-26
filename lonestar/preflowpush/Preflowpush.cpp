@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -449,16 +449,16 @@ struct PreflowPush {
   template <typename IncomingWL>
   void globalRelabel(IncomingWL& incoming) {
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     Node& node =
-                         graph.getData(src, galois::MethodFlag::UNPROTECTED);
-                     node.height  = graph.size();
-                     node.current = 0;
-                     if (src == sink)
-                       node.height = 0;
-                   },
-                   galois::loopname("ResetHeights"));
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& node   = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          node.height  = graph.size();
+          node.current = 0;
+          if (src == sink)
+            node.height = 0;
+        },
+        galois::loopname("ResetHeights"));
 
     using BSWL = galois::worklists::BulkSynchronous<>;
     using DWL  = galois::worklists::Deterministic<>;
@@ -477,17 +477,18 @@ struct PreflowPush {
       abort();
     }
 
-    galois::do_all(galois::iterate(graph),
-                   [&incoming, this](const GNode& src) {
-                     Node& node = this->graph.getData(
-                         src, galois::MethodFlag::UNPROTECTED);
-                     if (src == this->sink || src == this->source ||
-                         node.height >= (int)this->graph.size())
-                       return;
-                     if (node.excess > 0)
-                       incoming.push_back(src);
-                   },
-                   galois::loopname("FindWork"));
+    galois::do_all(
+        galois::iterate(graph),
+        [&incoming, this](const GNode& src) {
+          Node& node =
+              this->graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          if (src == this->sink || src == this->source ||
+              node.height >= (int)this->graph.size())
+            return;
+          if (node.excess > 0)
+            incoming.push_back(src);
+        },
+        galois::loopname("FindWork"));
   }
 
   template <typename C>
@@ -504,9 +505,10 @@ struct PreflowPush {
   }
 
   void run() {
-    Graph *captured_graph = &graph;
-    auto obimIndexer = [=](const GNode& n) {
-      return -captured_graph->getData(n, galois::MethodFlag::UNPROTECTED).height;
+    Graph* captured_graph = &graph;
+    auto obimIndexer      = [=](const GNode& n) {
+      return -captured_graph->getData(n, galois::MethodFlag::UNPROTECTED)
+                  .height;
     };
 
     typedef galois::worklists::PerSocketChunkFIFO<16> Chunk;
@@ -701,16 +703,16 @@ struct PreflowPush {
 
     reverseDirectionEdgeIterator.allocateInterleaved(graph.sizeEdges());
     // memoize the reverse direction edge-iterators
-    galois::do_all(galois::iterate(graph.begin(), graph.end()),
-                   [&, this](const GNode& src) {
-                     for (auto ii : this->graph.edges(
-                              src, galois::MethodFlag::UNPROTECTED)) {
-                       GNode dst = this->graph.getEdgeDst(ii);
-                       reverseDirectionEdgeIterator[*ii] =
-                           this->findEdge(dst, src);
-                     }
-                   },
-                   galois::loopname("FindReverseDirectionEdges"));
+    galois::do_all(
+        galois::iterate(graph.begin(), graph.end()),
+        [&, this](const GNode& src) {
+          for (auto ii :
+               this->graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst                         = this->graph.getEdgeDst(ii);
+            reverseDirectionEdgeIterator[*ii] = this->findEdge(dst, src);
+          }
+        },
+        galois::loopname("FindReverseDirectionEdges"));
   }
 
   void checkSorting(void) {

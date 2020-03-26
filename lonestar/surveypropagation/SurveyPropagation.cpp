@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -414,12 +414,12 @@ class SurveyPropagation {
   void SP_algorithm() {
     // 0) at t = 0, for every edge a->i, randomly initialize the message sigma
     // a->i(t=0) in [0,1] 1) for t = 1 to tmax: 1.1) sweep the set of edges in a
-    // random order, and update sequentially the warnings on all the edges of the
-    // graph, generating the values sigma a->i (t) using SP_update 1.2) if
-    // (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration has
-    // converged and generated sigma* a->i = sigma a->i(t), goto 2 2) if t = tmax
-    // return un-converged.  if (t < tmax) then return the set of fixed point
-    // warnings sigma* a->i = sigma a->i (t)
+    // random order, and update sequentially the warnings on all the edges of
+    // the graph, generating the values sigma a->i (t) using SP_update 1.2) if
+    // (|sigma a->i(t) - sigma a->i (t-1) < E on all the edges, the iteration
+    // has converged and generated sigma* a->i = sigma a->i(t), goto 2 2) if t =
+    // tmax return un-converged.  if (t < tmax) then return the set of fixed
+    // point warnings sigma* a->i = sigma a->i (t)
 
     //  tlimit += tmax;
 
@@ -558,26 +558,27 @@ class SurveyPropagation {
 
     galois::reportPageAlloc("MeminfoPre: decimate");
     // fix_variables
-    galois::do_all(galois::iterate(literalsN),
-                   [&](GNode i) {
-                     SPNode& idata = graph.getData(i);
-                     if (solved[idata.id]) {
-                       return;
-                     };
-                     if (Bias[idata.id] > limit) {
-                       solved[idata.id] = true;
-                       // TODO: simplify graph
-                       // for each b
-                       for (auto bii : graph.edges(i)) {
-                         // graph.getData(graph.getEdgeDst(bii)).solved = true;
-                         // graph.getData(graph.getEdgeDst(bii)).value = true;
-                         solved[graph.getData(graph.getEdgeDst(bii)).id] = true;
-                         value[graph.getData(graph.getEdgeDst(bii)).id]  = true;
-                       }
-                       graph.removeNode(i);
-                     }
-                   },
-                   galois::loopname("fix_variables"));
+    galois::do_all(
+        galois::iterate(literalsN),
+        [&](GNode i) {
+          SPNode& idata = graph.getData(i);
+          if (solved[idata.id]) {
+            return;
+          };
+          if (Bias[idata.id] > limit) {
+            solved[idata.id] = true;
+            // TODO: simplify graph
+            // for each b
+            for (auto bii : graph.edges(i)) {
+              // graph.getData(graph.getEdgeDst(bii)).solved = true;
+              // graph.getData(graph.getEdgeDst(bii)).value = true;
+              solved[graph.getData(graph.getEdgeDst(bii)).id] = true;
+              value[graph.getData(graph.getEdgeDst(bii)).id]  = true;
+            }
+            graph.removeNode(i);
+          }
+        },
+        galois::loopname("fix_variables"));
     galois::reportPageAlloc("MeminfoPost: decimate");
   }
 

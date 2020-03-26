@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -79,22 +79,22 @@ int main(int argc, char** argv) {
   T.start();
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPsimple]
-  galois::for_each(galois::iterate({std::make_pair(0U, *graph.begin())}),
-                   //! [Operator in SSSPsimple]
-                   [&](UpdateRequest& req, auto& ctx) {
-                     GNode active_node = req.second;
-                     unsigned& data    = graph.getData(active_node);
-                     if (req.first > data)
-                       return;
-                     //![loop over neighbors]
-                     for (auto ii : graph.edges(active_node))
-                       relax_edge(data, ii, ctx);
-                     //![loop over neighbors]
-                   }
-                   //! [Operator in SSSPsimple]
-                   ,
-                   galois::wl<OBIM>(reqIndexer),
-                   galois::loopname("sssp_run_loop"));
+  galois::for_each(
+      galois::iterate({std::make_pair(0U, *graph.begin())}),
+      //! [Operator in SSSPsimple]
+      [&](UpdateRequest& req, auto& ctx) {
+        GNode active_node = req.second;
+        unsigned& data    = graph.getData(active_node);
+        if (req.first > data)
+          return;
+        //![loop over neighbors]
+        for (auto ii : graph.edges(active_node))
+          relax_edge(data, ii, ctx);
+        //![loop over neighbors]
+      }
+      //! [Operator in SSSPsimple]
+      ,
+      galois::wl<OBIM>(reqIndexer), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPsimple]
   T.stop();
   return 0;

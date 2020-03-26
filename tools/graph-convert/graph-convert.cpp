@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -720,7 +720,6 @@ struct Gr2Adjacencylist : public Conversion {
   }
 };
 
-
 struct Gr2Edgelist : public Conversion {
   template <typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
@@ -1418,29 +1417,26 @@ struct SortByHighDegreeParent : public Conversion {
     std::cout << "Beginning perm sort\n";
 
     // sort the 0 -> # vertices array
-    std::sort(perm.begin(), perm.end(),
-      [&inv](GNode lhs, GNode rhs) -> bool {
-        const auto& leftBegin = inv[lhs].begin();
-        const auto& leftEnd = inv[lhs].end();
-        const auto& rightBegin = inv[rhs].begin();
-        const auto& rightEnd = inv[rhs].end();
-        // not less-than and not equal => greater-than
-        return (
-          !std::lexicographical_compare(leftBegin, leftEnd, rightBegin,
-                                        rightEnd) &&
-          !(std::distance(leftBegin, leftEnd) ==
-            std::distance(rightBegin, rightEnd) &&
-          std::equal(leftBegin, leftEnd, rightBegin))
-        );
-      }
-    );
+    std::sort(perm.begin(), perm.end(), [&inv](GNode lhs, GNode rhs) -> bool {
+      const auto& leftBegin  = inv[lhs].begin();
+      const auto& leftEnd    = inv[lhs].end();
+      const auto& rightBegin = inv[rhs].begin();
+      const auto& rightEnd   = inv[rhs].end();
+      // not less-than and not equal => greater-than
+      return (!std::lexicographical_compare(leftBegin, leftEnd, rightBegin,
+                                            rightEnd) &&
+              !(std::distance(leftBegin, leftEnd) ==
+                    std::distance(rightBegin, rightEnd) &&
+                std::equal(leftBegin, leftEnd, rightBegin)));
+    });
 
     std::cout << "Done sorting\n";
 
     Permutation perm2;
     perm2.create(sz);
     // perm2 stores the new ordering of a particular vertex
-    for (unsigned x = 0; x < perm.size(); ++x) perm2[perm[x]] = x;
+    for (unsigned x = 0; x < perm.size(); ++x)
+      perm2[perm[x]] = x;
 
     std::cout << "Done inverting\n";
 
@@ -2539,9 +2535,9 @@ struct Gr2Neo4j : public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     // TODO Need to figure out how we want to deal with labels
 
-    using Graph = galois::graphs::FileGraph;
-    using GNode = Graph::GraphNode;
-    using EdgeData = galois::LargeArray<EdgeTy>;
+    using Graph           = galois::graphs::FileGraph;
+    using GNode           = Graph::GraphNode;
+    using EdgeData        = galois::LargeArray<EdgeTy>;
     using edge_value_type = typename EdgeData::value_type;
 
     Graph graph;
@@ -2586,7 +2582,7 @@ struct Gr2Neo4j : public Conversion {
         GNode dst = graph.getEdgeDst(jj);
         if (EdgeData::has_value) {
           fileE << src << "," << dst << ",e,"
-               << graph.getEdgeData<edge_value_type>(jj) << "\n";
+                << graph.getEdgeData<edge_value_type>(jj) << "\n";
         } else {
           fileE << src << "," << dst << ",e\n";
         }

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -71,7 +71,7 @@ public:
   template <typename _node_data>
   struct with_node_data {
     using type = LC_Morph_Graph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,
-                                 HasOutOfLineLockable, HasId, FileEdgeTy>;
+                                HasOutOfLineLockable, HasId, FileEdgeTy>;
   };
 
   /**
@@ -101,7 +101,7 @@ public:
   template <bool _has_no_lockable>
   struct with_no_lockable {
     using type = LC_Morph_Graph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
-                           HasOutOfLineLockable, HasId, FileEdgeTy>;
+                                HasOutOfLineLockable, HasId, FileEdgeTy>;
   };
 
   /**
@@ -111,7 +111,7 @@ public:
   template <bool _use_numa_alloc>
   struct with_numa_alloc {
     using type = LC_Morph_Graph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
-                           HasOutOfLineLockable, HasId, FileEdgeTy>;
+                                HasOutOfLineLockable, HasId, FileEdgeTy>;
   };
 
   /**
@@ -121,8 +121,8 @@ public:
   template <bool _has_out_of_line_lockable>
   struct with_out_of_line_lockable {
     using type = LC_Morph_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
-                           _has_out_of_line_lockable,
-                           _has_out_of_line_lockable || HasId, FileEdgeTy>;
+                                _has_out_of_line_lockable,
+                                _has_out_of_line_lockable || HasId, FileEdgeTy>;
   };
 
   //! type that tells graph reader how to read a file for this graph
@@ -137,10 +137,11 @@ protected:
   //! Nodes are stored in an insert bag
   using Nodes = galois::InsertBag<NodeInfo>;
   //! Type of nodes
-  using NodeInfoTypes = internal::NodeInfoBaseTypes<NodeTy,
-                          !HasNoLockable && !HasOutOfLineLockable>;
+  using NodeInfoTypes =
+      internal::NodeInfoBaseTypes<NodeTy,
+                                  !HasNoLockable && !HasOutOfLineLockable>;
 
-  //! Linked list structure holding together blocks of memory that stores 
+  //! Linked list structure holding together blocks of memory that stores
   //! edges.
   struct EdgeHolder {
     //! Beginning of memory for this block.
@@ -158,8 +159,8 @@ protected:
   class NodeInfo
       : public internal::NodeInfoBase<NodeTy,
                                       !HasNoLockable && !HasOutOfLineLockable> {
-    using Super = internal::NodeInfoBase<NodeTy, !HasNoLockable && 
-                                                 !HasOutOfLineLockable>;
+    using Super =
+        internal::NodeInfoBase<NodeTy, !HasNoLockable && !HasOutOfLineLockable>;
     friend class LC_Morph_Graph;
 
     EdgeInfo* edgeBegin;
@@ -210,10 +211,11 @@ public:
   //! Iterator over EdgeInfo objects (edges)
   using edge_iterator = EdgeInfo*;
   //! Iterator over nodes
-  using iterator = boost::transform_iterator<makeGraphNode, typename Nodes::iterator>;
+  using iterator =
+      boost::transform_iterator<makeGraphNode, typename Nodes::iterator>;
   //! Constant iterator over nodes
   using const_iterator =
-    boost::transform_iterator<makeGraphNode, typename Nodes::const_iterator>;
+      boost::transform_iterator<makeGraphNode, typename Nodes::const_iterator>;
   //! Local iterator is just an iterator
   using local_iterator = iterator;
   //! Const local iterator is just an const_iterator
@@ -584,9 +586,9 @@ public:
   }
 
   /**
-   * Constructs the LCMorphGraph edges given a FileGraph to construct it from and
-   * pointers to already created nodes.
-   * Meant to be called by multiple threads.
+   * Constructs the LCMorphGraph edges given a FileGraph to construct it from
+   * and pointers to already created nodes. Meant to be called by multiple
+   * threads.
    *
    * @param[in] graph FileGraph to construct a morph graph from
    * @param[in] tid Thread id of thread calling this function

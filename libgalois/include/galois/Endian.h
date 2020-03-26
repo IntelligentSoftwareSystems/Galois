@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -40,8 +40,7 @@ static inline uint64_t bswap64(uint64_t x) {
   return ((x << 56) & 0xff00000000000000UL) |
          ((x << 40) & 0x00ff000000000000UL) |
          ((x << 24) & 0x0000ff0000000000UL) |
-         ((x <<  8) & 0x000000ff00000000UL) |
-         ((x >>  8) & 0x00000000ff000000UL) |
+         ((x << 8) & 0x000000ff00000000UL) | ((x >> 8) & 0x00000000ff000000UL) |
          ((x >> 24) & 0x0000000000ff0000UL) |
          ((x >> 40) & 0x000000000000ff00UL) |
          ((x >> 56) & 0x00000000000000ffUL);

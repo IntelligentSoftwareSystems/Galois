@@ -593,8 +593,8 @@ void SmallVectorImpl<T>::swap(SmallVectorImpl<T>& RHS) {
 }
 
 template <typename T>
-const SmallVectorImpl<T>& SmallVectorImpl<T>::
-operator=(const SmallVectorImpl<T>& RHS) {
+const SmallVectorImpl<T>&
+SmallVectorImpl<T>::operator=(const SmallVectorImpl<T>& RHS) {
   // Avoid self-assignment.
   if (this == &RHS)
     return *this;

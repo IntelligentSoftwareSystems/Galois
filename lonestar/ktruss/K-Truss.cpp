@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -71,13 +71,14 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to valid
-  galois::do_all(galois::iterate(g),
-                 [&g](typename Graph::GraphNode N) {
-                   for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
-                     g.getEdgeData(e) = valid;
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(g),
+      [&g](typename Graph::GraphNode N) {
+        for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
+          g.getEdgeData(e) = valid;
+        }
+      },
+      galois::steal());
 }
 
 #if 0
@@ -235,20 +236,21 @@ struct BSPTrussJacobiAlgo {
 
     // symmetry breaking:
     // consider only edges (i, j) where i < j
-    galois::do_all(galois::iterate(g),
-                   [&g, cur](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(g),
+        [&g, cur](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
 
     while (true) {
-      galois::do_all(galois::iterate(*cur), PickUnsupportedEdges{g, k - 2, unsupported, *next},
+      galois::do_all(galois::iterate(*cur),
+                     PickUnsupportedEdges{g, k - 2, unsupported, *next},
                      galois::steal());
 
       if (0 == std::distance(unsupported.begin(), unsupported.end())) {
@@ -256,14 +258,13 @@ struct BSPTrussJacobiAlgo {
       }
 
       // mark unsupported edges as removed
-      galois::do_all(galois::iterate(unsupported),
-                     [&g](Edge e) {
-                       g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) =
-                           removed;
-                       g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) =
-                           removed;
-                     },
-                     galois::steal());
+      galois::do_all(
+          galois::iterate(unsupported),
+          [&g](Edge e) {
+            g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
+            g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
+          },
+          galois::steal());
 
       unsupported.clear();
       cur->clear();
@@ -317,17 +318,17 @@ struct BSPTrussAlgo {
 
     // symmetry breaking:
     // consider only edges (i, j) where i < j
-    galois::do_all(galois::iterate(g),
-                   [&g, cur](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(g),
+        [&g, cur](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
     curSize = std::distance(cur->begin(), cur->end());
 
     // remove unsupported edges until no more edges can be removed
@@ -402,7 +403,8 @@ struct BSPCoreAlgo {
     NodeVec *cur = &work[0], *next = &work[1];
     size_t curSize = g.size(), nextSize;
 
-    galois::do_all(galois::iterate(g), KeepValidNodes{g, k, *next}, galois::steal());
+    galois::do_all(galois::iterate(g), KeepValidNodes{g, k, *next},
+                   galois::steal());
     nextSize = std::distance(next->begin(), next->end());
 
     while (curSize != nextSize) {
@@ -410,7 +412,8 @@ struct BSPCoreAlgo {
       curSize = nextSize;
       std::swap(cur, next);
 
-      galois::do_all(galois::iterate(*cur), KeepValidNodes{g, k, *next}, galois::steal());
+      galois::do_all(galois::iterate(*cur), KeepValidNodes{g, k, *next},
+                     galois::steal());
       nextSize = std::distance(next->begin(), next->end());
     }
   }
@@ -528,7 +531,6 @@ void run() {
   }
 
   galois::gInfo("Number of edges left in truss is ", numEdges);
-
 }
 
 int main(int argc, char** argv) {
