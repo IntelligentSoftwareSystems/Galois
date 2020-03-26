@@ -251,35 +251,38 @@ protected:
   }
 
   template <unsigned int limit, typename WL>
-  bool runQueue(ThreadLocalData& tld, WL& lwl) {
+  void runQueueDispatch(ThreadLocalData& tld, WL& lwl, unsigned int &num) {
     galois::optional<typename WL::value_type> p;
 #ifdef GALOIS_USE_LONGJMP_ABORT
     if (setjmp(execFrame) == 0) {
-      unsigned int num = 0;
       while ((!limit || num < limit) && (p = lwl.pop())) {
         ++num;
         doProcess(aborted.value(*p), tld);
       }
-      return (num > 0);
     } else {
       clearConflictLock();
       abortIteration(*p, tld);
-      return false;
     }
 #else
     try {
-      unsigned int num = 0;
       while ((!limit || num < limit) && (p = lwl.pop())) {
         ++num;
         doProcess(aborted.value(*p), tld);
       }
-      return (num > 0);
     } catch (ConflictFlag const& flag) {
       clearConflictLock();
       abortIteration(*p, tld);
-      return false;
     }
 #endif
+  }
+
+  template <unsigned int limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl) {
+    // Allocate num here in order to keep the stack frame of runQueueDispatch
+    // clean for longjmp.
+    unsigned int num = 0;
+    runQueueDispatch<limit>(tld, lwl, num);
+    return num > 0;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
