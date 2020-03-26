@@ -1,15 +1,17 @@
-#ifndef _LIBTSUBA_S3_H_
-#define _LIBTSUBA_S3_H_ 1
+#ifndef GALOIS_LIBTSUBA_S3_H_
+#define GALOIS_LIBTSUBA_S3_H_
 
-/* aws says buckets can only be 63 characters and object names can only be 1024
- * bytes */
-#define BUCKET_BUF_LIM   64
-#define OBJECT_BUF_LIM 1024
+#include <string>
+#include <cstdint>
 
-/* extra space for slashes and null terminators */
-#define URI_LIM (BUCKET_BUF_LIM + OBJECT_BUF_LIM + 64)
+namespace tsuba {
 
-int s3_uri_read(const char *uri, char *buf, char **bucket, char **object);
-int s3_open(const char *bucket, const char *object);
+int S3Open(const std::string& bucket, const std::string& object);
+
+std::pair<std::string, std::string> S3SplitUri(const std::string& /*uri*/);
+
+int S3DownloadRange(const std::string& bucket, const std::string& object,
+                    uint64_t start, uint64_t size, uint8_t* result_buf);
+} /* namespace tsuba */
 
 #endif

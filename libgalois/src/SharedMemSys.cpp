@@ -18,7 +18,7 @@
  */
 
 #include "galois/SharedMemSys.h"
+#include "tsuba/tsuba.h"
 
-galois::SharedMemSys::SharedMemSys() = default;
-
-galois::SharedMemSys::~SharedMemSys() = default;
+galois::SharedMemSys::SharedMemSys() { TsubaInit(); }
+galois::SharedMemSys::~SharedMemSys() { TsubaFini(); }
