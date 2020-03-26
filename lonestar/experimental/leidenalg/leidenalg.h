@@ -45,6 +45,10 @@ typedef galois::LargeArray<Comm> CommArray;
 struct Node{
   int64_t prev_comm_ass;
   int64_t curr_comm_ass;
+	
+	int64_t prev_subcomm_ass;
+	int64_t curr_subcomm_ass;
+
   uint64_t degree_wt;
   //uint64_t cluster_wt_internal;
   int64_t colorId;
@@ -632,14 +636,15 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
-    if(n_data.curr_comm_ass != -1) {
-      assert(n_data.curr_comm_ass < graph.size());
-      auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
+    //if(n_data.curr_comm_ass != -1) {
+    if(n_data.curr_subcomm_ass != -1) {
+      assert(n_data.curr_subcomm_ass < graph.size());
+      auto stored_already = cluster_local_map.find(n_data.curr_subcomm_ass);
      if(stored_already != cluster_local_map.end()){
-      n_data.curr_comm_ass = stored_already->second;
+      n_data.curr_subcomm_ass = stored_already->second;
      } else {
-      cluster_local_map[n_data.curr_comm_ass] = num_unique_clusters;
-      n_data.curr_comm_ass = num_unique_clusters;
+      cluster_local_map[n_data.curr_subcomm_ass] = num_unique_clusters;
+      n_data.curr_subcomm_ass = num_unique_clusters;
       num_unique_clusters++;
      }
     }

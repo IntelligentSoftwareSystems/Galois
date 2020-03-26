@@ -931,8 +931,8 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
   // Comment: Serial separation is better than do_all due to contention
   for(GNode n = 0; n < graph.size(); ++n) {
       auto n_data = graph.getData(n, flag_no_lock);
-      if(n_data.curr_comm_ass != -1)
-        cluster_bags[n_data.curr_comm_ass].push_back(n);
+      if(n_data.curr_subcomm_ass != -1)
+        cluster_bags[n_data.curr_subcomm_ass].push_back(n);
       //else galois::gPrint("ISOLATED NODE : ", n, "\n");
   }
 
@@ -947,19 +947,19 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                     uint64_t num_unique_clusters = 0;
                     for(auto cb_ii = cluster_bags[c].begin(); cb_ii != cluster_bags[c].end(); ++cb_ii) {
 
-                      assert(graph.getData(*cb_ii, flag_no_lock).curr_comm_ass == c); // All nodes in this bag must have same cluster id
+                      assert(graph.getData(*cb_ii, flag_no_lock).curr_subcomm_ass == c); // All nodes in this bag must have same cluster id
 
                       for(auto ii = graph.edge_begin(*cb_ii); ii != graph.edge_end(*cb_ii); ++ii) {
                         GNode dst = graph.getEdgeDst(ii);
                         auto dst_data = graph.getData(dst, flag_no_lock);
                         //assert(dst_data.curr_comm_ass < INF_VAL);
-                        assert(dst_data.curr_comm_ass !=  -1);
-                        auto stored_already = cluster_local_map.find(dst_data.curr_comm_ass); // Check if it already exists
+                        assert(dst_data.curr_subcomm_ass !=  -1);
+                        auto stored_already = cluster_local_map.find(dst_data.curr_subcomm_ass); // Check if it already exists
                         if(stored_already != cluster_local_map.end()) {
                           edges_data[c][stored_already->second] += graph.getEdgeData(ii);
                         } else {
-                          cluster_local_map[dst_data.curr_comm_ass] = num_unique_clusters;
-                          edges_id[c].push_back(dst_data.curr_comm_ass);
+                          cluster_local_map[dst_data.curr_subcomm_ass] = num_unique_clusters;
+                          edges_id[c].push_back(dst_data.curr_subcomm_ass);
                           edges_data[c].push_back(graph.getEdgeData(ii));
                           num_unique_clusters++;
                         }
