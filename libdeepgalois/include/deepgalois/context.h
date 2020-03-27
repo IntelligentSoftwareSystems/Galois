@@ -46,6 +46,8 @@ public:
   Graph* graph_cpu; // the input graph, |V| = N
   void genGraph(LGraph& lg, Graph& g);
   void add_selfloop(Graph &og, Graph &g);
+  //! returns pointer to the graph
+  Graph* getGraphPointer();
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }

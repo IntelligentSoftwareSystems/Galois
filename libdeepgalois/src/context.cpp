@@ -89,6 +89,10 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   //*/
 }
 
+Graph* Context::getGraphPointer() {
+  return Context::graph_cpu;
+}
+
 float_t* Context::get_in_ptr() { return &h_feats[0]; }
 
 void Context::norm_factor_counting() {
