@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,14 +27,13 @@
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
-namespace galois {
-namespace substrate {
+namespace galois::substrate {
 
 extern void initPTS(unsigned);
-}
-} // namespace galois
 
-using namespace galois::substrate;
+}
+
+using galois::substrate::ThreadPool;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
@@ -58,8 +57,9 @@ ThreadPool::ThreadPool()
 
 ThreadPool::~ThreadPool() {
   destroyCommon();
-  for (auto& t : threads)
+  for (auto& t : threads) {
     t.join();
+  }
 }
 
 void ThreadPool::destroyCommon() {
@@ -68,9 +68,12 @@ void ThreadPool::destroyCommon() {
 }
 
 void ThreadPool::burnPower(unsigned num) {
+  num = std::min(num, getMaxUsableThreads());
+
   // changing number of threads?  just do a reset
-  if (masterFastmode && masterFastmode != num)
+  if (masterFastmode && masterFastmode != num) {
     beKind();
+  }
   if (!masterFastmode) {
     run(num, []() { throw fastmode_ty{true}; });
     masterFastmode = num;
@@ -97,19 +100,19 @@ template <typename T>
 static unsigned findID(std::atomic<T*>& headptr, T* node, unsigned off) {
   T* n = headptr.load();
   assert(n);
-  if (n == node)
+  if (n == node) {
     return off;
-  else
-    return findID(n->next, node, off + 1);
+  }
+  return findID(n->next, node, off + 1);
 }
 
 template <typename T>
 static T* getNth(std::atomic<T*>& headptr, unsigned off) {
   T* n = headptr.load();
-  if (!off)
+  if (!off) {
     return n;
-  else
-    return getNth(n->next, off - 1);
+  }
+  return getNth(n->next, off - 1);
 }
 
 void ThreadPool::initThread(unsigned tid) {
@@ -118,10 +121,12 @@ void ThreadPool::initThread(unsigned tid) {
   // Initialize
   substrate::initPTS(mi.maxThreads);
 
-  if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-    if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
+  if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS")) {
+    if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
       bindThreadSelf(my_box.topo.osContext);
-  my_box.done = true;
+    }
+  }
+  my_box.done = 1;
 }
 
 void ThreadPool::threadLoop(unsigned tid) {
@@ -176,17 +181,11 @@ void ThreadPool::cascade(bool fastmode) {
   assert(me.wbegin <= me.wend);
 
   // nothing to wake up
-  if (me.wbegin == me.wend)
+  if (me.wbegin == me.wend) {
     return;
+  }
 
   auto midpoint = me.wbegin + (1 + me.wend - me.wbegin) / 2;
-  // static std::mutex m;
-  // {
-  //   std::lock_guard<std::mutex> lg(m);
-  //   std::cout << getTID() << "\t" << me.wbegin << ": (" << me.wbegin + 1 << "
-  //   " << midpoint << ")\t" << midpoint << ": (" << midpoint+1 << " " <<
-  //   me.wend << ")\n";
-  // }
 
   auto child1    = signals[me.wbegin];
   child1->wbegin = me.wbegin + 1;
@@ -204,9 +203,9 @@ void ThreadPool::cascade(bool fastmode) {
 void ThreadPool::runInternal(unsigned num) {
   // sanitize num
   // seq write to starting should make work safe
-  GALOIS_ASSERT(!running, "recursive thread pool execution not supported");
+  GALOIS_ASSERT(!running, "Recursive thread pool execution not supported");
   running = true;
-  num     = std::min(std::max(1U, num), mi.maxThreads - reserved);
+  num     = std::min(std::max(1U, num), getMaxUsableThreads());
   // my_box is tid 0
   auto& me  = my_box;
   me.wbegin = 1;
@@ -230,9 +229,13 @@ void ThreadPool::runInternal(unsigned num) {
 }
 
 void ThreadPool::runDedicated(std::function<void(void)>& f) {
+  // TODO(ddn): update galois::runtime::activeThreads to reflect the dedicated
+  // thread but we don't want to depend on galois::runtime symbols and too many
+  // clients access galois::runtime::activeThreads directly.
   GALOIS_ASSERT(!running,
-                "can't start dedicated thread durring parallel section");
+                "Can't start dedicated thread during parallel section");
   ++reserved;
+
   GALOIS_ASSERT(reserved < mi.maxThreads, "Too many dedicated threads");
   work          = [&f]() { throw dedicated_ty{f}; };
   auto child    = signals[mi.maxThreads - reserved];
@@ -244,7 +247,6 @@ void ThreadPool::runDedicated(std::function<void(void)>& f) {
     asmPause();
   }
   work = nullptr;
-  // FIXME: galois::setActiveThreads(galois::getActiveThreads());
 }
 
 static galois::substrate::ThreadPool* TPOOL = nullptr;
@@ -254,7 +256,7 @@ void galois::substrate::internal::setThreadPool(ThreadPool* tp) {
   TPOOL = tp;
 }
 
-galois::substrate::ThreadPool& galois::substrate::getThreadPool(void) {
+galois::substrate::ThreadPool& galois::substrate::getThreadPool() {
   GALOIS_ASSERT(TPOOL, "ThreadPool not initialized");
   return *TPOOL;
 }
