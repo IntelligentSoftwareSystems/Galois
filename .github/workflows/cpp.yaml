@@ -63,11 +63,11 @@ jobs:
         conan profile update settings.compiler.libcxx=libstdc++11 default
 
     - name: pre-build
-      run: mkdir -p ~/build
+      run: mkdir -p $HOME/build
     - name: install C++ dependencies
       run: |
         conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
-        conan install -if ~/build --build=missing config
+        conan install -if $HOME/build --build=missing config
 
     - name: check formating
       run: scripts/check_format.sh . || true  # Ignore formatting errors for now.
@@ -77,16 +77,16 @@ jobs:
     ###
     - name: configure
       run: |
-        cmake -S . -B ~/build \
+        cmake -S . -B $HOME/build \
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DCMAKE_INSTALL_PREFIX=/tmp \
-          -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
+          -DCMAKE_TOOLCHAIN_FILE=$HOME/build/conan_paths.cmake \
           -DCXX_CLANG_TIDY=clang-tidy \
           -DENABLE_DIST_GALOIS=on
     - name: build
-      run: cmake --build ~/build --parallel 4
+      run: cmake --build $HOME/build --parallel 4
 
   ###################################################################
   # build_and_test
@@ -141,15 +141,18 @@ jobs:
 
         conan profile new --detect --force default
         conan profile update settings.compiler.libcxx=libstdc++11 default
+
+        sudo sysctl -w kernel.core_pattern=$HOME/build/dumps/core.%e.%p.%h.%t
     - name: install dependencies
       if: startsWith(matrix.os, 'macOS-')
       run: |
         brew install ccache conan openmpi
         conan profile new --detect --force default
 
+        sudo sysctl -w kern.corefile=$HOME/build/dumps/core.%N.%P.%H.%I
     - name: pre-build
       run: |
-        mkdir -p ~/build
+        mkdir -p $HOME/build/dumps
 
         GRAPH_LOCATION=$HOME/.cache/graph
         if [[ ! -d "$GRAPH_LOCATION" ]]; then
@@ -159,33 +162,53 @@ jobs:
     - name: install C++ dependencies
       run: |
         conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
-        conan install -if ~/build --build=missing config
+        conan install -if $HOME/build --build=missing config
 
     ###
     # Standard CMake build process
     ###
     - name: configure
       run: |
-        cmake -S . -B ~/build \
+        [[ -f /proc/cpuinfo ]] && cat /proc/cpuinfo
+
+        cmake -S . -B $HOME/build \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
           -DCMAKE_INSTALL_PREFIX=/tmp \
-          -DCMAKE_TOOLCHAIN_FILE=~/build/conan_paths.cmake \
+          -DCMAKE_TOOLCHAIN_FILE=$HOME/build/conan_paths.cmake \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DENABLE_DIST_GALOIS=on \
           -DGRAPH_LOCATION=$HOME/.cache/graph
     - name: build
-      run: cmake --build ~/build --parallel 4
+      run: |
+        cmake --build $HOME/build --parallel 4
     - name: install
-      run: cmake --install ~/build
+      run: cmake --install $HOME/build
 
     - name: test
       if: startsWith(matrix.os, 'ubuntu-')
       run: |
-        cd ~/build && ctest -V --label-regex quick --parallel 4
+        ulimit -c unlimited
+        cd $HOME/build && ctest -V --label-regex quick --parallel 4
 
     # MacOS tests seem to run into CI host level failures that are hard to
     # reproduce locally. Rerun them for now.
     - name: test
       if: startsWith(matrix.os, 'macOS-')
       run: |
-        cd ~/build && ctest -V --label-regex quick --parallel 1 --repeat until-pass:2
+        ulimit -c unlimited
+        cd $HOME/build && ctest -V --label-regex quick --parallel 1 --repeat until-pass:2
+
+    # Upload path is relative to work directory and "~" and "${{env.HOME}}" do
+    # not seem to be expanded, so hard code HOME for now.
+    - name: upload build and test dumps
+      uses: actions/upload-artifact@v1
+      if: failure() && startsWith(matrix.os, 'ubuntu-')
+      with:
+        name: build-dump
+        path: /home/runner/build
+    - name: upload build and test dumps
+      uses: actions/upload-artifact@v1
+      if: failure() && startsWith(matrix.os, 'macOS-')
+      with:
+        name: build-dump
+        path: /Users/runner/build
