@@ -26,7 +26,7 @@
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
-#include <fstream>
+#include<fstream>
 
 /*
  * Headers for boost serialization
@@ -831,7 +831,7 @@ public:
         }
         );
   }
-    
+  
  /**
   * Reads the GR files directly into in-memory
   * data-structures of LC_CSR graphs using freads.
