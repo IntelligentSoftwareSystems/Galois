@@ -82,6 +82,12 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
+#ifdef GALOIS_USE_DIST
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+#else
+  unsigned myID = 0;
+#endif
+
   galois::gPrint("\nStart training...\n");
   galois::StatTimer Tupdate("Train-WeightUpdate");
   galois::StatTimer Tfw("Train-Forward");
@@ -91,7 +97,8 @@ void Net::train(optimizer* opt, bool need_validate) {
   Timer t_epoch;
   // run epochs
   for (unsigned i = 0; i < num_epochs; i++) {
-    galois::gPrint("Epoch ", std::setw(2), i, std::fixed, std::setprecision(3), ":");
+    galois::gPrint("[", myID, "] Epoch ", std::setw(2), i, std::fixed,
+                   std::setprecision(3), "\n");
     t_epoch.Start();
 
     // training steps
@@ -121,7 +128,7 @@ void Net::train(optimizer* opt, bool need_validate) {
 
     // validation / testing
     set_netphases(net_phase::test);
-    galois::gPrint("train_loss = ", std::setw(5), train_loss, " train_acc = ",
+    galois::gPrint("[", myID, "] train_loss = ", std::setw(5), train_loss, " train_acc = ",
                    std::setw(5), train_acc, "\n");
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
@@ -132,12 +139,12 @@ void Net::train(optimizer* opt, bool need_validate) {
       double val_time = evaluate(val_begin, val_end, val_count, &val_mask[0],
                                  val_loss, val_acc);
       Tval.stop();
-      galois::gPrint(" val_loss = ", std::setw(5), val_loss, " val_acc = ",
+      galois::gPrint("[", myID, "] val_loss = ", std::setw(5), val_loss, " val_acc = ",
                      std::setw(5), val_acc, "\n");
-      galois::gPrint(" time = ", epoch_time + val_time, " ms (train_time = ",
+      galois::gPrint("[", myID, "] time = ", epoch_time + val_time, " ms (train_time = ",
                      epoch_time, " val_time = ", val_time, ")\n");
     } else {
-      galois::gPrint(" train_time = ", epoch_time, " ms\n");
+      galois::gPrint("[", myID, "] train_time = ", epoch_time, " ms\n");
     }
   }
 }
