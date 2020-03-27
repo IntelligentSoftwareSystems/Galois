@@ -67,6 +67,9 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   }
   //std::cout << "Done\n";
 
+  // NOTE: train_begin/train_end are global IDs, train_mask is a local id
+  // train count and val count are LOCAL counts
+
   num_layers = NUM_CONV_LAYERS + 1;
   // initialize feature metadata
   feature_dims.resize(num_layers + 1);
@@ -111,7 +114,7 @@ void Net::train(optimizer* opt, bool need_validate) {
     train_loss =
         Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
     train_acc = masked_accuracy(train_begin, train_end, train_count,
-                                &train_mask[0]); // predict
+                                &train_mask[0], context->getGraphPointer()); // predict
     Tfw.stop();
 
     // backward: use intermediate features + ground truth to update layers
@@ -160,18 +163,60 @@ void Net::construct_layers() {
 }
 
 #ifdef CPU_ONLY
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
+/**
+ *
+ * @param begin GLOBAL begin
+ * @param end GLOBAL end
+ * @param count GLOBAL training count
+ */
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
+                           Graph* dGraph) {
+#ifndef GALOIS_USE_DIST
   AccumF accuracy_all;
+#else
+  AccuracyAccum accuracy_all;
+  galois::DGAccumulator<uint32_t> sampleCount;
+  sampleCount.reset();
+#endif
+
   accuracy_all.reset();
+
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
+#ifndef GALOIS_USE_DIST
     if (masks[i] == 1) {
+      // get prediction
       int preds = argmax(num_classes,
-	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[i * num_classes]));
+      	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[i * num_classes]));
+      // check prediction
       if ((label_t)preds == context->get_label(i))
         accuracy_all += 1.0;
     }
+#else
+    // only look at owned nodes (i.e. masters); the prediction for these
+    // should only by handled on the owner
+    if (dGraph->isOwned(i)) {
+      sampleCount += 1;
+
+      uint32_t localID = dGraph->getLID(i);
+      if (masks[localID] == 1) {
+        // get prediction
+        int preds = argmax(num_classes,
+        	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[localID * num_classes]));
+        // check prediction
+        if ((label_t)preds == context->get_label(localID))
+          accuracy_all += 1.0;
+      }
+    }
+#endif
   },
-  galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
+  galois::loopname("getMaskedLoss"));
+
+#ifdef GALOIS_USE_DIST
+  count = sampleCount.reduce();
+  galois::gDebug("sample count is ", count);
+#endif
+
+  // all hosts should get same accuracy
   return accuracy_all.reduce() / (acc_t)count;
 }
 #endif

@@ -122,7 +122,7 @@ public:
     Timer t_eval;
     t_eval.Start();
     loss = fprop(begin, end, count, masks);
-    acc  = masked_accuracy(begin, end, count, masks);
+    acc  = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
     t_eval.Stop();
     return t_eval.Millisecs();
   }
@@ -142,7 +142,8 @@ protected:
   size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
   std::vector<layer*> layers; // all the layers in the neural network
   // comparing outputs with the ground truth (labels)
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
+  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
+                        Graph* dGraph);
 };
 
 } // namespace deepgalois

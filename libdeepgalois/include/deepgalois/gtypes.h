@@ -12,6 +12,9 @@
 
 typedef galois::GAccumulator<acc_t> AccumF;
 typedef galois::GAccumulator<size_t> AccumU;
+#ifdef GALOIS_USE_DIST
+using AccuracyAccum = galois::DGAccumulator<acc_t>;
+#endif
 
 #ifndef GALOIS_USE_DIST
 #ifdef EDGE_LABEL
