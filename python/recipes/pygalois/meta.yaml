@@ -1,0 +1,34 @@
+{% set version = "0.1" %}
+# Boost doesn't have ABI compat guarantees across versions,
+# so fix the version throughout build and run time.
+#{% set boost_version = "1.69" %}
+
+package:
+  name: pygalois
+  version: {{ version }}
+
+build:
+  number: 3
+  skip: true # [not linux]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - cmake
+  host:
+    - python
+    - cython
+    - galois=5
+    - boost-cpp
+  run:
+    - galois=5
+    - python
+    - numba
+
+about:
+  license: BSD
+  summary: Low-level tasking runtime.
+
+extra:
+  recipe-maintainers:
+    - insertinterestingnamehere

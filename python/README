@@ -1,0 +1,17 @@
+A Prototype implementation of a Python interface for the Galois library
+for parallelism in graph algorithms.
+The Galois library is licensed under the three clause BSD license.
+These bindings are licensed under the two clause BSD license.
+
+
+Steps to run:
+1. Make sure Galois library is installed:
+  make && make install -j
+2. Build:
+  python3 setup.py build_ext --inplace
+3. In python interactive shell:
+  >> import galois as GL
+  >> GL.pagerank(2,0,b"/Users/gill/Documents/Katana/development/inputs/rmat15.tgr")
+
+
+
