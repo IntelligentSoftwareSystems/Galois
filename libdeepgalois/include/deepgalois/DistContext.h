@@ -39,6 +39,10 @@ public:
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
 
+  Graph* getGraphPointer() {
+    return graph_cpu;
+  }
+
   //! return label for some node
   //! NOTE: this is LID, not GID
   label_t get_label(size_t i) {
