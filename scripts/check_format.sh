@@ -1,5 +1,6 @@
 #!/bin/bash
 
+CLANG_FORMAT=${CLANG_FORMAT:-clang-format}
 set -e
 
 if [ $# -eq 0 ]; then
@@ -19,9 +20,9 @@ FAILED=
 while read -d '' filename; do
   if [ -n "${FIX}" ]; then
     echo "fixing ${filename}"
-    clang-format -style=file -i "${filename}"
+    ${CLANG_FORMAT} -style=file -i "${filename}"
   else
-    if clang-format -style=file -output-replacements-xml "${filename}" | grep '<replacement ' > /dev/null; then
+    if ${CLANG_FORMAT} -style=file -output-replacements-xml "${filename}" | grep '<replacement ' > /dev/null; then
         echo "${filename} NOT OK"
         FAILED=1
     fi
