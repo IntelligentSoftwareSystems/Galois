@@ -25,6 +25,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -39,6 +40,8 @@ static cll::opt<int> rounds("rounds", cll::desc("number of rounds"),
                             cll::init(10000));
 static cll::opt<int> trials("trials", cll::desc("number of trials"),
                             cll::init(1));
+static cll::opt<unsigned> threads("threads", cll::desc("number of threads"),
+                            cll::init(2));
 
 void runDoAllBurn(int num) {
   galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
@@ -62,7 +65,7 @@ void runDoAll(int num) {
 
 void runExplicitThread(int num) {
   galois::substrate::Barrier& barrier =
-      galois::runtime::getBarrier(galois::runtime::activeThreads);
+      galois::runtime::getBarrier(galois::getActiveThreads());
 
   galois::on_each([&](unsigned tid, unsigned total) {
     auto range =
@@ -86,12 +89,12 @@ void run(std::function<void(int)> fn, std::string name) {
 }
 
 std::atomic<int> EXIT;
-#include <chrono>
 
 int main(int argc, char* argv[]) {
   galois::SharedMemSys Galois_runtime;
   LonestarStart(argc, argv, 0, 0, 0);
-  galois::setActiveThreads(std::max(galois::getActiveThreads(), 2U));
+
+  galois::setActiveThreads(threads);
 
   EXIT                        = 0;
   std::function<void(void)> f = []() {
@@ -102,14 +105,16 @@ int main(int argc, char* argv[]) {
   };
   galois::substrate::getThreadPool().runDedicated(f);
 
-  std::cout << "threads: " << galois::getActiveThreads()
-            << " rounds: " << rounds << " size: " << size << "\n";
-
   for (int t = 0; t < trials; ++t) {
     run(runDoAll, "DoAll");
     run(runDoAllBurn, "DoAllBurn");
     run(runExplicitThread, "ExplicitThread");
   }
   EXIT = 1;
+
+  std::cout << "threads: " << galois::getActiveThreads()
+            << " usable threads: " << galois::substrate::getThreadPool().getMaxUsableThreads()
+            << " rounds: " << rounds << " size: " << size << "\n";
+
   return 0;
 }
