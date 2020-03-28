@@ -12,26 +12,16 @@ allocate(Graph *graph, unsigned max_size, unsigned max_degree, int num_patterns)
 	vid_lists.resize(max_level);
 	vid_lists[0].resize(1);
 	vid_lists[1].resize(1);
-	if (is_single) {
+	if (is_clique || do_local_counting) {
 		//std::cout << "allocating vertex list\n";
 		for (unsigned i = 2; i < max_level-1; i ++)
 			vid_lists[i].resize(length);
-		if (!is_clique) {
-			src_indices.resize(max_level);
-			for (unsigned i = 2; i < max_level; i ++) 
-				src_indices[i].resize(i*length);
-		}
 	} else {
-		if (do_local_counting) {
-			for (unsigned i = 2; i < max_level; i ++)
-				vid_lists[i].resize(length);
-		} else {
-			for (unsigned i = 2; i < max_level; i ++) 
-				vid_lists[i].resize(i*length);
-			src_indices.resize(max_level);
-			for (unsigned i = 2; i < max_level; i ++) 
-				src_indices[i].resize(i*length);
-		}
+		for (unsigned i = 2; i < max_level-1; i ++) 
+			vid_lists[i].resize(i*length);
+		src_indices.resize(max_level);
+		for (unsigned i = 2; i < max_level-1; i ++) 
+			src_indices[i].resize(i*length);
 	}
 
 	if (use_pcode) { // TODO: maybe useful for subgraph listing

@@ -5,8 +5,13 @@ const char* name = "Sgl";
 const char* desc = "Counts a single arbitrary pattern in a graph using DFS traversal";
 const char* url  = 0;
 
+//#define DIAMOND
+#define RECTANGLE // 4-cycle
+#ifdef RECTANGLE
+#define input_ccode 2
+#else
 #define input_ccode 3
-
+#endif
 #include "DfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI {
 public:
@@ -15,8 +20,16 @@ public:
 	}
 	static inline bool toAdd(unsigned level, unsigned max_level, VertexId vid, 
 		unsigned src_idx, BYTE ccode, const std::vector<VertexId> *emb) { 
+		if (vid == (*emb)[0]) return false;
+		if (vid == (*emb)[1]) return false;
 		if (level == 1) {
-			//if (vid <= (*emb)[1]) return false; // for diamond
+#ifdef RECTANGLE
+			if (vid < (*emb)[0]) return false;
+#else
+#ifdef DIAMOND
+			if (vid < (*emb)[0] && vid < (*emb)[1]) return false;
+#endif
+#endif
 			if ((input_ccode & 3) == 3) {
 				if (ccode == 3) return true;
 				else return false;
@@ -25,13 +38,21 @@ public:
 				else return false;
 			}
 		} else if (level == 2) {
-			//if (vid <= (*emb)[0]) return false;
-			if (vid == (*emb)[0]) return false;
-			if (vid == (*emb)[1]) return false;
 			//if (vid == (*emb)[2]) return false;
-			//if (ccode == 6) return true; // diamond
+#ifdef RECTANGLE
+			if (vid < (*emb)[0] || vid < (*emb)[1]) return false;
+			if (ccode == 5) return true; // 4-cycle
+#else
+#ifdef DIAMOND
+			if (ccode != 5 && ccode != 6) return false;
+			if (ccode == 5 && ((*emb)[2] < (*emb)[0] || vid < (*emb)[1])) return false;
+			if (ccode == 6 && ((*emb)[2] < (*emb)[1] || vid < (*emb)[0])) return false;
+			return true;
+#else
 			if (ccode == 4) return true; // tailed_tri
 			else return false;
+#endif // end diamond
+#endif // end 4cycle
 		} else {
 			exit(1);
 		}

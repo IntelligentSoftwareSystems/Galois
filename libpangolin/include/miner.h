@@ -93,34 +93,6 @@ protected:
 	unsigned max_degree;
 	uint32_t *degrees;
 
-	#ifdef USE_QUERY_GRAPH
-	std::vector<VertexId> matching_order;
-	std::vector<VertexId> matching_order_map;
-	std::vector<VertexId> automorph_group_id;
-	// Read the preset file to hardcode the presets
-	void read_presets() {
-		std::ifstream ifile;
-		ifile.open(preset_filename);
-		if (!ifile) printf("Error in reading file %s\n", preset_filename.c_str());
-		VertexId x;
-		for (size_t i = 0; i< max_size; ++i) {
-			ifile >> x;
-			matching_order[i] = x;
-			if(debug) std::cout << "matching_order[" << i << "] = " << x << "\n";
-		}
-		for (size_t i = 0; i < max_size; ++i) {
-			ifile >> x;
-			matching_order_map[i] = x;
-			if(debug) std::cout << "matching_map[" << i << "] = " << x << "\n";
-		}
-		for (size_t i = 0; i < max_size; ++i) {
-			ifile >> x;
-			automorph_group_id[i] = x;
-			if(debug) std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
-		}
-		ifile.close();
-	}
-	#endif
 	inline bool is_automorphism_dag(unsigned n, const EmbeddingTy& emb, unsigned idx, VertexId dst) {
 		//if (dst <= emb.get_vertex(0)) return true;
 		for (unsigned i = 0; i < n; ++i) if (dst == emb.get_vertex(i)) return true;
