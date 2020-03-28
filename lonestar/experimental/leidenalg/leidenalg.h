@@ -60,6 +60,13 @@ using Graph =
 
 using GNode = Graph::GraphNode;
 
+igraph_rng_t rng;
+double resolution;
+
+void setResolution(double res){
+
+	resolution = res;
+}
 
 
 void printGraphCharateristics(Graph& graph) {
@@ -379,6 +386,10 @@ double calModularityFinal(Graph& graph) {
 
    /* Calculate the overall modularity */
   double e_xx = 0;
+
+
+
+
   galois::GAccumulator<double> acc_e_xx;
   double a2_x = 0;
   galois::GAccumulator<double> acc_a2_x;
@@ -414,6 +425,91 @@ double calModularityFinal(Graph& graph) {
   return mod;
 }
 
+void set_rng(){
+	
+	igraph_rng_init(&rng, &igraph_rngtype_mt19937);
+	igraph_rng_seed(&rng, rand());
+}
+
+uint64_t getRandomInt(uint64_t from, uint64_t to){
+	
+	return igraph_rng_get_integer(rng, from, to);
+}
+
+double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt){
+
+	uint64_t size_x = subcomm_info[curr_subcomm].size;
+	uint64_t size_y = subcomm_info[candidate_subcomm].size;
+
+	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
+
+	return diff;
+}
+//subcomm_info should have updated size values
+uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info){
+
+	uint64_t rand_subcomm = -1;
+	uint64_t curr_subcomm = graph.getData(n).curr_subcomm_ass;
+
+	std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's subcommunity to local number: Subcommunity --> Index
+	std::vector<uint64_t> counter; //Number of edges to each unique subcommunity
+	uint64_t num_unique_clusters = 1;
+
+	cluster_local_map[curr_subcomm] = 0; // Add n's current subcommunity
+	counter.push_back(0); //Initialize the counter to zero (no edges incident yet)
+
+	uint64_t self_loop_wt = 0;
+
+	for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+  	GNode dst = graph.getEdgeDst(ii);
+    auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded	
+
+		if(dst == n){
+    	self_loop_wt += edge_wt; // Self loop weights is recorded
+		}
+		auto stored_already = cluster_local_map.find(graph.getData(dst).curr_subcomm_ass); // Check if it already exists
+		if(stored_already != cluster_local_map.end()) {
+    	counter[stored_already->second] += edge_wt;
+    } 
+		else {
+    	cluster_local_map[graph.getData(dst).curr_subcomm_ass] = num_unique_clusters;
+      counter.push_back(edge_wt);
+      num_unique_clusters++;
+    }
+  } // End edge loop
+
+	std::map<uint64_t, uint64_t> new_cluster_local_map;	
+	std::vector<uint64_t> new_counter;		
+	num_unique_clusters = 0;
+	uint64_t total = 0;	
+
+	for(auto pair: cluster_local_map){
+
+		auto subcomm = pair.first;
+		if(curr_subcomm == subcomm)
+			continue;
+		if(diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt) > 0){
+			new_cluster_local_map[subcomm] = num_unique_clusters;
+			uint64_t count = counter[cluster_local_map[subcomm]];
+			new_counter.push_back(count);
+			total += count;
+		}
+	}
+
+	uint64_t rand_idx = getRandomInt(0,total-1);
+
+	uint64_t idx = 0;
+	for(auto pair: new_cluster_local_map){
+
+		if(new_counter[idx] > rand_idx)
+			return pair.first;
+
+		rand_idx = rand_idx - new_counter[idx];
+	}
+
+	return -1;
+}
+/*
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
                        CommArray &c_info, uint64_t degree_wt, uint64_t sc, double resolution) {
@@ -438,6 +534,36 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
       cur_gain = 2 * (eiy - eix) + resolution*(size_x*(size_x - 1) - (size_y+1)*size_y);
+
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
+        max_gain = cur_gain;
+        max_index = stored_already->first;
+*/
+
+uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
+                       //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double resolution) {
+
+  uint64_t max_index = sc; // Assign the intial value as self community
+  double cur_gain = 0;
+  double max_gain = 0;
+  double eix = counter[0] - self_loop_wt;
+  double ax = c_info[sc].degree_wt - degree_wt;
+  double eiy = 0;
+  double ay = 0;
+
+	double size_x = c_info[sc].size;
+
+  auto stored_already = cluster_local_map.begin();
+  do {
+    if(sc != stored_already->first) {
+      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+			size_y = c_info[stored_already->first].size;
+
+      eiy = counter[stored_already->second]; // Total edges incident on cluster y
+      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
+      //From the paper: Verbatim
+   		cur_gain = 2.0f * (double)(eiy - eix) + resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));   
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -494,7 +620,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2 * (eiy - eix) + resolution*(size_x*(size_x - 1) - (size_y+1)*size_y);
+      cur_gain = 2.0f * (double)(eiy - eix) + resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -637,35 +763,6 @@ uint64_t renumberClustersContiguously(Graph &graph) {
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
     //if(n_data.curr_comm_ass != -1) {
-    if(n_data.curr_subcomm_ass != -1) {
-      assert(n_data.curr_subcomm_ass < graph.size());
-      auto stored_already = cluster_local_map.find(n_data.curr_subcomm_ass);
-     if(stored_already != cluster_local_map.end()){
-      n_data.curr_subcomm_ass = stored_already->second;
-     } else {
-      cluster_local_map[n_data.curr_subcomm_ass] = num_unique_clusters;
-      n_data.curr_subcomm_ass = num_unique_clusters;
-      num_unique_clusters++;
-     }
-    }
-  }
-
-  return num_unique_clusters;
-}
-
-uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
-
-  std::map<uint64_t, uint64_t> cluster_local_map;
-  uint64_t num_unique_clusters = 0;
-
-  for (GNode n = 0; n < arr.size(); ++n){
-    if(arr[n] != -1) {
-      assert(arr[n] < arr.size());
-      auto stored_already = cluster_local_map.find(arr[n]);
-     if(stored_already != cluster_local_map.end()){
-      arr[n] = stored_already->second;
-     } else {
-      cluster_local_map[arr[n]] = num_unique_clusters;
       arr[n] = num_unique_clusters;
       num_unique_clusters++;
      }

@@ -32,8 +32,10 @@
 #include <deque>
 #include <type_traits>
 
+#include <igraph.h>
+
 #include "Lonestar/BoilerPlate.h"
-#include "louvainClustering.h"
+#include "leidenalg.h"
 #include "galois/DynamicBitset.h"
 
 namespace cll = llvm::cl;
@@ -1097,6 +1099,8 @@ int main(int argc, char** argv) {
 
   galois::StatTimer TEnd2End("Timer_end2end");
   TEnd2End.start();
+
+	set_rng();
 
   std::cout << "Reading from file: " << filename << std::endl;
   std::cout << "[WARNING:] Make sure " << filename << " is symmetric graph without duplicate edges" << std::endl;
