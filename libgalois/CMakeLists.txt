@@ -37,6 +37,8 @@ set(sources
         src/ParaMeter.cpp
         src/DynamicBitset.cpp
         src/Tracer.cpp
+        src/FileView.cpp
+        src/OutIndexView.cpp
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
