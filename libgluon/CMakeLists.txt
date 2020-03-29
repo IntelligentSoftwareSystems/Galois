@@ -30,8 +30,3 @@ target_include_directories(galois_gluon PUBLIC
 if (USE_LCI)
   target_include_directories(galois_gluon PUBLIC ${LWCI_INCLUDE})
 endif()
-
-set_target_properties (galois_gluon PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)

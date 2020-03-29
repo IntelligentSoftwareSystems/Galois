@@ -15,10 +15,6 @@ target_include_directories(galois_dist_async_obj PUBLIC
   ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-set_target_properties (galois_dist_async_obj PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
 
 # new galois net library; link to shared memory galois
 add_library(galois_dist_async STATIC $<TARGET_OBJECTS:galois_dist_async_obj>)
@@ -46,8 +42,3 @@ target_include_directories(galois_dist_async PUBLIC
 if (USE_LCI)
   target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
 endif()
-
-set_target_properties (galois_dist_async PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
