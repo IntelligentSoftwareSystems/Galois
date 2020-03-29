@@ -13,10 +13,6 @@ set(sources
 add_library(gllvm_obj OBJECT ${sources})
 target_include_directories(gllvm_obj BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(gllvm_obj BEFORE PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-set_target_properties (gllvm_obj PROPERTIES 
-  INTERFACE_POSITION_INDEPENDENT_CODE On 
-  POSITION_INDEPENDENT_CODE On
-)
 
 add_library(gllvm STATIC $<TARGET_OBJECTS:gllvm_obj>)
 target_include_directories(gllvm BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

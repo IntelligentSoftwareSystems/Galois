@@ -20,10 +20,6 @@ target_include_directories(galois_python PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_link_libraries(galois_python ${Boost_SERIALIZATION_LIBRARY_RELEASE})
-set_target_properties (galois_python PROPERTIES 
-  INTERFACE_POSITION_INDEPENDENT_CODE On 
-  POSITION_INDEPENDENT_CODE On
-)
 
 if (USE_VTUNE)
   find_package(VTune)

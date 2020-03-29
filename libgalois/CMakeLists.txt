@@ -58,10 +58,6 @@ target_include_directories(galois_shmem_obj PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/libtsuba/include>
   $<INSTALL_INTERFACE:${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}>
 )
-set_target_properties (galois_shmem_obj PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
 
 add_library(galois_shmem $<TARGET_OBJECTS:galois_shmem_obj>)
 target_include_directories(galois_shmem PUBLIC

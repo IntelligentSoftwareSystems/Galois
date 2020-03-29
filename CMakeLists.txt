@@ -11,13 +11,6 @@ set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 set(GALOIS_COPYRIGHT_YEAR "2018") # Also in COPYRIGHT
 
-#adding additional compiler flags for mpip profiling
-#set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
-#set(MPIP_DIR "/net/ohm/export/cdgc/gill/modules/mpip/lib")
-#set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
-#link_directories(LIBUNWIND_DIR MPIP_DIR)
-
-
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release")
   # cmake default flags with relwithdebinfo is -O2 -g
@@ -50,17 +43,17 @@ set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy comman
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
 
+# This option is automatically handled by CMake.
+# It makes add_library build a shared lib unless STATIC is explicitly specified.
+# Putting this here is mostly just a placeholder so people know it's an option.
+# Currently this is really only intended to change anything for the libgalois_shmem target.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
 else()
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/CMake/Galois")
 endif()
-
-# This option is automatically handled by CMake.
-# It makes add_library build a shared lib unless STATIC is explicitly specified.
-# Putting this here is mostly just a placeholder so people know it's an option.
-# Currently this is really only intended to change anything for the libgalois_shmem target.
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries.")
 
 set(INSTALL_CMAKE_DIR "${DEFAULT_INSTALL_CMAKE_DIR}" CACHE PATH "Installation directory for CMake files")
 # Make relative path absolute
@@ -99,6 +92,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
