@@ -2,7 +2,7 @@
 #include "DfsMining/vertex_miner.h"
 
 const char* name = "Sgl";
-const char* desc = "Counts a single arbitrary pattern in a graph using DFS traversal";
+const char* desc = "Listing vertex-induced subgraphs of a single arbitrary pattern in a graph using DFS traversal";
 const char* url  = 0;
 
 //#define DIAMOND

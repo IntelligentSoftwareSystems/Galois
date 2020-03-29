@@ -14,6 +14,9 @@ public:
 	static inline bool toAdd(unsigned n, Graph &g, const EmbeddingTy &emb, unsigned pos, VertexId dst) {
 		return !is_vertex_automorphism(n, g, emb, pos, dst);
 	}
+	static inline bool toAddOrdered(unsigned n, Graph &g, const EmbeddingTy &emb, unsigned pos, VertexId dst, Graph &p) {
+		return true;
+	}
 	// given an embedding, return its pattern id (hash value)
 	static inline unsigned getPattern(unsigned n, Graph &g, unsigned i, VertexId dst, const EmbeddingTy &emb, unsigned pos) {
 		return 0;

@@ -6,7 +6,7 @@
 #include "canonical_graph.h"
 #include "embedding_list.h"
 
-template <typename ElementTy, typename EmbeddingTy, typename API, bool enable_dag=false, bool is_single=true, bool use_wedge=false>
+template <typename ElementTy, typename EmbeddingTy, typename API, bool enable_dag=false, bool is_single=true, bool use_wedge=false, bool use_match_order=false>
 class VertexMiner : public Miner<ElementTy,EmbeddingTy,enable_dag> {
 typedef EmbeddingList<ElementTy,EmbeddingTy> EmbeddingListTy;
 public:
@@ -14,6 +14,8 @@ public:
 		Miner<ElementTy,EmbeddingTy,enable_dag>(max_sz, nt), num_blocks(nb) {}
 	virtual ~VertexMiner() {}
 	void init_emb_list() { this->emb_list.init(this->graph, this->max_size, enable_dag); }
+	bool is_single_pattern() { return npatterns == 1; }
+	int get_num_patterns() { return npatterns; }
 	void set_num_patterns(int np = 1) {
 		npatterns = np;
 		if (npatterns == 1) total_num.reset();
@@ -25,8 +27,6 @@ public:
 					qp_localmaps.getLocal(i)->clear();
 		}
 	}
-	int get_num_patterns() { return npatterns; }
-	bool is_single_pattern() { return npatterns == 1; }
 	void clean() {
 		is_wedge.clear();
 		accumulators.clear();
@@ -36,20 +36,22 @@ public:
 		for (auto i = 0; i < this->num_threads; i++) cg_localmaps.getLocal(i)->clear();
 		this->emb_list.clean();
 	}
-	// Pangolin APIs
-	// toExtend
-	//bool toExtend(unsigned n, const EmbeddingTy &emb, unsigned pos) {
-	//virtual bool toExtend(unsigned n, const EmbeddingTy &emb, unsigned pos) {
-	//	return true;
-	//}
-	// toAdd (only add non-automorphisms)
-	//bool toAdd(unsigned n, const EmbeddingTy &emb, VertexId dst, unsigned pos) {
-	//virtual bool toAdd(unsigned n, const EmbeddingTy &emb, VertexId dst, unsigned pos) {
-	//	return !this->is_vertexInduced_automorphism(n, emb, pos, dst);
-	//}
-	//static unsigned getPattern(unsigned n, unsigned i, VertexId dst, const EmbeddingTy &emb, unsigned pos) {
-	//	return 0;
-	//}
+	void initialize(std::string pattern_filename) {
+		init_emb_list();
+		if (use_match_order) {
+			if (pattern_filename == "") {
+				std::cout << "need specify pattern file name using -p\n";
+				exit(1);
+			}
+			//unsigned pid = this->read_pattern(pattern_filename);
+			unsigned pid = this->read_pattern(pattern_filename, "gr", true);
+			std::cout << "pattern id = " << pid << "\n";
+			//set_input_pattern(pid);
+		}
+	}
+	void set_input_pattern(unsigned pid) {
+		//input_pid = pid;
+	} 
 	virtual void print_output() {}
 
 	// extension for vertex-induced motif
@@ -126,6 +128,7 @@ public:
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-insert"));
 		indices.clear();
 	}
+
 	// extension for vertex-induced clique
 	inline void extend_vertex_single(unsigned level, size_t chunk_begin, size_t chunk_end) {
 		auto cur_size = this->emb_list.size();
@@ -170,6 +173,67 @@ public:
 		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-insert"));
 		indices.clear();
 	}
+
+	inline void extend_ordered(unsigned level, size_t chunk_begin, size_t chunk_end) {
+		auto cur_size = this->emb_list.size();
+		size_t begin = 0, end = cur_size;
+		if (level == 1) {
+			begin = chunk_begin; end = chunk_end; cur_size = end - begin;
+			std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end " << chunk_end << "\n";
+		}
+		std::cout << "\t number of current embeddings in level " << level << ": " << cur_size << "\n";
+		UintList num_new_emb(cur_size);
+		galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
+			EmbeddingTy emb(level+1);
+			get_embedding(level, pos, emb);
+			num_new_emb[pos-begin] = 0;
+			//std::cout << "current embedding: " << emb << "\n";
+			for (auto q_edge : this->pattern.edges(level+1)) {
+				VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+				unsigned q_order = q_dst;
+				if (q_order < level+1) {
+					VertexId d_vertex = emb.get_vertex(q_order);
+					for (auto d_edge : this->graph.edges(d_vertex)) {
+						GNode d_dst = this->graph.getEdgeDst(d_edge);
+						if (API::toAddOrdered(level+1, this->graph, emb, q_order, d_dst, this->pattern)) {
+							if (level < this->max_size-2) num_new_emb[pos-begin] ++;
+							else total_num += 1;
+						}
+					}
+					break;
+				}
+			}
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-alloc"));
+
+		if (level == this->max_size-2) return;
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_new_emb);
+		num_new_emb.clear();
+		Ulong new_size = indices.back();
+		std::cout << "\t number of new embeddings: " << new_size << "\n";
+		this->emb_list.add_level(new_size);
+		galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
+			EmbeddingTy emb(level+1);
+			get_embedding(level, pos, emb);
+			unsigned start = indices[pos-begin];
+			for (auto q_edge : this->pattern.edges(level+1)) {
+				VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+				unsigned q_order = q_dst;
+				if (q_order < level+1) {
+					VertexId d_vertex = emb.get_vertex(q_order);
+					for (auto d_edge : this->graph.edges(d_vertex)) {
+						GNode d_dst = this->graph.getEdgeDst(d_edge);
+						if (API::toAddOrdered(level+1, this->graph, emb, q_order, d_dst, this->pattern)) {
+							this->emb_list.set_idx(level+1, start, pos);
+							this->emb_list.set_vid(level+1, start++, d_dst);
+						}
+					}
+					break;
+				}
+			}
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-insert"));
+		indices.clear();
+	}
+
 	// quick pattern reduction
 	inline void quick_reduce(unsigned n, unsigned i, VertexId dst, const EmbeddingTy &emb, StrQpMapFreq *qp_lmap) {
 		std::vector<bool> connected;
@@ -274,9 +338,13 @@ public:
 			unsigned level = 1;
 			while (1) {
 				//this->emb_list.printout_embeddings(level);
-				if (is_single_pattern())
-					extend_vertex_single(level, chunk_begin, chunk_end);
-				else extend_vertex_multi(level, chunk_begin, chunk_end);
+				if (use_match_order) {
+					extend_ordered(level, chunk_begin, chunk_end);
+				} else {
+					if (is_single_pattern())
+						extend_vertex_single(level, chunk_begin, chunk_end);
+					else extend_vertex_multi(level, chunk_begin, chunk_end);
+				}
 				if (level == this->max_size-2) break; 
 				level ++;
 			}

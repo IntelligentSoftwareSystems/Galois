@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 		std::cout << "\nStart running trial " << nt+1 << ": ";
 		galois::StatTimer Tinitemb("EmbInitTime");
 		Tinitemb.start();
-		miner.init_emb_list();
+		miner.initialize(pattern_filename);
 		Tinitemb.stop();
 
 		galois::StatTimer Tcomp("Compute");

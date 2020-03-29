@@ -2,7 +2,7 @@
 #include "DfsMining/vertex_miner.h"
 
 const char* name = "Sgl";
-const char* desc = "Listing occurances of a given pattern in a graph using DFS extension";
+const char* desc = "Listing edge-induced subgraphs of a given pattern in a graph using DFS extension";
 const char* url  = 0;
 #ifdef CYCLE
 uint32_t automorph_group_id[4] = {0, 1, 0, 1}; // 4-cycle
