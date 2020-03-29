@@ -91,6 +91,22 @@ static cll::opt<std::string> output_CID_filename("output_CID_filename",
   cll::desc("File name to output cluster IDs."),
   cll::init("output_CID_filename"));
 
+//implements SingletonPartition function
+//assigns every vertex to its own subcommunity
+void singletonPartition(Graph &graph, CommArray &subcomm_info){
+
+	//call sumvertexdegreeweight if vertices'degree wt is not calculated yet
+	//sumVertexDegreeWeight(graph, subcomm_info);
+
+	galois::do_all(galois::iterate(graph),
+		[&] (GNode n){
+		
+			graph.getData(n).curr_subcomm_ass = n;
+			subcomm_info[n].size = (uint64_t) 1;
+			subcomm_info[n].degree_wt = graph.getData(n).degree_wt;
+
+		}, galois::steal());
+}
 
 
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
