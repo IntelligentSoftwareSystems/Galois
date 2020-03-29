@@ -43,44 +43,82 @@ public:
 		//util::print_graph(graph);
 		return max_degree;
 	}
-	unsigned read_pattern(std::string filename, std::string filetype="gr") {
+	unsigned read_pattern(std::string filename, std::string filetype="gr", bool symmetric=false) {
 		unsigned max_deg = util::read_graph(pattern, filetype, filename, false);
+		pattern.degree_counting();
 		auto nv = pattern.size();
 		auto ne = pattern.sizeEdges();
 		std::cout << "Pattern graph: num_vertices " << nv << " num_edges " << ne << "\n";
-		if (nv == 4) {
-			if (ne == 6) {
-				std::cout << "Input pattern: 4-clique, please use kcl\n";
+		if (symmetric) {
+			if (nv == 4) {
+				if (ne == 12) {
+					std::cout << "Input pattern: 4-clique, please use kcl\n";
+					exit(1);
+				} else if (ne == 10) { 
+					std::cout << "Input pattern: diamond\n";
+					return 4;
+				} else if (ne == 8) {
+					if (max_deg == 3) {
+						std::cout << "Input pattern: tailed-triangle\n";
+						return 3;
+					} else {
+						std::cout << "Input pattern: 4-cycle\n";
+						return 2;
+					}
+				} else if (ne == 6) {
+					if (max_deg == 3) {
+						std::cout << "Input pattern: 3-star\n";
+						return 1;
+					} else {
+						std::cout << "Input pattern: 4-path\n";
+						return 0;
+					}
+				} else {
+					std::cout << "Error: the number of edges is invalid\n";
+					exit(1);
+				}
+			} else if (nv == 5) {
+				std::cout << "5-motif currently not supported\n";
 				exit(1);
-			} else if (ne == 5) { 
-				std::cout << "Input pattern: diamond\n";
-				return 4;
-			} else if (ne == 4) {
-				if (max_deg == 2) {
-					std::cout << "Input pattern: tailed-triangle\n";
-					return 3;
-				} else {
-					//assert(max_deg == 1);
-					std::cout << "Input pattern: 4-cycle\n";
-					return 2;
-				}
-			} else if (ne == 3) {
-				if (max_deg == 3) {
-					std::cout << "Input pattern: 3-star\n";
-					return 1;
-				} else {
-					//assert(max_deg == 2);
-					std::cout << "Input pattern: 4-path\n";
-					return 0;
-				}
 			} else {
-				std::cout << "Error: the unmber of edges is invalid\n";
+				std::cout << "pattern size currently not supported\n";
 				exit(1);
 			}
-		} else if (nv == 5) {
 		} else {
-			std::cout << "pattern size currently not supported\n";
-			exit(1);
+			if (nv == 4) {
+				if (ne == 6) {
+					std::cout << "Input pattern: 4-clique, please use kcl\n";
+					exit(1);
+				} else if (ne == 5) { 
+					std::cout << "Input pattern: diamond\n";
+					return 4;
+				} else if (ne == 4) {
+					if (max_deg == 2) {
+						std::cout << "Input pattern: tailed-triangle\n";
+						return 3;
+					} else {
+						//assert(max_deg == 1);
+						std::cout << "Input pattern: 4-cycle\n";
+						return 2;
+					}
+				} else if (ne == 3) {
+					if (max_deg == 3) {
+						std::cout << "Input pattern: 3-star\n";
+						return 1;
+					} else {
+						//assert(max_deg == 2);
+						std::cout << "Input pattern: 4-path\n";
+						return 0;
+					}
+				} else {
+					std::cout << "Error: the unmber of edges is invalid\n";
+					exit(1);
+				}
+			} else if (nv == 5) {
+			} else {
+				std::cout << "pattern size currently not supported\n";
+				exit(1);
+			}
 		}
 		return 0;
 	}

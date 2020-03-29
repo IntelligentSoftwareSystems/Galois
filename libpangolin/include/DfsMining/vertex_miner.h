@@ -8,9 +8,9 @@ template <typename API, bool enable_dag=false, bool is_single=true,
 	bool use_ccode=true, bool use_local_graph=false, bool use_pcode=false, 
 	bool do_local_counting=false, bool edge_par=true, bool is_clique=true>
 class VertexMinerDFS : public Miner<SimpleElement,BaseEmbedding,enable_dag> {
+public:
 typedef EmbeddingList<is_single,use_ccode,use_pcode,use_local_graph,do_local_counting,is_clique> EmbeddingListTy;
 typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
-public:
 	VertexMinerDFS(unsigned max_sz, int nt, unsigned slevel = 1) : 
 		Miner<SimpleElement,BaseEmbedding,enable_dag>(max_sz, nt), npatterns(1), starting_level(slevel) {
 		if (is_single) {
@@ -52,6 +52,7 @@ public:
 				exit(1);
 			}
 			unsigned pid = this->read_pattern(pattern_filename);
+			//unsigned pid = this->read_pattern(pattern_filename, "gr", true);
 			std::cout << "pattern id = " << pid << "\n";
 			set_input_pattern(pid);
 		}
@@ -71,11 +72,72 @@ public:
 			emb_lists.getLocal(i)->allocate(&(this->graph), this->max_size, core, npatterns);
 		}
 	}
+	/*
+	inline VertexId get_query_vertex(unsigned id) { return id; }
+	inline VertexId get_matching_order(unsigned id) { return id; }
+	VertexId get_query_vertex(unsigned id) { return matching_order[id]; }
+	inline VertexId get_matching_order(unsigned id) { return matching_order_map[id]; }
+	std::vector<VertexId> matching_order;
+	std::vector<VertexId> matching_order_map;
+	std::vector<VertexId> automorph_group_id;
+	// Read the preset file to hardcode the presets
+	void read_presets() {
+		matching_order_map.resize(ms);
+		automorph_group_id.resize(ms);
+		std::ifstream ifile;
+		ifile.open(preset_filename);
+		if (!ifile) printf("Error in reading file %s\n", preset_filename.c_str());
+		VertexId x;
+		for (size_t i = 0; i< max_size; ++i) {
+			ifile >> x;
+			matching_order[i] = x;
+			if(debug) std::cout << "matching_order[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			matching_order_map[i] = x;
+			if(debug) std::cout << "matching_map[" << i << "] = " << x << "\n";
+		}
+		for (size_t i = 0; i < max_size; ++i) {
+			ifile >> x;
+			automorph_group_id[i] = x;
+			if(debug) std::cout << "automorph_group_id[" << i << "] = " << x << "\n";
+		}
+		ifile.close();
+	}
+
+	void ordered_vertex_parallel_solver() {
+		VertexId curr_qnode = get_query_vertex(0);
+		galois::do_all(galois::iterate(this->graph.begin(), this->graph.end()), [&](const auto& src) {
+			auto emb_list = emb_lists.getLocal();
+			if (this->graph.get_degree(src) < this->pattern.get_degree(curr_qnode)) return;
+			emb_list->init_vertex(src);
+			extend_ordered(1, 0, *emb_list);
+		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("VertexParallelSolver"));
+	}
+	//*/
+
 	void solver () {
 		if (edge_par)
 			edge_parallel_solver();
+			//ordered_edge_parallel_solver();
 		else
 			vertex_parallel_solver();
+	}
+
+	void ordered_edge_parallel_solver() {
+		std::cout << "DFS ordered edge parallel processing\n";
+		galois::do_all(galois::iterate(edge_list), [&](const SEdge &edge) {
+			if (this->graph.get_degree(edge.src) < this->pattern.get_degree(0)) return;
+			if (this->graph.get_degree(edge.dst) < this->pattern.get_degree(1)) return;
+			auto emb_list = emb_lists.getLocal();
+			if (edge.src < edge.dst) { 
+				emb_list->init_edge(edge);
+				extend_ordered(starting_level, *emb_list);
+				emb_list->clear_labels(edge.dst);
+				emb_list->clear_labels(edge.src);
+			}
+		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("EdgeParallelSolver"));
 	}
 
 	void vertex_parallel_solver() {
@@ -546,6 +608,75 @@ public:
 			extend_multi_local(level+1, emb_list);
 			if (level > 1) emb_list.pop_history();
 		}
+	}
+
+	inline void extend_ordered(unsigned level, EmbeddingListTy &emb_list) {
+		unsigned n = level + 1;
+		unsigned last_vid = 0;
+		if (n == this->max_size-1) {
+			//std::cout << "\t\t level " << level << ": "; 
+			//emb_list.print_history(); std::cout << "\n";
+			if (level > 1) {
+				last_vid = emb_list.get_history(level);
+				//emb_list.push_history(last_vid);
+				emb_list.update_labels(level, last_vid);
+			}
+			for (auto q_edge : this->pattern.edges(n)) {
+				VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+				unsigned q_order = q_dst;
+				//std::cout << "\t\t order=" << q_order << "\n";
+				if (q_dst < n) {
+					auto d_src = emb_list.get_history(q_order);
+					//std::cout << "\t\t src=" << d_src << "\n";
+					for (auto d_edge : this->graph.edges(d_src)) {
+						auto d_dst = this->graph.getEdgeDst(d_edge);
+						auto ccode = emb_list.get_label(d_dst);
+						//std::cout << "\t\t dst=" << d_dst << ", ccode=" << unsigned(ccode) << "\n";
+						if (this->graph.get_degree(d_dst) < this->pattern.get_degree(n)) continue;
+						if (API::toAdd(level, this->max_size, d_dst, q_order, 
+								ccode, emb_list.get_history_ptr())) {
+							//std::cout << "\t\t\t subgraph macthed: dst=" << d_dst << "\n";
+							API::reduction(accumulators[0]);
+						}
+					}
+					break;
+				}
+			}
+			if (level > 1) emb_list.resume_labels(level, last_vid);
+			if (level > 1) emb_list.pop_history();
+			return;
+		}
+		for (auto q_edge : this->pattern.edges(n)) {
+			VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+			unsigned q_order = q_dst; //get_matching_order(q_dst); // using query vertex id to get its matching order
+			//std::cout << "level " << level << ": "; 
+			//emb_list.print_history();
+			//std::cout << ", order=" << q_order << "\n";
+			if (q_order < n) {
+				auto d_src = emb_list.get_history(q_order);
+				//std::cout << "src=" << d_src << "\n";
+				//emb_list.set_size(level+1, 0);
+				for (auto d_edge : this->graph.edges(d_src)) {
+					auto d_dst = this->graph.getEdgeDst(d_edge);
+					auto ccode = emb_list.get_label(d_dst);
+					//std::cout << "\t dst=" << d_dst << ", ccode=" << unsigned(ccode) << "\n";
+					if (API::toAdd(level, this->max_size, d_dst, q_order, 
+							ccode, emb_list.get_history_ptr())) {
+						//auto start = emb_list.size(level+1);
+						//emb_list.set_vid(level+1, start, d_dst);
+						//emb_list.set_idx(level+1, start, pos);
+						//emb_list.set_size(level+1, start+1);
+						//std::cout << "\t pushing vertex " << d_dst << " to stack\n";
+						emb_list.push_history(d_dst);
+						extend_ordered(level+1, emb_list);
+						if (level > 1) emb_list.pop_history();
+					}
+				}
+				break;
+			}
+		}
+		//extend_ordered(level+1, emb_list);
+		//if (level > 1) emb_list.pop_history();
 	}
 
 	// compute global counts using user-defined formula
