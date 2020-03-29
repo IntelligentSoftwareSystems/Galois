@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 
-include(GNUInstallDirs)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
+
+include(GNUInstallDirs)
+
 set(GALOIS_VERSION_MAJOR "5")
 set(GALOIS_VERSION_MINOR "0")
 set(GALOIS_VERSION_PATCH "0")
