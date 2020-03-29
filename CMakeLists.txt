@@ -48,6 +48,7 @@ set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Gal
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
+set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
 
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
@@ -81,6 +82,10 @@ set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 # Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
 set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
 set(NUM_TEST_THREADS "" CACHE STRING "Number of threads to use for running the tests.")
+
+if(ENABLE_HETERO_GALOIS)
+  set(USE_ARCH none)
+endif()
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -136,12 +141,10 @@ if(CYGWIN)
 endif()
 
 # Enable architecture-specific optimizations
-if(NOT ENABLE_HETERO_GALOIS)
-  find_package(ArchFlags)
-  if(ARCH_FLAGS_FOUND)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}> $<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>)
-    add_link_options(${ARCH_EXE_FLAGS})
-  endif()
+include(CheckArchFlags)
+if(ARCH_FLAGS_FOUND)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}> $<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>)
+  add_link_options(${ARCH_LINK_FLAGS})
 endif()
 
 # GNU profiling
