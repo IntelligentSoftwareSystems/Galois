@@ -177,6 +177,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=$HOME/build/conan_paths.cmake \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DENABLE_DIST_GALOIS=on \
+          -DUSE_ARCH=none \
           -DGRAPH_LOCATION=$HOME/.cache/graph
     - name: build
       run: |
