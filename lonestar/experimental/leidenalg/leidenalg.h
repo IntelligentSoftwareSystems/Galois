@@ -37,6 +37,7 @@ typedef galois::LargeArray<int64_t> largeArray;
 struct Comm {
   std::atomic<uint64_t> size;
   std::atomic<uint64_t> degree_wt;
+	std::atomic<uint64_t> flatSize;
 };
 
 typedef galois::LargeArray<Comm> CommArray;
@@ -54,6 +55,7 @@ struct Node{
   int64_t colorId;
 
 	uint64_t flatSize;
+	uint64_t external_edge_wt;
 };
 
 typedef uint64_t EdgeTy;
@@ -440,15 +442,15 @@ uint64_t getRandomInt(uint64_t from, uint64_t to){
 
 double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt){
 
-	uint64_t size_x = subcomm_info[curr_subcomm].size;
-	uint64_t size_y = subcomm_info[candidate_subcomm].size;
+	uint64_t size_x = subcomm_info[curr_subcomm].flatSize;
+	uint64_t size_y = subcomm_info[candidate_subcomm].flatSize;
 
 	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
 
 	return diff;
 }
 //subcomm_info should have updated size values
-uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info){
+uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info, uint64_t flatSize_comm){
 
 	uint64_t rand_subcomm = -1;
 	uint64_t curr_subcomm = graph.getData(n).curr_subcomm_ass;
@@ -490,6 +492,13 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 		auto subcomm = pair.first;
 		if(curr_subcomm == subcomm)
 			continue;
+
+		double flatSize_subcomm = (double) subcomm_info[subcomm].flatSize;
+
+		//check if subcommunity is well connected
+		if(subcomm_info[subcomm].external_edge_wt < resolution*flatSize_subcomm*((double)flatSize_comm - flatSize_subcomm))
+			continue;
+
 		if(diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt) > 0){
 			new_cluster_local_map[subcomm] = num_unique_clusters;
 			uint64_t count = counter[cluster_local_map[subcomm]];
@@ -554,13 +563,13 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   double eiy = 0;
   double ay = 0;
 
-	double size_x = c_info[sc].size;
+	double size_x = c_info[sc].flatSize;
 
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
       ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
-			size_y = c_info[stored_already->first].size;
+			size_y = c_info[stored_already->first].flatSize;
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
@@ -577,9 +586,9 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
   //galois::gPrint("Max Gain : ", max_gain, "\n");
   //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-    max_index = sc;
-  }
+ // if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+   // max_index = sc;
+  //}
 
   assert(max_gain >= 0);
   return max_index;
@@ -599,7 +608,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
   double eiy = 0;
   double ay = 0;
 
-	double size_x = c_info[sc].size;
+	double size_x = c_info[sc].flatSize;
 	double size_y = 0;
 
   auto stored_already = cluster_local_map.begin();
@@ -607,7 +616,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
     if(sc != stored_already->first) {
       ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
 
-			size_y = c_info[stored_already->first].size;
+			size_y = c_info[stored_already->first].flatSize;
 			//if(ay < (ax + degree_wt)){
 			if(size_y < size_x){
 				stored_already++;	
@@ -634,9 +643,9 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 
   //galois::gPrint("Max Gain : ", max_gain, "\n");
   //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-    max_index = sc;
-  }
+  //if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+   // max_index = sc;
+ // }
 
   assert(max_gain >= 0);
   return max_index;
@@ -680,7 +689,7 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (double) (c_info[n].size) * ((double) (c_info[n].size - 1) * 0.5f;
+                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1) * 0.5f;
                 });
 
 
@@ -743,7 +752,7 @@ double calCPMQualityFinal(Graph& graph, double resolution) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (double) (c_info[n].size) * ((double) (c_info[n].size - 1)* 0.5f);
+                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
                 });
 
 

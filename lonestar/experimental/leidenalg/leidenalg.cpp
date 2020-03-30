@@ -108,8 +108,63 @@ void singletonPartition(Graph &graph, CommArray &subcomm_info){
 		}, galois::steal());
 }
 
+//this should be implemented in serial; since this is called in parallel for all communities
+void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint64_t comm_flatSize){
 
-void mergeNodesSubset(Graph &graph, std::vector<uint64_t> &
+	CommArray subcomm_info;
+
+	//select set R
+	std::vector<GNode> R;
+	
+	for(auto n: S){
+		
+		uint64_t total = 0;
+		for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+                        
+			GNode dst = graph.getEdgeDst(ii);
+      auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded
+      if(dst != n && graph.getData(dst).curr_comm_ass == comm_id){
+      	total += edge_wt;
+			}
+		}
+
+		double flatSize_n = (double)graph.getData(n).flatSize;
+		if(total >= resolution*flatSize_n*((double)comm_flatSize - flatSize_n))
+			R.push_back(n);	
+
+		subcomm_info[n].flatSize = flatSize_n;
+		subcomm_info[n].external_edge_wt = total;
+		subcomm_info[n].size = (uint64_t) 1;
+	}
+
+	for(auto n:R){
+	
+		if(subcomm_info[graph.getData(n).curr_subcomm_ass].size == (uint64_t) 1){
+		
+			int subcomm_ass = getRandomSubcommunity(graph, n, subcomm_info, comm_flatSize);
+
+			graph.getData(n).curr_subcomm_ass = subcomm_ass;
+
+			//update Subcomm info
+			subcomm_info[subcomm_ass].flatSize += graph.getData(n).flatSize;
+			subcomm_info[subcomm_ass].size += (uint64_t) 1;
+	
+			for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+
+      	GNode dst = graph.getEdgeDst(ii);
+      	auto edge_wt = graph.getEdgeData(ii, flag_no_lock);	
+				
+				if(dst != n && graph.getData(dst).curr_subcomm_ass == subcomm_ass){
+					subcomm_info[subcomm_ass].external_edge_wt -= edge_wt;	
+				}
+				else if (dst != n){
+					subcomm_info[subcomm_ass].external_edge_wt += edge_wt;
+				}
+			}	
+		}
+	}
+}
+
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
 double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint32_t& iter) {
 
