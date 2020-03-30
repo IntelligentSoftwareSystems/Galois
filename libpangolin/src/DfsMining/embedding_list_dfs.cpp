@@ -59,6 +59,7 @@ init_vertex(const VertexId vid) {
 	sizes[0] = 1;
 	vid_lists[0][0] = vid;
 	vid_lists[1].resize(length);
+	history.clear();
 	history.push_back(vid);
 	if (use_local_graph) {
 		if (ids.empty()) {
@@ -77,6 +78,7 @@ init_vertex(const VertexId vid) {
 			labels[index] = 1; // mark the neighbors of edge.src
 			local_graph.set_degree(1, index, 0);//new degrees
 		} else {
+			if (!is_clique && dst <= vid) continue;
 			set_vid(1, index, dst); // use global vertex ID
 			labels[dst] = 1; // mark the neighbors of edge.src
 		}

@@ -4,12 +4,12 @@
 const char* name = "Sgl";
 const char* desc = "Listing edge-induced subgraphs of a given pattern in a graph using BFS extension";
 const char* url  = 0;
+
+#define CYCLE
 #ifdef CYCLE
 uint32_t automorph_group_id[4] = {0, 1, 0, 1}; // 4-cycle
-const BYTE pt_ccode = 22; // '10110' 4-cycle
 #else
 uint32_t automorph_group_id[4] = {0, 0, 1, 1}; // diamond
-const BYTE pt_ccode = 15; // '01111' diamond
 #endif
 
 #include "BfsMining/vertex_miner_api.h"

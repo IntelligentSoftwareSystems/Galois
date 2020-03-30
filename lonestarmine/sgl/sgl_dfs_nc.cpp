@@ -58,6 +58,23 @@ public:
 		}
 		return false; 
 	}
+};
+
+#define EDGE_PAR 1
+class AppMiner : public VertexMinerDFS<MyAPI, false, true, true, false, true, false, EDGE_PAR, false> {
+public:
+	AppMiner(unsigned ms, int nt) : 
+		VertexMinerDFS<MyAPI, false, true, true, false, true, false, EDGE_PAR, false>(ms, nt) {
+		assert(k > 2);
+	}
+	~AppMiner() {}
+	void print_output() {
+		std::cout << "\n\ttotal_num = " << get_total_count() << "\n";
+	}
+};
+
+#include "DfsMining/engine.h"
+
 /*
 	static inline unsigned getPattern(unsigned level, unsigned max_level, VertexId src, 
 		VertexId dst, BYTE ccode, unsigned pcode, BYTE src_idx, std::vector<VertexId> *emb) { 
@@ -103,19 +120,4 @@ public:
 		return false;
 	}
 */
-};
-
-class AppMiner : public VertexMinerDFS<MyAPI, false, true, true, false, true, false, true, false> {
-public:
-	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<MyAPI, false, true, true, false, true, false, true, false>(ms, nt) {
-		assert(k > 2);
-	}
-	~AppMiner() {}
-	void print_output() {
-		std::cout << "\n\ttotal_num = " << get_total_count() << "\n";
-	}
-};
-
-#include "DfsMining/engine.h"
 

@@ -145,10 +145,15 @@ typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 		//galois::for_each(galois::iterate(this->graph.begin(), this->graph.end()), [&](const auto &vid, auto &ctx) {
 		galois::do_all(galois::iterate(this->graph.begin(), this->graph.end()), [&](const auto& vid) {
 			EmbeddingListTy *emb_list = emb_lists.getLocal();
+			//std::cout << "Processing vertex " << vid << "\n";
 			emb_list->init_vertex(vid);
 			if (is_single) { // TODO: use constexpr
-				extend_clique(starting_level, *emb_list); 
-				//extend_single(starting_level, *emb_list); 
+				if (is_clique) {
+					extend_clique(starting_level, *emb_list); 
+				} else {
+					//extend_single(starting_level, *emb_list); 
+					extend_single_nc(starting_level, *emb_list);
+				}
 			} else {
 				extend_multi(starting_level, *emb_list);
 			}
@@ -399,20 +404,22 @@ typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 			return;
 		}
 		for (size_t emb_id = 0; emb_id < emb_list.size(level); emb_id ++) {
-			if (level > 1) {
-				unsigned last_vid = emb_list.get_vertex(level, emb_id);
+			unsigned last_vid = 0;
+			if (level > 1 || !edge_par) {
+				last_vid = emb_list.get_vertex(level, emb_id);
 				emb_list.push_history(last_vid);
 				emb_list.update_labels(level, last_vid);
 			}
 			emb_list.set_size(level+1, 0);
-			//emb_list.print_history(); std::cout << "\n";
 			auto src = emb_list.get_history(level);
+			//std::cout << "level=" << level << ", emb: "; emb_list.print_history();
+			//std::cout << ", src=" << src << "\n";
 			auto begin = this->graph.edge_begin(src);
 			auto end = this->graph.edge_end(src);
 			for (auto edge = begin; edge < end; edge ++) {
 				auto dst = this->graph.getEdgeDst(edge);
 				auto ccode = emb_list.get_label(dst);
-				//std::cout << "\t src=" << src << ", dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
+				//std::cout << "\t dst=" << dst << ", ccode=" << unsigned(ccode) << "\n";
 				if (API::toAdd(level, this->max_size, dst, level, 
 						ccode, emb_list.get_history_ptr())) {
 					auto start = emb_list.size(level+1);
@@ -421,7 +428,8 @@ typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 				}
 			}
 			extend_single_nc(level+1, emb_list);
-			if (level > 1) emb_list.pop_history();
+			if (level > 1 || !edge_par) emb_list.pop_history();
+			if (!edge_par) emb_list.resume_labels(level, last_vid);
 		}
 	}
 	/*

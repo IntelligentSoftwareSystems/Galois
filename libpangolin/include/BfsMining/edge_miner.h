@@ -57,7 +57,9 @@ public:
 			init_map_ptr->clear();
 		}
 	}
-
+	void initialize(std::string pattern_filename) {
+		init_emb_list();
+	}
 	void init_emb_list() {
 		this->emb_list.init(this->graph, this->max_size+1);
 		construct_edgemap();
