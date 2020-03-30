@@ -165,6 +165,52 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 	}
 }
 
+void refinePartition(Graph &graph){
+
+	//set singleton subcommunities
+	galois::do_all(galois::iterate(graph),
+		[&] (GNode n){
+		
+			graph.getData(n).curr_subcomm_ass = n;
+		}, galois::steal());
+
+	
+/*	std::vector<std::set<int64_t>> myVec(101);	//to identify total no. of different communities
+	std::vector<galois::InsertBag<GNode>> bags(101);	//to sort nodes according to their community
+
+	galois::do_all(galois::iterate(graph),
+		[&] (GNode n){
+			
+			int64_t comm_idx = graph.getData(n).curr_comm_ass%100;
+			myVec[comm_idx].insert(graph.getData(n).curr_comm_ass);
+			bag[comm_idx].push(n);
+		}, galois::steal());
+*/
+
+	//populate nodes into communities
+	std::vector<std::vector<GNode>> myVec(graph.size()+1);
+	CommArray comm_info;
+
+	comm_info.allocate(graph.size()+1);
+
+	for(auto n: graph){
+
+		myVec[graph.getData(n).curr_comm_ass].push_back(n);
+		comm_info[graph.getData(n).curr_comm_ass].flatSize += graph.getData(n).flatSize;
+	}
+	
+	//call mergeNodesSubset for each community in parallel	
+	galois::do_all(galois::iterate((uint32_t)0, graph.size()),
+  	[&](uint32_t c){
+		
+			if(myVec[c].size() > 0){
+				mergeNodesSubset(graph, myVec[c], c, comm_info[c].flatSize);
+			}
+		});
+}
+
+
+
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
 double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint32_t& iter) {
 
