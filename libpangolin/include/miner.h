@@ -41,7 +41,31 @@ public:
 		degrees = graph.degrees;
 		std::cout << "Input graph: num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";
 		//util::print_graph(graph);
+		//convert_to_gbbs(filename);
 		return max_degree;
+	}
+	void convert_to_gbbs(std::string filename) {
+		printf("writing gbbs file\n");
+		std::ofstream outfile;
+		outfile.open(filename+".gbbs");
+		outfile << "AdjacencyGraph" << "\n";
+		auto m = graph.size();
+		auto nnz = graph.sizeEdges();
+		outfile << m << "\n";
+		outfile << nnz << "\n";
+		size_t offset = 0;
+		for (size_t i = 0; i < m; i ++) {
+			outfile << offset << "\n";
+			offset += graph.get_degree(i);
+		}
+		for (size_t i = 0; i < m; i ++) {
+			for(auto e : graph.edges(i)) {
+				auto v = graph.getEdgeDst(e);
+				outfile << v << "\n";
+			}
+		}
+		outfile.close();
+		exit(0);
 	}
 	unsigned read_pattern(std::string filename, std::string filetype="gr", bool symmetric=false) {
 		unsigned max_deg = util::read_graph(pattern, filetype, filename, false);
