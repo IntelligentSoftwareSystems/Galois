@@ -56,6 +56,8 @@ struct Node{
 
 	uint64_t flatSize;
 	uint64_t external_edge_wt;
+
+	bool inBag;
 };
 
 typedef uint64_t EdgeTy;
@@ -594,13 +596,13 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   return max_index;
 }
 
-
+	
 
 uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double resolution) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc) {
 
-  uint64_t min_index = sc; // Assign the intial value as self community
+  int64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
   double max_gain = 0;
   double eix = counter[0] - self_loop_wt;

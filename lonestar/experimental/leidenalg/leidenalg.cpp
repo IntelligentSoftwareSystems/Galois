@@ -91,6 +91,138 @@ static cll::opt<std::string> output_CID_filename("output_CID_filename",
   cll::desc("File name to output cluster IDs."),
   cll::init("output_CID_filename"));
 
+int64_t maxCPMQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
+
+	//compute cluster local map first
+	auto& n_data = graph.getData(n, flag_write_lock);
+  uint64_t degree = std::distance(graph.edge_begin(n, flag_write_lock), graph.edge_end(n,  flag_write_lock));
+                   
+ 	int64_t local_target = -1;
+  std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's cluster to local number: Community --> Index
+  std::vector<uint64_t> counter; //Number of edges to each unique cluster
+  uint64_t num_unique_clusters = 1;
+  uint64_t self_loop_wt = 0;
+
+  if(degree > 0){
+
+ 		for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+    	graph.getData(graph.getEdgeDst(ii), flag_write_lock);
+    }
+
+    cluster_local_map[graph.getData(n).curr_comm_ass] = 0; // Add n's current cluster
+    counter.push_back(0); //Initialize the counter to zero (no edges incident yet)
+
+                      
+    for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
+    	GNode dst = graph.getEdgeDst(ii);
+     	auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded
+                       	
+			if(dst == n){
+      	self_loop_wt += edge_wt; // Self loop weights is recorded
+     	}
+                        
+			auto stored_already = cluster_local_map.find(graph.getData(dst).curr_comm_ass); // Check if it already exists
+                        
+			if(stored_already != cluster_local_map.end()) {
+      	counter[stored_already->second] += edge_wt;
+      } else {
+                        
+			 cluster_local_map[graph.getData(dst).curr_comm_ass] = num_unique_clusters;
+       counter.push_back(edge_wt);
+       num_unique_clusters++;
+      }
+    } // End edge loop
+
+    // Find the max gain
+    local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
+
+	} else {
+  	local_target = -1;
+  }
+
+	return local_target;
+}
+
+void moveNodesFast(Graph &graph){
+
+	galois::InsertBag<GNode> bag_curr;
+	galois::InsertBag<GNode> bag_next;
+
+	for(auto n:graph){
+		bag_curr.push(n);
+		graph.getData(n).inBag = true;
+	}
+
+	CommArray c_info;
+
+	c_info.allocate(graph.size());
+	
+	//updating c_info
+	galois::do_all(galois::iterate(graph),
+		[&] (GNode n){
+
+		graph.getData(n).curr_comm_ass = n;
+		c_info[n].size = (uint64_t) 1;
+		c_info[n].deree_wt = graph.getData(n).degree_wt;
+		c_info[n].flatSize = graph.getData(n).flatSize;
+		}, galois::steal());
+
+	while(true){
+	
+		galois::do_all(galois::iterate(bag_curr),
+			[&] (GNode n){
+			
+				//pop out node from queue;
+				graph.getData(n).inBag = false;
+
+				//create cluster local map 
+				int64_t local_target = maxCPMQualityWithoutSwaps(graph, n, c_info);
+
+				auto& n_data = graph.getData(n, flag_write_lock);
+				if(local_target != -1 && local_target != graph.getData(n).curr_comm_ass){
+	
+					galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
+          galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
+					galois::atomicAdd(c_info[local_target].flatSize, n_data.flatSize);
+
+          galois::atomicSubtract(c_info[n_data.curr_comm_ass].degree_wt, n_data.degree_wt);
+          galois::atomicSubtract(c_info[n_data.curr_comm_ass].size, (uint64_t)1);
+					galois::atomicSubtract(c_info[n_data.curr_comm_ass].flatSize, n_data.flatSize);
+
+					graph.getData(n).curr_comm_ass = local_target;
+
+					//explore neighbors and add them to queue
+					for(auto e: graph.edges(n)){
+			
+						GNode u = graph.getEdgeDst(e);
+						if(graph.getData(u).curr_comm_ass != local_target && !graph.getData(u).inBag){
+							graph.getData(u).inBag = true;
+							bag_next.push(u);
+						}
+					}
+				}
+
+
+			}, galois::steal());
+	
+		//breaking criterion
+		if(bag_next.begin() == bag_next.end())
+			break;
+
+		//clear the queue
+		bag_curr.clear();
+
+		//fill the queue
+		for(auto n: bag_next)
+			bag_curr.push(n);
+
+		bag_next.clear();
+	}//end while
+
+	c_info.destroy();
+	c_info.deallocate();
+}
+
 //implements SingletonPartition function
 //assigns every vertex to its own subcommunity
 void singletonPartition(Graph &graph, CommArray &subcomm_info){
