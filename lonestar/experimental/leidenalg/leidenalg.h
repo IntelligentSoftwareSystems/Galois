@@ -52,6 +52,8 @@ struct Node{
   uint64_t degree_wt;
   //uint64_t cluster_wt_internal;
   int64_t colorId;
+
+	uint64_t flatSize;
 };
 
 typedef uint64_t EdgeTy;
@@ -755,6 +757,8 @@ double calCPMQualityFinal(Graph& graph, double resolution) {
 
 
 
+
+//need to update this
 uint64_t renumberClustersContiguously(Graph &graph) {
 
   std::map<uint64_t, uint64_t> cluster_local_map;
@@ -762,8 +766,14 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
-    //if(n_data.curr_comm_ass != -1) {
-      arr[n] = num_unique_clusters;
+    if(n_data.curr_comm_ass != -1) {
+      assert(n_data.curr_comm_ass < graph.size());
+      auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
+     if(stored_already != cluster_local_map.end()){
+      n_data.curr_comm_ass = stored_already->second;
+     } else {
+      cluster_local_map[n_data.curr_comm_ass] = num_unique_clusters;
+      n_data.curr_comm_ass = num_unique_clusters;
       num_unique_clusters++;
      }
     }
@@ -772,6 +782,24 @@ uint64_t renumberClustersContiguously(Graph &graph) {
   return num_unique_clusters;
 }
 
+uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
+
+  std::map<uint64_t, uint64_t> cluster_local_map;
+  uint64_t num_unique_clusters = 0;
+
+  for (GNode n = 0; n < arr.size(); ++n){
+    if(arr[n] != -1) {
+      assert(arr[n] < arr.size());
+      auto stored_already = cluster_local_map.find(arr[n]);
+     if(stored_already != cluster_local_map.end()){
+      arr[n] = stored_already->second;
+     } else {
+      cluster_local_map[arr[n]] = num_unique_clusters;
+      arr[n] = num_unique_clusters;
+      num_unique_clusters++;
+     }
+    }
+  }
 
 
 

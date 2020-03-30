@@ -96,7 +96,7 @@ static cll::opt<std::string> output_CID_filename("output_CID_filename",
 void singletonPartition(Graph &graph, CommArray &subcomm_info){
 
 	//call sumvertexdegreeweight if vertices'degree wt is not calculated yet
-	//sumVertexDegreeWeight(graph, subcomm_info);
+	sumVertexDegreeWeight(graph, subcomm_info);
 
 	galois::do_all(galois::iterate(graph),
 		[&] (GNode n){
@@ -109,6 +109,7 @@ void singletonPartition(Graph &graph, CommArray &subcomm_info){
 }
 
 
+void mergeNodesSubset(Graph &graph, std::vector<uint64_t> &
 //double algoLouvainWithLocking(Graph &graph, largeArray& clusters, double lower, double threshold) {
 double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint32_t& iter) {
 
@@ -922,7 +923,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
   return prev_mod;
 }
 
-
+//num_unique_clusters must be the total number of subcommunities
 void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_clusters) {
   std::cerr << "Inside buildNextLevelGraph\n";
 
@@ -946,11 +947,20 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
                 galois::steal());
 #endif
 
+	std::vector<uint64_t> cluster_flatsize(num_unique_clusters);
+
+	//initialize to 0
+	for(int i=0;i<num_unique_clusters;i++)
+		cluster_flatsize = (uint64_t) 0;
+	
+	
   // Comment: Serial separation is better than do_all due to contention
   for(GNode n = 0; n < graph.size(); ++n) {
       auto n_data = graph.getData(n, flag_no_lock);
-      if(n_data.curr_subcomm_ass != -1)
+      if(n_data.curr_subcomm_ass != -1){
         cluster_bags[n_data.curr_subcomm_ass].push_back(n);
+				cluster_flatsize[n_data.curr_subcomm_ass] += n_data.flatSize;
+			}
       //else galois::gPrint("ISOLATED NODE : ", n, "\n");
   }
 
@@ -1018,6 +1028,13 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
   TimerConstructFrom.start();
   graph_next.constructFrom(num_nodes_next, num_edges_next, prefix_edges_count, edges_id, edges_data);
   TimerConstructFrom.stop();
+
+	//setting flatSizes
+	galois::do_all(galois::iterate(graph_next),
+		[&] (GNode n){
+			
+			graph_next.getData(n).flatSize = cluster_flatsize[n];
+		}, galois::steal());
 
   TimerGraphBuild.stop();
   galois::gPrint("Graph construction done\n");
@@ -1133,6 +1150,12 @@ int main(int argc, char** argv) {
   largeArray clusters_orig;
   clusters_orig.allocateBlocked(graph_curr->size());
 
+	//initialize flat sizes to 1
+	galois::do_all(galois::iterate(*graph_curr),
+                  [&](GNode n){	
+
+										graph.getData(n).flatSize = (uint64_t) 1;									
+									},galois::steal());
   /*
    * Vertex following optimization
    */
