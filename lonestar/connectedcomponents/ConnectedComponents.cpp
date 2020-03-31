@@ -43,44 +43,23 @@ const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
 const char* url  = 0;
 
-enum Algo {
-  async,
-  edgeasync,
-  edgetiledasync,
-  blockedasync,
-  labelProp,
-  serial,
-  synchronous,
-  afforest,
-  edgeafforest,
-  edgetiledafforest,
-};
-
-enum OutputEdgeType { void_, int32_, int64_ };
-
 namespace cll = llvm::cl;
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"),
                   cll::Required);
-static cll::opt<std::string>
-    largestComponentFilename("outputLargestComponent",
-                             cll::desc("[output graph file]"), cll::init(""));
-static cll::opt<std::string>
-    permutationFilename("outputNodePermutation",
-                        cll::desc("[output node permutation file]"),
-                        cll::init(""));
-cll::opt<unsigned int>
-    memoryLimit("memoryLimit",
-                cll::desc("Memory limit for out-of-core algorithms (in MB)"),
-                cll::init(~0U));
-static cll::opt<OutputEdgeType> writeEdgeType(
-    "edgeType", cll::desc("Input/Output edge type:"),
-    cll::values(
-        clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
-        clEnumValN(OutputEdgeType::int32_, "int32", "32 bit edge values"),
-        clEnumValN(OutputEdgeType::int64_, "int64", "64 bit edge values"),
-        clEnumValEnd),
-    cll::init(OutputEdgeType::void_));
+
+enum Algo {
+  serial,
+  labelProp,
+  synchronous,
+  async,
+  edgeasync,
+  blockedasync,
+  edgetiledasync,
+  afforest,
+  edgeafforest,
+  edgetiledafforest,
+};
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::async, "Async", "Asynchronous"),
@@ -102,6 +81,55 @@ static cll::opt<Algo> algo(
 
                 clEnumValEnd),
     cll::init(Algo::edgetiledasync));
+
+static cll::opt<std::string>
+    largestComponentFilename("outputLargestComponent",
+                             cll::desc("[output graph file]"), cll::init(""));
+static cll::opt<std::string>
+    permutationFilename("outputNodePermutation",
+                        cll::desc("[output node permutation file]"),
+                        cll::init(""));
+#ifndef NDEBUG
+enum OutputEdgeType { void_, int32_, int64_ };
+static cll::opt<unsigned int>
+    memoryLimit("memoryLimit",
+                cll::desc("Memory limit for out-of-core algorithms (in MB)"),
+                cll::init(~0U));
+static cll::opt<OutputEdgeType> writeEdgeType(
+    "edgeType", cll::desc("Input/Output edge type:"),
+    cll::values(
+        clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
+        clEnumValN(OutputEdgeType::int32_, "int32", "32 bit edge values"),
+        clEnumValN(OutputEdgeType::int64_, "int64", "64 bit edge values"),
+        clEnumValEnd),
+    cll::init(OutputEdgeType::void_));
+#endif
+
+// TODO (bozhi) LLVM commandline library now supports option categorization.
+// Categorize params when libllvm is updated to make -help beautiful!
+// static cll::OptionCategory ParamCat("Algorithm-Specific Parameters",
+//                                       "Only used for specific algorithms.");
+static cll::opt<uint32_t> EDGE_TILE_SIZE(
+    "edgeTileSize", cll::desc("(For Edgetiled algos) Size of edge tiles "
+                              "(default 512)"),
+            // cll::cat(ParamCat),
+            cll::init(512)); // 512 -> 64
+static const int CHUNK_SIZE = 1;
+//! parameter for the Vertex Neighbor Sampling step of Afforest algorithm
+static cll::opt<uint32_t> NEIGHBOR_SAMPLES(
+    "vns", cll::desc("(For Afforest and its variants) number of edges "
+                      "per vertice to process initially for exposing "
+                      "partial connectivity (default 2)"),
+            // cll::cat(ParamCat),
+            cll::init(2));
+//! parameter for the Large Component Skipping step of Afforest algorithm
+static cll::opt<uint32_t> COMPONENT_SAMPLES(
+    "lcs", cll::desc("(For Afforest and its variants) number of times "
+                      "randomly sampling over vertices to approximately "
+                      "capture the largest intermediate component "
+                      "(default 1024)"),
+            // cll::cat(ParamCat),
+            cll::init(1024));
 
 struct Node : public galois::UnionFindNode<Node> {
   using component_type = Node*;
@@ -135,11 +163,8 @@ struct SerialAlgo {
   }
 
   void operator()(Graph& graph) {
-
     for (const GNode& src : graph) {
-
       Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-
       for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst   = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
@@ -151,6 +176,55 @@ struct SerialAlgo {
       Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       sdata.compress();
     }
+  }
+};
+
+struct LabelPropAlgo {
+
+  struct LNode {
+    using component_type = unsigned int;
+    std::atomic<unsigned int> comp_current;
+    unsigned int comp_old;
+
+    component_type component() { return comp_current; }
+    bool isRep() { return false; }
+    bool isRepComp(unsigned int x) { return x == comp_current; }
+  };
+
+  using Graph =
+      galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<true>::type;
+  using GNode = Graph::GraphNode;
+  using component_type = LNode::component_type;
+
+  template <typename G>
+  void readGraph(G& graph) {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
+
+  void operator()(Graph& graph) {
+    galois::GReduceLogicalOR changed;
+    do {
+      changed.reset();
+      galois::do_all(
+          galois::iterate(graph),
+          [&](const GNode& src) {
+            LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            if (sdata.comp_old > sdata.comp_current) {
+              sdata.comp_old = sdata.comp_current;
+
+              changed.update(true);
+
+              for (auto e : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+                GNode dst              = graph.getEdgeDst(e);
+                auto& ddata            = graph.getData(dst);
+                unsigned int label_new = sdata.comp_current;
+                galois::atomicMin(ddata.comp_current, label_new);
+              }
+            }
+          },
+          galois::no_conflicts(), galois::steal(),
+          galois::loopname("LabelPropAlgo"));
+    } while (changed.reduce());
   }
 };
 
@@ -260,57 +334,6 @@ struct SynchronousAlgo {
   }
 };
 
-struct LabelPropAlgo {
-
-  struct LNode {
-    using component_type = unsigned int;
-    std::atomic<unsigned int> comp_current;
-    unsigned int comp_old;
-
-    component_type component() { return comp_current; }
-    bool isRep() { return false; }
-    bool isRepComp(unsigned int x) { return x == comp_current; }
-  };
-
-  using Graph =
-      galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<true>::type;
-
-  using GNode          = Graph::GraphNode;
-  using component_type = LNode::component_type;
-
-  template <typename G>
-  void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
-  }
-
-  void operator()(Graph& graph) {
-    galois::GReduceLogicalOR changed;
-    do {
-      changed.reset();
-      galois::do_all(
-          galois::iterate(graph),
-          [&](const GNode& src) {
-            LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-            if (sdata.comp_old > sdata.comp_current) {
-              sdata.comp_old = sdata.comp_current;
-
-              changed.update(true);
-
-              for (auto e : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-                GNode dst              = graph.getEdgeDst(e);
-                auto& ddata            = graph.getData(dst);
-                unsigned int label_new = sdata.comp_current;
-                galois::atomicMin(ddata.comp_current, label_new);
-              }
-            }
-          },
-          galois::no_conflicts(), galois::steal(),
-          galois::loopname("LabelPropAlgo"));
-
-    } while (changed.reduce());
-  }
-};
-
 /**
  * Like synchronous algorithm, but if we restrict path compression (as done is
  * @link{UnionFindNode}), we can perform unions and finds concurrently.
@@ -361,102 +384,6 @@ struct AsyncAlgo {
   }
 };
 
-struct EdgeTiledAsyncAlgo {
-  using Graph =
-      galois::graphs::LC_CSR_Graph<Node, void>::with_no_lockable<true>::type;
-  using GNode = Graph::GraphNode;
-
-  template <typename G>
-  void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
-  }
-
-  struct EdgeTile {
-    // Node* sData;
-    GNode src;
-    Graph::edge_iterator beg;
-    Graph::edge_iterator end;
-  };
-
-  /*struct EdgeTileMaker {
-      EdgeTile operator() (Node* sdata, Graph::edge_iterator beg,
-  Graph::edge_iterator end) const{ return EdgeTile{sdata, beg, end};
-      }
-  };*/
-
-  const int EDGE_TILE_SIZE = 512; // 512 -> 64
-  void operator()(Graph& graph) {
-    galois::GAccumulator<size_t> emptyMerges;
-
-    galois::InsertBag<EdgeTile> works;
-
-    const int CHUNK_SIZE = 1;
-    std::cout << "INFO: Using edge tile size of " << EDGE_TILE_SIZE
-              << " and chunk size of " << CHUNK_SIZE << "\n";
-    std::cout << "WARNING: Performance varies considerably due to parameter.\n";
-    std::cout
-        << "WARNING: Do not expect the default to be good for your graph.\n";
-
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     // Node& sdata=graph.getData(src,
-                     // galois::MethodFlag::UNPROTECTED);
-                     auto beg =
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-                     const auto end =
-                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-
-                     assert(beg <= end);
-                     if ((end - beg) > EDGE_TILE_SIZE) {
-                       for (; beg + EDGE_TILE_SIZE < end;) {
-                         auto ne = beg + EDGE_TILE_SIZE;
-                         assert(ne < end);
-                         works.push_back(EdgeTile{src, beg, ne});
-                         beg = ne;
-                       }
-                     }
-
-                     if ((end - beg) > 0) {
-                       works.push_back(EdgeTile{src, beg, end});
-                     }
-                   },
-                   galois::loopname("CC-EdgeTiledAsyncInit"), galois::steal());
-
-    galois::do_all(
-        galois::iterate(works),
-        [&](const EdgeTile& tile) {
-          // Node& sdata = *(tile.sData);
-          GNode src   = tile.src;
-          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-
-          for (auto ii = tile.beg; ii != tile.end; ++ii) {
-            GNode dst = graph.getEdgeDst(ii);
-            if (src >= dst)
-              continue;
-
-            Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-            if (!sdata.merge(&ddata))
-              emptyMerges += 1;
-          }
-        },
-        galois::loopname("CC-edgetiledAsync"), galois::steal(),
-        galois::chunk_size<CHUNK_SIZE>() // 16 -> 1
-    );
-
-    galois::do_all(
-        galois::iterate(graph),
-        [&](const GNode& src) {
-          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-          sdata.compress();
-        },
-        galois::steal(),
-        galois::loopname("CC-Async-Compress")
-    );
-
-    galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges",
-                                       emptyMerges.reduce());
-  }
-};
 
 struct EdgeAsyncAlgo {
   using Graph =
@@ -598,9 +525,516 @@ struct BlockedAsyncAlgo {
   }
 };
 
-#include "experimental/Afforest.hh"
-#include "experimental/EdgeAfforest.hh"
-#include "experimental/EdgetiledAfforest.hh"
+struct EdgeTiledAsyncAlgo {
+  using Graph =
+      galois::graphs::LC_CSR_Graph<Node, void>::with_no_lockable<true>::type;
+  using GNode = Graph::GraphNode;
+
+  template <typename G>
+  void readGraph(G& graph) {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
+
+  struct EdgeTile {
+    // Node* sData;
+    GNode src;
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
+
+  /*struct EdgeTileMaker {
+      EdgeTile operator() (Node* sdata, Graph::edge_iterator beg,
+  Graph::edge_iterator end) const{ return EdgeTile{sdata, beg, end};
+      }
+  };*/
+
+  void operator()(Graph& graph) {
+    galois::GAccumulator<size_t> emptyMerges;
+
+    galois::InsertBag<EdgeTile> works;
+
+    std::cout << "INFO: Using edge tile size of " << EDGE_TILE_SIZE
+              << " and chunk size of " << CHUNK_SIZE << "\n";
+    std::cout << "WARNING: Performance varies considerably due to parameter.\n";
+    std::cout
+        << "WARNING: Do not expect the default to be good for your graph.\n";
+
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     // Node& sdata=graph.getData(src,
+                     // galois::MethodFlag::UNPROTECTED);
+                     auto beg =
+                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+                     const auto end =
+                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+                     assert(beg <= end);
+                     if ((end - beg) > EDGE_TILE_SIZE) {
+                       for (; beg + EDGE_TILE_SIZE < end;) {
+                         auto ne = beg + EDGE_TILE_SIZE;
+                         assert(ne < end);
+                         works.push_back(EdgeTile{src, beg, ne});
+                         beg = ne;
+                       }
+                     }
+
+                     if ((end - beg) > 0) {
+                       works.push_back(EdgeTile{src, beg, end});
+                     }
+                   },
+                   galois::loopname("CC-EdgeTiledAsyncInit"), galois::steal());
+
+    galois::do_all(
+        galois::iterate(works),
+        [&](const EdgeTile& tile) {
+          // Node& sdata = *(tile.sData);
+          GNode src   = tile.src;
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+
+          for (auto ii = tile.beg; ii != tile.end; ++ii) {
+            GNode dst = graph.getEdgeDst(ii);
+            if (src >= dst)
+              continue;
+
+            Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            if (!sdata.merge(&ddata))
+              emptyMerges += 1;
+          }
+        },
+        galois::loopname("CC-edgetiledAsync"), galois::steal(),
+        galois::chunk_size<CHUNK_SIZE>() // 16 -> 1
+    );
+
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("CC-Async-Compress")
+    );
+
+    galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges",
+                                       emptyMerges.reduce());
+  }
+};
+
+template <typename component_type, typename Graph>
+component_type approxLargestComponent(Graph& graph) {
+  using map_type = std::unordered_map<component_type, int,
+      std::hash<component_type>, std::equal_to<component_type>,
+      galois::gstl::Pow2Alloc<std::pair<const component_type, int>>>;
+  using pair_type = std::pair<component_type, int>;
+
+  map_type comp_freq(COMPONENT_SAMPLES);
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::uniform_int_distribution<uint32_t> dist(0, graph.size() - 1);
+  for (uint32_t i = 0; i < COMPONENT_SAMPLES; i++) {
+    auto& ndata = graph.getData(dist(rng), galois::MethodFlag::UNPROTECTED);
+    comp_freq[ndata.component()]++;
+  }
+
+  assert(!comp_freq.empty());
+  auto most_frequent = std::max_element(comp_freq.begin(), comp_freq.end(),
+    [](const pair_type& a, const pair_type& b) { return a.second < b.second; });
+
+  galois::gDebug("Approximate largest intermediate component: ", most_frequent->first,
+    " (hit rate ", 100.0*(most_frequent->second) / COMPONENT_SAMPLES, "%)");
+
+  return most_frequent->first;
+}
+
+/**
+ * CC w/ Afforest sampling.
+ *
+ * [1] M. Sutton, T. Ben-Nun and A. Barak, "Optimizing Parallel Graph Connectivity
+ * Computation via Subgraph Sampling," 2018 IEEE International Parallel and Distributed 
+ * Processing Symposium (IPDPS), Vancouver, BC, 2018, pp. 12-21.
+ */
+struct AfforestAlgo {
+  struct NodeData : public galois::UnionFindNode<NodeData> {
+    using component_type = NodeData*;
+
+    NodeData() : galois::UnionFindNode<NodeData>(const_cast<NodeData*>(this)) {}
+    NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
+
+    component_type component() { return this->get(); }
+    bool isRepComp(unsigned int x) { return false; } // verify
+
+  public:
+    void link(NodeData* b) {
+      NodeData* a = m_component.load(std::memory_order_relaxed);
+      b = b->m_component.load(std::memory_order_relaxed);
+      while (a != b) {
+        if (a < b)
+          std::swap(a, b);
+        // Now a > b
+        NodeData* ac = a->m_component.load(std::memory_order_relaxed);
+        if (
+          (ac == a && a->m_component.compare_exchange_strong(a, b))
+          || (b == ac)
+          )
+          break;
+        a = (a->m_component.load(std::memory_order_relaxed))->m_component.load(std::memory_order_relaxed);
+        b = b->m_component.load(std::memory_order_relaxed);
+      }
+    }
+  };
+  using Graph =
+      galois::graphs::LC_CSR_Graph<NodeData, void>::with_no_lockable<true>::type;
+  using GNode = Graph::GraphNode;
+  using component_type = NodeData::component_type;
+
+  template <typename G>
+  void readGraph(G& graph) {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
+
+  void operator()(Graph& graph) {
+    // (bozhi) should NOT go through single direction in sampling step: nodes with edges less than NEIGHBOR_SAMPLES will fail
+    for (uint32_t r = 0; r < NEIGHBOR_SAMPLES; ++r) {
+      galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Graph::edge_iterator ii =
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ei =
+              graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+          for (std::advance(ii, r); ii < ei; ii++) {
+            GNode dst = graph.getEdgeDst(ii);
+            NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            sdata.link(&ddata);
+            break;
+          }
+        },
+        galois::steal(),
+        galois::loopname("Afforest-VNS-Link"));
+
+      galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          sdata.compress();
+        },
+        galois::steal(),
+        galois::loopname("Afforest-VNS-Compress")
+      );
+    }
+
+    galois::StatTimer StatTimer_Sampling("Afforest-LCS-Sampling");
+    StatTimer_Sampling.start();
+    const component_type c = approxLargestComponent<component_type>(graph);
+    StatTimer_Sampling.stop();
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        if (sdata.component() == c)
+          return;
+        Graph::edge_iterator ii =
+            graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator ei =
+            graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+        for (std::advance(ii, NEIGHBOR_SAMPLES); ii < ei; ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+          sdata.link(&ddata);
+        }
+      },
+      galois::steal(),
+      galois::loopname("Afforest-LCS-Link"));
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        sdata.compress();
+      },
+      galois::steal(),
+      galois::loopname("Afforest-LCS-Compress")
+    );
+  }
+};
+
+/**
+ * Edge CC w/ Afforest sampling
+ */
+struct EdgeAfforestAlgo {
+  struct NodeData : public galois::UnionFindNode<NodeData> {
+    using component_type = NodeData*;
+
+    NodeData() : galois::UnionFindNode<NodeData>(const_cast<NodeData*>(this)) {}
+    NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
+
+    component_type component() { return this->get(); }
+    bool isRepComp(unsigned int x) { return false; } // verify
+
+  public:
+    NodeData* hook_min(NodeData* b, NodeData* c=0) {
+      NodeData* a = m_component.load(std::memory_order_relaxed);
+      b = b->m_component.load(std::memory_order_relaxed);
+      while (a != b) {
+        if (a < b)
+          std::swap(a, b);
+        // Now a > b
+        NodeData* ac = a->m_component.load(std::memory_order_relaxed);
+        if (ac == a && a->m_component.compare_exchange_strong(a, b)) {
+          if (b == c)
+            return a; //! return victim
+          return 0;
+        }
+        if (b == ac) {
+          return 0;
+        }
+        a = (a->m_component.load(std::memory_order_relaxed))->m_component.load(std::memory_order_relaxed);
+        b = b->m_component.load(std::memory_order_relaxed);
+      }
+      return 0;
+    }
+  };
+  using Graph =
+      galois::graphs::LC_CSR_Graph<NodeData, void>::with_no_lockable<true>::type;
+  using GNode = Graph::GraphNode;
+  using component_type = NodeData::component_type;
+
+  using Edge  = std::pair<GNode, GNode>;
+
+  template <typename G>
+  void readGraph(G& graph) {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
+
+  void operator()(Graph& graph) {
+    // (bozhi) should NOT go through single direction in sampling step: nodes with edges less than NEIGHBOR_SAMPLES will fail
+    for (uint32_t r = 0; r < NEIGHBOR_SAMPLES; ++r) {
+      galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          Graph::edge_iterator ii =
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ei =
+              graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+          std::advance(ii, r);
+          if (ii < ei) {
+            GNode dst = graph.getEdgeDst(ii);
+            NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            sdata.hook_min(&ddata);
+          }
+        },
+        galois::steal(),
+        galois::loopname("EdgeAfforest-VNS-Link"));
+    }
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        sdata.compress();
+      },
+      galois::steal(),
+      galois::loopname("EdgeAfforest-VNS-Compress")
+    );
+
+    galois::StatTimer StatTimer_Sampling("EdgeAfforest-LCS-Sampling");
+    StatTimer_Sampling.start();
+    const component_type c = approxLargestComponent<component_type>(graph);
+    StatTimer_Sampling.stop();
+    const component_type c0 = &(graph.getData(0, galois::MethodFlag::UNPROTECTED));
+
+    galois::InsertBag<Edge> works;
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        if (sdata.component() == c)
+          return;
+        auto beg =
+             graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+        const auto end =
+           graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+        for (std::advance(beg, NEIGHBOR_SAMPLES); beg < end; beg++) {
+          GNode dst = graph.getEdgeDst(beg);
+          NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+          if (src < dst || c == ddata.component()) {
+            works.push_back(std::make_pair(src, dst));
+          }
+        }
+      },
+      galois::loopname("EdgeAfforest-LCS-Assembling"), galois::steal());
+
+    galois::for_each(
+      galois::iterate(works),
+      [&](const Edge& e, auto& ctx) {
+        NodeData& sdata = graph.getData(e.first, galois::MethodFlag::UNPROTECTED);
+        if (sdata.component() == c)
+          return;
+        NodeData& ddata = graph.getData(e.second, galois::MethodFlag::UNPROTECTED);
+        component_type victim = sdata.hook_min(&ddata, c);
+        if (victim) {
+          GNode src = victim - c0; // TODO (bozhi) tricky!
+          for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst = graph.getEdgeDst(ii);
+            ctx.push_back(std::make_pair(dst, src));
+          }
+        }
+      },
+      galois::no_conflicts(),
+      galois::loopname("EdgeAfforest-LCS-Link"));
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        sdata.compress();
+      },
+      galois::steal(),
+      galois::loopname("EdgeAfforest-LCS-Compress")
+    );
+  }
+};
+
+/**
+ * Edgetiled CC w/ Afforest sampling
+ */
+struct EdgeTiledAfforestAlgo {
+  struct NodeData : public galois::UnionFindNode<NodeData> {
+    using component_type = NodeData*;
+
+    NodeData() : galois::UnionFindNode<NodeData>(const_cast<NodeData*>(this)) {}
+    NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
+
+    component_type component() { return this->get(); }
+    bool isRepComp(unsigned int x) { return false; } // verify
+
+  public:
+    void link(NodeData* b) {
+      NodeData* a = m_component.load(std::memory_order_relaxed);
+      b = b->m_component.load(std::memory_order_relaxed);
+      while (a != b) {
+        if (a < b)
+          std::swap(a, b);
+        // Now a > b
+        NodeData* ac = a->m_component.load(std::memory_order_relaxed);
+        if (
+          (ac == a && a->m_component.compare_exchange_strong(a, b))
+          || (b == ac)
+          )
+          break;
+        a = (a->m_component.load(std::memory_order_relaxed))->m_component.load(std::memory_order_relaxed);
+        b = b->m_component.load(std::memory_order_relaxed);
+      }
+    }
+  };
+  using Graph =
+      galois::graphs::LC_CSR_Graph<NodeData, void>::with_no_lockable<true>::type;
+  using GNode = Graph::GraphNode;
+  using component_type = NodeData::component_type;
+
+  struct EdgeTile {
+    GNode src;
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
+
+  template <typename G>
+  void readGraph(G& graph) {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
+
+  void operator()(Graph& graph) {
+    // (bozhi) should NOT go through single direction in sampling step: nodes with edges less than NEIGHBOR_SAMPLES will fail
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        auto ii =
+           graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+        const auto end =
+           graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+        for (uint32_t r = 0; r < NEIGHBOR_SAMPLES && ii < end; ++r, ++ii) {
+          GNode dst = graph.getEdgeDst(ii);
+          NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+          sdata.link(&ddata);
+        }
+      },
+      galois::steal(),
+      galois::loopname("EdgetiledAfforest-VNS-Link"));
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        sdata.compress();
+      },
+      galois::steal(),
+      galois::loopname("EdgetiledAfforest-VNS-Compress")
+    );
+
+    galois::StatTimer StatTimer_Sampling("EdgetiledAfforest-LCS-Sampling");
+    StatTimer_Sampling.start();
+    const component_type c = approxLargestComponent<component_type>(graph);
+    StatTimer_Sampling.stop();
+
+    galois::InsertBag<EdgeTile> works;
+    std::cout << "INFO: Using edge tile size of " << EDGE_TILE_SIZE
+              << " and chunk size of " << CHUNK_SIZE << "\n";
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        if (sdata.component() == c)
+          return;
+        auto beg =
+           graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+        const auto end =
+           graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+        for (std::advance(beg, NEIGHBOR_SAMPLES); beg + EDGE_TILE_SIZE < end;) {
+          auto ne = beg + EDGE_TILE_SIZE;
+          assert(ne < end);
+          works.push_back(EdgeTile{src, beg, ne});
+          beg = ne;
+        }
+
+        if ((end - beg) > 0) {
+         works.push_back(EdgeTile{src, beg, end});
+        }
+      },
+      galois::loopname("EdgetiledAfforest-LCS-Tiling"), galois::steal());
+
+    galois::do_all(
+        galois::iterate(works),
+        [&](const EdgeTile& tile) {
+          NodeData& sdata = graph.getData(tile.src, galois::MethodFlag::UNPROTECTED);
+          if (sdata.component() == c)
+            return;
+          for (auto ii = tile.beg; ii < tile.end; ++ii) {
+            GNode dst = graph.getEdgeDst(ii);
+            NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            sdata.link(&ddata);
+          }
+        },
+        galois::steal(),
+        galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("EdgetiledAfforest-LCS-Link"));
+
+    galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        NodeData& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        sdata.compress();
+      },
+      galois::steal(),
+      galois::loopname("EdgetiledAfforest-LCS-Compress")
+    );
+  }
+};
 
 template <typename Graph>
 bool verify(
