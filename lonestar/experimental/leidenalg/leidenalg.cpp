@@ -143,7 +143,7 @@ int64_t maxCPMQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
 	return local_target;
 }
 
-void moveNodesFast(Graph &graph){
+void moveNodesFast(Graph &graph, CommArray &c_info){
 
 	galois::InsertBag<GNode> bag_curr;
 	galois::InsertBag<GNode> bag_next;
@@ -152,10 +152,6 @@ void moveNodesFast(Graph &graph){
 		bag_curr.push(n);
 		graph.getData(n).inBag = true;
 	}
-
-	CommArray c_info;
-
-	c_info.allocate(graph.size());
 	
 	//updating c_info
 	galois::do_all(galois::iterate(graph),
@@ -218,9 +214,6 @@ void moveNodesFast(Graph &graph){
 
 		bag_next.clear();
 	}//end while
-
-	c_info.destroy();
-	c_info.deallocate();
 }
 
 //implements SingletonPartition function
@@ -1354,6 +1347,32 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 #endif
   galois::gPrint("Phases : ", phase, "\n");
   galois::gPrint("Iter : ", iter, "\n");
+}
+
+void leiden(Graph &graph){
+
+
+	Graph* graph_curr, graph_next;
+
+	graph_curr = &graph;	
+	while(true){
+
+		CommArray c_info;
+		c_info.allocate(graph_curr->size()+1);
+	
+		moveNodesFast(*graph_curr, c_info);
+
+		bool done = true;
+
+		//check if done or not
+		galois::do_all(
+
+		);
+	
+		//destroying c_info
+		c_info.destroy();
+		c_info.deallocate();	
+	}
 }
 
 int main(int argc, char** argv) {
