@@ -38,6 +38,7 @@ struct Comm {
   std::atomic<uint64_t> size;
   std::atomic<uint64_t> degree_wt;
 	std::atomic<uint64_t> flatSize;
+	std::atomic<uint64_t> external_edge_wt;
 };
 
 typedef galois::LargeArray<Comm> CommArray;

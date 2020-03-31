@@ -332,6 +332,10 @@ void refinePartition(Graph &graph){
 				mergeNodesSubset(graph, myVec[c], c, comm_info[c].flatSize);
 			}
 		});
+
+	comm_info.destroy();
+	comm_info.deallocate();
+
 }
 
 
@@ -1352,7 +1356,8 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
 void leiden(Graph &graph){
 
 
-	Graph* graph_curr, graph_next;
+	Graph* graph_curr;
+	Graph graph_next;
 
 	graph_curr = &graph;	
 	while(true){
@@ -1365,10 +1370,24 @@ void leiden(Graph &graph){
 		bool done = true;
 
 		//check if done or not
-		galois::do_all(
+		galois::do_all(galois::iterate(*graph_curr),
+			[&] (GNode n){
 
-		);
-	
+				if(c_info[n].size > 1)
+					done = false;
+			});
+
+		//termination criterion
+		if(done)
+			break;
+
+		refinePartition(*graph_curr);
+
+		uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+		buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
+
+		graph_curr = &graph_next;					
+
 		//destroying c_info
 		c_info.destroy();
 		c_info.deallocate();	
