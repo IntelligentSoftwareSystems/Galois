@@ -17,40 +17,33 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_RUNTIME_INIT_H
-#define GALOIS_RUNTIME_INIT_H
+#include "galois/substrate/SharedMem.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Termination.h"
 
-#include "galois/runtime/Statistics.h"
-#include "galois/runtime/PagePool.h"
-#include "galois/substrate/Init.h"
+#include <memory>
 
-#include <string>
+galois::substrate::SharedMem::SharedMem() {
+  internal::setThreadPool(&m_tpool);
 
-namespace galois {
-namespace runtime {
+  // delayed initialization because both call getThreadPool in constructor
+  // which is valid only after setThreadPool() above
+  m_biPtr   = std::make_unique<internal::BarrierInstance<>>();
+  m_termPtr = std::make_unique<internal::LocalTerminationDetection<>>();
 
-template <typename SM>
-class SharedMemRuntime : public galois::substrate::SharedMemSubstrate {
+  internal::setBarrierInstance(m_biPtr.get());
+  internal::setTermDetect(m_termPtr.get());
+}
 
-  using Base = galois::substrate::SharedMemSubstrate;
+galois::substrate::SharedMem::~SharedMem() {
+  internal::setTermDetect(nullptr);
+  internal::setBarrierInstance(nullptr);
 
-  internal::PageAllocState<> m_pa;
-  SM m_sm;
+  // destructors can call getThreadPool(), hence must be destroyed before
+  // setThreadPool() below
+  m_termPtr.reset();
+  m_biPtr.reset();
 
-public:
-  explicit SharedMemRuntime(void) : Base(), m_pa(), m_sm() {
-    internal::setPagePoolState(&m_pa);
-    internal::setSysStatManager(&m_sm);
-  }
-
-  ~SharedMemRuntime(void) {
-    m_sm.print();
-    internal::setSysStatManager(nullptr);
-    internal::setPagePoolState(nullptr);
-  }
-};
-
-} // end namespace runtime
-} // end namespace galois
-
-#endif // GALOIS_RUNTIME_INIT_H
+  internal::setThreadPool(nullptr);
+}

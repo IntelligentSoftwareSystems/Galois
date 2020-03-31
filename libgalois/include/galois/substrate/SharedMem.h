@@ -17,43 +17,44 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/gIO.h"
-#include "galois/substrate/Init.h"
-#include "galois/substrate/Barrier.h"
+#ifndef GALOIS_SUBSTRATE_SHAREDMEM_H
+#define GALOIS_SUBSTRATE_SHAREDMEM_H
+
 #include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Barrier.h"
 #include "galois/substrate/Termination.h"
 
 #include <memory>
 
-using namespace galois::substrate;
+namespace galois::substrate {
 
-SharedMemSubstrate::SharedMemSubstrate(void) {
-  internal::setThreadPool(&m_tpool);
+class SharedMem {
 
-  // delayed initialization because both call getThreadPool in constructor
-  // which is valid only after setThreadPool() above
-  m_biPtr   = new internal::BarrierInstance<>();
-  m_termPtr = new internal::LocalTerminationDetection<>();
+  // Order is critical here
+  ThreadPool m_tpool;
 
-  GALOIS_ASSERT(m_biPtr);
-  GALOIS_ASSERT(m_termPtr);
+  std::unique_ptr<internal::LocalTerminationDetection<>> m_termPtr;
+  std::unique_ptr<internal::BarrierInstance<>> m_biPtr;
 
-  internal::setBarrierInstance(m_biPtr);
-  internal::setTermDetect(m_termPtr);
-}
+public:
+  /**
+   * Initializes the Substrate library components
+   */
+  SharedMem();
 
-SharedMemSubstrate::~SharedMemSubstrate(void) {
+  /**
+   * Destroys the Substrate library components
+   */
+  ~SharedMem();
 
-  internal::setTermDetect(nullptr);
-  internal::setBarrierInstance(nullptr);
 
-  // destructors call getThreadPool(), hence must be destroyed before
-  // setThreadPool() below
-  delete m_termPtr;
-  m_termPtr = nullptr;
+  SharedMem(const SharedMem&) = delete;
+  SharedMem& operator=(const SharedMem&) = delete;
 
-  delete m_biPtr;
-  m_biPtr = nullptr;
+  SharedMem(SharedMem&&) = delete;
+  SharedMem& operator=(SharedMem&&) = delete;
+};
 
-  internal::setThreadPool(nullptr);
-}
+}  // namespace galois::substrate
+
+#endif

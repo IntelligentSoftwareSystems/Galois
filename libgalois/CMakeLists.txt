@@ -1,5 +1,5 @@
 set(sources
-        src/Galois.cpp
+        src/SharedMemSys.cpp
         src/Context.cpp
         src/PreAlloc.cpp
         src/Support.cpp
@@ -29,7 +29,7 @@ set(sources
         src/Termination.cpp
         src/NumaMem.cpp
         src/PageAlloc.cpp
-        src/SubsInit.cpp
+        src/SharedMem.cpp
         src/FileGraph.cpp
         src/FileGraphParallel.cpp
         src/OCFileGraph.cpp

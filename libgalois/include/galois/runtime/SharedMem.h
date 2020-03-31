@@ -17,9 +17,41 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
+#ifndef GALOIS_RUNTIME_SHAREDMEM_H
+#define GALOIS_RUNTIME_SHAREDMEM_H
 
-galois::SharedMemSys::SharedMemSys(void)
-    : galois::runtime::SharedMemRuntime<galois::runtime::StatManager>() {}
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/PagePool.h"
+#include "galois/substrate/SharedMem.h"
 
-galois::SharedMemSys::~SharedMemSys(void) {}
+#include <string>
+
+namespace galois::runtime {
+
+template <typename SM>
+class SharedMem: public galois::substrate::SharedMem {
+  internal::PageAllocState<> m_pa;
+  SM m_sm;
+
+public:
+  explicit SharedMem() :  m_pa(), m_sm() {
+    internal::setPagePoolState(&m_pa);
+    internal::setSysStatManager(&m_sm);
+  }
+
+  ~SharedMem() {
+    m_sm.print();
+    internal::setSysStatManager(nullptr);
+    internal::setPagePoolState(nullptr);
+  }
+
+  SharedMem(const SharedMem&) = delete;
+  SharedMem& operator=(const SharedMem&) = delete;
+
+  SharedMem(SharedMem&&) = delete;
+  SharedMem& operator=(SharedMem&&) = delete;
+};
+
+}  // namespace galois::runtime
+
+#endif
