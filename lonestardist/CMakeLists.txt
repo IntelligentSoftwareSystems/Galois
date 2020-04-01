@@ -25,7 +25,7 @@ if(ENABLE_HETERO_GALOIS)
   # for debugging
   add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lineinfo)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>")
 
     add_definitions(-D__GALOIS_DEBUG_WORKLIST__)
   endif()
@@ -60,7 +60,7 @@ function(app_dist name)
     target_link_libraries(${name} ${name}_cuda)
 
     FILE(GLOB CUSOURCES ${name}*.cu)
-    cuda_add_library(${name}_cuda ${CUSOURCES})
+    add_library(${name}_cuda ${CUSOURCES})
     target_link_libraries(${name}_cuda galois_gpu)
   endif()
 endfunction()
