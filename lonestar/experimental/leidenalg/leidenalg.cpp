@@ -32,7 +32,7 @@
 #include <deque>
 #include <type_traits>
 
-#include <igraph.h>
+#include <random>
 
 #include "Lonestar/BoilerPlate.h"
 #include "leidenalg.h"

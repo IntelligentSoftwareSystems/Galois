@@ -67,14 +67,40 @@ using Graph =
 
 using GNode = Graph::GraphNode;
 
-igraph_rng_t rng;
+std::default_random_engine generator;
+std::uniform_real_distribution<double> distribution(0.0,1.0);
+
 double resolution;
+double randomness;
 
 void setResolution(double res){
 
 	resolution = res;
 }
 
+void setRandomness(double rdm){
+
+	randomness = rdm;
+}
+
+//verbatim as is from the Java code
+double fastExp(double exponent){
+
+	if(exponent < -256.0f)
+		return 0;
+
+	exponent = 1.0f + exponent/256.0f ;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	exponent *= exponent;
+	
+	return exponent;
+}
 
 void printGraphCharateristics(Graph& graph) {
 
@@ -452,7 +478,7 @@ double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
 
 	return diff;
 }
-//subcomm_info should have updated size values
+//subcomm_info should have updated size values and external edge weights
 uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info, uint64_t flatSize_comm){
 
 	uint64_t rand_subcomm = -1;
@@ -486,9 +512,9 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
   } // End edge loop
 
 	std::map<uint64_t, uint64_t> new_cluster_local_map;	
-	std::vector<uint64_t> new_counter;		
+	std::vector<double> prefix_transformed_quality_increment;		
 	num_unique_clusters = 0;
-	uint64_t total = 0;	
+	double total = 0.0f;	
 
 	for(auto pair: cluster_local_map){
 
@@ -502,26 +528,39 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 		if(subcomm_info[subcomm].external_edge_wt < resolution*flatSize_subcomm*((double)flatSize_comm - flatSize_subcomm))
 			continue;
 
-		if(diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt) > 0){
-			new_cluster_local_map[subcomm] = num_unique_clusters;
-			uint64_t count = counter[cluster_local_map[subcomm]];
-			new_counter.push_back(count);
-			total += count;
+		double quality_increment = diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt);
+
+		if(quality_increment > 0){
+		
+			new_cluster_local_map[num_unique_clusters] = subcomm;
+			double transformed_quality_increment = fastExp(quality_increment/randomness);
+			total += transformed_quality_increment;
+			prefix_transformed_quality_increment[num_unique_clusters] = total;
+			num_unique_clusters++;
 		}
 	}
 
-	uint64_t rand_idx = getRandomInt(0,total-1);
+	double r = distribution(generator);
+	r = total*r;
 
-	uint64_t idx = 0;
-	for(auto pair: new_cluster_local_map){
+	int64_t min_idx = -1;
+	int64_t max_idx = num_unique_clusters;
 
-		if(new_counter[idx] > rand_idx)
-			return pair.first;
+	while(min_idx < max_idx -1){
+		
+		min_idx = (min_idx + max_idx)/2;
 
-		rand_idx = rand_idx - new_counter[idx];
+		if(prefix_transformed_quality_increment[min_idx] >= r)
+			max_idx = mid_idx;
+		else
+			min_idx = mid_idx;
 	}
-
-	return -1;
+	
+	if(max_idx < num_unique_clusters)
+		return new_cluster_local_map[num_unique_clusters];
+	else
+		return -1;
+	
 }
 /*
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
