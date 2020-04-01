@@ -33,8 +33,8 @@
 #include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
-#include "galois/graphs/OfflineGraph.h"
 #include "galois/DynamicBitset.h"
+#include "galois/OutIndexView.h"
 #include "llvm/Support/CommandLine.h"
 
 /*
@@ -225,7 +225,7 @@ protected:
 
 private:
   /**
-   * Given an OfflineGraph, compute the masters for each node by
+   * Given an OutIndexView, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
    * blocking the nodes off to assign to each host. Considers
    * ONLY nodes and not edges.
@@ -240,7 +240,7 @@ private:
    * of nodes should be. For example, a factor of 2 will make 2 blocks
    * out of 1 block had the decompose factor been set to 1.
    */
-  void computeMastersBlockedNodes(galois::graphs::OfflineGraph& g,
+  void computeMastersBlockedNodes(const galois::OutIndexView& g,
                                   uint64_t numNodes_to_divide,
                                   const std::vector<unsigned>& scalefactor,
                                   unsigned DecomposeFactor = 1) {
@@ -280,7 +280,7 @@ private:
   }
 
   /**
-   * Given an OfflineGraph, compute the masters for each node by
+   * Given an OutIndexView, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
    * blocking the nodes off to assign to each host while taking
    * into consideration the only edges of the node to get
@@ -296,7 +296,7 @@ private:
    * of nodes should be. For example, a factor of 2 will make 2 blocks
    * out of 1 block had the decompose factor been set to 1.
    */
-  void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
+  void computeMastersBalancedEdges(const galois::OutIndexView& g,
                                    uint64_t numNodes_to_divide,
                                    const std::vector<unsigned>& scalefactor,
                                    uint32_t edgeWeight,
@@ -309,7 +309,7 @@ private:
 
     gid2host.resize(numHosts * DecomposeFactor);
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      auto r = g.divideByNode(0, edgeWeight, (id + d * numHosts),
+      auto r = g.DivideByNode(0, edgeWeight, (id + d * numHosts),
                               numHosts * DecomposeFactor, scalefactor);
       gid2host[id + d * numHosts].first  = *(r.first.first);
       gid2host[id + d * numHosts].second = *(r.first.second);
@@ -346,7 +346,7 @@ private:
         assert(gid2host[h].first == 0);
       } else if (h == numHosts - 1) {
         assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == g.size());
+        assert(gid2host[h].second == g.num_nodes());
       } else {
         assert(gid2host[h].first == gid2host[h - 1].second);
         assert(gid2host[h].second == gid2host[h + 1].first);
@@ -356,7 +356,7 @@ private:
   }
 
   /**
-   * Given an OfflineGraph, compute the masters for each node by
+   * Given an OutIndexView, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
    * blocking the nodes off to assign to each host while taking
    * into consideration the edges of the node AND the node itself.
@@ -375,11 +375,11 @@ private:
    * @todo make this function work with decompose factor
    */
   void computeMastersBalancedNodesAndEdges(
-      galois::graphs::OfflineGraph& g, uint64_t numNodes_to_divide,
+      const galois::OutIndexView& g, uint64_t numNodes_to_divide,
       const std::vector<unsigned>& scalefactor, uint32_t nodeWeight,
       uint32_t edgeWeight, unsigned DecomposeFactor = 1) {
     if (nodeWeight == 0) {
-      nodeWeight = g.sizeEdges() / g.size(); // average degree
+      nodeWeight = g.num_edges() / g.num_nodes(); // average degree
     }
     if (edgeWeight == 0) {
       edgeWeight = 1;
@@ -387,13 +387,14 @@ private:
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     gid2host.resize(numHosts);
-    auto r = g.divideByNode(nodeWeight, edgeWeight, id,
+    auto r = g.DivideByNode(nodeWeight, edgeWeight, id,
                             numHosts, scalefactor);
     gid2host[id].first  = *r.first.first;
     gid2host[id].second = *r.first.second;
     for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id)
+      if (h == id) {
         continue;
+      }
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
       net.sendTagged(h, galois::runtime::evilPhase, b);
@@ -427,17 +428,13 @@ protected:
    * out of 1 block had the decompose factor been set to 1.
    */
   uint64_t computeMasters(MASTERS_DISTRIBUTION masters_distribution,
-                          galois::graphs::OfflineGraph& g,
+                          const galois::OutIndexView& g,
                           const std::vector<unsigned>& scalefactor,
                           uint32_t nodeWeight=0, uint32_t edgeWeight=0,
                           unsigned DecomposeFactor = 1) {
-    galois::Timer timer;
-    timer.start();
-    g.reset_seek_counters();
-
     uint64_t numNodes_to_divide = 0;
 
-    numNodes_to_divide = g.size();
+    numNodes_to_divide = g.num_nodes();
 
     // compute masters for all nodes
     switch (masters_distribution) {
@@ -457,15 +454,6 @@ protected:
       break;
     }
 
-    timer.stop();
-
-    galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
-        GRNAME, "MasterDistTime", timer.get());
-
-    galois::gPrint(
-        "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
-        " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
-        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)\n");
     return numNodes_to_divide;
   }
 
