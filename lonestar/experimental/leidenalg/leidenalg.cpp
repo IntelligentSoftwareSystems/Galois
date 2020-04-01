@@ -155,7 +155,7 @@ int64_t maxQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
           case Mod:
             local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
             break;
-          case default:
+         	default:
             std::abort();
         }
 	} else {
@@ -181,7 +181,7 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
 
 		graph.getData(n).curr_comm_ass = n;
 		c_info[n].size = (uint64_t) 1;
-		c_info[n].deree_wt = graph.getData(n).degree_wt;
+		c_info[n].degree_wt = graph.getData(n).degree_wt;
 		c_info[n].flatSize = graph.getData(n).flatSize;
 		}, galois::steal());
 
@@ -318,7 +318,7 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 					case Mod:
 						quality_increment = diffModQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt, degree_wt);
 						break;
-					case default:
+					default:
             std::abort();
 		} 
 
@@ -337,10 +337,11 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 
   int64_t min_idx = -1;
   int64_t max_idx = num_unique_clusters;
+	int64_t mid_idx;
 
   while(min_idx < max_idx -1){
 
-    min_idx = (min_idx + max_idx)/2;
+    mid_idx = (min_idx + max_idx)/2;
 
     if(prefix_transformed_quality_increment[min_idx] >= r)
       max_idx = mid_idx;
@@ -439,7 +440,7 @@ void refinePartition(Graph &graph){
 	std::vector<std::vector<GNode>> myVec(graph.size()+1);
 	CommArray comm_info;
 
-	comm_info.allocate(graph.size()+1);
+	comm_info.allocateBlocked(graph.size()+1);
 
 	for(auto n: graph){
 
@@ -448,7 +449,7 @@ void refinePartition(Graph &graph){
 	}
 	
 	//call mergeNodesSubset for each community in parallel	
-	galois::do_all(galois::iterate((uint32_t)0, graph.size()),
+	galois::do_all(galois::iterate((uint32_t)0, (uint32_t)graph.size()),
   	[&](uint32_t c){
 		
 			if(myVec[c].size() > 0){
@@ -762,7 +763,7 @@ double algoLouvainWithoutLockingDoAll(Graph &graph, double lower, double thresho
                       } // End edge loop
 
                     // Find the max gain in modularity
-                    local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
+                    local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
 
                     } else {
                       local_target = -1;
@@ -1304,7 +1305,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
 
 	//initialize to 0
 	for(int i=0;i<num_unique_clusters;i++)
-		cluster_flatsize = (uint64_t) 0;
+		cluster_flatsize[i] = (uint64_t) 0;
 	
 	
   // Comment: Serial separation is better than do_all due to contention
@@ -1486,7 +1487,7 @@ void leiden(Graph &graph){
 	while(true){
 
 		CommArray c_info;
-		c_info.allocate(graph_curr->size()+1);
+		c_info.allocateBlocked(graph_curr->size()+1);
 	
 		moveNodesFast(*graph_curr, c_info);
 
@@ -1526,8 +1527,6 @@ int main(int argc, char** argv) {
 
   galois::StatTimer TEnd2End("Timer_end2end");
   TEnd2End.start();
-
-	set_rng();
 
   std::cout << "Reading from file: " << filename << std::endl;
   std::cout << "[WARNING:] Make sure " << filename << " is symmetric graph without duplicate edges" << std::endl;

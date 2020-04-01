@@ -252,7 +252,7 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
 uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc) {
 
   uint64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
@@ -530,7 +530,7 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   do {
     if(sc != stored_already->first) {
       ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
-			size_y = c_info[stored_already->first].flatSize;
+			double size_y = c_info[stored_already->first].flatSize;
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
@@ -650,7 +650,7 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1) * 0.5f;
+                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)) * 0.5f;
                 });
 
 
@@ -770,7 +770,7 @@ uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
      }
     }
   }
-
+}
 
 
 void printGraph(Graph& graph){
