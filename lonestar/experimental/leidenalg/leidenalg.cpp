@@ -54,6 +54,11 @@ enum Algo {
   doall
 };
 
+enum Quality{
+	CPM,
+	Mod
+};
+
 
 static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
@@ -66,6 +71,13 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::doall, "Doall", "Using galois for_each for conflict mitigation"),
                 clEnumValEnd),
     cll::init(Algo::foreach));
+
+static cll::opt<Quality> quality(
+    "quality", cll::desc("Choose an option:"),
+    cll::values(clEnumValN(Quality::CPM, "CPM", "Using CPM Quality"),
+                clEnumValN(Quality::Mod, "Mod", "Using mod"),
+                clEnumValEnd),
+    cll::init(Quality::Mod));
 
 static cll::opt<bool> enable_VF("enable_VF",
   cll::desc("Flag to enable vertex following optimization."),
@@ -91,7 +103,7 @@ static cll::opt<std::string> output_CID_filename("output_CID_filename",
   cll::desc("File name to output cluster IDs."),
   cll::init("output_CID_filename"));
 
-int64_t maxCPMQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
+int64_t maxQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
 
 	//compute cluster local map first
 	auto& n_data = graph.getData(n, flag_write_lock);
@@ -134,8 +146,18 @@ int64_t maxCPMQualityWithoutSwaps(Graph &graph, GNode n, CommArray &c_info){
     } // End edge loop
 
     // Find the max gain
-    local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
+  //  local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
 
+		switch(quality){
+          case CPM:
+            local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
+            break;
+          case Mod:
+            local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
+            break;
+          case default:
+            std::abort();
+        }
 	} else {
   	local_target = -1;
   }
@@ -172,8 +194,8 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
 				graph.getData(n).inBag = false;
 
 				//create cluster local map 
-				int64_t local_target = maxCPMQualityWithoutSwaps(graph, n, c_info);
-
+				int64_t local_target= maxQualityWithoutSwaps(graph, n, c_info);
+				
 				auto& n_data = graph.getData(n, flag_write_lock);
 				if(local_target != -1 && local_target != graph.getData(n).curr_comm_ass){
 	
