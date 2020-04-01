@@ -109,7 +109,7 @@ if(NOT "$ENV{GCC_BIN}" STREQUAL "")
 endif()
 
 # Always include debug info and aggressive warnings
-add_compile_options(-g -Wall -Wextra -Werror)
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
 
 # GCC
 if(CMAKE_COMPILER_IS_GNUCC)
@@ -120,11 +120,11 @@ if(CMAKE_COMPILER_IS_GNUCC)
   endif()
 
   # Avoid warnings from boost::counting_iterator
-  add_compile_options(-Wno-deprecated-copy)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
   # Avoid warnings from openmpi
-  add_compile_options(-Wno-cast-function-type)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
   # Removing unused parameters conflicts with readability rules
-  add_compile_options(-Wno-unused-parameter)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 # Clang
@@ -137,13 +137,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 
   if(CXX_TOOLCHAIN)
-    add_compile_options("-gcc-toolchain ${CXX_TOOLCHAIN}/..")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-gcc-toolchain ${CXX_TOOLCHAIN}/..>")
   else()
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
   
-  add_compile_options(-fcolor-diagnostics)
-  add_compile_options(-Wno-unused-parameter)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
 endif()
 
 # ICC
@@ -153,10 +152,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   if(ICC_VERSION VERSION_LESS 16.0)
     message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
   endif()
-  add_compile_options(-wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
 
   if(CXX_TOOLCHAIN)
-    add_compile_options("-gxx-name=${CXX_TOOLCHAIN}/g++")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-gxx-name=${CXX_TOOLCHAIN}/g++>")
   else()
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
@@ -170,7 +169,8 @@ endif()
 # Enable architecture-specific optimizations
 include(CheckArchFlags)
 if(ARCH_FLAGS_FOUND)
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}> $<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
   add_link_options(${ARCH_LINK_FLAGS})
 endif()
 
@@ -181,7 +181,7 @@ if(USE_GPROF)
 endif(USE_GPROF)
 
 if(USE_SANITIZER)
-  add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
 endif()
 
 if(CXX_CLANG_TIDY)
@@ -189,7 +189,7 @@ if(CXX_CLANG_TIDY)
   # Ignore warning flags intended for the CXX program. This only works because
   # the two compilers we care about, clang and gcc, both understand
   # -Wno-unknown-warning-option.
-  add_compile_options(-Wno-unknown-warning-option)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unknown-warning-option>")
 endif()
 
 add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
@@ -204,10 +204,11 @@ add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
+
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  add_compile_options(${MPI_COMPILE_FLAGS})
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${MPI_COMPILE_FLAGS}>")
   add_link_options(${MPI_LINK_FLAGS})
   include_directories(${MPI_INCLUDE_PATH})
 
@@ -224,29 +225,27 @@ if(ENABLE_DIST_GALOIS)
   endif(USE_LCI)
 
   if(ENABLE_HETERO_GALOIS)
-    SET(CUDA_SEPARABLE_COMPILATION ON)
-    find_package(CUDA REQUIRED)
-    set(CUDA_PROPAGATE_HOST_FLAGS off)
-    set(CUDA_SEPARABLE_COMPILATION on)
-    set(CUDA_HOST_COMPILER g++)
+    enable_language(CUDA)
 
     string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
     string(REPLACE "," ";" GENCODES ${GENCODES})
     foreach(GENCODE ${GENCODES})
-      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
+      add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
     endforeach()
 
-    cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
 
     # MGPU v1.1
     set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu") # only required headers
-    cuda_include_directories("${MGPU_ROOT}/include")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${MGPU_ROOT}/include>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${MGPU_ROOT}/include>")
 
     # CUB v1.6.4
     set(CUB_ROOT "${CMAKE_SOURCE_DIR}/libgpu/cub") # only required headers
-    cuda_include_directories("${CUB_ROOT}")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CUB_ROOT}>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CUB_ROOT}>")
 
-    #find_package(OpenCL REQUIRED)
   endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
 
@@ -262,7 +261,8 @@ if(USE_EXP)
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>" "$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
   endif()
 
   find_package(TBB)
@@ -286,7 +286,7 @@ if(USE_EXP)
 
   if(USE_HTM)
     if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-      add_compile_options(-qtm -qsmp=speculative)
+      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
       set(GALOIS_USE_HTM on)
       set(GALOIS_USE_SEQ_ONLY on)
       set(USE_LONGJMP_ABORT on)
