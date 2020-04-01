@@ -72,6 +72,7 @@ std::uniform_real_distribution<double> distribution(0.0,1.0);
 
 double resolution;
 double randomness;
+uint64_t constant;
 
 void setResolution(double res){
 
@@ -196,6 +197,19 @@ double calConstantForSecondTerm(Graph& graph){
   return 1/(double)total_edge_weight_twice;
 }
 
+void setConstant(Graph& graph){
+	constant = calConstantForSecondTerm(graph);
+}
+
+double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t degree_wt){
+
+  double ax = subcomm_info[curr_subcomm].degree_wt - degree_wt;
+  double ay = subcomm_info[candidate_subcomm].degree_wt;
+
+  double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + (double)degree_wt* constant *(double)(ax - ay);
+
+  return diff*constant;
+}
 
 uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
@@ -458,17 +472,6 @@ double calModularityFinal(Graph& graph) {
   return mod;
 }
 
-void set_rng(){
-	
-	igraph_rng_init(&rng, &igraph_rngtype_mt19937);
-	igraph_rng_seed(&rng, rand());
-}
-
-uint64_t getRandomInt(uint64_t from, uint64_t to){
-	
-	return igraph_rng_get_integer(rng, from, to);
-}
-
 double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt){
 
 	uint64_t size_x = subcomm_info[curr_subcomm].flatSize;
@@ -477,90 +480,6 @@ double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
 	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
 
 	return diff;
-}
-//subcomm_info should have updated size values and external edge weights
-uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info, uint64_t flatSize_comm){
-
-	uint64_t rand_subcomm = -1;
-	uint64_t curr_subcomm = graph.getData(n).curr_subcomm_ass;
-
-	std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's subcommunity to local number: Subcommunity --> Index
-	std::vector<uint64_t> counter; //Number of edges to each unique subcommunity
-	uint64_t num_unique_clusters = 1;
-
-	cluster_local_map[curr_subcomm] = 0; // Add n's current subcommunity
-	counter.push_back(0); //Initialize the counter to zero (no edges incident yet)
-
-	uint64_t self_loop_wt = 0;
-
-	for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-  	GNode dst = graph.getEdgeDst(ii);
-    auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded	
-
-		if(dst == n){
-    	self_loop_wt += edge_wt; // Self loop weights is recorded
-		}
-		auto stored_already = cluster_local_map.find(graph.getData(dst).curr_subcomm_ass); // Check if it already exists
-		if(stored_already != cluster_local_map.end()) {
-    	counter[stored_already->second] += edge_wt;
-    } 
-		else {
-    	cluster_local_map[graph.getData(dst).curr_subcomm_ass] = num_unique_clusters;
-      counter.push_back(edge_wt);
-      num_unique_clusters++;
-    }
-  } // End edge loop
-
-	std::map<uint64_t, uint64_t> new_cluster_local_map;	
-	std::vector<double> prefix_transformed_quality_increment;		
-	num_unique_clusters = 0;
-	double total = 0.0f;	
-
-	for(auto pair: cluster_local_map){
-
-		auto subcomm = pair.first;
-		if(curr_subcomm == subcomm)
-			continue;
-
-		double flatSize_subcomm = (double) subcomm_info[subcomm].flatSize;
-
-		//check if subcommunity is well connected
-		if(subcomm_info[subcomm].external_edge_wt < resolution*flatSize_subcomm*((double)flatSize_comm - flatSize_subcomm))
-			continue;
-
-		double quality_increment = diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt);
-
-		if(quality_increment > 0){
-		
-			new_cluster_local_map[num_unique_clusters] = subcomm;
-			double transformed_quality_increment = fastExp(quality_increment/randomness);
-			total += transformed_quality_increment;
-			prefix_transformed_quality_increment[num_unique_clusters] = total;
-			num_unique_clusters++;
-		}
-	}
-
-	double r = distribution(generator);
-	r = total*r;
-
-	int64_t min_idx = -1;
-	int64_t max_idx = num_unique_clusters;
-
-	while(min_idx < max_idx -1){
-		
-		min_idx = (min_idx + max_idx)/2;
-
-		if(prefix_transformed_quality_increment[min_idx] >= r)
-			max_idx = mid_idx;
-		else
-			min_idx = mid_idx;
-	}
-	
-	if(max_idx < num_unique_clusters)
-		return new_cluster_local_map[num_unique_clusters];
-	else
-		return -1;
-	
 }
 /*
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
