@@ -95,11 +95,11 @@ jobs:
       - checkout
       - run: |
           yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          yum -y -q install devtoolset-7-toolchain llvm-toolset-7
+          yum -y -q install devtoolset-7-toolchain llvm-toolset-8.0.7
           # For some reason using scl_source enable this way doesn't work when bash
           # was started with -e, so temporarily disable that, then re-enable it afterward.
           set +e
-          source scl_source enable llvm-toolset-7
+          source scl_source enable llvm-toolset-8.0.1
           set -e
           # Use miniconda to get recent boost and cmake
           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
