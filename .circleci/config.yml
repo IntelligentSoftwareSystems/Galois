@@ -97,6 +97,8 @@ jobs:
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
           yum -y -q install zlib-devel make gcc gcc-c++ boost-devel cmake eigen3-devel mpich-devel
+          # Make the "module" command work in this shell session.
+          source /etc/profile.d/modules.sh
           module load mpi
           mkdir build
           cd build
@@ -115,6 +117,8 @@ jobs:
           yum -y -q config-manager --set-enabled PowerTools
           yum -y -q install zlib-devel make boost-devel cmake eigen3-devel mpich-devel
           yum module -y -q install llvm-toolset
+          # Make the "module" command work in this shell session.
+          source /etc/profile.d/modules.sh
           module load mpi
           mkdir build
           cd build
