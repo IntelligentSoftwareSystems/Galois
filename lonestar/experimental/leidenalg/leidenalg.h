@@ -26,6 +26,8 @@
  */
 
 constexpr static const uint64_t INF_VAL = std::numeric_limits<uint64_t>::max() / 2 - 1;
+constexpr static const double INF_VAL_DOUBLE = std::numeric_limits<double>::max() / 2 - 1;
+
 
 constexpr galois::MethodFlag flag_no_lock = galois::MethodFlag::UNPROTECTED;
 constexpr galois::MethodFlag flag_read_lock = galois::MethodFlag::READ;
@@ -61,7 +63,7 @@ struct Node{
 	bool inBag;
 };
 
-typedef uint64_t EdgeTy;
+typedef uint32_t EdgeTy;
 using Graph =
     galois::graphs::LC_CSR_Graph<Node, EdgeTy>::with_no_lockable<false>::type::with_numa_alloc<true>::type;
 
@@ -72,7 +74,7 @@ std::uniform_real_distribution<double> distribution(0.0,1.0);
 
 double resolution;
 double randomness;
-uint64_t constant;
+double constant;
 
 void setResolution(double res){
 
@@ -187,6 +189,18 @@ void sumClusterWeight(Graph& graph, CommArray& c_info) {
 }
 
 double calConstantForSecondTerm(Graph& graph){
+	
+	galois::do_all(galois::iterate(graph),
+                [&](GNode n) {
+                  uint64_t total_weight = 0;
+                  auto &n_data = graph.getData(n);
+                  for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii){
+                     total_weight += graph.getEdgeData(ii, flag_no_lock);
+                  }
+                  n_data.degree_wt = total_weight;
+									std::cout << "totoal w: " << total_weight << std::endl;
+			});
+
   galois::GAccumulator<uint64_t> local_weight;
   galois::do_all(galois::iterate(graph),
                 [&graph, &local_weight](GNode n){
@@ -194,11 +208,14 @@ double calConstantForSecondTerm(Graph& graph){
                 });
   /* This is twice since graph is symmetric */
   uint64_t total_edge_weight_twice = local_weight.reduce();
+
+	std::cout << "totak twice: " << total_edge_weight_twice << std::endl;
   return 1/(double)total_edge_weight_twice;
 }
 
 void setConstant(Graph& graph){
 	constant = calConstantForSecondTerm(graph);
+	std::cout << "constant" << constant << std::endl;
 }
 
 double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t degree_wt){
@@ -265,6 +282,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 	double size_x = c_info[sc].size;
 	double size_y = 0;
 
+	std::cout << "const: " << constant << std::endl;
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
@@ -450,7 +468,7 @@ double calModularityFinal(Graph& graph) {
                 [&](GNode n) {
                   auto n_data = graph.getData(n);
                   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                    if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
+                    if(graph.getData(graph.getEdgeDst(ii)).curr_subcomm_ass == n_data.curr_subcomm_ass) {
                     //if(graph.getData(graph.getEdgeDst(ii)).prev_comm_ass == n_data.prev_comm_ass) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
@@ -670,7 +688,7 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
  * To compute the final modularity using prev cluster
  * assignments.
  */
-double calCPMQualityFinal(Graph& graph, double resolution) {
+double calCPMQualityFinal(Graph& graph) {
   CommArray c_info; // Community info
 
   /* Variables needed for Modularity calculation */
@@ -736,14 +754,14 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
-    if(n_data.curr_comm_ass != -1) {
-      assert(n_data.curr_comm_ass < graph.size());
-      auto stored_already = cluster_local_map.find(n_data.curr_comm_ass);
+    if(n_data.curr_subcomm_ass != -1) {
+      assert(n_data.curr_subcomm_ass < graph.size());
+      auto stored_already = cluster_local_map.find(n_data.curr_subcomm_ass);
      if(stored_already != cluster_local_map.end()){
-      n_data.curr_comm_ass = stored_already->second;
+      n_data.curr_subcomm_ass = stored_already->second;
      } else {
-      cluster_local_map[n_data.curr_comm_ass] = num_unique_clusters;
-      n_data.curr_comm_ass = num_unique_clusters;
+      cluster_local_map[n_data.curr_subcomm_ass] = num_unique_clusters;
+      n_data.curr_subcomm_ass = num_unique_clusters;
       num_unique_clusters++;
      }
     }
@@ -795,7 +813,7 @@ void checkModularity(Graph& graph, largeArray& clusters_orig) {
   //galois::gPrint("Number of unique clusters (renumber) ARR: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
   galois::do_all(galois::iterate(graph),
                 [&](GNode n){
-                  graph.getData(n, flag_no_lock).curr_comm_ass = clusters_orig[n];
+                  graph.getData(n, flag_no_lock).curr_subcomm_ass = clusters_orig[n];
                 });
 
   uint64_t num_unique_clusters = renumberClustersContiguously(graph);
@@ -803,5 +821,21 @@ void checkModularity(Graph& graph, largeArray& clusters_orig) {
   auto mod = calModularityFinal(graph);
   galois::gPrint("FINAL MOD: ", mod, "\n");
 }
+
+void checkCPMQuality(Graph& graph, largeArray& clusters_orig) {
+  galois::gPrint("checkModularity\n");
+
+  //galois::gPrint("Number of unique clusters (renumber) ARR: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
+  galois::do_all(galois::iterate(graph),
+                [&](GNode n){
+                  graph.getData(n, flag_no_lock).curr_subcomm_ass = clusters_orig[n];
+                });
+
+  uint64_t num_unique_clusters = renumberClustersContiguously(graph);
+  galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
+  auto mod = calCPMQualityFinal(graph);
+  galois::gPrint("FINAL MOD: ", mod, "\n");
+}
+
 
 #endif //LOUVAIN_CLUSTERING_H

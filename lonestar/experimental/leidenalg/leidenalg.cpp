@@ -186,6 +186,8 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
 		}, galois::steal());
 
 	while(true){
+
+		std::cout << "inside while move: \n";
 	
 		galois::do_all(galois::iterate(bag_curr),
 			[&] (GNode n){
@@ -195,8 +197,10 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
 
 				//create cluster local map 
 				int64_t local_target= maxQualityWithoutSwaps(graph, n, c_info);
-				
-				auto& n_data = graph.getData(n, flag_write_lock);
+        auto& n_data = graph.getData(n, flag_write_lock);
+
+				std::cout << "moving to" << local_target << "from " << n_data.curr_comm_ass << std::endl;				
+//				auto& n_data = graph.getData(n, flag_write_lock);
 				if(local_target != -1 && local_target != graph.getData(n).curr_comm_ass){
 	
 					galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
@@ -326,7 +330,9 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 
       new_cluster_local_map[num_unique_clusters] = subcomm;
       double transformed_quality_increment = fastExp(quality_increment/randomness);
-      total += transformed_quality_increment;
+   
+		std::cout << "transofrmed: " << transformed_quality_increment << std::endl; 
+	  total += transformed_quality_increment;
       prefix_transformed_quality_increment[num_unique_clusters] = total;
       num_unique_clusters++;
     }
@@ -358,9 +364,7 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 
 
 //this should be implemented in serial; since this is called in parallel for all communities
-void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint64_t comm_flatSize){
-
-	CommArray subcomm_info;
+void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint64_t comm_flatSize, CommArray& subcomm_info){
 
 	//select set R
 	std::vector<GNode> R;
@@ -381,7 +385,7 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 		if(total >= resolution*flatSize_n*((double)comm_flatSize - flatSize_n))
 			R.push_back(n);	
 
-		subcomm_info[n].flatSize = flatSize_n;
+		subcomm_info[n].flatSize = graph.getData(n).flatSize;
 		subcomm_info[n].external_edge_wt = total;
 		subcomm_info[n].size = (uint64_t) 1;
 	}
@@ -448,17 +452,23 @@ void refinePartition(Graph &graph){
 		comm_info[graph.getData(n).curr_comm_ass].flatSize += graph.getData(n).flatSize;
 	}
 	
+	CommArray subcomm_info;
+	
+	subcomm_info.allocateBlocked(graph.size()+1);
 	//call mergeNodesSubset for each community in parallel	
 	galois::do_all(galois::iterate((uint32_t)0, (uint32_t)graph.size()),
   	[&](uint32_t c){
 		
 			if(myVec[c].size() > 0){
-				mergeNodesSubset(graph, myVec[c], c, comm_info[c].flatSize);
+				mergeNodesSubset(graph, myVec[c], c, comm_info[c].flatSize, subcomm_info);
 			}
 		});
 
 	comm_info.destroy();
 	comm_info.deallocate();
+
+	subcomm_info.destroy();
+  subcomm_info.deallocate();
 
 }
 
@@ -1477,14 +1487,18 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double
   galois::gPrint("Iter : ", iter, "\n");
 }
 
-void leiden(Graph &graph){
+void leiden(Graph &graph, largeArray& clusters_orig){
 
 
 	Graph* graph_curr;
 	Graph graph_next;
 
 	graph_curr = &graph;	
+	uint64_t num_nodes_orig = clusters_orig.size();
+
 	while(true){
+
+		std::cout <<"inside while \n";
 
 		CommArray c_info;
 		c_info.allocateBlocked(graph_curr->size()+1);
@@ -1502,12 +1516,37 @@ void leiden(Graph &graph){
 			});
 
 		//termination criterion
-		if(done)
+		if(done){
+			galois::do_all(galois::iterate(*graph_curr),
+				[&] (GNode n){
+					graph_curr->getData(n).curr_subcomm_ass = graph_curr->getData(n).curr_comm_ass;
+				});
+		uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+			galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
+                    [&](GNode n) {
+                    //  if(clusters_orig[n] > 0){
+                        assert(clusters_orig[n] < (*graph_curr).size());
+                        //galois::gPrint(clusters_orig[n],"\n");
+                        clusters_orig[n] = (*graph_curr).getData(clusters_orig[n], flag_no_lock).curr_subcomm_ass;
+                     // }
+                    });
+	
+	
+
 			break;
+		}
 
 		refinePartition(*graph_curr);
 
 		uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
+			galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
+                    [&](GNode n) {
+                    //  if(clusters_orig[n] > 0){
+                        assert(clusters_orig[n] < (*graph_curr).size());
+                        //galois::gPrint(clusters_orig[n],"\n");
+                        clusters_orig[n] = (*graph_curr).getData(clusters_orig[n], flag_no_lock).curr_subcomm_ass;
+                     // }
+                    });
 		buildNextLevelGraph(*graph_curr, graph_next, num_unique_clusters);
 
 		graph_curr = &graph_next;					
@@ -1536,6 +1575,9 @@ int main(int argc, char** argv) {
 
   graph_curr = &graph;
 
+	setConstant(*graph_curr);
+	setResolution(1.0f);
+	setRandomness(0.1f);
   /*
    * To keep track of communities for nodes in the original graph.
    *Community will be set to -1 for isolated nodes
@@ -1577,7 +1619,7 @@ int main(int argc, char** argv) {
      */
     galois::do_all(galois::iterate(*graph_curr),
                   [&](GNode n){
-                    clusters_orig[n] = -1;
+                    clusters_orig[n] = n;
                   });
 
     printGraphCharateristics(*graph_curr);
@@ -1588,8 +1630,9 @@ int main(int argc, char** argv) {
   galois::gPrint("GOING in \n");
   galois::StatTimer Tmain("Timer_LC");
   Tmain.start();
-  runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold, clusters_orig);
-  Tmain.stop();
+  //runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold, clusters_orig);
+  leiden(*graph_curr, clusters_orig);
+	Tmain.stop();
 
   TEnd2End.stop();
 
@@ -1597,7 +1640,16 @@ int main(int argc, char** argv) {
    * Sanity check: Check modularity at the end
    */
 
-  checkModularity(graph, clusters_orig);
+	switch(quality){
+          case CPM:
+						checkCPMQuality(graph, clusters_orig);
+						break;
+					case Mod:	
+  					checkModularity(graph, clusters_orig);
+						break;
+					default:
+						std::abort();
+	}
   if(output_CID){
     printNodeClusterId(graph, output_CID_filename);
   }
