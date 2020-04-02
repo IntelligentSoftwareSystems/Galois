@@ -99,11 +99,6 @@ endif()
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT "$ENV{GCC_BIN}" STREQUAL "")
-  # Preserve captured environment variable during reconfiguration
-  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
-endif()
-
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -112,21 +107,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
-
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
 endif()
 
