@@ -45,16 +45,16 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   list(APPEND sources src/HWTopoDarwin.cpp)
 else()
   include(CheckSchedSetAffinity)
-  if (SCHED_SETAFFINITY_FOUND)
-    add_definitions(-DGALOIS_USE_SCHED_SETAFFINITY)
-  elseif (USE_STRICT_CONFIG)
-    message(FATAL_ERROR "Need sched_setaffinity")
+  if (NOT SCHED_SETAFFINITY_FOUND)
+    if (USE_STRICT_CONFIG)
+      message(FATAL_ERROR "Need sched_setaffinity")
+    endif()
   endif()
-
   list(APPEND sources src/HWTopoLinux.cpp)
 endif()
 
 add_library(galois_shmem_obj OBJECT ${sources})
+
 target_include_directories(galois_shmem_obj PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/libtsuba/include>
@@ -68,28 +68,31 @@ target_include_directories(galois_shmem PUBLIC
 )
 
 if (SCHED_SETAFFINITY_FOUND)
-  target_link_libraries(galois_shmem ${SCHED_SETAFFINITY_LIBRARIES})
+  target_compile_definitions(galois_shmem PRIVATE GALOIS_USE_SCHED_SETAFFINITY)
+  target_compile_definitions(galois_shmem_obj PRIVATE GALOIS_USE_SCHED_SETAFFINITY)
+  target_link_libraries(galois_shmem PRIVATE ${SCHED_SETAFFINITY_LIBRARIES})
 endif()
 
-target_link_libraries(galois_shmem ${Boost_SERIALIZATION_LIBRARY_RELEASE})
-target_link_libraries(galois_shmem tsuba)
+target_link_libraries(galois_shmem PRIVATE ${Boost_SERIALIZATION_LIBRARY_RELEASE})
+target_link_libraries(galois_shmem PRIVATE tsuba)
 
 if (CMAKE_HAVE_PTHREAD_H)
-   add_definitions(-DGALOIS_HAVE_PTHREAD)
-   target_link_libraries(galois_shmem Threads::Threads)
+  target_compile_definitions(galois_shmem PRIVATE GALOIS_HAVE_PTHREAD)
+  target_compile_definitions(galois_shmem_obj PRIVATE GALOIS_HAVE_PTHREAD)
+  target_link_libraries(galois_shmem PRIVATE Threads::Threads)
 endif()
 
 find_package(NUMA)
 if (NUMA_FOUND)
-  add_definitions(-DGALOIS_USE_NUMA)
-  target_link_libraries(galois_shmem ${NUMA_LIBRARY})
+  target_compile_definitions(galois_shmem PRIVATE GALOIS_USE_NUMA)
+  target_compile_definitions(galois_shmem_obj PRIVATE GALOIS_USE_NUMA)
+  target_link_libraries(galois_shmem PRIVATE ${NUMA_LIBRARY})
 else()
   message(WARNING "No NUMA Support.  Likely poor performance for multi-socket systems.")
 endif()
 
 if (VTune_FOUND)
-  target_link_libraries(galois_shmem ${VTune_LIBRARIES})
-  target_link_libraries(galois_shmem dl)
+  target_link_libraries(galois_shmem PRIVATE ${VTune_LIBRARIES})
 endif()
 
 install(DIRECTORY include DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/.." COMPONENT dev
