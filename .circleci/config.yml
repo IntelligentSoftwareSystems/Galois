@@ -93,7 +93,10 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel make gcc gcc-c++ boost cmake eigen mpich
+          # Needs to access PowerTools packages for eigen, so get access to those
+          yum -y -q install dnf-plugins-core
+          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q install zlib-devel make gcc gcc-c++ boost cmake eigen3-devel mpich
           mkdir build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
@@ -106,7 +109,10 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel make boost cmake eigen mpich
+          # Needs to access PowerTools packages for eigen, so get access to those
+          yum -y -q install dnf-plugins-core
+          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q install zlib-devel make boost cmake eigen3-devel mpich
           yum module -y -q install llvm-toolset
           mkdir build
           cd build
