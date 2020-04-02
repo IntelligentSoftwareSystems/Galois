@@ -73,8 +73,7 @@ jobs:
           source scl_source enable devtoolset-9
           set -e
           # Use miniconda to get recent boost and cmake
-          # Use Python 2 to make bmk2 work.
-          wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
@@ -88,41 +87,27 @@ jobs:
           make input
           make -j2
           make test || :
-  "CentOS-7-clang":
+  "CentOS-8-clang":
     docker:
-      - image: centos:7
+      - image: centos:8
     steps:
       - checkout
       - run: |
-          yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          yum -y -q install devtoolset-7-toolchain llvm-toolset-8.0.7
-          # For some reason using scl_source enable this way doesn't work when bash
-          # was started with -e, so temporarily disable that, then re-enable it afterward.
-          set +e
-          source scl_source enable llvm-toolset-8.0.1
-          set -e
-          # Use miniconda to get recent boost and cmake
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          # conda-forge used to use the devtoolset compilers.
-          # Use the latest boost build that's still ABI compatible there.
-          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen
+          yum -y -q install centos-release-scl zlib-devel make boost cmake eigen
+          yum module -y -q install llvm-toolset
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j2
           make test || :
-  "CentOS-7-clang-libc++":
+  "CentOS-8-clang-libc++":
     docker:
-      - image: centos:7
+      - image: centos:8
     steps:
       - checkout
       - run: |
-          yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
+          yum -y -q install centos-release-scl zlib-devel make wget bzip2
           # Use miniconda to get all remaining needed packages
           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
@@ -224,8 +209,8 @@ workflows:
       - "Ubuntu-18.04"
       - "Ubuntu-16.04"
       - "CentOS-7-gcc"
-      - "CentOS-7-clang"
-      - "CentOS-7-clang-libc++"
+      - "CentOS-8-clang"
+      - "CentOS-8-clang-libc++"
       - "Arch"
       - "Alpine"
       - "openSUSE"
