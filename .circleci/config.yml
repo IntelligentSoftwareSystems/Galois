@@ -66,11 +66,11 @@ jobs:
       - checkout
       - run: |
           yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          yum -y -q install devtoolset-7-toolchain
+          yum -y -q install devtoolset-9-toolchain
           # For some reason using scl_source enable this way doesn't work when bash
           # was started with -e, so temporarily disable that, then re-enable it afterward.
           set +e
-          source scl_source enable devtoolset-7
+          source scl_source enable devtoolset-9
           set -e
           # Use miniconda to get recent boost and cmake
           # Use Python 2 to make bmk2 work.
