@@ -17,9 +17,11 @@ target_include_directories(galois_dist_async_obj PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(galois_dist_async_obj PUBLIC MPI::MPI_CXX)
+
 # new galois net library; link to shared memory galois
 add_library(galois_dist_async STATIC $<TARGET_OBJECTS:galois_dist_async_obj>)
-target_link_libraries(galois_dist_async galois_shmem gllvm)
+target_link_libraries(galois_dist_async PUBLIC galois_shmem gllvm)
 
 if (USE_BARE_MPI)
   target_compile_definitions(galois_dist_async PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
@@ -29,9 +31,10 @@ target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
 
 if (USE_LCI)
   add_dependencies(galois_dist_async lci)
-  target_link_libraries(galois_dist_async ${LWCI_LIBRARY} -lpsm2)
+  target_link_libraries(galois_dist_async PRIVATE ${LWCI_LIBRARY} -lpsm2)
 endif()
-target_link_libraries(galois_dist_async ${MPI_CXX_LIBRARIES})
+
+target_link_libraries(galois_dist_async PUBLIC MPI::MPI_CXX)
 
 target_include_directories(galois_dist_async PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include

@@ -208,9 +208,6 @@ endif()
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${MPI_COMPILE_FLAGS}>")
-  add_link_options(${MPI_LINK_FLAGS})
-  include_directories(${MPI_INCLUDE_PATH})
 
   if (USE_LCI)
     add_definitions(-DGALOIS_USE_LWCI)
