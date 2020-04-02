@@ -126,7 +126,8 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel make wget bzip2 libgcc
+          # Note: gcc required to get libgcc and glibc-devel even though we're using clang.
+          yum -y -q install zlib-devel make wget bzip2 gcc
           # Use miniconda to get all remaining needed packages
           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
