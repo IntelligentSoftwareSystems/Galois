@@ -112,10 +112,10 @@ endif()
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
 
 # GCC
-if(CMAKE_COMPILER_IS_GNUCC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 9.0)
+    OUTPUT_VARIABLE CXX_VERSION)
+  if(CXX_VERSION VERSION_LESS 9.0)
     message(FATAL_ERROR "GCC must be 9.0 or higher")
   endif()
 
