@@ -20,7 +20,7 @@ jobs:
           apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -34,7 +34,7 @@ jobs:
           apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -56,7 +56,7 @@ jobs:
           wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
-          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
+          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j2
           make test || :
   "CentOS-7-gcc":
@@ -83,7 +83,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -96,7 +96,7 @@ jobs:
           yum -y -q install zlib-devel make gcc gcc-c++ boost cmake eigen mpich
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -110,7 +110,7 @@ jobs:
           yum module -y -q install llvm-toolset
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -130,7 +130,7 @@ jobs:
           conda install -y -q -c conda-forge make cmake boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen openmpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON -DNUM_TEST_THREADS=2 ..
           make input
           make -j2
           make test || :
@@ -144,7 +144,7 @@ jobs:
           pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -158,7 +158,7 @@ jobs:
           mkdir build
           cd build
           # Make sure we can build with ENABLE_DIST not set to ON.
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
           make test || :
@@ -173,7 +173,7 @@ jobs:
           zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip openmpi-devel
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -189,7 +189,7 @@ jobs:
           module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
@@ -208,7 +208,7 @@ jobs:
           module load mpi
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
           make input
           make -j2
           make test || :
