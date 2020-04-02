@@ -137,15 +137,14 @@ jobs:
           make test || :
   "Alpine":
     docker:
-      - image: frolvlad/alpine-gxx
+      - image: alpine:latest
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress make cmake boost-dev zlib-dev eigen
+          apk add --no-cache --no-progress gcc musl-dev g++ make cmake boost-dev zlib-dev eigen
           mkdir build
           cd build
-          # Don't test dist here since there's an issue with the alpine openmpi-dev package.
-          # It's good to test that configuration anyway.
+          # Make sure we can build with ENABLE_DIST not set to ON.
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
           make input
           make -j4
