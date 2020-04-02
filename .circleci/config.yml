@@ -87,6 +87,19 @@ jobs:
           make input
           make -j2
           make test || :
+  "CentOS-8-gcc":
+    docker:
+      - image: centos:8
+    steps:
+      - checkout
+      - run: |
+          yum -y -q install zlib-devel make gcc gcc-c++ boost cmake eigen mpich
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
+          make input
+          make -j2
+          make test || :
   "CentOS-8-clang":
     docker:
       - image: centos:8
@@ -208,6 +221,7 @@ workflows:
       - "Ubuntu-18.04"
       - "Ubuntu-16.04"
       - "CentOS-7-gcc"
+      - "CentOS-8-gcc"
       - "CentOS-8-clang"
       - "CentOS-8-clang-libc++"
       - "Arch"
