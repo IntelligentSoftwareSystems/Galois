@@ -48,15 +48,16 @@ jobs:
           apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ xenial main'
+          add-apt-repository ppa:ubuntu-toolchain-r/test
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ zlib1g-dev wget libopenmpi-dev openmpi-bin
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc-9 g++-9 zlib1g-dev wget libopenmpi-dev openmpi-bin
           mkdir build
           cd build
           # Also test custom GRAPH_LOCATION
           wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
-          cmake -DENABLE_DIST_GALOIS=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
+          cmake -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9 -DENABLE_DIST_GALOIS=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j2
           make test || :
   "CentOS-7-gcc":
