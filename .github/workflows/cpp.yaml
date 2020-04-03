@@ -101,6 +101,25 @@ jobs:
         build_type:
         - Debug
         - Release
+        # Only build and test the following configurations:
+        #
+        # - (ubuntu-18.04, Release, clang++) and
+        # - (*, *, g++)
+        #
+        # to reduce the total number of concurrent jobs.
+        #
+        # The key "include" exists but only allows for the refinement of an
+        # existing matrix "job" (i.e., point in the product space) by adding
+        # more variables. Fallback to "exclude".
+        cxx:
+        - g++
+        - clang++
+        exclude:
+        - os: macOS-latest
+          cxx: clang++
+        - os: ubuntu-18.04
+          build_type: Debug
+          cxx: clang++
     steps:
     - uses: actions/checkout@v2
 
@@ -135,6 +154,14 @@ jobs:
         sudo apt install -yq ccache curl gcc-9 g++-9 libopenmpi-dev
         sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
         sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
+
+        sudo apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
+        curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo apt update
+        sudo apt install -yq clang-10 clang++-10
+
+        sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
+        sudo update-alternatives --verbose --install /usr/bin/clang clang /usr/bin/clang-10 90
 
         sudo -H pip3 install --upgrade pip setuptools
         sudo -H pip3 install conan==1.22.3
@@ -171,10 +198,17 @@ jobs:
       run: |
         [[ -f /proc/cpuinfo ]] && cat /proc/cpuinfo
 
+        case ${{matrix.cxx}} in
+          clang*) CC=clang ;;
+          g*)     CC=gcc   ;;
+        esac
+
         cmake -S . -B $HOME/build \
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_TOOLCHAIN_FILE=$HOME/build/conan_paths.cmake \
+          -DCMAKE_CXX_COMPILER=${{matrix.cxx}} \
+          -DCMAKE_C_COMPILER=$CC \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DENABLE_DIST_GALOIS=on \
           -DUSE_ARCH=none \
