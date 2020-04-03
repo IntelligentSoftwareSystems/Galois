@@ -112,10 +112,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  # Avoid warnings from boost::counting_iterator
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
-  # Avoid warnings from openmpi
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
+    # GCC-{6,7} is a too imprecise
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-but-set-variable>")
+  elseif(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+    # Avoid warnings from boost::counting_iterator
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+    # Avoid warnings from openmpi
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  endif()
+
   # Removing unused parameters conflicts with readability rules
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
