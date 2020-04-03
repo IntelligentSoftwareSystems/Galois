@@ -49,7 +49,7 @@ beware.
 
 At the minimum, Galois depends on the following software:
 
-- A modern C++ compiler compliant with the C++-17 standard (GCC >= 9, Intel >= 19.0.1, LLVM >= 4.0)
+- A modern C++ compiler compliant with the C++-17 standard (GCC >= 7, Intel >= 19.0.1, clang >= 7.0)
 - CMake (>= 3.13)
 - Boost library ( >= 1.58.0, we recommend building/installing the full library)
 

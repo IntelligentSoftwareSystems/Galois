@@ -103,20 +103,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(NOT "$ENV{GCC_BIN}" STREQUAL "")
-  # Preserve captured environment variable during reconfiguration
-  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
-endif()
-
 # Always include debug info and aggressive warnings
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
 
 # GCC
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-    OUTPUT_VARIABLE CXX_VERSION)
-  if(CXX_VERSION VERSION_LESS 9.0)
-    message(FATAL_ERROR "GCC must be 9.0 or higher")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
   # Avoid warnings from boost::counting_iterator
@@ -129,37 +122,22 @@ endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  # Some apps break with -O3 on recent clang versions.
-  # Tracking that down is a work in progress, so for the current release,
-  # only use -O2 with clang.
-  if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    add_compile_options(-O2)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  if(CXX_TOOLCHAIN)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-gcc-toolchain ${CXX_TOOLCHAIN}/..>")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
-  
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE ICC_VERSION)
-  if(ICC_VERSION VERSION_LESS 16.0)
-    message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
+    message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
 
-  if(CXX_TOOLCHAIN)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-gxx-name=${CXX_TOOLCHAIN}/g++>")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
 endif()
+
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
