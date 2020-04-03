@@ -13,6 +13,7 @@ target_include_directories(galois_dist_async_obj PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_SOURCE_DIR}/libdist/include
+  ${CMAKE_SOURCE_DIR}/libtsuba/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
