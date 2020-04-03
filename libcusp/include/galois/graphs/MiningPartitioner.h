@@ -205,9 +205,16 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    galois::graphs::OfflineGraph g(filename);
-    base_DistGraph::numGlobalNodes = g.size();
-    base_DistGraph::numGlobalEdges = g.sizeEdges();
+    galois::OutIndexView g(filename);
+    if (g.Bind()) {
+      GALOIS_SYS_DIE("[", base_DistGraph::id, "] bind failed!\n");
+    }
+    if (g.gr_view()->header_.version_ != 1) {
+      GALOIS_SYS_DIE("[", base_DistGraph::id, "] CUSP only supports version 1!\n");
+    }
+
+    base_DistGraph::numGlobalNodes = g.num_nodes();
+    base_DistGraph::numGlobalEdges = g.num_edges();
     std::vector<unsigned> dummy;
 
     // not actually getting masters, but getting assigned readers for nodes
@@ -233,10 +240,10 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
     ////////////////////////////////////////////////////////////////////////////
 
     uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
-    typename galois::graphs::OfflineGraph::edge_iterator edgeBegin =
+    typename galois::OutIndexView::edge_iterator edgeBegin =
         g.edge_begin(nodeBegin);
     uint64_t nodeEnd = base_DistGraph::gid2host[base_DistGraph::id].second;
-    typename galois::graphs::OfflineGraph::edge_iterator edgeEnd =
+    typename galois::OutIndexView::edge_iterator edgeEnd =
         g.edge_begin(nodeEnd);
 
     galois::gPrint("[", base_DistGraph::id, "] Starting graph reading.\n");
