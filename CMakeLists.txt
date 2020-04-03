@@ -99,33 +99,18 @@ endif()
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT "$ENV{GCC_BIN}" STREQUAL "")
-  # Preserve captured environment variable during reconfiguration
-  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
-endif()
-
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE ICC_VERSION)
-  if(ICC_VERSION VERSION_LESS 16.0)
-    message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
+    message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${ICC_VERSION}.")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
-
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
-  endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
 endif()
@@ -136,11 +121,9 @@ if(CYGWIN)
 endif()
 
 # check for incompatible GCC
-if(CMAKE_COMPILER_IS_GNUCC)
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 5.2)
-    message(FATAL_ERROR "GCC must be 5.2 or higher")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 endif()
 
