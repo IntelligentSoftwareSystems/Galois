@@ -60,7 +60,7 @@ struct Node{
 	uint64_t flatSize;
 	uint64_t external_edge_wt;
 
-	bool inBag;
+	galois::CopyableAtomic<int> inBag;
 };
 
 typedef uint32_t EdgeTy;
@@ -198,7 +198,7 @@ double calConstantForSecondTerm(Graph& graph){
                      total_weight += graph.getEdgeData(ii, flag_no_lock);
                   }
                   n_data.degree_wt = total_weight;
-									std::cout << "totoal w: " << total_weight << std::endl;
+				//					std::cout << "totoal w: " << total_weight << std::endl;
 			});
 
   galois::GAccumulator<uint64_t> local_weight;
@@ -209,13 +209,13 @@ double calConstantForSecondTerm(Graph& graph){
   /* This is twice since graph is symmetric */
   uint64_t total_edge_weight_twice = local_weight.reduce();
 
-	std::cout << "totak twice: " << total_edge_weight_twice << std::endl;
+//	std::cout << "totak twice: " << total_edge_weight_twice << std::endl;
   return 1/(double)total_edge_weight_twice;
 }
 
 void setConstant(Graph& graph){
 	constant = calConstantForSecondTerm(graph);
-	std::cout << "constant" << constant << std::endl;
+//	std::cout << "constant" << constant << std::endl;
 }
 
 double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t degree_wt){
@@ -282,7 +282,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 	double size_x = c_info[sc].size;
 	double size_y = 0;
 
-	std::cout << "const: " << constant << std::endl;
+//	std::cout << "const: " << constant << std::endl;
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
@@ -754,6 +754,7 @@ uint64_t renumberClustersContiguously(Graph &graph) {
 
   for (GNode n = 0; n < graph.size(); ++n){
     auto& n_data = graph.getData(n, flag_no_lock);
+		assert(n_data.curr_subcomm_ass != -1);
     if(n_data.curr_subcomm_ass != -1) {
       assert(n_data.curr_subcomm_ass < graph.size());
       auto stored_already = cluster_local_map.find(n_data.curr_subcomm_ass);
