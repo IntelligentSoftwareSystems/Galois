@@ -115,7 +115,7 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make boost-devel cmake eigen3-devel mpich-devel
+          yum -y -q install zlib-devel make boost-devel cmake eigen3-devel openmpi-devel
           yum module -y -q install llvm-toolset
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
