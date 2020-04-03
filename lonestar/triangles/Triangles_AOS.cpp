@@ -50,8 +50,8 @@ static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
-    cll::values(clEnumValN(Algo::nodeiteratorpre, "nodeiteratorpre", "Node Iterator (default)"),
-                clEnumValEnd),
+    cll::values(clEnumValN(Algo::nodeiteratorpre, "nodeiteratorpre", "Node Iterator (default)")
+                ),
     cll::init(Algo::nodeiteratorpre));
 
 struct NodeData{

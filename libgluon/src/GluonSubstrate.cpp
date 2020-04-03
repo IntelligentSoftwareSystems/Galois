@@ -45,10 +45,10 @@ cll::opt<DataCommMode> enforce_metadata(
                 clEnumValN(gidsData, "gids", "Use global IDs metadata always"),
                 clEnumValN(onlyData, "none",
                            "Do not use any metadata (sends "
-                           "non-updated values)"),
+                           "non-updated values)")
                 //clEnumValN(neverOnlyData, "neverOnlyData",
                 //           "Never send onlyData"),
-                clEnumValEnd),
+                ),
     cll::init(noData), cll::Hidden);
 //! Enforced data mode. Using non-cll type because it can be used directly by
 //! the GPU.
@@ -62,7 +62,7 @@ cll::opt<BareMPI> bare_mpi(
                 clEnumValN(nonBlockingBareMPI, "nonBlocking",
                            "Use non-blocking bare MPI"),
                 clEnumValN(oneSidedBareMPI, "oneSided",
-                           "Use one-sided bare MPI"),
-                clEnumValEnd),
+                           "Use one-sided bare MPI")
+                ),
     cll::init(noBareMPI), cll::Hidden);
 #endif

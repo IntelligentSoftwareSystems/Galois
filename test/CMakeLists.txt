@@ -1,13 +1,3 @@
-# Linking against the Boost libs via target_link_libraries
-# can result in LLVM headers installed alongside Boost
-# taking precedence over our vendored ones.
-# avoid this by putting our vendored LLVM include paths
-# first when compiling the executables that use them.
-include_directories(BEFORE
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_CURRENT_BINARY_DIR}/../libllvm/include
-)
-
 add_test_unit(ADD_TARGET acquire)
 add_test_unit(ADD_TARGET bandwidth)
 add_test_unit(ADD_TARGET barriers)

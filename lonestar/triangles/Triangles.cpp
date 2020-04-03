@@ -56,8 +56,8 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::edgeiterator, "edgeiterator",
                            "Edge Iterator"),
                 clEnumValN(Algo::orderedCount, "orderedCount",
-                           "Ordered Simple Count (default)"),
-                clEnumValEnd),
+                           "Ordered Simple Count (default)")
+                ),
     cll::init(Algo::orderedCount));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<

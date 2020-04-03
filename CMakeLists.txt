@@ -326,6 +326,9 @@ endif()
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
 
+find_package(LLVM REQUIRED CONFIG)
+target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
+
 include(CheckEndian)
 
 ###### Build Hacks ######
@@ -417,7 +420,7 @@ function(link_app name)
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
-  target_link_libraries(${name} gllvm)
+  target_link_libraries(${name} LLVMSupport)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
   if(VTune_FOUND)
@@ -455,10 +458,9 @@ function(app name)
 endfunction(app)
 
 ###### Source finding ######
-#include_directories(include)
 
-add_subdirectory(libllvm)
 add_subdirectory(libgalois)
+
 if(ENABLE_DIST_GALOIS)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
@@ -467,6 +469,7 @@ if(ENABLE_DIST_GALOIS)
     add_subdirectory(libgpu)
   endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
+
 add_subdirectory(tools)
 add_subdirectory(scripts)
 

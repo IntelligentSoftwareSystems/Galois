@@ -19,7 +19,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include <iostream>
 #include <sstream>
 
 //! standard global options to the benchmarks
@@ -35,9 +34,10 @@ llvm::cl::opt<std::string> statFile(
     llvm::cl::desc("ouput file to print stats to (default value empty)"),
     llvm::cl::init(""));
 
-static void LonestarPrintVersion() {
-  std::cout << "LoneStar Benchmark Suite v" << galois::getVersion() << " ("
+static void LonestarPrintVersion(llvm::raw_ostream& out) {
+  out << "LoneStar Benchmark Suite v" << galois::getVersion() << " ("
             << galois::getRevision() << ")\n";
+  out.flush();
 }
 
 //! initialize lonestar benchmark
@@ -49,17 +49,18 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc,
 
   galois::runtime::setStatFile(statFile);
 
-  LonestarPrintVersion();
-  std::cout << "Copyright (C) " << galois::getCopyrightYear()
+  LonestarPrintVersion(llvm::outs());
+  llvm::outs() << "Copyright (C) " << galois::getCopyrightYear()
             << " The University of Texas at Austin\n";
-  std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-  std::cout << "application: " << (app ? app : "unspecified") << "\n";
+  llvm::outs() << "http://iss.ices.utexas.edu/galois/\n\n";
+  llvm::outs() << "application: " << (app ? app : "unspecified") << "\n";
   if (desc)
-    std::cout << desc << "\n";
+    llvm::outs() << desc << "\n";
   if (url)
-    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
+    llvm::outs() << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
               << url << "\n";
-  std::cout << "\n";
+  llvm::outs() << "\n";
+  llvm::outs().flush();
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {

@@ -59,8 +59,8 @@ static cll::opt<Algo> algo(
                    "Bulk-synchronous parallel with separated edge removal"),
         clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"),
         clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss",
-                   "Compute k-1 core and then k-truss"),
-        clEnumValEnd),
+                   "Compute k-1 core and then k-truss")
+        ),
     cll::init(Algo::bsp));
 
 static const uint32_t valid   = 0x0;

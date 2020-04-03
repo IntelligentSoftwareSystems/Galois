@@ -57,7 +57,7 @@ static cll::opt<Exec> execution(
     "exec",
     cll::desc("Distributed Execution Model (default value Async):"),
     cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
-    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)")),
     cll::init(Async));
 
 /******************************************************************************/
