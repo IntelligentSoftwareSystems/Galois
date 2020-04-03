@@ -495,7 +495,7 @@ double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
 	uint64_t size_x = subcomm_info[curr_subcomm].flatSize;
 	uint64_t size_y = subcomm_info[candidate_subcomm].flatSize;
 
-	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
+	double diff = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
 
 	return diff;
 }
@@ -610,7 +610,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2.0f * (double)(eiy - eix) + resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));
+      cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -703,6 +703,8 @@ double calCPMQualityFinal(Graph& graph) {
   cluster_wt_internal.allocateBlocked(graph.size());
 
 
+	for(auto n:graph)
+		c_info[n].flatSize = 0;
    /* Calculate the overall modularity */
   double e_xx = 0;
   galois::GAccumulator<double> acc_e_xx;
@@ -718,21 +720,23 @@ double calCPMQualityFinal(Graph& graph) {
                 [&](GNode n) {
                   auto n_data = graph.getData(n);
                   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                    if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
+                    if(graph.getData(graph.getEdgeDst(ii)).curr_subcomm_ass == n_data.curr_subcomm_ass) {
                     //if(graph.getData(graph.getEdgeDst(ii)).prev_comm_ass == n_data.prev_comm_ass) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
 
 									//updating community size
-									c_info[n_data.curr_comm_ass].size += (uint64_t)1;
+									galois::atomicAdd(c_info[n_data.curr_subcomm_ass].flatSize, n_data.flatSize);
                 });
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
-                });
+                  double t = (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
+                	if(t > 0)
+										acc_a2_x += t;
+								});
 
 
   e_xx = acc_e_xx.reduce();

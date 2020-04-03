@@ -474,7 +474,7 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 				if(dst != n && graph.getData(dst).curr_subcomm_ass == subcomm_ass){
 					subcomm_info[subcomm_ass].external_edge_wt -= edge_wt;	
 				}
-				else if (dst != n){
+				else if (dst != n && graph.getData(dst).curr_comm_ass == comm_id){
 					subcomm_info[subcomm_ass].external_edge_wt += edge_wt;
 				}
 			}
@@ -510,6 +510,9 @@ void refinePartition(Graph &graph){
 	CommArray comm_info;
 
 	comm_info.allocateBlocked(graph.size()+1);
+
+	for(auto n:graph)
+		comm_info[n].flatSize = (uint64_t) 0;
 
 	for(auto n: graph){
 
@@ -1560,8 +1563,8 @@ void leiden(Graph &graph, largeArray& clusters_orig){
 	graph_curr = &graph;	
 	uint64_t num_nodes_orig = clusters_orig.size();
 
-	int64_t prev_quality = -INF_VAL;
-	int64_t curr_quality = -INF_VAL;
+	double prev_quality = -INF_VAL;
+	double curr_quality = -INF_VAL;
 
 	int64_t iter = 0;
 	while(true){
@@ -1610,6 +1613,11 @@ void leiden(Graph &graph, largeArray& clusters_orig){
 
 		refinePartition(*graph_curr);
 
+/*	galois::do_all(galois::iterate(*graph_curr),
+        [&] (GNode n){
+          graph_curr->getData(n).curr_subcomm_ass = graph_curr->getData(n).curr_comm_ass;
+        });
+*/
 		uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
 		
 			galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
@@ -1621,14 +1629,22 @@ void leiden(Graph &graph, largeArray& clusters_orig){
                         clusters_orig[n] = (*graph_curr).getData(clusters_orig[n]).curr_subcomm_ass;
                       }
                     });
-
-		curr_quality = calCPMQualityFinal(graph);
+		switch(quality){
+			case CPM:
+				curr_quality = calCPMQualityFinal(*graph_curr);
+				break;
+			case Mod:
+				curr_quality = calModularityFinal(*graph_curr);
+				break;
+			default:
+				std::abort();
+		}
 
 		std::cout <<"Prev Quality: " << prev_quality << std::endl;
     std::cout << "Curr Quality: " << curr_quality << std::endl;
 	 
-		if(iter > 1 && curr_quality <= prev_quality)
-			break;
+	//	if(iter > 1 && curr_quality <= prev_quality)
+		//	break;
 	
 
 	//	prev_quality = curr_quality;
@@ -1732,7 +1748,7 @@ int main(int argc, char** argv) {
   /*
    * Sanity check: Check modularity at the end
    */
-
+std::cout <<"res:" << resolution <<std::endl;
 	switch(quality){
           case CPM:
 						checkCPMQuality(graph, clusters_orig);
