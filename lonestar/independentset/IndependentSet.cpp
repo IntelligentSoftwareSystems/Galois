@@ -60,8 +60,8 @@ static cll::opt<Algo> algo(
             "prio algo based on Martin's GPU ECL-MIS algorithm (default)"),
         clEnumVal(
             edgetiledprio,
-            "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm"),
-        clEnumValEnd),
+            "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")
+        ),
     cll::init(prio));
 
 enum MatchFlag : char { UNMATCHED, OTHER_MATCHED, MATCHED };

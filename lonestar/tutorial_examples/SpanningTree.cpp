@@ -46,7 +46,7 @@ static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumVal(demo, "Demonstration algorithm"),
                 clEnumVal(asynchronous, "Asynchronous"),
-                clEnumVal(blockedasync, "Blocked Asynchronous"), clEnumValEnd),
+                clEnumVal(blockedasync, "Blocked Asynchronous")),
     cll::init(blockedasync));
 
 struct Node : public galois::UnionFindNode<Node> {

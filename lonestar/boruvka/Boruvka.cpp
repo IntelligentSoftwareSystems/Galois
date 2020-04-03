@@ -54,11 +54,11 @@ static cll::opt<bool>
                    cll::init(false));
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value parallel):"),
-         cll::values(clEnumVal(parallel, "Parallel"),
+         cll::values(clEnumVal(parallel, "Parallel")
 #ifdef GALOIS_USE_EXP
-                     clEnumVal(exp_parallel, "Parallel (exp)"),
+                     ,clEnumVal(exp_parallel, "Parallel (exp)")
 #endif
-                     clEnumValEnd),
+                     ),
          cll::init(parallel));
 
 typedef int EdgeData;

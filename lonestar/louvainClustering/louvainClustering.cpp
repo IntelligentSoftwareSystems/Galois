@@ -61,8 +61,8 @@ static cll::opt<Algo> algo(
     cll::values(clEnumValN(Algo::coloring, "Coloring", "Using colors to mitigate conflicts"),
                 clEnumValN(Algo::foreach, "Foreach", "Using galois for_each for conflict mitigation"),
                 clEnumValN(Algo::delay, "Delay", "Using galois for_each for conflict mitigation but delay the updation"),
-                clEnumValN(Algo::doall, "Doall", "Using galois for_each for conflict mitigation"),
-                clEnumValEnd),
+                clEnumValN(Algo::doall, "Doall", "Using galois for_each for conflict mitigation")
+                ),
     cll::init(Algo::foreach));
 
 static cll::opt<bool> enable_VF("enable_VF",

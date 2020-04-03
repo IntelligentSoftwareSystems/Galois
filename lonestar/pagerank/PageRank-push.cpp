@@ -37,7 +37,7 @@ enum Algo { Async, Sync }; // Async has better asbolute performance.
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Async, "Async"),
-                                       clEnumVal(Sync, "Sync"), clEnumValEnd),
+                                       clEnumVal(Sync, "Sync")),
                            cll::init(Async));
 
 struct LNode {
