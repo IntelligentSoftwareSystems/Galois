@@ -48,7 +48,7 @@ jobs:
         sudo apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
         curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
         sudo apt update
-        sudo apt install -yq clang-format-10 clang-tidy-10
+        sudo apt install -yq clang-format-10 clang-tidy-10 llvm-10-dev
 
         sudo update-alternatives --verbose --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 90
         sudo update-alternatives --verbose --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 90
@@ -158,7 +158,10 @@ jobs:
         sudo apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
         curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
         sudo apt update
-        sudo apt install -yq clang-10 clang++-10
+        # Install llvm via apt instead of as a conan package because existing
+        # conan packages do yet enable RTTI, which is required for boost
+        # serialization.
+        sudo apt install -yq clang-10 clang++-10 llvm-10-dev
 
         sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
         sudo update-alternatives --verbose --install /usr/bin/clang clang /usr/bin/clang-10 90
@@ -173,7 +176,7 @@ jobs:
     - name: install dependencies
       if: startsWith(matrix.os, 'macOS-')
       run: |
-        brew install ccache conan openmpi
+        brew install ccache conan openmpi llvm
         conan profile new --detect --force default
 
         sudo sysctl -w kern.corefile=$HOME/build/dumps/core.%N.%P.%H.%I
@@ -197,6 +200,11 @@ jobs:
     - name: configure
       run: |
         [[ -f /proc/cpuinfo ]] && cat /proc/cpuinfo
+
+        case ${{matrix.os}} in
+          macOS-*) export PATH=$PATH:/usr/local/opt/llvm/bin ;;
+          *) ;;
+        esac
 
         case ${{matrix.cxx}} in
           clang*) CC=clang ;;
