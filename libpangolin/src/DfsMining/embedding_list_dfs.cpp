@@ -200,9 +200,10 @@ update_egonet(unsigned level) {
 		auto end = begin + local_graph.get_degree(level, src);
 		for (auto e = begin; e < end; e ++) {
 			auto dst = local_graph.getEdgeDst(e);
-			if (labels[dst] == level+1)
+			if (labels[dst] == level+1) {
 				local_graph.inc_degree(level+1, src);
-			else {
+			} else {
+				// swap with the last neighbor
 				local_graph.set_adj(e--, local_graph.getEdgeDst(--end));
 				local_graph.set_adj(end, dst);
 			}

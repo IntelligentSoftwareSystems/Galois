@@ -19,7 +19,6 @@
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
-#define CHUNK_SIZE 256
 #define LARGE_SIZE // for large graphs such as soc-Livejournal1 and com-Orkut
 
 typedef float Weight;

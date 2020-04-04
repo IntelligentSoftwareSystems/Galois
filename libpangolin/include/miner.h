@@ -4,6 +4,7 @@
 #include "util.h"
 #include "embedding_queue.h"
 #include "bliss/uintseqhash.hh"
+#define CHUNK_SIZE 32
 
 template <typename ElementTy, typename EmbeddingTy, bool enable_dag>
 class Miner {
@@ -25,18 +26,6 @@ public:
 	//unsigned read_graph(std::string filename);
 	unsigned read_graph(std::string filetype, std::string filename) {
 		max_degree = util::read_graph(graph, filetype, filename, enable_dag);
-		/*
-		if (enable_dag) {
-			Graph g_temp;
-			galois::graphs::readGraph(g_temp, filename);
-			util::orientation(g_temp, graph);
-		} else {
-			galois::graphs::readGraph(graph, filename);
-			galois::do_all(galois::iterate(graph), [&](const auto& vid) {
-				graph.getData(vid) = 1;
-			}, galois::chunk_size<CHUNK_SIZE>(), galois::loopname("assignVertexLabels"));
-		}
-		*/
 		graph.degree_counting();
 		degrees = graph.degrees;
 		std::cout << "Input graph: num_vertices " << graph.size() << " num_edges " << graph.sizeEdges() << "\n";

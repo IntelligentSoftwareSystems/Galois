@@ -23,7 +23,7 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 				auto dst = graph.getEdgeDst(e);
 				if (src < dst) num_init_emb[src] ++;
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-edgelist-alloc"));
+		}, galois::loopname("Init-edgelist-alloc"));
 		UintList indices(num_vertices + 1);
 		unsigned total = 0;
 		for (size_t n = 0; n < num_vertices; n++) {
@@ -40,7 +40,7 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 					start ++;
 				}
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-edgelist-insert"));
+		}, galois::loopname("Init-edgelist-insert"));
 	}
 	std::cout << "Done initialize edgelist, size: " << size() << "\n";
 }

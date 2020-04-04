@@ -15,7 +15,7 @@ void EmbeddingList<ElementType,EmbeddingType>::init(Graph& graph, unsigned max_s
 		his_lists[1].resize(num_emb);
 		galois::do_all(galois::iterate((size_t)0, num_emb), [&](const size_t& pos) {
 			his_lists[1][pos] = 0;
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-his"));
+		}, galois::chunk_size<64>(), galois::steal(), galois::loopname("Init-his"));
 	}
 	if (is_dag) {
 		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const GNode& src) {
@@ -24,7 +24,7 @@ void EmbeddingList<ElementType,EmbeddingType>::init(Graph& graph, unsigned max_s
 				vid_lists[1][*e] = dst;
 				idx_lists[1][*e] = src;
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-vid"));
+		}, galois::chunk_size<64>(), galois::steal(), galois::loopname("Init-vid"));
 	} else {
 		size_t num_vertices = graph.size();
 		UintList num_init_emb(num_vertices);
@@ -34,7 +34,7 @@ void EmbeddingList<ElementType,EmbeddingType>::init(Graph& graph, unsigned max_s
 				auto dst = graph.getEdgeDst(e);
 				if (src < dst) num_init_emb[src] ++;
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-vid-alloc"));
+		}, galois::chunk_size<64>(), galois::steal(), galois::loopname("Init-vid-alloc"));
 		UintList indices(num_vertices + 1);
 		unsigned total = 0;
 		for (size_t n = 0; n < num_vertices; n++) {
@@ -52,7 +52,7 @@ void EmbeddingList<ElementType,EmbeddingType>::init(Graph& graph, unsigned max_s
 					start ++;
 				}
 			}
-		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Init-vid-insert"));
+		}, galois::chunk_size<64>(), galois::steal(), galois::loopname("Init-vid-insert"));
 	}
 }
 

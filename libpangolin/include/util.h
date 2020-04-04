@@ -38,7 +38,7 @@ void DegreeRanking(Graph &og, Graph &g) {
 	std::vector<IndexT> old_degrees(og.size(), 0);
 	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
 		old_degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
+	}, galois::loopname("getOldDegrees"));
 
 	size_t num_vertices = og.size();
 	typedef std::pair<unsigned, IndexT> degree_node_p;
@@ -67,7 +67,7 @@ void DegreeRanking(Graph &og, Graph &g) {
 			offset ++;
 		}
 		assert(offset == degrees[src]);
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
+	}, galois::loopname("ConstructNewGraph"));
 	g.sortAllEdgesByDst();
 }
 
@@ -81,7 +81,7 @@ unsigned orientation(Graph &og, Graph &g) {
 
 	galois::do_all(galois::iterate(og.begin(), og.end()), [&](const auto& src) {
 		degrees[src] = std::distance(og.edge_begin(src), og.edge_end(src));
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getOldDegrees"));
+	}, galois::loopname("getOldDegrees"));
 
 	unsigned max_degree = *(std::max_element(degrees.begin(), degrees.end()));
 	std::vector<IndexT> new_degrees(og.size(), 0);
@@ -93,7 +93,7 @@ unsigned orientation(Graph &og, Graph &g) {
 				new_degrees[src] ++;
 			}
 		}
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("getNewDegrees"));
+	}, galois::loopname("getNewDegrees"));
 
 	std::vector<IndexT> offsets = PrefixSum(new_degrees);
 	assert(offsets[og.size()] == og.sizeEdges()/2);
@@ -114,7 +114,7 @@ unsigned orientation(Graph &og, Graph &g) {
 			}
 		}
 		assert(offset == new_degrees[src]);
-	}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("ConstructNewGraph"));
+	}, galois::loopname("ConstructNewGraph"));
 
 	g.sortAllEdgesByDst();
 	Tdag.stop();
@@ -148,7 +148,7 @@ unsigned read_graph(Graph &graph, std::string filetype, std::string filename, bo
 			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
 				graph.getData(vid) = 1;
 				//for (auto e : graph.edges(n)) graph.getEdgeData(e) = 1;
-			}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("assignVertexLabels"));
+			}, galois::loopname("assignVertexLabels"));
 			std::vector<unsigned> degrees(graph.size());
 			galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& vid) {
 				degrees[vid] = std::distance(graph.edge_begin(vid), graph.edge_end(vid));

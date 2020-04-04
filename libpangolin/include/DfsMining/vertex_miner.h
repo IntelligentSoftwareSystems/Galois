@@ -158,7 +158,7 @@ typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 				extend_multi(starting_level, *emb_list);
 			}
 			if (!use_local_graph) emb_list->clear_labels(vid);
-		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("VertexParallelSolver"));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("VertexParallelSolver"));
 		//}, galois::chunk_size<1>(), galois::steal(), galois::no_conflicts(), galois::loopname("VertexParallelSolver"));
 		if (!is_single) motif_count();
 	}
@@ -202,7 +202,7 @@ typedef galois::substrate::PerThreadStorage<EmbeddingListTy> EmbeddingLists;
 					emb_list->clear_labels(edge.src);
 				}
 			}
-		}, galois::chunk_size<1>(), galois::steal(), galois::loopname("EdgeParallelSolver"));
+		}, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("EdgeParallelSolver"));
 		if (!is_single) motif_count();
 	}
 
