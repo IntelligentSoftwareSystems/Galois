@@ -9,6 +9,7 @@
  * All rights reserved.
  * Reused/revised under 3-BSD
  */
+#include "edge.h"
 
 typedef unsigned VeridT;
 typedef unsigned LabelT;
@@ -34,18 +35,18 @@ typedef std::vector<LabEdge *> LabEdgeList;
 class Vertex {
 public:
 	LabelT label;
-	std::vector<Edge> edge; //neighbor list
+	std::vector<SEdge> edges; //neighbor list
 	void push(VeridT src_, VeridT dst_, LabelT elabel_ = 0) {
-		edge.resize(edge.size() + 1);
-		edge[edge.size() - 1].src = src_;
-		edge[edge.size() - 1].dst = dst_;
-		//edge[edge.size() - 1].elabel = elabel_;
+		edges.resize(edges.size() + 1);
+		edges[edges.size() - 1].src = src_;
+		edges[edges.size() - 1].dst = dst_;
+		//edges[edges.size() - 1].elabel = elabel_;
 		return;
 	}
-	bool find(VeridT src_, VeridT dst_, Edge &result) const {
-		for(size_t i = 0; i < edge.size(); i++) {
-			if(edge[i].src == src_ && edge[i].dst == dst_) {
-				result = edge[i];
+	bool find(VeridT src_, VeridT dst_, SEdge &result) const {
+		for(size_t i = 0; i < edges.size(); i++) {
+			if(edges[i].src == src_ && edges[i].dst == dst_) {
+				result = edges[i];
 				return true;
 			}
 		}
@@ -54,7 +55,7 @@ public:
 	std::string to_string() const {
 		std::stringstream ss;
 		ss << "vlabel: " << label << ", ";
-		for (auto e : edge) ss << e.to_string() << " ";
+		for (auto e : edges) ss << e.to_string() << " ";
 		return ss.str();
 	}
 };
@@ -78,7 +79,7 @@ public:
 		std::map <std::pair<unsigned,unsigned>, unsigned> edge_map;
 		unsigned id = 0;
 		for(size_t src = 0; src < size(); ++ src) {
-			for(auto it = (*this)[src].edge.begin(); it != (*this)[src].edge.end(); ++it) {
+			for(auto it = (*this)[src].edges.begin(); it != (*this)[src].edges.end(); ++it) {
 				auto dst = it->dst;
 				if(directed || src <= dst) new_edge = std::make_pair(src, dst);
 				else new_edge = std::make_pair(dst, src);
@@ -253,7 +254,7 @@ std::ostream &operator<<(std::ostream &out, const DFSCode &code) {
 // and an embedding pointer to its parent embedding
 struct BaseEdgeEmbedding {
 	unsigned num_vertices;
-	Edge *edge;
+	SEdge *edge;
 	BaseEdgeEmbedding *prev;
 	BaseEdgeEmbedding() : num_vertices(0), edge(0), prev(0) {};
 	std::string to_string() const {
@@ -262,7 +263,7 @@ struct BaseEdgeEmbedding {
 		return ss.str();
 	}
 	std::string to_string_all() {
-		std::vector<Edge> ev;
+		std::vector<SEdge> ev;
 		ev.push_back(*edge);
 		for (BaseEdgeEmbedding *p = prev; p; p = p->prev) {
 			ev.push_back(*(p->edge));
@@ -304,7 +305,7 @@ struct LabEdgeEmbedding {
 // Embedding list
 class BaseEdgeEmbeddingList : public std::vector<BaseEdgeEmbedding> {
 public:
-	void push(int n, Edge *edge, BaseEdgeEmbedding *prev) {
+	void push(int n, SEdge *edge, BaseEdgeEmbedding *prev) {
 		BaseEdgeEmbedding d;
 		d.num_vertices = n;
 		d.edge = edge;
@@ -344,14 +345,14 @@ typedef std::map<int, LabEdgeEmbeddingList>                                   La
 
 // Stores information of edges/nodes that were already visited in the
 // current DFS branch of the search.
-// TODO: change type 'Edge' to 'LabEdge' to enable edge label
-class History : public std::vector<Edge*> {
+// TODO: change type 'SEdge' to 'LabEdge' to enable edge label
+class History : public std::vector<SEdge*> {
 private:
 	std::set<int> edge;
 	std::set<int> vertex;
 public:
 	bool hasEdge(unsigned id) { return (bool)edge.count(id); }
-	bool hasEdge(Edge e) {
+	bool hasEdge(SEdge e) {
 		for(auto it = this->begin(); it != this->end(); ++it) {
 			if((*it)->src == e.src && (*it)->dst == e.dst)
 				return true;

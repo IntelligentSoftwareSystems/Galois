@@ -22,8 +22,8 @@ public:
 	//size_t get_num_vertices() const { return num_vertices; }
 	//void resize (size_t n) { all_edges.resize(n); }
 	//void push_back(Edge e) { all_edges.push_back(e); }
-	//Edge& get_edge(size_t i) { return all_edges[i]; }
-	//Edge* get_edge_ptr(size_t i) { return &(all_edges[i]); }
+	SEdge& get_edge(size_t i) { return (*this)[i]; }
+	SEdge* get_edge_ptr(size_t i) { return &((*this)[i]); }
 	unsigned get_core();
 	void ord_core();
 	void relabel();
@@ -31,8 +31,6 @@ public:
 private:
 	size_t num_vertices;
 	size_t num_edges;
-	//std::vector<Edge> all_edges;
-	//galois::gstl::Vector<Edge> all_edges;
 	void add_edge(size_t pos, VertexId src, VertexId dst) {
 	//	all_edges[pos] = Edge(src, dst);
 		(*this)[pos] = SEdge(src,dst);

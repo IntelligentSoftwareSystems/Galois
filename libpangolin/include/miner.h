@@ -4,7 +4,7 @@
 #include "util.h"
 #include "embedding_queue.h"
 #include "bliss/uintseqhash.hh"
-#define CHUNK_SIZE 32
+#define CHUNK_SIZE 1
 
 template <typename ElementTy, typename EmbeddingTy, bool enable_dag>
 class Miner {
