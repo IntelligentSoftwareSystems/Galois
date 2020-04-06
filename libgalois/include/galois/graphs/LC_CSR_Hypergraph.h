@@ -85,7 +85,7 @@ public:
 
   template <typename _edge_data>
   struct with_edge_data {
-    typedef LC_CSR_Hyergraph<NodeTy, _edge_data, HasNoLockable, UseNumaAlloc,
+    typedef LC_CSR_Hypergraph<NodeTy, _edge_data, HasNoLockable, UseNumaAlloc,
                          HasOutOfLineLockable, FileEdgeTy>
         type;
   };
