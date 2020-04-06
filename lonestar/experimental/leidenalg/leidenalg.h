@@ -54,6 +54,8 @@ struct Node{
 	int64_t curr_subcomm_ass;
 
   uint64_t degree_wt;
+	uint64_t internal_degree_wt;
+
   //uint64_t cluster_wt_internal;
   int64_t colorId;
 
@@ -183,8 +185,8 @@ void sumClusterWeight(Graph& graph, CommArray& c_info) {
    */
   for(GNode n = 0; n < graph.size(); ++n) {
       auto &n_data = graph.getData(n);
-      if(n_data.curr_comm_ass >= 0)
-        c_info[n_data.curr_comm_ass].degree_wt += n_data.degree_wt;
+      if(n_data.curr_subcomm_ass >= 0)
+        c_info[n_data.curr_subcomm_ass].degree_wt += n_data.degree_wt;
     }
 }
 
@@ -223,14 +225,15 @@ double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
   double ax = subcomm_info[curr_subcomm].degree_wt - degree_wt;
   double ay = subcomm_info[candidate_subcomm].degree_wt;
 
-  double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + (double)degree_wt* constant *(double)(ax - ay);
+//  double diff = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + 2.0f*(double)degree_wt* constant *(double)(ax - ay);
 
+	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + 2.0f*(double)degree_wt* constant *(double)(ax - ay);
   return diff*constant;
 }
 
 uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double constant) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc) {
 
   uint64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
@@ -247,9 +250,9 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
-
-      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
+//      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
+cur_gain = constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
         max_index = stored_already->first;
       }
@@ -259,7 +262,7 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
   //galois::gPrint("Max Gain : ", max_gain, "\n");
   //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index < sc)) {
     max_index = sc;
   }
 
@@ -294,7 +297,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 				stored_already++;	
 				continue;
 			}
-			else if (size_y == size_x && stored_already->first > sc)
+			else if (size_y == size_x && stored_already->first < sc)
 			{
 				stored_already++;
 				continue;
@@ -305,7 +308,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       //From the paper: Verbatim
       cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
 
-      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first < max_index))) {
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
         max_index = stored_already->first;
       }
@@ -315,7 +318,7 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 
   //galois::gPrint("Max Gain : ", max_gain, "\n");
   //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
+  if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index < sc)) {
     max_index = sc;
   }
 
@@ -486,18 +489,27 @@ double calModularityFinal(Graph& graph) {
   a2_x = acc_a2_x.reduce();
 	
 
+	std::cout <<"exx:" << e_xx << " a2x: "  <<a2_x << std::endl;
 	mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
   return mod;
 }
 
-double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt){
+double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, 
+std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, 
+CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t flatSize){
 
 	uint64_t size_x = subcomm_info[curr_subcomm].flatSize;
 	uint64_t size_y = subcomm_info[candidate_subcomm].flatSize;
 
-	double diff = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((size_x-1)*(size_x-2) + size_y*(size_y+1)));
+	uint64_t new_size_x = size_x - flatSize;
+	uint64_t new_size_y = size_y + flatSize;
 
-	return diff;
+	double diff1 = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt);
+	double diff2 = resolution * 0.5f*(double)((size_x*(size_x-1) + size_y*(size_y-1)) - ((new_size_x)*(new_size_x-1) + new_size_y*(new_size_y-1)));
+
+	double diff = diff1 + diff2;
+
+	return diff*constant;
 }
 /*
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
@@ -532,7 +544,7 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double resolution) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, uint64_t flatSize) {
 
   uint64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
@@ -543,17 +555,20 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   double ay = 0;
 
 	double size_x = c_info[sc].flatSize;
+	double new_size_x = size_x - (double) flatSize;
+
 
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
       ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
 			double size_y = c_info[stored_already->first].flatSize;
+			double new_size_y = size_y + (double) flatSize;
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-   		cur_gain = 2.0f * (double)(eiy - eix) + resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));   
+   		cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));   
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -577,7 +592,7 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 
 uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc) {
+                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, uint64_t flatSize) {
 
   int64_t max_index = sc; // Assign the intial value as self community
   double cur_gain = 0;
@@ -590,12 +605,18 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 	double size_x = c_info[sc].flatSize;
 	double size_y = 0;
 
+
+	double new_size_x = size_x - (double)flatSize;
+	double new_size_y = 0;	
+
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
       ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
 
 			size_y = c_info[stored_already->first].flatSize;
+			new_size_y = size_y + (double)flatSize;
+
 			//if(ay < (ax + degree_wt)){
 			if(size_y < size_x){
 				stored_already++;	
@@ -610,7 +631,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
       //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
       //From the paper: Verbatim
-      cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((size_x-1)*(size_x-2) + (size_y+1)*size_y));
+      cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -659,7 +680,7 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
                 [&](GNode n) {
                   auto n_data = graph.getData(n);
                   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
-                    if(graph.getData(graph.getEdgeDst(ii)).curr_comm_ass == n_data.curr_comm_ass) {
+                    if(graph.getData(graph.getEdgeDst(ii)).curr_subcomm_ass == n_data.curr_subcomm_ass) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
@@ -733,9 +754,7 @@ double calCPMQualityFinal(Graph& graph) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  double t = (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
-                	if(t > 0)
-										acc_a2_x += t;
+                  acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
 								});
 
 

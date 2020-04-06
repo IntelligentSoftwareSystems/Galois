@@ -104,7 +104,9 @@ static cll::opt<std::string> output_CID_filename("output_CID_filename",
   cll::desc("File name to output cluster IDs."),
   cll::init("output_CID_filename"));
 
-int64_t maxQualityWithoutSwaps(Graph &graph, uint64_t degree_wt, int64_t curr_comm_ass, std::map<uint64_t, uint64_t>& cluster_local_map, std::vector<uint64_t>& counter, uint64_t self_loop_wt, CommArray &c_info){
+int64_t maxQualityWithoutSwaps(Graph &graph, uint64_t degree_wt, int64_t curr_comm_ass,
+ std::map<uint64_t, uint64_t>& cluster_local_map,
+ std::vector<uint64_t>& counter, uint64_t self_loop_wt, CommArray &c_info, uint64_t flatSize){
 
 	//compute cluster local map first
 	//auto& n_data = graph.getData(n, flag_write_lock);
@@ -148,11 +150,12 @@ int64_t maxQualityWithoutSwaps(Graph &graph, uint64_t degree_wt, int64_t curr_co
 
 		switch(quality){
           case CPM:
-            local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, degree_wt, curr_comm_ass);
-            break;
+            local_target = maxCPMQualityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, degree_wt, curr_comm_ass, flatSize);
+           break;
           case Mod:
-            local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, degree_wt, curr_comm_ass);
-            break;
+//            local_target = maxModularityWithoutSwaps(cluster_local_map, counter, self_loop_wt, c_info, degree_wt, curr_comm_ass);
+  						local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, degree_wt, curr_comm_ass);
+	          break;
          	default:
             std::abort();
         }
@@ -179,15 +182,22 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
 		inBag[n] = 1;
 	}
 	
+	for(auto n:graph){
+		c_info[n].size = (uint64_t) 0;
+		c_info[n].degree_wt = (uint64_t) 0;
+		c_info[n].flatSize = (uint64_t) 0; 
+	}
 	//updating c_info
-	galois::do_all(galois::iterate(graph),
-		[&] (GNode n){
+//	galois::do_all(galois::iterate(graph),
+	//	[&] (GNode n){
 
-		graph.getData(n).curr_comm_ass = n;
-		c_info[n].size = (uint64_t) 1;
-		c_info[n].degree_wt = graph.getData(n).degree_wt;
-		c_info[n].flatSize = graph.getData(n).flatSize;
-		}, galois::steal());
+		//graph.getData(n).curr_comm_ass = n;
+		for(auto n: graph){
+			c_info[graph.getData(n).curr_comm_ass].size += (uint64_t) 1;
+		c_info[graph.getData(n).curr_comm_ass].degree_wt += graph.getData(n).degree_wt;
+		c_info[graph.getData(n).curr_comm_ass].flatSize += graph.getData(n).flatSize;
+		}
+//, galois::steal());
 
 	
 	while(true){
@@ -239,7 +249,7 @@ void moveNodesFast(Graph &graph, CommArray &c_info){
     } // End edge loop
 
 				//create cluster local map 
-				int64_t local_target= maxQualityWithoutSwaps(graph, n_data.degree_wt, n_data.curr_comm_ass, cluster_local_map, counter, self_loop_wt, c_info);
+				int64_t local_target= maxQualityWithoutSwaps(graph, n_data.degree_wt, n_data.curr_comm_ass, cluster_local_map, counter, self_loop_wt, c_info, n_data.flatSize);
 //        auto& n_data = graph.getData(n);
 
 			//	std::cout << "moving to" << local_target << "from " << n_data.curr_comm_ass << std::endl;				
@@ -322,7 +332,7 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
   std::map<uint64_t, uint64_t> cluster_local_map; // Map each neighbor's subcommunity to local number: Subcommunity --> Index
 	std::vector<uint64_t> counter; //Number of edges to each unique subcommunity
 
-	uint64_t num_unique_clusters = 1;
+	uint64_t num_unique_clusters = 0;
 
   cluster_local_map[curr_subcomm] = 0; // Add n's current subcommunity
 	counter.push_back(0); //Initialize the counter to zero (no edges incident yet)
@@ -333,6 +343,9 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
   for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
     GNode dst = graph.getEdgeDst(ii);
     auto edge_wt = graph.getEdgeData(ii, flag_no_lock); // Self loop weights is recorded
+
+		if(graph.getData(dst).curr_comm_ass != graph.getData(n).curr_comm_ass)
+			continue;
 
 		if(dst == n){
       self_loop_wt += edge_wt; // Self loop weights is recorded
@@ -350,11 +363,11 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
   } // End edge loop	
 
 	std::map<uint64_t, uint64_t> new_cluster_local_map;
-  std::vector<double> prefix_transformed_quality_increment;
+  std::vector<long double> prefix_transformed_quality_increment;
   num_unique_clusters = 0;
-  double total = 0.0f;
+  long double total = 0.0f;
 
-	double max_increment = 0;
+	double max_increment = -1;
 
 	int64_t idx = -1;
 
@@ -374,7 +387,7 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
 	
 		switch(quality){
           case CPM:
-						quality_increment = diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt);
+						quality_increment = diffCPMQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt, graph.getData(n).flatSize);
 						break;
 					case Mod:
 						quality_increment = diffModQuality(curr_subcomm, subcomm, cluster_local_map, counter, subcomm_info, self_loop_wt, degree_wt);
@@ -383,29 +396,32 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
             std::abort();
 		} 
 
-    if(quality_increment > 0){
+    if(quality_increment >= -0.000000000001f && quality_increment < 0)
+			quality_increment = 0.0f;
 
-/*      new_cluster_local_map[num_unique_clusters] = subcomm;
-      double transformed_quality_increment = fastExp(quality_increment/randomness);
-   
-		std::cout << "transofrmed: " << transformed_quality_increment << std::endl; 
+		if(quality_increment >= 0){
+
+      new_cluster_local_map[num_unique_clusters] = subcomm;
+      long double transformed_quality_increment = fastExp(quality_increment/randomness);
+   		//long double transformed_quality_increment = quality_increment/randomness;
+//		std::cout << "transofrmed: " << transformed_quality_increment << std::endl; 
 	  total += transformed_quality_increment;
-      prefix_transformed_quality_increment[num_unique_clusters] = total;
+      prefix_transformed_quality_increment.push_back(total);
       num_unique_clusters++;
- */
-			if(max_increment < quality_increment){
+ 
+	/*		if(max_increment < quality_increment || ((max_increment == quality_increment) && (subcomm > idx))){
 				max_increment  = quality_increment;
 				idx = subcomm;
-			}
-   }
+			}*/
+   	}
   }
 
-	return idx;
- /* double r = distribution(generator);
+//	return idx;
+  long double r = distribution(generator);
   r = total*r;
 
-  int64_t min_idx = -1;
-  int64_t max_idx = num_unique_clusters;
+  /*int64_t min_idx = -1;
+  int64_t max_idx = num_unique_clusters+1;
 	int64_t mid_idx;
 
   while(min_idx < max_idx -1){
@@ -419,10 +435,20 @@ uint64_t getRandomSubcommunity(Graph& graph, uint64_t n, CommArray &subcomm_info
   }
 
   if(max_idx < num_unique_clusters)
-    return new_cluster_local_map[num_unique_clusters];
+    return new_cluster_local_map[max_idx];
   else
     return -1;
 */
+
+	idx = 0;
+	for(auto pair:new_cluster_local_map){
+		if(prefix_transformed_quality_increment[idx] >= r){
+			return	new_cluster_local_map[idx];
+		}
+		//r = r - prefix_transformed_quality_increment[idx];
+		idx++;
+	} 
+	return -1;
 }
 
 
@@ -434,7 +460,7 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 	
 	for(auto n: S){
 		
-		uint64_t total = 0;
+		uint64_t total = 0, internal = 0;
 		for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
                         
 			GNode dst = graph.getEdgeDst(ii);
@@ -442,7 +468,11 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
       if(dst != n && graph.getData(dst).curr_comm_ass == comm_id){
       	total += edge_wt;
 			}
+			if(graph.getData(dst).curr_comm_ass == comm_id)
+				internal += edge_wt;
 		}
+
+		graph.getData(n).internal_degree_wt = internal;
 
 		double flatSize_n = (double)graph.getData(n).flatSize;
 		if(total >= resolution*flatSize_n*((double)comm_flatSize - flatSize_n))
@@ -451,6 +481,7 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 		subcomm_info[n].flatSize = graph.getData(n).flatSize;
 		subcomm_info[n].external_edge_wt = total;
 		subcomm_info[n].size = (uint64_t) 1;
+		subcomm_info[n].degree_wt = graph.getData(n).degree_wt;
 	}
 
 	for(auto n:R){
@@ -459,12 +490,13 @@ void mergeNodesSubset(Graph &graph, std::vector<GNode> &S, int64_t comm_id, uint
 		
 			int subcomm_ass = getRandomSubcommunity(graph, n, subcomm_info, comm_flatSize);
 
-			if(subcomm_ass != -1){
+			if(subcomm_ass != -1 && subcomm_ass != graph.getData(n).curr_subcomm_ass){
 			graph.getData(n).curr_subcomm_ass = subcomm_ass;
 
 			//update Subcomm info
 			subcomm_info[subcomm_ass].flatSize += graph.getData(n).flatSize;
 			subcomm_info[subcomm_ass].size += (uint64_t) 1;
+			subcomm_info[subcomm_ass].degree_wt += graph.getData(n).degree_wt;
 	
 			for(auto ii = graph.edge_begin(n); ii != graph.edge_end(n); ++ii) {
 
@@ -527,7 +559,7 @@ void refinePartition(Graph &graph){
 	galois::do_all(galois::iterate((uint32_t)0, (uint32_t)graph.size()),
   	[&](uint32_t c){
 		
-			if(myVec[c].size() > 0){
+			if(myVec[c].size() > 1){
 				mergeNodesSubset(graph, myVec[c], c, comm_info[c].flatSize, subcomm_info);
 			}
 		});
@@ -639,7 +671,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
                       } // End edge loop
 
                     // Find the max gain in modularity
-                    local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
+                    local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
 
                     } else {
                       local_target = -1;
@@ -1012,7 +1044,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
                       } // End edge loop
 
                     // Find the max gain in modularity
-                    local_target[n] = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
+                    local_target[n] = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
 
                     } else {
                       local_target[n] = -1;
@@ -1281,7 +1313,7 @@ double algoLouvainWithColoring(Graph &graph, double lower, double threshold, uin
                           } // End edge loop
 
                         // Find the max gain in modularity
-                        local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
+                        local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass);
 
                         } else {
                           local_target = -1;
@@ -1379,6 +1411,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
 #endif
 
 	std::vector<uint64_t> cluster_flatsize(num_unique_clusters);
+	std::vector<int64_t> comm_ass(num_unique_clusters);
 
 	//initialize to 0
 	for(int i=0;i<num_unique_clusters;i++)
@@ -1391,6 +1424,7 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
       if(n_data.curr_subcomm_ass != -1){
         cluster_bags[n_data.curr_subcomm_ass].push_back(n);
 				cluster_flatsize[n_data.curr_subcomm_ass] += n_data.flatSize;
+				comm_ass[n_data.curr_subcomm_ass] = graph.getData(n_data.curr_comm_ass).curr_subcomm_ass;
 			}
       //else galois::gPrint("ISOLATED NODE : ", n, "\n");
   }
@@ -1464,6 +1498,8 @@ void buildNextLevelGraph(Graph& graph, Graph& graph_next, uint64_t num_unique_cl
 		[&] (GNode n){
 			
 			graph_next.getData(n).flatSize = cluster_flatsize[n];
+			graph_next.getData(n).curr_comm_ass = comm_ass[n];
+			graph_next.getData(n).curr_subcomm_ass = comm_ass[n];
 		}, galois::steal());
 
 
@@ -1567,6 +1603,13 @@ void leiden(Graph &graph, largeArray& clusters_orig){
 	double curr_quality = -INF_VAL;
 
 	int64_t iter = 0;
+
+	galois::do_all(galois::iterate(*graph_curr),
+      [&] (GNode n){
+
+				graph.getData(n).curr_comm_ass = n;
+		});
+
 	while(true){
 
 		iter++;
@@ -1629,19 +1672,6 @@ void leiden(Graph &graph, largeArray& clusters_orig){
                         clusters_orig[n] = (*graph_curr).getData(clusters_orig[n]).curr_subcomm_ass;
                       }
                     });
-		switch(quality){
-			case CPM:
-				curr_quality = calCPMQualityFinal(*graph_curr);
-				break;
-			case Mod:
-				curr_quality = calModularityFinal(*graph_curr);
-				break;
-			default:
-				std::abort();
-		}
-
-		std::cout <<"Prev Quality: " << prev_quality << std::endl;
-    std::cout << "Curr Quality: " << curr_quality << std::endl;
 	 
 	//	if(iter > 1 && curr_quality <= prev_quality)
 		//	break;
@@ -1659,6 +1689,20 @@ void leiden(Graph &graph, largeArray& clusters_orig){
 
 		graph_curr = &graph_next;					
 
+		switch(quality){
+			case CPM:
+				curr_quality = calCPMQualityFinal(*graph_curr);
+				break;
+			case Mod:
+				curr_quality = calModularityFinal(*graph_curr);
+				break;
+			default:
+				std::abort();
+		}
+
+		std::cout <<"Prev Quality: " << prev_quality << std::endl;
+    std::cout << "Curr Quality: " << curr_quality << std::endl;
+	
 		//destroying c_info
 		c_info.destroy();
 		c_info.deallocate();	
@@ -1686,7 +1730,7 @@ int main(int argc, char** argv) {
 
 	setConstant(*graph_curr);
 	setResolution(1.0f);
-	setRandomness(0.1f);
+	setRandomness(0.01f);
   /*
    * To keep track of communities for nodes in the original graph.
    *Community will be set to -1 for isolated nodes
@@ -1748,7 +1792,7 @@ int main(int argc, char** argv) {
   /*
    * Sanity check: Check modularity at the end
    */
-std::cout <<"res:" << resolution <<std::endl;
+//std::cout <<"res:" << resolution <<std::endl;
 	switch(quality){
           case CPM:
 						checkCPMQuality(graph, clusters_orig);
