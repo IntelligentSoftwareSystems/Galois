@@ -27,7 +27,7 @@ class PartialGraphView {
   int BindEdgeFile() {
     sz_t edges_offset = outidx_.view_size();
     sz_t edges_start  = edges_offset + (*edge_begin() * sizeof(Edge));
-    sz_t edges_stop   = edges_start + (*edge_end() * sizeof(Edge));
+    sz_t edges_stop   = edges_offset + (*edge_end() * sizeof(Edge));
     return edge_file_.Bind(outidx_.filename(), edges_start, edges_stop);
   }
 
