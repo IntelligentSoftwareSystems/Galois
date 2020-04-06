@@ -17,10 +17,10 @@ public:
 	}
 };
 
-class AppMiner : public VertexMinerDFS<MyAPI, true, true, true, false, false, false, true, true> {
+class AppMiner : public VertexMinerDFS<MyAPI, true, true, true, false, false, false, false, true> {
 public:
 	AppMiner(unsigned ms, int nt) : 
-		VertexMinerDFS<MyAPI, true, true, true, false, false, false, true, true>(ms, nt) {
+		VertexMinerDFS<MyAPI, true, true, true, false, false, false, false, true>(ms, nt) {
 		assert(ms > 2);
 	}
 	~AppMiner() {}

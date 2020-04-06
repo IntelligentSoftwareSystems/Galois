@@ -19,7 +19,7 @@ typedef galois::substrate::PerThreadStorage<UintList> Lists;
 typedef galois::substrate::PerThreadStorage<unsigned> Counts;
 
 typedef galois::GAccumulator<unsigned> UintAccu;
-typedef galois::GAccumulator<unsigned long> UlongAccu;
+typedef galois::GAccumulator<uint64_t> UlongAccu;
 typedef galois::substrate::PerThreadStorage<UintMap> LocalUintMap;
 
 //typedef galois::gstl::Map<unsigned, unsigned> FreqMap;
