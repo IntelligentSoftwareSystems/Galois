@@ -388,13 +388,8 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, unsigned hedges, std:
   std::vector<unsigned> idmap(fineGGraph->hnodes);
   std::vector<unsigned> newrand(nodes);
   std::vector<unsigned> newWeight(nodes);
-  std::set<unsigned> myset;
   galois::StatTimer Tloop("for loop");
   Tloop.start();
-  /*for (GNode n = fineGGraph->hedges; n < fineGGraph->size(); n++) {
-    unsigned id = fineGGraph->getData(n).getParent();
-    myset.insert(id);
-  }*/
   std::vector<unsigned> v;
   for (auto n : bag) v.push_back(n);
   //std::copy(bag.begin(), bag.end(), v.begin());
@@ -413,7 +408,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, unsigned hedges, std:
       },
       galois::steal(), galois::loopname("first loop"));
   Tloop.stop();
-  std::cout<<"total first loop "<<Tloop.get()<<"\n";
+  //std::cout<<"total first loop "<<Tloop.get()<<"\n";
   uint32_t num_nodes_next = nodes + hedges;
   uint64_t num_edges_next; 
   std::vector<std::vector<uint32_t>> edges_id(num_nodes_next);
