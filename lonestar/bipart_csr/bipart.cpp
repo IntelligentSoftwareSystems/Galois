@@ -230,10 +230,12 @@ int main(int argc, char** argv) {
   printf("hedges: %d\n", hedges);
   printf("nodes: %d\n\n", nodes);
 
+  galois::StatTimer T("buildingG");
+  T.start();
   // read rest of input and initialize hedges (build hgraph)
   std::vector<std::vector<uint32_t> > edges_id(hedges+nodes);
   std::vector<std::vector<EdgeTy> > edges_data(hedges+nodes);
-  std::vector<uint64_t> hedge(nodes+hedges);
+  std::vector<uint64_t> prefix_edges(nodes+hedges);
   int cnt = 0, edges = 0;
   while (std::getline(f, line)) {
     if (cnt >= hedges) {printf("ERROR: too many lines in input file\n"); exit(-1);}
@@ -251,28 +253,31 @@ int main(int argc, char** argv) {
   graph.hedges = hedges;
   graph.hnodes = nodes;
   std::cout<<"number of edges "<<edges<<"\n";
-  unsigned newedge = 0;
-  for (int i = 0; i < hedges+nodes; i++) {
-    hedge[i] = newedge;
-    newedge += edges_id[i].size();
-  } 
-  std::cout<<newedge<<" this is the new edge \n"; 
+  uint32_t sizes = hedges+nodes;
+  galois::do_all(galois::iterate((uint32_t)0, sizes),
+                [&](uint32_t c){
+                  prefix_edges[c] = edges_id[c].size();
+                });
   
+  for (uint32_t c = 1; c < nodes+hedges; ++c) {
+    prefix_edges[c] += prefix_edges[c - 1];
+  }
   // edges = #edges, hedgecount = how many edges each node has, edges_id: for each node, which ndoes it is connected to
   // edges_data: data for each edge = 1
-  graph.constructFrom(nodes+hedges, edges, hedge, edges_id);//, edges_data);
+  graph.constructFrom(nodes+hedges, edges, prefix_edges, edges_id);//, edges_data);
   galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
-                    auto& n_data = graph.getData(n);
                     if (n < hedges)
-                      n_data.netnum = n;
+                      graph.getData(n).netnum = n;
                     else
-                      n_data.netnum = INT_MAX;
-                    n_data.netrand = INT_MAX;
-                    n_data.netval = INT_MAX;
-                    n_data.nodeid = n;
+                      graph.getData(n).netnum = INT_MAX;
+                    graph.getData(n).netrand = INT_MAX;
+                    graph.getData(n).netval = INT_MAX;
+                    graph.getData(n).nodeid = n;
   
   });
+  T.stop();
+  std::cout<<"time to build a graph "<<T.get()<<"\n";
   graphStat(graph);
   std::cout<<"\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);

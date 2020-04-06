@@ -92,9 +92,8 @@ void initGains(GGraph& g, int pass) {
   std::string name = "initgain";
   std::string fetsref = "FETSREF_";// + std::to_string(pass);
 
-  galois::do_all(galois::iterate(g),
+  galois::do_all(galois::iterate((uint64_t)0,g.hedges),
         [&](GNode n) {
-              if (n <g.hedges ) return;
               g.getData(n).FS.store(0);
               g.getData(n).TE.store(0);
         },
@@ -103,12 +102,11 @@ void initGains(GGraph& g, int pass) {
   typedef std::map<GNode, int> mapTy;
   typedef galois::substrate::PerThreadStorage<mapTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
-  galois::do_all(galois::iterate(g),
+  galois::do_all(galois::iterate((uint64_t)0,g.hedges),
         [&](GNode n) {
-        if (g.hedges <= n) return;
         auto& edges = *edgesThreadLocal.getLocal();
-           int p1=0;
-						int p2 = 0;
+            int p1=0;
+	    int p2 = 0;
             for (auto x : g.edges(n)) {
               auto cc = g.getEdgeDst(x);
               int part = g.getData(cc).getPart();
@@ -139,9 +137,8 @@ void initGains(GGraph& g, int pass) {
 }
 
 void unlock(GGraph& g) {
-    galois::do_all(galois::iterate(g),
+    galois::do_all(galois::iterate((uint64_t)g.hedges, g.size()),
                 [&](GNode n) {
-    if (n < g.hedges) return;
     g.getData(n).counter = 0;
   },
   galois::loopname("unlock"));
@@ -149,9 +146,8 @@ void unlock(GGraph& g) {
 }
 
 void unlocked(GGraph& g) {
-    galois::do_all(galois::iterate(g),
+    galois::do_all(galois::iterate((uint64_t)g.hedges, g.size()),
                 [&](GNode n) {
-    if (n < g.hedges) return;
     g.getData(n).setLocked(false);
   },
   galois::loopname("unlocked"));
@@ -171,15 +167,13 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g), 
+  galois::do_all(galois::iterate((uint64_t)0,g.hedges), 
   [&](GNode n) {
-     if (n < g.hedges) return;
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
        accum += g.getData(n).getWeight();
   },
   galois::loopname("make balance"));
-  //std::cout<<"weight of 0 : "<< nodeSize.reduce() - accum.reduce()<<"  1: "<<accum.reduce()<<"\n";
   const int hi = (1 + tol) * Size / (2 + tol);
   const int lo = Size - hi;
   int bal = accum.reduce();
