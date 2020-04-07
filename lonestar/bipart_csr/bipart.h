@@ -58,7 +58,7 @@ class MetisNode {
   void initCoarsen() {
     data.cd.matched     = false;
     data.cd.failedmatch = false;
-    data.cd.parent      = NULL;
+    data.cd.parent      = 0;
     netval = 0;
   }
 
@@ -83,7 +83,7 @@ public:
     data.rd.partition = 0;
   }
 
-  MetisNode(unsigned weight, GNode child0, GNode child1 = NULL)
+  MetisNode(unsigned weight, GNode child0, GNode child1 = 0)
       : _weight(weight) {
     initCoarsen();
     initPartition();
@@ -181,6 +181,7 @@ public:
     while (f->finer)
       f = f->finer;
     //return std::distance(f->graph.cellList().begin(), f->graph.cellList().end());
+    return 0;
   }
 };
 

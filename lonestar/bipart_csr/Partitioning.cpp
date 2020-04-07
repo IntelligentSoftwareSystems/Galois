@@ -30,11 +30,10 @@
 #include <stack>
 #include <climits>
 #include <array>
-const bool multiSeed = true;
 
 namespace {
 // final
-int cut(GGraph& g) {
+__attribute__((unused)) int cut(GGraph& g) {
 
   GNodeBag bag;
   galois::do_all(galois::iterate(g),
@@ -73,7 +72,6 @@ void initGain(GGraph& g) {
   galois::do_all(galois::iterate(g),
         [&](GNode n) {
         if (g.hedges <= n) return; 
-        auto& edges = *edgesThreadLocal.getLocal();
            int p1=0;
 						int p2 = 0;
             for (auto x : g.edges(n)) {
@@ -151,7 +149,7 @@ void partition(MetisGraph* mcg) {
   waccum = accum.reduce() - accumZ.reduce();
   unsigned targetWeight = accum.reduce() / 2;
 
-  if (accumZ.reduce() > waccum) {
+  if (static_cast<long>(accumZ.reduce()) > waccum) {
   int gain = waccum;
   //initGain(*g);
   while(1) {
@@ -181,11 +179,11 @@ void partition(MetisGraph* mcg) {
     //std::cout<<" weight "<<g->getData(zz).getWeight()<<"\n";
     
     i++;
-    if (gain >= targetWeight) break;
+    if (gain >= static_cast<long>(targetWeight)) break;
    if(i > sqrt(newSize)) break;
   }
 	
-    if (gain >= targetWeight) break;
+    if (gain >= static_cast<long>(targetWeight)) break;
     //updateGain(*g,zz);
 
   }
@@ -224,11 +222,11 @@ else {
   gain += g->getData(zz).getWeight();
     
     i++;
-    if (gain >= targetWeight) break;
+    if (gain >= static_cast<long>(targetWeight)) break;
     if(i > sqrt(newSize)) break;
   }
 	
-   if (gain >= targetWeight) break;
+   if (gain >= static_cast<long>(targetWeight)) break;
 
    //updateGain(*g,zz);
   }

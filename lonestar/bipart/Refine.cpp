@@ -31,7 +31,7 @@ namespace {
 // This is only used on the terminal graph (find graph)
 // Should workd for hmetis
 
-int calculate_cutsize(GGraph& g) {
+__attribute__((unused)) int calculate_cutsize(GGraph& g) {
 
   GNodeBag bag;
   galois::do_all(galois::iterate(g.getNets()),
@@ -52,7 +52,7 @@ int calculate_cutsize(GGraph& g) {
   return std::distance(bag.begin(), bag.end());
 }
 
-int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
+__attribute__((unused)) int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
 
   GNodeBag bag;
   galois::do_all(galois::iterate(g.getNets()),
@@ -103,7 +103,6 @@ void initGains(GGraph& g, int pass) {
   ThreadLocalData edgesThreadLocal;
   galois::do_all(galois::iterate(g.getNets()),
         [&](GNode n) {
-        auto& edges = *edgesThreadLocal.getLocal();
            int p1=0;
 						int p2 = 0;
             for (auto x : g.edges(n)) {
@@ -144,7 +143,7 @@ void unlock(GGraph& g) {
 
 }
 
-void unlocked(GGraph& g) {
+__attribute__((unused)) void unlocked(GGraph& g) {
     galois::do_all(galois::iterate(g.cellList()),
                 [&](GNode n) {
     g.getData(n).setLocked(false);
@@ -162,7 +161,6 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
   std::string name = "findZandO";
 
   //typedef galois::worklists::PerSocketChunkFIFO<8> Chunk;
-  unsigned Size = std::distance(g.cellList().begin(), g.cellList().end());
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
@@ -174,11 +172,7 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
   },
   galois::loopname("make balance"));
   //std::cout<<"weight of 0 : "<< nodeSize.reduce() - accum.reduce()<<"  1: "<<accum.reduce()<<"\n";
-  const int hi = (1 + tol) * Size / (2 + tol);
-  const int lo = Size - hi;
-  int bal = accum.reduce();
-  int pass = 0;
-  int changed = 0;
+  unsigned pass = 0;
  // std::cout<<"cut parallel "<<calculate_cutsize(g)<<"\n";
  // initGain(g);
   while (pass < refineTo) {
@@ -208,13 +202,9 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
     galois::loopname("findZandO"));
     zeroW = std::distance(nodelistz.begin(), nodelistz.end());
     oneW = std::distance(nodelisto.begin(), nodelisto.end());
-    unsigned z = 0, o = 0;
     GNodeBag bb;
     std::vector<GNode> bbagz;
     std::vector<GNode> bbago;
-    int zw = 0;
-    int ow = 0;
-    unsigned ts = 0;
     for (auto n : nodelistz) bbagz.push_back(n);
     for (auto n : nodelisto) bbago.push_back(n);
     std::sort(bbagz.begin(), bbagz.end(), [&g] (GNode& lpw, GNode& rpw) {
@@ -226,7 +216,7 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
       return g.getData(lpw).getGain() > g.getData(rpw).getGain();
     });
     if (zeroW <= oneW) {
-      for (int i = 0; i < zeroW; i++) {
+      for (unsigned i = 0; i < zeroW; i++) {
         bb.push(bbago[i]);
         bb.push(bbagz[i]);
     //    if (i >= sqrt(Size)) break;
@@ -242,7 +232,7 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
       galois::loopname("swap"));
    }
    else {
-      for (int i = 0; i < oneW; i++) {
+      for (unsigned i = 0; i < oneW; i++) {
         bb.push(bbago[i]);
         bb.push(bbagz[i]);
    //     if (i >= sqrt(Size)) break;
@@ -264,7 +254,7 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
 // find the boundary in parallel 
 // sort the boundary in parallel
 // swap in parallel using for_each (find the smallest and go over that)
-unsigned hash(unsigned int val)
+__attribute__((unused)) unsigned hash(unsigned int val)
 {
   val = ((val >> 16) ^ val) * 0x45d9f3b;
   val = ((val >> 16) ^ val) * 0x45d9f3b;
@@ -290,9 +280,6 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
   const int lo = nodeSize.reduce() - hi;
   int bal = accum.reduce();
 
-  int zero_weight = nodeSize.reduce() - accum.reduce();
-  int one_weights = bal;
-  int pass = 0;
   while(1) {
     if(bal >= lo && bal <= hi)  break;
     initGains(g, p);
@@ -528,7 +515,7 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
 	
   }//end while
 }
-void make_balance(GGraph& g, float tol, int p) {
+__attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
 
  unsigned Size = std::distance(g.cellList().begin(), g.cellList().end());
 
@@ -546,8 +533,6 @@ void make_balance(GGraph& g, float tol, int p) {
   const int lo = nodeSize.reduce() - hi;
   int bal = accum.reduce();
 
-  int zero_weight = nodeSize.reduce() - accum.reduce();
-  int one_weights = bal;
   int pass = 0;
   while(1) {
     if(bal >= lo && bal <= hi)	break;
@@ -627,11 +612,9 @@ void make_balance(GGraph& g, float tol, int p) {
 } // namespace
 
 void refine(MetisGraph* coarseGraph, unsigned refineTo) {
-  MetisGraph* fineG;
   const float ratio = 55.0 / 45.0;  // change if needed
   const float tol = std::max(ratio, 1 - ratio) - 1;
   do {
-    fineG = coarseGraph;
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     auto gg = coarseGraph->getGraph();
 
