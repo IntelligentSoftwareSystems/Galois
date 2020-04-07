@@ -38,12 +38,10 @@ typedef uint32_t IndexTy;
 typedef std::set<uint32_t> UintSet;
 typedef std::vector<UintSet> UintSets;
 
-#ifdef LARGE_SIZE
 typedef std::vector<BYTE> ByteList;
 typedef std::vector<uint32_t> UintList;
 typedef std::vector<Ulong> UlongList;
 typedef std::vector<VertexId> VertexList;
-#endif
 typedef std::vector<UintList> IndexLists;
 typedef std::vector<ByteList> ByteLists;
 typedef std::vector<VertexList> VertexLists;
