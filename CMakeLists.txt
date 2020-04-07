@@ -132,6 +132,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
   
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+    # Avoid warnings from boost::counting_iterator
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+  endif()
+
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
 endif()
 
