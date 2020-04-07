@@ -120,7 +120,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   T.stop();
 
  galois::StatTimer T2("PartitionSEP");
-  int cuts = std::numeric_limits<int>::max();
   T2.start();
   partition(mcg);
   T2.stop();
@@ -130,8 +129,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   T3.start();
   refine(mcg, refineTo);
   T3.stop();
-  int one = 0;
-  int zero = 0;
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
   std::cout << "Refinement:," << T3.get() << "\n";
@@ -164,7 +161,7 @@ int computingCut(GGraph& g) {
 
 int computingBalance(GGraph& g) {
   int zero = 0, one = 0;
-  for (int c = g.hedges; c < g.size(); c++) {
+  for (size_t c = g.hedges; c < g.size(); c++) {
     int part = g.getData(c).getPart();
     if (part == 0) zero++;
     else one++;
@@ -226,9 +223,10 @@ int main(int argc, char** argv) {
   uint32_t i1;
   uint64_t i2;
   ss >> i1 >> i2;
-  const int hedges = i1, nodes = i2;
-  printf("hedges: %d\n", hedges);
-  printf("nodes: %d\n\n", nodes);
+  const uint32_t hedges = i1;
+  const uint64_t nodes = i2;
+  std::cout << "hedges: " << hedges << "\n";
+  std::cout << "nodes: " << nodes << "\n\n";
 
   galois::StatTimer T("buildingG");
   T.start();
@@ -236,13 +234,14 @@ int main(int argc, char** argv) {
   std::vector<std::vector<uint32_t> > edges_id(hedges+nodes);
   std::vector<std::vector<EdgeTy> > edges_data(hedges+nodes);
   std::vector<uint64_t> prefix_edges(nodes+hedges);
-  int cnt = 0, edges = 0;
+  uint32_t cnt = 0;
+  uint32_t edges = 0;
   while (std::getline(f, line)) {
     if (cnt >= hedges) {printf("ERROR: too many lines in input file\n"); exit(-1);}
     std::stringstream ss(line);
     int val;
     while (ss >> val) {
-      if ((val < 1) || (val > nodes)) {printf("ERROR: node value %d out of bounds\n", val); exit(-1);}
+      if ((val < 1) || (val > static_cast<long>(nodes))) {printf("ERROR: node value %d out of bounds\n", val); exit(-1);}
       unsigned newval = hedges + (val - 1);
       edges_id[cnt].push_back(newval);
       edges++;
@@ -259,7 +258,7 @@ int main(int argc, char** argv) {
                   prefix_edges[c] = edges_id[c].size();
                 });
   
-  for (uint32_t c = 1; c < nodes+hedges; ++c) {
+  for (uint64_t c = 1; c < nodes+hedges; ++c) {
     prefix_edges[c] += prefix_edges[c - 1];
   }
   // edges = #edges, hedgecount = how many edges each node has, edges_id: for each node, which ndoes it is connected to

@@ -58,7 +58,6 @@ struct onlineStat {
 
 unsigned graphStat(GGraph& graph) {
   onlineStat e;
-  unsigned edges = 0;
   for (auto ii : graph) {
     unsigned val = std::distance(graph.edge_begin(ii), graph.edge_end(ii));
     e.add(val);

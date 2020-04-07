@@ -35,13 +35,13 @@ bool FLAG = false;
 namespace {
 
 #ifndef NDEBUG
-void assertAllMatched(GNode node, GGraph* graph) {
+__attribute__((unused)) void assertAllMatched(GNode node, GGraph* graph) {
   for (auto jj : graph->edges(node))
     assert(node == graph->getEdgeDst(jj) ||
            graph->getData(graph->getEdgeDst(jj)).isMatched());
 }
 
-void assertNoMatched(GGraph* graph) {
+__attribute__((unused)) void assertNoMatched(GGraph* graph) {
   for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
     assert(!graph->getData(*nn).isMatched());
 }
@@ -52,13 +52,11 @@ typedef galois::GAccumulator<unsigned> Pcounter;
 
 
 // phaseII scheduling
-void parallelReHMatchAndCreateNodes(MetisGraph* graph) {
+__attribute__((unused)) void parallelReHMatchAndCreateNodes(MetisGraph* graph) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  GGraph* coarseGGraph = graph->getGraph();
-  assert(fineGGraph != coarseGGraph);
+  assert(fineGGraph != graph->getGraph());
   typedef std::set<GNode> SecTy;
-  typedef std::vector<GNode> VecTy;
   typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
   
@@ -94,8 +92,7 @@ int hash(unsigned val) {
 void parallelRand(MetisGraph* graph, int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  GGraph* coarseGGraph = graph->getGraph();
-  int x = iter % 2;
+  unsigned x = iter % 2;
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
@@ -173,10 +170,8 @@ template <MatchingPolicy matcher>
 void parallelPrioRand(MetisGraph* graph, int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  GGraph* coarseGGraph = graph->getGraph();
-  assert(fineGGraph != coarseGGraph);
+  assert(fineGGraph != graph->getGraph());
   typedef std::set<GNode> SecTy;
-  typedef std::vector<GNode> VecTy;
   typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
   std::string name = "phaseI";
@@ -227,7 +222,6 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
   GGraph* coarseGGraph = graph->getGraph();
   assert(fineGGraph != coarseGGraph);
   typedef std::set<GNode> SecTy;
-  typedef std::vector<GNode> VecTy;
   typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
   std::string name = "phaseI";
@@ -320,7 +314,6 @@ void moreCoarse(MetisGraph* graph, int iter) {
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   GGraph* coarseGGraph = graph->getGraph();
   assert(fineGGraph != coarseGGraph);
-  typedef std::set<int> SecTy;
   typedef std::vector<GNode> VecTy;
   GNodeBag bag;
   typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
@@ -344,7 +337,7 @@ void moreCoarse(MetisGraph* graph, int iter) {
           auto& cells = *edgesThreadLocal.getLocal();
           cells.clear();
           int best = INT_MAX;
-          GNode b;
+          GNode b = 0;
           int w = 0;
           for (auto edge : fineGGraph->edges(item)) {
 	      auto e = fineGGraph->getEdgeDst(edge);
@@ -372,7 +365,6 @@ void moreCoarse(MetisGraph* graph, int iter) {
           if (cells.size() > 0) {
               if (best < INT_MAX) {
                   auto nn = fineGGraph->getData(b).getParent();
-                  int ww = coarseGGraph->getData(nn).getWeight();
                   for (auto e : cells) {
 	            bag.push(e);
                     fineGGraph->getData(e).setMatched();
@@ -413,8 +405,7 @@ void coarsePhaseII(MetisGraph* graph,
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
         if (fineGGraph->getData(item).isMatched()) return;
-        unsigned id = fineGGraph->getData(item).netnum;
-        unsigned ids;
+        int ids;
         int count = 0;
         for (auto c : fineGGraph->edges(item)) {
           auto dst = fineGGraph->getEdgeDst(c);
@@ -499,13 +490,8 @@ void parallelCreateEdges(MetisGraph* graph) {
 void findMatching(MetisGraph* coarseMetisGraph,
                        scheduleMode sch,
                        int iter) {
-  MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
-
   GNodeBag bagOfLoners;
   Pcounter pc;
-  unsigned c;
-
-  bool useOBIM = true;
 
        switch(sch) {
            case PLD:
@@ -544,7 +530,9 @@ void findMatching(MetisGraph* coarseMetisGraph,
              parallelHMatchAndCreateNodes<MDEG_f>(coarseMetisGraph,
                                             iter);
        break;
-      
+
+           default:
+             abort();
        }
        coarsePhaseII(coarseMetisGraph, iter);
        parallelCreateEdges(coarseMetisGraph);
@@ -567,17 +555,13 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
   const float ratio = 55.0 / 45.0;  // change if needed
   const float tol = std::max(ratio, 1 - ratio) - 1;
   const int hi = (1 + tol) * size / (2 + tol);
-  const int lo = size - hi;
   LIMIT = hi / 4;
-  int totw = 0;
   
-  unsigned Size = size;
   unsigned iterNum        = 0;
   unsigned newSize = size;
   while (size > coarsenTo) { 
     if (iterNum > coarsenTo) break;
     //if (Size - newSize <= 0 && iterNum > 2) break; //final
-     Size = newSize;
      coarseGraph      = coarsenOnce(coarseGraph, sch, iterNum);
       newSize = std::distance(coarseGraph->getGraph()->cellList().begin(), coarseGraph->getGraph()->cellList().end());
       if (newSize < coarsenTo)break;
