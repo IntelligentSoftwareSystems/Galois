@@ -286,7 +286,7 @@ void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
           if (cells.size() > 0) {
               if (best < INT_MAX) {
                   auto nn = fineGGraph->getData(b).getParent();
-                  int ww = weight[nn];
+                  int ww = weight[nn-fineGGraph->hedges];
                   for (auto e : cells) {
 	            bag.push(e);
                     fineGGraph->getData(e).setMatched();
