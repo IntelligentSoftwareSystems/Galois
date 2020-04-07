@@ -39,7 +39,7 @@ public:
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void* p) { SuperTy::__setLocalState(p); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
-  void setBreakFlag(bool* b) { SuperTy::didBreak = b; }
+  void setBreakFlag(bool* b) { SuperTy::didBreak = b; }  // NOLINT(readability-non-const-parameter)
 
   void setFirstPass(void) { SuperTy::__setFirstPass(); }
   void resetFirstPass(void) { SuperTy::__resetFirstPass(); }

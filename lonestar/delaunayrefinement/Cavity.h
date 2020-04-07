@@ -47,7 +47,6 @@ class Cavity {
     assert(std::distance(graph->edge_begin(node), graph->edge_end(node)) == 3);
     Element& element   = graph->getData(node, galois::MethodFlag::WRITE);
     Tuple elementTuple = element.getObtuse();
-    Edge ObtuseEdge    = element.getOppositeObtuse();
     for (Graph::edge_iterator
              ii = graph->edge_begin(node, galois::MethodFlag::WRITE),
              ee = graph->edge_end(node, galois::MethodFlag::WRITE);

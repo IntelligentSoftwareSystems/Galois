@@ -125,13 +125,12 @@ template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>*
 loadDGraph(std::vector<unsigned>& scaleFactor, bool loadProxyEdges,
            struct CUDA_Context** cuda_ctx = nullptr) {
+  using Graph = galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>;
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
 
   dGraphTimer.start();
-  typedef galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees> Graph;
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  Graph* loadedGraph = new galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>(inputFile,
-                           net.ID, net.Num, loadProxyEdges, loadProxyEdges);
+  auto* loadedGraph = new Graph(inputFile, net.ID, net.Num, loadProxyEdges, loadProxyEdges);
   assert(loadedGraph != nullptr);
   dGraphTimer.stop();
 

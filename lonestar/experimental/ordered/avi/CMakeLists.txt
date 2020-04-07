@@ -49,33 +49,33 @@ endif()
 
 if (AVI_FOUND)
   app(AVIorderedSerial main/AVIorderedSerial.cpp
-    REQUIRES AVI_FOUND EXP_OPT
+    REQUIRES AVI_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgExplicit main/AVIodgExplicit.cpp
-    REQUIRES AVI_FOUND EXP_OPT
+    REQUIRES AVI_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
-    REQUIRES AVI_FOUND EXP_OPT
+    REQUIRES AVI_FOUND
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   # the files may be removed from the release without causing error in cmake
   if(USE_EXP)
     app(AVIodgOrdered main/AVIodgOrdered.cpp 
-      REQUIRES AVI_FOUND EXP_OPT
+      REQUIRES AVI_FOUND
       EXTLIBS AVI ${LAPACK_LIBRARIES})
 
     app(AVIorderedSpec exp/AVIorderedSpec.cpp 
-      REQUIRES AVI_FOUND EXP_OPT
+      REQUIRES AVI_FOUND
       EXTLIBS AVI ${LAPACK_LIBRARIES})
 
     app(AVIlevelExec exp/AVIlevelExec.cpp 
-      REQUIRES AVI_FOUND EXP_OPT
+      REQUIRES AVI_FOUND
       EXTLIBS AVI ${LAPACK_LIBRARIES})
 
     app(AVIserialGalloc exp/AVIserialGalloc.cpp 
-      REQUIRES AVI_FOUND EXP_OPT
+      REQUIRES AVI_FOUND
       EXTLIBS AVI ${LAPACK_LIBRARIES})
   endif()
 

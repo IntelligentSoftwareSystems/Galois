@@ -26,11 +26,14 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-7
             - g++-7
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -40,11 +43,14 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-8
             - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -54,11 +60,14 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -69,11 +78,14 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -85,12 +97,15 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-7
             - gcc-8
             - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -102,12 +117,15 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-8
             - gcc-8
             - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -119,12 +137,15 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-9
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -136,12 +157,15 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -154,12 +178,15 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -176,6 +203,9 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
             - libc++-10-dev
@@ -183,7 +213,7 @@ matrix:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -199,6 +229,9 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
             - libc++-10-dev
@@ -206,7 +239,7 @@ matrix:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
@@ -232,7 +265,8 @@ before_script:
     fi
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+  # Use apt-installed cmake rather than travis-provided one (/usr/local/cmake-3.12.4/bin/cmake).
+  - /usr/bin/cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
 
 script:
   - make input

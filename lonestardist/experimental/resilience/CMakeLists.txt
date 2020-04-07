@@ -13,7 +13,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 function(distApp name)
-  app(${name}_resilient ${name}/gen.cpp DISTSAFE)
+  app(${name}_resilient ${name}/gen.cpp)
   target_compile_definitions(${name}_resilient PRIVATE __GALOIS_CHECKPOINT__=1)
   target_link_libraries(${name}_resilient galois_gluon distbench)
   target_include_directories(${name}_resilient PUBLIC ${CMAKE_SOURCE_DIR}/libgluon/include)

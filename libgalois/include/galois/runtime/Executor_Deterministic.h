@@ -1367,6 +1367,8 @@ class Executor : public BreakManager<OptionsTy>,
   substrate::CacheLineStorage<volatile long> outerDone;
   substrate::CacheLineStorage<volatile long> hasNewWork;
 
+  int runFunction(ThreadLocalData& tld, Context* ctx);
+
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
   void go();
@@ -1498,6 +1500,28 @@ void Executor<OptionsTy>::go() {
 }
 
 template <typename OptionsTy>
+int Executor<OptionsTy>::runFunction(ThreadLocalData& tld, Context* ctx) {
+    int result = 0;
+#ifdef GALOIS_USE_LONGJMP_ABORT
+    if ((result = setjmp(execFrame)) == 0) {
+#else
+    try {
+#endif
+      tld.fn1(ctx->item.val, tld.facing.data());
+#ifdef GALOIS_USE_LONGJMP_ABORT
+    } else {
+      clearConflictLock();
+    }
+#else
+    } catch (const ConflictFlag& flag) {
+      clearConflictLock();
+      result = flag;
+    }
+#endif
+    return result;
+}
+
+template <typename OptionsTy>
 bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld) {
   auto& local = this->getLocalWindowManager();
   bool retval = false;
@@ -1517,23 +1541,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld) {
     setThreadContext(ctx);
 
     this->allocLocalState(tld.facing, tld.fn2);
-    int result = 0;
-#ifdef GALOIS_USE_LONGJMP_ABORT
-    if ((result = setjmp(execFrame)) == 0) {
-#else
-    try {
-#endif
-      tld.fn1(ctx->item.val, tld.facing.data());
-#ifdef GALOIS_USE_LONGJMP_ABORT
-    } else {
-      clearConflictLock();
-    }
-#else
-    } catch (const ConflictFlag& flag) {
-      clearConflictLock();
-      result = flag;
-    }
-#endif
+    int result = runFunction(tld, ctx);
     // FIXME:    clearReleasable();
     tld.facing.resetFirstPass();
     ctx->resetFirstPass();

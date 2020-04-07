@@ -760,11 +760,11 @@ public:
 
 /**
  * Adds reverse edges to a graph. Reverse edges have edge data copied from the
- * original edge. New graph is placed in out parameter.  The previous graph in
+ * original edge. The new graph is placed in the out parameter.  The previous
  * out is destroyed.
  */
 template <typename EdgeTy>
-void makeSymmetric(FileGraph& in, FileGraph& out) {
+void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
   typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
@@ -774,29 +774,31 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 
   size_t numEdges = 0;
 
-  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+  for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
+       ++ii) {
     GNode src = *ii;
-    for (FileGraph::edge_iterator jj = in.edge_begin(src),
-                                  ej = in.edge_end(src);
+    for (FileGraph::edge_iterator jj = in_graph.edge_begin(src),
+                                  ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
-      GNode dst = in.getEdgeDst(jj);
+      GNode dst = in_graph.getEdgeDst(jj);
       numEdges += 1;
       if (src != dst)
         numEdges += 1;
     }
   }
 
-  g.setNumNodes(in.size());
+  g.setNumNodes(in_graph.size());
   g.setNumEdges(numEdges);
   g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
 
   g.phase1();
-  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+  for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
+       ++ii) {
     GNode src = *ii;
-    for (FileGraph::edge_iterator jj = in.edge_begin(src),
-                                  ej = in.edge_end(src);
+    for (FileGraph::edge_iterator jj = in_graph.edge_begin(src),
+                                  ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
-      GNode dst = in.getEdgeDst(jj);
+      GNode dst = in_graph.getEdgeDst(jj);
       g.incrementDegree(src);
       if (src != dst)
         g.incrementDegree(dst);
@@ -805,14 +807,15 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 
   g.phase2();
   edgeData.create(numEdges);
-  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+  for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
+       ++ii) {
     GNode src = *ii;
-    for (FileGraph::edge_iterator jj = in.edge_begin(src),
-                                  ej = in.edge_end(src);
+    for (FileGraph::edge_iterator jj = in_graph.edge_begin(src),
+                                  ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
-      GNode dst = in.getEdgeDst(jj);
+      GNode dst = in_graph.getEdgeDst(jj);
       if (EdgeData::has_value) {
-        edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
+        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
         edgeData.set(g.addNeighbor(src, dst), data);
         if (src != dst)
           edgeData.set(g.addNeighbor(dst, src), data);
@@ -838,14 +841,14 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
  *
  * Permutation array, P, conforms to: P[i] = j where i is a node index from the
  * original graph and j is a node index in the permuted graph. New, permuted
- * graph is placed in the out parameter. The previous graph in out is destroyed.
+ * graph is placed in the out parameter. The previous out is destroyed.
  *
- * @param in original graph
+ * @param in_graph original graph
  * @param p permutation array
  * @param out permuted graph
  */
 template <typename EdgeTy, typename PTy>
-void permute(FileGraph& in, const PTy& p, FileGraph& out) {
+void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
   typedef LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
@@ -853,16 +856,17 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   FileGraphWriter g;
   EdgeData edgeData;
 
-  size_t numEdges = in.sizeEdges();
-  g.setNumNodes(in.size());
+  size_t numEdges = in_graph.sizeEdges();
+  g.setNumNodes(in_graph.size());
   g.setNumEdges(numEdges);
   g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
 
   g.phase1();
-  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+  for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
+       ++ii) {
     GNode src = *ii;
-    for (FileGraph::edge_iterator jj = in.edge_begin(src),
-                                  ej = in.edge_end(src);
+    for (FileGraph::edge_iterator jj = in_graph.edge_begin(src),
+                                  ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
       g.incrementDegree(p[src]);
     }
@@ -870,14 +874,15 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
 
   g.phase2();
   edgeData.create(numEdges);
-  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+  for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
+       ++ii) {
     GNode src = *ii;
-    for (FileGraph::edge_iterator jj = in.edge_begin(src),
-                                  ej = in.edge_end(src);
+    for (FileGraph::edge_iterator jj = in_graph.edge_begin(src),
+                                  ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
-      GNode dst = in.getEdgeDst(jj);
+      GNode dst = in_graph.getEdgeDst(jj);
       if (EdgeData::has_value) {
-        edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
+        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
         edgeData.set(g.addNeighbor(p[src], p[dst]), data);
       } else {
         g.addNeighbor(p[src], p[dst]);

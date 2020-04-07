@@ -16,8 +16,3 @@ target_include_directories(galois_cusp PUBLIC
   ${CMAKE_SOURCE_DIR}/libcusp/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-
-set_target_properties (galois_cusp PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)

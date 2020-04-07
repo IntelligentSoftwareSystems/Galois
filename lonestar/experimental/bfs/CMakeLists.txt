@@ -1,1 +1,1 @@
-app(bfs2)
+app(bfs2 bfs.cpp)

@@ -17,31 +17,33 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
-#include <iostream>
+#include "galois/substrate/SharedMem.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Termination.h"
 
-struct Function {
-  void operator()(unsigned tid, unsigned total) {
-    galois::runtime::LL::gPrint("host: ", galois::runtime::NetworkInterface::ID,
-                                " tid: ", tid, "\n");
-  }
-};
+#include <memory>
 
-int main(int argc, char** argv) {
-  int threads = 2;
-  if (argc > 1)
-    threads = atoi(argv[1]);
+galois::substrate::SharedMem::SharedMem() {
+  internal::setThreadPool(&m_tpool);
 
-  galois::setActiveThreads(threads);
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  net.start();
+  // delayed initialization because both call getThreadPool in constructor
+  // which is valid only after setThreadPool() above
+  m_biPtr   = std::make_unique<internal::BarrierInstance<>>();
+  m_termPtr = std::make_unique<internal::LocalTerminationDetection<>>();
 
-  std::cout << "Hosts: " << galois::runtime::NetworkInterface::Num << " ";
-  std::cout << "Threads: " << threads << "\n";
+  internal::setBarrierInstance(m_biPtr.get());
+  internal::setTermDetect(m_termPtr.get());
+}
 
-  galois::on_each(Function());
+galois::substrate::SharedMem::~SharedMem() {
+  internal::setTermDetect(nullptr);
+  internal::setBarrierInstance(nullptr);
 
-  net.terminate();
+  // destructors can call getThreadPool(), hence must be destroyed before
+  // setThreadPool() below
+  m_termPtr.reset();
+  m_biPtr.reset();
 
-  return 0;
+  internal::setThreadPool(nullptr);
 }

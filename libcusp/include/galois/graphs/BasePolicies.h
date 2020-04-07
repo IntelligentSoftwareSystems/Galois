@@ -195,7 +195,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
           //galois::gDebug("[", _hostID, "] ", gid, " found with master ",
           //               mappedMaster, "!");
           // make sure host is in bounds
-          assert(mappedMaster >= 0 && mappedMaster < _numHosts);
+          assert(mappedMaster < _numHosts);
           return mappedMaster;
         } else {
           // NOT FOUND (not necessarily a bad thing, and required for
@@ -212,7 +212,6 @@ class CustomMasterAssignment : public PartitioningScaffold {
         // determine offset
         uint32_t offsetIntoMap = gid - _nodeOffset;
         assert(offsetIntoMap != (uint32_t)-1);
-        assert(offsetIntoMap >= 0);
         assert(offsetIntoMap < _localNodeToMaster.size());
         return _localNodeToMaster[offsetIntoMap];
       }
@@ -310,7 +309,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
    * @returns true if new mapping added; false if already existed in map
    */
   bool addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
-    assert(mappedMaster >= 0 && mappedMaster < _numHosts);
+    assert(mappedMaster < _numHosts);
     if (_status <= 1) {
       auto offsetIntoMapIter = _gid2masters.find(gid);
       if (offsetIntoMapIter == _gid2masters.end()) {
