@@ -231,7 +231,6 @@ else {
    //updateGain(*g,zz);
   }
 }
-  //std::cout<<cut(*g)<<"\n";
   
 }
 

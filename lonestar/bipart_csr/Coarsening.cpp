@@ -194,6 +194,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
         unsigned nodeid = INT_MAX;
         auto& edges = *edgesThreadLocal.getLocal();
         edges.clear();
+        int w = 0;
         for (auto c : fineGGraph->edges(item)) {
           auto dst = fineGGraph->getEdgeDst(c);
           auto& data = fineGGraph->getData(dst);
@@ -202,7 +203,9 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
             continue;
           }
           if (data.netnum == fineGGraph->getData(item).netnum) {
+            if (w + fineGGraph->getData(dst).getWeight() > LIMIT) break;
             edges.push_back(dst);
+            w += fineGGraph->getData(dst).getWeight();
             nodeid = std::min(nodeid, dst);
           }
           else { 
@@ -258,13 +261,13 @@ void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
           cells.clear();
           int best = INT_MAX;
           GNode b = 0;
-          //int w = 0;
           for (auto edge : fineGGraph->edges(item)) {
 	      auto e = fineGGraph->getEdgeDst(edge);
               auto& data = fineGGraph->getData(e);
               if (!fineGGraph->getData(e).isMatched()) {
                   if (data.netnum == fineGGraph->getData(item).netnum) {
                       cells.push_back(e);
+                      //w += fineGGraph->getData(e).getWeight();
                   }
               }
               else if (fineGGraph->getData(e).netval == INT_MIN) {
@@ -561,6 +564,8 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
      hedgeSize = coarseGraph->getGraph()->hedges; 
      std::cout<<"SIZE IS "<<coarseGraph->getGraph()->hnodes<<" and net is "<<hedgeSize<<"\n";
      if (hedgeSize < 1000) return coarseGraph->getFinerGraph();
+     if (Size < 300) return coarseGraph->getFinerGraph();
+
      
     ++iterNum;
     
