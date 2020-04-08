@@ -19,7 +19,7 @@
 
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include "bipart.h"
+#include "Metis.h"
 #include <set>
 #include "galois/Galois.h"
 #include "galois/AtomicHelpers.h"
@@ -33,34 +33,9 @@
 
 namespace {
 // final
-__attribute__((unused)) int cut(GGraph& g) {
-
-  GNodeBag bag;
-  galois::do_all(galois::iterate(g),
-        [&](GNode n) {
-          if (g.hedges <= n) return;
-          for (auto cell : g.edges(n)) {
-            auto c = g.getEdgeDst(cell);
-            int part = g.getData(c).getPart();
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int partc = g.getData(cc).getPart();
-              if (partc != part) {
-                bag.push(n);
-                return;
-              }
-
-            }
-          }
-        },
-        galois::loopname("cutsize"));
-  return std::distance(bag.begin(), bag.end());
-}
-
 void initGain(GGraph& g) {
-  galois::do_all(galois::iterate(g),
+  galois::do_all(galois::iterate(g.cellList()),
         [&](GNode n) {
-            if (n < g.hedges) return;
             g.getData(n).FS.store(0);
             g.getData(n).TE.store(0);
         },
@@ -69,9 +44,8 @@ void initGain(GGraph& g) {
   typedef std::map<GNode, int> mapTy;
   typedef galois::substrate::PerThreadStorage<mapTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
-  galois::do_all(galois::iterate(g),
+  galois::do_all(galois::iterate(g.getNets()),
         [&](GNode n) {
-        if (g.hedges <= n) return; 
            int p1=0;
 						int p2 = 0;
             for (auto x : g.edges(n)) {
@@ -113,9 +87,8 @@ void partition(MetisGraph* mcg) {
   galois::GAccumulator<unsigned int> accumZ;
   GNodeBag nodelist;
   galois::do_all(
-      galois::iterate(*g),
+      galois::iterate(mcg->getGraph()->cellList()),
       [&](GNode item) {
-        if (item < g->hedges) return;
         accum += g->getData(item).getWeight();
         g->getData(item, galois::MethodFlag::UNPROTECTED).initRefine(1, true);
         g->getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
@@ -123,9 +96,8 @@ void partition(MetisGraph* mcg) {
       galois::loopname("initPart"));
 
   galois::do_all(
-      galois::iterate(*g),
+      galois::iterate(g->getNets()),
       [&](GNode item) {
-        if (g->hedges <= item) return;
         for (auto c : g->edges(item)) {
           auto n = g->getEdgeDst(c);
           g->getData(n).setPart(0);
@@ -134,9 +106,8 @@ void partition(MetisGraph* mcg) {
       galois::loopname("initones")); 
   GNodeBag nodelistoz;
   galois::do_all(
-      galois::iterate(*g),
+      galois::iterate(g->cellList()),
       [&](GNode item) {
-        if (item < g->hedges) return;
         if (g->getData(item).getPart() == 0) { 
            accumZ += g->getData(item).getWeight();
            nodelist.push(item);
@@ -159,6 +130,7 @@ void partition(MetisGraph* mcg) {
     galois::do_all(
       galois::iterate(nodelist),
       [&](GNode node) {
+    //for (auto node : nodelist) {
       unsigned pp = g->getData(node).getPart();
       if (pp == 0) {
         nodelistz.push(node);
@@ -231,7 +203,7 @@ else {
    //updateGain(*g,zz);
   }
 }
-  //std::cout<<cut(*g)<<"\n";
+  //std::cout<<cutsize(*g)<<"\n";
   
 }
 

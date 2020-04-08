@@ -272,7 +272,7 @@ protected:
 #else
     try {
       while ((!limit || s.num < limit) && (s.item = lwl.pop())) {
-        ++num;
+        ++s.num;
         doProcess(aborted.value(*s.item), tld);
       }
     } catch (ConflictFlag const& flag) {

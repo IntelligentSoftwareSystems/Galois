@@ -17,20 +17,17 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef BIPART_H_
-#define BIPART_H_
+#ifndef METIS_H_
+#define METIS_H_
 
-#include "galois/graphs/LC_CSR_Hypergraph.h"
+#include "galois/graphs/MorphHyperGraph.h"
 #include "galois/AtomicWrapper.h"
 
 class MetisNode;
-typedef uint32_t EdgeTy;
-using GGraph   = 
-    galois::graphs::LC_CSR_Hypergraph<MetisNode, EdgeTy>::with_no_lockable<false>::type::with_numa_alloc<true>::type;
+using GGraph   = galois::graphs::MorphHyperGraph<MetisNode, int, true>;
 using GNode    = GGraph::GraphNode;
 using GNodeBag = galois::InsertBag<GNode>;
 
-constexpr galois::MethodFlag flag_no_lock = galois::MethodFlag::UNPROTECTED;
 // algorithms
 enum scheduleMode {PLD, WD, RI, PP, MRI, MWD, DEG, MDEG, HIS, RAND};
 
@@ -58,7 +55,7 @@ class MetisNode {
   void initCoarsen() {
     data.cd.matched     = false;
     data.cd.failedmatch = false;
-    data.cd.parent      = 0;
+    data.cd.parent      = NULL;
     netval = 0;
   }
 
@@ -83,7 +80,7 @@ public:
     data.rd.partition = 0;
   }
 
-  MetisNode(unsigned weight, GNode child0, GNode child1 = 0)
+  MetisNode(unsigned weight, GNode child0, GNode child1 = NULL)
       : _weight(weight) {
     initCoarsen();
     initPartition();
@@ -98,7 +95,9 @@ public:
     initPartition();
     counter = 0;
     data.rd.partition = 0;
-    data.cd.matched = false;
+    //flag = false;
+  //  p1 = 0;
+    //p2 = 0;
   }
 
   // call to switch data to refining
@@ -174,14 +173,13 @@ public:
   MetisGraph* getFinerGraph() const { return finer; }
   MetisGraph* getCoarserGraph() const { return coarser; }
 
-  //unsigned getNumNodes() { return std::distance(graph.cellList().begin(), graph.cellList().end()); }
+  unsigned getNumNodes() { return std::distance(graph.cellList().begin(), graph.cellList().end()); }
 
   unsigned getTotalWeight() {
     MetisGraph* f = this;
     while (f->finer)
       f = f->finer;
-    //return std::distance(f->graph.cellList().begin(), f->graph.cellList().end());
-    return 0;
+    return std::distance(f->graph.cellList().begin(), f->graph.cellList().end());
   }
 };
 
