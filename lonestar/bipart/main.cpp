@@ -85,8 +85,6 @@ static cll::opt<double> imbalance(
 // const double COARSEN_FRACTION = 0.9;
 
 int cutsize(GGraph& g) { 
-  unsigned size = std::distance(g.cellList().begin(), g.cellList().end());
-  unsigned sizen = std::distance(g.getNets().begin(), g.getNets().end());
   int cutsize = 0;
   std::vector<int> cells;
   for (auto n : g.getNets()) { 
@@ -120,7 +118,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   T.stop();
 
   galois::StatTimer T2("PartitionSEP");
-  int cuts = std::numeric_limits<int>::max();
   T2.start();
   partition(mcg);
   T2.stop();
@@ -130,8 +127,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   T3.start();
   refine(mcg, refineTo);
   T3.stop();
-  int one = 0;
-  int zero = 0;
   std::cout << "clustering:," << T2.get() << '\n';
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "Refinement:," << T3.get() << "\n";
