@@ -44,63 +44,6 @@ jobs:
           make input
           make -j2
           make test || :
-  "Ubuntu-16.04":
-    docker:
-      - image: ubuntu:16.04
-    steps:
-      - checkout
-      - run: |
-          apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
-
-          apt-add-repository -y 'deb https://apt.kitware.com/ubuntu/ xenial main'
-          apt-add-repository -y ppa:ubuntu-toolchain-r/test  # for gcc-9
-          apt-add-repository -y ppa:mhier/libboost-latest
-          apt-get -q update -y
-
-          apt-get -q install -y libboost1.70-dev libeigen3-dev cmake gcc-9 g++-9 zlib1g-dev wget libopenmpi-dev openmpi-bin
-
-          update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
-          update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
-
-          mkdir build
-          cd build
-          # Also test custom GRAPH_LOCATION
-          wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
-          tar -xvzf small_inputs.tar.gz
-          rm small_inputs.tar.gz
-          cmake -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9 -DENABLE_DIST_GALOIS=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
-          make -j2
-          make test || :
-  "CentOS-7-gcc":
-    docker:
-      - image: centos:7
-    steps:
-      - checkout
-      - run: |
-          yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          yum -y -q install devtoolset-9-toolchain
-          # For some reason using scl_source enable this way doesn't work when bash
-          # was started with -e, so temporarily disable that, then re-enable it afterward.
-          set +e
-          source scl_source enable devtoolset-9
-          set -e
-          # Use miniconda to get recent boost and cmake
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          # conda-forge used to use the devtoolset compilers.
-          # Use the latest boost build that's still ABI compatible there.
-          conda install --update-specs -y -q -c conda-forge cmake>=3.13 boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
   "CentOS-8-gcc":
     docker:
       - image: centos:8
@@ -201,26 +144,9 @@ jobs:
           make input
           make -j4
           make test || :
-  "openSUSE":
-    docker:
-      - image: opensuse/leap:latest
-    steps:
-      - checkout
-      - run: |
-          # Note: Eigen is deliberately excluded here since the tests should still run properly without it installed.
-          # It's also excluded here because, as of this writing, it doesn't have a stable package in the latest OpenSUSE release.
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip openmpi-devel
 
-          zypper --non-interactive install wget
-          wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
-          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
 
           mkdir build
-          cd build
-          cmake -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
   "Fedora-gcc":
     docker:
       - image: fedora:latest
@@ -263,13 +189,10 @@ workflows:
     jobs:
       - "Debian"
       - "Ubuntu-18.04"
-      - "Ubuntu-16.04"
-      - "CentOS-7-gcc"
       - "CentOS-8-gcc"
       - "CentOS-8-clang"
       - "CentOS-8-clang-libc++"
       - "Arch"
       - "Alpine"
-      - "openSUSE"
       - "Fedora-gcc"
       - "Fedora-clang"
