@@ -560,7 +560,7 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
      Size = coarseGraph->getGraph()->hnodes;
      hedgeSize = coarseGraph->getGraph()->hedges; 
      std::cout<<"SIZE IS "<<coarseGraph->getGraph()->hnodes<<" and net is "<<hedgeSize<<"\n";
- //    if (hedgeSize < 1000) return coarseGraph->getFinerGraph();
+     if (hedgeSize < 1000) return coarseGraph->getFinerGraph();
      
     ++iterNum;
     
