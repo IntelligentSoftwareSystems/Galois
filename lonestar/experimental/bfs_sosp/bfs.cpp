@@ -35,11 +35,9 @@
 #include <iostream>
 
 #include "HybridBFS.h"
-#ifdef GALOIS_USE_EXP
 #include "galois/runtime/Executor_BulkSynchronous.h"
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
-#endif
 #include "BFS.h"
 
 static const char* name = "Breadth-first Search";
@@ -102,7 +100,6 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::hybrid, "hybrid",
                            "Hybrid of barrier and high centrality algorithms"),
                 clEnumValN(Algo::serial, "serial", "Serial"),
-#ifdef GALOIS_USE_EXP
                 clEnumValN(Algo::barrierWithInline, "barrierWithInline",
                            "Optimized with inlined workset"),
                 clEnumValN(Algo::graphlab, "graphlab",
@@ -110,7 +107,6 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::ligraChi, "ligraChi",
                            "Use Ligra and GraphChi programming model"),
                 clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
-#endif
                 clEnumValEnd),
     cll::init(Algo::barrier));
 
@@ -641,13 +637,7 @@ struct DeterministicAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) const {
-#ifdef GALOIS_USE_EXP
     typedef galois::worklists::BulkSynchronousInline<> WL;
-#else
-    typedef galois::worklists::BulkSynchronous<
-        galois::worklists::PerSocketChunkLIFO<256>>
-        WL;
-#endif
     typedef galois::worklists::Deterministic<> DWL;
     graph.getData(source).dist = 0;
 
@@ -730,11 +720,7 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   typedef BulkSynchronous<PerSocketChunkLIFO<256>> BSWL;
 
-#ifdef GALOIS_USE_EXP
   typedef BulkSynchronousInline<> BSInline;
-#else
-  typedef BSWL BSInline;
-#endif
   if (useDetDisjoint)
     algo = Algo::deterministicDisjoint;
   else if (useDetBase)
@@ -764,7 +750,6 @@ int main(int argc, char** argv) {
   case Algo::hybrid:
     run<HybridAlgo>();
     break;
-#ifdef GALOIS_USE_EXP
   case Algo::graphlab:
     run<GraphLabBFS>();
     break;
@@ -774,7 +759,6 @@ int main(int argc, char** argv) {
   case Algo::ligra:
     run<LigraBFS<false>>();
     break;
-#endif
   case Algo::deterministic:
     run<DeterministicAlgo<DetAlgo::base>>();
     break;

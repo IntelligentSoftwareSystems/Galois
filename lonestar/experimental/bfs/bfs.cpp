@@ -24,10 +24,8 @@
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
-#ifdef GALOIS_USE_EXP
 #include "galois/PriorityScheduling.h"
 #include "galois/runtime/BulkSynchronousWork.h"
-#endif
 #ifdef USE_TBB
 #include "tbb/parallel_for.h"
 #include "tbb/parallel_for_each.h"
@@ -93,12 +91,10 @@ static cll::opt<BFSAlgo> algo(
         clEnumVal(detParallelBarrier, "Deterministic parallelBarrier"),
         clEnumVal(detDisjointParallelBarrier,
                   "Deterministic parallelBarrier with disjoint optimization"),
-#ifdef GALOIS_USE_EXP
         clEnumVal(parallelBarrierExp,
                   "Parallel optimized with inlined workset and barrier"),
         clEnumVal(parallelBarrierInline,
                   "Parallel optimized with inlined workset and barrier"),
-#endif
 #ifdef GALOIS_USE_TBB
         clEnumVal(parallelTBBAsync, "TBB"),
         clEnumVal(parallelTBBBarrier, "TBB with barrier"),
@@ -409,7 +405,6 @@ struct BarrierAlgo {
   }
 };
 
-#ifdef GALOIS_USE_EXP
 //! BFS using optimized flags and barrier scheduling
 struct BarrierExpAlgo {
   std::string name() const { return "Parallel (Exp)"; }
@@ -470,13 +465,6 @@ struct BarrierExpAlgo {
 #endif
   }
 };
-#else
-struct BarrierExpAlgo {
-  std::string name() const { return "Parallel (Exp)"; }
-  void operator()(const GNode& source) const { abort(); }
-};
-
-#endif
 
 //! BFS using optimized flags and barrier scheduling
 template <DetAlgo Version>
@@ -505,13 +493,9 @@ struct DetBarrierAlgo {
 
   void operator()(const GNode& source) const {
     typedef galois::worklists::Deterministic<> DWL;
-    //#ifdef GALOIS_USE_EXP
-    //    typedef galois::worklists::BulkSynchronousInline<> WL;
-    //#else
     typedef galois::worklists::BulkSynchronous<
         galois::worklists::PerSocketChunkLIFO<256>>
         WL;
-    //#endif
     std::deque<ItemTy> initial;
 
     graph.getData(source).dist = 0;
@@ -809,11 +793,7 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   typedef BulkSynchronous<PerSocketChunkLIFO<256>> BSWL;
 
-  //#ifdef GALOIS_USE_EXP
-  //  typedef BulkSynchronousInline<> BSInline;
-  //#else
   typedef BSWL BSInline;
-  //#endif
 
   switch (algo) {
   case serialAsync:

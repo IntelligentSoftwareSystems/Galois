@@ -140,10 +140,6 @@ public:
 
   unsigned cancelIteration();
   unsigned commitIteration();
-
-#ifdef GALOIS_USE_EXP
-  virtual bool owns(Lockable* lockable, galois::MethodFlag m) const;
-#endif
 };
 
 //! get the current conflict detection class, may be null if not in parallel
@@ -201,10 +197,6 @@ struct CheckedLockObj {
 };
 
 void signalConflict(Lockable* = nullptr);
-
-#ifdef GALOIS_USE_EXP
-bool owns(Lockable* lockable, MethodFlag m);
-#endif
 
 void signalFailSafe(void);
 
