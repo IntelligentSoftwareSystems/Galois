@@ -26,8 +26,7 @@ protected:
       if (i != brokenEdge) {
         lengths[j++] = graph.getEdgeData(edgesIterators[i].get()).getLength();
       } else {
-        const std::pair<int, int>& brokenEdgeVertices =
-            getEdgeVertices(brokenEdge);
+        std::pair<int, int> brokenEdgeVertices = getEdgeVertices(brokenEdge);
         GNode& hangingNode =
             connManager
                 .findNodeBetween(vertices[brokenEdgeVertices.first],
