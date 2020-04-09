@@ -55,7 +55,7 @@ void inpWriter(const std::string filename, Graph& graph) {
   }
 
   // Then elements related to nodes (interior, edges, and triangles)
-  for (const auto conec : conecVector) {
+  for (const auto &conec : conecVector) {
     file << counter << " " << conec.mat << " " << conec.type;
 
     for (const auto id : conec.conec) {
