@@ -17,49 +17,44 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/ForeachTask.h"
-#include "galois/runtime/DistributedStructs.h"
-#include <vector>
+#ifndef GALOIS_SUBSTRATE_SHAREDMEM_H
+#define GALOIS_SUBSTRATE_SHAREDMEM_H
 
-using namespace std;
-using namespace galois::runtime;
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/Termination.h"
 
-struct R : public galois::runtime::Lockable {
-  int i;
+#include <memory>
 
-  R() { i = 0; }
+namespace galois::substrate {
 
-  void add(int v) {
-    i += v;
-    return;
-  }
+class SharedMem {
+
+  // Order is critical here
+  ThreadPool m_tpool;
+
+  std::unique_ptr<internal::LocalTerminationDetection<>> m_termPtr;
+  std::unique_ptr<internal::BarrierInstance<>> m_biPtr;
+
+public:
+  /**
+   * Initializes the Substrate library components
+   */
+  SharedMem();
+
+  /**
+   * Destroys the Substrate library components
+   */
+  ~SharedMem();
+
+
+  SharedMem(const SharedMem&) = delete;
+  SharedMem& operator=(const SharedMem&) = delete;
+
+  SharedMem(SharedMem&&) = delete;
+  SharedMem& operator=(SharedMem&&) = delete;
 };
 
-int main(int argc, char* argv[]) {
-  /*
-    int  rc;
+}  // namespace galois::substrate
 
-    rc = MPI_Init(&argc,&argv);
-    if (rc != MPI_SUCCESS) {
-      printf ("Error starting MPI program. Terminating.\n");
-      MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-   */
-
-  galois::setActiveThreads(4);
-
-  // check the task id and decide if the following should be executed
-  galois::for_each_begin();
-
-  vector<int> myvec;
-  typedef vector<int>::iterator IterTy;
-  f1 f;
-  for (int i = 1; i <= 40; i++)
-    myvec.push_back(i);
-  galois::for_each_task<IterTy, f1>(myvec.begin(), myvec.end(), f);
-  printf("final output: %d\n", f.r->i);
-
-  master_terminate();
-
-  return 0;
-}
+#endif

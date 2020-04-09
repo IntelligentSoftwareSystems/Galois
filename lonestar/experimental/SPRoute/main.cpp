@@ -454,20 +454,23 @@ int main(int argc, char** argv)
 				if(!finegrain && nthreads_tmp != 1)
 				{
 					thread_livelock++;
-					if(thread_livelock == thread_livelock_limit[thread_choice])
+					if(thread_livelock == 1)
 					{
 						thread_choice++;
 						thread_livelock = 0;
-                        if(thread_steps[thread_choice] == 1) {
-						    galois::setActiveThreads(min(6, nthreads_tmp));
+                        if(nthreads_tmp < 6) {
+						    galois::setActiveThreads(4);
+                            numThreads = 4;
                             finegrain = true;
                         }
-                        else
-							galois::setActiveThreads(min(thread_steps[thread_choice], nthreads_tmp));
-					}
-					cout << "nthreads :" <<	min(thread_steps[thread_choice], nthreads_tmp) << " live lock cnt: " << thread_livelock << endl;
+                        else {
+                            numThreads = numThreads/2;
+							galois::setActiveThreads(numThreads);
+					    }
+                    }
 				}
 			}
+			cout << "nthreads :" << numThreads  << endl;
 			extrarun = false;
 
 

@@ -175,7 +175,7 @@ int getLogIndex(ptrdiff_t x) {
     x = -x;
   }
 
-  while (x >>= 1) {
+  while ((x >>= 1) != 0) {
     ++logvalue;
   }
   return sign * logvalue;

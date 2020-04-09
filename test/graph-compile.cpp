@@ -32,7 +32,7 @@ private:
 template <typename GraphTy>
 void check() {
   typedef typename GraphTy::GraphNode GNode;
-  int v;
+  int v = 0;
 
   GraphTy g;
   GNode n1 = g.createNode(1);

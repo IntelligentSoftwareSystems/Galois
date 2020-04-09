@@ -1,6 +1,6 @@
 add_subdirectory(cuda)
 include_directories(${CUDA_INCLUDE_DIRS} )
-app(pr-push_gen pr_push.cpp DISTSAFE)
+app(pr-push_gen pr_push.cpp)
 target_link_libraries(pr-push_gen hpr_push_cuda cudadevrt OpenCL)
 #target_link_libraries(sssp_gen cuda OpenCL)
 add_custom_command(TARGET pr-push_gen POST_BUILD COMMAND ${CMAKE_COMMAND}

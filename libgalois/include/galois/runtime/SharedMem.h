@@ -17,37 +17,41 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include <iostream>
-#include <cstring>
+#ifndef GALOIS_RUNTIME_SHAREDMEM_H
+#define GALOIS_RUNTIME_SHAREDMEM_H
 
-#include "galois/runtime/NetworkBackend.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/PagePool.h"
+#include "galois/substrate/SharedMem.h"
 
-using namespace galois::runtime;
+#include <string>
 
-int main(int argc, char** argv) {
-  NetworkBackend& net = getSystemNetworkBackend();
+namespace galois::runtime {
 
-  for (int i = 1; i < net.Num(); ++i) {
-    auto* sb = net.allocSendBlock();
-    sb->size = net.size();
-    sb->dest = (net.ID() + i) % net.Num();
-    if (net.ID() == 0)
-      std::strcpy((char*)sb->data, "Hi there minions");
-    else
-      std::strcpy((char*)sb->data, "Hello");
-    net.send(sb);
-  }
-  int seen = 1;
-  while (seen < net.Num()) {
-    NetworkBackend::SendBlock* rb = nullptr;
-    while (!rb)
-      rb = net.recv();
+template <typename SM>
+class SharedMem: public galois::substrate::SharedMem {
+  internal::PageAllocState<> m_pa;
+  SM m_sm;
 
-    std::cout << rb->dest << ":" << rb->size << "|" << rb->data << "| at "
-              << net.ID() << "\n";
-    net.freeSendBlock(rb);
-    ++seen;
+public:
+  explicit SharedMem() :  m_pa(), m_sm() {
+    internal::setPagePoolState(&m_pa);
+    internal::setSysStatManager(&m_sm);
   }
 
-  return 0;
-}
+  ~SharedMem() {
+    m_sm.print();
+    internal::setSysStatManager(nullptr);
+    internal::setPagePoolState(nullptr);
+  }
+
+  SharedMem(const SharedMem&) = delete;
+  SharedMem& operator=(const SharedMem&) = delete;
+
+  SharedMem(SharedMem&&) = delete;
+  SharedMem& operator=(SharedMem&&) = delete;
+};
+
+}  // namespace galois::runtime
+
+#endif

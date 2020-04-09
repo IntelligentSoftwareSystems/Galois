@@ -28,11 +28,11 @@
 
 //! DistMemSys constructor which calls the shared memory runtime constructor
 //! with the distributed stats manager
-galois::DistMemSys::DistMemSys(void)
-    : galois::runtime::SharedMemRuntime<galois::runtime::DistStatManager>() {}
+galois::DistMemSys::DistMemSys()
+    : galois::runtime::SharedMem<galois::runtime::DistStatManager>() {}
 
 //! DistMemSys destructor which reports memory usage from the network
-galois::DistMemSys::~DistMemSys(void) {
+galois::DistMemSys::~DistMemSys() {
   if (MORE_DIST_STATS) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     net.reportMemUsage();

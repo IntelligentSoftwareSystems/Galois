@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,8 +25,8 @@
 #include <cstdlib>
 #include <unistd.h>
 
-unsigned iter       = 1;
-unsigned numThreads = 2;
+unsigned iter       = 0;
+unsigned numThreads = 0;
 
 char bname[100];
 
@@ -35,11 +35,8 @@ struct emp {
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
-      // if (galois::runtime::LL::getTID() == 0)
-      //   usleep(100);
       b.wait();
     }
-    // std::cout << galois::runtime::LL::getTID() << " ";
   }
 
   template <typename T>
@@ -54,11 +51,16 @@ struct emp {
 };
 
 void test(std::unique_ptr<galois::substrate::Barrier> b) {
+  if (b == nullptr) {
+    std::cout << "skipping " << bname << "\n";
+    return;
+  }
+
   unsigned M = numThreads;
   if (M > 16)
     M /= 2;
   while (M) {
-    galois::setActiveThreads(M); // galois::runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M);
     b->reinit(M);
     galois::Timer t;
     t.start();
@@ -75,9 +77,11 @@ int main(int argc, char** argv) {
   galois::SharedMemSys Galois_runtime;
   if (argc > 1)
     iter = atoi(argv[1]);
-  if (!iter)
+  else
     iter = 16 * 1024;
   if (argc > 2)
+    numThreads = atoi(argv[2]);
+  else
     numThreads = galois::substrate::getThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));

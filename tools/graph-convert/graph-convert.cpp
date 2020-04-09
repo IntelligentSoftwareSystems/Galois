@@ -32,9 +32,11 @@
 #include <stdint.h>
 #include <vector>
 #include <random>
+#include <string>
 
 #include <fcntl.h>
 #include <cstdlib>
+#include <boost/algorithm/string.hpp> 
 
 // TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {
@@ -43,6 +45,7 @@ enum ConvertMode {
   bipartitegr2sorteddegreegr,
   dimacs2gr,
   edgelist2gr,
+  csv2gr,
   gr2biggr,
   gr2binarypbbs32,
   gr2binarypbbs64,
@@ -127,6 +130,7 @@ static cll::opt<ConvertMode> convertMode(
                   "Sort nodes of bipartite binary gr by degree"),
         clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
         clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
+        clEnumVal(csv2gr, "Convert csv to binary gr"),
         clEnumVal(gr2biggr, "Convert binary gr with little-endian edge data to "
                             "big-endian edge data"),
         clEnumVal(gr2binarypbbs32,
@@ -332,12 +336,34 @@ void outputPermutation(const T& perm) {
 }
 
 /**
- * Just a bunch of pairs or triples:
- * src dst weight?
+ * Custom spliting of a line in the input text file.
+ * To be used for reading edges in edgelist format (src dst edge_weight) or 
+ * csv format (src,dst,edge_weight). 
+ * 
+ * @param line : single line from a file
+ * @param iss  : std::stringStream to be returned with split parts
+ * @param delim: Custom delimiter; [space] for edgelist, [,] for CSV 
  */
-struct Edgelist2Gr : public Conversion {
-  template <typename EdgeTy>
-  void convert(const std::string& infilename, const std::string& outfilename) {
+void splitString(std::string line, std::vector<std::string> &result, std::stringstream &iss, std::string delim) {
+  boost::split(result, line, boost::is_any_of(delim)); 
+  // Populate
+  std::copy(result.begin(), result.end(),std::ostream_iterator<std::string>(iss,"\n"));
+  return;
+}
+
+/**
+ * Common function to convert formats similar to edgelist by passing
+ * custom delimiter:
+ * 
+ * Edgelist: delim:[space]
+ * src dst weight
+ * 
+ * CSV: delim: [,] (NOTE: First line (labels) in CSV is ignored)
+ * src,dst,weight 
+ * 
+ */
+template <typename EdgeTy>
+void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& infilename, const std::string& outfilename, std::string delim) {
     typedef galois::graphs::FileGraphWriter Writer;
     typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
@@ -349,16 +375,27 @@ struct Edgelist2Gr : public Conversion {
     size_t numNodes = 0;
     size_t numEdges = 0;
 
-    while (infile) {
+    std::vector<std::string> result; 
+    std::string line;
+    if(skipFirstLine){
+      std::getline(infile, line);
+      galois::gPrint("WARNING: First line is assumed to contain labels and is ignored\n");
+      galois::gPrint("First Line : " , line, "\n");
+    }
+    while (std::getline(infile, line)) {
+      std::stringstream iss;
+      // Populate
+      splitString(line, result, iss, delim);
       size_t src;
       size_t dst;
       edge_value_type data;
 
-      infile >> src >> dst;
-
+      iss >> src >> dst;
+      
       if (EdgeData::has_value)
-        infile >> data;
-
+        iss >> data;
+        
+    
       if (infile) {
         ++numEdges;
         if (src > numNodes)
@@ -374,18 +411,28 @@ struct Edgelist2Gr : public Conversion {
     p.setSizeofEdgeData(EdgeData::size_of::value);
     edgeData.create(numEdges);
 
+    galois::gPrint(numNodes, " , ", numEdges, "\n");
     infile.clear();
     infile.seekg(0, std::ios::beg);
     p.phase1();
-    while (infile) {
+
+    result.clear(); 
+    line.clear();
+    if(skipFirstLine){
+      std::getline(infile, line); /* Ignore first line */
+    }
+    while (std::getline(infile, line)) {
+      std::stringstream iss(line);
+      // Populate
+      splitString(line, result, iss, delim);
       size_t src;
       size_t dst;
       edge_value_type data;
 
-      infile >> src >> dst;
+      iss >> src >> dst;
 
       if (EdgeData::has_value)
-        infile >> data;
+        iss >> data;
 
       if (infile) {
         p.incrementDegree(src);
@@ -395,15 +442,24 @@ struct Edgelist2Gr : public Conversion {
     infile.clear();
     infile.seekg(0, std::ios::beg);
     p.phase2();
-    while (infile) {
+
+    result.clear(); 
+    line.clear();
+    if(skipFirstLine){
+      std::getline(infile, line); /* Ignore first line */
+    }
+    while (std::getline(infile, line)) {
+      std::stringstream iss(line);
+      // Populate
+      splitString(line, result, iss, delim);
       size_t src;
       size_t dst;
       edge_value_type data{};
 
-      infile >> src >> dst;
+      iss >> src >> dst;
 
       if (EdgeData::has_value)
-        infile >> data;
+        iss >> data;
 
       if (infile) {
         edgeData.set(p.addNeighbor(src, dst), data);
@@ -418,6 +474,35 @@ struct Edgelist2Gr : public Conversion {
 
     p.toFile(outfilename);
     printStatus(numNodes, numEdges);
+  }
+
+
+/**
+ * Assumption: First line has labels
+ * Just a bunch of pairs or triples:
+ * src dst weight?
+ */
+struct CSV2Gr : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+
+    /**
+     * WARNING: First line is assumed to contain labels and is ignored;
+     * The first bool arg to edgelistStyleWithCustomDelim is skipFirstLine=True
+     */
+    edgelistStyleWithCustomDelim<EdgeTy>(true, infilename, outfilename, ",");
+  }
+};
+
+
+/**
+ * Just a bunch of pairs or triples:
+ * src dst weight?
+ */
+struct Edgelist2Gr : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    edgelistStyleWithCustomDelim<EdgeTy>(false, infilename, outfilename, "\t ");
   }
 };
 
@@ -2871,6 +2956,9 @@ int main(int argc, char** argv) {
     break;
   case edgelist2gr:
     convert<Edgelist2Gr>();
+    break;
+  case csv2gr:
+    convert<CSV2Gr>();
     break;
   case gr2biggr:
     convert<ToBigEndian>();
