@@ -1,4 +1,5 @@
 add_library(galois_cusp INTERFACE)
+add_library(Galois::cusp ALIAS galois_cusp)
 add_dependencies(lib galois_cusp)
 
 target_include_directories(galois_cusp INTERFACE

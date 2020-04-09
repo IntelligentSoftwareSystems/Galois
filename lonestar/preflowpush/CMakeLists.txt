@@ -1,5 +1,5 @@
 add_executable(preflowpush Preflowpush.cpp)
 add_dependencies(apps preflowpush)
-target_link_libraries(preflowpush PRIVATE galois_shmem lonestar)
+target_link_libraries(preflowpush PRIVATE Galois::shmem lonestar)
 install(TARGETS preflowpush DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small1 preflowpush "${BASEINPUT}/reference/structured/torus5.gr" 0 10)

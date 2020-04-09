@@ -1,4 +1,5 @@
 add_library(galois_gluon STATIC)
+add_library(Galois::gluon ALIAS galois_gluon)
 add_dependencies(lib galois_gluon)
 
 target_sources(galois_gluon PRIVATE

@@ -1,6 +1,6 @@
 add_executable(boruvka Boruvka.cpp)
 add_dependencies(apps boruvka)
-target_link_libraries(boruvka PRIVATE galois_shmem lonestar)
+target_link_libraries(boruvka PRIVATE Galois::shmem lonestar)
 install(TARGETS boruvka DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 add_test_scale(small1 boruvka "${BASEINPUT}/scalefree/rmat10.gr")

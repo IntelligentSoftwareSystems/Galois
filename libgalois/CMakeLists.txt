@@ -1,4 +1,5 @@
 add_library(galois_shmem)
+add_library(Galois::shmem ALIAS galois_shmem)
 add_dependencies(lib galois_shmem)
 
 set(sources

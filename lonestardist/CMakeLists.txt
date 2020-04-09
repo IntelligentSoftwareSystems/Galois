@@ -8,7 +8,7 @@ target_include_directories(distbench PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(distbench galois_cusp galois_gluon)
+target_link_libraries(distbench Galois::cusp Galois::gluon)
 
 if(EXISTS /net/ohm/export/iss/dist-outputs)
   set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
@@ -45,7 +45,7 @@ function(app_dist name)
   FILE(GLOB CPPSOURCES ${name}*.cpp)
   add_executable(${name} ${CPPSOURCES})
   add_dependencies(apps ${name})
-  target_link_libraries(${name} lonestar galois_shmem LLVMSupport)
+  target_link_libraries(${name} lonestar Galois::shmem LLVMSupport)
   install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
   target_link_libraries(${name} distbench)
@@ -65,7 +65,7 @@ function(app_dist name)
 
     FILE(GLOB CUSOURCES ${name}*.cu)
     add_library(${name}_cuda ${CUSOURCES})
-    target_link_libraries(${name}_cuda galois_gpu)
+    target_link_libraries(${name}_cuda Galois::gpu)
     set_property(TARGET ${name}_cuda PROPERTY CUDA_STANDARD 14)
   endif()
 endfunction()

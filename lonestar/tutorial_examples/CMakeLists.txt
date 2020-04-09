@@ -1,7 +1,7 @@
 function(app name)
   add_executable(${name} ${ARGN})
   add_dependencies(apps ${name})
-  target_link_libraries(${name} PRIVATE galois_shmem lonestar)
+  target_link_libraries(${name} PRIVATE Galois::shmem lonestar)
   install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 endfunction()
 

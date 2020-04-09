@@ -1,6 +1,6 @@
 add_executable(barneshut Barneshut.cpp)
 add_dependencies(apps barneshut)
-target_link_libraries(barneshut PRIVATE galois_shmem lonestar)
+target_link_libraries(barneshut PRIVATE Galois::shmem lonestar)
 install(TARGETS barneshut DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 if(CMAKE_COMPILER_IS_GNUCC)

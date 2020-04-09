@@ -1,4 +1,5 @@
 add_library(galois_gpu)
+add_library(Galois::gpu ALIAS galois_gpu)
 add_dependencies(lib galois_gpu)
 
 target_sources(galois_gpu PRIVATE

@@ -1,6 +1,6 @@
 add_executable(matrixCompletion matrixCompletion.cpp)
 add_dependencies(apps matrixCompletion)
-target_link_libraries(matrixCompletion PRIVATE galois_shmem lonestar)
+target_link_libraries(matrixCompletion PRIVATE Galois::shmem lonestar)
 install(TARGETS matrixCompletion DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 if(CMAKE_COMPILER_IS_GNUCC)

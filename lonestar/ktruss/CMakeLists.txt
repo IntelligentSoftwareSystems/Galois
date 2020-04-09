@@ -1,6 +1,6 @@
 add_executable(ktruss K-Truss.cpp)
 add_dependencies(apps ktruss)
-target_link_libraries(ktruss PRIVATE galois_shmem lonestar)
+target_link_libraries(ktruss PRIVATE Galois::shmem lonestar)
 install(TARGETS ktruss DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_custom_command(
   TARGET ktruss
@@ -10,5 +10,5 @@ add_custom_command(
 
 add_executable(verifyKTruss Verify.cpp)
 add_dependencies(apps verifyKTruss)
-target_link_libraries(verifyKTruss PRIVATE galois_shmem lonestar)
+target_link_libraries(verifyKTruss PRIVATE Galois::shmem lonestar)
 install(TARGETS verifyKTruss DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

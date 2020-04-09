@@ -1,6 +1,6 @@
 add_executable(delaunayrefinement DelaunayRefinement.cpp)
 add_dependencies(apps delaunayrefinement)
-target_link_libraries(delaunayrefinement PRIVATE galois_shmem lonestar)
+target_link_libraries(delaunayrefinement PRIVATE Galois::shmem lonestar)
 install(TARGETS delaunayrefinement DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 if(CMAKE_COMPILER_IS_GNUCC)

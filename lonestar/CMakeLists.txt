@@ -5,7 +5,7 @@ target_include_directories(lonestar PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(lonestar galois_shmem LLVMSupport)
+target_link_libraries(lonestar Galois::shmem LLVMSupport)
 
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality) 

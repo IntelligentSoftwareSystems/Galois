@@ -1,4 +1,5 @@
 add_library(galois_dist_async STATIC)
+add_library(Galois::dist_async ALIAS galois_dist_async)
 add_dependencies(lib galois_dist_async)
 
 target_sources(galois_dist_async PRIVATE
