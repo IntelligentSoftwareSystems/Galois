@@ -230,11 +230,13 @@ if(ENABLE_DIST_GALOIS)
 
     # MGPU v1.1
     set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
-    cuda_include_directories("${MGPU_ROOT}/src")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${MGPU_ROOT}/src>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${MGPU_ROOT}/src>")
 
     # CUB v1.6.4
     set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
-    cuda_include_directories("${CUB_ROOT}")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CUB_ROOT}>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CUB_ROOT}>")
 
   endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
