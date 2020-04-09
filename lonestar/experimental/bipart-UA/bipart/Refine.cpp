@@ -636,7 +636,12 @@ void refine(MetisGraph* coarseGraph, unsigned refineTo) {
     auto gg = coarseGraph->getGraph();
 
     parallel_refine_KF(*gg, tol, refineTo);
-    parallel_make_balance(*gg, tol, 2);
+		
+		std::cout <<"cut after rf:" << calculate_cutsize(*gg) << std::endl;
+ 
+   	parallel_make_balance(*gg, tol, 2);
+	
+		std::cout <<"cut after bal:" << calculate_cutsize(*gg) << std::endl;
 
     bool do_pro = true;
     if (fineGraph && do_pro) {

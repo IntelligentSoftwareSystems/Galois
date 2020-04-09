@@ -31,10 +31,10 @@ namespace {
 // This is only used on the terminal graph (find graph)
 // Should workd for hmetis
 
-/*int calculate_cutsize(GGraph& g) {
+int calculate_cutsize(GGraph& g) {
 
   GNodeBag bag;
-  galois::do_all(galois::iterate(g.getNets()),
+  galois::do_all(galois::iterate((uint64_t)0,g.hedges),
         [&](GNode n) {
             auto c = g.edges(n).begin();
             GNode cn = g.getEdgeDst(*c);
@@ -50,7 +50,7 @@ namespace {
         },
         galois::loopname("cutsize"));
   return std::distance(bag.begin(), bag.end());
-}*/
+}
 
 /*int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
 
@@ -92,7 +92,7 @@ void initGains(GGraph& g, int pass) {
   std::string name = "initgain";
   std::string fetsref = "FETSREF_";// + std::to_string(pass);
 
-  galois::do_all(galois::iterate((uint64_t)0,g.hedges),
+  galois::do_all(galois::iterate((uint64_t)g.hedges,g.size()),
         [&](GNode n) {
               g.getData(n).FS.store(0);
               g.getData(n).TE.store(0);
@@ -640,9 +640,15 @@ void refine(MetisGraph* coarseGraph, unsigned refineTo) {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     auto gg = coarseGraph->getGraph();
 
-    parallel_refine_KF(*gg, tol, refineTo);
-    parallel_make_balance(*gg, tol, 2);
+		std::cout <<"g hedges: " << gg->hedges << std::endl;
 
+    parallel_refine_KF(*gg, tol, refineTo);
+ 
+		std::cout <<"cut after refine:" << calculate_cutsize(*gg) << std::endl;
+
+	  parallel_make_balance(*gg, tol, 2);
+
+		std::cout << "cut after bal:" << calculate_cutsize(*gg) << std::endl;
     bool do_pro = true;
     if (fineGraph && do_pro) {
       projectPart(coarseGraph);

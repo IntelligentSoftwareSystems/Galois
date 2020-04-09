@@ -107,37 +107,6 @@ static cll::opt<double> imbalance(
   }
   return cutsize;
 }*/
-/**
- * Partitioning 
- */
-void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
-  galois::StatTimer TM;
-  TM.start();
-
-  galois::StatTimer T("CoarsenSEP");
-  T.start();
-  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
-  T.stop();
-
- galois::StatTimer T2("PartitionSEP");
-  int cuts = std::numeric_limits<int>::max();
-  T2.start();
-  partition(mcg);
-  T2.stop();
-
-
-  galois::StatTimer T3("Refine");
-  T3.start();
-  refine(mcg, refineTo);
-  T3.stop();
-  int one = 0;
-  int zero = 0;
-  std::cout << "coarsen:," << T.get() << "\n";
-  std::cout << "clustering:," << T2.get() << '\n';
-  std::cout << "Refinement:," << T3.get() << "\n";
-  return;
-}
-
 int computingCut(GGraph& g) {
 
   GNodeBag bag;
@@ -162,6 +131,63 @@ int computingCut(GGraph& g) {
   return std::distance(bag.begin(), bag.end());
 }
 
+/**
+ * Partitioning 
+ */
+void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
+  galois::StatTimer TM;
+  TM.start();
+
+  galois::StatTimer T("CoarsenSEP");
+  T.start();
+  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
+  T.stop();
+
+ galois::StatTimer T2("PartitionSEP");
+  int cuts = std::numeric_limits<int>::max();
+  T2.start();
+  partition(mcg);
+  T2.stop();
+
+
+	std::cout <<"cut sie: " <<computingCut(*(mcg->getGraph())) << std::endl;
+  galois::StatTimer T3("Refine");
+  T3.start();
+  refine(mcg, refineTo);
+  T3.stop();
+  int one = 0;
+  int zero = 0;
+  std::cout << "coarsen:," << T.get() << "\n";
+  std::cout << "clustering:," << T2.get() << '\n';
+  std::cout << "Refinement:," << T3.get() << "\n";
+  return;
+}
+
+/*
+int computingCut(GGraph& g) {
+
+  GNodeBag bag;
+  galois::do_all(galois::iterate(g),
+        [&](GNode n) {
+          if (g.hedges <= n) return;
+          for (auto cell : g.edges(n)) {
+            auto c = g.getEdgeDst(cell);
+            int part = g.getData(c).getPart();
+            for (auto x : g.edges(n)) {
+              auto cc = g.getEdgeDst(x);
+              int partc = g.getData(cc).getPart();
+              if (partc != part) {
+                bag.push(n);
+                return;
+              }
+
+            }
+          }
+        },
+        galois::loopname("cutsize"));
+  return std::distance(bag.begin(), bag.end());
+}
+*/
 int computingBalance(GGraph& g) {
   int zero = 0, one = 0;
   for (int c = g.hedges; c < g.size(); c++) {
