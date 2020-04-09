@@ -107,7 +107,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
 
 # GCC
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
@@ -127,23 +127,31 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 # Clang
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+    # Avoid warnings from boost::counting_iterator
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+  endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 # ICC
-if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
     message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
 endif()
-
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
@@ -266,7 +274,7 @@ if(USE_EXP)
   endif()
 
   if(USE_HTM)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
       add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
       set(GALOIS_USE_HTM on)
       set(GALOIS_USE_SEQ_ONLY on)
@@ -338,7 +346,6 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
-
 if(GRAPH_LOCATION)
   MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")

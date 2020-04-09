@@ -17,7 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "bipart.h"
+#include "Metis.h"
 #include "galois/Galois.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/Reduction.h"
@@ -51,6 +51,39 @@ __attribute__((unused)) void assertNoMatched(GGraph* graph) {
 typedef galois::GAccumulator<unsigned> Pcounter;
 
 
+// phaseII scheduling
+__attribute__((unused)) void parallelReHMatchAndCreateNodes(MetisGraph* graph) {
+
+  GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
+  assert(fineGGraph != graph->getGraph());
+  typedef std::set<GNode> SecTy;
+  typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
+  ThreadLocalData edgesThreadLocal;
+  
+  // Making deterministic
+  galois::do_all(
+      galois::iterate(fineGGraph->getNets()),
+      [&](GNode item) {
+        for (auto c : fineGGraph->edges(item)) {
+          auto dst = fineGGraph->getEdgeDst(c);
+          galois::atomicMin(fineGGraph->getData(dst).netval, fineGGraph->getData(item).netval.load());
+        }
+      },
+      galois::steal(),  galois::loopname("atomicMin2"));
+
+
+  galois::do_all(
+      galois::iterate(fineGGraph->getNets()),
+      [&](GNode item) {
+        for (auto c : fineGGraph->edges(item)) {
+          auto dst = fineGGraph->getEdgeDst(c);
+          if (fineGGraph->getData(dst).netval == fineGGraph->getData(item).netval)
+            galois::atomicMin(fineGGraph->getData(dst).netnum, fineGGraph->getData(item).netnum.load());
+        }
+      },
+      galois::steal(),  galois::loopname("secondMin2"));
+}
+
 int hash(unsigned val) {
   unsigned long int seed = val * 1103515245 + 12345;
   return((unsigned)(seed/65536) % 32768);
@@ -58,13 +91,17 @@ int hash(unsigned val) {
 
 void parallelRand(MetisGraph* graph, int iter) {
 
-  GGraph* fineGGraph  = graph->getFinerGraph()->getGraph();
+  GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
+  unsigned x = iter % 2;
   galois::do_all(
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
-          fineGGraph->getData(item).netrand = hash(fineGGraph->getData(item).netnum);
-    },
-    galois::loopname("rand"));
+      unsigned id = fineGGraph->getData(item).netrand;
+      unsigned idx = fineGGraph->getData(item).netnum;
+      if (idx % 2 == x)
+          fineGGraph->getData(item).netrand = hash(id);
+      },
+      galois::loopname("rand"));
 }
 
 using MatchingPolicy  = void(GNode, GGraph*);
@@ -133,11 +170,16 @@ template <MatchingPolicy matcher>
 void parallelPrioRand(MetisGraph* graph, int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
+  assert(fineGGraph != graph->getGraph());
+  typedef std::set<GNode> SecTy;
+  typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
+  ThreadLocalData edgesThreadLocal;
+  std::string name = "phaseI";
   parallelRand(graph, iter); 
   
   // Making deterministic
   galois::do_all(
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
           matcher(item, fineGGraph);
           for (auto c : fineGGraph->edges(item)) {
@@ -146,8 +188,9 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
           }
       },
       galois::steal(),  galois::loopname("atomicMin"));
+
   galois::do_all(
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
             for (auto c : fineGGraph->edges(item)) {
                 auto dst = fineGGraph->getEdgeDst(c);
@@ -157,7 +200,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
      },
       galois::steal(),  galois::loopname("secondMin2"));
   galois::do_all(
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
         for (auto c : fineGGraph->edges(item)) {
           auto dst = fineGGraph->getEdgeDst(c);
@@ -172,108 +215,148 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
 // hyper edge matching
 template <MatchingPolicy matcher> 
 void parallelHMatchAndCreateNodes(MetisGraph* graph,
-                                 int iter, GNodeBag& bag, unsigned& hedges, std::vector<unsigned>& weight) {
+                                 int iter) {
   parallelPrioRand<matcher>(graph, iter);
+
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  assert(fineGGraph != graph->getGraph());
-  typedef std::vector<GNode> VecTy;
-  typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
+  GGraph* coarseGGraph = graph->getGraph();
+  assert(fineGGraph != coarseGGraph);
+  typedef std::set<GNode> SecTy;
+  typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
   std::string name = "phaseI";
-  //galois::GAccumulator<unsigned> nnodes;
-  galois::GAccumulator<unsigned> hedge;
   // hyperedge coarsening 
   galois::do_all(
-      galois::iterate(size_t{0},fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
+         
         unsigned id = fineGGraph->getData(item).netnum;
         if (fmod(id, pow(2,iter)) <= pow(2,(iter - 1)) - 1) { //final
-            return;
+           // leave the hedges
+            GNode netN;
+            MetisNode n2;
+            n2.netval = INT_MAX;
+            n2.netrand = fineGGraph->getData(item).netrand;
+            n2.netnum = fineGGraph->getData(item).netnum;
+            n2.setChild(item);
+            netN = coarseGGraph->createNode(n2);
+            coarseGGraph->addNode(netN);
+            coarseGGraph->addHyperedge(netN);
+            fineGGraph->getData(item).setParent(netN);
+            fineGGraph->getData(item).setMatched();
+          return;
         }
         bool flag = false;
-        unsigned nodeid = INT_MAX;
         auto& edges = *edgesThreadLocal.getLocal();
         edges.clear();
-        for (auto c : fineGGraph->edges(item)) {
+        int w = 0;
+        for (auto c : fineGGraph->out_edges(item)) {
           auto dst = fineGGraph->getEdgeDst(c);
           auto& data = fineGGraph->getData(dst);
-          if (data.isMatched()) {
-            flag = true;
-            continue;
+          if (data.isMatched()) { flag = true;
+            continue;//return;
           }
           if (data.netnum == fineGGraph->getData(item).netnum) {
-            edges.push_back(dst);
-            nodeid = std::min(nodeid, dst);
+            if (w + fineGGraph->getData(dst).getWeight() > LIMIT) break;
+            edges.insert(dst);
+            w += fineGGraph->getData(dst).getWeight();
           }
-          else { 
-             flag = true;
+          else {
+              //edges.clear();
+              //break;
+              flag = true;
           }
         }
 
         if (!edges.empty()) {
           if (flag && edges.size() == 1) return; 
-          if (!flag) {
-            fineGGraph->getData(item).setMatched();
-          }
-          //nnodes += 1;
-          bag.push(nodeid);
-          unsigned ww = 0;
+          fineGGraph->getData(item).setMatched();
+          GNode N;
+          MetisNode n1;
+          n1.netval = INT_MAX;
+          n1.netnum = INT_MAX;
+          n1.nodeid = INT_MAX;
+          n1.netrand = INT_MAX;
+          N = coarseGGraph->createNode(n1);
+          coarseGGraph->addNode(N);
+          coarseGGraph->addCell(N);
+          int ww = 0;
+          // create cell node
           for (auto pp : edges) {
+            coarseGGraph->getData(N).nodeid = std::min(coarseGGraph->getData(N).nodeid, fineGGraph->getData(pp).nodeid);
             ww += fineGGraph->getData(pp).getWeight();
             fineGGraph->getData(pp).setMatched();
-            fineGGraph->getData(pp).setParent(nodeid);
+            fineGGraph->getData(pp).setParent(N);
             fineGGraph->getData(pp).netnum = fineGGraph->getData(item).netnum;
           }
-          weight[nodeid-fineGGraph->hedges] = ww;
+          coarseGGraph->getData(N).setWeight(ww);
+          if (flag) {
+            GNode netN;
+            MetisNode n2;
+            n2.netval = INT_MAX;
+            n2.netrand = fineGGraph->getData(item).netrand;
+            n2.netnum = fineGGraph->getData(item).netnum;
+            n2.setChild(item);
+            netN = coarseGGraph->createNode(n2);
+            coarseGGraph->addNode(netN);
+            coarseGGraph->addHyperedge(netN);
+            fineGGraph->getData(item).setParent(netN);
+            //fineGGraph->getData(item).setMatched();
+          }
         }
       },
-      galois::steal(), galois::loopname("phaseI"));
-      //nodes = nnodes.reduce();
-      hedges = hedge.reduce();
+      galois::steal(),  galois::loopname("phaseI"));
+
 }
 
-void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
+void moreCoarse(MetisGraph* graph, int iter) {
   
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
+  GGraph* coarseGGraph = graph->getGraph();
+  assert(fineGGraph != coarseGGraph);
   typedef std::vector<GNode> VecTy;
   GNodeBag bag;
   typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
   galois::do_all(
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
         if (fineGGraph->getData(item).isMatched()) return;
-          for (auto c : fineGGraph->edges(item)) {
-            auto dst = fineGGraph->getEdgeDst(c);
-            if (fineGGraph->getData(dst).isMatched()) 
-                fineGGraph->getData(dst).netval = INT_MIN;
-          }
+        for (auto c : fineGGraph->edges(item)) {
+          auto dst = fineGGraph->getEdgeDst(c);
+          if (fineGGraph->getData(dst).isMatched()) 
+              fineGGraph->getData(dst).netval = INT_MIN;
+        }
       },
       galois::steal(),  galois::loopname("atomicMin2"));
+
   galois::do_all( 
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
           if (fineGGraph->getData(item).isMatched()) return;
           auto& cells = *edgesThreadLocal.getLocal();
           cells.clear();
           int best = INT_MAX;
           GNode b = 0;
-          //int w = 0;
+          int w = 0;
           for (auto edge : fineGGraph->edges(item)) {
 	      auto e = fineGGraph->getEdgeDst(edge);
               auto& data = fineGGraph->getData(e);
               if (!fineGGraph->getData(e).isMatched()) {
                   if (data.netnum == fineGGraph->getData(item).netnum) {
                       cells.push_back(e);
+                      w += coarseGGraph->getData(e).getWeight();
                   }
               }
               else if (fineGGraph->getData(e).netval == INT_MIN) {
+                  auto nn = fineGGraph->getData(e).getParent();
+                  if (coarseGGraph->getData(nn).getWeight() + w > LIMIT) continue;
                   if (fineGGraph->getData(e).getWeight() < best) {
                     best = fineGGraph->getData(e).getWeight();
                     b = e;
                   }
                   else if (fineGGraph->getData(e).getWeight() == best) {
-                    if (e < b)
+                    if (fineGGraph->getData(e).nodeid < fineGGraph->getData(b).nodeid)
                       b = e;
                   }
               }
@@ -295,17 +378,20 @@ void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
         galois::steal(), galois::loopname("moreCoarse"));
       for (auto c : bag) {
         auto nn = fineGGraph->getData(c).getParent();
-        int ww = weight[nn-fineGGraph->hedges];
+        coarseGGraph->getData(nn).nodeid = std::min(coarseGGraph->getData(nn).nodeid, fineGGraph->getData(c).nodeid);
+        int ww = coarseGGraph->getData(nn).getWeight();
         ww += fineGGraph->getData(c).getWeight();
-        weight[nn-fineGGraph->hedges] = ww;
+        coarseGGraph->getData(nn).setWeight(ww);
       }
 }
 
 // Coarsening phaseII
 void coarsePhaseII(MetisGraph* graph,
-                    int iter, unsigned & hedges, std::vector<unsigned> & weight) {
+                    int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
+  GGraph* coarseGGraph = graph->getGraph();
+  assert(fineGGraph != coarseGGraph);
   typedef std::set<int> SecTy;
   typedef std::vector<GNode> VecTy;
   typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
@@ -313,25 +399,23 @@ void coarsePhaseII(MetisGraph* graph,
   typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalDataV;
   ThreadLocalDataV edgesThreadLocalV;
   std::string name = "CoarseningPhaseII";
-  galois::GAccumulator<int> hhedges;
-  galois::GAccumulator<int> hnode;
-  moreCoarse(graph, iter, weight);
+  moreCoarse(graph, iter);
 
   galois::do_all( 
-      galois::iterate(size_t{0}, fineGGraph->hedges),
+      galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
         if (fineGGraph->getData(item).isMatched()) return;
-        unsigned ids;
+        int ids;
         int count = 0;
         for (auto c : fineGGraph->edges(item)) {
           auto dst = fineGGraph->getEdgeDst(c);
           auto& data = fineGGraph->getData(dst);
           if (data.isMatched()) {
             if (count == 0) {
-              ids = data.getParent();
+              ids = coarseGGraph->getData(data.getParent()).nodeid;
               count++;
             }
-            else if (ids != data.getParent()) {
+            else if (ids != coarseGGraph->getData(data.getParent()).nodeid) {
               count++;
               break;
             }
@@ -343,195 +427,121 @@ void coarsePhaseII(MetisGraph* graph,
         }
         if (count == 1) {
             fineGGraph->getData(item).setMatched();
-          
         }
         else {
-         hhedges += 1;
-         
+          GNode netN;
+          MetisNode n2;
+          n2.netval = INT_MAX;
+          n2.netnum = fineGGraph->getData(item).netnum;
+          n2.netrand = fineGGraph->getData(item).netrand;
+          n2.setChild(item);
+          netN = coarseGGraph->createNode(n2);
+          coarseGGraph->addNode(netN);
+          coarseGGraph->addHyperedge(netN);
+          fineGGraph->getData(item).setParent(netN);
+          fineGGraph->getData(item).setMatched();
         }
 
       },
-      galois::steal(), galois::loopname("count # Hyperedges"));
+      galois::steal(), galois::loopname("phaseII_2"));
 
-   hedges += hhedges.reduce();
+  galois::do_all(
+      galois::iterate(fineGGraph->cellList()),
+      [&](GNode ii) {
+          if (!fineGGraph->getData(ii).isMatched()) {
+            MetisNode n1;
+            n1.netval = INT_MAX;
+            n1.netnum = INT_MAX;
+            n1.nodeid = fineGGraph->getData(ii).nodeid;
+            n1.netrand = INT_MAX;
+            unsigned val = fineGGraph->getData(ii).getWeight();
+            n1.setWeight(val);
+            GNode N = coarseGGraph->createNode(n1);
+            coarseGGraph->addNode(N);
+            coarseGGraph->addCell(N);
+            fineGGraph->getData(ii).setMatched();
+            fineGGraph->getData(ii).setParent(N);
+          }
+      },
+      galois::steal(), galois::loopname("noedgebag match"));
 }
 
-void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, unsigned hedges, std::vector<unsigned> weight) {
+void parallelCreateEdges(MetisGraph* graph) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   GGraph* coarseGGraph = graph->getGraph();
   assert(fineGGraph != coarseGGraph);
-  galois::GAccumulator<unsigned> nnodes;
-  galois::do_all(
-      galois::iterate(fineGGraph->hedges, fineGGraph->size()),
-      [&](GNode ii) {
-            if (!fineGGraph->getData(ii).isMatched()) { 
-              //nnodes += 1; 
-              bag.push(ii);
-              fineGGraph->getData(ii).setMatched();
-              fineGGraph->getData(ii).setParent(ii);
-              fineGGraph->getData(ii).netnum = INT_MAX;
-              weight[ii-fineGGraph->hedges] = fineGGraph->getData(ii).getWeight();
-            }
-          
-      },
-      galois::steal(), galois::loopname("noedgebag match"));
-  unsigned nodes = std::distance(bag.begin(), bag.end());// + numnodes;
-  unsigned newval = hedges;
-  //std::map<unsigned, unsigned > idmap;
-  std::vector<unsigned> idmap(fineGGraph->hnodes);
-  std::vector<unsigned> newrand(nodes);
-  std::vector<unsigned> newWeight(nodes);
-  galois::StatTimer Tloop("for loop");
-  Tloop.start();
-  std::vector<unsigned> v;
-  for (auto n : bag) v.push_back(n);
-  //std::copy(bag.begin(), bag.end(), v.begin());
-  std::sort(v.begin(), v.end());
-  for (auto n : v) {
-    newrand[newval-hedges] = n;
-    idmap[n-fineGGraph->hedges] = newval++;
-    newWeight[idmap[n-fineGGraph->hedges]-hedges] = weight[n-fineGGraph->hedges];
-  }
-  //for (GNode n = fineGGraph->hedges; n < fineGGraph->size(); n++) {
-  galois::do_all(
-      galois::iterate(fineGGraph->hedges, fineGGraph->size()),
-      [&](GNode n) {
-        unsigned id = fineGGraph->getData(n).getParent();
-        fineGGraph->getData(n).setParent(idmap[id-fineGGraph->hedges]);
-      },
-      galois::steal(), galois::loopname("first loop"));
-  Tloop.stop();
-  //std::cout<<"total first loop "<<Tloop.get()<<"\n";
-  uint32_t num_nodes_next = nodes + hedges;
-  uint64_t num_edges_next; 
-  std::vector<std::vector<uint32_t>> edges_id(num_nodes_next);
-  std::vector<unsigned> old_id(hedges);
-  unsigned h_id = 0;
-  //galois::StatTimer sloop("for loop II");
-  //sloop.start();
-  for (GNode n = 0; n < fineGGraph->hedges; n++) {
-    if (!fineGGraph->getData(n).isMatched()) {
-       old_id[h_id] = fineGGraph->getData(n).netnum;
-       fineGGraph->getData(n).nodeid = h_id++;
-    }
-  }
-  //sloop.stop();
-  //std::cout<<"second for loop "<<sloop.get()<<"\n";
-  galois::do_all(galois::iterate(size_t{0}, fineGGraph->hedges),
-                [&](GNode n) {
-                    if (fineGGraph->getData(n).isMatched()) return;
-                        auto data = fineGGraph->getData(n, flag_no_lock);
-                        unsigned id =  fineGGraph->getData(n).nodeid;
-           
-                    for (auto ii : fineGGraph->edges(n)) { 
-                        GNode dst = fineGGraph->getEdgeDst(ii);
-                        auto dst_data = fineGGraph->getData(dst, flag_no_lock);
-                          unsigned pid = dst_data.getParent();
-                          auto f = std::find(edges_id[id].begin(), edges_id[id].end(), pid);
-                          if (f == edges_id[id].end()) {
-                            edges_id[id].push_back(pid);
-                          }
-                    } // End edge loop
-                }, galois::steal(),
-                   galois::loopname("BuildGrah: Find edges"));
-
-
-  std::vector<uint64_t> prefix_edges(num_nodes_next);
-  galois::GAccumulator<uint64_t> num_edges_acc;
-  galois::do_all(galois::iterate((uint32_t)0, num_nodes_next),
-                [&](uint32_t c){
-                  prefix_edges[c] = edges_id[c].size();
-                  num_edges_acc += prefix_edges[c];
-                }, galois::steal(),
-                   galois::loopname("BuildGrah: Prefix sum"));
-
-  num_edges_next = num_edges_acc.reduce();
-  for (uint32_t c = 1; c < num_nodes_next; ++c) {
-    prefix_edges[c] += prefix_edges[c - 1];
-  }
-  //galois::StatTimer TimerConstructFrom("Timer_Construct_From");
-  //TimerConstructFrom.start();
-  coarseGGraph->constructFrom(num_nodes_next, num_edges_next, prefix_edges, edges_id);
-  //TimerConstructFrom.stop();
-  //std::cout<<"graph cons time "<<TimerConstructFrom.get()<<"\n";
-  coarseGGraph->hedges = hedges;
-  coarseGGraph->hnodes = nodes;
-  galois::do_all(
-      galois::iterate(*coarseGGraph),
-      [&](GNode ii) {
-        if (ii < hedges) {
-          coarseGGraph->getData(ii).netval = INT_MAX;
-          coarseGGraph->getData(ii).netnum = old_id[ii]; 
+    galois::do_all(
+      galois::iterate(coarseGGraph->getNets()),
+      [&](GNode item) {
+        MetisNode& nodeData =
+            coarseGGraph->getData(item, galois::MethodFlag::UNPROTECTED);
+        for (auto c : fineGGraph->edges(nodeData.getChild(0))) {
+          auto dst = fineGGraph->getEdgeDst(c);
+          auto& data = fineGGraph->getData(dst);
+          auto cpar = data.getParent();
+            coarseGGraph->addEdge(item, cpar);
         } 
-        else {
-            coarseGGraph->getData(ii).netval = INT_MAX;
-            coarseGGraph->getData(ii).netnum = INT_MAX;
-            coarseGGraph->getData(ii).netrand = INT_MAX;
-            coarseGGraph->getData(ii).nodeid = ii;//fineGGraph->getData(id).nodeid;
-            coarseGGraph->getData(ii).setWeight(newWeight[ii-coarseGGraph->hedges]);
-        }
       },
-      galois::steal(), galois::loopname("noedgebag match"));
+      galois::loopname("HyperedgeEDGE"));
 }
 
 
 void findMatching(MetisGraph* coarseMetisGraph,
                        scheduleMode sch,
                        int iter) {
-  MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
-  GNodeBag nodes;
-  unsigned hedges = 0;
-  std::vector<unsigned> weight(fineMetisGraph->getGraph()->hnodes);
-  
+  GNodeBag bagOfLoners;
+  Pcounter pc;
+
        switch(sch) {
            case PLD:
             parallelHMatchAndCreateNodes<PLD_f>(coarseMetisGraph,
-                                            iter, nodes, hedges, weight);
+                                            iter);
        break;
            case RAND:
             parallelHMatchAndCreateNodes<RAND_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case PP:
              parallelHMatchAndCreateNodes<PP_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case WD:
              parallelHMatchAndCreateNodes<WD_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case RI:
              parallelHMatchAndCreateNodes<RI_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case MRI:
              parallelHMatchAndCreateNodes<MRI_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case MWD:
              parallelHMatchAndCreateNodes<MWD_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case DEG:
              parallelHMatchAndCreateNodes<DEG_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
            case MDEG:
              parallelHMatchAndCreateNodes<MDEG_f>(coarseMetisGraph,
-                                            iter, nodes, hedges,weight);
+                                            iter);
        break;
+
            default:
              abort();
        }
-       coarsePhaseII(coarseMetisGraph, iter, hedges, weight);
-       parallelCreateEdges(coarseMetisGraph, nodes, hedges, weight);
+       coarsePhaseII(coarseMetisGraph, iter);
+       parallelCreateEdges(coarseMetisGraph);
 }
 
 MetisGraph* coarsenOnce(MetisGraph* fineMetisGraph, scheduleMode sch, 
                          int iter) {
   MetisGraph* coarseMetisGraph = new MetisGraph(fineMetisGraph);
-  findMatching(coarseMetisGraph, sch, iter);
+  findMatching(coarseMetisGraph,sch, iter);
   return coarseMetisGraph;
 }
 
@@ -541,27 +551,22 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
                     scheduleMode sch) {
 
   MetisGraph* coarseGraph = fineMetisGraph;
-  unsigned size           = fineMetisGraph->getGraph()->hnodes;//, fineMetisGraph->getGraph()->cellList().end());
-  unsigned hedgeSize = 0;
+  unsigned size           = std::distance(fineMetisGraph->getGraph()->cellList().begin(), fineMetisGraph->getGraph()->cellList().end());
   const float ratio = 55.0 / 45.0;  // change if needed
   const float tol = std::max(ratio, 1 - ratio) - 1;
   const int hi = (1 + tol) * size / (2 + tol);
   LIMIT = hi / 4;
   
-  //std::cout<<"inital weight is "<<totw<<"\n";
-  unsigned Size = size;
   unsigned iterNum        = 0;
   unsigned newSize = size;
   while (size > coarsenTo) { 
     if (iterNum > coarsenTo) break;
-    if (Size - newSize <= 0 && iterNum > 2) break; //final
-     newSize = coarseGraph->getGraph()->hnodes;
+    //if (Size - newSize <= 0 && iterNum > 2) break; //final
      coarseGraph      = coarsenOnce(coarseGraph, sch, iterNum);
-     Size = coarseGraph->getGraph()->hnodes;
-     hedgeSize = coarseGraph->getGraph()->hedges; 
-     std::cout<<"SIZE IS "<<coarseGraph->getGraph()->hnodes<<" and net is "<<hedgeSize<<"\n";
- //    if (hedgeSize < 1000) return coarseGraph->getFinerGraph();
-     
+      newSize = std::distance(coarseGraph->getGraph()->cellList().begin(), coarseGraph->getGraph()->cellList().end());
+      if (newSize < coarsenTo)break;
+      //int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
+     //std::cout<<"SIZE IS "<<newSize<<"\n";// and net is "<<netsize<<"\n";
     ++iterNum;
     
   }

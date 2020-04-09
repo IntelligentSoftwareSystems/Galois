@@ -31,7 +31,7 @@
 #include <array>
 #include <unordered_set>
 
-#include "bipart.h"
+#include "Metis.h"
 #include "galois/graphs/Util.h"
 #include "galois/Timer.h"
 //#include "GraphReader.h"
@@ -84,9 +84,7 @@ static cll::opt<double> imbalance(
 
 // const double COARSEN_FRACTION = 0.9;
 
-/*int cutsize(GGraph& g) { 
-  unsigned size = std::distance(g.cellList().begin(), g.cellList().end());
-  unsigned sizen = std::distance(g.getNets().begin(), g.getNets().end());
+int cutsize(GGraph& g) { 
   int cutsize = 0;
   std::vector<int> cells;
   for (auto n : g.getNets()) { 
@@ -106,7 +104,7 @@ static cll::opt<double> imbalance(
     }
   }
   return cutsize;
-}*/
+}
 /**
  * Partitioning 
  */
@@ -119,7 +117,7 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
   T.stop();
 
- galois::StatTimer T2("PartitionSEP");
+  galois::StatTimer T2("PartitionSEP");
   T2.start();
   partition(mcg);
   T2.stop();
@@ -129,8 +127,8 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   T3.start();
   refine(mcg, refineTo);
   T3.stop();
-  std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
+  std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "Refinement:," << T3.get() << "\n";
   return;
 }
@@ -138,9 +136,8 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
 int computingCut(GGraph& g) {
 
   GNodeBag bag;
-  galois::do_all(galois::iterate(g),
+  galois::do_all(galois::iterate(g.getNets()),
         [&](GNode n) {
-          if (g.hedges <= n) return;
           for (auto cell : g.edges(n)) {
             auto c = g.getEdgeDst(cell);
             int part = g.getData(c).getPart();
@@ -161,7 +158,7 @@ int computingCut(GGraph& g) {
 
 int computingBalance(GGraph& g) {
   int zero = 0, one = 0;
-  for (size_t c = g.hedges; c < g.size(); c++) {
+  for (auto c : g.cellList()) {
     int part = g.getData(c).getPart();
     if (part == 0) zero++;
     else one++;
@@ -216,73 +213,69 @@ int main(int argc, char** argv) {
   MetisGraph metisGraph;
   GGraph& graph = *metisGraph.getGraph();
   std::ifstream f(filename.c_str());
-  //GGraph graph;// = *metisGraph.getGraph();
   std::string line;
   std::getline(f, line);
   std::stringstream ss(line);
-  uint32_t i1;
-  uint64_t i2;
+  int i1, i2;
   ss >> i1 >> i2;
-  const uint32_t hedges = i1;
-  const uint64_t nodes = i2;
-  std::cout << "hedges: " << hedges << "\n";
-  std::cout << "nodes: " << nodes << "\n\n";
+  const int hedges = i1, nodes = i2;
+  printf("hedges: %d\n", hedges);
+  printf("nodes: %d\n\n", nodes);
 
-  galois::StatTimer T("buildingG");
-  T.start();
   // read rest of input and initialize hedges (build hgraph)
-  std::vector<std::vector<uint32_t> > edges_id(hedges+nodes);
-  std::vector<std::vector<EdgeTy> > edges_data(hedges+nodes);
-  std::vector<uint64_t> prefix_edges(nodes+hedges);
-  uint32_t cnt = 0;
-  uint32_t edges = 0;
+  std::unordered_set<int>* const hedge = new std::unordered_set<int> [hedges];
+  int cnt = 0, entries = 0;
   while (std::getline(f, line)) {
     if (cnt >= hedges) {printf("ERROR: too many lines in input file\n"); exit(-1);}
     std::stringstream ss(line);
     int val;
     while (ss >> val) {
-      if ((val < 1) || (val > static_cast<long>(nodes))) {printf("ERROR: node value %d out of bounds\n", val); exit(-1);}
-      unsigned newval = hedges + (val - 1);
-      edges_id[cnt].push_back(newval);
-      edges++;
+      if ((val < 1) || (val > nodes)) {printf("ERROR: node value %d out of bounds\n", val); exit(-1);}
+      hedge[cnt].insert(val - 1);
+      entries++;
     }
     cnt++;
   }
   f.close();
-  graph.hedges = hedges;
-  graph.hnodes = nodes;
-  std::cout<<"number of edges "<<edges<<"\n";
-  uint32_t sizes = hedges+nodes;
-  galois::do_all(galois::iterate((uint32_t)0, sizes),
-                [&](uint32_t c){
-                  prefix_edges[c] = edges_id[c].size();
-                });
-  
-  for (uint64_t c = 1; c < nodes+hedges; ++c) {
-    prefix_edges[c] += prefix_edges[c - 1];
+  std::map<int, GNode> hnets;
+  // create nodes
+  for(int i = 0; i < nodes; i++){
+    GNode node;
+    MetisNode n1;
+    n1.netnum = INT_MAX;
+    n1.netrand = INT_MAX;
+    n1.netval = INT_MAX;
+    n1.nodeid = i + 1;
+    //n1.setWeight(hash(i+1));
+    node = graph.createNode(n1); 
+    graph.addNode(node);
+    graph.addCell(node);
+    hnets[i] = node;
   }
-  // edges = #edges, hedgecount = how many edges each node has, edges_id: for each node, which ndoes it is connected to
-  // edges_data: data for each edge = 1
-  graph.constructFrom(nodes+hedges, edges, prefix_edges, edges_id);//, edges_data);
-  galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    if (n < hedges)
-                      graph.getData(n).netnum = n;
-                    else
-                      graph.getData(n).netnum = INT_MAX;
-                    graph.getData(n).netrand = INT_MAX;
-                    graph.getData(n).netval = INT_MAX;
-                    graph.getData(n).nodeid = n;
-  
-  });
-  T.stop();
-  std::cout<<"time to build a graph "<<T.get()<<"\n";
+  // create hyperedges
+  for (int i = 0; i < hedges; i++){
+    GNode a;
+    MetisNode n1;
+    //int id = rand()%(hedges-1);
+    n1.netnum = i+1;
+    unsigned rand = hash(i+1);
+    n1.netrand = rand;
+    //n1.setWeight(rand);
+    a = graph.createNode(n1);
+    graph.addNode(a);
+    graph.addHyperedge(a);
+    for (auto v : hedge[i]) {
+      GNode b = hnets[v];
+      graph.addEdge(a,b);
+    }
+  }
+
   graphStat(graph);
   std::cout<<"\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
   Partition(&metisGraph, csize, refiter);
-  //std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
+  std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
   galois::runtime::reportStat_Single("HyPar", "Edge Cut", computingCut(graph));
   galois::runtime::reportStat_Single("HyParzo", "zero-one", computingBalance(graph));
   // galois::reportPageAlloc("MeminfoPost");
