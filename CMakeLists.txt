@@ -261,11 +261,6 @@ target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
 include(CheckEndian)
 
-###### Build Hacks ######
-
-add_definitions(-D__STDC_LIMIT_MACROS)
-add_definitions(-D__STDC_CONSTANT_MACROS)
-
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
