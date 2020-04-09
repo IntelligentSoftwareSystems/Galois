@@ -164,12 +164,6 @@ if(CXX_CLANG_TIDY)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unknown-warning-option>")
 endif()
 
-add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
-add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
-add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
-add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
-
 ###### Configure features ######
 
 if(ENABLE_HETERO_GALOIS)

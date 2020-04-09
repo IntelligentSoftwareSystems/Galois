@@ -3,6 +3,7 @@ add_library(Galois::shmem ALIAS galois_shmem)
 set_target_properties(galois_shmem PROPERTIES EXPORT_NAME shmem)
 add_dependencies(lib galois_shmem)
 
+configure_file(src/Version.cpp.in Version.cpp @ONLY)
 set(sources
         src/SharedMemSys.cpp
         src/Context.cpp
@@ -14,7 +15,7 @@ set(sources
         src/PagePool.cpp
         src/Deterministic.cpp
         src/Substrate.cpp
-        src/Version.cpp
+        "${CMAKE_CURRENT_BINARY_DIR}/Version.cpp"
         src/PagePool.cpp
         src/Statistics.cpp
         src/Barrier.cpp
@@ -60,6 +61,7 @@ target_sources(galois_shmem PRIVATE ${sources})
 
 target_include_directories(galois_shmem PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
