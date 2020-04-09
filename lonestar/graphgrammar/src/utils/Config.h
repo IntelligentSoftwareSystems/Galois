@@ -45,7 +45,7 @@ public:
     parseArguments(argc, argv);
   }
 
-  static Config getConfig(int argc, char** argv) { Config config{argc, argv}; }
+  static Config getConfig(int argc, char** argv) { return Config(argc, argv); }
 
 private:
   inline static const std::string USAGE =
