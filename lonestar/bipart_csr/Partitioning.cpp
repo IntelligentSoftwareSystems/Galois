@@ -113,19 +113,16 @@ void partition(MetisGraph* mcg) {
   galois::GAccumulator<unsigned int> accumZ;
   GNodeBag nodelist;
   galois::do_all(
-      galois::iterate(*g),
+      galois::iterate(g->hedges, g->size()),
       [&](GNode item) {
-        if (item < g->hedges) return;
         accum += g->getData(item).getWeight();
         g->getData(item, galois::MethodFlag::UNPROTECTED).initRefine(1, true);
         g->getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
       },
       galois::loopname("initPart"));
 
-  galois::do_all(
-      galois::iterate(*g),
+  galois::do_all(galois::iterate(size_t{0}, g->hedges),
       [&](GNode item) {
-        if (g->hedges <= item) return;
         for (auto c : g->edges(item)) {
           auto n = g->getEdgeDst(c);
           g->getData(n).setPart(0);
@@ -134,9 +131,8 @@ void partition(MetisGraph* mcg) {
       galois::loopname("initones")); 
   GNodeBag nodelistoz;
   galois::do_all(
-      galois::iterate(*g),
+      galois::iterate(g->hedges, g->size()),
       [&](GNode item) {
-        if (item < g->hedges) return;
         if (g->getData(item).getPart() == 0) { 
            accumZ += g->getData(item).getWeight();
            nodelist.push(item);
