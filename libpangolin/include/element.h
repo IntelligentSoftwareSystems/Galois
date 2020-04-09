@@ -39,7 +39,7 @@ public:
 		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
 	LabeledElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
-	~LabeledElement() { }
+	~LabeledElement() = default;
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { history_info = his; }
 	inline void set_vertex_label(BYTE lab) { vertex_label = lab; }
@@ -86,7 +86,7 @@ public:
 		vertex_id(_vertex_id), history_info(_history) { }
 	StructuralElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 		vertex_id(_vertex_id), history_info(_history) { }
-	~StructuralElement() { }
+	~StructuralElement() = default;
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { history_info = his; }
 	inline void set_vertex_label(BYTE lab) { }
@@ -119,7 +119,7 @@ public:
 	SimpleElement(VertexId _vertex_id) : vertex_id(_vertex_id) { }
 	SimpleElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
 	SimpleElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
-	~SimpleElement() { }
+	~SimpleElement() = default;
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { }
 	inline void set_vertex_label(BYTE lab) { }
