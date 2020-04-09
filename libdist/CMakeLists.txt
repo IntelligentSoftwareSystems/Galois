@@ -28,7 +28,7 @@ endif()
 
 if (USE_LCI)
   add_definitions(-DGALOIS_USE_LWCI)
-  set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
+  set(LWCI_ROOT "${PROJECT_SOURCE_DIR}/liblci")
   set(LWCI_INCLUDE "${LWCI_ROOT}/include")
   set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
 

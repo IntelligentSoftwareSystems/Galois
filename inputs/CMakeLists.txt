@@ -9,7 +9,7 @@ add_custom_command(
 OUTPUT small_inputs
 COMMAND ${CMAKE_COMMAND} -E tar xJf lonestar-cpu-inputs.tar.gz
 DEPENDS lonestar-cpu-inputs.tar.gz
-WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/inputs
+WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/inputs
 COMMENT "Unpacking lonestar-cpu-inputs.tar.gz"
 VERBATIM
 )

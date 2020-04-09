@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 include(GNUInstallDirs)
 
@@ -175,7 +176,7 @@ if(USE_SANITIZER)
 endif()
 
 if(CXX_CLANG_TIDY)
-  set(CMAKE_CXX_CLANG_TIDY ${CXX_CLANG_TIDY} "-header-filter=.*${CMAKE_SOURCE_DIR}.*")
+  set(CMAKE_CXX_CLANG_TIDY ${CXX_CLANG_TIDY} "-header-filter=.*${PROJECT_SOURCE_DIR}.*")
   # Ignore warning flags intended for the CXX program. This only works because
   # the two compilers we care about, clang and gcc, both understand
   # -Wno-unknown-warning-option.
@@ -302,7 +303,7 @@ if(GRAPH_LOCATION)
   MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 else()
-  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
+  set(BASEINPUT ${PROJECT_BINARY_DIR}/inputs/small_inputs)
   MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 

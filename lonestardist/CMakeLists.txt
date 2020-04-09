@@ -1,7 +1,7 @@
 # NOTE: this is required because 
 # target_link_libraries() does not work with cuda_add_library() 
 # (in old versions of CMake)
-include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
+include_directories(${PROJECT_SOURCE_DIR}/libgluon/include)
 
 add_library(distbench STATIC src/DistBenchStart.cpp src/DistributedGraphLoader.cpp)
 target_include_directories(distbench PUBLIC
@@ -70,7 +70,7 @@ function(app_dist name)
   endif()
 endfunction()
 
-set(RESULT_CHECKER ${CMAKE_SOURCE_DIR}/scripts/result_checker.py)
+set(RESULT_CHECKER ${PROJECT_SOURCE_DIR}/scripts/result_checker.py)
 cmake_host_system_information(RESULT HOSTNAME QUERY HOSTNAME)
 
 function(add_test_dist_and_verify app input type part N np)
