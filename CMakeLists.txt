@@ -205,7 +205,7 @@ if(ENABLE_DIST_GALOIS)
 
   if (USE_LCI)
     add_definitions(-DGALOIS_USE_LWCI)
-    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
+    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/external/lci")
     set(LWCI_INCLUDE "${LWCI_ROOT}/include")
     set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
     add_custom_command(
@@ -229,12 +229,12 @@ if(ENABLE_DIST_GALOIS)
     include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
 
     # MGPU v1.1
-    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/external/moderngpu") # only required headers
     include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${MGPU_ROOT}/src>")
     include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${MGPU_ROOT}/src>")
 
     # CUB v1.6.4
-    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
+    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/external/cub") # only required headers
     include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CUB_ROOT}>")
     include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CUB_ROOT}>")
 
