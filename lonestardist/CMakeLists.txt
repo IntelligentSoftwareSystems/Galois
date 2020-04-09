@@ -62,6 +62,7 @@ function(app_dist name)
     FILE(GLOB CUSOURCES ${name}*.cu)
     add_library(${name}_cuda ${CUSOURCES})
     target_link_libraries(${name}_cuda galois_gpu)
+    set_property(TARGET ${name}_cuda PROPERTY CUDA_STANDARD 14)
   endif()
 endfunction()
 
