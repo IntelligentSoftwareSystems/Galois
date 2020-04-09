@@ -278,7 +278,6 @@ endif()
 
 # Boost
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
-include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(LLVM REQUIRED CONFIG)
 if("${LLVM_PACKAGE_VERSION}" VERSION_LESS "7")
@@ -356,12 +355,11 @@ function(add_test_unit)
     endif()
   endforeach()
 
-
   set(name ${X_ADD_TARGET})
   set(test_name unit-${name})
 
   add_executable(${test_name} ${name}.cpp)
-  link_app(${test_name})
+  target_link_libraries(${test_name} galois_shmem lonestar)
 
   set(commandline ${X_COMMAND_PREFIX})
   list(APPEND commandline "$<TARGET_FILE:${test_name}>")
@@ -376,49 +374,6 @@ function(add_test_unit)
       LABELS quick
     )
 endfunction()
-
-function(link_app name)
-  if (ARGN)
-    target_link_libraries(${name} ${ARGN})
-  endif()
-  target_link_libraries(${name} lonestar)
-  target_link_libraries(${name} galois_shmem)
-  target_link_libraries(${name} LLVMSupport)
-  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
-
-  if(VTune_FOUND)
-    target_link_libraries(${name} ${VTune_LIBRARIES})
-  endif()
-
-  if(PAPI_FOUND)
-    target_link_libraries(${name} ${PAPI_LIBRARIES})
-  endif()
-
-endfunction()
-
-# TODO: separate out shared and dist libraries to link
-# one way to go about it is to create two functions
-function(app name)
-  set(options)
-  set(one_value_args)
-  set(multi_value_args REQUIRES EXTLIBS)
-  cmake_parse_arguments(APP "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  foreach(required ${APP_REQUIRES})
-    if(${${required}} MATCHES "TRUE")
-    else()
-      message(STATUS "NOT compiling ${name} (missing: ${required})")
-      return()
-    endif()
-  endforeach()
-
-  add_executable(${name} ${APP_UNPARSED_ARGUMENTS})
-  link_app(${name} ${APP_EXTLIBS})
-
-  if(INSTALL_APPS)
-    install(TARGETS ${name} DESTINATION bin)
-  endif()
-endfunction(app)
 
 ###### Source finding ######
 

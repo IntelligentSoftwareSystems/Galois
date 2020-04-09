@@ -1,5 +1,13 @@
-app(bfs bfs.cpp)
-app(bfsDO bfsDirectionOpt.cpp)
-
+add_executable(bfs bfs.cpp)
+add_dependencies(apps bfs)
+target_link_libraries(bfs PRIVATE galois_shmem lonestar)
+install(TARGETS bfs DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small1 bfs "${BASEINPUT}/reference/structured/rome99.gr")
 add_test_scale(small2 bfs "${BASEINPUT}/scalefree/rmat10.gr")
+
+add_executable(bfsDO bfsDirectionOpt.cpp)
+add_dependencies(apps bfsDO)
+target_link_libraries(bfsDO PRIVATE galois_shmem lonestar)
+install(TARGETS bfsDO DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small1 bfsDO "${BASEINPUT}/reference/structured/rome99.gr")
+add_test_scale(small2 bfsDO "${BASEINPUT}/scalefree/rmat10.gr")

@@ -1,5 +1,3 @@
-#file(DOWNLOAD http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.gz SHOW_PROGRESS)
-
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/download.cmake "file(DOWNLOAD http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.gz SHOW_PROGRESS)")
 
 add_custom_command(

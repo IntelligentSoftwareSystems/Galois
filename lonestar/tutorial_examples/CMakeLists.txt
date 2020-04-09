@@ -1,3 +1,10 @@
+function(app name)
+  add_executable(${name} ${ARGN})
+  add_dependencies(apps ${name})
+  target_link_libraries(${name} PRIVATE galois_shmem lonestar)
+  install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+endfunction()
+
 app(example-sssp-push-simple SSSPPushSimple.cpp)
 app(example-sssp-simple SSSPsimple.cpp)
 app(example-sssp-pull-simple SSSPPullSimple.cpp)

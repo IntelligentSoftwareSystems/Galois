@@ -43,7 +43,11 @@ function(app_dist name)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   FILE(GLOB CPPSOURCES ${name}*.cpp)
-  app(${name} ${CPPSOURCES})
+  add_executable(${name} ${CPPSOURCES})
+  add_dependencies(apps ${name})
+  target_link_libraries(${name} lonestar galois_shmem LLVMSupport)
+  install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
   target_link_libraries(${name} distbench)
   if(REPORT_PER_ROUND_STATS)
     target_compile_definitions(${name} PRIVATE DIST_PER_ROUND_TIMER=1)

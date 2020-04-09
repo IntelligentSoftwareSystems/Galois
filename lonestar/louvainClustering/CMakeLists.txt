@@ -1,5 +1,4 @@
-app(louvainClustering louvainClustering.cpp)
-
-#add_test_scale(small1 bfs "${BASEINPUT}/reference/structured/rome99.gr")
-#add_test_scale(small2 bfs "${BASEINPUT}/scalefree/rmat10.gr")
-#add_test_scale(web bfs "${BASEINPUT}/random/r4-2e26.gr")
+add_executable(louvainClustering louvainClustering.cpp)
+add_dependencies(apps louvainClustering)
+target_link_libraries(louvainClustering PRIVATE galois_shmem lonestar)
+install(TARGETS louvainClustering DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

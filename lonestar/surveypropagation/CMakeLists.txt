@@ -1,4 +1,7 @@
-app(surveypropagation SurveyPropagation.cpp)
+add_executable(surveypropagation SurveyPropagation.cpp)
+add_dependencies(apps surveypropagation)
+target_link_libraries(surveypropagation PRIVATE galois_shmem lonestar)
+install(TARGETS surveypropagation DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 # We can get into a situation where these tests do not terminate (issue #119).
 # add_test_scale(small1 surveypropagation 9 100 300 3)
