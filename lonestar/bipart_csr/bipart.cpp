@@ -267,12 +267,12 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
                     if (n < hedges)
-                      graph.getData(n).netnum = n;
+                      graph.getData(n).netnum = n+1;
                     else
                       graph.getData(n).netnum = INT_MAX;
                     graph.getData(n).netrand = INT_MAX;
                     graph.getData(n).netval = INT_MAX;
-                    graph.getData(n).nodeid = n;
+                    graph.getData(n).nodeid = n+1;
   
   });
   T.stop();
