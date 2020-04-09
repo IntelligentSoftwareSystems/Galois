@@ -48,22 +48,6 @@ set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture
 # Currently this is really only intended to change anything for the libgalois_shmem target.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 
-if(WIN32 AND NOT CYGWIN)
-  set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
-else()
-  set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/CMake/Galois")
-endif()
-
-set(INSTALL_CMAKE_DIR "${DEFAULT_INSTALL_CMAKE_DIR}" CACHE PATH "Installation directory for CMake files")
-# Make relative path absolute
-if(NOT IS_ABSOLUTE "${INSTALL_CMAKE_DIR}")
-  set(INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_CMAKE_DIR}")
-endif()
-
-file(RELATIVE_PATH RELATIVE_INCLUDE_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
-file(RELATIVE_PATH RELATIVE_LIB_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_LIBDIR}")
-file(RELATIVE_PATH RELATIVE_BIN_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_BINDIR}")
-
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
@@ -89,7 +73,6 @@ endif()
 
 ###### Configure (users don't need to go beyond here) ######
 
-# Enable testing and ctest integration
 include(CTest)
 
 ###### Configure compiler ######
@@ -125,7 +108,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
-# Clang
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
@@ -143,7 +125,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
-# ICC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
     message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
@@ -165,7 +146,6 @@ if(ARCH_FLAGS_FOUND)
   add_link_options(${ARCH_LINK_FLAGS})
 endif()
 
-# GNU profiling
 if(USE_GPROF)
   add_compile_options(-pg)
   add_link_options(-pg)
@@ -191,12 +171,10 @@ add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
 ###### Configure features ######
 
-# Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
 
-# Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
   set(USE_PAPI ON)
@@ -259,23 +237,19 @@ if(USE_PAPI)
   add_definitions(-DGALOIS_USE_PAPI)
 endif()
 
-# PThreads
 find_package(Threads REQUIRED)
 
 include(CheckMmap)
 
-# HugePages
 include(CheckHugePages)
 if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
-# Longjmp
 if(USE_LONGJMP_ABORT)
   add_definitions(-DGALOIS_USE_LONGJMP_ABORT)
 endif()
 
-# Boost
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 
 find_package(LLVM REQUIRED CONFIG)
@@ -432,6 +406,32 @@ if(DOXYGEN_FOUND)
      ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
+###### Installation ######
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/GaloisConfigVersion.cmake
+  VERSION ${GALOIS_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+configure_package_config_file(
+  cmake/GaloisConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/GaloisConfig.cmake
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Galois"
+  PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR CMAKE_INSTALL_BINDIR
+)
+install(
+  FILES "${CMAKE_CURRENT_BINARY_DIR}/GaloisConfigVersion.cmake" "${CMAKE_CURRENT_BINARY_DIR}/GaloisConfig.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Galois"
+  COMPONENT dev
+)
+install(
+  EXPORT GaloisTargets
+  NAMESPACE Galois::
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Galois"
+  COMPONENT dev
+)
+
 ###### Distribution ######
 
 set(CPACK_GENERATOR "TGZ")
@@ -442,33 +442,3 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${GALOIS_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${GALOIS_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
-
-###### Installation ######
-
-# Galois compiler definitions
-set(galois_defs)
-set(galois_options)
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
-foreach(d ${defs})
-  set(galois_defs "${galois_defs} -D${d}")
-endforeach()
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
-foreach(d ${defs})
-  set(galois_defs "${galois_defs} -D${d}")
-endforeach()
-string(TOUPPER ${CMAKE_BUILD_TYPE} upper_build_type)
-set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_build_type}}")
-set(GALOIS_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
-
-file(RELATIVE_PATH PATH_FROM_INSTALLED_CMAKE_FILE_TO_PREFIX "${INSTALL_CMAKE_DIR}" "${CMAKE_INSTALL_PREFIX}")
-
-# Generate appropriate CMake files for installation and build trees
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake" @ONLY)
-install(FILES
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake"
-  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT lib)
-install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT lib)

@@ -1,6 +1,7 @@
 add_library(galois_dist_async STATIC)
 add_library(Galois::dist_async ALIAS galois_dist_async)
 add_dependencies(lib galois_dist_async)
+set_target_properties(galois_dist_async PROPERTIES EXPORT_NAME dist_async)
 
 target_sources(galois_dist_async PRIVATE
         src/Barrier.cpp
@@ -42,3 +43,21 @@ if (USE_LCI)
   target_link_libraries(galois_dist_async PRIVATE ${LWCI_LIBRARY} -lpsm2)
   target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
 endif(USE_LCI)
+
+install(
+  DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(TARGETS galois_dist_async
+  EXPORT GaloisTargets
+  LIBRARY
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT shlib
+  ARCHIVE
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)

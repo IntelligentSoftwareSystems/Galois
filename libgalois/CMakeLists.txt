@@ -1,5 +1,6 @@
 add_library(galois_shmem)
 add_library(Galois::shmem ALIAS galois_shmem)
+set_target_properties(galois_shmem PROPERTIES EXPORT_NAME shmem)
 add_dependencies(lib galois_shmem)
 
 set(sources
@@ -95,19 +96,21 @@ if (VTune_FOUND)
   target_link_libraries(galois_shmem PRIVATE ${VTune_LIBRARIES})
 endif()
 
-install(DIRECTORY include DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/.." COMPONENT lib
+install(
+  DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
-  PATTERN ".git" EXCLUDE
-  PATTERN ".svn" EXCLUDE)
+)
 
-install(TARGETS galois_shmem
+install(
+  TARGETS galois_shmem
   EXPORT GaloisTargets
   LIBRARY
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    COMPONENT lib
+    COMPONENT shlib
   ARCHIVE
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     COMPONENT lib
-  INCLUDES DESTINATION "${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}"
-    COMPONENT lib
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )

@@ -1,5 +1,6 @@
 add_library(galois_gluon STATIC)
 add_library(Galois::gluon ALIAS galois_gluon)
+set_target_properties(galois_gluon PROPERTIES EXPORT_NAME gluon)
 add_dependencies(lib galois_gluon)
 
 target_sources(galois_gluon PRIVATE
@@ -29,3 +30,21 @@ if (USE_LCI)
   target_link_libraries(galois_gluon ${LWCI_LIBRARY} -lpsm2)
   target_include_directories(galois_gluon PUBLIC ${LWCI_INCLUDE})
 endif()
+
+install(
+  DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(TARGETS galois_gluon
+  EXPORT GaloisTargets
+  LIBRARY
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT shlib
+  ARCHIVE
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
