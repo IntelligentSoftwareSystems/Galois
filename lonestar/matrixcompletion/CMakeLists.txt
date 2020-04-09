@@ -7,7 +7,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
   target_compile_options(matrixCompletion PRIVATE -ffast-math)
 endif()
 
-find_package(Eigen)
+find_package(Eigen CONFIG)
 if(Eigen_FOUND)
   target_link_libraries(matrixCompletion Eigen3::Eigen)
   target_compile_definitions(matrixCompletion PRIVATE -DHAS_EIGEN -DEIGEN_DONT_PARALLELIZE)
