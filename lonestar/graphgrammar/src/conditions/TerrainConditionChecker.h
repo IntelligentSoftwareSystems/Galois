@@ -4,7 +4,7 @@
 #include <values.h>
 #include <cmath>
 #include "../utils/ConnectivityManager.h"
-#include "../utils/utils.h"
+#include "../utils/GaloisUtils.h"
 #include "../model/Map.h"
 #include "../model/ProductionState.h"
 #include "../libmgrs/utm.h"

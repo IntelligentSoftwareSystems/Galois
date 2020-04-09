@@ -3,7 +3,7 @@
 
 #include "Production.h"
 #include "../utils/ConnectivityManager.h"
-#include "../utils/utils.h"
+#include "../utils/GaloisUtils.h"
 
 class Production1 : public Production {
 private:

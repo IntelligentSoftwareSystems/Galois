@@ -2,7 +2,7 @@
 #define GALOIS_COORDINATES_H
 
 #include <ostream>
-#include "../utils/utils.h"
+#include "../utils/GaloisUtils.h"
 #include "Map.h"
 
 /**
