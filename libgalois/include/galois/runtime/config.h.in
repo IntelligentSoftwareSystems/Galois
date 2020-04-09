@@ -1,0 +1,6 @@
+#ifndef GALOIS_RUNTIME_CONFIG_H
+#define GALOIS_RUNTIME_CONFIG_H
+
+#cmakedefine GALOIS_USE_LONGJMP_ABORT
+
+#endif

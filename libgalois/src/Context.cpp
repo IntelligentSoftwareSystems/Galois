@@ -20,6 +20,7 @@
 #include "galois/runtime/Context.h"
 #include "galois/substrate/SimpleLock.h"
 #include "galois/substrate/CacheLineStorage.h"
+#include "galois/runtime/config.h"
 
 #include <stdio.h>
 

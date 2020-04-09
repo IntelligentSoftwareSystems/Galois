@@ -26,6 +26,7 @@
 #include "galois/Timer.h"
 #include "galois/Threads.h"
 #include "galois/Traits.h"
+#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/ForEachTraits.h"

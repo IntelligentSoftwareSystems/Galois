@@ -26,6 +26,7 @@
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
 #include "galois/ParallelSTL.h"
+#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/ForEachTraits.h"

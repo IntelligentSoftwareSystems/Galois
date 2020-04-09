@@ -23,6 +23,7 @@
 #include "galois/MethodFlags.h"
 #include "galois/substrate/PtrLock.h"
 #include "galois/gIO.h"
+#include "galois/runtime/config.h"
 
 #include <boost/utility.hpp>
 

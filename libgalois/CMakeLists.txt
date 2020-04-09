@@ -4,6 +4,8 @@ set_target_properties(galois_shmem PROPERTIES EXPORT_NAME shmem)
 add_dependencies(lib galois_shmem)
 
 configure_file(src/Version.cpp.in Version.cpp @ONLY)
+configure_file(include/galois/runtime/config.h.in include/galois/runtime/config.h)
+
 set(sources
         src/SharedMemSys.cpp
         src/Context.cpp
@@ -100,6 +102,13 @@ endif()
 
 install(
   DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/
   DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h"

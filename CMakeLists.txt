@@ -242,7 +242,7 @@ if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
 endif()
 
 if(USE_LONGJMP_ABORT)
-  add_definitions(-DGALOIS_USE_LONGJMP_ABORT)
+  set(GALOIS_USE_LONGJMP_ABORT ON)
 endif()
 
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
