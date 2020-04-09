@@ -197,47 +197,6 @@ if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
 
-if(ENABLE_DIST_GALOIS)
-  add_definitions(-DGALOIS_USE_DIST)
-  find_package(MPI REQUIRED) # required even if USE_LCI
-
-  if (USE_LCI)
-    add_definitions(-DGALOIS_USE_LWCI)
-    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
-    set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-    set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
-    add_custom_command(
-      OUTPUT ${LWCI_LIBRARY}
-      COMMAND make -C ${LWCI_ROOT}
-    )
-    add_custom_target(lci DEPENDS ${LWCI_LIBRARY})
-  endif(USE_LCI)
-
-  if(ENABLE_HETERO_GALOIS)
-    enable_language(CUDA)
-
-    string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
-    string(REPLACE "," ";" GENCODES ${GENCODES})
-    foreach(GENCODE ${GENCODES})
-      add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
-    endforeach()
-
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
-
-    # MGPU v1.1
-    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu") # only required headers
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${MGPU_ROOT}/include>")
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${MGPU_ROOT}/include>")
-
-    # CUB v1.6.4
-    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/libgpu/cub") # only required headers
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CUB_ROOT}>")
-    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CUB_ROOT}>")
-
-  endif(ENABLE_HETERO_GALOIS)
-endif(ENABLE_DIST_GALOIS)
-
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
@@ -341,11 +300,11 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
+
 if(GRAPH_LOCATION)
   MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 else()
-  add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
   MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
@@ -463,41 +422,51 @@ endfunction(app)
 
 ###### Source finding ######
 
-add_subdirectory(libgalois)
+add_custom_target(lib)
+add_custom_target(apps)
 
-if(ENABLE_DIST_GALOIS)
+# Core libraries (lib)
+add_subdirectory(libgalois)
+if (ENABLE_DIST_GALOIS)
+  find_package(MPI REQUIRED)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
-  if(ENABLE_HETERO_GALOIS)
-    add_subdirectory(libgpu)
-  endif(ENABLE_HETERO_GALOIS)
-endif(ENABLE_DIST_GALOIS)
+endif()
+if (ENABLE_HETERO_GALOIS)
+  enable_language(CUDA)
+  string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
+  string(REPLACE "," ";" GENCODES ${GENCODES})
+  foreach(GENCODE ${GENCODES})
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
+  endforeach()
 
-add_subdirectory(tools)
-add_subdirectory(scripts)
-
-if(NOT SKIP_COMPILE_APPS)
-  add_subdirectory(lonestar)
-  if(ENABLE_DIST_GALOIS)
-    add_subdirectory(lonestardist)
-  endif(ENABLE_DIST_GALOIS)
-  add_subdirectory(test)
-#  add_subdirectory(toolkit_ml)
-
-  if(USE_DIST_EXP)
-    if(ENABLE_DIST_GALOIS)
-      add_subdirectory(lonestardist/experimental)
-      add_subdirectory(lonestardist/experimental/resilience)
-      add_subdirectory(lonestardist/experimental/on_demand)
-    endif(ENABLE_DIST_GALOIS)
-  endif(USE_DIST_EXP)
-  if(USE_EXP)
-    add_subdirectory(lonestar/experimental)
-  endif(USE_EXP)
+  add_subdirectory(libgpu)
 endif()
 
+# Applications (apps)
+add_subdirectory(lonestar)
+if (ENABLE_DIST_GALOIS)
+  add_subdirectory(lonestardist)
+endif()
+
+add_subdirectory(scripts)
+add_subdirectory(test)
+add_subdirectory(inputs)
+add_subdirectory(tools)
+
+if(USE_DIST_EXP)
+  add_subdirectory(lonestardist/experimental)
+  add_subdirectory(lonestardist/experimental/resilience)
+  add_subdirectory(lonestardist/experimental/on_demand)
+endif()
+
+if(USE_EXP)
+  add_subdirectory(lonestar/experimental)
+endif(USE_EXP)
+
 ###### Documentation ######
+
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
   #TODO: double check the list of directories here
@@ -546,5 +515,5 @@ configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake"
-  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
-install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT lib)
+install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT lib)
