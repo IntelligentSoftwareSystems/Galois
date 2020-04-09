@@ -12,7 +12,7 @@ set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERS
 set(GALOIS_COPYRIGHT_YEAR "2018") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "No build type selected, default to release")
+  message(STATUS "No build type selected, default to Release")
   # cmake default flags with relwithdebinfo is -O2 -g
   # cmake default flags with release is -O3 -DNDEBUG
   set(CMAKE_BUILD_TYPE "Release")
