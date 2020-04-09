@@ -18,12 +18,17 @@ jobs:
       - run: |
           apt-get -q update -y
           apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          # Run tests as non-root otherwise MPI will complain
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -36,14 +41,17 @@ jobs:
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
 
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin
+          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin ssh
 
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-gcc":
     docker:
       - image: centos:8
@@ -57,17 +65,21 @@ jobs:
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
           module load mpi
 
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          useradd runner
+          mkdir -p build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-clang":
     docker:
       - image: centos:8
@@ -77,22 +89,25 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make boost-devel cmake eigen3-devel openmpi-devel wget
+          yum -y -q install zlib-devel make boost-devel eigen3-devel openmpi-devel wget
           yum module -y -q install llvm-toolset
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
+
+          useradd runner
+          mkdir -p /tmp/build
 
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
           module load mpi
-
-          mkdir build
-          cd build
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-clang-libc++":
     docker:
       - image: centos:8
@@ -102,20 +117,27 @@ jobs:
           # Note: gcc required to get libgcc and glibc-devel even though we're using clang.
           yum -y -q install zlib-devel make wget bzip2 gcc
 
+          wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
+
           # Use miniconda to get all remaining needed packages
           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          conda install --update-specs -y -q -c conda-forge make cmake>=3.13 boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen openmpi
-          mkdir build
-          cd build
-          # Dist Galois currently doesn't build when llvm headers are installed, so don't include it in this build.
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
-          make input
-          make -j2
-          make test || :
+          conda install --update-specs -y -q -c conda-forge boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen openmpi
+
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX"
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Arch":
     docker:
       - image: archlinux/base
@@ -124,29 +146,34 @@ jobs:
       - run: |
           pacman -Sy
           pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Alpine":
     docker:
       - image: alpine:latest
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress gcc musl-dev g++ make cmake boost-dev zlib-dev eigen
-          mkdir build
-          cd build
-          # Make sure we can build with ENABLE_DIST not set to ON.
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
-          make input
-          make -j4
-          make test || :
+          apk add --no-cache --no-progress gcc musl-dev g++ make cmake boost-dev zlib-dev eigen openssh-client
+          apk add --no-cache --no-progress --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ openmpi-dev
 
+          adduser -D runner
+          mkdir -p /tmp/build
 
-          mkdir build
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-gcc":
     docker:
       - image: fedora:latest
@@ -155,14 +182,18 @@ jobs:
       - run: |
           yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel mpich-devel
           # Get the "module" function set up before loading MPI.
+
+          useradd runner
+          mkdir -p /tmp/build
+
           . /etc/bashrc
           module load mpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-clang":
     docker:
       - image: fedora:latest
@@ -174,14 +205,18 @@ jobs:
           # command line programs. That configuration needs to be tested.
           yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel openmpi-devel
           # Get the "module" function set up before loading MPI.
+
+          useradd runner
+          mkdir -p /tmp/build
+
           . /etc/bashrc
           module load mpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          make -C /tmp/build input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
  
 workflows:
   version: 2
