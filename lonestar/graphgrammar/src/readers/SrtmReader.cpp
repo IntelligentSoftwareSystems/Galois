@@ -147,8 +147,8 @@ void SrtmReader::read_from_file(int north_border_int, int west_border_int,
 void SrtmReader::skip_outliers(double* const* map_data, size_t length,
                                size_t width) {
   bool outlierFound = false;
-  for (int i = 0; i < length; ++i) {
-    for (int j = 0; j < width; ++j) {
+  for (size_t i = 0; i < length; ++i) {
+    for (size_t j = 0; j < width; ++j) {
       // smooth out outlier point here
       if (map_data[i][j] > 3000 || map_data[i][j] < 10) {
         outlierFound = true;

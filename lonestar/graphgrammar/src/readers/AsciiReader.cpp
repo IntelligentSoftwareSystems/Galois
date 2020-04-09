@@ -80,7 +80,7 @@ Map* AsciiReader::read(const std::string filename) {
   const double xMin     = dtm_data[2];
   const double yMin     = dtm_data[3];
   const double cellSize = dtm_data[4];
-  const double noData   = dtm_data[5];
+  //const double noData   = dtm_data[5];
 
   const size_t numOfPoints = nCols * nRows;
 
@@ -126,7 +126,7 @@ Map* AsciiReader::read(const std::string filename) {
 
   Map* map = convert(coords, nRows, nCols);
 
-  for (int k = 0; k < numOfPoints; ++k) {
+  for (size_t k = 0; k < numOfPoints; ++k) {
     free(coords[k]);
   }
   free(coords);

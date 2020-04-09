@@ -18,8 +18,8 @@ double** Map::init_map_data(size_t rows, size_t cols) {
 }
 
 void Map::print_map() {
-  for (int i = 0; i < this->length; ++i) {
-    for (int j = 0; j < this->width; ++j) {
+  for (size_t i = 0; i < this->length; ++i) {
+    for (size_t j = 0; j < this->width; ++j) {
       fprintf(stdout, "%5.0lf ", this->data[i][j]);
     }
     fprintf(stdout, "\n");
