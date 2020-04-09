@@ -165,18 +165,18 @@ public:
 		local_graph.set_degree(level, dst, 0);
 	}
 	void update_egonet(unsigned level);
-	inline VertexId getEdgeDst(VertexId vid) const { return getEdgeDstImpl<use_local_graph>(vid); }
+	inline VertexId getEdgeDst(EdgeId eid) const { return getEdgeDstImpl<use_local_graph>(eid); }
 	inline EdgeId edge_begin(unsigned level, VertexId vid) { return edge_begin_impl<use_local_graph>(level, vid); }
 	inline EdgeId edge_end(unsigned level, VertexId vid) { return edge_end_impl<use_local_graph>(level, vid); }
 
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
-	inline VertexId getEdgeDstImpl(VertexId vid) const {
-		return local_graph.getEdgeDst(vid);
+	inline VertexId getEdgeDstImpl(EdgeId eid) const {
+		return local_graph.getEdgeDst(eid);
 	}
 
 	template <bool en, typename std::enable_if<!en>::type* = nullptr>
-	inline GNode getEdgeDstImpl(VertexId vid) const {
-		return global_graph->getEdgeDst(vid);
+	inline GNode getEdgeDstImpl(EdgeId eid) const {
+		return global_graph->getEdgeDst(eid);
 	}
 
 	template <bool en, typename std::enable_if<en>::type* = nullptr>
