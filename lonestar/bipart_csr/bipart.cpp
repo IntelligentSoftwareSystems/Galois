@@ -253,7 +253,7 @@ int main(int argc, char** argv) {
   graph.hnodes = nodes;
   std::cout<<"number of edges "<<edges<<"\n";
   uint32_t sizes = hedges+nodes;
-  galois::do_all(galois::iterate((uint32_t)0, sizes),
+  galois::do_all(galois::iterate(uint32_t{0}, sizes),
                 [&](uint32_t c){
                   prefix_edges[c] = edges_id[c].size();
                 });
