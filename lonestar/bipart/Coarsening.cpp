@@ -92,14 +92,10 @@ int hash(unsigned val) {
 void parallelRand(MetisGraph* graph, int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  unsigned x = iter % 2;
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
-      unsigned id = fineGGraph->getData(item).netrand;
-      unsigned idx = fineGGraph->getData(item).netnum;
-      if (idx % 2 == x)
-          fineGGraph->getData(item).netrand = hash(id);
+          fineGGraph->getData(item).netrand = hash(fineGGraph->getData(item).netnum);
       },
       galois::loopname("rand"));
 }
@@ -230,7 +226,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
          
-        unsigned id = fineGGraph->getData(item).netnum;
+       /* unsigned id = fineGGraph->getData(item).netnum;
         if (fmod(id, pow(2,iter)) <= pow(2,(iter - 1)) - 1) { //final
            // leave the hedges
             GNode netN;
@@ -245,7 +241,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
             fineGGraph->getData(item).setParent(netN);
             fineGGraph->getData(item).setMatched();
           return;
-        }
+        }*/
         bool flag = false;
         auto& edges = *edgesThreadLocal.getLocal();
         edges.clear();
@@ -561,12 +557,14 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
   unsigned newSize = size;
   while (size > coarsenTo) { 
     if (iterNum > coarsenTo) break;
-    //if (Size - newSize <= 0 && iterNum > 2) break; //final
+    if (size - newSize <= 0 && iterNum > 2) break; //final
+     size = newSize;
      coarseGraph      = coarsenOnce(coarseGraph, sch, iterNum);
       newSize = std::distance(coarseGraph->getGraph()->cellList().begin(), coarseGraph->getGraph()->cellList().end());
       if (newSize < coarsenTo)break;
-      //int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
-     //std::cout<<"SIZE IS "<<newSize<<"\n";// and net is "<<netsize<<"\n";
+      int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
+     std::cout<<"SIZE IS "<<newSize<<" and net is "<<netsize<<"\n";
+     if (netsize < 1000) return coarseGraph->getFinerGraph();
     ++iterNum;
     
   }
