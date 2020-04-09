@@ -220,8 +220,8 @@ if(ENABLE_DIST_GALOIS)
 
     string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
     string(REPLACE "," ";" GENCODES ${GENCODES})
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>")
     foreach(GENCODE ${GENCODES})
-      #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --expt-extended-lambda -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
       add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
     endforeach()
 
