@@ -1,5 +1,4 @@
-dist: xenial
-sudo: false
+dist: bionic
 
 language: c++
 
@@ -18,8 +17,7 @@ matrix:
         - export CXX=clang++
         - brew install openmpi
         - mkdir build
-        - pushd build
-        - cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+        - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON || exit 1
     - env:
         - GCC_VER=7
       addons:
@@ -264,14 +262,13 @@ before_script:
       export BUILD_TYPE=Release
     fi
   - mkdir build
-  - pushd build
   # Use apt-installed cmake rather than travis-provided one (/usr/local/cmake-3.12.4/bin/cmake).
-  - /usr/bin/cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+  - /usr/bin/cmake -S . -B build -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_DIST_GALOIS=ON || exit 1
 
 script:
-  - make input
-  - make -j2 || exit 1
-  - make test || true
+  - make -C build input
+  - cmake --build build --parallel 2 || exit 1
+  - (cd build && ctest -V --parallel 2 --label-regex quick) || exit 1
 
 notifications:
   email: false
