@@ -22,7 +22,7 @@
 #ifndef GALOIS_DIST_GALOIS_H
 #define GALOIS_DIST_GALOIS_H
 
-#include "galois/runtime/Init.h"
+#include "galois/runtime/SharedMem.h"
 #include "galois/runtime/DistStats.h"
 
 #include <string>
@@ -39,12 +39,18 @@ namespace galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class DistMemSys : public runtime::SharedMemRuntime<runtime::DistStatManager> {
+class DistMemSys : public runtime::SharedMem<runtime::DistStatManager> {
 
 public:
-  explicit DistMemSys(void);
+  explicit DistMemSys();
 
-  ~DistMemSys(void);
+  ~DistMemSys();
+
+  DistMemSys(const DistMemSys&) = delete;
+  DistMemSys& operator=(const DistMemSys&) = delete;
+
+  DistMemSys(DistMemSys&&) = delete;
+  DistMemSys& operator=(DistMemSys&&) = delete;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -81,8 +81,10 @@ class LazyObject {
     CharData buf;
     T value_;
 
-    Data() {}
-    ~Data() {}
+    // Declare constructor explicitly because Data must be default
+    // constructable regardless of the constructability of T.
+    Data() {} // NOLINT(modernize-use-equals-default)
+    ~Data() {} // NOLINT(modernize-use-equals-default)
 
     T& value() { return value_; }
     const T& value() const { return value_; }

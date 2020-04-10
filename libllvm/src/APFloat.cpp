@@ -527,13 +527,13 @@ static char* writeUnsignedDecimal(char* dst, unsigned int n) {
   char buff[40], *p;
 
   p = buff;
-  do
+  do {
     *p++ = '0' + n % 10;
-  while (n /= 10);
+  } while ((n /= 10) != 0);
 
-  do
+  do {
     *dst++ = *--p;
-  while (p != buff);
+  } while (p != buff);
 
   return dst;
 }

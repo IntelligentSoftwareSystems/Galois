@@ -470,12 +470,12 @@ struct EdgeTiledPrioAlgo {
             for (; beg + EDGE_TILE_SIZE < end;) {
               auto ne = beg + EDGE_TILE_SIZE;
               assert(ne < end);
-              works.push_back(EdgeTile{src, beg, ne});
+              works.push_back(EdgeTile{src, beg, ne, false});
               beg = ne;
             }
           }
           if ((end - beg) > 0) {
-            works.push_back(EdgeTile{src, beg, end});
+            works.push_back(EdgeTile{src, beg, end, false});
           }
         },
         galois::loopname("init-prio"), galois::steal());
@@ -549,8 +549,8 @@ struct EdgeTiledPrioAlgo {
           [&](const GNode& src) {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
-            if ((nodedata.flag & (unsigned char)0x01)) { // undecided
-              if (nodedata.flag & (unsigned char)0x02) { // temporary yes
+            if ((nodedata.flag & (unsigned char)0x01) != 0) { // undecided
+              if ((nodedata.flag & (unsigned char)0x02) != 0) { // temporary yes
                 nodedata.flag =
                     (unsigned char)0xfe; // 0x1111 1110, permanent yes
                 for (auto edge :

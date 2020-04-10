@@ -31,10 +31,7 @@
 #include <cassert>
 #include <cstdlib>
 
-namespace galois {
-namespace substrate {
-
-namespace internal {
+namespace galois::substrate::internal {
 
 template <typename tpl, int s, int r>
 struct ExecuteTupleImpl {
@@ -49,10 +46,13 @@ struct ExecuteTupleImpl<tpl, s, 0> {
   static inline void execute(tpl& f) {}
 };
 
-} // namespace internal
+}  // namespace galois::substrate::internal
+
+
+namespace galois::substrate {
 
 class ThreadPool {
-  friend class SharedMemSubstrate;
+  friend class SharedMem;
 
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
@@ -131,6 +131,12 @@ protected:
 public:
   ~ThreadPool();
 
+  ThreadPool(const ThreadPool&) = delete;
+  ThreadPool& operator=(const ThreadPool&) = delete;
+
+  ThreadPool(ThreadPool&&) = delete;
+  ThreadPool& operator=(ThreadPool&&) = delete;
+
   //! execute work on all threads
   //! a simple wrapper for run
   template <typename... Args>
@@ -206,16 +212,17 @@ public:
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 };
 
-namespace internal {
-void setThreadPool(ThreadPool* tp);
-}
-
 /**
  * return a reference to system thread pool
  */
 ThreadPool& getThreadPool(void);
 
-} // namespace substrate
-} // namespace galois
+}  // namespace galois::substrate
+
+namespace galois::substrate::internal {
+
+void setThreadPool(ThreadPool* tp);
+
+}  // namespace galois::substrate::internal
 
 #endif

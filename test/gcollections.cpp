@@ -79,7 +79,7 @@ struct Heap<C, true> {
 };
 
 template <typename C>
-void testBasic(std::string prefix, C&& collection, size_t N) {
+void testBasic(std::string prefix, C&& collection, int N) {
   Heap<C, needs_heap<C>(0)> heap;
 
   assert(N > 0);
@@ -103,7 +103,7 @@ void testBasic(std::string prefix, C&& collection, size_t N) {
 }
 
 template <typename C>
-void testNormal(std::string prefix, C&& collection, size_t N) {
+void testNormal(std::string prefix, C&& collection, int N) {
   Heap<C, needs_heap<C>(0)> heap;
 
   assert(N > 0);
@@ -121,17 +121,17 @@ void testNormal(std::string prefix, C&& collection, size_t N) {
     GALOIS_ASSERT(*it == i, prefix);
   }
 
-  GALOIS_ASSERT(c.size() == N, prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == N, prefix);
 
-  GALOIS_ASSERT(c.size() == std::distance(c.begin(), c.end()), prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()), prefix);
 
   i = N - 1;
   for (; !c.empty(); --i, removeFromCollection(c)) {
     GALOIS_ASSERT(c.back() == i, prefix);
   }
 
-  GALOIS_ASSERT(c.size() == 0, prefix);
-  GALOIS_ASSERT(c.size() == std::distance(c.begin(), c.end()), prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == 0, prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()), prefix);
 }
 
 template <typename C>

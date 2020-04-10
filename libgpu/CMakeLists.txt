@@ -2,12 +2,8 @@ set(sources
   src/csr_graph.cu
   src/ggc_rt.cu
 )
-cuda_add_library(galois_gpu
-  ${sources}
-  OPTIONS -D_FORCE_INLINES
-)
-
-set_target_properties (galois_gpu PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
+add_library(galois_gpu ${sources})
+target_compile_definitions(galois_gpu PRIVATE _FORCE_INLINES)
+target_include_directories(galois_gpu PRIVATE moderngpu)
+target_include_directories(galois_gpu PUBLIC include)
+set_property(TARGET galois_gpu PROPERTY CUDA_STANDARD 14)

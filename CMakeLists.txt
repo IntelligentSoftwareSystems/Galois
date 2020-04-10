@@ -1,21 +1,15 @@
-cmake_minimum_required(VERSION 3.2.0)
-
-include(GNUInstallDirs)
+cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
+
+include(GNUInstallDirs)
+
 set(GALOIS_VERSION_MAJOR "5")
 set(GALOIS_VERSION_MINOR "0")
 set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 set(GALOIS_COPYRIGHT_YEAR "2018") # Also in COPYRIGHT
-
-#adding additional compiler flags for mpip profiling
-#set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
-#set(MPIP_DIR "/net/ohm/export/cdgc/gill/modules/mpip/lib")
-#set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
-#link_directories(LIBUNWIND_DIR MPIP_DIR)
-
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release")
@@ -47,18 +41,21 @@ set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Gal
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(USE_PANGOLIN OFF CACHE BOOL "Install pangolin apps as well as library")
 set(USE_GPU OFF CACHE BOOL "Build Galois with GPU support")
+set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
+set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
+set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
+
+# This option is automatically handled by CMake.
+# It makes add_library build a shared lib unless STATIC is explicitly specified.
+# Putting this here is mostly just a placeholder so people know it's an option.
+# Currently this is really only intended to change anything for the libgalois_shmem target.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 
 if(WIN32 AND NOT CYGWIN)
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
 else()
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/CMake/Galois")
 endif()
-
-# This option is automatically handled by CMake.
-# It makes add_library build a shared lib unless STATIC is explicitly specified.
-# Putting this here is mostly just a placeholder so people know it's an option.
-# Currently this is really only intended to change anything for the libgalois_shmem target.
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries.")
 
 set(INSTALL_CMAKE_DIR "${DEFAULT_INSTALL_CMAKE_DIR}" CACHE PATH "Installation directory for CMake files")
 # Make relative path absolute
@@ -79,99 +76,115 @@ set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
 # Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
 set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
-set(NUM_TEST_THREADS "" CACHE STRING "Number of threads to use for running the tests.")
+
+set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
+
+if(NOT NUM_TEST_THREADS)
+  cmake_host_system_information(RESULT NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
+endif()
+if(NUM_TEST_THREADS LESS_EQUAL 0)
+  set(NUM_TEST_THREADS 1)
+endif()
+
+if(ENABLE_HETERO_GALOIS)
+  set(USE_ARCH none)
+endif()
 
 ###### Configure (users don't need to go beyond here) ######
 
-enable_testing()
+# Enable testing and ctest integration
+include(CTest)
 
 ###### Configure compiler ######
-
-#Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
-
-# Some apps break with -O3 on recent clang versions.
-# Tracking that down is a work in progress, so for the current release,
-# only use -O2 with clang.
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-endif()
 
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT "$ENV{GCC_BIN}" STREQUAL "")
-  # Preserve captured environment variable during reconfiguration
-  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
-endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# ICC
-if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE ICC_VERSION)
-  if(ICC_VERSION VERSION_LESS 16.0)
-    message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
-  endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
+# Always include debug info and aggressive warnings
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
 
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+# GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
+
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
+    # GCC-{6,7} is a too imprecise
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-but-set-variable>")
+  elseif(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+    # Avoid warnings from boost::counting_iterator
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+    # Avoid warnings from openmpi
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  endif()
+
+  # Removing unused parameters conflicts with readability rules
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 # Clang
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if(CXX_TOOLCHAIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
-  else()
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+    message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+  
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+    # Avoid warnings from boost::counting_iterator
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+  endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+endif()
+
+# ICC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.1)
+    message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
+  endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
 endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
-endif()
-
-# check for incompatible GCC
-if(CMAKE_COMPILER_IS_GNUCC)
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                  OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 5.2)
-    message(FATAL_ERROR "GCC must be 5.2 or higher")
-  endif()
+  add_definitions(-U__STRICT_ANSI__)
 endif()
 
 # Enable architecture-specific optimizations
-if(NOT ENABLE_HETERO_GALOIS)
-  find_package(ArchFlags)
-  if(ARCH_FLAGS_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
-  endif()
+include(CheckArchFlags)
+if(ARCH_FLAGS_FOUND)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
+  add_link_options(${ARCH_LINK_FLAGS})
 endif()
 
 # GNU profiling
 if(USE_GPROF)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+  add_compile_options(-pg)
+  add_link_options(-pg)
 endif(USE_GPROF)
 
 if(USE_SANITIZER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
-
-###### Configure features ######
+if(CXX_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY ${CXX_CLANG_TIDY} "-header-filter=.*${CMAKE_SOURCE_DIR}.*")
+  # Ignore warning flags intended for the CXX program. This only works because
+  # the two compilers we care about, clang and gcc, both understand
+  # -Wno-unknown-warning-option.
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unknown-warning-option>")
+endif()
 
 add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
 add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
@@ -179,21 +192,20 @@ add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
+###### Configure features ######
 
 # Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
+
 if(ENABLE_DIST_GALOIS)
   add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED) # required even if USE_LCI
-  set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS}")
-  set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS}")
-  include_directories(${MPI_INCLUDE_PATH})
 
   if (USE_LCI)
     add_definitions(-DGALOIS_USE_LWCI)
-    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
+    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/external/lci")
     set(LWCI_INCLUDE "${LWCI_ROOT}/include")
     set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
     add_custom_command(
@@ -204,29 +216,28 @@ if(ENABLE_DIST_GALOIS)
   endif(USE_LCI)
 
   if(ENABLE_HETERO_GALOIS)
-    SET(CUDA_SEPARABLE_COMPILATION ON)
-    find_package(CUDA REQUIRED)
-    set(CUDA_PROPAGATE_HOST_FLAGS off)
-    set(CUDA_SEPARABLE_COMPILATION on)
-    set(CUDA_HOST_COMPILER g++)
+    enable_language(CUDA)
 
     string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
     string(REPLACE "," ";" GENCODES ${GENCODES})
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>")
     foreach(GENCODE ${GENCODES})
-      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --expt-extended-lambda -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
+      add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
     endforeach()
 
-    cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CMAKE_SOURCE_DIR}/libgpu/include>")
 
     # MGPU v1.1
-    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
-    cuda_include_directories("${MGPU_ROOT}/src")
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/external/moderngpu") # only required headers
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${MGPU_ROOT}/src>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${MGPU_ROOT}/src>")
 
     # CUB v1.6.4
-    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
-    cuda_include_directories("${CUB_ROOT}")
+    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/external/cub") # only required headers
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:${CUB_ROOT}>")
+    include_directories("$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${CUB_ROOT}>")
 
-    #find_package(OpenCL REQUIRED)
   endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
 
@@ -243,8 +254,8 @@ if(USE_EXP)
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
   endif()
 
   find_package(TBB)
@@ -267,8 +278,8 @@ if(USE_EXP)
   endif()
 
   if(USE_HTM)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qtm -qsmp=speculative")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
+      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
       set(GALOIS_USE_HTM on)
       set(GALOIS_USE_SEQ_ONLY on)
       set(USE_LONGJMP_ABORT on)
@@ -325,13 +336,11 @@ endif()
 
 # Boost
 set(Boost_ADDITIONAL_VERSIONS "1.58.0" "1.60.0" "1.61.0" "1.62.0")
-set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
-include_directories(${Boost_INCLUDE_DIR})
-add_definitions(-DBOOST_NO_AUTO_PTR)
+include_directories(${Boost_INCLUDE_DIRS})
 
 include(CheckEndian)
 
@@ -341,69 +350,86 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
-if(GRAPH_LOCATION AND EXISTS "${GRAPH_LOCATION}")
-  MESSAGE(STATUS "USING graph location ${GRAPH_LOCATION}")
-  set(BASEINPUT "${GRAPH_LOCATION}")
-elseif(EXISTS /net/ohm/export/iss/inputs)
-  set(BASEINPUT /net/ohm/export/iss/inputs)
-  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
+if(GRAPH_LOCATION)
+  MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
+  set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/small_inputs)
-  MESSAGE(STATUS "use make input to download inputs in the build directory")
-endif()
-
-###### Test Outputs ######
-if(EXISTS /net/ohm/export/iss/dist-outputs)
-  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
-elseif(EXISTS /net/ohm/export/cdgc/dist-outputs)
-  set(BASEOUTPUT /net/ohm/export/cdgc/dist-outputs)
-elseif(EXISTS /workspace/dist-outputs)
-  set(BASEOUTPUT /workspace/dist-outputs)
+  MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 
 ###### Global Functions ######
 
-function(add_internal_library name)
-  add_library(${name} OBJECT ${ARGN})
-endfunction()
-
 function(add_test_scale type app)
-  if(NUM_TEST_THREADS)
-    set(N ${NUM_TEST_THREADS})
-  else()
-    cmake_host_system_information(RESULT N QUERY NUMBER_OF_PHYSICAL_CORES)
+  set(options NOT_QUICK)
+  set(one_value_args)
+  set(multi_value_args REQUIRES COMMAND_PREFIX)
+  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+  set(threads)
+  set(thr 1)
+  while (${thr} LESS ${NUM_TEST_THREADS})
+    list(APPEND threads ${thr})
+    math(EXPR thr "${thr} * 2")
+  endwhile()
+  if (NOT ${thr} EQUAL ${NUM_TEST_THREADS})
+    list(APPEND threads ${NUM_TEST_THREADS})
   endif()
-  if (N EQUAL 0)
-    set(N 1)
-  endif()
-  if (N LESS 8)
-    foreach(thr RANGE 1 ${N})
-      add_test(test-${type}-${app}-${thr} ${app} ${ARGN} -t ${thr})
-    endforeach(thr)
-  else()
-    foreach(part RANGE 1 8)
-      math(EXPR thr "(${N} * ${part})/ 8")
-      if ((part EQUAL 1) AND NOT (thr EQUAL 1))
-        add_test(test-${type}-${app}-1 ${app} ${ARGN} -t 1)
-      endif()
-      add_test(test-${type}-${app}-${thr} ${app} ${ARGN} -t ${thr})
-    endforeach(part)
-  endif()
+
+  foreach (thr ${threads})
+    set(name run-${type}-${app}-${thr})
+    add_test(NAME ${name} COMMAND ${app} ${X_UNPARSED_ARGUMENTS} -t ${thr})
+    if (NOT ${X_NOT_QUICK})
+      # Allow parallel tests
+      set_tests_properties(${name}
+        PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
+    endif()
+  endforeach()
 endfunction(add_test_scale)
 
-function(compileApp name)
-  if(ARGN)
-    set(Sources ${ARGN})
-  else()
-    file(GLOB Sources *.cpp)
-  endif()
-  add_executable(${name} ${Sources})
-endfunction(compileApp)
+function(add_test_unit)
+  set(options)
+  set(one_value_args ADD_TARGET)
+  set(multi_value_args REQUIRES COMMAND_PREFIX)
+  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
-function(linkApp name extlibs)
-  if (NOT extlibs STREQUAL "")
-    target_link_libraries(${name} ${extlibs})
+  if(NOT ${APP_ADD_TARGET})
+    message(FATAL_ERROR "Missing required option ADD_TARGET to add_test_unit")
+  endif()
+
+  foreach(required ${X_REQUIRES})
+    if(${${required}} MATCHES "TRUE")
+    else()
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+
+  set(name ${X_ADD_TARGET})
+  set(test_name unit-${name})
+
+  add_executable(${test_name} ${name}.cpp)
+  link_app(${test_name})
+
+  set(commandline ${X_COMMAND_PREFIX})
+  list(APPEND commandline "$<TARGET_FILE:${test_name}>")
+  list(APPEND commandline ${X_UNPARSED_ARGUMENTS})
+
+  add_test(NAME ${test_name} COMMAND ${commandline})
+
+  # Allow parallel tests
+  set_tests_properties(${test_name}
+    PROPERTIES
+      ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1
+      LABELS quick
+    )
+endfunction()
+
+function(link_app name)
+  if (ARGN)
+    target_link_libraries(${name} ${ARGN})
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
@@ -418,15 +444,15 @@ function(linkApp name extlibs)
     target_link_libraries(${name} ${PAPI_LIBRARIES})
   endif()
 
-endfunction(linkApp)
+endfunction()
 
 # TODO: separate out shared and dist libraries to link
 # one way to go about it is to create two functions
 function(app name)
-  set(options DISTSAFE EXP_OPT)
-  set(oneValueArgs)
-  set(multiValueArgs REQUIRES EXTLIBS)
-  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  set(options)
+  set(one_value_args)
+  set(multi_value_args REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
@@ -436,63 +462,13 @@ function(app name)
     endif()
   endforeach()
 
-  compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
-  linkApp(${name} "${APP_EXTLIBS}")
+  add_executable(${name} ${APP_UNPARSED_ARGUMENTS})
+  link_app(${name} ${APP_EXTLIBS})
 
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
 endfunction(app)
-
-function(makeTest)
-  set(options DISTSAFE ADD_TARGET TARGET EXP_OPT)
-  set(oneValueArgs)
-  set(multiValueArgs REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-  list(GET APP_UNPARSED_ARGUMENTS 0 name)
-  list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
-
-  foreach(required ${APP_REQUIRES})
-    if(${${required}} MATCHES "TRUE")
-    else()
-      message(STATUS "NOT compiling ${name} (missing: ${required})")
-      return()
-    endif()
-  endforeach()
-
-  set(commandline)
-  foreach(f ${APP_COMMAND_PREFIX})
-    list(APPEND commandline ${f})
-  endforeach()
-
-  if(${APP_ADD_TARGET})
-    add_executable(test-${name} ${name}.cpp)
-    linkApp(test-${name} "")
-
-    list(APPEND commandline "$<TARGET_FILE:test-${name}>")
-  elseif(${APP_TARGET})
-    get_filename_component(base ${name} NAME)
-    if(TARGET ${base})
-      list(APPEND commandline "$<TARGET_FILE:${base}>")
-    else()
-      message(STATUS "NOT adding test ${name} (missing target: ${base})")
-      return()
-    endif()
-  else()
-    list(APPEND commandline ${name})
-  endif()
-
-  foreach(f ${APP_UNPARSED_ARGUMENTS})
-    list(APPEND commandline ${f})
-  endforeach()
-
-  add_test(NAME ${name} COMMAND ${commandline})
-
-  # Allow parallel tests
-  set_tests_properties(${name} PROPERTIES ENVIRONMENT
-    GALOIS_DO_NOT_BIND_THREADS=1)
-endfunction()
 
 ###### Source finding ######
 #include_directories(include)
@@ -557,18 +533,17 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-#export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-#export(PACKAGE Galois)
 
 # Galois compiler definitions
 set(galois_defs)
+set(galois_options)
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
 foreach(d ${defs})
-  set(galois_defs "-D${d} ${galois_defs}")
+  set(galois_defs "${galois_defs} -D${d}")
 endforeach()
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
 foreach(d ${defs})
-  set(galois_defs "-D${d} ${galois_defs}")
+  set(galois_defs "${galois_defs} -D${d}")
 endforeach()
 string(TOUPPER ${CMAKE_BUILD_TYPE} upper_build_type)
 set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_build_type}}")
@@ -578,13 +553,11 @@ file(RELATIVE_PATH PATH_FROM_INSTALLED_CMAKE_FILE_TO_PREFIX "${INSTALL_CMAKE_DIR
 
 # Generate appropriate CMake files for installation and build trees
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/GaloisConfig.cmake" @ONLY)
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
-  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake" @ONLY)
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake" @ONLY)
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
-  "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfigVersion.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)

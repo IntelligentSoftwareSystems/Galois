@@ -1,2 +1,2 @@
-app(GraphColoringDAG GraphColoringDAG.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP_OPT)
-app(GraphColoringLocking GraphColoringLocking.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP_OPT)
+app(GraphColoringDAG GraphColoringDAG.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND)
+app(GraphColoringLocking GraphColoringLocking.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND)

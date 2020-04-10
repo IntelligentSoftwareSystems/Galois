@@ -1,6 +1,6 @@
 add_subdirectory(cuda)
 include_directories(${CUDA_INCLUDE_DIRS} )
-app(bfs-push bfs_push.cpp DISTSAFE)
+app(bfs-push bfs_push.cpp)
 target_link_libraries(bfs-push hbfs_push_cuda cudadevrt OpenCL)
 #target_link_libraries(sssp_gen cuda OpenCL)
 add_custom_command(TARGET bfs-push POST_BUILD COMMAND ${CMAKE_COMMAND}

@@ -1,12 +1,12 @@
 [submodule "liblci"]
-	path = liblci
+	path = external/lci
 	url = https://github.com/uiuc-hpc/LC.git
 [submodule "bliss"]
 	path = bliss
 	url = https://github.com/chenxuhao/bliss.git
 [submodule "moderngpu"]
-	path = moderngpu
+	path = external/moderngpu
 	url = https://github.com/moderngpu/moderngpu.git
 [submodule "cub"]
-	path = cub
+	path = external/cub
 	url = https://github.com/NVlabs/cub.git

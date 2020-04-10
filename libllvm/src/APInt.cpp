@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
+#include <boost/config.hpp>
 using namespace llvm;
 
 /// A utility function for allocating memory, checking for allocation failures,
@@ -730,11 +731,14 @@ static inline uint32_t hashword(const uint64_t* k64, size_t length) {
   switch (length) { /* all the case statements fall through */
   case 3:
     c += k[2];
+    BOOST_FALLTHROUGH;
   case 2:
     b += k[1];
+    BOOST_FALLTHROUGH;
   case 1:
     a += k[0];
     final(a, b, c);
+    BOOST_FALLTHROUGH;
   case 0: /* case 0: nothing left to add */
     break;
   }

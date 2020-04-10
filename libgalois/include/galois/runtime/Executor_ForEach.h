@@ -165,7 +165,6 @@ protected:
   typedef typename WorkListTy::value_type value_type;
 
   struct ThreadLocalBasics {
-
     UserContextAccess<value_type> facing;
     FunctionTy function;
     SimpleRuntimeContext ctx;
@@ -180,6 +179,14 @@ protected:
 
     ThreadLocalData(FunctionTy fn, const char* ln)
         : ThreadLocalBasics(fn), LoopStat(ln) {}
+  };
+
+  // RunQueueState factors out state within runQueue iterations to protect it
+  // from being overwritten when using longjmp/setjmp.
+  template <typename WL>
+  struct RunQueueState {
+    unsigned int num = 0;
+    galois::optional<typename WL::value_type> item;
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -251,32 +258,35 @@ protected:
   }
 
   template <unsigned int limit, typename WL>
-  bool runQueue(ThreadLocalData& tld, WL& lwl) {
-    galois::optional<typename WL::value_type> p;
-    unsigned int num = 0;
+  void runQueueDispatch(ThreadLocalData& tld, WL& lwl, RunQueueState<WL>& s) {
 #ifdef GALOIS_USE_LONGJMP_ABORT
     if (setjmp(execFrame) == 0) {
-      while ((!limit || num < limit) && (p = lwl.pop())) {
-        ++num;
-        doProcess(aborted.value(*p), tld);
+      while ((!limit || s.num < limit) && (s.item = lwl.pop())) {
+        ++s.num;
+        doProcess(aborted.value(*s.item), tld);
       }
     } else {
       clearConflictLock();
-      abortIteration(*p, tld);
+      abortIteration(*s.item, tld);
     }
 #else
     try {
-      while ((!limit || num < limit) && (p = lwl.pop())) {
-        ++num;
-        doProcess(aborted.value(*p), tld);
+      while ((!limit || s.num < limit) && (s.item = lwl.pop())) {
+        ++s.num;
+        doProcess(aborted.value(*s.item), tld);
       }
     } catch (ConflictFlag const& flag) {
       clearConflictLock();
-      abortIteration(*p, tld);
+      abortIteration(*s.item, tld);
     }
 #endif
+  }
 
-    return (num > 0);
+  template <unsigned int limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl) {
+    RunQueueState<WL> s;
+    runQueueDispatch<limit>(tld, lwl, s);
+    return s.num > 0;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE

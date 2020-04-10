@@ -27,6 +27,9 @@
 #ifdef __GALOIS_HET_CUDA__
 #include "pagerank_pull_cuda.h"
 struct CUDA_Context* cuda_ctx;
+#else
+enum { CPU, GPU_CUDA };
+int personality = CPU;
 #endif
 
 #include <iostream>
@@ -95,19 +98,22 @@ struct ResetGraph {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       std::string impl_str("ResetGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       ResetGraph_allNodes_cuda(alpha, cuda_ctx);
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+        abort();
 #endif
+    } else if (personality == CPU) {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           ResetGraph{alpha, &_graph}, galois::no_stats(),
           galois::loopname(syncSubstrate->get_run_identifier("ResetGraph").c_str()));
+    }
   }
 
   void operator()(GNode src) const {
@@ -130,20 +136,23 @@ struct InitializeGraph {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+        abort();
 #endif
+    } else if (personality == CPU) {
       // doing a local do all because we are looping over edges
       galois::do_all(galois::iterate(nodesWithEdges), InitializeGraph{&_graph},
                      galois::steal(), galois::no_stats(),
                      galois::loopname(
                          syncSubstrate->get_run_identifier("InitializeGraph").c_str()));
+    }
 
     syncSubstrate->sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
@@ -181,8 +190,8 @@ struct PageRank_delta {
   void static go(Graph& _graph, DGTerminatorDetector& dga) {
     const auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       std::string impl_str("PageRank_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -190,13 +199,16 @@ struct PageRank_delta {
       PageRank_delta_allNodes_cuda(__retval, alpha, tolerance, cuda_ctx);
       dga += __retval;
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+        abort();
 #endif
-      galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()),
-                     PageRank_delta{alpha, tolerance, &_graph, dga},
-                     galois::no_stats(),
-                     galois::loopname(
-                         syncSubstrate->get_run_identifier("PageRank_delta").c_str()));
+    } else if (personality == CPU) {
+      galois::do_all(
+          galois::iterate(allNodes.begin(), allNodes.end()),
+          PageRank_delta{alpha, tolerance, &_graph, dga}, galois::no_stats(),
+          galois::loopname(
+              syncSubstrate->get_run_identifier("PageRank_delta").c_str()));
+    }
   }
 
   void operator()(GNode src) const {
@@ -242,19 +254,22 @@ struct PageRank {
       // reset residual on mirrors
       syncSubstrate->reset_mirrorField<Reduce_add_residual>();
 
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str("PageRank_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         PageRank_nodesWithEdges_cuda(cuda_ctx);
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
+      } else if (personality == CPU) {
         galois::do_all(
             galois::iterate(nodesWithEdges), PageRank{&_graph}, galois::steal(),
             galois::no_stats(),
             galois::loopname(syncSubstrate->get_run_identifier("PageRank").c_str()));
+      }
 
       syncSubstrate->sync<writeSource, readDestination, Reduce_add_residual,
                   Bitset_residual, async>("PageRank");
@@ -340,8 +355,8 @@ struct PageRankSanity {
     min_residual.reset();
     DGA_residual_over_tolerance.reset();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       float _max_value;
       float _min_value;
       float _sum_value;
@@ -359,9 +374,8 @@ struct PageRankSanity {
       max_residual.update(_max_residual);
       min_value.update(_min_value);
       min_residual.update(_min_residual);
-    } else
 #endif
-    {
+    } else {
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
                                      _graph.masterNodesRange().end()),
                      PageRankSanity(tolerance, &_graph, DGA_sum,
@@ -481,13 +495,14 @@ int main(int argc, char** argv) {
                        max_residual, min_residual);
 
     if ((run + 1) != numRuns) {
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         bitset_residual_reset_cuda(cuda_ctx);
         bitset_nout_reset_cuda(cuda_ctx);
-      } else
+#else
+        abort();
 #endif
-      {
+      } else {
         bitset_residual.reset();
         bitset_nout.reset();
       }
@@ -502,23 +517,23 @@ int main(int argc, char** argv) {
 
   // Verify
   if (verify) {
-#ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) {
-#endif
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
                                      (*hg).getData(*ii).value);
       }
-#ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
                                      get_node_value_cuda(cuda_ctx, *ii));
       }
-    }
+#else
+        abort();
 #endif
+    }
   }
 
   return 0;

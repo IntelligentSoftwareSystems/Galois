@@ -1,6 +1,6 @@
 add_subdirectory(cuda)
 include_directories(${CUDA_INCLUDE_DIRS} )
-app(sssp-push sssp_push.cpp DISTSAFE)
+app(sssp-push sssp_push.cpp)
 target_link_libraries(sssp-push sssp_cuda_push cudadevrt OpenCL)
 #target_link_libraries(sssp_gen cuda OpenCL)
 add_custom_command(TARGET sssp-push POST_BUILD COMMAND

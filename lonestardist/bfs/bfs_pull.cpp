@@ -29,6 +29,9 @@
 #ifdef __GALOIS_HET_CUDA__
 #include "bfs_pull_cuda.h"
 struct CUDA_Context* cuda_ctx;
+#else
+enum { CPU, GPU_CUDA };
+int personality = CPU;
 #endif
 
 constexpr static const char* const regionname = "BFS";
@@ -91,16 +94,17 @@ struct InitializeGraph {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+      abort();
 #endif
-    {
+    } else if (personality == CPU) {
       galois::do_all(galois::iterate(allNodes),
                      InitializeGraph(src_node, infinity, &_graph),
                      galois::no_stats(),
@@ -135,8 +139,8 @@ struct BFS {
     do {
       syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str("BFS_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
@@ -144,9 +148,10 @@ struct BFS {
         BFS_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-      {
+      } else if (personality == CPU) {
         galois::do_all(
             galois::iterate(nodesWithEdges), BFS(&_graph, dga),
             galois::no_stats(), galois::steal(),
@@ -209,16 +214,17 @@ struct BFSSanityCheck {
     dgas.reset();
     dgm.reset();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       uint64_t sum;
       uint32_t max;
       BFSSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
       dgas += sum;
       dgm.update(max);
-    } else
+#else
+      abort();
 #endif
-    {
+    } else {
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
                                      _graph.masterNodesRange().end()),
                      BFSSanityCheck(infinity, &_graph, dgas, dgm),
@@ -306,12 +312,15 @@ int main(int argc, char** argv) {
     BFSSanityCheck::go(*hg, DGAccumulator_sum, m);
 
     if ((run + 1) != numRuns) {
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         bitset_dist_current_reset_cuda(cuda_ctx);
-      } else
+#else
+        abort();
 #endif
+      } else {
         bitset_dist_current.reset();
+      }
 
       (*syncSubstrate).set_num_run(run + 1);
       InitializeGraph::go((*hg));
@@ -323,16 +332,14 @@ int main(int argc, char** argv) {
 
   // Verify
   if (verify) {
-#ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) {
-#endif
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
                                      (*hg).getData(*ii).dist_current);
       }
-#ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         if ((*hg).isOwned((*hg).getGID(*ii)))
@@ -340,8 +347,10 @@ int main(int argc, char** argv) {
               "% %\n", (*hg).getGID(*ii),
               get_node_dist_current_cuda(cuda_ctx, *ii));
       }
-    }
+#else
+    abort();
 #endif
+    }
   }
   return 0;
 }

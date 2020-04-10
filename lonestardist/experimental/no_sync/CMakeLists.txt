@@ -7,7 +7,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 ################################################################################
 
 function(inputApp name)
-  app(${name}_cinput ${name}.cpp DISTSAFE)
+  app(${name}_cinput ${name}.cpp)
   target_link_libraries(${name}_cinput galois_dist distbench)
 endfunction()
 
@@ -38,12 +38,3 @@ endfunction()
 inputApp(bc_pull)
 
 # TODO BC, SGD, Kcore Pull (?)
-
-#app(bc bc/gen.cpp DISTSAFE)
-#target_link_libraries(bc galois_dist)
-#if(ENABLE_HETERO_GALOIS)
-#  target_compile_definitions(bc PRIVATE __GALOIS_HET_CUDA__=1)
-#  target_link_libraries(bc bc_cuda)
-#  cuda_add_library(bc_cuda bc/gen_cuda.cu)
-#  target_link_libraries(bc_cuda ggrt)
-#endif()
