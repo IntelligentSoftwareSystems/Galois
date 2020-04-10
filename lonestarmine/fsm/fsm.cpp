@@ -24,8 +24,7 @@ public:
 	}
 	~AppMiner() {}
 	void print_output() {
-		std::cout << "\n\tNumber of frequent patterns (minsup=" 
-			<< minsup << "): " << this->total_num << "\n";
+		std::cout << "\n\ttotal_num_frequent_patterns = " << this->total_num << "\n";
 	}
 };
 

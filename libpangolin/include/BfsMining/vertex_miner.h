@@ -285,8 +285,8 @@ public:
 	void printout_motifs() {
 		std::cout << std::endl;
 		if (accumulators.size() == 2) {
-			std::cout << "\ttriangles\t" << accumulators[0].reduce() << std::endl;
-			std::cout << "\t3-chains\t" << accumulators[1].reduce() << std::endl;
+			std::cout << "\ttriangles " << accumulators[0].reduce() << std::endl;
+			std::cout << "\twedges    " << accumulators[1].reduce() << std::endl;
 		} else if (accumulators.size() == 6) {
 			std::cout << "\t4-paths --> " << accumulators[0].reduce() << std::endl;
 			std::cout << "\t3-stars --> " << accumulators[1].reduce() << std::endl;

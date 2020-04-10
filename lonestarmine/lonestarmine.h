@@ -21,7 +21,8 @@ static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns 
 static cll::opt<unsigned> minsup("ms", cll::desc("minimum support (default value 0)"), cll::init(0));
 static cll::opt<int>numThreads("t", llvm::cl::desc("Number of threads (default value 1)"), llvm::cl::init(1));
 static cll::opt<std::string> preset_filename("pf", cll::desc("<filename: preset matching order>"), cll::init(""));
- 
+static cll::opt<bool> verify("v", llvm::cl::desc("do verification step (default value false)"), llvm::cl::init(false));
+
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc, const char* url) {
 	//llvm::cl::SetVersionPrinter(LonestarPrintVersion);
 	llvm::cl::ParseCommandLineOptions(argc, argv);
