@@ -136,7 +136,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
             galois::atomicMin(fineGGraph->getData(dst).netval, fineGGraph->getData(item).netval.load());
           }
       },
-      galois::steal(),  galois::loopname("atomicMin"));
+        galois::loopname("atomicMin"));
 
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
@@ -147,7 +147,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
                 galois::atomicMin(fineGGraph->getData(dst).netrand, fineGGraph->getData(item).netrand.load());
             }  
      },
-      galois::steal(),  galois::loopname("secondMin2"));
+      galois::loopname("secondMin2"));
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
@@ -157,7 +157,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
             galois::atomicMin(fineGGraph->getData(dst).netnum, fineGGraph->getData(item).netnum.load());
         }
       },
-      galois::steal(),  galois::loopname("secondMin"));
+       galois::loopname("secondMin"));
 }
 
 
@@ -310,7 +310,7 @@ void moreCoarse(MetisGraph* graph, int iter) {
         galois::loopname("moreCoarse"));
       for (auto c : bag) {
         auto nn = fineGGraph->getData(c).getParent();
-        coarseGGraph->getData(nn).nodeid = std::min(coarseGGraph->getData(nn).nodeid, fineGGraph->getData(c).nodeid);
+        //coarseGGraph->getData(nn).nodeid = std::min(coarseGGraph->getData(nn).nodeid, fineGGraph->getData(c).nodeid);
         int ww = coarseGGraph->getData(nn).getWeight();
         ww += fineGGraph->getData(c).getWeight();
         coarseGGraph->getData(nn).setWeight(ww);
@@ -395,7 +395,7 @@ void coarsePhaseII(MetisGraph* graph,
             fineGGraph->getData(ii).setParent(N);
           }
       },
-      galois::steal(), galois::loopname("noedgebag match"));
+       galois::loopname("noedgebag match"));
 }
 
 void parallelCreateEdges(MetisGraph* graph) {
@@ -499,6 +499,7 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
       int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
      std::cout<<"SIZE IS "<<newSize<<" and net is "<<netsize<<"\n";
      if (netsize < 1000) return coarseGraph->getFinerGraph();
+  //   if (newSize < 100) break;
     ++iterNum;
     
   }
