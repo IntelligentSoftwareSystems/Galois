@@ -258,8 +258,8 @@ int main(int argc, char** argv) {
     MetisNode n1;
     //int id = rand()%(hedges-1);
     n1.netnum = i+1;
-    unsigned rand = hash(i+1);
-    n1.netrand = rand;
+    //unsigned rand = hash(i+1);
+    n1.netrand = INT_MAX;
     //n1.setWeight(rand);
     a = graph.createNode(n1);
     graph.addNode(a);
