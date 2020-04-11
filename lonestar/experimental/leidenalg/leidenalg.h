@@ -61,8 +61,6 @@ struct Node{
 
 	uint64_t flatSize;
 	uint64_t external_edge_wt;
-
-	galois::CopyableAtomic<int> inBag;
 };
 
 typedef uint32_t EdgeTy;
@@ -117,40 +115,6 @@ void printGraphCharateristics(Graph& graph) {
 
 }
 
-uint64_t vertexFollowing(Graph& graph){
-
-  //Initialize each node to its own cluster
-  galois::do_all(galois::iterate(graph),
-                 [&graph](GNode n) { graph.getData(n).curr_comm_ass = n; });
-
-  //Remove isolated and degree-one nodes
-  galois::GAccumulator<uint64_t> isolatedNodes;
-  galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    auto& n_data = graph.getData(n);
-                    uint64_t degree = std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
-                                                     graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
-                    if(degree == 0) {
-                      isolatedNodes += 1;
-                      n_data.curr_comm_ass = -1;
-                    } else {
-                      if(degree == 1) {
-                        //Check if the destination has degree greater than one
-                        auto dst = graph.getEdgeDst(graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
-                        uint64_t dst_degree = std::distance(graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED),
-                                                         graph.edge_end(dst, galois::MethodFlag::UNPROTECTED));
-                        if((dst_degree > 1 || (n > dst))){
-                          isolatedNodes += 1;
-                          n_data.curr_comm_ass = graph.getData(dst).curr_comm_ass;
-                        }
-                      }
-                    }
-                  });
-  //The number of isolated nodes that can be removed
-  return isolatedNodes.reduce();
-}
-
-
 
 void sumVertexDegreeWeight(Graph& graph, CommArray& c_info) {
 //void sumVertexDegreeWeight(Graph& graph, std::vector<Comm>& c_info) {
@@ -163,9 +127,8 @@ void sumVertexDegreeWeight(Graph& graph, CommArray& c_info) {
                   }
                   n_data.degree_wt = total_weight;
                   c_info[n].degree_wt = total_weight;
-                  //galois::gPrint(n, " : ", c_info[n].degree_wt.load(), "\n");
                   c_info[n].size = 1;
-                });
+                }, galois::steal());
 }
 
 void sumClusterWeight(Graph& graph, CommArray& c_info) {
@@ -178,16 +141,14 @@ void sumClusterWeight(Graph& graph, CommArray& c_info) {
                   }
                   n_data.degree_wt = total_weight;
                   c_info[n].degree_wt = 0;
-                });
+                }, galois::steal());
 
-  /*
-   * TODO: Parallelize this
-   */
-  for(GNode n = 0; n < graph.size(); ++n) {
-      auto &n_data = graph.getData(n);
-      if(n_data.curr_subcomm_ass >= 0)
-        c_info[n_data.curr_subcomm_ass].degree_wt += n_data.degree_wt;
-    }
+	galois::do_all(galois::iterate(graph),
+                [&](GNode n) {
+      
+			auto &n_data = graph.getData(n);
+      galois::atomicAdd(c_info[n_data.curr_subcomm_ass].degree_wt, n_data.degree_wt);
+   }, galois::steal());
 }
 
 double calConstantForSecondTerm(Graph& graph){
@@ -200,24 +161,21 @@ double calConstantForSecondTerm(Graph& graph){
                      total_weight += graph.getEdgeData(ii, flag_no_lock);
                   }
                   n_data.degree_wt = total_weight;
-				//					std::cout << "totoal w: " << total_weight << std::endl;
-			});
+			}, galois::steal());
 
   galois::GAccumulator<uint64_t> local_weight;
   galois::do_all(galois::iterate(graph),
                 [&graph, &local_weight](GNode n){
                   local_weight += graph.getData(n).degree_wt;
-                });
+                }, galois::steal());
   /* This is twice since graph is symmetric */
   uint64_t total_edge_weight_twice = local_weight.reduce();
 
-//	std::cout << "totak twice: " << total_edge_weight_twice << std::endl;
   return 1/(double)total_edge_weight_twice;
 }
 
 void setConstant(Graph& graph){
 	constant = calConstantForSecondTerm(graph);
-//	std::cout << "constant" << constant << std::endl;
 }
 
 double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t degree_wt){
@@ -225,10 +183,10 @@ double diffModQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
   double ax = subcomm_info[curr_subcomm].degree_wt - degree_wt;
   double ay = subcomm_info[candidate_subcomm].degree_wt;
 
-//  double diff = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + 2.0f*(double)degree_wt* constant *(double)(ax - ay);
+  double diff = 2.0f*(double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + 2.0f*(double)degree_wt* constant *(double)(ax - ay);
 
-	double diff = (double)(counter[cluster_local_map[candidate_subcomm]] - counter[cluster_local_map[curr_subcomm]] + self_loop_wt) + 2.0f*(double)degree_wt* constant *(double)(ax - ay);
-  return diff*constant;
+//  return diff*constant;
+ return diff;
 }
 
 uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
@@ -246,13 +204,12 @@ uint64_t maxModularity(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
-      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+      ay = c_info[stored_already->first].degree_wt.load(); // Degree wt of cluster y
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
-      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
-      //From the paper: Verbatim
-//      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
-cur_gain = constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
-      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
+      
+			cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
+      
+			if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
         max_index = stored_already->first;
       }
@@ -260,13 +217,12 @@ cur_gain = constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * cons
     stored_already++; // Explore next cluster
   } while (stored_already != cluster_local_map.end());
 
-  //galois::gPrint("Max Gain : ", max_gain, "\n");
-  //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
   if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index < sc)) {
     max_index = sc;
   }
 
   assert(max_gain >= 0);
+
   return max_index;
 }
 
@@ -285,7 +241,6 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 	double size_x = c_info[sc].size;
 	double size_y = 0;
 
-//	std::cout << "const: " << constant << std::endl;
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
@@ -304,9 +259,8 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 			}
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
-      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
-      //From the paper: Verbatim
-      cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
+      
+			cur_gain = 2 * constant * (eiy - eix) + 2 * degree_wt * ((ax - ay) * constant * constant);
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -316,8 +270,6 @@ uint64_t maxModularityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
     stored_already++; // Explore next cluster
   } while (stored_already != cluster_local_map.end());
 
-  //galois::gPrint("Max Gain : ", max_gain, "\n");
-  //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
   if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index < sc)) {
     max_index = sc;
   }
@@ -340,15 +292,13 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
 
 
    /* Calculate the overall modularity */
-  //double e_xx = 0;
   galois::GAccumulator<double> acc_e_xx;
-  //double a2_x = 0;
   galois::GAccumulator<double> acc_a2_x;
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   cluster_wt_internal[n] = 0;
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -357,13 +307,13 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
                   acc_a2_x += (double) (c_info[n].degree_wt + c_update[n].degree_wt) * ((double) (c_info[n].degree_wt + c_update[n].degree_wt) * (double)constant_for_second_term);
-                });
+                }, galois::steal());
 
 
   e_xx = acc_e_xx.reduce();
@@ -371,7 +321,6 @@ double calModularityDelay(Graph& graph, CommArray& c_info, CommArray& c_update, 
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
   mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
-  //galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
 
   return mod;
 }
@@ -391,15 +340,13 @@ double calModularity(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
 
 
    /* Calculate the overall modularity */
-  //double e_xx = 0;
   galois::GAccumulator<double> acc_e_xx;
-  //double a2_x = 0;
   galois::GAccumulator<double> acc_a2_x;
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   cluster_wt_internal[n] = 0;
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -409,13 +356,13 @@ double calModularity(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
                   acc_a2_x += (double) (c_info[n].degree_wt) * ((double) (c_info[n].degree_wt) * (double)constant_for_second_term);
-                });
+                }, galois::steal());
 
 
   e_xx = acc_e_xx.reduce();
@@ -423,7 +370,6 @@ double calModularity(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
   mod = e_xx * (double)constant_for_second_term - a2_x * (double)constant_for_second_term;
-  //galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
 
   return mod;
 }
@@ -449,8 +395,8 @@ double calModularityFinal(Graph& graph) {
   sumClusterWeight(graph, c_info);
 
   /* Compute the total weight (2m) and 1/2m terms */
-  constant_for_second_term = calConstantForSecondTerm(graph);
-
+//  constant_for_second_term = calConstantForSecondTerm(graph);
+constant_for_second_term = constant;
 
    /* Calculate the overall modularity */
   double e_xx = 0;
@@ -465,7 +411,7 @@ double calModularityFinal(Graph& graph) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   cluster_wt_internal[n] = 0;
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -476,13 +422,13 @@ double calModularityFinal(Graph& graph) {
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
-                  acc_a2_x += (double) (c_info[n].degree_wt) * ((double) (c_info[n].degree_wt)* (double)constant_for_second_term);
-								});
+                  acc_a2_x += (double) (c_info[n].degree_wt.load()) * ((double) (c_info[n].degree_wt.load())* (double)constant_for_second_term);
+								}, galois::steal());
 
 	
 	e_xx = acc_e_xx.reduce();
@@ -509,38 +455,9 @@ CommArray &subcomm_info, uint64_t self_loop_wt, uint64_t flatSize){
 
 	double diff = diff1 + diff2;
 
-	return diff*constant;
+	return diff;
+//	return diff*constant;
 }
-/*
-uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
-                       //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
-                       CommArray &c_info, uint64_t degree_wt, uint64_t sc, double resolution) {
-
-  uint64_t max_index = sc; // Assign the intial value as self community
-  double cur_gain = 0;
-  double max_gain = 0;
-  double eix = counter[0] - self_loop_wt;
-  double ax = c_info[sc].degree_wt - degree_wt;
-  double eiy = 0;
-  double ay = 0;
-
-	double size_x = c_info[sc].size;
-
-  auto stored_already = cluster_local_map.begin();
-  do {
-    if(sc != stored_already->first) {
-      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
-			size_y = c_info[stored_already->first].size;
-
-      eiy = counter[stored_already->second]; // Total edges incident on cluster y
-      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
-      //From the paper: Verbatim
-      cur_gain = 2 * (eiy - eix) + resolution*(size_x*(size_x - 1) - (size_y+1)*size_y);
-
-      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
-        max_gain = cur_gain;
-        max_index = stored_already->first;
-*/
 
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vector<uint64_t> &counter, uint64_t self_loop_wt,
                        //std::vector<Comm>&c_info, uint64_t degree_wt, uint64_t sc, double constant) {
@@ -566,9 +483,8 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
 			double new_size_y = size_y + (double) flatSize;
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
-      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
-      //From the paper: Verbatim
-   		cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));   
+   		
+			cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));   
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -577,12 +493,6 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
     }
     stored_already++; // Explore next cluster
   } while (stored_already != cluster_local_map.end());
-
-  //galois::gPrint("Max Gain : ", max_gain, "\n");
-  //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
- // if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-   // max_index = sc;
-  //}
 
   assert(max_gain >= 0);
   return max_index;
@@ -629,9 +539,8 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
 			}
 
       eiy = counter[stored_already->second]; // Total edges incident on cluster y
-      //cur_gain = 2 * (eiy - eix) - 2 * degree_wt * (ay - ax) * constant;
-      //From the paper: Verbatim
-      cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));
+      
+			cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));
 
       if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
         max_gain = cur_gain;
@@ -640,12 +549,6 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
     }
     stored_already++; // Explore next cluster
   } while (stored_already != cluster_local_map.end());
-
-  //galois::gPrint("Max Gain : ", max_gain, "\n");
-  //if(max_gain < 1e-3 || (c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-  //if((c_info[max_index].size == 1 && c_info[sc].size == 1 && max_index > sc)) {
-   // max_index = sc;
- // }
 
   assert(max_gain >= 0);
   return max_index;
@@ -666,15 +569,13 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
 
 
    /* Calculate the overall modularity */
-  //double e_xx = 0;
   galois::GAccumulator<double> acc_e_xx;
-  //double a2_x = 0;
   galois::GAccumulator<double> acc_a2_x;
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   cluster_wt_internal[n] = 0;
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -684,13 +585,13 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
                       cluster_wt_internal[n] += graph.getEdgeData(ii);
                     }
                   }
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
                   acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)) * 0.5f;
-                });
+                }, galois::steal());
 
 
   e_xx = acc_e_xx.reduce();
@@ -698,7 +599,6 @@ double calCPMQuality(Graph& graph, CommArray& c_info, double& e_xx, double& a2_x
 
   //galois::gPrint("e_xx : ", e_xx, " ,constant_for_second_term : ", constant_for_second_term, " a2_x : ", a2_x, "\n");
   mod = e_xx - a2_x*resolution;
-  //galois::gPrint("Final Stats: ", " Number of clusters:  ", graph.size() , " Modularity: ", mod, "\n");
 
   return mod;
 }
@@ -723,9 +623,6 @@ double calCPMQualityFinal(Graph& graph) {
   c_info.allocateBlocked(graph.size());
   cluster_wt_internal.allocateBlocked(graph.size());
 
-
-	for(auto n:graph)
-		c_info[n].flatSize = 0;
    /* Calculate the overall modularity */
   double e_xx = 0;
   galois::GAccumulator<double> acc_e_xx;
@@ -735,7 +632,8 @@ double calCPMQualityFinal(Graph& graph) {
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   cluster_wt_internal[n] = 0;
-                });
+									c_info[n].flatSize = 0;
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
@@ -749,13 +647,13 @@ double calCPMQualityFinal(Graph& graph) {
 
 									//updating community size
 									galois::atomicAdd(c_info[n_data.curr_subcomm_ass].flatSize, n_data.flatSize);
-                });
+                }, galois::steal());
 
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                   acc_e_xx += cluster_wt_internal[n];
                   acc_a2_x += (double) (c_info[n].flatSize) * ((double) (c_info[n].flatSize - 1)* 0.5f);
-								});
+								}, galois::steal());
 
 
   e_xx = acc_e_xx.reduce();
@@ -769,7 +667,6 @@ double calCPMQualityFinal(Graph& graph) {
 
 
 
-//need to update this
 uint64_t renumberClustersContiguously(Graph &graph) {
 
   std::map<uint64_t, uint64_t> cluster_local_map;
@@ -779,7 +676,7 @@ uint64_t renumberClustersContiguously(Graph &graph) {
     auto& n_data = graph.getData(n, flag_no_lock);
 		assert(n_data.curr_subcomm_ass != -1);
     if(n_data.curr_subcomm_ass != -1) {
-      assert(n_data.curr_subcomm_ass < graph.size());
+ //     assert(n_data.curr_subcomm_ass < graph.size());
       auto stored_already = cluster_local_map.find(n_data.curr_subcomm_ass);
      if(stored_already != cluster_local_map.end()){
       n_data.curr_subcomm_ass = stored_already->second;
@@ -827,18 +724,16 @@ void printNodeClusterId(Graph& graph, std::string output_CID_filename){
   std::ofstream outputFile(output_CID_filename, std::ofstream::out);
   for(GNode n = 0; n < graph.size(); ++n) {
     outputFile << n << "  " << graph.getData(n).curr_comm_ass << "\n";
-    //outputFile << graph.getData(n).curr_comm_ass << "\n";
   }
 }
 
 void checkModularity(Graph& graph, largeArray& clusters_orig) {
   galois::gPrint("checkModularity\n");
 
-  //galois::gPrint("Number of unique clusters (renumber) ARR: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
   galois::do_all(galois::iterate(graph),
                 [&](GNode n){
                   graph.getData(n, flag_no_lock).curr_subcomm_ass = clusters_orig[n];
-                });
+                }, galois::steal());
 
   uint64_t num_unique_clusters = renumberClustersContiguously(graph);
   galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
@@ -849,11 +744,10 @@ void checkModularity(Graph& graph, largeArray& clusters_orig) {
 void checkCPMQuality(Graph& graph, largeArray& clusters_orig) {
   galois::gPrint("checkModularity\n");
 
-  //galois::gPrint("Number of unique clusters (renumber) ARR: ", renumberClustersContiguouslyArray(clusters_orig), "\n");
   galois::do_all(galois::iterate(graph),
                 [&](GNode n){
                   graph.getData(n, flag_no_lock).curr_subcomm_ass = clusters_orig[n];
-                });
+                }, galois::steal());
 
   uint64_t num_unique_clusters = renumberClustersContiguously(graph);
   galois::gPrint("Number of unique clusters (renumber): ", num_unique_clusters, "\n");
