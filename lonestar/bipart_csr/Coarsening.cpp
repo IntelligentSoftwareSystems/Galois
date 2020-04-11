@@ -361,7 +361,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, std::vector<bool> hed
   assert(fineGGraph != coarseGGraph);
   galois::GAccumulator<unsigned> hg;
   galois::do_all(
-      galois::iterate((uint64_t)0, fineGGraph->hedges),
+      galois::iterate(size_t{0}, fineGGraph->hedges),
       [&](GNode n) {
           if (hedges[n])
               hg += 1;
@@ -444,7 +444,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, std::vector<bool> hed
 
   std::vector<uint64_t> prefix_edges(num_nodes_next);
   galois::GAccumulator<uint64_t> num_edges_acc;
-  galois::do_all(galois::iterate((uint32_t)0, num_nodes_next),
+  galois::do_all(galois::iterate(uint32_t{0}, num_nodes_next),
                 [&](uint32_t c){
                   prefix_edges[c] = edges_id[c].size();
                   num_edges_acc += prefix_edges[c];
