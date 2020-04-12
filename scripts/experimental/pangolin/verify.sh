@@ -8,7 +8,7 @@ bin=${execname}
 if [[ $execname == *"tc"* ]]; then
   bin="tc_mine"
 fi
-execdirname="/net/ohm/export/cdgc/cxh/GaloisCpp/build-distdev/lonestarmine/${execname}"
+execdirname="./${execname}"
 NTHREADS="56"
 MINSUP="500"
 EXEC=${execdirname}/${bin}
@@ -50,14 +50,14 @@ checker=${outputdirname}/result_checker.py
 pass=0
 fail=0
 failed_cases=""
-check_output="${outputdirname}/my-output.log"
+check_output="my-output.log"
 
 
 for K in $SIZES; do
 	for NT in $NTHREADS; do
-		LOG=${outputdirname}/${execname}-${inputname}-$K-$NT.log
+		LOG=${execname}-${inputname}-$K-$NT.log
 		echo "${EXEC} $filetype ${INPUT} -t=$NT -k=$K $FLAGS -v > $LOG"
-		eval "${EXEC} $filetype ${INPUT} -t=$NT -k=$K $FLAGS -v" > $LOG 2>> ${outputdirname}/error.log
+		eval "${EXEC} $filetype ${INPUT} -t=$NT -k=$K $FLAGS -v" > $LOG 2>> error.log
 		echo "python $checker ${execname} ${inputname} $K $MINSUP $LOG &> ${check_output}"
 		eval "python $checker ${execname} ${inputname} $K $MINSUP $LOG &> ${check_output}"
 		#cat ${check_output}
