@@ -235,40 +235,48 @@ void nodeIteratingAlgo(Graph& graph) {
   std::cout << "Num Triangles: " << numTriangles.reduce() << "\n";
 }
 
+/**
+ * Lambda function to count triangles
+ */ 
+void orderedCountFunc(Graph& graph, GNode n, galois::GAccumulator<size_t> & numTriangles){
+    size_t numTriangles_local = 0;
+    for(auto it_v : graph.edges(n)){
+            auto v = graph.getEdgeDst(it_v);
+            if( v > n)
+                    break;
+            Graph::edge_iterator it_n =
+                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+
+            for(auto it_vv : graph.edges(v)){
+                    auto vv = graph.getEdgeDst(it_vv);
+                    if( vv > v)
+                            break;
+                    while(graph.getEdgeDst(it_n) < vv)
+                            it_n++;
+                    if(vv == graph.getEdgeDst(it_n)) {
+                            numTriangles_local += 1;
+                    }
+            }
+    }
+    numTriangles += numTriangles_local;
+
+}
+
 /*
  * Simple counting loop, instead of binary searching.
  */
 void orderedCountAlgo(Graph& graph) {
-
   galois::GAccumulator<size_t> numTriangles;
         galois::do_all(
             galois::iterate(graph),
             [&](const GNode& n) {
-              for(auto it_v : graph.edges(n)){
-                auto v = graph.getEdgeDst(it_v);
-                if( v > n)
-                  break;
-                Graph::edge_iterator it_n =
-                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-
-                for(auto it_vv : graph.edges(v)){
-                  auto vv = graph.getEdgeDst(it_vv);
-                  //std::cout << "-- vv : " << vv << "\n";
-                  if( vv > v)
-                    break;
-                  while(graph.getEdgeDst(it_n) < vv)
-                    it_n++;
-                  if(vv == graph.getEdgeDst(it_n)) {
-                    numTriangles += 1;
-                  }
-                }
-              }
+                orderedCountFunc(graph, n, numTriangles);
             },
             galois::chunk_size<CHUNK_SIZE>(),
             galois::steal(),
             galois::loopname("orderedCountAlgo"));
 
-  std::cout << "Num Triangles: " << numTriangles.reduce() << "\n";
+  galois::gPrint("Num Triangles: ", numTriangles.reduce(), "\n");
 }
 
 /**
@@ -393,7 +401,11 @@ void readGraph(Graph& graph) {
     std::ifstream triangleFile(triangleFilename.c_str());
     if (!triangleFile.good()) {
       // triangles doesn't already exist, create it
+      galois::StatTimer Trelabel("GraphRelabelTimer");
+      galois::gPrint("WARNING: Sorted graph does not exist; Relabelling and Creating a sorted graph\n");
+      Trelabel.start();
       makeGraph(graph, triangleFilename);
+      Trelabel.stop();
     } else {
       // triangles does exist, load it
       galois::graphs::readGraph(graph, triangleFilename);
