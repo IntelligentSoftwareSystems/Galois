@@ -327,6 +327,7 @@ find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
 include(CheckEndian)

@@ -98,13 +98,12 @@ const char* const ALGO_NAMES[] = {"SyncDO"};
 static cll::opt<Exec> execution(
     "exec",
     cll::desc("Choose SERIAL or PARALLEL execution (default value PARALLEL):"),
-    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL"),
-                clEnumValEnd),
+    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL")),
     cll::init(PARALLEL));
 
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-    cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumValEnd),
+    cll::values(clEnumVal(SyncDO, "SyncDO")),
     cll::init(SyncDO));
 
 using Graph =
@@ -360,10 +359,10 @@ int main(int argc, char** argv) {
   }
 
   auto it = graph.begin();
-  std::advance(it, startNode);
+  std::advance(it, static_cast<unsigned long long>(startNode));
   source = *it;
   it     = graph.begin();
-  std::advance(it, reportNode);
+  std::advance(it, static_cast<unsigned long long>(reportNode));
   report = *it;
 
   galois::preAlloc(preAlloc);
