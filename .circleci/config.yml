@@ -160,7 +160,17 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost eigen llvm openmpi
+          # NB(ddn): make requires libffi but its package doesn't depend on it.
+          pacman -q -S --noconfirm \
+            boost \
+            cmake \
+            eigen \
+            gcc \
+            libffi \
+            llvm \
+            make \
+            openmpi
+
 
           useradd runner
           mkdir -p /tmp/build
