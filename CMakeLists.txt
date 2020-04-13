@@ -327,6 +327,9 @@ find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(LLVM REQUIRED CONFIG)
+if(NOT LLVM_ENABLE_RTTI)
+  message(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
+endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
 include(CheckEndian)
