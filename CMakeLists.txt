@@ -328,6 +328,12 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+if(NOT DEFINED LLVM_ENABLE_RTTI)
+  MESSAGE(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
+endif()
+if(NOT ${LLVM_ENABLE_RTTI})
+  MESSAGE(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
+endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
 include(CheckEndian)
