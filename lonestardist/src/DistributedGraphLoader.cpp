@@ -54,8 +54,8 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(GINGER_I, "ginger-i", "ginger, incoming edges, using CuSP"),
         clEnumValN(FENNEL_O, "fennel-o", "fennel, outgoing edge cut, using CuSP"),
         clEnumValN(FENNEL_I, "fennel-i", "fennel, incoming edge cut, using CuSP"),
-        clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using CuSP"),
-        clEnumValEnd),
+        clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using CuSP")
+        ),
     cll::init(OEC));
 
 //cll::opt<std::string>

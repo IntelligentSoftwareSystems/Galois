@@ -288,30 +288,18 @@ endif()
 
 if(USE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
-  find_package(VTune)
-  message(STATUS "VTUNE: ${VTune_INCLUDE_DIRS}")
-
-  if (VTune_FOUND)
-    include_directories(${VTune_INCLUDE_DIRS})
-    add_definitions(-DGALOIS_USE_VTUNE)
-  else()
-    message(WARNING "VTune not found")
-  endif()
+  find_package(VTune REQUIRED)
+  include_directories(${VTune_INCLUDE_DIRS})
+  add_definitions(-DGALOIS_USE_VTUNE)
 endif()
 
 if(USE_PAPI)
   if (PAPI_ROOT STREQUAL "")
     set(PAPI_ROOT /usr)
   endif()
-  find_package(PAPI)
-  message(STATUS "PAPI: ${PAPI_INCLUDE_DIRS}")
-
-  if (PAPI_FOUND)
-    include_directories(${PAPI_INCLUDE_DIRS})
-    add_definitions(-DGALOIS_USE_PAPI)
-  else()
-    message(WARNING "PAPI not found")
-  endif()
+  find_package(PAPI REQUIRED)
+  include_directories(${PAPI_INCLUDE_DIRS})
+  add_definitions(-DGALOIS_USE_PAPI)
 endif()
 
 # PThreads
@@ -337,6 +325,9 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
 endif()
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
+
+find_package(LLVM REQUIRED CONFIG)
+target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
 include(CheckEndian)
 
@@ -429,7 +420,7 @@ function(link_app name)
   endif()
   target_link_libraries(${name} lonestar)
   target_link_libraries(${name} galois_shmem)
-  target_link_libraries(${name} gllvm)
+  target_link_libraries(${name} LLVMSupport)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
   if(VTune_FOUND)
@@ -467,10 +458,9 @@ function(app name)
 endfunction(app)
 
 ###### Source finding ######
-#include_directories(include)
 
-add_subdirectory(libllvm)
 add_subdirectory(libgalois)
+
 if(ENABLE_DIST_GALOIS)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
@@ -479,6 +469,7 @@ if(ENABLE_DIST_GALOIS)
     add_subdirectory(libgpu)
   endif(ENABLE_HETERO_GALOIS)
 endif(ENABLE_DIST_GALOIS)
+
 add_subdirectory(tools)
 add_subdirectory(scripts)
 
