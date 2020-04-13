@@ -17,13 +17,23 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-iostreams-dev \
+            libboost-serialization-dev \
+            libeigen3-dev \
+            libmpich-dev \
+            llvm-7-dev \
+            mpich \
+            zlib1g-dev
 
           useradd runner
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           # Run tests as non-root otherwise MPI will complain
           (cd /tmp/build \
@@ -41,13 +51,22 @@ jobs:
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
 
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin ssh
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-all-dev \
+            libeigen3-dev \
+            libopenmpi-dev \
+            llvm-7-dev \
+            openmpi-bin \
+            ssh
 
           useradd runner
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -61,7 +80,19 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make gcc gcc-c++ boost-devel cmake eigen3-devel mpich-devel wget
+          yum -y -q install \
+            boost-devel \
+            cmake \
+            eigen3-devel \
+            gcc \
+            gcc-c++ \
+            llvm-devel \
+            llvm-static \
+            make \
+            mpich-devel \
+            ncurses-devel \
+            wget \
+            zlib-devel
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
@@ -75,7 +106,7 @@ jobs:
           mkdir -p build
 
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -89,7 +120,16 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make boost-devel eigen3-devel openmpi-devel wget
+          yum -y -q install \
+            boost-devel \
+            eigen3-devel \
+            llvm-devel \
+            llvm-static \
+            make \
+            ncurses-devel \
+            openmpi-devel \
+            wget \
+            zlib-devel
           yum module -y -q install llvm-toolset
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
@@ -102,43 +142,14 @@ jobs:
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
           module load mpi
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-          make -C /tmp/build input
+          cmake \
+            -S . \
+            -B /tmp/build \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-
-          # A segfault occures for all MPI based tests in this environment.
-          # Disable reporting test results (issue #118).
-          (cd /tmp/build \
-            && chown -R runner Testing \
-            && su runner -c "ctest -V --label-regex quick --parallel 2") || true
-  "CentOS-8-clang-libc++":
-    docker:
-      - image: centos:8
-    steps:
-      - checkout
-      - run: |
-          # Note: gcc required to get libgcc and glibc-devel even though we're using clang.
-          yum -y -q install zlib-devel make wget bzip2 gcc
-
-          wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
-          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
-          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
-
-          # Use miniconda to get all remaining needed packages
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          conda install --update-specs -y -q -c conda-forge boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen openmpi
-
-          useradd runner
-          mkdir -p /tmp/build
-
-          cmake -S . -B /tmp/build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX"
-          make -C /tmp/build input
-          cmake --build /tmp/build --parallel 2
-          # Need to enable runtime location of libc++ for these tests to pass.
           (cd /tmp/build \
             && chown -R runner Testing \
             && su runner -c "ctest -V --label-regex quick --parallel 2") || true
@@ -149,13 +160,23 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
+          # NB(ddn): make requires libffi but its package doesn't depend on it.
+          pacman -q -S --noconfirm \
+            boost \
+            cmake \
+            eigen \
+            gcc \
+            libffi \
+            llvm \
+            make \
+            openmpi
+
 
           useradd runner
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -166,14 +187,27 @@ jobs:
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress gcc musl-dev g++ make cmake boost-dev zlib-dev eigen openssh-client
-          apk add --no-cache --no-progress --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ openmpi-dev
+          apk add --no-cache --no-progress \
+            boost-dev \
+            cmake \
+            eigen \
+            g++ \
+            gcc \
+            llvm9-dev \
+            llvm9-static \
+            make \
+            musl-dev \
+            openssh-client \
+            zlib-dev
+          apk add --no-cache --no-progress \
+            --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
+            openmpi-dev
 
           adduser -D runner
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -184,16 +218,25 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel mpich-devel
-          # Get the "module" function set up before loading MPI.
+          yum -y -q install \
+            boost-devel \
+            cmake \
+            eigen3-devel \
+            gcc-c++ \
+            llvm-devel \
+            llvm-static \
+            make \
+            mpich-devel \
+            zlib-devel
 
           useradd runner
           mkdir -p /tmp/build
 
+          # Get the "module" function set up before loading MPI.
           . /etc/bashrc
           module load mpi
           cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
-          make -C /tmp/build input
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -204,10 +247,16 @@ jobs:
     steps:
       - checkout
       - run: |
-          # Install llvm-devel, not because it is required, but because it may
-          # conflict with the llvm headers that are vendored for use when building
-          # command line programs. That configuration needs to be tested.
-          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel openmpi-devel
+          yum -y -q install \
+            boost-devel \
+            clang \
+            cmake \
+            eigen3-devel \
+            llvm-devel \
+            llvm-static \
+            make \
+            openmpi-devel \
+            zlib-devel
           # Get the "module" function set up before loading MPI.
 
           useradd runner
@@ -215,8 +264,13 @@ jobs:
 
           . /etc/bashrc
           module load mpi
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-          make -C /tmp/build input
+          cmake \
+            -S . \
+            -B /tmp/build \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner Testing \
@@ -230,7 +284,6 @@ workflows:
       - "Ubuntu-18.04"
       - "CentOS-8-gcc"
       - "CentOS-8-clang"
-      - "CentOS-8-clang-libc++"
       - "Arch"
       - "Alpine"
       - "Fedora-gcc"
