@@ -249,13 +249,13 @@ find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 
 find_package(LLVM REQUIRED CONFIG)
 if("${LLVM_PACKAGE_VERSION}" VERSION_LESS "7")
-  MESSAGE(FATAL_ERROR "LLVM 7 or greater is required.")
+  message(FATAL_ERROR "LLVM 7 or greater is required.")
 endif()
 if(NOT DEFINED LLVM_ENABLE_RTTI)
-  MESSAGE(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
+  message(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
 endif()
 if(NOT ${LLVM_ENABLE_RTTI})
-  MESSAGE(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
+  message(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
 endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
@@ -264,14 +264,14 @@ include(CheckEndian)
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
-  MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
+  message(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 elseif(EXISTS /net/ohm/export/iss/inputs)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   set(BASEINPUT ${PROJECT_BINARY_DIR}/inputs/small_inputs)
-  MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
+  message(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 
 ###### Global Functions ######
