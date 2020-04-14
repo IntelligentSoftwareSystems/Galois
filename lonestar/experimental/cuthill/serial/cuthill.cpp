@@ -1164,11 +1164,7 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   typedef BulkSynchronous<PerSocketChunkLIFO<256>> BSWL;
 
-  //#ifdef GALOIS_USE_EXP
-  //  typedef BulkSynchronousInline<> BSInline;
-  //#else
   typedef BSWL BSInline;
-  //#endif
 
   switch (algo) {
   case serialCM:

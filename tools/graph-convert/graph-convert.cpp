@@ -29,7 +29,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 #include <random>
 #include <string>

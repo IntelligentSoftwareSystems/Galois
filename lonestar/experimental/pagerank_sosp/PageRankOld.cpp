@@ -27,9 +27,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_USE_EXP
 #include "galois/worklists/WorkListDebug.h"
-#endif
 
 #include <atomic>
 #include <string>
@@ -707,11 +705,7 @@ struct PrtRsd {
     using namespace galois::worklists;
     typedef PerSocketChunkLIFO<4> PSchunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk> OBIM;
-#ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
-#else
-    typedef OBIM dOBIM;
-#endif
     galois::InsertBag<UpdateRequest> initialWL;
     galois::do_all(graph, [&initialWL, &graph](GNode src) {
       LNode& data = graph.getData(src);

@@ -1,14 +1,14 @@
 # NOTE: this is required because 
 # target_link_libraries() does not work with cuda_add_library() 
 # (in old versions of CMake)
-include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
+include_directories(${PROJECT_SOURCE_DIR}/libgluon/include)
 
 add_library(distbench STATIC src/DistBenchStart.cpp src/DistributedGraphLoader.cpp)
 target_include_directories(distbench PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(distbench galois_cusp galois_gluon)
+target_link_libraries(distbench Galois::cusp Galois::gluon)
 
 if(EXISTS /net/ohm/export/iss/dist-outputs)
   set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
@@ -43,7 +43,11 @@ function(app_dist name)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   FILE(GLOB CPPSOURCES ${name}*.cpp)
-  app(${name} ${CPPSOURCES})
+  add_executable(${name} ${CPPSOURCES})
+  add_dependencies(apps ${name})
+  target_link_libraries(${name} lonestar Galois::shmem LLVMSupport)
+  install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
   target_link_libraries(${name} distbench)
   if(REPORT_PER_ROUND_STATS)
     target_compile_definitions(${name} PRIVATE DIST_PER_ROUND_TIMER=1)
@@ -61,12 +65,12 @@ function(app_dist name)
 
     FILE(GLOB CUSOURCES ${name}*.cu)
     add_library(${name}_cuda ${CUSOURCES})
-    target_link_libraries(${name}_cuda galois_gpu)
+    target_link_libraries(${name}_cuda Galois::gpu)
     set_property(TARGET ${name}_cuda PROPERTY CUDA_STANDARD 14)
   endif()
 endfunction()
 
-set(RESULT_CHECKER ${CMAKE_SOURCE_DIR}/scripts/result_checker.py)
+set(RESULT_CHECKER ${PROJECT_SOURCE_DIR}/scripts/result_checker.py)
 cmake_host_system_information(RESULT HOSTNAME QUERY HOSTNAME)
 
 function(add_test_dist_and_verify app input type part N np)

@@ -1,16 +1,29 @@
-set(sources
-  $<TARGET_OBJECTS:galois_shmem_obj>
-  $<TARGET_OBJECTS:galois_dist_async_obj>
+add_library(galois_cusp INTERFACE)
+add_library(Galois::cusp ALIAS galois_cusp)
+set_target_properties(galois_cusp PROPERTIES EXPORT_NAME cusp)
+add_dependencies(lib galois_cusp)
+
+target_include_directories(galois_cusp INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-add_library(galois_cusp STATIC ${sources})
+target_link_libraries(galois_cusp INTERFACE galois_dist_async)
 
-target_link_libraries(galois_cusp galois_shmem galois_dist_async LLVMSupport)
-target_link_libraries(galois_cusp ${MPI_CXX_LIBRARIES})
+install(
+  DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+)
 
-target_include_directories(galois_cusp PUBLIC
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libdist/include
-  ${CMAKE_SOURCE_DIR}/libcusp/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+install(TARGETS galois_cusp
+  EXPORT GaloisTargets
+  LIBRARY
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT shlib
+  ARCHIVE
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )

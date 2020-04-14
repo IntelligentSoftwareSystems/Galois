@@ -150,6 +150,7 @@ jobs:
             -DENABLE_DIST_GALOIS=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
+          # OpenMPI segfaults here issue #118
           (cd /tmp/build \
             && chown -R runner Testing \
             && su runner -c "ctest -V --label-regex quick --parallel 2") || true
