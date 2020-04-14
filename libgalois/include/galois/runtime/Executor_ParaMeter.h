@@ -20,12 +20,12 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
+#include "galois/config.h"
 #include "galois/Reduction.h"
 #include "galois/PerThreadContainer.h"
 #include "galois/Traits.h"
 #include "galois/Mem.h"
 #include "galois/worklists/Simple.h"
-#include "galois/runtime/config.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/Executor_DoAll.h"
