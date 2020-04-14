@@ -1,6 +1,6 @@
 # cython: cdivision = True
 
-from galois cimport *
+from galois.shmem cimport *
 from cython.operator cimport preincrement, dereference as deref
 
 ctypedef atomic[uint32_t] atomuint32_t
@@ -15,10 +15,10 @@ ctypedef LC_CSR_Graph[uint32_t, void, dummy_true].GraphNode GNodeCSR
 cdef void printValue(Graph_CSR *g):
     cdef unsigned long numNodes = g[0].size()
     cdef uint32_t *data
-    gPrint("Number of nodes : ", numNodes, "\n")
+    gPrint(b"Number of nodes : ", numNodes, b"\n")
     for n in range(numNodes):
         data = &g[0].getData(n)
-        gPrint("\t", data[0],"\n")
+        gPrint(b"\t", data[0], b"\n")
          
 ##############################################################################
 ## Bfs implementation
@@ -32,13 +32,13 @@ cdef void Initialize(Graph_CSR *g, unsigned long source):
         LC_CSR_Graph[uint32_t, void, dummy_true].edge_iterator ii
         LC_CSR_Graph[uint32_t, void, dummy_true].edge_iterator ei
         uint32_t *data
-    gPrint("Number of nodes : ", numNodes, "\n")
+    gPrint(b"Number of nodes : ", numNodes, b"\n")
     for n in range(numNodes):
         #gPrint(n,"\n")
         data = &g[0].getData(n)
         if(n == source):
             data[0] = 0
-            gPrint("Srouce\n")
+            gPrint(b"Srouce\n")
         else:
             data[0] = numNodes
         
@@ -69,7 +69,7 @@ cdef void bfs_pull_topo(Graph_CSR *graph):
     while(work_done):
         rounds += 1;
         print("starting for_each")
-        gPrint("Work done Before : ", work_done, "\n")
+        gPrint(b"Work done Before : ", work_done, b"\n")
         with nogil:
             T.start()
             work_done = 0
@@ -77,8 +77,8 @@ cdef void bfs_pull_topo(Graph_CSR *graph):
                      bind_leading(&bfs_operator, graph, &work_done), no_pushes())#,
                      #loopname("name1"))
             T.stop()
-            gPrint("Work done : ", work_done, "\n")
-            gPrint("Elapsed time:", T.get(), " milliseconds.\n")
+            gPrint(b"Work done : ", work_done, b"\n")
+            gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")
     print("Number of rounds : ", rounds, "\n")
 
 
@@ -121,7 +121,7 @@ cdef void bfs_sync(Graph_CSR *graph, GNodeCSR source):
                      bind_leading(&bfs_sync_operator, graph, &next, nextLevel), no_pushes(), steal(),
                      loopname("bfs_sync"))
     T.stop()
-    gPrint("Elapsed time:", T.get(), " milliseconds.\n")        
+    gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")        
     print("Number of rounds : ", nextLevel, "\n")
 
 cdef void not_visited_operator(Graph_CSR *graph, atomuint32_t *notVisited, GNodeCSR n):
@@ -149,7 +149,7 @@ cdef bool verify_bfs(Graph_CSR *graph, GNodeCSR source):
 
     data = &graph[0].getData(source)
     if(data[0] is not 0):
-        gPrint("ERROR: source has non-zero dist value == ", data[0], "\n")
+        gPrint(b"ERROR: source has non-zero dist value == ", data[0], b"\n")
     
     notVisited.store(0)
     with nogil:
@@ -158,20 +158,20 @@ cdef bool verify_bfs(Graph_CSR *graph, GNodeCSR source):
                 loopname("not_visited_op"))
 
     if(notVisited.load() > 0):
-        gPrint(notVisited.load(), " unvisited nodes; this is an error if graph is strongly connected\n")
+        gPrint(notVisited.load(), b" unvisited nodes; this is an error if graph is strongly connected\n")
 
     with nogil:
         do_all(iterate(graph[0]),
                 bind_leading(&max_dist_operator, graph, &maxDist), no_pushes(), steal(),
                 loopname("not_visited_op"))
 
-    gPrint("Max distance : ", maxDist.reduce(), "\n")
+    gPrint(b"Max distance : ", maxDist.reduce(), b"\n")
 #
 # Main callsite for Bfs
 #        
 def bfs(int numThreads, unsigned long source, string filename):
     cdef int new_numThreads = setActiveThreads(numThreads)
-    gPrint("Hello this is gprint\n")
+    gPrint(b"Hello this is gprint\n")
     if new_numThreads != numThreads:
         print("Warning, using fewer threads than requested")
     
@@ -181,13 +181,13 @@ def bfs(int numThreads, unsigned long source, string filename):
     ## Read the CSR format of graph
     ## directly from disk.
     graph.readGraphFromGRFile(filename)
-    gPrint("Using Source Node: ", source, "\n");
+    gPrint(b"Using Source Node: ", source, b"\n");
     Initialize(&graph, source)
     #printValue(&graph)
     #bfs_pull_topo(&graph)
     bfs_sync(&graph, <GNodeCSR>source)
     verify_bfs(&graph, <GNodeCSR>source)
-    gPrint("Node 1 has dist : ", graph.getData(1), "\n")
+    gPrint(b"Node 1 has dist : ", graph.getData(1), b"\n")
     
 
 

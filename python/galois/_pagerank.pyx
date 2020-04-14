@@ -1,6 +1,6 @@
 # cython: cdivision = True
 
-from galois cimport *
+from galois.shmem cimport *
 from cython.operator cimport preincrement, dereference as deref
 
 ctypedef atomic[uint32_t] atomuint32_t
@@ -36,7 +36,7 @@ cdef uint32_t MAX_ITER = 1000;
 cdef void InitializePR(Graph *g):
     cdef unsigned long numNodes = g[0].size()
     cdef NodeTy *data
-    gPrint("Number of nodes : ", numNodes, "\n")
+    gPrint(b"Number of nodes : ", numNodes, b"\n")
     for n in range(numNodes):
         #gPrint(n,"\n")
         data = &g[0].getData(n)
@@ -46,12 +46,12 @@ cdef void InitializePR(Graph *g):
 cdef void printValuePR(Graph *g):
     cdef unsigned long numNodes = g[0].size()
     cdef NodeTy *data
-    gPrint("Number of nodes : ", numNodes, "\n")
+    gPrint(b"Number of nodes : ", numNodes, b"\n")
     for n in range(numNodes):
         #gPrint(n,"\n")
         data = &g[0].getData(n)
         #if(data[0].nout.load() > 0):
-        gPrint(data[0].rank, "\n")
+        gPrint(data[0].rank, b"\n")
 
 #
 # Operator for computing outdegree of nodes in the Graph
@@ -146,9 +146,9 @@ cdef void pagerankPullTopo(Graph *graph, uint32_t max_iterations) nogil:
         max_delta.reset();
     
     T.stop()
-    gPrint("Elapsed time:", T.get(), " milliseconds.\n")
+    gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")
     if(iteration >= max_iterations):
-        gPrint("ERROR : failed to converge in ", iteration, " iterations\n")
+        gPrint(b"ERROR : failed to converge in ", iteration, b" iterations\n")
     
 
 #
@@ -156,7 +156,7 @@ cdef void pagerankPullTopo(Graph *graph, uint32_t max_iterations) nogil:
 #   
 def pagerank(int numThreads, uint32_t max_iterations, string filename):
     cdef int new_numThreads = setActiveThreads(numThreads)
-    gPrint("Running Pagerank on : ", filename, "\n")
+    gPrint(b"Running Pagerank on : ", filename, b"\n")
     if new_numThreads != numThreads:
         print("Warning, using fewer threads than requested")
     

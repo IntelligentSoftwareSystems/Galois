@@ -1,7 +1,7 @@
-# cython: cdivision = True
-
-from galois cimport *
+# cython: cdivision= True
+from galois.shmem cimport *
 from cython.operator cimport preincrement, dereference as deref
+from libstd.atomic cimport atomic
 
 ctypedef atomic[uint32_t] atomuint32_t
 
@@ -22,15 +22,15 @@ ctypedef LC_CSR_Graph[atomuint32_t, EdgeTy, dummy_true].GraphNode GNodeCSR
 #
 cdef void Initialize(Graph_CSR *g, unsigned long source):
     cdef:
-        unsigned long numNodes = g[0].size() 
+        unsigned long numNodes = g[0].size()
         atomuint32_t *data
-    gPrint("Number of nodes : ", numNodes, "\n")
+    gPrint(b"Number of nodes : ", numNodes, b"\n")
     for n in range(numNodes):
         #gPrint(n,"\n")
         data = &g[0].getData(n)
         if(n == source):
             data[0].store(0)
-            gPrint("Srouce\n")
+            gPrint(b"Srouce\n")
         else:
             data[0].store(numNodes)
         
@@ -69,14 +69,14 @@ cdef void ssspDeltaStep(Graph_CSR *graph, GNodeCSR source):
                     bind_leading(&sssp_operator, graph), no_pushes(), steal(),
                     loopname("SSSP"))
     T.stop()
-    gPrint("Elapsed time:", T.get(), " milliseconds.\n")        
+    gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")        
     
 #
 # Main callsite for Bfs
 #        
 def sssp(int numThreads, unsigned long source, string filename):
     cdef int new_numThreads = setActiveThreads(numThreads)
-    gPrint("Hello this is gprint\n")
+    gPrint(b"Hello this is gprint\n")
     if new_numThreads != numThreads:
         print("Warning, using fewer threads than requested")
     
@@ -86,7 +86,7 @@ def sssp(int numThreads, unsigned long source, string filename):
     ## Read the CSR format of graph
     ## directly from disk.
     graph.readGraphFromGRFile(filename)
-    gPrint("Using Source Node: ", source, "\n");
+    gPrint(b"Using Source Node: ", source, b"\n");
     Initialize(&graph, source)
     #printValue(&graph)
     #bfs_pull_topo(&graph)
