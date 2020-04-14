@@ -86,14 +86,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Always include debug info and aggressive warnings
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
+# Always include debug info
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g>")
 
 # GCC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
     # GCC-{6,7} is a too imprecise
@@ -113,7 +115,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
@@ -123,6 +127,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
