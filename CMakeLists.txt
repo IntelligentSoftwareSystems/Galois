@@ -31,7 +31,6 @@ set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
 set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 ###### General features ######
-set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
@@ -152,11 +151,6 @@ if(ARCH_FLAGS_FOUND)
   add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
   add_link_options(${ARCH_LINK_FLAGS})
 endif()
-
-if(USE_GPROF)
-  add_compile_options(-pg)
-  add_link_options(-pg)
-endif(USE_GPROF)
 
 if(USE_SANITIZER)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
