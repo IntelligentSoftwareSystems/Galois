@@ -1,10 +1,10 @@
 from cython.operator cimport preincrement, dereference as deref
-from .cpp.libgalois.Galois cimport UserContext, iterate, for_each, setActiveThreads, SharedMemSys, loopname, no_conflicts, no_pushes, gPrint, do_all, GReduceMax, InsertBag, steal
-from .cpp.libgalois.Galois cimport LargeArray, MethodFlag, FLAG_UNPROTECTED
-from .cpp.libgalois.graphs.Graph cimport dummy_true, dummy_false, MorphGraph, LC_CSR_Graph
-from .cpp.libgalois.graphs.Util cimport readGraph
-from .cpp.libgalois.Timer cimport Timer
-from .cpp.libstd.atomic cimport atomic
+from libgalois.Galois cimport UserContext, iterate, for_each, setActiveThreads, SharedMemSys, loopname, no_conflicts, no_pushes, gPrint, do_all, GReduceMax, InsertBag, steal
+from libgalois.Galois cimport LargeArray, MethodFlag, FLAG_UNPROTECTED
+from libgalois.graphs.Graph cimport dummy_true, dummy_false, MorphGraph, LC_CSR_Graph
+from libgalois.graphs.Util cimport readGraph
+from libgalois.Timer cimport Timer
+from libstd.atomic cimport atomic
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libcpp cimport bool

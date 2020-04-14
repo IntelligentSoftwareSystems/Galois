@@ -1,4 +1,4 @@
-
+# distutils: language=c++
 from libcpp cimport bool
 from libc.stdint cimport *
 
