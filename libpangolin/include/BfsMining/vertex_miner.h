@@ -162,7 +162,7 @@ public:
 			EmbeddingTy emb(level+1);
 			get_embedding(level, pos, emb);
 			auto vid = this->emb_list.get_vid(level, pos);
-			unsigned start = indices[pos-begin];
+			auto start = indices[pos-begin];
 			for (auto e : this->graph.edges(vid)) {
 				GNode dst = this->graph.getEdgeDst(e);
 				if (API::toAdd(level+1, this->graph, emb, level, dst)) {
@@ -190,7 +190,7 @@ public:
 			//std::cout << "current embedding: " << emb << "\n";
 			for (auto q_edge : this->pattern.edges(level+1)) {
 				VertexId q_dst = this->pattern.getEdgeDst(q_edge);
-				unsigned q_order = q_dst;
+				VertexId q_order = q_dst;
 				if (q_order < level+1) {
 					VertexId d_vertex = emb.get_vertex(q_order);
 					for (auto d_edge : this->graph.edges(d_vertex)) {
@@ -214,10 +214,10 @@ public:
 		galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
 			EmbeddingTy emb(level+1);
 			get_embedding(level, pos, emb);
-			unsigned start = indices[pos-begin];
+			auto start = indices[pos-begin];
 			for (auto q_edge : this->pattern.edges(level+1)) {
 				VertexId q_dst = this->pattern.getEdgeDst(q_edge);
-				unsigned q_order = q_dst;
+				VertexId q_order = q_dst;
 				if (q_order < level+1) {
 					VertexId d_vertex = emb.get_vertex(q_order);
 					for (auto d_edge : this->graph.edges(d_vertex)) {
@@ -365,7 +365,7 @@ private:
 	LocalStrCgMapFreq cg_localmaps; // canonical graph local map for each thread
 	std::vector<BYTE> is_wedge; // indicate a 3-vertex embedding is a wedge or chain (v0-cntered or v1-centered)
 
-	inline void get_embedding(unsigned level, unsigned pos, EmbeddingTy &emb) {
+	inline void get_embedding(unsigned level, size_t pos, EmbeddingTy &emb) {
 		auto vid = this->emb_list.get_vid(level, pos);
 		auto idx = this->emb_list.get_idx(level, pos);
 		ElementTy ele(vid);

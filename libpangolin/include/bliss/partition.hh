@@ -98,6 +98,7 @@ private:
 
   class BacktrackInfo {
   public:
+    BacktrackInfo() : refinement_stack_size(0), cr_backtrack_point(0) {}
     unsigned int refinement_stack_size;
     unsigned int cr_backtrack_point;
   };

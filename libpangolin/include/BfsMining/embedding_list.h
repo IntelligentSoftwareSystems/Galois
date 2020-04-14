@@ -60,7 +60,7 @@ public:
 	}
 	void clean() {
 		pid_list.clear();
-		for (unsigned i = 0; i < vid_lists.size(); i ++) {
+		for (size_t i = 0; i < vid_lists.size(); i ++) {
 			if (std::is_same<ElementType,LabeledElement>::value)
 				his_lists[i].clear();
 			idx_lists[i].clear();
