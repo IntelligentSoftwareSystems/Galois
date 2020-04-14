@@ -45,6 +45,7 @@ set(sources
         src/ParaMeter.cpp
         src/DynamicBitset.cpp
         src/Tracer.cpp
+        src/ThreadTimer.cpp
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
