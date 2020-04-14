@@ -20,13 +20,13 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
+#include "galois/config.h"
 #include "galois/gIO.h" // TODO: remove
 #include "galois/gtuple.h"
 #include "galois/Mem.h"
 #include "galois/Timer.h"
 #include "galois/Threads.h"
 #include "galois/Traits.h"
-#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/ForEachTraits.h"

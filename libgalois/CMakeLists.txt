@@ -4,7 +4,7 @@ set_target_properties(galois_shmem PROPERTIES EXPORT_NAME shmem)
 add_dependencies(lib galois_shmem)
 
 configure_file(src/Version.cpp.in Version.cpp @ONLY)
-configure_file(include/galois/runtime/config.h.in include/galois/runtime/config.h)
+configure_file(include/galois/config.h.in include/galois/config.h)
 
 set(sources
         src/SharedMemSys.cpp

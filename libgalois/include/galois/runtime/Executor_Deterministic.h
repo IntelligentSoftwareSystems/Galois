@@ -21,12 +21,12 @@
 #define GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 
 #include "galois/Bag.h"
+#include "galois/config.h"
 #include "galois/gslist.h"
 #include "galois/Threads.h"
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
 #include "galois/ParallelSTL.h"
-#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/ForEachTraits.h"
