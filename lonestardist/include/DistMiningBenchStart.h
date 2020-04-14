@@ -31,9 +31,6 @@
 #include "galois/graphs/GluonEdgeSubstrate.h"
 #include "DistributedGraphLoader.h"
 #include "galois/AtomicHelpers.h"
-#ifdef GALOIS_USE_EXP
-#include "galois/CompilerHelpers.h"
-#endif
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/cuda/EdgeHostDecls.h"

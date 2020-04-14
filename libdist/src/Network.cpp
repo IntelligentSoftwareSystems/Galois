@@ -50,8 +50,8 @@ void NetworkInterface::initializeMPI() {
     MPI_Abort(MPI_COMM_WORLD, initSuccess);
   }
 
-  if (supportProvided < MPI_THREAD_MULTIPLE) {
-    GALOIS_DIE("Thread multiple (MPI) not supported.");
+  if (supportProvided != MPI_THREAD_MULTIPLE) {
+    GALOIS_DIE("MPI_THREAD_MULTIPLE not supported.");
   }
 }
 

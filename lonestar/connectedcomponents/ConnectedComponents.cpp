@@ -60,6 +60,7 @@ enum Algo {
   edgeafforest,
   edgetiledafforest,
 };
+
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::async, "Async", "Asynchronous"),
@@ -77,9 +78,9 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::edgeafforest, "EdgeAfforest",
                            "Using Afforest sampling, Edge-wise"),
                 clEnumValN(Algo::edgetiledafforest, "EdgetiledAfforest",
-                           "Using Afforest sampling, EdgeTiled"),
+                           "Using Afforest sampling, EdgeTiled")
 
-                clEnumValEnd),
+                ),
     cll::init(Algo::edgetiledasync));
 
 static cll::opt<std::string>
@@ -100,8 +101,8 @@ static cll::opt<OutputEdgeType> writeEdgeType(
     cll::values(
         clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
         clEnumValN(OutputEdgeType::int32_, "int32", "32 bit edge values"),
-        clEnumValN(OutputEdgeType::int64_, "int64", "64 bit edge values"),
-        clEnumValEnd),
+        clEnumValN(OutputEdgeType::int64_, "int64", "64 bit edge values")
+        ),
     cll::init(OutputEdgeType::void_));
 #endif
 
@@ -739,7 +740,7 @@ struct AfforestAlgo {
             graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
         Graph::edge_iterator ei =
             graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-        for (std::advance(ii, NEIGHBOR_SAMPLES); ii < ei; ++ii) {
+        for (std::advance(ii, NEIGHBOR_SAMPLES.getValue()); ii < ei; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           sdata.link(&ddata);
@@ -858,7 +859,7 @@ struct EdgeAfforestAlgo {
         const auto end =
            graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
-        for (std::advance(beg, NEIGHBOR_SAMPLES); beg < end; beg++) {
+        for (std::advance(beg, NEIGHBOR_SAMPLES.getValue()); beg < end; beg++) {
           GNode dst = graph.getEdgeDst(beg);
           NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           if (src < dst || c == ddata.component()) {
@@ -995,7 +996,7 @@ struct EdgeTiledAfforestAlgo {
         const auto end =
            graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
-        for (std::advance(beg, NEIGHBOR_SAMPLES); beg + EDGE_TILE_SIZE < end;) {
+        for (std::advance(beg, NEIGHBOR_SAMPLES.getValue()); beg + EDGE_TILE_SIZE < end;) {
           auto ne = beg + EDGE_TILE_SIZE;
           assert(ne < end);
           works.push_back(EdgeTile{src, beg, ne});

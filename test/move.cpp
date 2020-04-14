@@ -21,9 +21,6 @@
 #include "galois/gdeque.h"
 #include "galois/gslist.h"
 #include "galois/FlatMap.h"
-#ifdef GALOIS_USE_EXP
-#include "galois/ConcurrentFlatMap.h"
-#endif
 #include "galois/LargeArray.h"
 #include "galois/runtime/Mem.h"
 #include "galois/substrate/PerThreadStorage.h"
@@ -99,18 +96,11 @@ int main() {
   test(galois::LargeArray<MoveOnly>());
   test(galois::substrate::PerSocketStorage<MoveOnly>());
   test(galois::substrate::PerThreadStorage<MoveOnly>());
-#ifdef GALOIS_USE_EXP
-  test(galois::concurrent_flat_map<int, MoveOnly>());
-#endif
 
   testContainerA(galois::gdeque<MoveOnly>(), MoveOnly());
   testContainerAA(galois::gslist<MoveOnly>(), MoveOnly());
   // testContainerAA(galois::concurrent_gslist<MoveOnly>(), MoveOnly());
   testContainerA(galois::InsertBag<MoveOnly>(), MoveOnly());
-#ifdef GALOIS_USE_EXP
-  testContainerB(galois::concurrent_flat_map<int, MoveOnly>(),
-                 std::make_pair(1, MoveOnly()));
-#endif
   testContainerC(galois::gdeque<MoveOnly>(), MoveOnly());
 
   return 0;

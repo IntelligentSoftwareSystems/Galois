@@ -1,8 +1,0 @@
-diff -Naur src/CMakeLists.txt src.patched/CMakeLists.txt
---- src/CMakeLists.txt  1969-12-31 18:00:00.000000000 -0600
-+++ src.patched/CMakeLists.txt  2011-06-22 11:50:25.697422244 -0500
-@@ -0,0 +1,4 @@
-+cmake_minimum_required(VERSION 2.6)
-+add_definitions(-DCUT_ONLY -DPRINT_STAT)
-+add_executable(hi_pr hi_pr.c)
-+install(TARGETS hi_pr DESTINATION bin)

@@ -20,6 +20,7 @@
 #include "galois/runtime/Context.h"
 #include "galois/substrate/SimpleLock.h"
 #include "galois/substrate/CacheLineStorage.h"
+#include "galois/runtime/config.h"
 
 #include <stdio.h>
 
@@ -58,16 +59,6 @@ void galois::runtime::setThreadContext(
 galois::runtime::SimpleRuntimeContext* galois::runtime::getThreadContext() {
   return thread_ctx;
 }
-
-#ifdef GALOIS_USE_EXP
-bool galois::runtime::owns(Lockable* lockable, MethodFlag m) {
-  SimpleRuntimeContext* ctx = getThreadContext();
-  if (ctx) {
-    return ctx->owns(lockable, m);
-  }
-  return false;
-}
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // LockManagerBase & SimpleRuntimeContext
@@ -143,10 +134,3 @@ void galois::runtime::SimpleRuntimeContext::subAcquire(
     galois::runtime::Lockable* lockable, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }
-
-#ifdef GALOIS_USE_EXP
-bool galois::runtime::SimpleRuntimeContext::owns(
-    galois::runtime::Lockable* lockable, galois::MethodFlag) const {
-  GALOIS_DIE("SimpleRuntimeContext::owns Not Implemented");
-}
-#endif

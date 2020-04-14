@@ -79,7 +79,7 @@ static cll::opt<Algo>
                      clEnumVal(serDelta, "serDelta"),
                      clEnumVal(dijkstraTile, "dijkstraTile"),
                      clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
-                     clEnumVal(topoTile, "topoTile"), clEnumValEnd),
+                     clEnumVal(topoTile, "topoTile")),
          cll::init(deltaTile));
 
 // typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>,
@@ -376,10 +376,10 @@ int main(int argc, char** argv) {
   }
 
   auto it = graph.begin();
-  std::advance(it, startNode);
+  std::advance(it, startNode.getValue());
   source = *it;
   it     = graph.begin();
-  std::advance(it, reportNode);
+  std::advance(it, reportNode.getValue());
   report = *it;
 
   size_t approxNodeData = graph.size() * 64;

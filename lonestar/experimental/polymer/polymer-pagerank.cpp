@@ -29,10 +29,7 @@
 #include "galois/Graph/LCGraph.h"
 #include "galois/Graph/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
-
-#ifdef GALOIS_USE_EXP
 #include "galois/worklists/WorkListDebug.h"
-#endif
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
@@ -43,11 +40,9 @@
 #include <numa.h>
 
 #include "PageRank.h"
-#ifdef GALOIS_USE_EXP
 #include "GraphLabAlgo.h"
 #include "LigraAlgo.h"
 #include "PagerankDelta.h"
-#endif
 #define PAGESIZE (4096)
 
 namespace cll = llvm::cl;
@@ -116,7 +111,6 @@ static cll::opt<Algo> algo(
                            "Prioritized (max. residual) version..."),
                 clEnumValN(Algo::prt_deg, "prt_deg",
                            "Prioritized (degree biased) version..."),
-#ifdef GALOIS_USE_EXP
                 clEnumValN(Algo::graphlab, "graphlab",
                            "Use GraphLab programming model"),
                 clEnumValN(Algo::graphlabAsync, "graphlabAsync",
@@ -126,7 +120,6 @@ static cll::opt<Algo> algo(
                            "Use Ligra and GraphChi programming model"),
                 clEnumValN(Algo::pagerankWorklist, "pagerankWorklist",
                            "Use worklist-based algorithm"),
-#endif
                 clEnumValEnd),
     cll::init(Algo::pull));
 
@@ -3598,11 +3591,7 @@ struct PrtRsd {
     using namespace galois::worklists;
     typedef PerSocketChunkLIFO<4> PSchunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk> OBIM;
-#ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
-#else
-    typedef OBIM dOBIM;
-#endif
     galois::InsertBag<UpdateRequest> initialWL;
     galois::do_all(graph, [&initialWL, &graph](GNode src) {
       LNode& data = graph.getData(src);
@@ -3978,7 +3967,6 @@ int main(int argc, char** argv) {
   case Algo::prt_deg:
     run<PrtDeg>();
     break;
-#ifdef GALOIS_USE_EXP
   case Algo::ligra:
     run<LigraAlgo<false>>();
     break;
@@ -3994,7 +3982,6 @@ int main(int argc, char** argv) {
   case Algo::pagerankWorklist:
     run<PagerankDelta>();
     break;
-#endif
   case Algo::serial:
     run<SerialAlgo>();
     break;

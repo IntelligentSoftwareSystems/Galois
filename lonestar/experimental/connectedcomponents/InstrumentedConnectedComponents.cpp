@@ -35,13 +35,11 @@
 #include <algorithm>
 #include <iostream>
 
-#ifdef GALOIS_USE_EXP
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #include "GraphChiAlgo.h"
 #include "galois/worklists/WorkSet.h"
 #include "galois/worklists/MarkingSet.h"
-#endif
 
 #include <ostream>
 #include <fstream>
@@ -174,7 +172,6 @@ static cll::opt<Algo> algo(
             "Using label propagation algorithm w/ possibly stale lables"),
         clEnumValN(Algo::serial, "serial", "Serial"),
         clEnumValN(Algo::synchronous, "sync", "Synchronous"),
-#ifdef GALOIS_USE_EXP
         clEnumValN(Algo::asyncOSet, "asyncOSet",
                    "async with a two-level set uni-set scheduler"),
         clEnumValN(Algo::asyncHSet, "asyncHSet",
@@ -311,7 +308,6 @@ static cll::opt<Algo> algo(
         clEnumValN(Algo::ligraChi, "ligraChi",
                    "Using Ligra and GraphChi programming model"),
         clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
-#endif
         clEnumValEnd),
     cll::init(Algo::async));
 
@@ -504,7 +500,6 @@ struct SynchronousAlgo {
   }
 };
 
-#ifdef GALOIS_USE_EXP
 template <typename Graph, typename GNode = typename Graph::GraphNode>
 struct LabelDivIndexer : public std::unary_function<GNode, unsigned int> {
   Graph& graph;
@@ -831,7 +826,6 @@ struct LabelPropNoCasAlgo {
     } // end switch
   }
 };
-#endif
 
 template <bool UseStaleValue>
 struct LabelPropAlgo {
@@ -981,7 +975,6 @@ struct LabelPropAlgo {
     auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
     galois::do_all(graph, Initialize(graph));
-#ifdef GALOIS_USE_EXP
     switch (algo) {
     case Algo::labelPropMSet:
     case Algo::staleLpMSet:
@@ -1137,20 +1130,16 @@ struct LabelPropAlgo {
                          galois::wl<ShrObimHSet>(dummy, shrIndexer));
       break;
     default:
-#endif
       if (symmetricGraph) {
         galois::for_each(graph, Process<true, false>(graph), galois::wl<WL>());
       } else {
         galois::for_each(graph, Process<true, true>(graph), galois::wl<WL>());
       }
-#ifdef GALOIS_USE_EXP
       break;
     } // end switch
-#endif
   }
 };
 
-#ifdef GALOIS_USE_EXP
 //! Assumes symmetric graph
 struct PullLPAlgo {
   struct LNode {
@@ -1448,7 +1437,6 @@ struct PullLPCASAlgo {
     } // end switch
   }
 };
-#endif
 
 struct AsyncOCAlgo {
   typedef galois::graphs::OCImmutableEdgeGraph<Node, void> Graph;
@@ -1545,7 +1533,6 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph) {
     galois::Statistic emptyMerges("EmptyMerges");
-#ifdef GALOIS_USE_EXP
     if (algo == Algo::asyncOSet) {
       galois::for_each(
           graph, Merge(graph, emptyMerges),
@@ -1555,11 +1542,8 @@ struct AsyncAlgo {
           graph, Merge(graph, emptyMerges),
           galois::wl<galois::worklists::PerSocketChunkTwoLevelHashFIFO<32>>());
     } else {
-#endif
       galois::for_each(graph, Merge(graph, emptyMerges));
-#ifdef GALOIS_USE_EXP
     }
-#endif
   }
 };
 
@@ -2000,7 +1984,6 @@ int main(int argc, char** argv) {
   case Algo::synchronous:
     run<SynchronousAlgo>();
     break;
-#ifdef GALOIS_USE_EXP
   case Algo::asyncOSet:
     run<AsyncAlgo>();
     break;
@@ -2208,7 +2191,6 @@ int main(int argc, char** argv) {
   case Algo::ligra:
     run<LigraAlgo<false>>();
     break;
-#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();

@@ -33,10 +33,8 @@
 #include <string>
 
 #include "HybridBFS.h"
-#ifdef GALOIS_USE_EXP
 #include "GraphLabAlgo.h"
 #include "LigraAlgo.h"
-#endif
 #include "BFS.h"
 
 static const char* name = "Diameter Estimation";
@@ -452,7 +450,6 @@ int main(int argc, char** argv) {
   case Algo::pickK:
     run<PickKAlgo>();
     break;
-#ifdef GALOIS_USE_EXP
   case Algo::ligra:
     run<LigraDiameter<false>>();
     break;
@@ -462,7 +459,6 @@ int main(int argc, char** argv) {
   case Algo::graphlab:
     run<GraphLabDiameter<true>>();
     break;
-#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();

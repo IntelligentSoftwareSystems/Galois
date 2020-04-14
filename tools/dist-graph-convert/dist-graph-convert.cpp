@@ -56,8 +56,8 @@ static cll::opt<EdgeType>
     edgeType("edgeType", cll::desc("Input/Output edge type:"),
              cll::values(clEnumValN(EdgeType::uint32_, "uint32",
                                     "32 bit unsigned int edge values"),
-                         clEnumValN(EdgeType::void_, "void", "no edge values"),
-                         clEnumValEnd),
+                         clEnumValN(EdgeType::void_, "void", "no edge values")
+                         ),
              cll::init(EdgeType::void_));
 
 static cll::opt<ConvertMode> convertMode(
@@ -73,8 +73,8 @@ static cll::opt<ConvertMode> convertMode(
                           "or multi-edges; edge data will be ignored"),
                 clEnumVal(gr2rgr, "Convert binary gr to randomized binary gr"),
                 clEnumVal(tgr2lux, "Convert transpose graph to Lux CSC"),
-                clEnumVal(nodemap2binary, "Convert node map into binary form"),
-                clEnumValEnd),
+                clEnumVal(nodemap2binary, "Convert node map into binary form")
+                ),
     cll::Required);
 
 static cll::opt<unsigned long long>
@@ -680,7 +680,7 @@ int main(int argc, char** argv) {
         }
       }
       // overwrite new symmetric graph with clean version of self
-      inputFilename = outputFilename;
+      inputFilename = outputFilename.getValue();
       convert<Gr2CGr>();
     }
 

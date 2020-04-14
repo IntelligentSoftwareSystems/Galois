@@ -67,8 +67,8 @@ static cll::opt<Algo>
              clEnumValN(Algo::sgdBlockJump, "sgdBlockJump",
                         "SGD using Block jumping "),
              clEnumValN(Algo::sgdByItems, "sgdByItems", "Simple SGD on Items"),
-             clEnumValN(Algo::sgdByEdges, "sgdByEdges", "Simple SGD on edges"),
-             clEnumValEnd),
+             clEnumValN(Algo::sgdByEdges, "sgdByEdges", "Simple SGD on edges")
+             ),
          cll::init(Algo::sgdBlockEdge));
 /*
  * Commandline options for different learning functions
@@ -79,7 +79,7 @@ static cll::opt<Step> learningRateFunction(
                 clEnumValN(Step::purdue, "purdue", "Purdue"),
                 clEnumValN(Step::bottou, "bottou", "Bottou"),
                 clEnumValN(Step::bold, "bold", "Bold (default)"),
-                clEnumValN(Step::inverse, "inverse", "Inverse"), clEnumValEnd),
+                clEnumValN(Step::inverse, "inverse", "Inverse")),
     cll::init(Step::bold));
 
 static cll::opt<int> cutoff("cutoff");

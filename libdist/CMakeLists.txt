@@ -1,4 +1,9 @@
-set(sources
+add_library(galois_dist_async STATIC)
+add_library(Galois::dist_async ALIAS galois_dist_async)
+add_dependencies(lib galois_dist_async)
+set_target_properties(galois_dist_async PROPERTIES EXPORT_NAME dist_async)
+
+target_sources(galois_dist_async PRIVATE
         src/Barrier.cpp
         src/DistGalois.cpp
         src/DistStats.cpp
@@ -8,41 +13,52 @@ set(sources
         src/NetworkLCI.cpp
 )
 
-add_library(galois_dist_async_obj OBJECT ${sources})
-target_include_directories(galois_dist_async_obj PUBLIC
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libdist/include
-  ${CMAKE_SOURCE_DIR}/libtsuba/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+target_include_directories(galois_dist_async PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(galois_dist_async_obj PUBLIC MPI::MPI_CXX)
+target_link_libraries(galois_dist_async PUBLIC MPI::MPI_CXX)
+target_link_libraries(galois_dist_async PUBLIC galois_shmem)
+target_link_libraries(galois_dist_async PRIVATE tsuba)
 
-# new galois net library; link to shared memory galois
-add_library(galois_dist_async STATIC $<TARGET_OBJECTS:galois_dist_async_obj>)
-target_link_libraries(galois_dist_async PUBLIC galois_shmem gllvm)
+target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
 
 if (USE_BARE_MPI)
   target_compile_definitions(galois_dist_async PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
 endif()
 
-target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
-
 if (USE_LCI)
+  add_definitions(-DGALOIS_USE_LWCI)
+  set(LWCI_ROOT "${PROJECT_SOURCE_DIR}/liblci")
+  set(LWCI_INCLUDE "${LWCI_ROOT}/include")
+  set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
+
+  add_custom_command(
+    OUTPUT ${LWCI_LIBRARY}
+    COMMAND make -C ${LWCI_ROOT}
+  )
+  add_custom_target(lci DEPENDS ${LWCI_LIBRARY})
+
   add_dependencies(galois_dist_async lci)
   target_link_libraries(galois_dist_async PRIVATE ${LWCI_LIBRARY} -lpsm2)
-endif()
+  target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
+endif(USE_LCI)
 
-target_link_libraries(galois_dist_async PUBLIC MPI::MPI_CXX)
-
-target_include_directories(galois_dist_async PUBLIC
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libdist/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+install(
+  DIRECTORY include/
+  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
 )
 
-if (USE_LCI)
-  target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
-endif()
+install(TARGETS galois_dist_async
+  EXPORT GaloisTargets
+  LIBRARY
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT shlib
+  ARCHIVE
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
