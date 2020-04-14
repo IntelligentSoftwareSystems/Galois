@@ -20,8 +20,10 @@
 #ifndef GALOIS_OPTIONAL_H
 #define GALOIS_OPTIONAL_H
 
-#include "galois/LazyObject.h"
 #include <cassert>
+
+#include "galois/config.h"
+#include "galois/LazyObject.h"
 
 namespace galois {
 

@@ -24,6 +24,8 @@
 #include <memory>
 #include <vector>
 
+#include "galois/config.h"
+
 namespace galois {
 namespace substrate {
 

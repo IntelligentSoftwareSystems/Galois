@@ -20,11 +20,12 @@
 #ifndef GALOIS_SUBSTRATE_SIMPLELOCK_H
 #define GALOIS_SUBSTRATE_SIMPLELOCK_H
 
-#include "galois/substrate/CompilerSpecific.h"
-
-#include <cassert>
 #include <atomic>
+#include <cassert>
 #include <mutex>
+
+#include "galois/config.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 namespace substrate {

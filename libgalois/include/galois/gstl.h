@@ -20,8 +20,6 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
-#include "galois/PriorityQueue.h"
-
 #include <algorithm>
 #include <iterator>
 #include <utility>
@@ -33,6 +31,9 @@
 #include <list>
 #include <string>
 #include <sstream>
+
+#include "galois/config.h"
+#include "galois/PriorityQueue.h"
 
 namespace galois {
 

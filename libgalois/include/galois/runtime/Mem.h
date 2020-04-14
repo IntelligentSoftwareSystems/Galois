@@ -20,22 +20,24 @@
 #ifndef GALOIS_RUNTIME_MEM_H
 #define GALOIS_RUNTIME_MEM_H
 
-#include "galois/substrate/PerThreadStorage.h"
-#include "galois/substrate/SimpleLock.h"
-#include "galois/substrate/PtrLock.h"
-#include "galois/substrate/CacheLineStorage.h"
-#include "galois/substrate/NumaMem.h"
-#include "galois/gIO.h"
-#include "galois/runtime/PagePool.h"
-
-#include <memory>
-#include <boost/utility.hpp>
-#include <cstdlib>
-#include <cstring>
-#include <map>
-#include <list>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <list>
+#include <map>
+#include <memory>
+
+#include <boost/utility.hpp>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/runtime/PagePool.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/NumaMem.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 namespace galois {
 namespace runtime {

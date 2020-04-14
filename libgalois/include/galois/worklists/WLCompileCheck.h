@@ -20,6 +20,8 @@
 #ifndef GALOIS_WORKLIST_WLCOMPILECHECK_H
 #define GALOIS_WORKLIST_WLCOMPILECHECK_H
 
+#include "galois/config.h"
+
 #ifndef GALOIS_WLCOMPILECHECK
 #define GALOIS_WLCOMPILECHECK(name) //
 #endif

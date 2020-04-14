@@ -20,9 +20,10 @@
 #ifndef GALOIS_GRAPH_UTIL_H
 #define GALOIS_GRAPH_UTIL_H
 
+#include "galois/config.h"
 #include "galois/Galois.h"
-#include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/Timer.h"
 
 namespace galois {

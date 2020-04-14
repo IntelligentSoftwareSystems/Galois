@@ -25,6 +25,8 @@
 #ifndef GALOIS_GRAPH__B_LC_CSR_GRAPH_H
 #define GALOIS_GRAPH__B_LC_CSR_GRAPH_H
 
+#include "galois/config.h"
+
 #include "galois/graphs/LC_CSR_Graph.h"
 
 namespace galois {

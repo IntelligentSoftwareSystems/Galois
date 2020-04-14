@@ -20,6 +20,7 @@
 #ifndef _GALOIS_RUNTIME_TILEDEXECUTOR_H_
 #define _GALOIS_RUNTIME_TILEDEXECUTOR_H_
 
+#include "galois/config.h"
 #include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/NoDerefIterator.h"

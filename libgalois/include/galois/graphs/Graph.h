@@ -20,8 +20,9 @@
 #ifndef GALOIS_GRAPH_GRAPH_H
 #define GALOIS_GRAPH_GRAPH_H
 
-#include "MorphGraph.h"
-#include "LCGraph.h"
-#include "Util.h"
+#include "galois/config.h"
+#include "galois/graphs/MorphGraph.h"
+#include "galois/graphs/LCGraph.h"
+#include "galois/graphs/Util.h"
 
 #endif

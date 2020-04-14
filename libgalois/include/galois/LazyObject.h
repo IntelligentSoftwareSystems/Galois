@@ -20,15 +20,15 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
+#include <type_traits>
+#include <utility>
+
+#include <boost/type_traits/has_trivial_constructor.hpp>
+
+#include "galois/config.h"
 #include "galois/gIO.h"
 #include "galois/TypeTraits.h"
 
-// For consistent name, use boost rather than C++11
-// std::is_trivially_constuctible
-#include <boost/type_traits/has_trivial_constructor.hpp>
-
-#include <type_traits>
-#include <utility>
 
 namespace galois {
 

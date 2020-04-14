@@ -28,25 +28,25 @@
 #ifndef GALOIS_GRAPH_FILEGRAPH_H
 #define GALOIS_GRAPH_FILEGRAPH_H
 
+#include <cstring>
+#include <deque>
+#include <type_traits>
+#include <vector>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+
+#include "galois/config.h"
 #include "galois/Endian.h"
 #include "galois/MethodFlags.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/Details.h"
+#include "galois/graphs/GraphHelpers.h"
 #include "galois/runtime/Context.h"
 #include "galois/substrate/CacheLineStorage.h"
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/substrate/NumaMem.h"
 #include "galois/Reduction.h"
-
-#include "galois/graphs/GraphHelpers.h"
-
-#include <boost/iterator/counting_iterator.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-
-#include <type_traits>
-#include <deque>
-#include <vector>
-#include <string.h>
 
 namespace galois {
 namespace graphs {

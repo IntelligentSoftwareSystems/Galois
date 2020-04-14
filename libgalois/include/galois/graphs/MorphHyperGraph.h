@@ -26,30 +26,30 @@
 #ifndef GALOIS_GRAPH_MORPHGRAPH_H
 #define GALOIS_GRAPH_MORPHGRAPH_H
 
-//#define AUX_MAP
+#include <algorithm>
+#include <map>
+#include <set>
+#include <type_traits>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/functional.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/filter_iterator.hpp>
 
 #include "galois/Bag.h"
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 #include "galois/gstl.h"
+
 #ifdef AUX_MAP
 #include "galois/PerThreadContainer.h"
 #else
 #include "galois/substrate/CacheLineStorage.h"
 #include "galois/substrate/SimpleLock.h"
 #endif
-#include "galois/graphs/FileGraph.h"
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
-#include <boost/functional.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/container/small_vector.hpp>
-
-#include <algorithm>
-#include <map>
-#include <set>
-#include <type_traits>
-#include <vector>
 
 namespace galois {
 namespace graphs {

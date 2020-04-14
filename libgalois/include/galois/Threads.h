@@ -20,6 +20,8 @@
 #ifndef GALOIS_THREADS_H
 #define GALOIS_THREADS_H
 
+#include "galois/config.h"
+
 namespace galois {
 
 /**

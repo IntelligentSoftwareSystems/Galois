@@ -20,11 +20,12 @@
 #ifndef GALOIS_SUBSTRATE_BARRIER_H
 #define GALOIS_SUBSTRATE_BARRIER_H
 
-#include "galois/substrate/ThreadPool.h"
-#include "galois/gIO.h"
-
-#include <memory>
 #include <functional>
+#include <memory>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/substrate/ThreadPool.h"
 
 namespace galois {
 namespace substrate {

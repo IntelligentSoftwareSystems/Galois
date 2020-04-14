@@ -20,9 +20,10 @@
 #ifndef GALOIS_SUBSTRATE_ENVCHECK_H
 #define GALOIS_SUBSTRATE_ENVCHECK_H
 
+#include <cassert>
 #include <string>
 
-#include <cassert>
+#include "galois/config.h"
 
 namespace galois {
 namespace substrate {

@@ -20,12 +20,13 @@
 #ifndef GALOIS_GRAPH_LC_INOUT_GRAPH_H
 #define GALOIS_GRAPH_LC_INOUT_GRAPH_H
 
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at_c.hpp>
+
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/Galois.h"
 
 namespace galois {
 namespace graphs {

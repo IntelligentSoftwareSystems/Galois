@@ -20,20 +20,20 @@
 #ifndef GALOIS_RUNTIME_PAGEPOOL_H
 #define GALOIS_RUNTIME_PAGEPOOL_H
 
-#include "galois/gIO.h"
-#include "galois/substrate/SimpleLock.h"
-#include "galois/substrate/PtrLock.h"
-#include "galois/substrate/CacheLineStorage.h"
-#include "galois/substrate/PageAlloc.h"
-#include "galois/substrate/ThreadPool.h"
-
-#include <unordered_map>
-#include <vector>
+#include <cstddef>
+#include <deque>
 #include <mutex>
 #include <numeric>
-#include <deque>
+#include <unordered_map>
+#include <vector>
 
-#include <cstddef>
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PageAlloc.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/ThreadPool.h"
 
 namespace galois {
 namespace runtime {

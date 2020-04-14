@@ -20,6 +20,7 @@
 #ifndef GALOIS_LOOPS_H
 #define GALOIS_LOOPS_H
 
+#include "galois/config.h"
 #include "galois/runtime/Executor_Deterministic.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_ForEach.h"

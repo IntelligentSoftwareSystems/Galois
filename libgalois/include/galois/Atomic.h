@@ -20,9 +20,10 @@
 #ifndef GALOIS_ATOMIC_H
 #define GALOIS_ATOMIC_H
 
-#include "galois/substrate/CacheLineStorage.h"
-
 #include <iterator>
+
+#include "galois/config.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 namespace galois {
 

@@ -20,11 +20,13 @@
 #ifndef __GALOIS_GRAPH_HELPERS__
 #define __GALOIS_GRAPH_HELPERS__
 
-#include <galois/gIO.h>
-
-#include <boost/iterator/counting_iterator.hpp>
 #include <cassert>
 #include <vector>
+
+#include <boost/iterator/counting_iterator.hpp>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 namespace graphs {

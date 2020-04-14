@@ -20,16 +20,17 @@
 #ifndef GALOIS_GRAPH_OCGRAPH_H
 #define GALOIS_GRAPH_OCGRAPH_H
 
-#include "galois/optional.h"
-#include "galois/LazyObject.h"
-#include "galois/LargeArray.h"
-#include "galois/graphs/Details.h"
+#include <string>
+#include <type_traits>
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
 
-#include <type_traits>
-#include <string>
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/LazyObject.h"
+#include "galois/LargeArray.h"
+#include "galois/optional.h"
 
 namespace galois {
 namespace graphs {

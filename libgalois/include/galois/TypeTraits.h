@@ -20,8 +20,10 @@
 #ifndef GALOIS_TYPETRAITS_H
 #define GALOIS_TYPETRAITS_H
 
-#include "galois/substrate/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
+
+#include "galois/config.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 namespace DEPRECATED {

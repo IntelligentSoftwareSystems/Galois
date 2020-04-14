@@ -27,6 +27,7 @@
 #ifndef __COND_REDUCTION__
 #define __COND_REDUCTION__
 
+#include "galois/config.h"
 #include "galois/Reduction.h"
 
 /**

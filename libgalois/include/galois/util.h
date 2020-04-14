@@ -23,6 +23,8 @@
 #include <string>
 #include <sstream>
 
+#include "galois/config.h"
+
 namespace galois {
 
 template <typename C>

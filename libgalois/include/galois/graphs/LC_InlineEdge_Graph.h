@@ -20,11 +20,12 @@
 #ifndef GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
 #define GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
 
+#include <type_traits>
+
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-
-#include <type_traits>
 
 namespace galois {
 namespace graphs {

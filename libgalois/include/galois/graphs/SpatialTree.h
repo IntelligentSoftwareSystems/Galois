@@ -20,6 +20,8 @@
 #ifndef GALOIS_GRAPH_SPATIALTREE_H
 #define GALOIS_GRAPH_SPATIALTREE_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace graphs {
 

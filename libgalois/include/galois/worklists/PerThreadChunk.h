@@ -21,12 +21,12 @@
 #define GALOIS_WORKLIST_PERTHREADCHUNK_H
 
 #include "galois/FixedSizeRing.h"
-#include "galois/Threads.h"
+#include "galois/runtime/Mem.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/substrate/PtrLock.h"
-#include "galois/runtime/Mem.h"
-#include "WLCompileCheck.h"
+#include "galois/Threads.h"
+#include "galois/worklists/WLCompileCheck.h"
 
 namespace galois {
 namespace worklists {

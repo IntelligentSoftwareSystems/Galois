@@ -20,13 +20,14 @@
 #ifndef GALOIS_GSLIST_H
 #define GALOIS_GSLIST_H
 
-#include "galois/FixedSizeRing.h"
-#include "galois/TwoLevelIteratorA.h"
+#include <type_traits>
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/mpl/if.hpp>
 
-#include <type_traits>
+#include "galois/config.h"
+#include "galois/FixedSizeRing.h"
+#include "galois/TwoLevelIteratorA.h"
 
 namespace galois {
 

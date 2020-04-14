@@ -20,11 +20,12 @@
 #ifndef GALOIS_RUNTIME_FOREACHTRAITS_H
 #define GALOIS_RUNTIME_FOREACHTRAITS_H
 
+#include <tuple>
+
+#include "galois/config.h"
 #include "galois/gtuple.h"
 #include "galois/Traits.h"
 #include "galois/TypeTraits.h"
-
-#include <tuple>
 
 namespace galois {
 namespace runtime {

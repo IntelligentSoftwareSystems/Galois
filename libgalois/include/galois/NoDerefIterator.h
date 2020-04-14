@@ -22,6 +22,8 @@
 
 #include "boost/iterator/iterator_adaptor.hpp"
 
+#include "galois/config.h"
+
 namespace galois {
 
 //! Modify an iterator so that *it == it

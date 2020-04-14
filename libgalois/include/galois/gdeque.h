@@ -20,6 +20,7 @@
 #ifndef GALOIS_GDEQUE_H
 #define GALOIS_GDEQUE_H
 
+#include "galois/config.h"
 #include "galois/FixedSizeRing.h"
 #include "galois/Mem.h"
 #include "galois/TwoLevelIteratorA.h"

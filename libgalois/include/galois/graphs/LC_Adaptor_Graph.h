@@ -20,8 +20,9 @@
 #ifndef GALOIS_GRAPH_LC_ADAPTOR_H
 #define GALOIS_GRAPH_LC_ADAPTOR_H
 
-#include "galois/LargeArray.h"
+#include "galois/config.h"
 #include "galois/graphs/Details.h"
+#include "galois/LargeArray.h"
 
 namespace galois {
 namespace graphs {

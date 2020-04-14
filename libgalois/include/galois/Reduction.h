@@ -20,10 +20,11 @@
 #ifndef GALOIS_REDUCTION_H
 #define GALOIS_REDUCTION_H
 
+#include <limits>
+
+#include "galois/config.h"
 #include "galois/gstl.h"
 #include "galois/substrate/PerThreadStorage.h"
-
-#include <limits>
 
 namespace galois {
 

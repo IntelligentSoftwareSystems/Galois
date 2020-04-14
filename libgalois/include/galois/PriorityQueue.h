@@ -20,14 +20,14 @@
 #ifndef GALOIS_PRIORITYQUEUE_H
 #define GALOIS_PRIORITYQUEUE_H
 
-#include "galois/substrate/PaddedLock.h"
-#include "galois/substrate/CompilerSpecific.h"
-
-#include <vector>
 #include <algorithm>
 #include <set>
+#include <vector>
 
+#include "galois/config.h"
 #include "galois/Mem.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 

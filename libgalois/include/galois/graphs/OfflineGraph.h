@@ -20,19 +20,21 @@
 #ifndef _GALOIS_DIST_OFFLINE_GRAPH_
 #define _GALOIS_DIST_OFFLINE_GRAPH_
 
-#include "galois/substrate/SimpleLock.h"
-#include "galois/graphs/Details.h"
-#include "galois/graphs/GraphHelpers.h"
-
 #include <cstdint>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <mutex>
 #include <numeric>
-#include <sys/mman.h>
+
 #include <fcntl.h>
+#include <sys/mman.h>
 
 #include <boost/iterator/counting_iterator.hpp>
+
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/graphs/GraphHelpers.h"
+#include "galois/substrate/SimpleLock.h"
 
 namespace galois {
 namespace graphs {

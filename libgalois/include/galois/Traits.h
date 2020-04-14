@@ -20,11 +20,11 @@
 #ifndef GALOIS_TRAITS_H
 #define GALOIS_TRAITS_H
 
+#include <tuple>
+#include <type_traits>
+
 #include "galois/gtuple.h"
 #include "galois/worklists/WorkList.h"
-
-#include <type_traits>
-#include <tuple>
 
 namespace galois {
 

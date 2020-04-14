@@ -20,17 +20,16 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_ONEACH_H
 #define GALOIS_RUNTIME_EXECUTOR_ONEACH_H
 
+#include "galois/config.h"
 #include "galois/gIO.h"
 #include "galois/gtuple.h"
-#include "galois/Threads.h"
-#include "galois/Timer.h"
-#include "galois/Traits.h"
 #include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/runtime/ThreadTimer.h"
 #include "galois/substrate/ThreadPool.h"
-
-#include <tuple>
+#include "galois/Threads.h"
+#include "galois/Timer.h"
+#include "galois/Traits.h"
 
 namespace galois {
 namespace runtime {

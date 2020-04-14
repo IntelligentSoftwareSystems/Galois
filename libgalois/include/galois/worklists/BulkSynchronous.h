@@ -20,11 +20,12 @@
 #ifndef GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
-#include "galois/runtime/Substrate.h"
-#include "Chunk.h"
-#include "WLCompileCheck.h"
-
 #include <atomic>
+
+#include "galois/config.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/worklists/Chunk.h"
+#include "galois/worklists/WLCompileCheck.h"
 
 namespace galois {
 namespace worklists {

@@ -20,16 +20,16 @@
 #ifndef GALOIS_SUBSTRATE_THREADPOOL_H
 #define GALOIS_SUBSTRATE_THREADPOOL_H
 
-#include "CacheLineStorage.h"
-#include "HWTopo.h"
-
-#include <condition_variable>
-#include <thread>
-#include <functional>
 #include <atomic>
-#include <vector>
 #include <cassert>
+#include <condition_variable>
 #include <cstdlib>
+#include <functional>
+#include <thread>
+#include <vector>
+
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/HWTopo.h"
 
 namespace galois::substrate::internal {
 

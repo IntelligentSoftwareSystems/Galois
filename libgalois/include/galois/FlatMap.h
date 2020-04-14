@@ -25,6 +25,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "galois/config.h"
+
 namespace galois {
 
 //! Simple map data structure, based off a single array.

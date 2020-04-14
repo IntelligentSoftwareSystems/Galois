@@ -24,6 +24,8 @@
 #include <tuple>
 #include <cstring>
 
+#include "galois/config.h"
+
 namespace galois {
 
 /** Is Derived a subtype of Base? */
