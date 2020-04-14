@@ -20,6 +20,7 @@
 #ifndef GALOIS_SUBSTRATE_STATICINSTANCE_H
 #define GALOIS_SUBSTRATE_STATICINSTANCE_H
 
+#include "galois/config.h"
 #include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {

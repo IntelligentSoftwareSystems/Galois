@@ -20,6 +20,7 @@
 #ifndef GALOIS_RUNTIME_USERCONTEXTACCESS_H
 #define GALOIS_RUNTIME_USERCONTEXTACCESS_H
 
+#include "galois/config.h"
 #include "galois/UserContext.h"
 
 namespace galois {

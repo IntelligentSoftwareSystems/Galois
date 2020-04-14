@@ -20,23 +20,21 @@
 #ifndef GALOIS_GRAPHS_LC_CSR_GRAPH_H
 #define GALOIS_GRAPHS_LC_CSR_GRAPH_H
 
-#include "galois/Galois.h"
-#include "galois/graphs/Details.h"
-#include "galois/graphs/FileGraph.h"
-#include "galois/graphs/GraphHelpers.h"
-#include "galois/PODResizeableArray.h"
-
+#include <fstream>
 #include <type_traits>
-#include<fstream>
 
-/*
- * Headers for boost serialization
- */
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/serialization.hpp>
+
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/GraphHelpers.h"
+#include "galois/PODResizeableArray.h"
 
 namespace galois {
 namespace graphs {

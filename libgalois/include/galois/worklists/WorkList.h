@@ -20,17 +20,17 @@
 #ifndef GALOIS_WORKLIST_WORKLIST_H
 #define GALOIS_WORKLIST_WORKLIST_H
 
+#include "galois/config.h"
 #include "galois/optional.h"
-
-#include "PerThreadChunk.h"
-#include "BulkSynchronous.h"
-#include "Chunk.h"
-#include "Simple.h"
-#include "LocalQueue.h"
-#include "Obim.h"
-#include "OrderedList.h"
-#include "OwnerComputes.h"
-#include "StableIterator.h"
+#include "galois/worklists/PerThreadChunk.h"
+#include "galois/worklists/BulkSynchronous.h"
+#include "galois/worklists/Chunk.h"
+#include "galois/worklists/Simple.h"
+#include "galois/worklists/LocalQueue.h"
+#include "galois/worklists/Obim.h"
+#include "galois/worklists/OrderedList.h"
+#include "galois/worklists/OwnerComputes.h"
+#include "galois/worklists/StableIterator.h"
 
 namespace galois {
 /**

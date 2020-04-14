@@ -20,25 +20,25 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
-#include "galois/config.h"
-#include "galois/Reduction.h"
-#include "galois/PerThreadContainer.h"
-#include "galois/Traits.h"
-#include "galois/Mem.h"
-#include "galois/worklists/Simple.h"
-#include "galois/runtime/Context.h"
-#include "galois/runtime/Executor_ForEach.h"
-#include "galois/runtime/Executor_DoAll.h"
-#include "galois/runtime/Executor_OnEach.h"
-#include "galois/gIO.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <deque>
-#include <vector>
 #include <random>
+#include <vector>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/Mem.h"
+#include "galois/Reduction.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_OnEach.h"
+#include "galois/PerThreadContainer.h"
+#include "galois/Traits.h"
+#include "galois/worklists/Simple.h"
 
 namespace galois {
 namespace runtime {

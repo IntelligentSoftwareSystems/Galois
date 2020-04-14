@@ -26,13 +26,15 @@
 #ifndef GALOIS_GRAPHS_LC_MORPH_GRAPH_H
 #define GALOIS_GRAPHS_LC_MORPH_GRAPH_H
 
+#include <type_traits>
+
+#include <boost/mpl/if.hpp>
+
 #include "galois/Bag.h"
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-
-#include <boost/mpl/if.hpp>
-#include <type_traits>
 
 namespace galois {
 namespace graphs {

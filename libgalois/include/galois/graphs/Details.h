@@ -20,6 +20,10 @@
 #ifndef GALOIS_GRAPHS_DETAILS_H
 #define GALOIS_GRAPHS_DETAILS_H
 
+#include <algorithm>
+#include <boost/mpl/if.hpp>
+
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/LazyObject.h"
 #include "galois/NoDerefIterator.h"
@@ -27,9 +31,6 @@
 #include "galois/runtime/Iterable.h"
 #include "galois/runtime/Context.h"
 #include "galois/substrate/PerThreadStorage.h"
-
-#include <boost/mpl/if.hpp>
-#include <algorithm>
 
 namespace galois {
 namespace graphs {

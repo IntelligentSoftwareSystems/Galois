@@ -20,12 +20,14 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
-#include "galois/gstl.h"
-#include "galois/substrate/ThreadPool.h"
+#include <iterator>
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include <iterator>
+#include "galois/config.h"
+#include "galois/gstl.h"
+#include "galois/substrate/ThreadPool.h"
+
 
 namespace galois {
 namespace runtime {

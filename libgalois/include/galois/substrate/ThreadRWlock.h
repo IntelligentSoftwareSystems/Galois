@@ -20,6 +20,7 @@
 #ifndef GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
 #define GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
 
+#include "galois/config.h"
 #include "galois/substrate/PaddedLock.h"
 #include "galois/substrate/PerThreadStorage.h"
 

@@ -25,11 +25,12 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
+#include <functional>
+#include <sstream>
+
+#include "galois/config.h"
 #include "galois/substrate/EnvCheck.h"
 #include "galois/PODResizeableArray.h"
-
-#include <sstream>
-#include <functional>
 
 namespace galois {
 namespace runtime {

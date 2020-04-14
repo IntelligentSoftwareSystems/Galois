@@ -20,9 +20,10 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "galois/gstl.h"
-
 #include <chrono>
+
+#include "galois/config.h"
+#include "galois/gstl.h"
 
 namespace galois {
 

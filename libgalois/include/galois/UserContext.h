@@ -20,12 +20,13 @@
 #ifndef GALOIS_USERCONTEXT_H
 #define GALOIS_USERCONTEXT_H
 
-#include "galois/Mem.h"
-#include "galois/gdeque.h"
+#include <functional>
 
+#include "galois/config.h"
+#include "galois/gdeque.h"
+#include "galois/Mem.h"
 #include "galois/runtime/Context.h"
 
-#include <functional>
 
 namespace galois {
 

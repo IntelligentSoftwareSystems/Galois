@@ -20,11 +20,12 @@
 #ifndef GALOIS_RUNTIME_SHAREDMEM_H
 #define GALOIS_RUNTIME_SHAREDMEM_H
 
-#include "galois/runtime/Statistics.h"
-#include "galois/runtime/PagePool.h"
-#include "galois/substrate/SharedMem.h"
-
 #include <string>
+
+#include "galois/config.h"
+#include "galois/runtime/PagePool.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/substrate/SharedMem.h"
 
 namespace galois::runtime {
 

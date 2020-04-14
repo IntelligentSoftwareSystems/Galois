@@ -19,6 +19,10 @@
 
 #ifndef GALOIS_RUNTIME_LOOPSTATISTICS_H
 #define GALOIS_RUNTIME_LOOPSTATISTICS_H
+
+#include "galois/config.h"
+#include "galois/runtime/Statistics.h"
+
 namespace galois {
 namespace runtime {
 

@@ -20,6 +20,7 @@
 #ifndef GALOIS_MEM_H
 #define GALOIS_MEM_H
 
+#include "galois/config.h"
 #include "galois/runtime/Mem.h"
 
 namespace galois {

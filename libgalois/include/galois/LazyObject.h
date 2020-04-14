@@ -20,10 +20,11 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
-#include "galois/gIO.h"
-
 #include <type_traits>
 #include <utility>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 

@@ -20,6 +20,7 @@
 #ifndef GALOIS_CHECKEDOBJECT_H
 #define GALOIS_CHECKEDOBJECT_H
 
+#include "galois/config.h"
 #include "galois/runtime/Context.h"
 
 namespace galois {

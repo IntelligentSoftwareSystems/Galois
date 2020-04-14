@@ -20,6 +20,8 @@
 #ifndef GALOIS_METHODFLAGS_H
 #define GALOIS_METHODFLAGS_H
 
+#include "galois/config.h"
+
 namespace galois {
 
 /**

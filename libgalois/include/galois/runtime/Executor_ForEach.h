@@ -20,28 +20,29 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
-#include "galois/config.h"
-#include "galois/gIO.h" // TODO: remove
-#include "galois/Mem.h"
-#include "galois/Timer.h"
-#include "galois/Threads.h"
-#include "galois/Traits.h"
-#include "galois/runtime/Substrate.h"
-#include "galois/runtime/Context.h"
-#include "galois/runtime/Range.h"
-#include "galois/runtime/LoopStatistics.h"
-#include "galois/runtime/OperatorReferenceTypes.h"
-#include "galois/runtime/Statistics.h"
-#include "galois/substrate/Termination.h"
-#include "galois/substrate/ThreadPool.h"
-#include "galois/runtime/UserContextAccess.h"
-#include "galois/worklists/Chunk.h"
-#include "galois/worklists/Simple.h"
-
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <utility>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/Mem.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/LoopStatistics.h"
+#include "galois/runtime/OperatorReferenceTypes.h"
+#include "galois/runtime/Range.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/ThreadTimer.h"
+#include "galois/runtime/UserContextAccess.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/Threads.h"
+#include "galois/Timer.h"
+#include "galois/Traits.h"
+#include "galois/worklists/Chunk.h"
+#include "galois/worklists/Simple.h"
 
 namespace galois {
 //! Internal Galois functionality - Use at your own risk.

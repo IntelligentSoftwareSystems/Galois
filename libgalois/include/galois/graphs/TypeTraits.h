@@ -22,6 +22,8 @@
 
 #include <boost/mpl/has_xxx.hpp>
 
+#include "galois/config.h"
+
 namespace galois {
 namespace graphs {
 

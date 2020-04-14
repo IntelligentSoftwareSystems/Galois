@@ -20,24 +20,22 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
-#include "galois/ParallelSTL.h"
-#include "galois/Galois.h"
-#include "galois/gIO.h"
-#include "galois/runtime/Mem.h"
-#include "galois/substrate/NumaMem.h"
-
-#include <iostream> // TODO remove this once cerr is removed
+#include <iostream>
 #include <utility>
 
-/*
- * Headers for boost serialization
- */
-#include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/split_member.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/split_member.hpp>
+
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/gIO.h"
+#include "galois/ParallelSTL.h"
+#include "galois/runtime/Mem.h"
+#include "galois/substrate/NumaMem.h"
 
 namespace galois {
 

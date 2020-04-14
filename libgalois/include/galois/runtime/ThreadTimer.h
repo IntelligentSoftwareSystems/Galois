@@ -1,9 +1,10 @@
 #ifndef GALOIS_RUNTIME_THREADTIMER_H
 #define GALOIS_RUNTIME_THREADTIMER_H
 
-#include "galois/substrate/PerThreadStorage.h"
-
 #include <ctime>
+
+#include "galois/config.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 namespace galois::runtime {
 

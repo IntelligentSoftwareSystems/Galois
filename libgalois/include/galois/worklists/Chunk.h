@@ -20,11 +20,12 @@
 #ifndef GALOIS_WORKLIST_CHUNK_H
 #define GALOIS_WORKLIST_CHUNK_H
 
+#include "galois/config.h"
 #include "galois/FixedSizeRing.h"
-#include "galois/substrate/PaddedLock.h"
 #include "galois/runtime/Mem.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/worklists/WLCompileCheck.h"
 #include "galois/worklists/WorkListHelpers.h"
-#include "WLCompileCheck.h"
 
 namespace galois {
 namespace runtime {

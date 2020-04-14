@@ -20,6 +20,7 @@
 #ifndef GALOIS_WORKLIST_ORDEREDLIST_H
 #define GALOIS_WORKLIST_ORDEREDLIST_H
 
+#include "galois/config.h"
 #include "galois/FlatMap.h"
 
 namespace galois {

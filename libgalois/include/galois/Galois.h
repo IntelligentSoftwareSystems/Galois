@@ -20,6 +20,7 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
+#include "galois/config.h"
 #include "galois/Loops.h"
 #include "galois/SharedMemSys.h"
 #include "galois/runtime/Mem.h"

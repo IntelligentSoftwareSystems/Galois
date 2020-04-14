@@ -25,6 +25,8 @@
 #ifndef __GALOIS_COPYABLE_TUPLE__
 #define __GALOIS_COPYABLE_TUPLE__
 
+#include "galois/config.h"
+
 namespace galois {
 
 /**

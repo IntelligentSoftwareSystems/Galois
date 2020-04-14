@@ -26,16 +26,19 @@
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
 
+#include <climits>
+#include <vector>
+#include <cassert>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/mpl/has_xxx.hpp>
+
+#include "galois/config.h"
 #include "galois/AtomicWrapper.h"
 #include "galois/PODResizeableArray.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/Traits.h"
 #include "galois/Galois.h"
-#include <boost/iterator/counting_iterator.hpp>
-#include <boost/mpl/has_xxx.hpp>
-#include <climits> // CHAR_BIT
-#include <vector>
-#include <assert.h>
 
 namespace galois {
 /**

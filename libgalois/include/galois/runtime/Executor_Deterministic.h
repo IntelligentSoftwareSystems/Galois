@@ -20,32 +20,32 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 #define GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 
+#include <deque>
+#include <queue>
+#include <type_traits>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+
 #include "galois/Bag.h"
 #include "galois/config.h"
+#include "galois/gIO.h"
 #include "galois/gslist.h"
+#include "galois/ParallelSTL.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/LoopStatistics.h"
+#include "galois/runtime/Mem.h"
+#include "galois/runtime/Range.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/UserContextAccess.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/Threads.h"
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
-#include "galois/ParallelSTL.h"
-#include "galois/runtime/Substrate.h"
-#include "galois/runtime/Executor_ForEach.h"
-#include "galois/runtime/LoopStatistics.h"
-#include "galois/runtime/Range.h"
-#include "galois/runtime/Statistics.h"
-#include "galois/substrate/Termination.h"
-#include "galois/substrate/ThreadPool.h"
-#include "galois/runtime/UserContextAccess.h"
-#include "galois/gIO.h"
-#include "galois/runtime/Mem.h"
 #include "galois/worklists/WorkList.h"
-
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/counting_iterator.hpp>
-
-#include <type_traits>
-#include <deque>
-#include <queue>
 
 // TODO deterministic hash
 // TODO deterministic hash: only give ids to window

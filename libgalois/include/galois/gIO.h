@@ -25,6 +25,8 @@
 #include <cstdlib>
 #include <string.h>
 
+#include "galois/config.h"
+
 // FIXME: move to Runtime
 
 namespace galois {

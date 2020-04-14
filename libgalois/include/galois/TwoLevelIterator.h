@@ -20,12 +20,16 @@
 #ifndef GALOIS_TWO_LEVEL_ITER_H
 #define GALOIS_TWO_LEVEL_ITER_H
 
-#include <iterator>
+#include <cassert>
+#include <cstdlib>
 #include <functional>
+#include <iterator>
 #include <type_traits>
 
 #include <cstdlib>
 #include <cassert>
+
+#include "galois/config.h"
 
 namespace galois {
 

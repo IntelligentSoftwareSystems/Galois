@@ -20,15 +20,16 @@
 #ifndef GALOIS_FIXEDSIZERING_H
 #define GALOIS_FIXEDSIZERING_H
 
-#include "galois/optional.h"
-#include "galois/LazyArray.h"
+#include <atomic>
+#include <utility>
 
 #include <boost/mpl/if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
 
-#include <utility>
-#include <atomic>
+#include "galois/config.h"
+#include "galois/optional.h"
+#include "galois/LazyArray.h"
 
 namespace galois {
 

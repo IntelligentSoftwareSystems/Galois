@@ -20,10 +20,11 @@
 #ifndef GALOIS_SUBSTRATE_TERMINATION_H
 #define GALOIS_SUBSTRATE_TERMINATION_H
 
+#include <atomic>
+
+#include "galois/config.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/CacheLineStorage.h"
-
-#include <atomic>
 
 namespace galois {
 namespace substrate {

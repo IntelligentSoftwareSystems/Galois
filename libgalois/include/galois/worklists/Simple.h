@@ -20,12 +20,13 @@
 #ifndef GALOIS_WORKLIST_FIFO_H
 #define GALOIS_WORKLIST_FIFO_H
 
-#include "galois/substrate/PaddedLock.h"
-#include "galois/gdeque.h"
-#include "WLCompileCheck.h"
-
 #include <deque>
 #include <mutex>
+
+#include "galois/config.h"
+#include "galois/gdeque.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/worklists/WLCompileCheck.h"
 
 namespace galois {
 namespace worklists {

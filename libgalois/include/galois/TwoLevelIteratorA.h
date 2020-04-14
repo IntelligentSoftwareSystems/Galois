@@ -20,13 +20,15 @@
 #ifndef GALOIS_TWOLEVELITERATORA_H
 #define GALOIS_TWOLEVELITERATORA_H
 
-#include "galois/gIO.h"
-
-#include <boost/iterator/iterator_adaptor.hpp>
 #include <cassert>
 #include <iterator>
 #include <type_traits>
 #include <utility>
+
+#include <boost/iterator/iterator_adaptor.hpp>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 

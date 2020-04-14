@@ -20,13 +20,14 @@
 #ifndef GALOIS_PARALLELSTL_H
 #define GALOIS_PARALLELSTL_H
 
-#include "galois/Reduction.h"
+#include "galois/config.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/NoDerefIterator.h"
+#include "galois/runtime/Range.h"
+#include "galois/Reduction.h"
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
 #include "galois/worklists/Chunk.h"
-#include "galois/runtime/Range.h"
 
 namespace galois {
 //! Parallel versions of STL library algorithms.

@@ -27,6 +27,8 @@
 
 #include <atomic>
 
+#include "galois/config.h"
+
 namespace galois {
 /**
  * Class that inherits from std::atomic to make it copyable by defining a copy

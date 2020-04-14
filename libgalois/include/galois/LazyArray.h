@@ -20,14 +20,15 @@
 #ifndef GALOIS_LAZYARRAY_H
 #define GALOIS_LAZYARRAY_H
 
-#include "galois/LazyObject.h"
-
+#include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <stdexcept>
-#include <cstddef>
-#include <algorithm>
-#include <utility>
 #include <type_traits>
+#include <utility>
+
+#include "galois/config.h"
+#include "galois/LazyObject.h"
 
 namespace galois {
 

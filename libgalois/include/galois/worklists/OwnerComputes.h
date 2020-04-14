@@ -20,7 +20,8 @@
 #ifndef GALOIS_WORKLIST_OWNERCOMPUTES_H
 #define GALOIS_WORKLIST_OWNERCOMPUTES_H
 
-#include "WLCompileCheck.h"
+#include "galois/config.h"
+#include "galois/worklists/WLCompileCheck.h"
 
 namespace galois {
 namespace worklists {

@@ -20,6 +20,8 @@
 #ifndef GALOIS_RUNTIME_OPERATOR_REFERENCE_TYPES_H
 #define GALOIS_RUNTIME_OPERATOR_REFERENCE_TYPES_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace runtime {
 

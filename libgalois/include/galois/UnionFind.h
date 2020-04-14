@@ -22,6 +22,8 @@
 
 #include <atomic>
 
+#include "galois/config.h"
+
 namespace galois {
 /**
  * Intrusive union-find implementation. Users subclass this to get disjoint

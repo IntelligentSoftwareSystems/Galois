@@ -27,9 +27,7 @@
 #include <utility>
 #include <type_traits>
 
-// Statistics & Debug
-// #include "galois/Timer.h"
-// #include "galois/gIO.h"
+#include "galois/config.h"
 
 namespace galois {
 

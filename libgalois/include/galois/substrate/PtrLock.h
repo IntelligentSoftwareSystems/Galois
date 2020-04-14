@@ -20,11 +20,12 @@
 #ifndef GALOIS_SUBSTRATE_PTRLOCK_H
 #define GALOIS_SUBSTRATE_PTRLOCK_H
 
-#include "galois/substrate/CompilerSpecific.h"
-
 #include <cstdint>
 #include <cassert>
 #include <atomic>
+
+#include "galois/config.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 namespace substrate {

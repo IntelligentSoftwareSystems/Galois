@@ -20,6 +20,8 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 #define GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace runtime {
 
