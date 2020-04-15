@@ -95,10 +95,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
-    # GCC-{6,7} is a too imprecise
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-but-set-variable>")
-  elseif(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
     # Avoid warnings from openmpi
