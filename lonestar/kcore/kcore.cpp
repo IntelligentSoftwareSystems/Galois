@@ -42,8 +42,8 @@ static cll::opt<std::string> inputFilename(cll::Positional,
 //! Choose algorithm: worklist vs. sync
 static cll::opt<Algo> algo("algo",
     cll::desc("Choose an algorithm (default Sync):"),
-    cll::values(clEnumVal(Async, "Asynchronous"), clEnumVal(Sync, "Synchronous"),
-                clEnumValEnd),
+    cll::values(clEnumVal(Async, "Asynchronous"), clEnumVal(Sync, "Synchronous")
+                ),
     cll::init(Sync));
 
 //! Required k specification for k-core

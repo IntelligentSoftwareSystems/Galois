@@ -49,7 +49,7 @@ static const char* url = "HyPar";
 static cll::opt<scheduleMode> schedulingMode(
     cll::desc("Choose a inital scheduling mode:"),
     cll::values(clEnumVal(PLD, "PLD"), clEnumVal(PP, "PP"), clEnumVal(WD, "WD"),
-                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),clEnumVal(MDEG, "MDEG"),clEnumVal(DEG, "DEG"),clEnumVal(MWD, "MWD"),clEnumVal(HIS, "HIS"),clEnumVal(RAND, "random"),clEnumValEnd),
+                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),clEnumVal(MDEG, "MDEG"),clEnumVal(DEG, "DEG"),clEnumVal(MWD, "MWD"),clEnumVal(HIS, "HIS"),clEnumVal(RAND, "random")),
     cll::init(PLD));
 
 static cll::opt<bool>
@@ -258,8 +258,8 @@ int main(int argc, char** argv) {
     MetisNode n1;
     //int id = rand()%(hedges-1);
     n1.netnum = i+1;
-    unsigned rand = hash(i+1);
-    n1.netrand = rand;
+    //unsigned rand = hash(i+1);
+    n1.netrand = INT_MAX;
     //n1.setWeight(rand);
     a = graph.createNode(n1);
     graph.addNode(a);

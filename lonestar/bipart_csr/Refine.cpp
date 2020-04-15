@@ -75,9 +75,9 @@ namespace {
 void projectPart(MetisGraph* Graph) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
-  galois::do_all(galois::iterate(*fineGraph),
+  galois::do_all(
+      galois::iterate(fineGraph->hedges, fineGraph->size()),
                  [&](GNode n) {
-                   if (n < fineGraph->hedges) return;
                    auto parent = fineGraph->getData(n).getParent();
                    auto& cn      = coarseGraph->getData(parent);
                    unsigned part = cn.getPart();
@@ -92,8 +92,9 @@ void initGains(GGraph& g, int pass) {
   std::string name = "initgain";
   std::string fetsref = "FETSREF_";// + std::to_string(pass);
 
-  galois::do_all(galois::iterate(size_t{0},g.hedges),
-        [&](GNode n) {
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
+                 [&](GNode n) {
               g.getData(n).FS.store(0);
               g.getData(n).TE.store(0);
         },
@@ -165,7 +166,8 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(size_t{0},g.hedges), 
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
   [&](GNode n) {
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
@@ -184,9 +186,9 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
     GNodeBag nodelisto;
     unsigned zeroW = 0;
     unsigned oneW = 0;
-    galois::do_all(galois::iterate(g), 
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
-          if (n < g.hedges) return;
           if (g.getData(n).FS == 0 && g.getData(n).TE == 0) return;
           int gain = g.getData(n).getGain();
           if (gain < 0) {
@@ -265,13 +267,13 @@ __attribute__((unused)) unsigned hash(unsigned int val)
 
 void parallel_make_balance(GGraph& g, float tol, int p) {
 
-  unsigned Size = g.hnodes;//std::distance(g.cellList().begin(), g.cellList().end());
+  unsigned Size = g.hnodes;
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g),
-  [&](GNode n) {
-     if (n < g.hedges) return;
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
+      [&](GNode n) {
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
        accum += g.getData(n).getWeight();
@@ -303,9 +305,9 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
     if (bal < lo) {
 	
 	//placing each node in an appropriate bucket using the gain by weight ratio
-	galois::do_all(galois::iterate(g),
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
-          if ( n < g.hedges) return;
 
           float  gain = ((float) g.getData(n).getGain())/ ((float) g.getData(n).getWeight());
           unsigned pp = g.getData(n).getPart();
@@ -411,10 +413,9 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
     else {
 
 	//placing each node in an appropriate bucket using the gain by weight ratio
-    	galois::do_all(galois::iterate(g),
+      galois::do_all(
+          galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
-          if (n < g.hedges) return;
-
           float  gain = ((float) g.getData(n).getGain())/ ((float) g.getData(n).getWeight());
           unsigned pp = g.getData(n).getPart();
           if (pp == 1) {
@@ -521,7 +522,7 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
 }
 __attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
 
- unsigned Size = g.hnodes;//std::distance(g.cellList().begin(), g.cellList().end());
+ unsigned Size = g.hnodes;
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
@@ -533,7 +534,6 @@ __attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
        accum += g.getData(n).getWeight();
   },
   galois::loopname("make balance"));
-  //std::cout<<"weight of 0 : "<< nodeSize.reduce() - accum.reduce()<<"  1: "<<accum.reduce()<<"\n";
   const int hi = (1 + tol) * nodeSize.reduce() / (2 + tol);
   const int lo = nodeSize.reduce() - hi;
   int bal = accum.reduce();

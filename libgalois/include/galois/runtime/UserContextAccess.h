@@ -43,20 +43,6 @@ public:
 
   void setFirstPass(void) { SuperTy::__setFirstPass(); }
   void resetFirstPass(void) { SuperTy::__resetFirstPass(); }
-
-// TODO: move to a separate class dedicated for speculative executors
-#ifdef GALOIS_USE_EXP
-  void rollback() { SuperTy::__rollback(); }
-
-  void commit() { SuperTy::__commit(); }
-
-  void reset() {
-    SuperTy::__resetPushBuffer();
-    SuperTy::__resetUndoLog();
-    SuperTy::__resetCommitLog();
-    SuperTy::__resetAlloc();
-  }
-#endif
 };
 
 } // namespace runtime

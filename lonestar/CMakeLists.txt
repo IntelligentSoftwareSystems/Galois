@@ -1,20 +1,11 @@
-# Linking against the Boost libs via target_link_libraries
-# can result in LLVM headers installed alongside Boost
-# taking precedence over our vendored ones.
-# avoid this by putting our vendored LLVM include paths
-# first when compiling the executables that use them.
-include_directories(BEFORE
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_CURRENT_BINARY_DIR}/../libllvm/include
+add_library(lonestar STATIC src/BoilerPlate.cpp)
+
+target_include_directories(lonestar PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-add_library(lonestar STATIC src/BoilerPlate.cpp)
-target_include_directories(lonestar PUBLIC 
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libgalois/experimental/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(lonestar galois_shmem gllvm)
+target_link_libraries(lonestar Galois::shmem LLVMSupport)
 
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality) 

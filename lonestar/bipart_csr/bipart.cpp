@@ -49,7 +49,7 @@ static const char* url = "HyPar";
 static cll::opt<scheduleMode> schedulingMode(
     cll::desc("Choose a inital scheduling mode:"),
     cll::values(clEnumVal(PLD, "PLD"), clEnumVal(PP, "PP"), clEnumVal(WD, "WD"),
-                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),clEnumVal(MDEG, "MDEG"),clEnumVal(DEG, "DEG"),clEnumVal(MWD, "MWD"),clEnumVal(HIS, "HIS"),clEnumVal(RAND, "random"),clEnumValEnd),
+                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),clEnumVal(MDEG, "MDEG"),clEnumVal(DEG, "DEG"),clEnumVal(MWD, "MWD"),clEnumVal(HIS, "HIS"),clEnumVal(RAND, "random")),
     cll::init(PLD));
 
 static cll::opt<bool>
@@ -253,7 +253,7 @@ int main(int argc, char** argv) {
   graph.hnodes = nodes;
   std::cout<<"number of edges "<<edges<<"\n";
   uint32_t sizes = hedges+nodes;
-  galois::do_all(galois::iterate((uint32_t)0, sizes),
+  galois::do_all(galois::iterate(uint32_t{0}, sizes),
                 [&](uint32_t c){
                   prefix_edges[c] = edges_id[c].size();
                 });
@@ -267,12 +267,12 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
                     if (n < hedges)
-                      graph.getData(n).netnum = n;
+                      graph.getData(n).netnum = n+1;
                     else
                       graph.getData(n).netnum = INT_MAX;
                     graph.getData(n).netrand = INT_MAX;
                     graph.getData(n).netval = INT_MAX;
-                    graph.getData(n).nodeid = n;
+                    graph.getData(n).nodeid = n+1;
   
   });
   T.stop();

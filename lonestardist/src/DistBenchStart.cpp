@@ -23,7 +23,6 @@
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/DataCommMode.h"
 
-#include <iostream>
 #include <sstream>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,9 +79,10 @@ cll::opt<std::string> personality_set(
     cll::init("c"));
 #endif
 
-static void PrintVersion() {
-  std::cout << "D-Galois Benchmark Suite v" << galois::getVersion() << " ("
+static void PrintVersion(llvm::raw_ostream& out) {
+  out << "D-Galois Benchmark Suite v" << galois::getVersion() << " ("
             << galois::getRevision() << ")\n";
+  out.flush();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -99,20 +99,21 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    PrintVersion();
-    std::cout << "Copyright (C) " << galois::getCopyrightYear()
+    PrintVersion(llvm::outs());
+    llvm::outs() << "Copyright (C) " << galois::getCopyrightYear()
               << " The University of Texas at Austin\n";
-    std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-    std::cout << "application: " << (app ? app : "unspecified") << "\n";
+    llvm::outs() << "http://iss.ices.utexas.edu/galois/\n\n";
+    llvm::outs() << "application: " << (app ? app : "unspecified") << "\n";
 
     if (desc) {
-      std::cout << desc << "\n";
+      llvm::outs() << desc << "\n";
     }
     if (url) {
-      std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
+      llvm::outs() << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
                 << url << "\n";
     }
-    std::cout << "\n";
+    llvm::outs() << "\n";
+    llvm::outs().flush();
 
     std::ostringstream cmdout;
 

@@ -46,13 +46,13 @@ static const char* url = "gMetis";
 static cll::opt<InitialPartMode> partMode(
     cll::desc("Choose a inital part mode:"),
     cll::values(clEnumVal(GGP, "GGP"), clEnumVal(GGGP, "GGGP (default)"),
-                clEnumVal(MGGGP, "MGGGP"), clEnumValEnd),
+                clEnumVal(MGGGP, "MGGGP")),
     cll::init(GGGP));
 static cll::opt<refinementMode> refineMode(
     cll::desc("Choose a refinement mode:"),
     cll::values(clEnumVal(BKL, "BKL"), clEnumVal(BKL2, "BKL2 (default)"),
-                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS"),
-                clEnumValEnd),
+                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS")
+                ),
     cll::init(BKL2));
 
 static cll::opt<bool>

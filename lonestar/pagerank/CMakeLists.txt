@@ -1,7 +1,13 @@
-app(pagerank-pull PageRank-pull.cpp)
-app(pagerank-push PageRank-push.cpp)
-
+add_executable(pagerank-pull PageRank-pull.cpp)
+add_dependencies(apps pagerank-pull)
+target_link_libraries(pagerank-pull PRIVATE Galois::shmem lonestar)
+install(TARGETS pagerank-pull DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small pagerank-pull -tolerance=0.01 "${BASEINPUT}/scalefree/transpose/rmat10.tgr")
 add_test_scale(small-topo pagerank-pull -tolerance=0.01 -algo=Topo "${BASEINPUT}/scalefree/transpose/rmat10.tgr")
+
+add_executable(pagerank-push PageRank-push.cpp)
+add_dependencies(apps pagerank-push)
+target_link_libraries(pagerank-push PRIVATE Galois::shmem lonestar)
+install(TARGETS pagerank-pull DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small pagerank-push -tolerance=0.01 "${BASEINPUT}/scalefree/transpose/rmat10.tgr")
 add_test_scale(small-sync pagerank-push -tolerance=0.01 -algo=Sync "${BASEINPUT}/scalefree/transpose/rmat10.tgr")
