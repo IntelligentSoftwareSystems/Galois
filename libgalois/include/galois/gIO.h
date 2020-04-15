@@ -69,7 +69,7 @@ void gWarn(Args&&... args) {
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
 //! is defined.
 template <typename... Args>
-void gDebug(Args&&... args) {
+void gDebug(Args&&... GALOIS_USED_ONLY_IN_DEBUG(args)) {
 #ifndef NDEBUG
   std::ostringstream os;
   (os << ... << args);
@@ -120,7 +120,7 @@ struct debug {
 template <>
 struct debug<0> {
   template <typename... Args>
-  inline static void print(const Args&... args) {}
+  inline static void print(const Args&... GALOIS_USED_ONLY_IN_DEBUG(args)) {}
 };
 
 } // end namespace galois

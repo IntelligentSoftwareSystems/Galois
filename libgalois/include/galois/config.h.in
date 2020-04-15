@@ -20,4 +20,10 @@ _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
 #define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
 #endif
 
+#if defined(__GNUC__) && defined(NDEBUG)
+#define GALOIS_USED_ONLY_IN_DEBUG(NAME) NAME __attribute__((used))
+#else
+#define GALOIS_USED_ONLY_IN_DEBUG(NAME) NAME
+#endif
+
 #endif

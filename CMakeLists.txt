@@ -119,8 +119,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
   endif()
-
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
