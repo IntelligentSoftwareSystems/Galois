@@ -110,10 +110,10 @@ struct Counter: public T {
 
 template <typename T>
 struct Counter<T, false> {
-  Counter(std::string s) { }
+  Counter(std::string) { }
 
   template <typename... Args>
-  void update(Args... args) { }
+  void update(Args...) { }
 };
 
 struct BetweenessCentralityAsync {
@@ -136,7 +136,7 @@ struct BetweenessCentralityAsync {
 
   using LeafCounter = Counter<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
 
-  void correctNode(uint32_t dstID, BCEdge& ed) {
+  void correctNode(uint32_t dstID, BCEdge&) {
     NodeType& dstData = graph.getData(dstID);
 
     // loop through in edges

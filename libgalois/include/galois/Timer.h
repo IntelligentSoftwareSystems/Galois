@@ -96,8 +96,8 @@ public:
 template <>
 class CondStatTimer<false> {
 public:
-  CondStatTimer(const char* name) {}
-  CondStatTimer(const char* const n, const char* region) {}
+  CondStatTimer(const char* ) {}
+  CondStatTimer(const char* const , const char* ) {}
 
   void start() const {}
   void stop() const {}

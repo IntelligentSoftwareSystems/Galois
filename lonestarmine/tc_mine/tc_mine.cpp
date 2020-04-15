@@ -10,11 +10,11 @@ const char* url  = 0;
 class MyAPI: public VertexMinerAPI<BaseEmbedding> {
 public:
 	// toExtend (only extend the last vertex in the embedding)
-	static bool toExtend(unsigned n, const BaseEmbedding &emb, unsigned pos) {
+	static bool toExtend(unsigned n, const BaseEmbedding &, unsigned pos) {
 		return pos == n-1;
 	}
 	// toAdd (only add vertex connected to all the vertices in the embedding)
-	static bool toAdd(unsigned n, Graph &g, const BaseEmbedding &emb, unsigned pos, VertexId dst) {
+	static bool toAdd(unsigned, Graph &, const BaseEmbedding &, unsigned, VertexId) {
 		return true;
 	}
 };

@@ -2645,7 +2645,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     bufGraph.resetAndFree();
 
     // receives data
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
+    galois::on_each([&](unsigned, unsigned) {
       receiveEdges(graph, receivedNodes);
     });
     base_DistGraph::increment_evilPhase();
@@ -3033,7 +3033,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   template <typename GraphTy,
             typename std::enable_if<std::is_void<
                 typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer&,
                         std::vector<uint64_t>& gdst_vec, uint64_t& cur,
                         uint64_t& cur_end) {
     uint64_t i = 0;

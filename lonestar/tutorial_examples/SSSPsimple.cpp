@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   galois::graphs::readGraph(graph, filename);
   //! [ReadGraph]
 
-  galois::for_each(galois::iterate(graph), [&](GNode n, auto& ctx) {
+  galois::for_each(galois::iterate(graph), [&](GNode n, auto&) {
     graph.getData(n) = DIST_INFINITY;
   });
 

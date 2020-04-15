@@ -52,7 +52,7 @@ auto addToCollection(C& c, HeapTy& heap, V&& v) ->
 }
 
 template <typename C, typename HeapTy, typename V>
-auto addToCollection(C& c, HeapTy& heap, V&& v) ->
+auto addToCollection(C& c, HeapTy&, V&& v) ->
     typename std::enable_if<!needs_heap<C>(0)>::type {
   c.push_back(std::forward<V>(v));
 }

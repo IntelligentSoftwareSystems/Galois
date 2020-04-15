@@ -10,13 +10,13 @@ struct Move {
   Move() = default;
   ~Move() = default;
   Move(const Move&) = delete;
-  Move(Move&& other) noexcept { }
+  Move(Move&&) noexcept { }
   Move& operator=(const Move&) = delete;
-  Move& operator=(Move&& other) noexcept { return *this; }
+  Move& operator=(Move&&) noexcept { return *this; }
 };
 
 void test_move() {
-  auto merge_fn = [](Move& a , Move&& b) -> Move& {
+  auto merge_fn = [](Move& a , Move&&) -> Move& {
     return a;
   };
 
@@ -83,7 +83,7 @@ void test_accum() {
 
   constexpr int num = 123456;
 
-  galois::do_all(galois::iterate(0, num), [&](int _) {
+  galois::do_all(galois::iterate(0, num), [&](int) {
     accum += 1;
       });
 

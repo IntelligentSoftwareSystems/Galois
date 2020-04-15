@@ -286,7 +286,7 @@ namespace internal {
  */
 template <typename T>
 __attribute__((always_inline)) constexpr size_t
-gSizedObj(const T& data,
+gSizedObj(const T&,
           typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) {
   return sizeof(T);
 }
@@ -301,7 +301,7 @@ gSizedObj(const T& data,
  */
 template <typename T>
 __attribute__((always_inline)) constexpr size_t
-gSizedObj(const T& data,
+gSizedObj(const T&,
           typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
           typename std::enable_if<has_serialize<T>::value>::type*       = 0) {
   return sizeof(uintptr_t);
@@ -1038,7 +1038,7 @@ void gDeserialize(DeSerializeBuffer& buf, T1&& t1, Args&&... args) {
 /**
  * Base case for regular gDeserialize recursive call.
  */
-inline void gDeserialize(DeSerializeBuffer& buf) {}
+inline void gDeserialize(DeSerializeBuffer&) {}
 
 /**
  * "Deserialize" data in an iterator type into a data object.

@@ -45,7 +45,7 @@ class HostFence : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostFence"; }
 
-  virtual void reinit(unsigned val) {}
+  virtual void reinit(unsigned) {}
 
   //! control-flow barrier across distributed hosts
   //! acts as a distributed-memory fence as well (flushes send and receives)
@@ -90,7 +90,7 @@ class HostBarrier : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostBarrier"; }
 
-  virtual void reinit(unsigned val) {}
+  virtual void reinit(unsigned) {}
 
   //! Control-flow barrier across distributed hosts
   virtual void wait() {

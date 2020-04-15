@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
   // push operator with Galois synchronization
   initialize(graph);
   galois::for_each(galois::iterate(graph),
-                   [&](GNode n, auto& ctx) {
+                   [&](GNode n, auto&) {
                      for (auto ii : graph.edges(n)) {
                        GNode dst  = graph.getEdgeDst(ii);
                        auto& data = graph.getData(dst);
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
   // push operator with self synchronization in optimized for_each
   initialize(graph);
   galois::for_each(galois::iterate(graph),
-                   [&](GNode n, auto& ctx) { incrementNeighborsAtomically(n); },
+                   [&](GNode n, auto&) { incrementNeighborsAtomically(n); },
                    galois::loopname("for_each_self_sync"),
                    galois::no_conflicts(), galois::no_pushes());
   verify(graph, N);

@@ -202,11 +202,8 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
  *
  * @param graph Local graph to operate on
  * @param roundNumber current round number
- * @param dga Distributed accumulator for determining if work was done in
- * an iteration across all hosts
  */
-void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
-                          galois::DGAccumulator<uint32_t>& dga) {
+void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber) {
   const auto& allNodes = graph.allNodesRange();
 
   galois::do_all(
@@ -308,7 +305,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
-    ConfirmMessageToSend(graph, roundNumber, dga);
+    ConfirmMessageToSend(graph, roundNumber);
 
     // send messages (if any)
     SendAPSPMessages(graph, dga);

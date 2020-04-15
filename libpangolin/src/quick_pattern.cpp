@@ -32,7 +32,7 @@ QuickPattern<EmbTy,EleTy>::QuickPattern(const EmbTy & emb) {
 }
 
 template <typename EmbTy, typename EleTy>
-QuickPattern<EmbTy,EleTy>::QuickPattern(EmbTy & emb, bool need_permute) {
+QuickPattern<EmbTy,EleTy>::QuickPattern(EmbTy & emb, bool) {
 	cg_id = 0;
 	size = emb.size();
 	unsigned bytes = size * sizeof(EleTy);

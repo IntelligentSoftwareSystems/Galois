@@ -24,7 +24,7 @@
 
 #include <iostream>
 
-int main(int argc, char* argv[]) {
+int main() {
   galois::SharedMemSys G;
 
   //! [heap wrapping example]

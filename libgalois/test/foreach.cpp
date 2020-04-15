@@ -22,7 +22,7 @@
 #include <vector>
 #include <iostream>
 
-void function_pointer(int x, galois::UserContext<int>& ctx) {
+void function_pointer(int x, galois::UserContext<int>&) {
   std::cout << x << "\n";
 }
 

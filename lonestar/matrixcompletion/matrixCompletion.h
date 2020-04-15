@@ -133,7 +133,8 @@ static cll::opt<bool>
  * if init is -"ground truth"
  */
 template <typename T>
-T innerProduct(T* __restrict__ first1, T* __restrict__ last1,
+T innerProduct(T* __restrict__ first1,
+               T* __restrict__ GALOIS_USED_ONLY_IN_DEBUG(last1),
                T* __restrict__ first2, T init) {
   assert(first1 + LATENT_VECTOR_SIZE == last1);
   for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {

@@ -297,7 +297,7 @@ protected:
   bool checkEmpty(WorkListTy&, ThreadLocalData&, ...) { return true; }
 
   template <typename WL>
-  auto checkEmpty(WL& wl, ThreadLocalData& tld, int)
+  auto checkEmpty(WL& wl, ThreadLocalData&, int)
       -> decltype(wl.empty(), bool()) {
     return wl.empty();
   }
@@ -376,8 +376,8 @@ protected:
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args, const WArgsTy& wlargs,
-                  std::index_sequence<>)
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
+                  const WArgsTy&, std::index_sequence<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:

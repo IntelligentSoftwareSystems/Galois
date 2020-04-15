@@ -41,7 +41,7 @@ int hash(unsigned val) {
   return((unsigned)(seed/65536) % 32768);
 }
 
-void parallelRand(MetisGraph* graph, int iter) {
+void parallelRand(MetisGraph* graph, int) {
 
   GGraph* fineGGraph  = graph->getFinerGraph()->getGraph();
   galois::do_all(
@@ -217,7 +217,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
        galois::loopname("phaseI"));
 }
 
-void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
+void moreCoarse(MetisGraph* graph, std::vector<unsigned>& weight) {
   
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   typedef std::vector<GNode> VecTy;
@@ -287,7 +287,7 @@ void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
 
 // Coarsening phaseII
 void coarsePhaseII(MetisGraph* graph,
-                    int iter, std::vector<bool> & hedges, std::vector<unsigned> & weight) {
+                   std::vector<bool> & hedges, std::vector<unsigned> & weight) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   typedef std::set<int> SecTy;
@@ -299,7 +299,7 @@ void coarsePhaseII(MetisGraph* graph,
   std::string name = "CoarseningPhaseII";
   galois::GAccumulator<int> hhedges;
   galois::GAccumulator<int> hnode;
-  moreCoarse(graph, iter, weight);
+  moreCoarse(graph, weight);
 
   galois::do_all( 
       galois::iterate(size_t{0}, fineGGraph->hedges),
@@ -516,7 +516,7 @@ void findMatching(MetisGraph* coarseMetisGraph,
            default:
              abort();
        }
-       coarsePhaseII(coarseMetisGraph, iter, hedges, weight);
+       coarsePhaseII(coarseMetisGraph, hedges, weight);
        parallelCreateEdges(coarseMetisGraph, nodes, hedges, weight);
 }
 

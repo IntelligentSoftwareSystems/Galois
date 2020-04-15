@@ -102,13 +102,13 @@ private:
                          DecGraph* decGraph, int maxNode, int maxLevel);
   aig::GNode updateAig(ThreadContextData* threadCtx, aig::GNode oldRoot,
                        DecGraph* decGraph, GNodeVector& fanoutNodes,
-                       bool isOutputCompl, bool updateLevel, int gain);
+                       bool isOutputCompl);
   aig::GNode decGraphToAig(ThreadContextData* threadCtx, DecGraph* decGraph);
   aig::GNode createAndNode(ThreadContextData* threadCtx, aig::GNode lhsAnd,
                            aig::GNode rhsAnd, bool lhsAndPol, bool rhsAndPol);
-  void addNewSubgraph(ThreadContextData* threadCtx, aig::GNode oldNode,
-                      aig::GNode newNode, GNodeVector& fanoutNodes,
-                      bool isNewRootComplement, bool updateLevel);
+  void addNewSubgraph(aig::GNode oldNode, aig::GNode newNode,
+                      GNodeVector& fanoutNodes,
+                      bool isNewRootComplement);
   void deleteOldMFFC(aig::Graph& aigGraph, aig::GNode oldNode);
   void deleteOldMFFCRec(aig::Graph& aigGraph, aig::GNode oldNode);
 

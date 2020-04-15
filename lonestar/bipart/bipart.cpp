@@ -113,7 +113,7 @@ static cll::opt<double> imbalance(
 /**
  * Partitioning 
  */
-void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo, unsigned K) {
+void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   galois::StatTimer TM;
   TM.start();
 
@@ -130,7 +130,7 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo, un
 
   galois::StatTimer T3("Refine");
   T3.start();
-  refine(mcg, refineTo, K);
+  refine(mcg, K);
   T3.stop();
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
@@ -381,7 +381,7 @@ int main(int argc, char** argv) {
   
   });
         //GGraph* gr = metisGraph[i].getGraph();
-        Partition(&metisG, 25, 2, kValue[i]);
+        Partition(&metisG, 25, kValue[i]);
         MetisGraph *mcg = &metisG;
 
         while (mcg->getCoarserGraph() != NULL) {

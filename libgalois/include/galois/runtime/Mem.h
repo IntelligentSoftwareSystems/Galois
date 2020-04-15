@@ -345,14 +345,14 @@ public:
 
   ~BlockHeap() { clear(); }
 
-  inline void* allocate(size_t size) {
+  inline void* allocate(size_t GALOIS_USED_ONLY_IN_DEBUG(size)) {
     assert(size == ElemSize);
     if (!head || headIndex == TotalFit)
       refill();
     return &head->data[headIndex++];
   }
 
-  inline void deallocate(void* ptr) {}
+  inline void deallocate(void*) {}
 };
 
 //! This implements a bump pointer though chunks of memory
@@ -436,7 +436,7 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr) {}
+  inline void deallocate(void*) {}
 };
 
 /**
@@ -502,7 +502,7 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr) {}
+  inline void deallocate(void*) {}
 };
 
 //! This is the base source of memory for all allocators.
@@ -515,7 +515,7 @@ public:
   SystemHeap();
   ~SystemHeap();
 
-  inline void* allocate(size_t size) { return pagePoolAlloc(); }
+  inline void* allocate(size_t) { return pagePoolAlloc(); }
 
   inline void deallocate(void* ptr) { pagePoolFree(ptr); }
 };
@@ -742,7 +742,7 @@ public:
     return static_cast<pointer>(heap.allocate(sizeof(Ty)));
   }
 
-  void deallocate(pointer ptr, size_type len) {
+  void deallocate(pointer ptr, size_type GALOIS_USED_ONLY_IN_DEBUG(len)) {
     assert(len == 1);
     heap.deallocate(ptr);
   }
@@ -988,7 +988,7 @@ public:
     return static_cast<pointer>(heap->allocate(size * sizeof(Ty)));
   }
 
-  void deallocate(pointer ptr, size_type len) { heap->deallocate(ptr); }
+  void deallocate(pointer ptr, size_type) { heap->deallocate(ptr); }
 
   inline void construct(pointer ptr, const_reference val) const {
     new (ptr) Ty(val);

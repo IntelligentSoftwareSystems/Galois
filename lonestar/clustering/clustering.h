@@ -235,8 +235,7 @@ double calConstantForSecondTerm(GraphTy& graph){
 template<typename GraphTy, typename CommArrayTy> 
 uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, 
                        std::vector<EdgeTy> &counter, EdgeTy self_loop_wt,
-                       CommArrayTy &c_info, uint64_t node_wt, uint64_t sc, 
-                       double constant) {
+                       CommArrayTy &c_info, uint64_t node_wt, uint64_t sc) {
 
   uint64_t max_index = sc; // Assign the initial value as self community
   double cur_gain = 0;
@@ -682,7 +681,7 @@ double diffCPMQuality(uint64_t curr_subcomm, uint64_t candidate_subcomm, std::ma
 }
 
 template<typename GraphTy, typename CommArrayTy>
-uint64_t getRandomSubcommunity(GraphTy& graph, uint64_t n, CommArrayTy &subcomm_info, uint64_t total_node_wt, uint64_t total_degree_wt, double constant_for_second_term){
+uint64_t getRandomSubcommunity(GraphTy& graph, uint64_t n, CommArrayTy &subcomm_info, uint64_t total_degree_wt, double constant_for_second_term){
   using GNode = typename GraphTy::GraphNode;
   uint64_t curr_subcomm = graph.getData(n).curr_subcomm_ass;
 
@@ -750,7 +749,7 @@ uint64_t getRandomSubcommunity(GraphTy& graph, uint64_t n, CommArrayTy &subcomm_
 }
 
 template<typename GraphTy, typename CommTy>
-uint64_t getRandomSubcommunity2(GraphTy &graph, typename GraphTy::GraphNode n, CommTy& subcomm_info, uint64_t total_node_wt,  uint64_t total_degree_wt, uint64_t comm_id, double constant_for_second_term){
+uint64_t getRandomSubcommunity2(GraphTy &graph, typename GraphTy::GraphNode n, CommTy& subcomm_info, uint64_t total_degree_wt, uint64_t comm_id, double constant_for_second_term){
   using GNode = typename GraphTy::GraphNode;  
   auto& n_data = graph.getData(n);
    /*
@@ -893,7 +892,7 @@ uint64_t getRandomSubcommunity2(GraphTy &graph, typename GraphTy::GraphNode n, C
  *  
  */
 template<typename GraphTy, typename CommTy>
-void mergeNodesSubset(GraphTy &graph, std::vector<typename GraphTy::GraphNode> &cluster_nodes, uint64_t comm_id, uint64_t total_node_wt, uint64_t total_degree_wt, CommTy& subcomm_info, double constant_for_second_term){
+void mergeNodesSubset(GraphTy &graph, std::vector<typename GraphTy::GraphNode> &cluster_nodes, uint64_t comm_id, uint64_t total_degree_wt, CommTy& subcomm_info, double constant_for_second_term){
 
   using GNode = typename GraphTy::GraphNode;
 
@@ -940,7 +939,7 @@ void mergeNodesSubset(GraphTy &graph, std::vector<typename GraphTy::GraphNode> &
       * Only consider singleton communities 
       */ 
     if(subcomm_info[n_data.curr_subcomm_ass].size == 1){
-      uint64_t new_subcomm_ass = getRandomSubcommunity2(graph, n, subcomm_info, total_node_wt, total_degree_wt, comm_id, constant_for_second_term);
+      uint64_t new_subcomm_ass = getRandomSubcommunity2(graph, n, subcomm_info, total_degree_wt, comm_id, constant_for_second_term);
 
       if((int64_t) new_subcomm_ass != -1 && new_subcomm_ass != graph.getData(n).curr_subcomm_ass){ 
         n_data.curr_subcomm_ass = new_subcomm_ass;
@@ -1026,7 +1025,7 @@ void refinePartition(GraphTy &graph, double constant_for_second_term){
       comm_info[c].num_subcomm = 0;
       if(cluster_bags[c].size() > 1){
         //comm_info[c].num_subcomm = 
-        mergeNodesSubset<GraphTy, CommArray>(graph, cluster_bags[c], c, comm_info[c].node_wt, comm_info[c].degree_wt, subcomm_info, constant_for_second_term);
+        mergeNodesSubset<GraphTy, CommArray>(graph, cluster_bags[c], c, comm_info[c].degree_wt, subcomm_info, constant_for_second_term);
       } else {
         comm_info[c].num_subcomm = 0;
       }

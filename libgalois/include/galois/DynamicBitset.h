@@ -426,7 +426,7 @@ struct InvalidBitsetFnTy {
   static galois::DynamicBitSet& get() { return EmptyBitset; }
 
   //! No-op since it's an empty bitset
-  static void reset_range(size_t begin, size_t end) {}
+  static void reset_range(size_t, size_t) {}
 };
 } // namespace galois
 #endif

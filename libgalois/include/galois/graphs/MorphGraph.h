@@ -81,11 +81,11 @@ struct UEdgeInfoBase<NTy, ETy, true> {
   inline const ETy* second() const { return &Ea; }
 
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, ETy*, bool, Args&&... args)
       : N(n), Ea(std::forward<Args>(args)...) {}
 
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy& v, bool f, Args&&... args) : N(n) {
+  UEdgeInfoBase(NTy* n, ETy& v, bool, Args&&...) : N(n) {
     Ea = v;
   }
 
@@ -111,7 +111,7 @@ struct UEdgeInfoBase<NTy, ETy, false> {
   inline ETy* second() { return Ea; }
   inline const ETy* second() const { return Ea; }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&...)
       : N((NTy*)((uintptr_t)n | f)), Ea(v) {}
   static size_t sizeOfSecond() { return sizeof(ETy); }
   bool isInEdge() const { return (uintptr_t)N & 1; }
@@ -127,7 +127,7 @@ struct UEdgeInfoBase<NTy, void, true> {
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args) : N(n) {}
+  UEdgeInfoBase(NTy* n, void*, bool, Args&&...) : N(n) {}
   static size_t sizeOfSecond() { return 0; }
   bool isInEdge() const { return false; }
 };
@@ -142,7 +142,7 @@ struct UEdgeInfoBase<NTy, void, false> {
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, void*, bool f, Args&&...)
       : N((NTy*)((uintptr_t)n | f)) {}
   static size_t sizeOfSecond() { return 0; }
   bool isInEdge() const { return (uintptr_t)N & 1; }
@@ -167,7 +167,7 @@ struct EdgeFactory {
 template <typename ETy>
 struct EdgeFactory<ETy, true> {
   template <typename... Args>
-  ETy* mkEdge(Args&&... args) {
+  ETy* mkEdge(Args&&...) {
     return nullptr;
   }
   void delEdge(ETy*) {}
@@ -177,7 +177,7 @@ struct EdgeFactory<ETy, true> {
 template <>
 struct EdgeFactory<void, false> {
   template <typename... Args>
-  void* mkEdge(Args&&... args) {
+  void* mkEdge(Args&&...) {
     return static_cast<void*>(NULL);
   }
   void delEdge(void*) {}
@@ -494,7 +494,7 @@ private:///////////////////////////////////////////////////////////////////////
     }
 
     template <bool _A1 = HasNoLockable>
-    void acquire(MethodFlag mflag, typename std::enable_if<_A1>::type* = 0) {}
+    void acquire(MethodFlag, typename std::enable_if<_A1>::type* = 0) {}
 
   public:
     template <typename... Args>
@@ -705,14 +705,14 @@ private:///////////////////////////////////////////////////////////////////////
   template <bool _A1 = LargeArray<EdgeTy>::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
   EdgeTy*
-  constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  constructOutEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
                         GraphNode src, GraphNode dst,
                         typename std::enable_if<_A1 && !_A2>::type* = 0) {
     return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
   // will reuse edge data from outgoing edges
-  void constructInEdgeValue(FileGraph& graph, EdgeTy* e, GraphNode src,
+  void constructInEdgeValue(FileGraph&, EdgeTy* e, GraphNode src,
                             GraphNode dst) {
     createInEdge(src, dst, e, galois::MethodFlag::UNPROTECTED);
   }
@@ -1023,7 +1023,7 @@ public://///////////////////////////////////////////////////////////////////////
 
   //! Returns the end of the neighbor edge iterator
   edge_iterator edge_end(GraphNode N,
-                         galois::MethodFlag mflag = MethodFlag::WRITE) {
+    galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -1034,7 +1034,8 @@ public://///////////////////////////////////////////////////////////////////////
   //! Returns the end of an in-neighbor edge iterator
   template <bool _Undirected = !Directional>
   in_edge_iterator
-  in_edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+  in_edge_end(GraphNode N,
+              galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE,
               typename std::enable_if<!_Undirected>::type* = 0) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should

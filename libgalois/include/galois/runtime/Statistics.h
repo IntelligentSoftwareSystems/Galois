@@ -127,7 +127,7 @@ public:
 
   const Str& name(void) const { return m_name; }
 
-  void add(const T& val) const {}
+  void add(const T&) const {}
 };
 
 template <typename T, typename... Bases>

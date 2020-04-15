@@ -119,7 +119,7 @@ struct InverseStepFunction : public StepFunction {
 struct BoldStepFunction : public StepFunction {
   virtual std::string name() const { return "Bold"; }
   virtual bool isBold() const { return true; }
-  virtual LatentValue stepSize(int round) const { return 0.0; }
+  virtual LatentValue stepSize(int) const { return 0.0; }
 };
 
 template <typename Graph>
@@ -151,8 +151,8 @@ size_t countEdges(Graph& g) {
   executor.execute(g.begin(), g.begin() + NUM_ITEM_NODES,
                    g.begin() + NUM_ITEM_NODES, g.end(), itemsPerBlock,
                    usersPerBlock,
-                   [&](GNode src, GNode dst,
-                       typename Graph::edge_iterator edge) { edges += 1; },
+                   [&](GNode, GNode,
+                       typename Graph::edge_iterator) { edges += 1; },
                    false); // false = no locks
   return edges.reduce();
 }
@@ -677,13 +677,13 @@ private:
     Graph& g;
     galois::GAccumulator<unsigned>& edgesVisited;
 
-    void operator()(LatentValue* steps, int maxUpdates,
+    void operator()(LatentValue* steps, int,
                     galois::GAccumulator<double>* errorAccum) {
 
       const LatentValue stepSize = steps[0];
       galois::for_each(
           galois::iterate(g.begin(), g.begin() + NUM_ITEM_NODES),
-          [&](GNode src, auto& ctx) {
+          [&](GNode src, auto&) {
             for (auto ii : g.edges(src)) {
 
               GNode dst         = g.getEdgeDst(ii);
@@ -758,7 +758,7 @@ private:
   struct Execute {
     Graph& g;
     galois::GAccumulator<unsigned>& edgesVisited;
-    void operator()(LatentValue* steps, int maxUpdates,
+    void operator()(LatentValue* steps, int,
                     galois::GAccumulator<double>* errorAccum) {
       const LatentValue stepSize = steps[0];
       galois::for_each(
@@ -861,7 +861,7 @@ private:
     Graph& g;
     galois::GAccumulator<unsigned>& edgesVisited;
 
-    void operator()(LatentValue* steps, int maxUpdates,
+    void operator()(LatentValue* steps, int,
                     galois::GAccumulator<double>* errorAccum) {
       galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
       executor.execute(

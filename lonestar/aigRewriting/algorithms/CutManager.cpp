@@ -110,7 +110,7 @@ void CutManager::computeCuts(CutPool* cutPool, CutList* cutList,
     for (Cut* rhsCut = this->nodeCuts[rhsId]; rhsCut != rhsLargeCutsBegin;
          rhsCut      = rhsCut->nextCut) {
       if (processTwoCuts(cutPool, cutList, auxTruth, lhsCut, rhsCut,
-                         lhsPolarity, rhsPolarity, nodeId, currentNumCuts)) {
+                         lhsPolarity, rhsPolarity, currentNumCuts)) {
         commitCuts(nodeId, cutList);
         return; // The Maximum number of cuts per node was reached
       }
@@ -126,7 +126,7 @@ void CutManager::computeCuts(CutPool* cutPool, CutList* cutList,
         continue;
       }
       if (processTwoCuts(cutPool, cutList, auxTruth, lhsCut, rhsCut,
-                         lhsPolarity, rhsPolarity, nodeId, currentNumCuts)) {
+                         lhsPolarity, rhsPolarity, currentNumCuts)) {
         commitCuts(nodeId, cutList);
         return; // The Maximum number of cuts per node was reached
       }
@@ -142,7 +142,7 @@ void CutManager::computeCuts(CutPool* cutPool, CutList* cutList,
         continue;
       }
       if (processTwoCuts(cutPool, cutList, auxTruth, lhsCut, rhsCut,
-                         lhsPolarity, rhsPolarity, nodeId, currentNumCuts)) {
+                         lhsPolarity, rhsPolarity, currentNumCuts)) {
         commitCuts(nodeId, cutList);
         return; // The Maximum number of cuts per node was reached
       }
@@ -166,7 +166,7 @@ void CutManager::computeCuts(CutPool* cutPool, CutList* cutList,
         continue;
       }
       if (processTwoCuts(cutPool, cutList, auxTruth, lhsCut, rhsCut,
-                         lhsPolarity, rhsPolarity, nodeId, currentNumCuts)) {
+                         lhsPolarity, rhsPolarity, currentNumCuts)) {
         commitCuts(nodeId, cutList);
         return; // The Maximum number of cuts per node was reached
       }
@@ -239,7 +239,7 @@ void CutManager::computeCutsRec(aig::GNode node, CutPool* cutPool,
 inline bool CutManager::processTwoCuts(CutPool* cutPool, CutList* cutList,
                                        AuxTruth* auxTruth, Cut* lhsCut,
                                        Cut* rhsCut, bool lhsPolarity,
-                                       bool rhsPolarity, int nodeId,
+                                       bool rhsPolarity,
                                        int& currentNumCuts) {
 
   // std::chrono::high_resolution_clock::time_point t0 =

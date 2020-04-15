@@ -146,7 +146,7 @@ class RAND_WL : public FIFO_WL<T> {
 public:
   auto iterateCurr(void) {
     galois::runtime::on_each_gen(
-        [&](int tid, int numT) {
+        [&](int, int) {
           auto& lwl = Base::curr->get();
 
           std::random_device r;
@@ -168,7 +168,7 @@ public:
 
     // TODO: use reverse iterator instead of std::reverse
     galois::runtime::on_each_gen(
-        [&](int tid, int numT) {
+        [&](int, int) {
           auto& lwl = Base::curr->get();
           std::reverse(lwl.begin(), lwl.end());
         },
@@ -360,7 +360,7 @@ template <typename R>
 void execute(const R& range) {
 
   galois::runtime::on_each_gen(
-      [&, this](const unsigned tid, const unsigned numT) {
+      [&, this](const unsigned, const unsigned) {
         auto p = range.local_pair();
 
         for (auto i = p.first; i != p.second; ++i) {
@@ -412,7 +412,7 @@ void init(const RangeTy& range) {
 
 // called once on each thread followed by a barrier
 template <typename RangeTy>
-void initThread(const RangeTy& range) const {}
+void initThread(const RangeTy&) const {}
 
 void operator()(void) {}
 

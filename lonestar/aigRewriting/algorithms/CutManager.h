@@ -117,7 +117,7 @@ private:
 
   inline bool processTwoCuts(CutPool* cutPool, CutList* cutList,
                              AuxTruth* auxTruth, Cut* lhsCut, Cut* rhsCut,
-                             bool lhsPolarity, bool rhsPolarity, int nodeId,
+                             bool lhsPolarity, bool rhsPolarity,
                              int& currentNumCuts);
 
   Cut* mergeCuts(CutPool* cutPool, Cut* lhsCut, Cut* rhsCut);

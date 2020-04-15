@@ -142,7 +142,7 @@ public:
 		if (!directed_) symmetrize_ = false; // no need to symmetrize undirected graph
 		MakeGraphFromEL();
 	}
-	void read_mtx(const char *filename, bool symmetrize = false, bool needs_weights = false) {
+	void read_mtx(const char *filename, bool symmetrize = false) {
 		std::ifstream in;
 		in.open(filename, std::ios::in);
 		std::string start, object, format, field, symmetry, line;

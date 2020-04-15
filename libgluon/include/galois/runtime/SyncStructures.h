@@ -489,56 +489,56 @@ public:
   struct Reduce_add_##fieldname {                                              \
     typedef fieldtype ValTy;                                                   \
                                                                                \
-    static ValTy extract(uint32_t node_id, const struct NodeData& node) {      \
+    static ValTy extract(uint32_t, const struct NodeData& node) {      \
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id,  \
-                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned,  \
+                              uint8_t*, size_t*, DataCommMode*) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }  \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }  \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id,             \
-                                    uint8_t* y, size_t* s,      \
-                                    DataCommMode* data_mode) {                 \
+    static bool extract_reset_batch(unsigned,             \
+                                    uint8_t*, size_t*,      \
+                                    DataCommMode*) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
+    static bool extract_reset_batch(unsigned, uint8_t*) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t, size_t) { return false; }        \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t, struct NodeData& node, ValTy y) {     \
       {                                                                        \
         galois::add(node.fieldname, y);                                        \
         return true;                                                           \
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce_mirror_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_mirror_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t, struct NodeData& node) {               \
       galois::set(node.fieldname, (ValTy)0);                                   \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
   }
@@ -855,54 +855,54 @@ public:
   struct Reduce_set_##fieldname {                                              \
     typedef fieldtype ValTy;                                                   \
                                                                                \
-    static ValTy extract(uint32_t node_id, const struct NodeData& node) {      \
+    static ValTy extract(uint32_t, const struct NodeData& node) {      \
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id,  \
-                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned,  \
+                              uint8_t*, size_t*, DataCommMode*) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }  \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }  \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id,             \
-                                    uint8_t* y, size_t* s,      \
-                                    DataCommMode* data_mode) {                 \
+    static bool extract_reset_batch(unsigned,             \
+                                    uint8_t*, size_t*,      \
+                                    DataCommMode*) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
+    static bool extract_reset_batch(unsigned, uint8_t*) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t, size_t) { return true; }         \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t, struct NodeData& node, ValTy y) {     \
       {                                                                        \
         galois::set(node.fieldname, y);                                        \
         return true;                                                           \
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce_mirror_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_mirror_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t, struct NodeData&) {}              \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
   }
@@ -1200,51 +1200,51 @@ public:
   struct Reduce_min_##fieldname {                                              \
     typedef fieldtype ValTy;                                                   \
                                                                                \
-    static ValTy extract(uint32_t node_id, const struct NodeData& node) {      \
+    static ValTy extract(uint32_t, const struct NodeData& node) {      \
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id,  \
-                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned,  \
+                              uint8_t*, size_t*, DataCommMode*) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }  \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }  \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id,             \
-                                    uint8_t* y, size_t* s,      \
-                                    DataCommMode* data_mode) {                 \
+    static bool extract_reset_batch(unsigned,             \
+                                    uint8_t*, size_t*,      \
+                                    DataCommMode*) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
+    static bool extract_reset_batch(unsigned, uint8_t*) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t, size_t) { return true; }         \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t, struct NodeData& node, ValTy y) {     \
       { return y < galois::min(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce_mirror_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_mirror_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t, struct NodeData&) {}              \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
   }
@@ -1707,56 +1707,56 @@ public:
   struct Reduce_pair_wise_avg_array_##fieldname {                              \
     typedef fieldtype ValTy;                                                   \
                                                                                \
-    static ValTy extract(uint32_t node_id, const struct NodeData& node) {      \
+    static ValTy extract(uint32_t, const struct NodeData& node) {      \
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id,  \
-                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned,  \
+                              uint8_t*, size_t*, DataCommMode*) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }  \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }  \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id,             \
-                                    uint8_t* y, size_t* s,      \
-                                    DataCommMode* data_mode) {                 \
+    static bool extract_reset_batch(unsigned,             \
+                                    uint8_t*, size_t*,      \
+                                    DataCommMode*) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
+    static bool extract_reset_batch(unsigned, uint8_t*) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t, size_t) { return false; }        \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t, struct NodeData& node, ValTy y) {     \
       {                                                                        \
         galois::pairWiseAvg_vec(node.fieldname, y);                            \
         return true;                                                           \
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce_mirror_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_mirror_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t, struct NodeData& node) {               \
       { galois::resetVec(node.fieldname); }                                    \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
   }
@@ -1770,56 +1770,56 @@ public:
   struct Reduce_pair_wise_add_array_##fieldname {                              \
     typedef fieldtype ValTy;                                                   \
                                                                                \
-    static ValTy extract(uint32_t node_id, const struct NodeData& node) {      \
+    static ValTy extract(uint32_t, const struct NodeData& node) {      \
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id,  \
-                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned,  \
+                              uint8_t*, size_t*, DataCommMode*) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }  \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }  \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id,             \
-                                    uint8_t* y, size_t* s,      \
-                                    DataCommMode* data_mode) {                 \
+    static bool extract_reset_batch(unsigned,             \
+                                    uint8_t*, size_t*,      \
+                                    DataCommMode*) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
+    static bool extract_reset_batch(unsigned, uint8_t*) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t, size_t) { return false; }        \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t, struct NodeData& node, ValTy y) {     \
       {                                                                        \
         galois::addArray(node.fieldname, y);                                   \
         return true;                                                           \
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce_mirror_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool reduce_mirror_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t, struct NodeData& node) {               \
       { galois::resetVec(node.fieldname); }                                    \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id,   \
-                             uint8_t* y, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned,   \
+                             uint8_t*, DataCommMode) {     \
       return false;                                                            \
     }                                                                          \
   }

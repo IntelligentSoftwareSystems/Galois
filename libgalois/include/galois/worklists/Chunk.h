@@ -48,7 +48,7 @@ struct squeue {
 template <template <typename> class PS, typename TQ>
 struct squeue<false, PS, TQ> {
   TQ queue;
-  TQ& get(int i) { return queue; }
+  TQ& get(int) { return queue; }
   TQ& get() { return queue; }
   int myEffectiveID() { return 0; }
   int size() { return 0; }

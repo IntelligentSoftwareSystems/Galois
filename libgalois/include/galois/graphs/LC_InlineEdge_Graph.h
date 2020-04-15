@@ -162,18 +162,18 @@ protected:
 
   template <bool C_b = HasCompressedNodePtr>
   NodeInfo* getDst(edge_iterator ii,
-                   typename std::enable_if<C_b>::type* x = 0) const {
+                   typename std::enable_if<C_b>::type* = 0) const {
     return const_cast<NodeInfo*>(&nodeData[ii->dst]);
   }
 
   template <bool C_b = HasCompressedNodePtr>
   NodeInfo* getDst(edge_iterator ii,
-                   typename std::enable_if<!C_b>::type* x = 0) const {
+                   typename std::enable_if<!C_b>::type* = 0) const {
     return ii->dst;
   }
 
   template <typename Container, typename Index, bool C_b = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx,
+  void setEdgeDst(Container&, edge_iterator edge, Index idx,
                   typename std::enable_if<C_b>::type* = 0) {
     edge->dst = idx;
   }
@@ -197,7 +197,7 @@ protected:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   edge_iterator raw_begin(GraphNode N) {
@@ -218,8 +218,8 @@ protected:
 
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
-                          typename FileGraph::edge_iterator nn, EdgeInfo* edge,
+  void constructEdgeValue(FileGraph&,
+                          typename FileGraph::edge_iterator, EdgeInfo* edge,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edge->construct();
   }
@@ -251,7 +251,7 @@ public:
 
   edge_data_reference
   getEdgeData(edge_iterator ni,
-              MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) const {
     // galois::runtime::checkWrite(mflag, false);
     return ni->get();
   }

@@ -117,7 +117,7 @@ struct EdgeTileMaker {
 struct NodePushWrap {
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     (*this)(cont, n);
   }
 
@@ -131,7 +131,7 @@ struct EdgeTilePushWrap {
   Graph& graph;
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     BFS::pushEdgeTilesParallel(cont, graph, n, EdgeTileMaker{});
   }
 
@@ -145,7 +145,7 @@ struct OneTilePushWrap {
   Graph& graph;
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     (*this)(cont, n);
   }
 

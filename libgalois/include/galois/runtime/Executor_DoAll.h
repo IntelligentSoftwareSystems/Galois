@@ -551,7 +551,7 @@ struct ChooseDoAllImpl<false> {
   static void call(const R& range, F func, const ArgsT& argsTuple) {
 
     runtime::on_each_gen(
-        [&](const unsigned tid, const unsigned numT) {
+        [&](const unsigned int, const unsigned int) {
           static constexpr bool NEED_STATS =
               galois::internal::NeedStats<ArgsT>::value;
           static constexpr bool MORE_STATS =

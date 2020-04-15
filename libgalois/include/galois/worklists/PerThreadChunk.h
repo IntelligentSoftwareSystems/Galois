@@ -346,7 +346,7 @@ private:
       return c->extract_back();
   }
 
-  void push_internal(std::pair<Chunk*, Chunk*>& tld, Chunk*& n, const T& val) {
+  void push_internal(std::pair<Chunk*, Chunk*>&, Chunk*& n, const T& val) {
     // Simple case, space in current chunk
     if (n && doPush(n, val))
       return;

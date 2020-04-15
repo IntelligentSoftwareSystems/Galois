@@ -57,7 +57,7 @@ public:
 			init_map_ptr->clear();
 		}
 	}
-	void initialize(std::string pattern_filename) {
+	void initialize(std::string) {
 		init_emb_list();
 	}
 	void init_emb_list() {

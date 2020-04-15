@@ -195,6 +195,6 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
 // Partitioning
 void partition(MetisGraph* coarseMetisGraph, unsigned K);
 // Refinement
- void refine(MetisGraph* coarseGraph, unsigned refineTo, unsigned K);
+ void refine(MetisGraph* coarseGraph, unsigned K);
 
 #endif

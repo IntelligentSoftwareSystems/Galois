@@ -36,7 +36,7 @@ Aig::Aig(float expansionRate) {
 
 Aig::~Aig() { }
 
-void Aig::resize(int m, int i, int l, int o, int a, bool hasSymbols) {
+void Aig::resize(int m, int i, int l, int o, bool hasSymbols) {
 	this->inputNodes.resize(i);
   this->latchNodes.resize(l);
   this->outputNodes.resize(o);
@@ -112,7 +112,7 @@ void Aig::insertNodeInFanoutMap(GNode andNode, GNode lhsNode, GNode rhsNode, boo
   NodeData& lhsNodeData = this->graph.getData(lhsNode, galois::MethodFlag::READ);
   NodeData& rhsNodeData = this->graph.getData(rhsNode, galois::MethodFlag::READ);
 
-  unsigned key = makeAndHashKey(lhsNode, rhsNode, lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
+  unsigned key = makeAndHashKey(lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
 
   if (lhsNodeData.id < rhsNodeData.id) {
     this->nodesFanoutMap[lhsNodeData.id].emplace(key, andNode);
@@ -132,7 +132,7 @@ void Aig::removeNodeInFanoutMap(GNode removedNode, GNode lhsNode, GNode rhsNode,
   NodeData& lhsNodeData = this->graph.getData(lhsNode, galois::MethodFlag::READ);
   NodeData& rhsNodeData = this->graph.getData(rhsNode, galois::MethodFlag::READ);
 
-  unsigned key = makeAndHashKey(lhsNode, rhsNode, lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
+  unsigned key = makeAndHashKey(lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
 
   if (lhsNodeData.id < rhsNodeData.id) {
     smallestId = lhsNodeData.id;
@@ -190,7 +190,7 @@ GNode Aig::lookupNodeInFanoutMap(GNode lhsNode, GNode rhsNode, bool lhsPol, bool
   NodeData& lhsNodeData = this->graph.getData(lhsNode, galois::MethodFlag::READ);
   NodeData& rhsNodeData = this->graph.getData(rhsNode, galois::MethodFlag::READ);
 
-  unsigned key = makeAndHashKey(lhsNode, rhsNode, lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
+  unsigned key = makeAndHashKey(lhsNodeData.id, rhsNodeData.id, lhsPol, rhsPol);
 
   if (lhsNodeData.id < rhsNodeData.id) {
     smallestId = lhsNodeData.id;
@@ -235,7 +235,7 @@ GNode Aig::lookupNodeInFanoutMap(GNode lhsNode, GNode rhsNode, bool lhsPol, bool
   return nullptr;
 }
 
-unsigned Aig::makeAndHashKey(GNode lhsNode, GNode rhsNode, int lhsId, int rhsId, bool lhsPol, bool rhsPol) {
+unsigned Aig::makeAndHashKey(int lhsId, int rhsId, bool lhsPol, bool rhsPol) {
 
   unsigned key = 0;
 

@@ -91,8 +91,11 @@ bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
   return false;
 }
 
-void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode,
-                     uint32_t endNode, std::vector<uint32_t>& returnRanges) {
+void unitRangeSanity(
+  uint32_t GALOIS_USED_ONLY_IN_DEBUG(unitsToSplit),
+  uint32_t GALOIS_USED_ONLY_IN_DEBUG(beginNode),
+  uint32_t GALOIS_USED_ONLY_IN_DEBUG(endNode),
+  std::vector<uint32_t>& GALOIS_USED_ONLY_IN_DEBUG(returnRanges)) {
 #ifndef NDEBUG
   // sanity checks
   assert(returnRanges[0] == beginNode &&

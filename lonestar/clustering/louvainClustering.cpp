@@ -138,7 +138,7 @@ double algoLouvainWithLocking(Graph &graph, double lower, double threshold, uint
                   });
 
   galois::for_each(galois::iterate(graph),
-                [&](GNode n, auto& ctx) {
+                [&](GNode n, auto&) {
 
                     auto& n_data = graph.getData(n, flag_write_lock);
                     uint64_t degree = std::distance(graph.edge_begin(n, flag_write_lock),
@@ -459,7 +459,7 @@ double algoLouvainWithLockingDelayUpdate(Graph &graph, double lower, double thre
 
 uint64_t coloringDistanceOne(Graph& graph) {
   galois::for_each(galois::iterate(graph),
-                  [&](GNode n, auto& ctx){
+                  [&](GNode n, auto&){
                     auto& n_data = graph.getData(n, flag_write_lock);
 
                     /* Grab lock on neighbours: Cautious operator */

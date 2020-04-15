@@ -47,7 +47,7 @@ void runDoAllBurn(int num) {
   galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   for (int r = 0; r < rounds; ++r) {
-    galois::do_all(galois::iterate(0, num), [&](int i) {
+    galois::do_all(galois::iterate(0, num), [&](int) {
       asm volatile("" ::: "memory");
     });
   }
@@ -57,7 +57,7 @@ void runDoAllBurn(int num) {
 
 void runDoAll(int num) {
   for (int r = 0; r < rounds; ++r) {
-    galois::do_all(galois::iterate(0, num), [&](int i) {
+    galois::do_all(galois::iterate(0, num), [&](int) {
       asm volatile("" ::: "memory");
     });
   }

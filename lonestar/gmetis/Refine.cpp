@@ -107,7 +107,7 @@ void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
 
   //! [Example Per-Thread-Storage Usage]
   // Find the partition n is most connected to
-  auto pickPartitionEC = [&](GNode n, auto& cnx) -> unsigned {
+  auto pickPartitionEC = [&](GNode n, auto&) -> unsigned {
     auto& edges = *edgesThreadLocal.getLocal();
     edges.clear();
     edges.resize(parts.size(), 0);
@@ -124,7 +124,7 @@ void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
   //! [Example Per-Thread-Storage Usage]
 
   // Find the smallest partition n is connected to
-  auto pickPartitionMP = [&](GNode n, auto& cnx) -> unsigned {
+  auto pickPartitionMP = [&](GNode n, auto&) -> unsigned {
     unsigned P  = cg.getData(n).getPart();
     unsigned W  = parts[P].partWeight;
     auto& edges = *edgesThreadLocal.getLocal();
@@ -177,7 +177,7 @@ void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
       galois::loopname("refine"), galois::wl<pG>(gainIndexer));
 }
 
-void projectPart(MetisGraph* Graph, std::vector<partInfo>& parts) {
+void projectPart(MetisGraph* Graph, std::vector<partInfo>&) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
 

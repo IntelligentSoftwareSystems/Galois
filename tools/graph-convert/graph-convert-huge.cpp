@@ -169,7 +169,7 @@ void go(std::istream& input) {
                 edgeCount.resize(src + 1);
               ++edgeCount[src];
             },
-            [&edgeCount](uint64_t nodes, uint64_t edges) {
+            [&edgeCount](uint64_t nodes, uint64_t) {
               edgeCount.resize(nodes);
             });
     input.clear();
@@ -204,7 +204,7 @@ void go_edgesSorted(std::istream& input, uint64_t numNodes) {
     uint64_t curr_src_edgeCount = 0;
     perEdge(input,
             [&outFile, &edgeCount, &curr_src,
-             &curr_src_edgeCount](uint64_t src, uint64_t dst, dataTy data) {
+             &curr_src_edgeCount](uint64_t src, uint64_t dst, dataTy) {
               if (src == curr_src) {
                 ++curr_src_edgeCount;
               } else {

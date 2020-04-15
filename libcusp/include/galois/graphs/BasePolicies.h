@@ -289,14 +289,15 @@ class CustomMasterAssignment : public PartitioningScaffold {
    * @returns Host id in which to assing a node
    */
   template<typename EdgeTy> uint32_t getMaster(
-      uint32_t src,
-      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
-      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-      const std::vector<uint64_t>& nodeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      const std::vector<uint64_t>& edgeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+      uint32_t GALOIS_UNUSED(src),
+      galois::graphs::BufferedGraph<EdgeTy>& GALOIS_UNUSED(bufGraph),
+      const std::vector<uint32_t>& GALOIS_UNUSED(localNodeToMaster),
+      std::unordered_map<uint64_t, uint32_t>& GALOIS_UNUSED(gid2offsets),
+      const std::vector<uint64_t>& GALOIS_UNUSED(nodeLoads),
+      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(nodeAccum),
+      const std::vector<uint64_t>& GALOIS_UNUSED(edgeLoads),
+      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(edgeAccum))
+  {
     return (uint32_t)-1;
   }
 

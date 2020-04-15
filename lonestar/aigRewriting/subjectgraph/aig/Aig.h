@@ -85,7 +85,7 @@ public:
 	Aig(float expansionRate);
   virtual ~Aig();
 
-	void resize(int m, int i, int l, int o, int a, bool hasSymbols);
+	void resize(int m, int i, int l, int o, bool hasSymbols);
 	void resizeNodeVectors(int size);
 	void expandNodeVectors(size_t extraSize);
 	size_t getNextId();
@@ -94,7 +94,7 @@ public:
 	void insertNodeInFanoutMap(GNode andNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
   void removeNodeInFanoutMap(GNode removedNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
   GNode lookupNodeInFanoutMap(GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);
-  unsigned makeAndHashKey(GNode lhsNode, GNode rhsNode, int lhsId, int rhsId, bool lhsPol, bool rhsPol);
+  unsigned makeAndHashKey(int lhsId, int rhsId, bool lhsPol, bool rhsPol);
 
  	void registerTravId(int nodeId, int threadId, int travId);
   bool lookupTravId(int nodeId, int threadId, int travId);

@@ -110,7 +110,7 @@ struct MFBipartiteGraph
 
 template <typename G, template <typename, bool> class Algo>
 struct Exists {
-  bool operator()(G& g, const typename G::edge_iterator&) { return true; }
+  bool operator()(G&, const typename G::edge_iterator&) { return true; }
 };
 
 template <typename G>
@@ -704,7 +704,7 @@ struct MatchingMF {
     return relabeled;
   }
 
-  void relabel(G& g, const GraphNode& src, unsigned numNodes) {
+  void relabel(G& g, const GraphNode& src, unsigned int) {
     unsigned minHeight = std::numeric_limits<unsigned>::max();
     int minEdge        = 0; // TODO: not sure of initial value
 

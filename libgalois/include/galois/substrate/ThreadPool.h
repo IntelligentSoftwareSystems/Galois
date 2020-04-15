@@ -43,7 +43,7 @@ struct ExecuteTupleImpl {
 
 template <typename tpl, int s>
 struct ExecuteTupleImpl<tpl, s, 0> {
-  static inline void execute(tpl& f) {}
+  static inline void execute(tpl&) {}
 };
 
 }  // namespace galois::substrate::internal
