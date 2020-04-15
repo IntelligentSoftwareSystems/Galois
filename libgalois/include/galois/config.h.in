@@ -8,4 +8,16 @@
 #error Exactly one of GALOIS_USE_LONGJMP_ABORT or GALOIS_USE_EXCEPTION_ABORT must be defined.
 #endif
 
+// Macro to suppress compiler warnings that a variable is set but unused.
+// This warning is buggy in gcc 7.
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 8
+#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET                           \
+_Pragma("GCC diagnostic push")                                 \
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
+#define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET
+#define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
+#endif
+
 #endif
