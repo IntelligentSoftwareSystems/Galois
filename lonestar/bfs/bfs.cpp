@@ -172,7 +172,9 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
       typename std::conditional<CONCURRENT, galois::ForEach,
                                 galois::WhileQ<galois::SerFIFO<T>>>::type;
 
+GALOIS_GCC7_IGNORE_UNUSED_BUT_SET
   constexpr bool useCAS = CONCURRENT && !std::is_same<WL, BSWL>::value;
+GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
 
   Loop loop;
 
