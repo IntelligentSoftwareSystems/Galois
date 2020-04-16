@@ -65,8 +65,8 @@ static uint8_t* AllocAndReadS3(const char* filename, uint64_t begin,
 }
 
 class MappingDesc {
-  uint8_t* ptr_;
-  size_t size_;
+  uint8_t* ptr_{nullptr};
+  size_t size_{0};
   bool valid_ = false;
 
 public:
