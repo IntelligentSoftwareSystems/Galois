@@ -317,14 +317,13 @@ private:
         if (needsBreak) {
           it->facing.setBreakFlag(&broke);
         }
-
 #ifdef GALOIS_USE_LONGJMP_ABORT
         int flag = 0;
         if ((flag = setjmp(execFrame)) == 0) {
           m_func(it->item, it->facing.data());
 
         } else {
-#else
+#elif GALOIS_USE_EXCEPTION_ABORT
         try {
           m_func(it->item, it->facing.data());
 

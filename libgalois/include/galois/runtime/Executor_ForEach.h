@@ -270,7 +270,7 @@ protected:
       clearConflictLock();
       abortIteration(*s.item, tld);
     }
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
     try {
       while ((!limit || s.num < limit) && (s.item = lwl.pop())) {
         ++s.num;
