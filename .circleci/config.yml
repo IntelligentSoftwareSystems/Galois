@@ -17,13 +17,28 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-iostreams-dev libboost-serialization-dev libeigen3-dev cmake gcc g++ zlib1g-dev libmpich-dev mpich
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-iostreams-dev \
+            libboost-serialization-dev \
+            libeigen3-dev \
+            libmpich-dev \
+            llvm-7-dev \
+            mpich \
+            zlib1g-dev
+
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          # Run tests as non-root otherwise MPI will complain
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -36,71 +51,26 @@ jobs:
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
 
-          apt-get -q install -y libboost-all-dev libeigen3-dev cmake gcc g++ libopenmpi-dev openmpi-bin
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-all-dev \
+            libeigen3-dev \
+            libopenmpi-dev \
+            llvm-7-dev \
+            openmpi-bin \
+            ssh
 
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
-  "Ubuntu-16.04":
-    docker:
-      - image: ubuntu:16.04
-    steps:
-      - checkout
-      - run: |
-          apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
+          useradd runner
+          mkdir -p /tmp/build
 
-          apt-add-repository -y 'deb https://apt.kitware.com/ubuntu/ xenial main'
-          apt-add-repository -y ppa:ubuntu-toolchain-r/test  # for gcc-9
-          apt-add-repository -y ppa:mhier/libboost-latest
-          apt-get -q update -y
-
-          apt-get -q install -y libboost1.70-dev libeigen3-dev cmake gcc-9 g++-9 zlib1g-dev wget libopenmpi-dev openmpi-bin
-
-          update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
-          update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
-
-          mkdir build
-          cd build
-          # Also test custom GRAPH_LOCATION
-          wget http://iss.oden.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
-          tar -xvzf small_inputs.tar.gz
-          rm small_inputs.tar.gz
-          cmake -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9 -DENABLE_DIST_GALOIS=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
-          make -j2
-          make test || :
-  "CentOS-7-gcc":
-    docker:
-      - image: centos:7
-    steps:
-      - checkout
-      - run: |
-          yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
-          yum -y -q install devtoolset-9-toolchain
-          # For some reason using scl_source enable this way doesn't work when bash
-          # was started with -e, so temporarily disable that, then re-enable it afterward.
-          set +e
-          source scl_source enable devtoolset-9
-          set -e
-          # Use miniconda to get recent boost and cmake
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          # conda-forge used to use the devtoolset compilers.
-          # Use the latest boost build that's still ABI compatible there.
-          conda install --update-specs -y -q -c conda-forge cmake>=3.13 boost-cpp=1.69.0=h3a22d5f_0 eigen mpich=3.2.1=h26a2512_4
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-gcc":
     docker:
       - image: centos:8
@@ -110,21 +80,37 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make gcc gcc-c++ boost-devel cmake eigen3-devel mpich-devel wget
+          yum -y -q install \
+            boost-devel \
+            cmake \
+            eigen3-devel \
+            gcc \
+            gcc-c++ \
+            llvm-devel \
+            llvm-static \
+            make \
+            mpich-devel \
+            ncurses-devel \
+            wget \
+            zlib-devel
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
           module load mpi
 
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          useradd runner
+          mkdir -p build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-clang":
     docker:
       - image: centos:8
@@ -134,45 +120,40 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
-          yum -y -q install zlib-devel make boost-devel cmake eigen3-devel openmpi-devel wget
+          yum -y -q install \
+            boost-devel \
+            eigen3-devel \
+            llvm-devel \
+            llvm-static \
+            make \
+            ncurses-devel \
+            openmpi-devel \
+            wget \
+            zlib-devel
           yum module -y -q install llvm-toolset
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
+
+          useradd runner
+          mkdir -p /tmp/build
 
           # Make the "module" command work in this shell session.
           source /etc/profile.d/modules.sh
           module load mpi
-
-          mkdir build
-          cd build
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
-  "CentOS-8-clang-libc++":
-    docker:
-      - image: centos:8
-    steps:
-      - checkout
-      - run: |
-          # Note: gcc required to get libgcc and glibc-devel even though we're using clang.
-          yum -y -q install zlib-devel make wget bzip2 gcc
-
-          # Use miniconda to get all remaining needed packages
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-          bash miniconda.sh -b -p $HOME/miniconda
-          rm miniconda.sh
-          export PATH=$HOME/miniconda/bin:$PATH
-          source activate
-          conda install --update-specs -y -q -c conda-forge make cmake>=3.13 boost-cpp clangdev=9 llvmdev=9 llvm-meta=9 libcxx=9 libcxxabi=9 zlib eigen openmpi
-          mkdir build
-          cd build
-          # Dist Galois currently doesn't build when llvm headers are installed, so don't include it in this build.
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib -std=c++17 -L$CONDA_PREFIX/lib -lc++ -lc++abi" -DCMAKE_SYSTEM_PREFIX_PATH="$CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
-          make input
-          make -j2
-          make test || :
+          cmake \
+            -S . \
+            -B /tmp/build \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          # OpenMPI segfaults here issue #118
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2") || true
   "Arch":
     docker:
       - image: archlinux/base
@@ -180,82 +161,121 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm gcc make cmake boost eigen openmpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          # NB(ddn): make requires libffi but its package doesn't depend on it.
+          pacman -q -S --noconfirm \
+            boost \
+            cmake \
+            eigen \
+            gcc \
+            libffi \
+            llvm \
+            make \
+            openmpi
+
+
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Alpine":
     docker:
       - image: alpine:latest
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress gcc musl-dev g++ make cmake boost-dev zlib-dev eigen
-          mkdir build
-          cd build
-          # Make sure we can build with ENABLE_DIST not set to ON.
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 ..
-          make input
-          make -j4
-          make test || :
-  "openSUSE":
-    docker:
-      - image: opensuse/leap:latest
-    steps:
-      - checkout
-      - run: |
-          # Note: Eigen is deliberately excluded here since the tests should still run properly without it installed.
-          # It's also excluded here because, as of this writing, it doesn't have a stable package in the latest OpenSUSE release.
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel tar gzip openmpi-devel
+          apk add --no-cache --no-progress \
+            boost-dev \
+            cmake \
+            eigen \
+            g++ \
+            gcc \
+            llvm9-dev \
+            llvm9-static \
+            make \
+            musl-dev \
+            openssh-client \
+            zlib-dev
+          apk add --no-cache --no-progress \
+            --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
+            openmpi-dev
 
-          zypper --non-interactive install wget
-          wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
-          ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
+          adduser -D runner
+          mkdir -p /tmp/build
 
-          mkdir build
-          cd build
-          cmake -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-gcc":
     docker:
       - image: fedora:latest
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel boost-devel make cmake gcc-c++ eigen3-devel mpich-devel
+          yum -y -q install \
+            boost-devel \
+            cmake \
+            eigen3-devel \
+            gcc-c++ \
+            llvm-devel \
+            llvm-static \
+            make \
+            mpich-devel \
+            zlib-devel
+
+          useradd runner
+          mkdir -p /tmp/build
+
           # Get the "module" function set up before loading MPI.
           . /etc/bashrc
           module load mpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-clang":
     docker:
       - image: fedora:latest
     steps:
       - checkout
       - run: |
-          # Install llvm-devel, not because it is required, but because it may
-          # conflict with the llvm headers that are vendored for use when building
-          # command line programs. That configuration needs to be tested.
-          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel eigen3-devel openmpi-devel
+          yum -y -q install \
+            boost-devel \
+            clang \
+            cmake \
+            eigen3-devel \
+            llvm-devel \
+            llvm-static \
+            make \
+            openmpi-devel \
+            zlib-devel
           # Get the "module" function set up before loading MPI.
+
+          useradd runner
+          mkdir -p /tmp/build
+
           . /etc/bashrc
           module load mpi
-          mkdir build
-          cd build
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON ..
-          make input
-          make -j2
-          make test || :
+          cmake \
+            -S . \
+            -B /tmp/build \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DIST_GALOIS=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          (cd /tmp/build \
+            && chown -R runner Testing \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
  
 workflows:
   version: 2
@@ -263,13 +283,9 @@ workflows:
     jobs:
       - "Debian"
       - "Ubuntu-18.04"
-      - "Ubuntu-16.04"
-      - "CentOS-7-gcc"
       - "CentOS-8-gcc"
       - "CentOS-8-clang"
-      - "CentOS-8-clang-libc++"
       - "Arch"
       - "Alpine"
-      - "openSUSE"
       - "Fedora-gcc"
       - "Fedora-clang"

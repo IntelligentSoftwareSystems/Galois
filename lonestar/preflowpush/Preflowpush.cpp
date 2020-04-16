@@ -66,7 +66,7 @@ static cll::opt<DetAlgo> detAlgo(
     cll::desc("Deterministic algorithm:"),
     cll::values(clEnumVal(nondet, "Non-deterministic (default)"),
                 clEnumVal(detBase, "Base execution"),
-                clEnumVal(detDisjoint, "Disjoint execution"), clEnumValEnd),
+                clEnumVal(detDisjoint, "Disjoint execution")),
     cll::init(nondet));
 
 /**

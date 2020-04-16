@@ -1425,17 +1425,6 @@ int main(int argc, char** argv) {
   typedef PerSocketChunkLIFO<8> BSWL_LIFO;
   typedef PerSocketChunkFIFO<8> BSWL_FIFO;
 
-  /*
-  #ifdef GALOIS_USE_EXP
-    typedef BulkSynchronousInline<> BSInline;
-  #else
-      */
-  // typedef BulkSynchronousInline<> BSInline1;
-  // typedef BulkSynchronousInline<> BSInline2;
-  // typedef BSWL_LIFO BSInline1;
-  // typedef BSWL_FIFO BSInline2;
-  //#endif
-
   switch (algo) {
   case barrierCM:
     run(BarrierNoDup());

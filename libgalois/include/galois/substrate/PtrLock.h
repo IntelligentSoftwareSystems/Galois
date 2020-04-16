@@ -22,7 +22,7 @@
 
 #include "galois/substrate/CompilerSpecific.h"
 
-#include <stdint.h>
+#include <cstdint>
 #include <cassert>
 #include <atomic>
 

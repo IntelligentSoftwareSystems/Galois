@@ -27,10 +27,6 @@
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 
-#ifdef GALOIS_USE_EXP
-#include "galois/runtime/BulkSynchronousWork.h"
-#endif
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <atomic>
@@ -54,11 +50,7 @@ static cll::opt<bool>
                    cll::init(false));
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value parallel):"),
-         cll::values(clEnumVal(parallel, "Parallel"),
-#ifdef GALOIS_USE_EXP
-                     clEnumVal(exp_parallel, "Parallel (exp)"),
-#endif
-                     clEnumValEnd),
+         cll::values(clEnumVal(parallel, "Parallel")),
          cll::init(parallel));
 
 typedef int EdgeData;
@@ -279,30 +271,7 @@ struct ParallelAlgo {
     galois::runtime::reportStat_Single("Boruvka", "rounds", rounds);
   }
 
-#if defined(GALOIS_USE_EXP) && !defined(GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR)
-  void processExp() {
-    typedef boost::fusion::vector<WorkItem, WorkItem> Items;
-
-    init();
-
-    galois::do_all_bs_local<Items>(
-        graph, boost::fusion::make_vector(Merge(this), Find(this)),
-        Initialize(this));
-
-    while (!pending->empty()) {
-      std::swap(next, pending);
-
-      galois::do_all_bs_local<Items>(
-          *next, boost::fusion::make_vector(Merge(this), Find(this)));
-
-      next->clear();
-
-      limit *= 2;
-    }
-  }
-#else
   void processExp() { GALOIS_DIE("not supported"); }
-#endif
 
   void operator()() {
     if (useExp) {

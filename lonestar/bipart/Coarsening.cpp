@@ -34,55 +34,8 @@ int LIMIT;
 bool FLAG = false;
 namespace {
 
-#ifndef NDEBUG
-__attribute__((unused)) void assertAllMatched(GNode node, GGraph* graph) {
-  for (auto jj : graph->edges(node))
-    assert(node == graph->getEdgeDst(jj) ||
-           graph->getData(graph->getEdgeDst(jj)).isMatched());
-}
-
-__attribute__((unused)) void assertNoMatched(GGraph* graph) {
-  for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
-    assert(!graph->getData(*nn).isMatched());
-}
-#endif
 
 
-typedef galois::GAccumulator<unsigned> Pcounter;
-
-
-// phaseII scheduling
-__attribute__((unused)) void parallelReHMatchAndCreateNodes(MetisGraph* graph) {
-
-  GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  assert(fineGGraph != graph->getGraph());
-  typedef std::set<GNode> SecTy;
-  typedef galois::substrate::PerThreadStorage<SecTy> ThreadLocalData;
-  ThreadLocalData edgesThreadLocal;
-  
-  // Making deterministic
-  galois::do_all(
-      galois::iterate(fineGGraph->getNets()),
-      [&](GNode item) {
-        for (auto c : fineGGraph->edges(item)) {
-          auto dst = fineGGraph->getEdgeDst(c);
-          galois::atomicMin(fineGGraph->getData(dst).netval, fineGGraph->getData(item).netval.load());
-        }
-      },
-      galois::steal(),  galois::loopname("atomicMin2"));
-
-
-  galois::do_all(
-      galois::iterate(fineGGraph->getNets()),
-      [&](GNode item) {
-        for (auto c : fineGGraph->edges(item)) {
-          auto dst = fineGGraph->getEdgeDst(c);
-          if (fineGGraph->getData(dst).netval == fineGGraph->getData(item).netval)
-            galois::atomicMin(fineGGraph->getData(dst).netnum, fineGGraph->getData(item).netnum.load());
-        }
-      },
-      galois::steal(),  galois::loopname("secondMin2"));
-}
 
 int hash(unsigned val) {
   unsigned long int seed = val * 1103515245 + 12345;
@@ -92,14 +45,10 @@ int hash(unsigned val) {
 void parallelRand(MetisGraph* graph, int iter) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
-  unsigned x = iter % 2;
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
-      unsigned id = fineGGraph->getData(item).netrand;
-      unsigned idx = fineGGraph->getData(item).netnum;
-      if (idx % 2 == x)
-          fineGGraph->getData(item).netrand = hash(id);
+          fineGGraph->getData(item).netrand = hash(fineGGraph->getData(item).netnum);
       },
       galois::loopname("rand"));
 }
@@ -187,7 +136,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
             galois::atomicMin(fineGGraph->getData(dst).netval, fineGGraph->getData(item).netval.load());
           }
       },
-      galois::steal(),  galois::loopname("atomicMin"));
+        galois::loopname("atomicMin"));
 
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
@@ -198,7 +147,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
                 galois::atomicMin(fineGGraph->getData(dst).netrand, fineGGraph->getData(item).netrand.load());
             }  
      },
-      galois::steal(),  galois::loopname("secondMin2"));
+      galois::loopname("secondMin2"));
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
@@ -208,7 +157,7 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
             galois::atomicMin(fineGGraph->getData(dst).netnum, fineGGraph->getData(item).netnum.load());
         }
       },
-      galois::steal(),  galois::loopname("secondMin"));
+       galois::loopname("secondMin"));
 }
 
 
@@ -229,23 +178,6 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
   galois::do_all(
       galois::iterate(fineGGraph->getNets()),
       [&](GNode item) {
-         
-        unsigned id = fineGGraph->getData(item).netnum;
-        if (fmod(id, pow(2,iter)) <= pow(2,(iter - 1)) - 1) { //final
-           // leave the hedges
-            GNode netN;
-            MetisNode n2;
-            n2.netval = INT_MAX;
-            n2.netrand = fineGGraph->getData(item).netrand;
-            n2.netnum = fineGGraph->getData(item).netnum;
-            n2.setChild(item);
-            netN = coarseGGraph->createNode(n2);
-            coarseGGraph->addNode(netN);
-            coarseGGraph->addHyperedge(netN);
-            fineGGraph->getData(item).setParent(netN);
-            fineGGraph->getData(item).setMatched();
-          return;
-        }
         bool flag = false;
         auto& edges = *edgesThreadLocal.getLocal();
         edges.clear();
@@ -257,7 +189,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
             continue;//return;
           }
           if (data.netnum == fineGGraph->getData(item).netnum) {
-            if (w + fineGGraph->getData(dst).getWeight() > LIMIT) break;
+            //if (w + fineGGraph->getData(dst).getWeight() > LIMIT) break;
             edges.insert(dst);
             w += fineGGraph->getData(dst).getWeight();
           }
@@ -295,6 +227,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
             MetisNode n2;
             n2.netval = INT_MAX;
             n2.netrand = fineGGraph->getData(item).netrand;
+            //n2.netrand = INT_MAX;
             n2.netnum = fineGGraph->getData(item).netnum;
             n2.setChild(item);
             netN = coarseGGraph->createNode(n2);
@@ -305,7 +238,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
           }
         }
       },
-      galois::steal(),  galois::loopname("phaseI"));
+       galois::loopname("phaseI"));
 
 }
 
@@ -328,7 +261,7 @@ void moreCoarse(MetisGraph* graph, int iter) {
               fineGGraph->getData(dst).netval = INT_MIN;
         }
       },
-      galois::steal(),  galois::loopname("atomicMin2"));
+       galois::loopname("atomicMin2"));
 
   galois::do_all( 
       galois::iterate(fineGGraph->getNets()),
@@ -338,19 +271,19 @@ void moreCoarse(MetisGraph* graph, int iter) {
           cells.clear();
           int best = INT_MAX;
           GNode b = 0;
-          int w = 0;
+         // int w = 0;
           for (auto edge : fineGGraph->edges(item)) {
 	      auto e = fineGGraph->getEdgeDst(edge);
               auto& data = fineGGraph->getData(e);
               if (!fineGGraph->getData(e).isMatched()) {
                   if (data.netnum == fineGGraph->getData(item).netnum) {
                       cells.push_back(e);
-                      w += coarseGGraph->getData(e).getWeight();
+               //       w += coarseGGraph->getData(e).getWeight();
                   }
               }
               else if (fineGGraph->getData(e).netval == INT_MIN) {
-                  auto nn = fineGGraph->getData(e).getParent();
-                  if (coarseGGraph->getData(nn).getWeight() + w > LIMIT) continue;
+                  //auto nn = fineGGraph->getData(e).getParent();
+                  //if (coarseGGraph->getData(nn).getWeight() + w > LIMIT) continue;
                   if (fineGGraph->getData(e).getWeight() < best) {
                     best = fineGGraph->getData(e).getWeight();
                     b = e;
@@ -370,15 +303,14 @@ void moreCoarse(MetisGraph* graph, int iter) {
                     fineGGraph->getData(e).setMatched();
                     fineGGraph->getData(e).setParent(nn);
                     fineGGraph->getData(e).netnum = fineGGraph->getData(b).netnum;
-                  }
-                             
+                  }                            
               }        
           }          
       },
-        galois::steal(), galois::loopname("moreCoarse"));
+        galois::loopname("moreCoarse"));
       for (auto c : bag) {
         auto nn = fineGGraph->getData(c).getParent();
-        coarseGGraph->getData(nn).nodeid = std::min(coarseGGraph->getData(nn).nodeid, fineGGraph->getData(c).nodeid);
+        //coarseGGraph->getData(nn).nodeid = std::min(coarseGGraph->getData(nn).nodeid, fineGGraph->getData(c).nodeid);
         int ww = coarseGGraph->getData(nn).getWeight();
         ww += fineGGraph->getData(c).getWeight();
         coarseGGraph->getData(nn).setWeight(ww);
@@ -443,7 +375,7 @@ void coarsePhaseII(MetisGraph* graph,
         }
 
       },
-      galois::steal(), galois::loopname("phaseII_2"));
+      galois::loopname("phaseII_2"));
 
   galois::do_all(
       galois::iterate(fineGGraph->cellList()),
@@ -463,7 +395,7 @@ void coarsePhaseII(MetisGraph* graph,
             fineGGraph->getData(ii).setParent(N);
           }
       },
-      galois::steal(), galois::loopname("noedgebag match"));
+       galois::loopname("noedgebag match"));
 }
 
 void parallelCreateEdges(MetisGraph* graph) {
@@ -490,8 +422,6 @@ void parallelCreateEdges(MetisGraph* graph) {
 void findMatching(MetisGraph* coarseMetisGraph,
                        scheduleMode sch,
                        int iter) {
-  GNodeBag bagOfLoners;
-  Pcounter pc;
 
        switch(sch) {
            case PLD:
@@ -561,12 +491,15 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
   unsigned newSize = size;
   while (size > coarsenTo) { 
     if (iterNum > coarsenTo) break;
-    //if (Size - newSize <= 0 && iterNum > 2) break; //final
+    if (size - newSize <= 0 && iterNum > 2) break; //final
+     size = newSize;
      coarseGraph      = coarsenOnce(coarseGraph, sch, iterNum);
       newSize = std::distance(coarseGraph->getGraph()->cellList().begin(), coarseGraph->getGraph()->cellList().end());
       if (newSize < coarsenTo)break;
-      //int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
-     //std::cout<<"SIZE IS "<<newSize<<"\n";// and net is "<<netsize<<"\n";
+      int netsize           = std::distance(coarseGraph->getGraph()->getNets().begin(), coarseGraph->getGraph()->getNets().end());
+     std::cout<<"SIZE IS "<<newSize<<" and net is "<<netsize<<"\n";
+     if (netsize < 1000) return coarseGraph->getFinerGraph();
+  //   if (newSize < 100) break;
     ++iterNum;
     
   }

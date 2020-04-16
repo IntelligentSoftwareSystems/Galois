@@ -26,6 +26,7 @@
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
+#include <fstream>
 
 /*
  * Headers for boost serialization
@@ -830,6 +831,143 @@ public:
         }
         );
   }
+    
+ /**
+  * Reads the GR files directly into in-memory
+  * data-structures of LC_CSR graphs using freads.
+  * 
+  * Edge is not void.
+  * 
+  */
+  template <typename U = void, typename std::enable_if<!std::is_void<EdgeTy>::value, U>::type* = nullptr>
+  void readGraphFromGRFile(const std::string& filename) {
+    std::ifstream graphFile(filename.c_str());
+    if(!graphFile.is_open()){
+      GALOIS_DIE("ERROR: Failed to open file.");
+    }
+  uint64_t header[4];
+  graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
+  uint64_t version = header[0];
+  numNodes = header[2];
+  numEdges = header[3];
+  galois::gPrint("Number of Nodes: ", numNodes, ", Number of Edges: ", numEdges, "\n");
+  allocateFrom(numNodes, numEdges);
+  constructNodes();
+  /**
+   * Load outIndex array
+   **/
+  assert(edgeIndData.data());
+  if(!edgeIndData.data()){
+    GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+  }
+
+  // start position to read index data
+  uint64_t readPosition = (4 * sizeof(uint64_t));
+  graphFile.seekg(readPosition);
+  graphFile.read(reinterpret_cast<char*>(edgeIndData.data()), sizeof(uint64_t)*numNodes);
+  /**
+   * Load edgeDst array
+   **/
+  assert(edgeDst.data());
+  if(!edgeDst.data()){
+    GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+  }
+
+  readPosition = ((4 + numNodes) * sizeof(uint64_t));
+  graphFile.seekg(readPosition);
+  if(version == 1) {
+    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint32_t)*numEdges);
+    readPosition = ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint32_t));
+    // version 1 padding TODO make version agnostic
+    if (numEdges% 2) {
+      readPosition += sizeof(uint32_t);
+    }
+  } else if(version == 2) {
+    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint64_t)*numEdges);
+    readPosition = ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint64_t));
+    if (numEdges % 2) {
+      readPosition += sizeof(uint64_t);
+    }
+  } else {
+    GALOIS_DIE("ERROR: Unknown graph file version.");
+  }
+  /**
+   * Load edge data array
+   **/
+  assert(edgeData.data());
+  if(!edgeData.data()){
+    GALOIS_DIE("Failed: memory not allocated for edgeData.");
+  }
+  graphFile.seekg(readPosition);
+  graphFile.read(reinterpret_cast<char*>(edgeData.data()), sizeof(EdgeTy)*numEdges);
+  galois::on_each(
+    [&](unsigned tid, unsigned total) {
+      std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
+      auto r = divideByNode(0, 1, tid, total).first;
+      this->setLocalRange(*r.first, *r.second);
+    }
+    );
+  graphFile.close();
+}
+
+ /**
+  * Reads the GR files directly into in-memory
+  * data-structures of LC_CSR graphs using freads.
+  * 
+  * Edge is void.
+  * 
+  */
+template <typename U = void, typename std::enable_if<std::is_void<EdgeTy>::value, U>::type* = nullptr>
+void readGraphFromGRFile(const std::string& filename) {
+  std::ifstream graphFile(filename.c_str());
+  if(!graphFile.is_open()){
+    GALOIS_DIE("ERROR: Failed to open file.");
+  }
+  uint64_t header[4];
+  graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
+  uint64_t version = header[0];
+  numNodes = header[2];
+  numEdges = header[3];
+  galois::gPrint("Number of Nodes: ", numNodes, ", Number of Edges: ", numEdges, "\n");
+  allocateFrom(numNodes, numEdges);
+  constructNodes();
+  /**
+   * Load outIndex array
+   **/
+  assert(edgeIndData.data());
+  if(!edgeIndData.data()){
+    GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+  }
+  // start position to read index data
+  uint64_t readPosition = (4 * sizeof(uint64_t));
+  graphFile.seekg(readPosition);
+  graphFile.read(reinterpret_cast<char*>(edgeIndData.data()), sizeof(uint64_t)*numNodes);
+  /**
+   * Load edgeDst array
+   **/
+  assert(edgeDst.data());
+  if(!edgeDst.data()){
+    GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+  }
+  readPosition = ((4 + numNodes) * sizeof(uint64_t));
+  graphFile.seekg(readPosition);
+  if(version == 1) {
+    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint32_t)*numEdges);
+  } else if(version == 2) {
+    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint64_t)*numEdges);
+  } else {
+    GALOIS_DIE("ERROR: Unknown graph file version.");
+  }
+  galois::on_each(
+      [&](unsigned tid, unsigned total) {
+      std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
+      auto r = divideByNode(0, 1, tid, total).first;
+      this->setLocalRange(*r.first, *r.second);
+      }
+      );
+
+  graphFile.close();
+}
 };
 } // namespace graphs
 } // namespace galois

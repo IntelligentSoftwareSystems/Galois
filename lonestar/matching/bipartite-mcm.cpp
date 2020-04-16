@@ -55,17 +55,17 @@ static cll::opt<MatchingAlgo> algo(
     cll::desc("Choose an algorithm:"),
     cll::values(clEnumVal(pfpAlgo, "Preflow-push"),
                 clEnumVal(ffAlgo, "Ford-Fulkerson augmenting paths"),
-                clEnumVal(abmpAlgo, "Alt-Blum-Mehlhorn-Paul"), clEnumValEnd),
+                clEnumVal(abmpAlgo, "Alt-Blum-Mehlhorn-Paul")),
     cll::init(abmpAlgo));
 static cll::opt<ExecutionType>
     executionType(cll::desc("Choose execution type:"),
                   cll::values(clEnumVal(serial, "Serial"),
-                              clEnumVal(parallel, "Parallel"), clEnumValEnd),
+                              clEnumVal(parallel, "Parallel")),
                   cll::init(parallel));
 static cll::opt<InputType>
     inputType("inputType", cll::desc("Input type:"),
               cll::values(clEnumVal(generated, "Generated"),
-                          clEnumVal(fromFile, "From file"), clEnumValEnd),
+                          clEnumVal(fromFile, "From file")),
               cll::init(fromFile));
 static cll::opt<int>
     N("n", cll::desc("Size of each set of nodes in generated input"),

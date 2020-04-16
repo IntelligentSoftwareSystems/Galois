@@ -1,12 +1,21 @@
-if(CMAKE_COMPILER_IS_GNUCC)
-  add_compile_options(-ffast-math)
-endif()
-
-app(delaunaytriangulation DelaunayTriangulation.cpp Element.cpp)
-app(delaunaytriangulation-det DelaunayTriangulationDet.cpp Element.cpp)
-
+add_executable(delaunaytriangulation DelaunayTriangulation.cpp Element.cpp)
+add_dependencies(apps delaunaytriangulation)
+target_link_libraries(delaunaytriangulation PRIVATE Galois::shmem lonestar)
+install(TARGETS delaunaytriangulation DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small1 delaunaytriangulation "${BASEINPUT}/reference/meshes/r10k.node")
 add_test_scale(small2 delaunaytriangulation "${BASEINPUT}/meshes/250k.2.node" NOT_QUICK)
 
+if(CMAKE_COMPILER_IS_GNUCC)
+  target_compile_options(delaunaytriangulation PRIVATE -ffast-math)
+endif()
+
+add_executable(delaunaytriangulation-det DelaunayTriangulationDet.cpp Element.cpp)
+add_dependencies(apps delaunaytriangulation-det)
+target_link_libraries(delaunaytriangulation-det PRIVATE Galois::shmem lonestar)
+install(TARGETS delaunaytriangulation-det DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small1 delaunaytriangulation-det "${BASEINPUT}/reference/meshes/r10k.node")
 add_test_scale(small2 delaunaytriangulation-det "${BASEINPUT}/meshes/250k.2.node" NOT_QUICK)
+
+if(CMAKE_COMPILER_IS_GNUCC)
+  target_compile_options(delaunaytriangulation-det PRIVATE -ffast-math)
+endif()

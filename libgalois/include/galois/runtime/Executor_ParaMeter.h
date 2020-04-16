@@ -26,6 +26,7 @@
 #include "galois/Traits.h"
 #include "galois/Mem.h"
 #include "galois/worklists/Simple.h"
+#include "galois/runtime/config.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/Executor_DoAll.h"
@@ -316,14 +317,13 @@ private:
         if (needsBreak) {
           it->facing.setBreakFlag(&broke);
         }
-
 #ifdef GALOIS_USE_LONGJMP_ABORT
         int flag = 0;
         if ((flag = setjmp(execFrame)) == 0) {
           m_func(it->item, it->facing.data());
 
         } else {
-#else
+#elif GALOIS_USE_EXCEPTION_ABORT
         try {
           m_func(it->item, it->facing.data());
 

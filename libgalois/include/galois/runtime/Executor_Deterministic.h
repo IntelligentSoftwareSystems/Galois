@@ -26,6 +26,7 @@
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
 #include "galois/ParallelSTL.h"
+#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/ForEachTraits.h"
@@ -1504,7 +1505,7 @@ int Executor<OptionsTy>::runFunction(ThreadLocalData& tld, Context* ctx) {
     int result = 0;
 #ifdef GALOIS_USE_LONGJMP_ABORT
     if ((result = setjmp(execFrame)) == 0) {
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
     try {
 #endif
       tld.fn1(ctx->item.val, tld.facing.data());
@@ -1512,7 +1513,7 @@ int Executor<OptionsTy>::runFunction(ThreadLocalData& tld, Context* ctx) {
     } else {
       clearConflictLock();
     }
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
     } catch (const ConflictFlag& flag) {
       clearConflictLock();
       result = flag;
@@ -1580,7 +1581,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP_ABORT
   if ((result = setjmp(execFrame)) == 0) {
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   try {
 #endif
     tld.fn2(ctx->item.val, tld.facing.data());
@@ -1588,7 +1589,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   } else {
     clearConflictLock();
   }
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   } catch (const ConflictFlag& flag) {
     clearConflictLock();
     result = flag;

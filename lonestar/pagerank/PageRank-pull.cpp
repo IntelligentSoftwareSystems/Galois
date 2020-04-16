@@ -33,8 +33,8 @@ enum Algo { Topo = 0, Residual };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Topo, "Topological"),
-                                       clEnumVal(Residual, "Residual"),
-                                       clEnumValEnd),
+                                       clEnumVal(Residual, "Residual")
+                                       ),
                            cll::init(Residual));
 
 constexpr static const unsigned CHUNK_SIZE = 32;
