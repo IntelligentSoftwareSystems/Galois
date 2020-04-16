@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
   initialize(g);
   galois::for_each(
       galois::iterate(g.begin(), g.end()), // range
-      [&](GNode n, auto& ctx) {            // operator
+      [&](GNode n, auto&) {            // operator
         for (auto e : g.edges(n)) {        // cautious point
           auto dst = g.getEdgeDst(e);
           g.getData(dst) += g.getEdgeData(e);
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
   initialize(g);
   galois::for_each(
       galois::iterate(g.begin(), g.end()),                     // range
-      [&](GNode n, auto& ctx) { sumEdgeWeightsAtomically(n); } // operator
+      [&](GNode n, auto&) { sumEdgeWeightsAtomically(n); } // operator
       ,
       galois::loopname("sum_in_for_each_with_push_atomic") // options
       ,

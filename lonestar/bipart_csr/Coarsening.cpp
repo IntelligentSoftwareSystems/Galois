@@ -56,7 +56,7 @@ int hash(unsigned val) {
   return((unsigned)(seed/65536) % 32768);
 }
 
-void parallelRand(MetisGraph* graph, int iter) {
+void parallelRand(MetisGraph* graph, int) {
 
   GGraph* fineGGraph  = graph->getFinerGraph()->getGraph();
   galois::do_all(
@@ -232,7 +232,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
        galois::loopname("phaseI"));
 }
 
-void moreCoarse(MetisGraph* graph, int iter, std::vector<unsigned>& weight) {
+void moreCoarse(MetisGraph* graph, int, std::vector<unsigned>& weight) {
   
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   typedef std::vector<GNode> VecTy;

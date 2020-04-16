@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main() {
   galois::SharedMemSys Galois_runtime;
   galois::substrate::SimpleLock l;
   galois::setActiveThreads(10000);

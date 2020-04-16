@@ -626,8 +626,8 @@ struct is_matched {
   }
 };
 
-template <typename Graph, typename Algo>
-bool verify(Graph& graph, Algo& algo) {
+template <typename Graph>
+bool verify(Graph& graph) {
   using GNode    = typename Graph::GraphNode;
   using prioNode = typename Graph::node_data_type;
 
@@ -682,7 +682,7 @@ void run() {
   galois::reportPageAlloc("MeminfoPost");
 
 
-  if (!skipVerify && !verify(graph, algo)) {
+  if (!skipVerify && !verify(graph)) {
     std::cerr << "verification failed\n";
     assert(0 && "verification failed");
     abort();

@@ -284,8 +284,8 @@ protected:
    */
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
-                          typename FileGraph::edge_iterator nn, GraphNode src,
+  void constructEdgeValue(FileGraph&,
+                          typename FileGraph::edge_iterator, GraphNode src,
                           GraphNode dst,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
@@ -295,7 +295,7 @@ protected:
    * No-op acquire node when HasNoLockable is true.
    */
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   /**
@@ -395,7 +395,8 @@ public:
   /**
    * Return an iterator to the end of edges of a particular node.
    */
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator edge_end(GraphNode N,
+                         MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE) {
     return N->edgeEnd;
   }
 

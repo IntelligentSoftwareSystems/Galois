@@ -42,7 +42,7 @@ int hash(unsigned val) {
   return((unsigned)(seed/65536) % 32768);
 }
 
-void parallelRand(MetisGraph* graph, int iter) {
+void parallelRand(MetisGraph* graph, int) {
 
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   galois::do_all(
@@ -242,7 +242,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph,
 
 }
 
-void moreCoarse(MetisGraph* graph, int iter) {
+void moreCoarse(MetisGraph* graph, int) {
   
   GGraph* fineGGraph   = graph->getFinerGraph()->getGraph();
   GGraph* coarseGGraph = graph->getGraph();

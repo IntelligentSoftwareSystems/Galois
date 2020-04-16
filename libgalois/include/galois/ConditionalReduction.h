@@ -74,7 +74,7 @@ public:
 
   //! no-op
   template <bool A = Active, typename std::enable_if<!A>::type* = nullptr>
-  void update(T newValue) {
+  void update(T) {
     // no-op
   }
 

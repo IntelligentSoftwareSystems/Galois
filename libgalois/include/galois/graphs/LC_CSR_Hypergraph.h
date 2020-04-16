@@ -201,7 +201,7 @@ protected:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   template <bool _A1 = EdgeData::has_value,
@@ -216,7 +216,7 @@ protected:
 
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
+  void constructEdgeValue(FileGraph&,
                           typename FileGraph::edge_iterator nn,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
@@ -229,7 +229,7 @@ protected:
 private:
   friend class boost::serialization::access;
   template <typename Archive>
-  void save(Archive& ar, const unsigned int version) const {
+  void save(Archive& ar, const unsigned int) const {
     ar << numNodes;
     ar << numEdges;
 
@@ -240,7 +240,7 @@ private:
   }
 
   template <typename Archive>
-  void load(Archive& ar, const unsigned int version) {
+  void load(Archive& ar, const unsigned int) {
     ar >> numNodes;
     ar >> numEdges;
 
@@ -402,7 +402,7 @@ public:
   }
 
   edge_data_reference getEdgeData(edge_iterator ni,
-                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
@@ -710,8 +710,7 @@ public:
   }
 
   template <bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, uint64_t e_new,
-                    uint64_t e,
+  void edgeDataCopy(EdgeData&, EdgeData&, uint64_t, uint64_t,
                     typename std::enable_if<!is_non_void>::type* = 0) {
     // does nothing
   }

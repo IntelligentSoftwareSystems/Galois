@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   Heaps heaps;
   Collection c;
 
-  galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned int, unsigned int) {
     HeapPtr& hp = *heaps.getLocal();
     hp          = HeapPtr(new Heap(sizeof(Collection::block_type)));
     for (unsigned i = 0; i < size; ++i)
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   }
   GALOIS_ASSERT(counter.size() == size);
 
-  galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned int, unsigned int) {
     while (c.pop_front(Collection::promise_to_dealloc()))
       ;
   });

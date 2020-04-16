@@ -68,8 +68,8 @@ template <>
 class PerThreadTimer<false> {
 
 public:
-  PerThreadTimer(const char* const _region,
-                 const char* const _category) {}
+  PerThreadTimer(const char* const,
+                 const char* const) {}
 
   PerThreadTimer(const PerThreadTimer&) = delete;
   PerThreadTimer(PerThreadTimer&&) = delete;

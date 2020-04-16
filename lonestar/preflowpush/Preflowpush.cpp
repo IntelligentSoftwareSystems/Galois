@@ -117,8 +117,7 @@ struct PreflowPush {
       reverseDirectionEdgeIterator; // ideally should be on the graph as
                                     // graph.getReverseEdgeIterator()
 
-  void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src,
-                      const GNode& dst, int64_t amount) {
+  void reduceCapacity(const Graph::edge_iterator& ii, int64_t amount) {
     Graph::edge_data_type& cap1 = graph.getEdgeData(ii);
     Graph::edge_data_type& cap2 =
         graph.getEdgeData(reverseDirectionEdgeIterator[*ii]);
@@ -271,7 +270,7 @@ struct PreflowPush {
 
         // Push flow
         int64_t amount = std::min(node.excess, cap);
-        reduceCapacity(ii, src, dst, amount);
+        reduceCapacity(ii, amount);
 
         // Only add once
         if (dst != sink && dst != source && dnode.excess == 0)
@@ -495,7 +494,7 @@ struct PreflowPush {
     for (auto ii : graph.edges(source)) {
       GNode dst   = graph.getEdgeDst(ii);
       int64_t cap = graph.getEdgeData(ii);
-      reduceCapacity(ii, source, dst, cap);
+      reduceCapacity(ii, cap);
       Node& node = graph.getData(dst);
       node.excess += cap;
       if (cap > 0)

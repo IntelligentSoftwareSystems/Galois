@@ -116,15 +116,14 @@ template <typename S, typename T, typename D,
           typename ResSeq =
               typename internal::indices_of_non_matching_tags<S, T, Seq>::type>
 typename tuple_elements<D, ResSeq>::type
-get_default_trait_values(S source, T tags, D defaults) {
+get_default_trait_values(S, T, D defaults) {
   return get_by_indices(defaults, ResSeq{});
 }
 
 template <typename T, typename Tuple,
           typename Seq =
               typename make_int_seq<std::tuple_size<Tuple>::value - 1>::type>
-typename tuple_elements<Tuple, Seq>::type get_tuple_without(T rm_type,
-                                                            Tuple tpl) {
+typename tuple_elements<Tuple, Seq>::type get_tuple_without(T, Tuple tpl) {
   typedef
       typename make_int_seq<subtype_index_nodup<T, Tuple>::value>::type Seq_pre;
   typedef typename make_int_seq<std::tuple_size<Tuple>::value -
@@ -388,7 +387,7 @@ getLoopName(const Tup& t) {
 template <typename Tup>
 std::enable_if_t<!galois::exists_by_supertype<loopname_tag, Tup>::value,
                  const char*>
-getLoopName(const Tup& t) {
+getLoopName(const Tup&) {
   return "ANON_LOOP";
 }
 } // namespace internal

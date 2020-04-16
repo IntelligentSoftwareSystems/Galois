@@ -176,7 +176,7 @@ public:
 
 template <typename T>
 struct DummyIndexer : public std::unary_function<const T&, unsigned> {
-  unsigned operator()(const T& x) { return 0; }
+  unsigned operator()(const T&) { return 0; }
 };
 
 } // namespace worklists

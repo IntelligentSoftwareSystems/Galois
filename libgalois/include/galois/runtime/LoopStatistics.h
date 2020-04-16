@@ -61,14 +61,14 @@ public:
 template <>
 class LoopStatistics<false> {
 public:
-  explicit LoopStatistics(const char* ln) {}
+  explicit LoopStatistics(const char*) {}
 
   size_t iterations(void) const { return 0; }
   size_t pushes(void) const { return 0; }
   size_t conflicts(void) const { return 0; }
 
   inline void inc_iterations() const {}
-  inline void inc_pushes(size_t v = 0) const {}
+  inline void inc_pushes(size_t = 0) const {}
   inline void inc_conflicts() const {}
 };
 

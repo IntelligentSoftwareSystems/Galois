@@ -19,7 +19,7 @@ void galois::runtime::ThreadTimers::reportTimes(const char* category,
   std::string lagCat  = category + std::string("PerThreadLag");
 
   on_each_gen(
-      [&](auto a, auto b) {
+      [&](auto, auto) {
         auto ns  = timers_.getLocal()->get_nsec();
         auto lag = ns - minTime;
         assert(lag > 0 && "negative time lag from min is impossible");

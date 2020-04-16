@@ -105,7 +105,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   endif()
 
   # Removing unused parameters conflicts with readability rules
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+  #add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

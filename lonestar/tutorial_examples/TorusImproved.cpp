@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
   galois::Timer T;
   T.start();
 
-  galois::for_each(galois::iterate(graph), [&](GNode n, auto& ctx) {
+  galois::for_each(galois::iterate(graph), [&](GNode n, auto&) {
     // For each outgoing edge (n, dst)
     for (auto ii : graph.edges(n)) {
       GNode dst = graph.getEdgeDst(ii);

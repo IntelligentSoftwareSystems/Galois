@@ -122,7 +122,7 @@ struct BetweenessCentralityAsync {
                              BC_COUNT_LEAVES>;
   LeafCounter leafCount;
 
-  void correctNode(uint32_t dstID, BCEdge& ed) {
+  void correctNode(uint32_t dstID, BCEdge&) {
     NodeType& dstData = graph.getData(dstID);
 
     // loop through in edges

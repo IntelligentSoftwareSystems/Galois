@@ -104,7 +104,7 @@ public:
   flat_map() : _data(), _comp() {}
 
   explicit flat_map(const _Compare& __comp,
-                    const allocator_type& __a = allocator_type())
+                    const allocator_type& = allocator_type())
       // XXX :_data(_Pair_alloc_type(__a)), _comp(__comp) {}
       : _data(), _comp(__comp) {}
 
@@ -129,7 +129,7 @@ public:
 
   template <typename _InputIterator>
   flat_map(_InputIterator __first, _InputIterator __last,
-           const _Compare& __comp, const allocator_type& __a = allocator_type())
+           const _Compare&, const allocator_type& __a = allocator_type())
       : _data(__first, __last, _Pair_alloc_type(__a)) {
     resort();
   }

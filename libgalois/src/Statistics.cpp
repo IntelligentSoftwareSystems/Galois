@@ -129,13 +129,13 @@ StatManager* galois::runtime::internal::sysStatManager(void) { return SM; }
 
 void galois::runtime::reportPageAlloc(const char* category) {
   galois::runtime::on_each_gen(
-      [category](const unsigned tid, const unsigned numT) {
+      [category](const unsigned int tid, const unsigned int) {
         reportStat_Tsum("PageAlloc", category, numPagePoolAllocForThread(tid));
       },
       std::make_tuple());
 }
 
-void galois::runtime::reportNumaAlloc(const char* category) {
+void galois::runtime::reportNumaAlloc(const char* GALOIS_UNUSED(category)) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
   int nodes = substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {

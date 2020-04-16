@@ -88,7 +88,7 @@ void projectPart(MetisGraph* Graph) {
 
 
 
-void initGains(GGraph& g, int pass) {
+void initGains(GGraph& g, int) {
   std::string name = "initgain";
   std::string fetsref = "FETSREF_";// + std::to_string(pass);
 
@@ -154,7 +154,7 @@ __attribute__((unused)) void unlocked(GGraph& g) {
 
 }
 //refine
-void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
+void parallel_refine_KF(GGraph& g, float, unsigned refineTo) {
 
   //std::cout<<"in parallel balance\n";
   typedef galois::gstl::Vector<unsigned> VecTy;

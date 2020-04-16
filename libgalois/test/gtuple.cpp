@@ -22,7 +22,7 @@
 #include <iostream>
 #include <cassert>
 
-void print(std::tuple<> tpl) { std::cout << "\n"; }
+void print(std::tuple<>) { std::cout << "\n"; }
 
 template <typename T, typename... Ts>
 void print(std::tuple<T, Ts...> tpl) {
