@@ -57,16 +57,12 @@ jobs:
         clang-tidy --version
 
         sudo -H pip3 install --upgrade pip setuptools
-        sudo -H pip3 install conan==1.22.3
-
-        conan profile new --detect --force default
-        conan profile update settings.compiler.libcxx=libstdc++11 default
-
+        sudo -H pip3 install conan==1.24
     - name: pre-build
       run: mkdir -p $HOME/build
     - name: install C++ dependencies
       run: |
-        conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
+        .github/workflows/setup_conan.sh
         conan install -if $HOME/build --build=missing config
 
     - name: check formating
@@ -167,17 +163,13 @@ jobs:
         sudo update-alternatives --verbose --install /usr/bin/clang clang /usr/bin/clang-10 90
 
         sudo -H pip3 install --upgrade pip setuptools
-        sudo -H pip3 install conan==1.22.3
-
-        conan profile new --detect --force default
-        conan profile update settings.compiler.libcxx=libstdc++11 default
+        sudo -H pip3 install conan==1.24
 
         sudo sysctl -w kernel.core_pattern=$HOME/build/dumps/core.%e.%p.%h.%t
     - name: install dependencies
       if: startsWith(matrix.os, 'macOS-')
       run: |
         brew install ccache conan openmpi llvm
-        conan profile new --detect --force default
 
         sudo sysctl -w kern.corefile=$HOME/build/dumps/core.%N.%P.%H.%I
     - name: pre-build
@@ -191,7 +183,7 @@ jobs:
         fi
     - name: install C++ dependencies
       run: |
-        conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
+        .github/workflows/setup_conan.sh
         conan install -if $HOME/build --build=missing config
 
     ###
@@ -247,11 +239,11 @@ jobs:
       uses: actions/upload-artifact@v1
       if: failure() && startsWith(matrix.os, 'ubuntu-')
       with:
-        name: build-dump
+        name: build-dump-${{matrix.os}}
         path: /home/runner/build
     - name: upload build and test dumps
       uses: actions/upload-artifact@v1
       if: failure() && startsWith(matrix.os, 'macOS-')
       with:
-        name: build-dump
+        name: build-dump-${{matrix.os}}
         path: /Users/runner/build

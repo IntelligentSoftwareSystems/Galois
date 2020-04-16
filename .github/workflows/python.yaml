@@ -1,0 +1,92 @@
+name: Python Packaging
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ###################################################################
+  # package
+  ###################################################################
+  package:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os:
+        - ubuntu-18.04
+        - macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    ###
+    # Caching between builds
+    ###
+    - name: Cache conan packages
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-conan-${{hashFiles('config/conanfile.txt')}}
+        path: ~/.conan/data
+    - name: Cache ccache objects
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-ccache
+        path: ~/.ccache
+    - name: Cache pip packages
+      if: startsWith(matrix.os, 'ubuntu-')
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-pip
+        path: ~/.cache/pip
+    - name: Cache pip packages
+      if: startsWith(matrix.os, 'macOS-')
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-pip
+        path: ~/Library/Caches/pip
+    - name: Cache yum packages
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-yum
+        path: ~/.cache/yum
+    - name: Cache python installer files
+      uses: actions/cache@v1
+      with:
+        key: ${{runner.os}}-cache-python-installer
+        path: ~/.cache/python-installer
+
+    ###
+    # Make package
+    ###
+    - name: package
+      if: startsWith(matrix.os, 'ubuntu-')
+      run: |
+        docker run \
+          -v $HOME/.cache/yum:/var/cache/yum \
+          -v $HOME/.cache/pip:/root/.cache/pip \
+          -v $HOME/.ccache:/root/.ccache \
+          -v $HOME/.conan/data:/root/.conan/data \
+          -v $(pwd):/work \
+          -v $HOME/build:/output \
+          --rm dockcross/manylinux2014-x64 .github/workflows/dist_python.sh
+    - name: package
+      if: startsWith(matrix.os, 'macOS-')
+      run: |
+        brew install ccache conan openmpi llvm
+        export PATH=$PATH:/usr/local/opt/llvm/bin
+        .github/workflows/dist_python_macos.sh
+
+    ###
+    # Upload artifacts
+    ###
+    - name: upload packages
+      uses: actions/upload-artifact@v1
+      if: startsWith(matrix.os, 'ubuntu-')
+      with:
+        name: python-packages-${{matrix.os}}
+        path: /home/runner/build
+    - name: upload packages
+      uses: actions/upload-artifact@v1
+      if: startsWith(matrix.os, 'macOS-')
+      with:
+        name: python-packages-${{matrix.os}}
+        path: /Users/runner/build
