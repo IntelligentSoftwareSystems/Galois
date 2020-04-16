@@ -7,14 +7,15 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 	num_edges = graph.sizeEdges();
 	if (!directed && !symmetrize) num_edges = num_edges / 2;
 	this->resize(num_edges);
+	//std::cout << "edgelist size: " << num_edges << "\n";
 	if (directed || symmetrize) {
-		//galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const GNode& src) {
-		for (GNode src : graph) {
+		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const GNode& src) {
+		//for (GNode src : graph) {
 			for (auto e : graph.edges(src)) {
 				auto dst = graph.getEdgeDst(e);
 				this->add_edge(*e, src, dst);
 			}
-		}//, galois::chunk_size<256>(), galois::steal(), galois::loopname("Init-edgelist"));
+		}, galois::chunk_size<64>(), galois::steal(), galois::loopname("Init-edgelist"));
 	} else {
 		UintList num_init_emb(num_vertices);
 		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const GNode& src) {
@@ -24,6 +25,7 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 				if (src < dst) num_init_emb[src] ++;
 			}
 		}, galois::loopname("Init-edgelist-alloc"));
+		/*
 		UintList indices(num_vertices + 1);
 		unsigned total = 0;
 		for (size_t n = 0; n < num_vertices; n++) {
@@ -31,6 +33,8 @@ void EdgeList::init(Graph& graph, bool directed, bool symmetrize) {
 			total += num_init_emb[n];
 		}
 		indices[num_vertices] = total;
+		//*/
+		UlongList indices = parallel_prefix_sum<unsigned,Ulong>(num_init_emb);
 		galois::do_all(galois::iterate(graph.begin(), graph.end()), [&](const auto& src) {
 			auto start = indices[src];
 			for (auto e : graph.edges(src)) {
