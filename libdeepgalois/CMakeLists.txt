@@ -76,6 +76,7 @@ set(sources
   src/math_functions.cpp
   src/optimizer.cpp
   src/context.cpp
+  src/sampler.cpp
   src/node.cpp
   src/net.cpp
 )
