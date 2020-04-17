@@ -16,20 +16,20 @@ tar -xzvf sources.tar.gz
 
 wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-road.sgr
 
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-urand.sgr ${INPUT_DIR}/
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-urand.sgr 
 
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-kron.sgr ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-kron.sgr.triangles ${INPUT_DIR}/
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-kron.sgr 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-kron.sgr.triangles 
 
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.csgr.triangles ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.gr ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.sgr ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.tgr ${INPUT_DIR}/
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.csgr.triangles 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.gr 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.sgr 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-twitter.tgr 
 
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.csgr.triangles ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.gr ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.sgr ${INPUT_DIR}/
-#wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.tgr ${INPUT_DIR}/
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.csgr.triangles 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.gr 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.sgr 
+wget https://intel-study-sc20-galois-inputs.s3.us-east-2.amazonaws.com/GAP-web.tgr
 
 
 
