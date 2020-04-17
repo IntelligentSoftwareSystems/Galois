@@ -22,9 +22,8 @@
  *
  * Contains the implementation of a bidirectional LC_CS_Graph.
  */
-
-#ifndef __B_LC_CSR_GRAPH__
-#define __B_LC_CSR_GRAPH__
+#ifndef GALOIS_GRAPH__B_LC_CSR_GRAPH_H
+#define GALOIS_GRAPH__B_LC_CSR_GRAPH_H
 
 #include "galois/graphs/LC_CSR_Graph.h"
 
@@ -413,6 +412,15 @@ public:
     galois::do_all(galois::iterate((size_t)0, this->size()),
                    [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
                    galois::no_stats(), galois::steal());
+  }
+
+  /**
+   * Directly reads the GR file to construct CSR graph
+   * and then constructs reverse edges based on that. 
+   */
+  void readAndConstructBiGraphFromGRFile(const std::string& filename) {
+    this->readGraphFromGRFile(filename);
+    constructIncomingEdges();
   }
 
 };

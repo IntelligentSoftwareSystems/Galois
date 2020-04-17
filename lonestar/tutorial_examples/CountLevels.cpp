@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
   }
   GNode source;
   auto it = graph.begin();
-  std::advance(it, startNode);
+  std::advance(it, startNode.getValue());
   source = *it;
 
   galois::StatTimer T;

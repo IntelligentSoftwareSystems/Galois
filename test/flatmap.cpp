@@ -19,9 +19,6 @@
 
 #include "galois/Galois.h"
 #include "galois/FlatMap.h"
-#ifdef GALOIS_USE_EXP
-#include "galois/ConcurrentFlatMap.h"
-#endif
 #include "galois/Timer.h"
 
 #include <boost/iterator/counting_iterator.hpp>
@@ -150,23 +147,12 @@ void timeTests(std::string prefix, const std::vector<int>& keys) {
     timeMap<std::map<int, element>>(prefix + "std::map", keys);
   for (int i = 0; i < 3; ++i)
     timeMap<galois::flat_map<int, element>>(prefix + "flat_map", keys);
-#ifdef GALOIS_USE_EXP
-  for (int i = 0; i < 3; ++i)
-    timeMap<galois::concurrent_flat_map<int, element>>(
-        prefix + "concurrent_flat_map", keys);
-  for (int i = 0; i < 3; ++i)
-    timeMapParallel<galois::concurrent_flat_map<int, element>>(
-        prefix + "concurrent_flat_map (parallel)", keys);
-#endif
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys Galois_runtime;
   testMap<std::map<int, element>>();
   testMap<galois::flat_map<int, element>>();
-#ifdef GALOIS_USE_EXP
-  testMap<galois::concurrent_flat_map<int, element>>();
-#endif
   galois::setActiveThreads(8);
 
   int size = 100;

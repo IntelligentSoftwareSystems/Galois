@@ -23,12 +23,10 @@
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
-#ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
 #include "galois/graphs/OCGraph.h"
 #include "galois/graphs/GraphNodeBag.h"
 #include "galois/DomainSpecificExecutors.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -98,7 +96,6 @@ void readInOutGraph(Graph& graph) {
   }
 }
 
-#ifdef GALOIS_USE_EXP
 template <bool UseGraphChi>
 struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
@@ -293,7 +290,6 @@ struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
     });
   }
 };
-#endif
 
 template <typename Algo>
 void run() {
@@ -345,14 +341,12 @@ int main(int argc, char** argv) {
   galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-#ifdef GALOIS_USE_EXP
   case Algo::ligra:
     run<LigraAlgo<false>>();
     break;
   case Algo::ligraChi:
     run<LigraAlgo<true>>();
     break;
-#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();

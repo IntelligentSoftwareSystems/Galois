@@ -29,7 +29,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 #include <random>
 #include <string>
@@ -116,8 +116,7 @@ static cll::opt<EdgeType> edgeType(
                            "32 bit unsigned int edge values"),
                 clEnumValN(EdgeType::uint64_, "uint64",
                            "64 bit unsigned int edge values"),
-                clEnumValN(EdgeType::void_, "void", "no edge values"),
-                clEnumValEnd),
+                clEnumValN(EdgeType::void_, "void", "no edge values")),
     cll::init(EdgeType::void_));
 static cll::opt<ConvertMode> convertMode(
     cll::desc("Conversion mode:"),
@@ -183,8 +182,7 @@ static cll::opt<ConvertMode> convertMode(
         clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
         clEnumVal(svmlight2gr, "Convert svmlight file to binary gr"),
         clEnumVal(edgelist2binary, "Convert edge list to binary edgelist "
-                                   "format (assumes vertices of type uin32_t)"),
-        clEnumValEnd),
+                                   "format (assumes vertices of type uin32_t)")),
     cll::Required);
 static cll::opt<uint32_t>
     sourceNode("sourceNode", cll::desc("Source node ID for BFS traversal"),

@@ -1,12 +1,17 @@
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
+add_executable(matrixCompletion matrixCompletion.cpp)
+add_dependencies(apps matrixCompletion)
+target_link_libraries(matrixCompletion PRIVATE Galois::shmem lonestar)
+install(TARGETS matrixCompletion DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
-find_package(Eigen)
-if(Eigen_FOUND)
-  include_directories(${Eigen_INCLUDE_DIRS})
-  add_definitions(-DHAS_EIGEN -DEIGEN_DONT_PARALLELIZE)
+if(CMAKE_COMPILER_IS_GNUCC)
+  target_compile_options(matrixCompletion PRIVATE -ffast-math)
 endif()
 
-app(matrixCompletion matrixCompletion.cpp)
+find_package(Eigen CONFIG)
+if(Eigen_FOUND)
+  target_link_libraries(matrixCompletion Eigen3::Eigen)
+  target_compile_definitions(matrixCompletion PRIVATE -DHAS_EIGEN -DEIGEN_DONT_PARALLELIZE)
+endif()
 
 if (Eigen_FOUND)
   add_test_scale(small-sync matrixCompletion -algo=syncALS -lambda=0.001 -learningRate=0.01 -learningRateFunction=intel -tolerance=0.01 -useSameLatentVector -useDetInit "${BASEINPUT}/weighted/bipartite/Epinions_dataset.gr" NOT_QUICK)

@@ -71,7 +71,7 @@ static cll::opt<DetAlgo> detAlgo(
     cll::values(clEnumVal(nondet, "Non-deterministic"),
                 clEnumVal(detBase, "Base execution"),
                 clEnumVal(detPrefix, "Prefix execution"),
-                clEnumVal(detDisjoint, "Disjoint execution"), clEnumValEnd),
+                clEnumVal(detDisjoint, "Disjoint execution")),
     cll::init(nondet));
 
 struct GetPointer : public std::unary_function<Point&, Point*> {
