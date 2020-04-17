@@ -268,71 +268,6 @@ else()
   MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 
-###### Global Functions ######
-
-function(add_test_scale type app)
-  set(options NOT_QUICK)
-  set(one_value_args)
-  set(multi_value_args REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  set(threads)
-  set(thr "${NUM_TEST_THREADS}")
-  while (${thr} GREATER 1)
-    list(APPEND threads ${thr})
-    math(EXPR thr "${thr} / 2")
-  endwhile()
-  list(APPEND threads "1")
-
-  foreach (thr ${threads})
-    set(name run-${type}-${app}-${thr})
-    add_test(NAME ${name} COMMAND ${app} ${X_UNPARSED_ARGUMENTS} -t ${thr})
-    if (NOT ${X_NOT_QUICK})
-      # Allow parallel tests
-      set_tests_properties(${name}
-        PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
-    endif()
-  endforeach()
-endfunction(add_test_scale)
-
-function(add_test_unit)
-  set(options)
-  set(one_value_args ADD_TARGET)
-  set(multi_value_args REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  if(NOT ${APP_ADD_TARGET})
-    message(FATAL_ERROR "Missing required option ADD_TARGET to add_test_unit")
-  endif()
-
-  foreach(required ${X_REQUIRES})
-    if(${${required}} MATCHES "TRUE")
-    else()
-      message(STATUS "NOT compiling ${name} (missing: ${required})")
-      return()
-    endif()
-  endforeach()
-
-  set(name ${X_ADD_TARGET})
-  set(test_name unit-${name})
-
-  add_executable(${test_name} ${name}.cpp)
-  target_link_libraries(${test_name} galois_shmem lonestar)
-
-  set(commandline ${X_COMMAND_PREFIX})
-  list(APPEND commandline "$<TARGET_FILE:${test_name}>")
-  list(APPEND commandline ${X_UNPARSED_ARGUMENTS})
-
-  add_test(NAME ${test_name} COMMAND ${commandline})
-
-  # Allow parallel tests
-  set_tests_properties(${test_name}
-    PROPERTIES
-      ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1
-      LABELS quick
-    )
-endfunction()
-
 ###### Source finding ######
 
 add_custom_target(lib)
@@ -364,7 +299,6 @@ if (ENABLE_DIST_GALOIS)
 endif()
 
 add_subdirectory(scripts)
-add_subdirectory(test)
 add_subdirectory(inputs)
 add_subdirectory(tools)
 

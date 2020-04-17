@@ -100,6 +100,9 @@ if (VTune_FOUND)
   target_link_libraries(galois_shmem PRIVATE ${VTune_LIBRARIES})
 endif()
 
+
+add_subdirectory(test)
+
 install(
   DIRECTORY include/
   DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
