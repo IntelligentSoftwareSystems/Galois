@@ -44,7 +44,6 @@ else
   Threads=64
 fi
 
-extension=sgr
 exec="triangles"
 algo="orderedCount"
 echo "Logs will be available in ${execDir}/logs/${input}"
@@ -53,10 +52,15 @@ if [ ! -d "${execDir}/logs/" ];
    mkdir -p ${execDir}/logs/
 fi
 
+extension=sgr
 for run in $(seq 1 ${numRuns})
 do
        for input in "kron" "web" "twitter"
        do
+          if [ ${input} == "kron" ];
+           then extension=sgr
+           else extension=csgr
+          fi
            echo "Running on ${input}"
            filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
            statfile="${filename}.stats"
@@ -64,6 +68,7 @@ do
            #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
        done
 done
+extension=sgr
 for run in $(seq 1 ${numRuns})
 do
        for input in "road" "urand"

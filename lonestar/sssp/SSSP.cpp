@@ -121,7 +121,6 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
   //! [reducible for self-defined stats]
   galois::GAccumulator<size_t> WLEmptyWork;
 
-  galois::gPrint("OBUM type :", typeid(OBIMTy).name(), "\n");
   graph.getData(source) = 0;
 
   galois::InsertBag<T> initBag;
