@@ -410,7 +410,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, std::vector<bool> hed
   //std::cout<<"total first loop "<<Tloop.get()<<"\n";
   uint32_t num_nodes_next = nodes + hnum;
   uint64_t num_edges_next; 
-  std::vector<std::vector<uint32_t>> edges_id(num_nodes_next);
+  galois::gstl::Vector<galois::PODResizeableArray<uint32_t>> edges_id(num_nodes_next);
   std::vector<unsigned> old_id(hnum);
   unsigned h_id = 0;
   //galois::StatTimer sloop("for loop II");

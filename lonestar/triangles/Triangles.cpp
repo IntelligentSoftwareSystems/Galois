@@ -60,10 +60,18 @@ static cll::opt<Algo> algo(
                 ),
     cll::init(Algo::orderedCount));
 
+static cll::opt<bool>
+    relabel("relabel",
+              cll::desc("Relabel nodes of the graph (default value true)"),
+              cll::init(true));
+
+static cll::opt<bool>
+    storeRelabeledGraph("storeRelabeledGraph",
+              cll::desc("Write the relabeled graph to disk for future use with .gr.triangles extension (default value true)"),
+              cll::init(true));
+
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
-// typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
-// typedef galois::graphs::LC_Linear_Graph<uint32_t,void> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -388,13 +396,15 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   galois::do_all(galois::iterate(permuted),
                  [&](N x) { permuted.sortEdges<void>(x, IdLess<N, void>()); });
 
-  std::cout << "Writing new input file: " << triangleFilename << "\n";
-  permuted.toFile(triangleFilename);
+  if(storeRelabeledGraph) {
+    std::cout << "Writing new input file: " << triangleFilename << "\n";
+    permuted.toFile(triangleFilename);
+  }
   galois::graphs::readGraph(graph, permuted);
 }
 
 void readGraph(Graph& graph) {
-  if (inputFilename.find(".gr.triangles") !=
+  if (relabel && inputFilename.find(".gr.triangles") !=
       inputFilename.size() - strlen(".gr.triangles")) {
     // Not directly passed .gr.triangles file
     std::string triangleFilename = inputFilename + ".triangles";

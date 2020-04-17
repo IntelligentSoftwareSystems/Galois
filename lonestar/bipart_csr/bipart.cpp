@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
   galois::StatTimer T("buildingG");
   T.start();
   // read rest of input and initialize hedges (build hgraph)
-  std::vector<std::vector<uint32_t> > edges_id(hedges+nodes);
+  galois::gstl::Vector<galois::PODResizeableArray<uint32_t> > edges_id(hedges+nodes);
   std::vector<std::vector<EdgeTy> > edges_data(hedges+nodes);
   std::vector<uint64_t> prefix_edges(nodes+hedges);
   uint32_t cnt = 0;
