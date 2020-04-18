@@ -71,6 +71,7 @@ else()
 set(sources
   src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
+  src/layers/sigmoid_loss_layer.cpp
   src/layers/aggregator.cpp
   src/layers/layer.cpp
   src/math_functions.cpp

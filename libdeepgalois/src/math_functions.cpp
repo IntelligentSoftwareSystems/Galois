@@ -501,17 +501,24 @@ float reduce_mean(const vec_t& x) {
   return sum / (float)n;
 }
 
-
-
-float_t sigmoid_func(float_t x) { return 0.5 * tanh(0.5 * x) + 0.5; }
+// use sigmoid instead of softmax for multi-class datasets, e.g. ppi, yelp and amazon
+// inline float_t sigmoid_func(float_t x) { return 0.5 * tanh(0.5 * x) + 0.5; }
+inline float_t sigmoid_func(float_t x) { return 1./(1.+expf(-x)); }
 
 // Sigmoid
-void sigmoid(vec_t& fv) {
-  size_t count = fv.size();
-  for (size_t i = 0; i < count; ++i) {
-    fv[i] = sigmoid_func(fv[i]);
+void sigmoid(const vec_t& input, vec_t &output) {
+  for (size_t i = 0; i < input.size(); ++i)
+    output[i] = sigmoid_func(input[i]);
+}
+
+void sigmoid(size_t n, const float_t* input, float_t* output) {
+  for (int i=0; i< n; i++) {
+    output[i] = 1. / (1. + expf(-input[i]));
   }
 }
 
-
-
+void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp) {
+  for (int i=0; i< n; i++) {
+    dy[i] = dp[i] * p[i] * (float_t(1) - p[i]);
+  }
+}

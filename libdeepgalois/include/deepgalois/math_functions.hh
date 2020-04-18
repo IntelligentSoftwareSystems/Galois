@@ -39,15 +39,22 @@ void d_dropout_cpu(size_t n, const float scale, const float_t* in_diff,
 void relu_cpu(size_t n, const float_t* in, float_t* out);
 //! ReLU derivative; generally, 1 if data > 0, 0 otherwise
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
+
+// Loss function for single-class label (one-hot) data: softmax
 void softmax(const vec_t& input, vec_t& output);
 void softmax(size_t n, const float_t* input, float_t* output);
 void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
-               const float_t* dp);
+void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
+
 float_t cross_entropy(const vec_t& y, const vec_t& p);
 float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
 void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
 void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
+
+// Loss function for multi-class label (one-hot) data: sigmoid
+void sigmoid(size_t n, const float_t* input, float_t* output);
+void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
+
 //! copy vector from in -> out; first len elements
 void copy_cpu(size_t len, const float_t* in, float_t* out);
 // single-precision dense matrix multiply
