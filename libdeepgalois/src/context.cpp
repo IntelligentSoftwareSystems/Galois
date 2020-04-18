@@ -18,6 +18,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
+  graph_cpu = new Graph(); 
   if (filetype == "el") {
     std::string filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());

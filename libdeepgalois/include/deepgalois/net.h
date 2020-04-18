@@ -10,6 +10,7 @@
 #include "deepgalois/gtypes.h"
 #include "deepgalois/layers/graph_conv_layer.h"
 #include "deepgalois/layers/softmax_loss_layer.h"
+#include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/optimizer.h"
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
@@ -31,7 +32,8 @@ class Net {
 public:
   Net() {}
   #ifndef GALOIS_USE_DIST
-  void init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop);
+  void init(std::string dataset_str, unsigned epochs, unsigned hidden1, 
+            bool selfloop, bool is_single = true);
   #else
   void init(std::string dataset_str, unsigned epochs, unsigned hidden1,
             bool selfloop, Graph* dGraph);
@@ -79,7 +81,10 @@ public:
     in_dims[0] = out_dims[0] = num_samples;
     in_dims[1]               = get_in_dim(layer_id);
     out_dims[1]              = get_out_dim(layer_id);
-    layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
+	if (is_single_class)
+	  layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
+    else
+	  layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
     connect(layers[layer_id - 1], layers[layer_id]);
   }
 
@@ -133,6 +138,7 @@ protected:
 #else
   deepgalois::DistContext* context;
 #endif
+  bool is_single_class;             // single-class (one-hot) or multi-class label
   size_t num_samples;               // number of samples: N
   size_t num_classes;               // number of vertex classes: E
   size_t num_layers;                // for now hard-coded: NUM_CONV_LAYERS + 1

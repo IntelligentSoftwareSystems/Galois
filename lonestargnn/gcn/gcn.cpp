@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 
 #ifndef GALOIS_USE_DIST
   // read network, features, ground truth, initialize metadata
-  network.init(dataset, epochs, hidden1, add_selfloop);
+  network.init(dataset, epochs, hidden1, add_selfloop, is_single_class);
 #else
   network.init(dataset, epochs, hidden1, add_selfloop, dGraph);
 #endif

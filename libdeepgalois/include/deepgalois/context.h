@@ -32,10 +32,12 @@ public:
   size_t read_graph_gpu(std::string dataset_str, bool selfloop);
   void copy_data_to_device(); // copy labels and input features
   void norm_factor_counting();
+  //void set_label_class(bool is_single = true) { is_single_class = is_single; }
 
   size_t n;                    // number of samples: N
   size_t num_classes;          // number of classes: E
   size_t feat_len;             // input feature length: D
+  //bool is_single_class;        // single-class (one-hot) or multi-class label
   std::vector<label_t> labels; // labels for classification: N x 1
   label_t* d_labels;           // labels on device
   vec_t h_feats;               // input features: N x D

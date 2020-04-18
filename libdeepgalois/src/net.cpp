@@ -7,12 +7,14 @@
 namespace deepgalois {
 
 #ifndef GALOIS_USE_DIST
-void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, bool selfloop) {
+void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, 
+               bool selfloop, bool is_single) {
 #else
 void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
                bool selfloop, Graph* dGraph) {
 #endif
 #ifndef GALOIS_USE_DIST
+  is_single_class = is_single;
   context = new deepgalois::Context();
   num_samples = context->read_graph(dataset_str, selfloop);
 #else
@@ -87,8 +89,13 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
 void Net::train(optimizer* opt, bool need_validate) {
 #ifdef GALOIS_USE_DIST
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  std::string header = "[" + std::to_string(myID) + "] ";
+  std::string seperator = "\n";
 #else
-  unsigned myID = 0;
+  //std::string header = "[" + std::to_string(0) + "] ";
+  //std::string seperator = "\n";
+  std::string header = "";
+  std::string seperator = " ";
 #endif
 
   galois::gPrint("\nStart training...\n");
@@ -100,8 +107,7 @@ void Net::train(optimizer* opt, bool need_validate) {
   Timer t_epoch;
   // run epochs
   for (unsigned i = 0; i < num_epochs; i++) {
-    galois::gPrint("[", myID, "] Epoch ", std::setw(2), i, std::fixed,
-                   std::setprecision(3), "\n");
+    galois::gPrint(header, "Epoch ", std::setw(3), i, seperator);
     t_epoch.Start();
 
     // training steps
@@ -131,8 +137,8 @@ void Net::train(optimizer* opt, bool need_validate) {
 
     // validation / testing
     set_netphases(net_phase::test);
-    galois::gPrint("[", myID, "] train_loss = ", std::setw(5), train_loss, " train_acc = ",
-                   std::setw(5), train_acc, "\n");
+    galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed, train_loss,
+                   " train_acc ", train_acc, seperator);
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
     if (need_validate) {
@@ -142,12 +148,12 @@ void Net::train(optimizer* opt, bool need_validate) {
       double val_time = evaluate(val_begin, val_end, val_count, &val_mask[0],
                                  val_loss, val_acc);
       Tval.stop();
-      galois::gPrint("[", myID, "] val_loss = ", std::setw(5), val_loss, " val_acc = ",
-                     std::setw(5), val_acc, "\n");
-      galois::gPrint("[", myID, "] time = ", epoch_time + val_time, " ms (train_time = ",
-                     epoch_time, " val_time = ", val_time, ")\n");
+      galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed, val_loss,
+                     " val_acc ", val_acc, seperator);
+      galois::gPrint(header, "time ", std::setprecision(3), std::fixed, epoch_time + val_time, 
+                     " ms (train_time ", epoch_time, " val_time ", val_time, ")\n");
     } else {
-      galois::gPrint("[", myID, "] train_time = ", epoch_time, " ms\n");
+      galois::gPrint(header, "train_time ", std::fixed, epoch_time, " ms\n");
     }
   }
 }

@@ -52,7 +52,9 @@ void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
 void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
 
 // Loss function for multi-class label (one-hot) data: sigmoid
+void sigmoid(const vec_t& input, vec_t& output);
 void sigmoid(size_t n, const float_t* input, float_t* output);
+void d_sigmoid(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
 void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
 
 //! copy vector from in -> out; first len elements
