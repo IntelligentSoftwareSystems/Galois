@@ -171,7 +171,11 @@ double Net::evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
   Timer t_eval;
   t_eval.Start();
   loss = fprop(begin, end, count, masks);
-  acc  = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
+  if (is_single_class) {
+    acc = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
+  } else {
+    acc = masked_multi_class_accuracy(begin, end, count, masks, context->getGraphPointer());
+  }
   t_eval.Stop();
   return t_eval.Millisecs();
 }

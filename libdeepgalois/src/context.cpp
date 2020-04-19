@@ -8,7 +8,11 @@ namespace deepgalois {
 
 #ifdef CPU_ONLY
 Context::Context() {}
-Context::~Context() {}
+Context::~Context() {
+  if (labels) delete labels;
+  if (h_feats) delete h_feats;
+  if (norm_factor) delete norm_factor;
+}
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   n = read_graph_cpu(dataset_str, "gr", selfloop);

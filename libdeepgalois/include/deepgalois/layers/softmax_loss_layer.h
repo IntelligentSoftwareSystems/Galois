@@ -6,7 +6,7 @@ class softmax_loss_layer : public layer {
 public:
   softmax_loss_layer(unsigned level, std::vector<size_t> in_dims,
                      std::vector<size_t> out_dims);
-  ~softmax_loss_layer() {}
+  ~softmax_loss_layer();
   std::string layer_type() const override {
     return std::string("softmax_loss");
   }

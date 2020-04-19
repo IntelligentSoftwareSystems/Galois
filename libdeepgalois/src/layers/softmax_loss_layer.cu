@@ -41,6 +41,10 @@ softmax_loss_layer::softmax_loss_layer(unsigned level,
   float_malloc_device(in_dims[0], loss);
 }
 
+softmax_loss_layer::~softmax_loss_layer() {
+  float_free_device(loss);
+}
+
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
   init_const_gpu(input_dims[0], 0.0, loss);

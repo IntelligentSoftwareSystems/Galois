@@ -6,10 +6,24 @@ namespace deepgalois {
 #define NUM_DATASETS 8
 const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pubmed", "flickr", "yelp", "reddit", "amazon"};
 
+// Compute the F1 score, also known as balanced F-score or F-measure
+// The F1 score can be interpreted as a weighted average of the precision and recall, 
+// where an F1 score reaches its best value at 1 and worst score at 0. 
+// The relative contribution of precision and recall to the F1 score are equal.
+// The formula for the F1 score is:
+// F1 = 2 * (precision * recall) / (precision + recall)
+// where precision = TP / (TP + FP), recall = TP / (TP + FN)
+// TP: true positive; FP: false positive; FN: false negtive.
+// In the multi-class and multi-label case, this is the weighted average of the F1 score of each class.
+// Please refer to https://sebastianraschka.com/faq/docs/multiclass-metric.html,
+// http://pageperso.lif.univ-mrs.fr/~francois.denis/IAAM1/scikit-learn-docs.pdf (p.1672)
+// and https://github.com/ashokpant/accuracy-evaluation-cpp/blob/master/src/evaluation.hpp
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred) {
+  float beta = 1;
   std::vector<acc_t> true_positive(num_classes, 0);
   std::vector<acc_t> false_positive(num_classes, 0);
+  std::vector<acc_t> false_negtive(num_classes, 0);
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
     if (masks[i] == 1) {
       for (size_t j = 0; j < num_classes; j++) {
@@ -18,20 +32,30 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
           true_positive[j] ++;
         } else if (ground_truth[idx] == 0 && pred[idx] > 0.5) {
           false_positive[j] ++;
+        } else if (ground_truth[idx] == 1 && pred[idx] <= 0.5) {
+          false_negtive[j] ++;
         }
       }
 	}
   }, galois::loopname("MaskedF1Score"));
   acc_t pNumerator = 0.0;
   acc_t pDenominator = 0.0;
+  acc_t rNumerator = 0.0;
+  acc_t rDenominator = 0.0;
   for (size_t i = 0; i < num_classes; i++) {
+    auto fn = false_negtive[i]; // false negtive
     auto fp = false_positive[i]; // false positive
 	auto tp = true_positive[i]; // true positive
 	pNumerator = pNumerator + tp;
 	pDenominator = pDenominator + (tp + fp);
+    rNumerator = rNumerator + tp;
+    rDenominator = rDenominator + (tp + fn);
   }
+  auto recallMicro = rNumerator / rDenominator;
   acc_t precisionMicro = pNumerator / pDenominator;
-  return precisionMicro;
+  auto fscoreMicro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
+                     ((beta * beta) * precisionMicro + recallMicro);
+  return fscoreMicro;
 }
 
 #ifndef GALOIS_USE_DIST
