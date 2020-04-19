@@ -94,7 +94,7 @@ Graph* Context::getGraphPointer() {
   return Context::graph_cpu;
 }
 
-float_t* Context::get_in_ptr() { return &h_feats[0]; }
+float_t* Context::get_in_ptr() { return h_feats; }
 
 void Context::norm_factor_counting() {
   norm_factor = new float_t[n];
@@ -123,16 +123,23 @@ size_t Context::read_labels(std::string dataset_str) {
   size_t m; // m: number of samples
   in >> m >> num_classes >> std::ws;
   assert(m == n);
-  labels.resize(m, 0); // label for each vertex: N x 1
+  if (is_single_class)
+    labels = new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
+  else
+    labels = new label_t[m*num_classes]; // multi-class label for each vertex: N x E
   unsigned v = 0;
   while (std::getline(in, line)) {
     std::istringstream label_stream(line);
     unsigned x;
     for (size_t idx = 0; idx < num_classes; ++idx) {
       label_stream >> x;
-      if (x != 0) {
-        labels[v] = idx;
-        break;
+      if (is_single_class) {
+        if (x != 0) {
+          labels[v] = idx;
+          break;
+        }
+      } else {
+        labels[v*num_classes+idx] = x;
       }
     }
     v++;
@@ -142,36 +149,56 @@ size_t Context::read_labels(std::string dataset_str) {
   // print the number of vertex classes
   std::cout << "Done, unique label counts: " << num_classes
             << ", time: " << t_read.Millisecs() << " ms\n";
+  //for (auto i = 0; i < 10; i ++) std::cout << "labels[" << i << "] = " << unsigned(labels[i]) << "\n";
   return num_classes;
 }
 
 //! Read features, return the length of a feature vector
 //! Features are stored in the Context class
-size_t Context::read_features(std::string dataset_str) {
+size_t Context::read_features(std::string dataset_str, std::string filetype) {
+  //filetype = "txt";
   std::cout << "Reading features ... ";
   Timer t_read;
   t_read.Start();
+  size_t m; // m = number of vertices
   std::string filename = path + dataset_str + ".ft";
   std::ifstream in;
-  std::string line;
-  in.open(filename, std::ios::in);
-  size_t m; // m = number of vertices
-  in >> m >> feat_len >> std::ws;
-  // assert(m == );
-  h_feats.resize(m * feat_len, 0);
-  while (std::getline(in, line)) {
-    std::istringstream edge_stream(line);
-    unsigned u, v;
-    float_t w;
-    edge_stream >> u;
-    edge_stream >> v;
-    edge_stream >> w;
-    h_feats[u * feat_len + v] = w;
+
+  if (filetype == "bin") {
+    std::string file_dims = path + dataset_str + "-dims.txt";
+    std::ifstream ifs;
+    ifs.open(file_dims, std::ios::in);
+    ifs >> m >> feat_len >> std::ws;
+    ifs.close();
+  } else {
+    in.open(filename, std::ios::in);
+    in >> m >> feat_len >> std::ws;
+  }
+  std::cout << "N x D: " << m << " x " << feat_len << "\n";
+  h_feats = new float_t[m * feat_len];
+  if (filetype == "bin") {
+    filename = path + dataset_str + "-feats.bin";
+    in.open(filename, std::ios::binary|std::ios::in);
+    in.read((char*)h_feats, sizeof(float_t) * m * feat_len);
+  } else {
+    std::string line;
+    while (std::getline(in, line)) {
+      std::istringstream edge_stream(line);
+      unsigned u, v;
+      float_t w;
+      edge_stream >> u;
+      edge_stream >> v;
+      edge_stream >> w;
+      h_feats[u * feat_len + v] = w;
+    }
   }
   in.close();
   t_read.Stop();
   std::cout << "Done, feature length: " << feat_len
             << ", time: " << t_read.Millisecs() << " ms\n";
+  //for (auto i = 0; i < 6; i ++) 
+    //for (auto j = 0; j < 6; j ++) 
+      //std::cout << "feats[" << i << "][" << j << "] = " << h_feats[i*feat_len+j] << "\n";
   return feat_len;
 }
 

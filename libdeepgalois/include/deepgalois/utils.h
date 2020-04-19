@@ -110,7 +110,7 @@ inline bool bernoulli(float_t p) {
 inline size_t read_masks(std::string dataset_str, std::string mask_type,
                          size_t& begin, size_t& end,
                          std::vector<uint8_t>& masks) {
-  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed") {
+  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed" && dataset_str != "flickr") {
     std::cout << "Dataset currently not supported\n";
     exit(1);
   }
@@ -145,7 +145,7 @@ inline size_t read_masks(std::string dataset_str, std::string mask_type,
 inline size_t read_masks(std::string dataset_str, std::string mask_type,
                          size_t& begin, size_t& end,
                          std::vector<uint8_t>& masks, Graph* dGraph) {
-  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed") {
+  if (dataset_str != "citeseer" && dataset_str != "cora" && dataset_str != "pubmed" && dataset_str != "flickr") {
     std::cout << "Dataset currently not supported\n";
     exit(1);
   }

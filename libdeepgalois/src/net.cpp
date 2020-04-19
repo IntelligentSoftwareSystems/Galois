@@ -16,6 +16,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
 #ifndef GALOIS_USE_DIST
   is_single_class = is_single;
   context = new deepgalois::Context();
+  context->set_label_class(is_single);
   num_samples = context->read_graph(dataset_str, selfloop);
 #else
   context = new deepgalois::DistContext();
