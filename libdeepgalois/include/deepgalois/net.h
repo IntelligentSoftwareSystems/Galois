@@ -41,8 +41,17 @@ public:
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
-  void train(optimizer* opt, bool need_validate); // training
   void construct_layers();
+  void append_out_layer(size_t layer_id);
+  void train(optimizer* opt, bool need_validate); // training
+  double evaluate(size_t begin, size_t end, size_t count, 
+                  mask_t* masks, acc_t& loss, acc_t& acc); // inference
+
+  //! Add a convolution layer to the network
+  void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
+                         bool bias = false, bool dropout = true,
+                         float_t dropout_rate = 0.5);
+
   //! Save the context object to all layers of the network
   void set_contexts() {
     for (size_t i = 0; i < num_layers; i++)
@@ -57,35 +66,6 @@ public:
   void print_layers_info() {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->print_layer_info();
-  }
-
-  //! Add a convolution layer to the network
-  void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
-                         bool bias = false, bool dropout = true,
-                         float_t dropout_rate = 0.5) {
-    assert(dropout_rate < 1.0);
-    assert(layer_id < NUM_CONV_LAYERS);
-    std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0] = out_dims[0] = num_samples;
-    in_dims[1]               = get_in_dim(layer_id);
-    out_dims[1]              = get_out_dim(layer_id);
-    layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
-                                            dropout_rate, in_dims, out_dims);
-    if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
-  }
-
-  //! Add an output layer to the network
-  void append_out_layer(size_t layer_id) {
-    assert(layer_id > 0); // can not be the first layer
-    std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0] = out_dims[0] = num_samples;
-    in_dims[1]               = get_in_dim(layer_id);
-    out_dims[1]              = get_out_dim(layer_id);
-	if (is_single_class)
-	  layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
-    else
-	  layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
-    connect(layers[layer_id - 1], layers[layer_id]);
   }
 
   //! forward propagation: [begin, end) is the range of samples used.
@@ -120,18 +100,6 @@ public:
     }
   }
 
-  // evaluate, i.e. inference or predict
-  double evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
-                  acc_t& loss, acc_t& acc) {
-    // TODO may need to do something for the dist case
-    Timer t_eval;
-    t_eval.Start();
-    loss = fprop(begin, end, count, masks);
-    acc  = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
-    t_eval.Stop();
-    return t_eval.Millisecs();
-  }
-
 protected:
 #ifndef GALOIS_USE_DIST
   deepgalois::Context* context;
@@ -143,13 +111,15 @@ protected:
   size_t num_classes;               // number of vertex classes: E
   size_t num_layers;                // for now hard-coded: NUM_CONV_LAYERS + 1
   unsigned num_epochs;              // number of epochs
+
   std::vector<size_t> feature_dims; // feature dimnesions for each layer
   std::vector<mask_t> train_mask, val_mask; // masks for traning and validation
   size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
   std::vector<layer*> layers; // all the layers in the neural network
+
   // comparing outputs with the ground truth (labels)
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
-                        Graph* dGraph);
+  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
+  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
 };
 
 } // namespace deepgalois

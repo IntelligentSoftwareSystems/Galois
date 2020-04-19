@@ -64,6 +64,7 @@ set(sources
   src/math_functions.cpp
   src/optimizer.cpp
   src/DistContext.cpp
+  src/utils.cpp
   src/node.cpp
   src/net.cpp
 )
@@ -78,6 +79,7 @@ set(sources
   src/optimizer.cpp
   src/context.cpp
   src/sampler.cpp
+  src/utils.cpp
   src/node.cpp
   src/net.cpp
 )

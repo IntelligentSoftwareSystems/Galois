@@ -49,14 +49,12 @@ acc_t sigmoid_loss_layer::get_masked_loss() {
   AccumU valid_sample_count;
   total_loss.reset();
   valid_sample_count.reset();
-  galois::do_all(galois::iterate(layer::begin_, layer::end_),
-    [&](const auto& i) {
-      if (masks_[i]) {
-        total_loss += loss[i];
-        valid_sample_count += 1;
-      }
-    }, galois::chunk_size<256>(), galois::steal(),
-    galois::loopname("getMaskedLoss"));
+  galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
+    if (masks_[i]) {
+      total_loss += loss[i];
+      valid_sample_count += 1;
+    }
+  }, galois::chunk_size<256>(), galois::steal(), galois::loopname("getMaskedLoss"));
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
 }

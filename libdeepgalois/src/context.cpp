@@ -123,10 +123,13 @@ size_t Context::read_labels(std::string dataset_str) {
   size_t m; // m: number of samples
   in >> m >> num_classes >> std::ws;
   assert(m == n);
-  if (is_single_class)
+  if (is_single_class) {
+    std::cout << "Using single-class (one-hot) labels\n";
     labels = new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
-  else
+  } else {
+    std::cout << "Using multi-class labels\n";
     labels = new label_t[m*num_classes]; // multi-class label for each vertex: N x E
+  }
   unsigned v = 0;
   while (std::getline(in, line)) {
     std::istringstream label_stream(line);

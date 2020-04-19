@@ -1,0 +1,124 @@
+#include "galois/Galois.h"
+#include "deepgalois/utils.h"
+
+namespace deepgalois {
+
+#define NUM_DATASETS 8
+const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pubmed", "flickr", "yelp", "reddit", "amazon"};
+
+acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
+                      size_t num_classes, label_t *ground_truth, float_t *pred) {
+  std::vector<acc_t> true_positive(num_classes, 0);
+  std::vector<acc_t> false_positive(num_classes, 0);
+  galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
+    if (masks[i] == 1) {
+      for (size_t j = 0; j < num_classes; j++) {
+        auto idx = i * num_classes + j;
+        if (ground_truth[idx] == 1 && pred[idx] > 0.5) {
+          true_positive[j] ++;
+        } else if (ground_truth[idx] == 0 && pred[idx] > 0.5) {
+          false_positive[j] ++;
+        }
+      }
+	}
+  }, galois::loopname("MaskedF1Score"));
+  acc_t pNumerator = 0.0;
+  acc_t pDenominator = 0.0;
+  for (size_t i = 0; i < num_classes; i++) {
+    auto fp = false_positive[i]; // false positive
+	auto tp = true_positive[i]; // true positive
+	pNumerator = pNumerator + tp;
+	pDenominator = pDenominator + (tp + fp);
+  }
+  acc_t precisionMicro = pNumerator / pDenominator;
+  return precisionMicro;
+}
+
+#ifndef GALOIS_USE_DIST
+//! Get masks from datafile where first line tells range of
+//! set to create mask from
+size_t read_masks(std::string dataset_str, std::string mask_type,
+                         size_t& begin, size_t& end, std::vector<uint8_t>& masks) {
+  bool dataset_found = false;
+  for (int i = 0; i < NUM_DATASETS; i++) {
+    if (dataset_str == dataset_names[i]) {
+      dataset_found = true;
+      break;
+    }
+  }
+  if (!dataset_found) {
+    std::cout << "Dataset currently not supported\n";
+    exit(1);
+  }
+  size_t i             = 0;
+  size_t sample_count  = 0;
+  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
+  // std::cout << "Reading " << filename << "\n";
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  in >> begin >> end >> std::ws;
+  while (std::getline(in, line)) {
+    std::istringstream mask_stream(line);
+    if (i >= begin && i < end) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        masks[i] = 1;
+        sample_count++;
+      }
+    }
+    i++;
+  }
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << " (" 
+    << (float)sample_count/(float)masks.size()*(float)100 << "\%)\n";
+  in.close();
+  return sample_count;
+}
+#else
+size_t read_masks(std::string dataset_str, std::string mask_type,
+                         size_t& begin, size_t& end,
+                         std::vector<uint8_t>& masks, Graph* dGraph) {
+  bool dataset_found = false;
+  for (int i = 0; i < NUM_DATASETS; i++) {
+    if (dataset_str == dataset_names[i]) {
+      dataset_found = true;
+      break;
+    }
+  }
+  if (!dataset_found) {
+    std::cout << "Dataset currently not supported\n";
+    exit(1);
+  }
+  size_t i             = 0;
+  size_t sample_count  = 0;
+  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
+
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  in >> begin >> end >> std::ws;
+  while (std::getline(in, line)) {
+    std::istringstream mask_stream(line);
+    if (i >= begin && i < end) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        // only bother if it's local
+        if (dGraph->isLocal(i)) {
+          masks[dGraph->getLID(i)] = 1;
+          sample_count++;
+        }
+      }
+    }
+    i++;
+  }
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << "\n";
+  in.close();
+  return sample_count;
+}
+#endif
+
+}

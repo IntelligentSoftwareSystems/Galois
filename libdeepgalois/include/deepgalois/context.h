@@ -26,7 +26,7 @@ public:
   size_t read_features(std::string dataset_str, std::string filetype = "bin");
   label_t get_label(size_t i) { return labels[i]; } // single-class (one-hot) label
   label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
-  label_t* get_labels_ptr(size_t i) { return labels; }
+  label_t* get_labels_ptr() { return labels; }
   float_t* get_in_ptr();
 
   size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);

@@ -120,8 +120,13 @@ void Net::train(optimizer* opt, bool need_validate) {
     Tfw.start();
     train_loss =
         Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
-    train_acc = masked_accuracy(train_begin, train_end, train_count,
-                                &train_mask[0], context->getGraphPointer()); // predict
+    if (is_single_class) {
+      train_acc = masked_accuracy(train_begin, train_end, train_count,
+                                  &train_mask[0], context->getGraphPointer()); // predict
+    } else {
+      train_acc = masked_multi_class_accuracy(train_begin, train_end, train_count,
+                                  &train_mask[0], context->getGraphPointer()); // predict
+    }
     Tfw.stop();
 
     // backward: use intermediate features + ground truth to update layers
@@ -159,6 +164,18 @@ void Net::train(optimizer* opt, bool need_validate) {
   }
 }
 
+// evaluate, i.e. inference or predict
+double Net::evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
+                     acc_t& loss, acc_t& acc) {
+  // TODO may need to do something for the dist case
+  Timer t_eval;
+  t_eval.Start();
+  loss = fprop(begin, end, count, masks);
+  acc  = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
+  t_eval.Stop();
+  return t_eval.Millisecs();
+}
+
 void Net::construct_layers() {
   std::cout << "\nConstructing layers...\n";
   append_conv_layer(0, true);                    // first conv layer
@@ -169,6 +186,34 @@ void Net::construct_layers() {
   set_contexts();
 }
 
+//! Add an output layer to the network
+void Net::append_out_layer(size_t layer_id) {
+  assert(layer_id > 0); // can not be the first layer
+  std::vector<size_t> in_dims(2), out_dims(2);
+  in_dims[0] = out_dims[0] = num_samples;
+  in_dims[1]               = get_in_dim(layer_id);
+  out_dims[1]              = get_out_dim(layer_id);
+  if (is_single_class)
+    layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
+  else
+    layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
+  connect(layers[layer_id - 1], layers[layer_id]);
+}
+
+//! Add a convolution layer to the network
+void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
+                            bool dropout, float_t dropout_rate) {
+  assert(dropout_rate < 1.0);
+  assert(layer_id < NUM_CONV_LAYERS);
+  std::vector<size_t> in_dims(2), out_dims(2);
+  in_dims[0] = out_dims[0] = num_samples;
+  in_dims[1]               = get_in_dim(layer_id);
+  out_dims[1]              = get_out_dim(layer_id);
+  layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
+                                          dropout_rate, in_dims, out_dims);
+  if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
+}
+
 #ifdef CPU_ONLY
 /**
  *
@@ -176,8 +221,7 @@ void Net::construct_layers() {
  * @param end GLOBAL end
  * @param count GLOBAL training count
  */
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
-                           Graph* dGraph) {
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
 #ifndef GALOIS_USE_DIST
   AccumF accuracy_all;
 #else
@@ -215,8 +259,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
       }
     }
 #endif
-  },
-  galois::loopname("getMaskedLoss"));
+  }, galois::loopname("getMaskedLoss"));
 
 #ifdef GALOIS_USE_DIST
   count = sampleCount.reduce();
@@ -225,6 +268,12 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
 
   // all hosts should get same accuracy
   return accuracy_all.reduce() / (acc_t)count;
+}
+
+acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
+  auto preds = layers[NUM_CONV_LAYERS - 1]->next()->get_data();
+  auto ground_truth = context->get_labels_ptr();
+  return deepgalois::masked_f1_score(begin, end, count, masks, num_classes, ground_truth, preds);
 }
 #endif
 
