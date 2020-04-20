@@ -104,6 +104,7 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::StatTimer Tfw("Train-Forward");
   galois::StatTimer Tbw("Train-Backward");
   galois::StatTimer Tval("Validation");
+  double total_train_time = 0.0;
 
   Timer t_epoch;
   // run epochs
@@ -147,6 +148,7 @@ void Net::train(optimizer* opt, bool need_validate) {
                    " train_acc ", train_acc, seperator);
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
+    total_train_time += epoch_time;
     if (need_validate) {
       // Validation
       acc_t val_loss = 0.0, val_acc = 0.0;
@@ -162,6 +164,10 @@ void Net::train(optimizer* opt, bool need_validate) {
       galois::gPrint(header, "train_time ", std::fixed, epoch_time, " ms\n");
     }
   }
+  double avg_train_time = total_train_time / (double)num_epochs;
+  double throughput = 1000.0 * (double)num_epochs / total_train_time;
+  galois::gPrint("\nAverage training time: ", avg_train_time, 
+                 " ms. Throughput: ", throughput, " epoch/s\n");
 }
 
 // evaluate, i.e. inference or predict
