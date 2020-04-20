@@ -277,7 +277,7 @@ void moveNodesFastDeterministic(Graph &graph, CommArray &c_info){
 	[&](GNode n){
 
 		bag_curr.push(n);
-		inBag[n] = false;
+		inBag[n] = true;
 	}, galois::steal());
 	
 	galois::do_all(galois::iterate((uint32_t)0, (uint32_t)(2*graph.size()+1)),
@@ -337,16 +337,34 @@ galois::do_all(galois::iterate((uint32_t)0, (uint32_t)(2*graph.size()+1)),
 
   local_target.allocateBlocked(graph.size());
 
+int iter = 0;
 	while(true){
+
+	if(iter >= 10)break;
+
+	iter++;
 
 		for(int64_t idx =0;idx<=15;idx++){
 
+
+if(bag[idx].begin() == bag[idx].end())
+        continue;
+
+			galois::do_all(galois::iterate(bag[idx]),
+        [&] (GNode n){
+
+					inBag[n] = false;
+				});
+
+
+//			if(bag[idx].begin() == bag[idx].end())
+	//			continue;
 
 			galois::do_all(galois::iterate(bag[idx]),
 				[&] (GNode n){
 			
         auto& n_data = graph.getData(n,flag_write_lock);
-			//	inBag[n] = false;
+//				inBag[n] = false;
 
 				//uint64_t degree = std::distance(graph.edge_begin(n, flag_no_lock), graph.edge_end(n, flag_no_lock));
 
@@ -430,16 +448,21 @@ galois::do_all(galois::iterate((uint32_t)0, (uint32_t)(2*graph.size()+1)),
 						}	//end for
 					}//end if
 
-			}, galois::steal() );
+			});
+//, galois::steal() );
 
-				galois::do_all(galois::iterate(bag[idx]),
-        	[&](GNode n) {
-        	auto& n_data = graph.getData(n, flag_no_lock);
+	galois::do_all(galois::iterate(bag[idx]),
+       	[&](GNode n) {
+      
+		//		for(auto n: bag[idx]){
+					auto& n_data = graph.getData(n, flag_no_lock);
 					if(local_target[n] != -1 && local_target[n] != graph.getData(n).curr_comm_ass){
           	n_data.prev_comm_ass = n_data.curr_comm_ass;
           	n_data.curr_comm_ass = local_target[n];
 					}
-        }, galois::steal());
+       }
+//);
+, galois::steal());
 
 
 				for(auto n: toProcess){
@@ -468,20 +491,20 @@ galois::do_all(galois::iterate((uint32_t)0, (uint32_t)(2*graph.size()+1)),
 			
 
 			//populate bag_next
-			galois::do_all(galois::iterate(graph),
-			[&](GNode n){
-			
+		galois::do_all(galois::iterate(graph),
+	[&](GNode n){
+	//		for(auto n:graph){
 					if(inBag[n]){
 
 						int64_t idx = n%16;
 						bag[idx].push(n);
-						inBag[n] = false;
+		//				inBag[n] = false;
 					}
 				}, galois::steal());
 
 			bool break_flag = true;
 
-			for(int64_t idx =0; idx<16;idx++)
+			for(int idx =0; idx<16;idx++)
 				if(bag[idx].begin() != bag[idx].end())
 					break_flag = false;
 
@@ -958,12 +981,12 @@ void leiden(Graph &graph, largeArray& clusters_orig){
 			break;
 		}
 
-//		refinePartition(*graph_curr);
-galois::do_all(galois::iterate(*graph_curr),
+		refinePartition(*graph_curr);
+/*galois::do_all(galois::iterate(*graph_curr),
         [&] (GNode n){
           graph_curr->getData(n).curr_subcomm_ass = graph_curr->getData(n).curr_comm_ass;
         }, galois::steal());
-
+*/
 		uint64_t num_unique_clusters = renumberClustersContiguously(*graph_curr);
 		
 			galois::do_all(galois::iterate((uint64_t)0, num_nodes_orig),
