@@ -31,7 +31,6 @@ set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
 set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 ###### General features ######
-set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
@@ -85,14 +84,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Always include debug info and aggressive warnings
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
+# Always include debug info
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g>")
 
 # GCC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
     # GCC-{6,7} is a too imprecise
@@ -112,7 +113,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
@@ -122,6 +125,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
@@ -145,11 +150,6 @@ if(ARCH_FLAGS_FOUND)
   add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
   add_link_options(${ARCH_LINK_FLAGS})
 endif()
-
-if(USE_GPROF)
-  add_compile_options(-pg)
-  add_link_options(-pg)
-endif(USE_GPROF)
 
 if(USE_SANITIZER)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
@@ -243,13 +243,13 @@ find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 
 find_package(LLVM REQUIRED CONFIG)
 if("${LLVM_PACKAGE_VERSION}" VERSION_LESS "7")
-  MESSAGE(FATAL_ERROR "LLVM 7 or greater is required.")
+  message(FATAL_ERROR "LLVM 7 or greater is required.")
 endif()
 if(NOT DEFINED LLVM_ENABLE_RTTI)
-  MESSAGE(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
+  message(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
 endif()
 if(NOT ${LLVM_ENABLE_RTTI})
-  MESSAGE(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
+  message(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
 endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
@@ -258,14 +258,14 @@ include(CheckEndian)
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
-  MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
+  message(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 elseif(EXISTS /net/ohm/export/iss/inputs)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   set(BASEINPUT ${PROJECT_BINARY_DIR}/inputs/small_inputs)
-  MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
+  message(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
 
 ###### Source finding ######
