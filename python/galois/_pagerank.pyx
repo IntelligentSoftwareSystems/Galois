@@ -148,13 +148,16 @@ cdef void pagerankPullTopo(Graph *graph, uint32_t max_iterations) nogil:
     T.stop()
     gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")
     if(iteration >= max_iterations):
-        gPrint(b"ERROR : failed to converge in ", iteration, b" iterations\n")
+        gPrint(b"WARNING : failed to converge in ", iteration, b" iterations\n")
     
 
 #
 # Main callsite for Pagerank
 #   
 def pagerank(int numThreads, uint32_t max_iterations, string filename):
+    ## Hack: Need a better way to initialize shared
+    ## memory runtime.
+    sys = new SharedMemSys()
     cdef int new_numThreads = setActiveThreads(numThreads)
     gPrint(b"Running Pagerank on : ", filename, b"\n")
     if new_numThreads != numThreads:
@@ -169,7 +172,6 @@ def pagerank(int numThreads, uint32_t max_iterations, string filename):
     
     InitializePR(&graph)
     computeOutDeg(&graph)
-    #printValuePR(&graph)
     pagerankPullTopo(&graph, max_iterations)
     #printValuePR(&graph)
     
