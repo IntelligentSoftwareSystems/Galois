@@ -311,6 +311,11 @@ __device__ void softmax_device(int n, const float_t* input, float_t* output) {
   }
 }
 
+__device__ void sigmoid_device(int n, const float_t* in, float_t* out) {
+  for (int i = 0; i < n; i++)
+    out[i] = 1. / (1. + expf(-in[i]));
+}
+
 __device__ void cross_entropy_device(int n, const label_t idx, const float_t* p, float_t& loss) {
   if (p[idx] == 0.0) loss -= logf(float_t(1e-10));
   else loss -= logf(p[idx]);
@@ -341,6 +346,31 @@ void softmax_cross_entropy_gpu(int len, int begin, int end, const float_t* in,
   softmax_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
       len, begin, end, in, masks, labels, loss, out);
   CudaTest("solving softmax_cross_entropy kernel failed");
+}
+
+// n: number of vectors
+// len: length of vectors
+// for each vector, do softmax to normalize the vector, and then compute a loss
+__global__ void sigmoid_cross_entropy_kernel(int len, int begin, int end,
+                                             const float_t* in_data,
+                                             const mask_t* masks,
+                                             const label_t* labels,
+                                             float_t* loss, float_t* out_data) {
+  CUDA_KERNEL_LOOP(i, end-begin) {
+    int id = begin + i;
+    if (masks[id] == 1) { // masked
+      sigmoid_device(len, in_data + len*id, out_data + len*id);
+      cross_entropy_device(len, labels[id], out_data + len*id, loss[id]);
+    }
+  }
+}
+
+void sigmoid_cross_entropy_gpu(int len, int begin, int end, const float_t* in,
+                               const mask_t* masks, const label_t* labels,
+                               float_t* loss, float_t* out) {
+  sigmoid_cross_entropy_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(
+      len, begin, end, in, masks, labels, loss, out);
+  CudaTest("solving sigmoid_cross_entropy kernel failed");
 }
 
 __device__ void d_cross_entropy_device(int n, const label_t idx, const float_t* p, float_t* d) {
@@ -394,7 +424,7 @@ __global__ void d_cross_entropy_warp(int len, int begin, int end,
     }
   }
 }
-// TODO: use warp
+
 __device__ void d_softmax_device(int n, const float_t* p, const float_t* dp, float_t* dy) {
   for (int i = 0; i < n; i++) {
     dy[i] = 0;
@@ -406,8 +436,8 @@ __device__ void d_softmax_device(int n, const float_t* p, const float_t* dp, flo
 }
 
 __global__ void d_softmax_kernel(int len, int begin, int end,
-                                const mask_t* masks, const float_t* data,
-                                const float_t* in_grad, float_t* out_grad) {
+                                 const mask_t* masks, const float_t* data,
+                                 const float_t* in_grad, float_t* out_grad) {
   CUDA_KERNEL_LOOP(i, end-begin) {
     int id = begin + i;
     if (masks[id] == 1) { // masked
@@ -417,8 +447,8 @@ __global__ void d_softmax_kernel(int len, int begin, int end,
 } 
 
 __global__ void d_softmax_warp(int len, int begin, int end,
-                                const mask_t* masks, const float_t* data,
-                                const float_t* in_grad, float_t* out_grad) {
+                               const mask_t* masks, const float_t* data,
+                               const float_t* in_grad, float_t* out_grad) {
   __shared__ float_t p[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
   __shared__ float_t d[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
   const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
@@ -457,8 +487,8 @@ __global__ void d_softmax_warp(int len, int begin, int end,
 }
 
 __global__ void d_softmax_cross_entropy_kernel(int len, int begin, int end,
-                               const mask_t* masks, const label_t* labels,
-                               const float_t* out, float_t* diff) {
+                                               const mask_t* masks, const label_t* labels,
+                                               const float_t* out, float_t* diff) {
   CUDA_KERNEL_LOOP(i, end-begin) {
     int id = begin + i;
     if (masks[id] == 1) { // masked
@@ -534,5 +564,44 @@ void d_softmax_cross_entropy_gpu(int len, int begin, int end,
   d_softmax_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
       len, begin, end, masks, labels, out, diff);
   CudaTest("solving d_softmax_cross_entropy_warp kernel failed");
+}
+
+__global__ void d_sigmoid_cross_entropy_warp(int len, int begin, int end,
+                                             const mask_t* masks, const label_t* labels,
+                                             const float_t* data, float_t* grad) {
+
+}
+
+void d_sigmoid_cross_entropy_gpu(int len, int begin, int end,
+                                 const mask_t* masks, const label_t* labels,
+                                 const float_t* out, float_t* diff) {
+  d_sigmoid_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
+      len, begin, end, masks, labels, out, diff);
+  CudaTest("solving d_softmax_cross_entropy_warp kernel failed");
+}
+
+__global__ void masked_avg_loss_kernel(int begin, int end, mask_t* masks,
+                                       float_t* loss, HGAccumulator<acc_t> total) {
+  total.thread_entry();
+  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage local_loss;
+  CUDA_KERNEL_LOOP(i, end - begin) {
+    if (masks[begin + i] == 1)
+      total.reduce(loss[begin + i]);
+  }
+  total.thread_exit<cub::BlockReduce<acc_t, CUDA_NUM_THREADS>>(local_loss);
+}
+
+//acc_t masked_avg_loss(int begin, int end, int count, mask_t* masks, float_t* loss);
+acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t* loss) {
+  assert(count > 0);
+  HGAccumulator<acc_t> loss_accum;
+  Shared<acc_t> total_loss   = Shared<acc_t>(1);
+  *(total_loss.cpu_wr_ptr()) = 0;
+  loss_accum.rv              = total_loss.gpu_wr_ptr();
+  masked_avg_loss_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
+      begin, end, masks, loss, loss_accum);
+  CudaTest("solving masked_avg_loss kernel failed");
+  cudaDeviceSynchronize();
+  return *(total_loss.cpu_rd_ptr()) / count;
 }
 

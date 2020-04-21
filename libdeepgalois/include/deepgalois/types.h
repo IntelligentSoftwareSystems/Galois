@@ -22,6 +22,8 @@ typedef uint8_t label_t;  // label is for classification (supervised learning)
 typedef uint8_t mask_t; // mask is used to indicate different uses of labels:
                         // train, val, test
 typedef uint32_t VertexID;
+typedef uint64_t EdgeID;
+typedef std::vector<VertexID> VertexList;
 
 #define CHUNK_SIZE 256
 #define TB_SIZE 256

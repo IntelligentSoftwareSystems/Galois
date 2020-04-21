@@ -40,6 +40,7 @@ else()
   set(CUDA_SOURCES
     src/layers/graph_conv_layer.cu
     src/layers/softmax_loss_layer.cu
+    src/layers/sigmoid_loss_layer.cu
     src/layers/aggregator.cu
     src/math_functions.cu
     src/optimizer.cu

@@ -12,6 +12,10 @@ sigmoid_loss_layer::sigmoid_loss_layer(unsigned level,
   loss = new float_t[in_dims[0]]; // error for each sample
 }
 
+sigmoid_loss_layer::~sigmoid_loss_layer() {
+  delete loss;
+}
+
 void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {

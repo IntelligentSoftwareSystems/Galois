@@ -126,9 +126,8 @@ size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
 }
 
 void Context::copy_data_to_device() {
-  assert(labels.size() == n);
   CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
-  CUDA_CHECK(cudaMemcpy(d_labels, &labels[0], n * sizeof(label_t),
+  CUDA_CHECK(cudaMemcpy(d_labels, labels, n * sizeof(label_t),
                         cudaMemcpyHostToDevice));
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
   CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t),
@@ -138,7 +137,7 @@ void Context::copy_data_to_device() {
 
 //void Context::copy_data_to_device() {
   //float_malloc_device(n, d_labels);
-  //float_copy_device(n, &labels[0], d_labels);
+  //float_copy_device(n, labels, d_labels);
   //float_malloc_device(n*feat_len, d_feats);
   //float_copy_device(n*feat_len, &h_feats[0], d_feats);
 //}

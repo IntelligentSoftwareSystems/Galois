@@ -118,8 +118,13 @@ protected:
   std::vector<layer*> layers; // all the layers in the neural network
 
   // comparing outputs with the ground truth (labels)
+#ifdef CPU_ONLY
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
   acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
+#else
+  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, CSRGraph *gGraph);
+  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, CSRGraph *gGraph);
+#endif
 };
 
 } // namespace deepgalois

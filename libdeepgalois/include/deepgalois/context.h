@@ -44,13 +44,14 @@ public:
   void genGraph(LGraph& lg, Graph& g);
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
-  Graph* getGraphPointer();
+  Graph* getCpuGraphPointer();
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
   inline static cusparseHandle_t cusparse_handle() { return cusparse_handle_; }
   inline static cusparseMatDescr_t cusparse_matdescr() { return cusparse_matdescr_; }
   inline static curandGenerator_t curand_generator() { return curand_generator_; }
+  CSRGraph* getGpuGraphPointer() { return &graph_gpu; }
 #endif
 
 protected:

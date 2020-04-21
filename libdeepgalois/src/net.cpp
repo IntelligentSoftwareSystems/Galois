@@ -119,14 +119,18 @@ void Net::train(optimizer* opt, bool need_validate) {
     // forward: after this phase, layer edges will contain intermediate features
     // for use during backprop
     Tfw.start();
-    train_loss =
-        Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
+    train_loss = Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
+#ifdef CPU_ONLY
+    Graph *g = context->getGraphPointer();
+#else
+	CSRGraph *g = context->getGpuGraphPointer();
+#endif
     if (is_single_class) {
       train_acc = masked_accuracy(train_begin, train_end, train_count,
-                                  &train_mask[0], context->getGraphPointer()); // predict
+                                  &train_mask[0], g); // predict
     } else {
       train_acc = masked_multi_class_accuracy(train_begin, train_end, train_count,
-                                  &train_mask[0], context->getGraphPointer()); // predict
+                                              &train_mask[0], g); // predict
     }
     Tfw.stop();
 
@@ -177,10 +181,15 @@ double Net::evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
   Timer t_eval;
   t_eval.Start();
   loss = fprop(begin, end, count, masks);
+#ifdef CPU_ONLY
+  Graph* g = context->getCpuGraphPointer();
+#else
+  CSRGraph* g = context->getGpuGraphPointer();
+#endif
   if (is_single_class) {
-    acc = masked_accuracy(begin, end, count, masks, context->getGraphPointer());
+    acc = masked_accuracy(begin, end, count, masks, g);
   } else {
-    acc = masked_multi_class_accuracy(begin, end, count, masks, context->getGraphPointer());
+    acc = masked_multi_class_accuracy(begin, end, count, masks, g);
   }
   t_eval.Stop();
   return t_eval.Millisecs();

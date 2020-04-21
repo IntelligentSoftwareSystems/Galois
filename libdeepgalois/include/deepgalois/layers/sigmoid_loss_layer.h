@@ -6,7 +6,7 @@ class sigmoid_loss_layer : public layer {
 public:
   sigmoid_loss_layer(unsigned level, std::vector<size_t> in_dims,
                      std::vector<size_t> out_dims);
-  ~sigmoid_loss_layer() {}
+  ~sigmoid_loss_layer();
   std::string layer_type() const override {
     return std::string("sigmoid_loss");
   }

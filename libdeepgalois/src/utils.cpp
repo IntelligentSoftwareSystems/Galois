@@ -20,7 +20,7 @@ const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pub
 // and https://github.com/ashokpant/accuracy-evaluation-cpp/blob/master/src/evaluation.hpp
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred) {
-  float beta = 1;
+  float beta = 1.0;
   std::vector<acc_t> true_positive(num_classes, 0);
   std::vector<acc_t> false_positive(num_classes, 0);
   std::vector<acc_t> false_negtive(num_classes, 0);
