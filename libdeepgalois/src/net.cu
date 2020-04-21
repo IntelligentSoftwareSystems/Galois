@@ -114,16 +114,14 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
 namespace deepgalois {
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                            mask_t* masks, CSRGraph *g) {
-  return masked_accuracy_gpu(num_classes, begin, end, count,
-                             layers[NUM_CONV_LAYERS]->get_device_masks(),
+  return masked_accuracy_gpu(num_classes, begin, end, count, masks,
                              layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
                              context->get_labels_device_ptr());
 }
 
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, 
                                        mask_t* masks, CSRGraph* g) {
-	return masked_f1_score_gpu(num_classes, begin, end, count,
-                             layers[NUM_CONV_LAYERS]->get_device_masks(),
+	return masked_f1_score_gpu(num_classes, begin, end, count, masks,
                              layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
                              context->get_labels_device_ptr());
 }

@@ -31,8 +31,10 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   num_epochs = epochs;
 
   //std::cout << "Reading label masks ... ";
-  train_mask.resize(num_samples, 0);
-  val_mask.resize(num_samples, 0);
+  train_masks = new mask_t[num_samples];
+  val_masks = new mask_t[num_samples];
+  std::fill(train_masks, train_masks+num_samples, 0);
+  std::fill(val_masks, val_masks+num_samples, 0);
   // get testing and validation sets
   if (dataset_str == "reddit") {
     train_begin = 0, train_count = 153431,
@@ -40,37 +42,32 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
     val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
     // TODO do all can be used below
 #ifndef GALOIS_USE_DIST
-    for (size_t i = train_begin; i < train_end; i++) train_mask[i] = 1;
-    for (size_t i = val_begin; i < val_end; i++) val_mask[i] = 1;
+    for (size_t i = train_begin; i < train_end; i++) train_masks[i] = 1;
+    for (size_t i = val_begin; i < val_end; i++) val_masks[i] = 1;
 #else
     // find local ID from global ID, set if it exists
     for (size_t i = train_begin; i < train_end; i++) {
       if (dGraph->isLocal(i)) {
-        train_mask[dGraph->getLID(i)] = 1;
+        train_masks[dGraph->getLID(i)] = 1;
       }
     }
     for (size_t i = val_begin; i < val_end; i++) {
       if (dGraph->isLocal(i)) {
-        val_mask[dGraph->getLID(i)] = 1;
+        val_masks[dGraph->getLID(i)] = 1;
       }
     }
 #endif
   } else {
 #ifndef GALOIS_USE_DIST
-    train_count =
-        read_masks(dataset_str, "train", train_begin, train_end, train_mask);
-    val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask);
+    train_count = read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks);
+    val_count = read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks);
 #else
-    train_count =
-        read_masks(dataset_str, "train", train_begin, train_end, train_mask,
-                   dGraph);
-    val_count = read_masks(dataset_str, "val", val_begin, val_end, val_mask,
-                           dGraph);
+    train_count = read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
+    val_count = read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
 #endif
   }
-  //std::cout << "Done\n";
 
-  // NOTE: train_begin/train_end are global IDs, train_mask is a local id
+  // NOTE: train_begin/train_end are global IDs, train_masks is a local id
   // train count and val count are LOCAL counts
 
   num_layers = NUM_CONV_LAYERS + 1;
@@ -82,7 +79,10 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   feature_dims[2] = num_classes;           // output embedding: E
   feature_dims[3] = num_classes;           // normalized output embedding: E
   layers.resize(num_layers);
+
 #ifndef CPU_ONLY
+  copy_masks_device(num_samples, train_masks, d_train_masks);
+  copy_masks_device(num_samples, val_masks, d_val_masks);
   context->copy_data_to_device(); // copy labels and input features to the device
 #endif
 }
@@ -119,19 +119,20 @@ void Net::train(optimizer* opt, bool need_validate) {
     // forward: after this phase, layer edges will contain intermediate features
     // for use during backprop
     Tfw.start();
-    train_loss = Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
+    double fw_time = evaluate("train", train_loss, train_acc);
+	/*
+    train_loss = Net::fprop(train_begin, train_end, train_count, train_masks); // forward
 #ifdef CPU_ONLY
     Graph *g = context->getCpuGraphPointer();
 #else
 	CSRGraph *g = context->getGpuGraphPointer();
 #endif
     if (is_single_class) {
-      train_acc = masked_accuracy(train_begin, train_end, train_count,
-                                  &train_mask[0], g); // predict
+      train_acc = masked_accuracy(train_begin, train_end, train_count, train_masks, g); // predict
     } else {
-      train_acc = masked_multi_class_accuracy(train_begin, train_end, train_count,
-                                              &train_mask[0], g); // predict
+      train_acc = masked_multi_class_accuracy(train_begin, train_end, train_count, train_masks, g); // predict
     }
+	*/
     Tfw.stop();
 
     // backward: use intermediate features + ground truth to update layers
@@ -157,15 +158,15 @@ void Net::train(optimizer* opt, bool need_validate) {
       // Validation
       acc_t val_loss = 0.0, val_acc = 0.0;
       Tval.start();
-      double val_time = evaluate(val_begin, val_end, val_count, &val_mask[0],
-                                 val_loss, val_acc);
+      double val_time = evaluate("val", val_loss, val_acc);
       Tval.stop();
       galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed, val_loss,
                      " val_acc ", val_acc, seperator);
       galois::gPrint(header, "time ", std::setprecision(3), std::fixed, epoch_time + val_time, 
                      " ms (train_time ", epoch_time, " val_time ", val_time, ")\n");
     } else {
-      galois::gPrint(header, "train_time ", std::fixed, epoch_time, " ms\n");
+      galois::gPrint(header, "train_time ", std::fixed, epoch_time, 
+                     " ms (fw ", fw_time, ", bw ", epoch_time - fw_time, ")\n");
     }
   }
   double avg_train_time = total_train_time / (double)num_epochs;
@@ -175,11 +176,38 @@ void Net::train(optimizer* opt, bool need_validate) {
 }
 
 // evaluate, i.e. inference or predict
-double Net::evaluate(size_t begin, size_t end, size_t count, mask_t* masks,
-                     acc_t& loss, acc_t& acc) {
+double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
   // TODO may need to do something for the dist case
   Timer t_eval;
   t_eval.Start();
+  size_t begin = 0, end = 0, count = 0;
+  mask_t* masks = NULL;
+  if (type == "train") {
+    begin = train_begin;
+    end = train_end;
+    count = train_count;
+    masks = train_masks;
+  } else if (type == "val") {
+    begin = val_begin;
+    end = val_end;
+    count = val_count;
+    masks = val_masks;
+  } else {
+    begin = test_begin;
+    end = test_end;
+    count = test_count;
+    masks = test_masks;
+  }
+#ifndef CPU_ONLY
+  if (type == "train") {
+    masks = d_train_masks;
+  } else if (type == "val") {
+    masks = d_val_masks;
+  } else {
+    masks = d_test_masks;
+  }
+#endif
+
   loss = fprop(begin, end, count, masks);
 #ifdef CPU_ONLY
   Graph* g = context->getCpuGraphPointer();
@@ -231,6 +259,33 @@ void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
   layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                           dropout_rate, in_dims, out_dims);
   if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
+}
+
+void Net::read_test_masks(std::string dataset, Graph* dGraph) {
+  test_masks = new mask_t[num_samples];
+  if (dataset == "reddit") {
+    test_begin = 177262;
+    test_count = 55703;
+    test_end   = test_begin + test_count;
+#ifndef GALOIS_USE_DIST
+    for (size_t i = test_begin; i < test_end; i++) test_masks[i] = 1;
+#else
+    for (size_t i = test_begin; i < test_end; i++)  {
+      if (dGraph->isLocal(i)) {
+        test_masks[dGraph->getLID(i)] = 1;
+      }
+    }
+#endif
+  } else {
+#ifndef GALOIS_USE_DIST
+    test_count = deepgalois::read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks);
+#else
+    test_count = deepgalois::read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks, dGraph);
+#endif
+  }
+#ifndef CPU_ONLY
+  copy_masks_device(num_samples, test_masks, d_test_masks);
+#endif
 }
 
 #ifdef CPU_ONLY

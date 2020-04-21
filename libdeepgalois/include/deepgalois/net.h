@@ -30,7 +30,11 @@ namespace deepgalois {
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
 public:
-  Net() {}
+  Net() : is_single_class(true), num_samples(0), num_classes(0),
+          num_layers(0), num_epochs(0), 
+          train_begin(0), train_end(0), train_count(0),
+          val_begin(0), val_end(0), val_count(0),
+          train_masks(NULL), val_masks(NULL), context(NULL) {}
   #ifndef GALOIS_USE_DIST
   void init(std::string dataset_str, unsigned epochs, unsigned hidden1, 
             bool selfloop, bool is_single = true);
@@ -44,8 +48,8 @@ public:
   void construct_layers();
   void append_out_layer(size_t layer_id);
   void train(optimizer* opt, bool need_validate); // training
-  double evaluate(size_t begin, size_t end, size_t count, 
-                  mask_t* masks, acc_t& loss, acc_t& acc); // inference
+  double evaluate(std::string type, acc_t& loss, acc_t& acc); // inference
+  void read_test_masks(std::string dataset, Graph* dGraph);
 
   //! Add a convolution layer to the network
   void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
@@ -101,21 +105,28 @@ public:
   }
 
 protected:
+  bool is_single_class;              // single-class (one-hot) or multi-class label
+  size_t num_samples;                // number of samples: N
+  size_t num_classes;                // number of vertex classes: E
+  size_t num_layers;                 // for now hard-coded: NUM_CONV_LAYERS + 1
+  unsigned num_epochs;               // number of epochs
+  size_t train_begin, train_end, train_count;
+  size_t val_begin, val_end, val_count;
+  size_t test_begin, test_end, test_count;
+
+  mask_t* train_masks;               // masks for training
+  mask_t* d_train_masks;             // masks for training on device
+  mask_t* val_masks;                 // masks for validation
+  mask_t* d_val_masks;               // masks for validation on device
+  mask_t* test_masks;                // masks for test
+  mask_t* d_test_masks;              // masks for test on device
+  std::vector<size_t> feature_dims;  // feature dimnesions for each layer
+  std::vector<layer*> layers;        // all the layers in the neural network
 #ifndef GALOIS_USE_DIST
   deepgalois::Context* context;
 #else
   deepgalois::DistContext* context;
 #endif
-  bool is_single_class;             // single-class (one-hot) or multi-class label
-  size_t num_samples;               // number of samples: N
-  size_t num_classes;               // number of vertex classes: E
-  size_t num_layers;                // for now hard-coded: NUM_CONV_LAYERS + 1
-  unsigned num_epochs;              // number of epochs
-
-  std::vector<size_t> feature_dims; // feature dimnesions for each layer
-  std::vector<mask_t> train_mask, val_mask; // masks for traning and validation
-  size_t train_begin, train_end, train_count, val_begin, val_end, val_count;
-  std::vector<layer*> layers; // all the layers in the neural network
 
   // comparing outputs with the ground truth (labels)
 #ifdef CPU_ONLY

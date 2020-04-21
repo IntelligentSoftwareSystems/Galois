@@ -62,7 +62,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
 //! Get masks from datafile where first line tells range of
 //! set to create mask from
 size_t read_masks(std::string dataset_str, std::string mask_type,
-                         size_t& begin, size_t& end, std::vector<uint8_t>& masks) {
+                  size_t n, size_t& begin, size_t& end, mask_t* masks) {
   bool dataset_found = false;
   for (int i = 0; i < NUM_DATASETS; i++) {
     if (dataset_str == dataset_names[i]) {
@@ -96,14 +96,14 @@ size_t read_masks(std::string dataset_str, std::string mask_type,
   }
   std::cout << mask_type + "_mask range: [" << begin << ", " << end
     << ") Number of valid samples: " << sample_count << " (" 
-    << (float)sample_count/(float)masks.size()*(float)100 << "\%)\n";
+    << (float)sample_count/(float)n*(float)100 << "\%)\n";
   in.close();
   return sample_count;
 }
 #else
 size_t read_masks(std::string dataset_str, std::string mask_type,
-                         size_t& begin, size_t& end,
-                         std::vector<uint8_t>& masks, Graph* dGraph) {
+                         size_t n, size_t& begin, size_t& end,
+                         mask_t* masks, Graph* dGraph) {
   bool dataset_found = false;
   for (int i = 0; i < NUM_DATASETS; i++) {
     if (dataset_str == dataset_names[i]) {
@@ -139,7 +139,8 @@ size_t read_masks(std::string dataset_str, std::string mask_type,
     i++;
   }
   std::cout << mask_type + "_mask range: [" << begin << ", " << end
-    << ") Number of valid samples: " << sample_count << "\n";
+    << ") Number of valid samples: " << sample_count << "("
+    << (float)sample_count/(float)n*(float)100 << "\%)\n";
   in.close();
   return sample_count;
 }

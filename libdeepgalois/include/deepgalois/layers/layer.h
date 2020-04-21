@@ -85,9 +85,10 @@ public:
     begin_ = sample_begin;
     end_   = sample_end;
     count_ = sample_count;
+#ifdef CPU_ONLY
     masks_ = masks;
-#ifndef CPU_ONLY
-    copy_masks_device(input_dims[0], masks_, d_masks_);
+#else
+	d_masks_ = masks;
 #endif
   }
 

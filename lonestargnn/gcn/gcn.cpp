@@ -46,38 +46,17 @@ int main(int argc, char** argv) {
   Ttrain.stop();
 
   if (do_test) {
-    galois::gPrint("\n");
     // test using test samples
-    size_t n        = network.get_nnodes();
-    acc_t test_loss = 0.0, test_acc = 0.0;
-    size_t test_begin = 0, test_end = n, test_count = n;
-    std::vector<mask_t> test_mask(n, 0);
-    if (dataset == "reddit") {
-      test_begin = 177262;
-      test_count = 55703;
-      test_end   = test_begin + test_count;
+    galois::gPrint("\n");
 #ifndef GALOIS_USE_DIST
-      for (size_t i = test_begin; i < test_end; i++)
-        test_mask[i] = 1;
+    network.read_test_masks(dataset, NULL);
 #else
-      for (size_t i = test_begin; i < test_end; i++)  {
-        if (dGraph->isLocal(i)) {
-          test_mask[dGraph->getLID(i)] = 1;
-        }
-      }
+    network.read_test_masks(dataset, dGraph);
 #endif
-    } else {
-#ifndef GALOIS_USE_DIST
-      test_count = deepgalois::read_masks(dataset, "test", test_begin, test_end, test_mask);
-#else
-      test_count = deepgalois::read_masks(dataset, "test", test_begin, test_end,
-                                          test_mask, dGraph);
-#endif
-    }
     galois::StatTimer Ttest("Test");
     Ttest.start();
-    double test_time = network.evaluate(test_begin, test_end, test_count,
-                                        &test_mask[0], test_loss, test_acc);
+    acc_t test_loss = 0.0, test_acc = 0.0;
+    double test_time = network.evaluate("test", test_loss, test_acc);
     galois::gPrint("Testing: test_loss = ", test_loss, " test_acc = ", test_acc,
                    " test_time = ", test_time, "\n");
     Ttest.stop();

@@ -110,9 +110,9 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
 
 #ifdef GALOIS_USE_DIST
 size_t read_masks(std::string dataset_str, std::string mask_type,
-                         size_t& begin, size_t& end, std::vector<uint8_t>& masks, Graph* dGraph);
+                  size_t n, size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
 #else
 size_t read_masks(std::string dataset_str, std::string mask_type,
-                         size_t& begin, size_t& end, std::vector<uint8_t>& masks);
+                  size_t n, size_t& begin, size_t& end, mask_t* masks);
 #endif
 }
