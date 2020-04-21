@@ -25,8 +25,7 @@ __global__ void masked_accuracy_kernel(int num_classes, int begin,
       local_accuracy;
   CUDA_KERNEL_LOOP(i, end - begin) {
     if (masks[begin + i] == 1) {
-      label_t pred = (label_t)argmax_device(num_classes,
-                                            preds + (begin + i) * num_classes);
+      label_t pred = (label_t)argmax_device(num_classes, preds + (begin + i) * num_classes);
       if (pred == labels[begin + i])
         total.reduce(1.0);
     }
@@ -56,9 +55,10 @@ __global__ void masked_f1_score_kernel(int num_classes, int begin,
                                        f1count_t* false_positive,
                                        f1count_t* false_negtive) {
   CUDA_KERNEL_LOOP(i, end - begin) {
-    if (masks[begin + i] == 1) {
+    int id = begin + i;
+    if (masks[id] == 1) {
       for (size_t j = 0; j < num_classes; j++) {
-        auto idx = i * num_classes + j;
+        int idx = id * num_classes + j;
         if (labels[idx] == 1 && preds[idx] > 0.5) {
           atomicAdd(&true_positive[j], 1.0);
         } else if (labels[idx] == 0 && preds[idx] > 0.5) {
@@ -82,11 +82,15 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
   float_malloc_device(num_classes, d_tp);
   float_malloc_device(num_classes, d_fp);
   float_malloc_device(num_classes, d_fn);
+  init_const_gpu(num_classes, 0.0, d_tp);
+  init_const_gpu(num_classes, 0.0, d_fp);
+  init_const_gpu(num_classes, 0.0, d_fn);
   masked_f1_score_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
       num_classes, begin, end, masks, preds, labels, d_tp, d_fp, d_fn);
-  cudaMemcpy(h_tp, d_tp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
-  cudaMemcpy(h_fp, d_fp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
-  cudaMemcpy(h_fn, d_fn, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
+  CudaTest("solving masked_f1_score_kernel kernel failed");
+  CUDA_CHECK(cudaMemcpy(h_tp, d_tp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_fp, d_fp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_fn, d_fn, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
 
   acc_t pNumerator = 0.0;
   acc_t pDenominator = 0.0;
@@ -105,9 +109,13 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
   acc_t precisionMicro = pNumerator / pDenominator;
   acc_t fscoreMicro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
                      ((beta * beta) * precisionMicro + recallMicro);
+  
   float_free_device(d_tp);
   float_free_device(d_fp);
   float_free_device(d_fn);
+  delete h_tp;
+  delete h_fp;
+  delete h_fn;
   return fscoreMicro;
 }
 

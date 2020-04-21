@@ -41,7 +41,7 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
       size_t idx = len * i;
       float_t *norm_grad = new float_t[len];
       float_t *ground_truth = new float_t[len];
-      for (size_t j = 0; j < len; j++) ground_truth[j] = context->get_label(i, j);
+      for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)context->get_label(i, j);
       // use ground truth to determine derivative of cross entropy
       math::d_cross_entropy(len, ground_truth, &out_data[idx], norm_grad);
       // derviative sigmoid to gradient used in the next layer

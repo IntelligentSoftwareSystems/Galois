@@ -83,6 +83,9 @@ Context::~Context() {
     CUSPARSE_CHECK(cusparseDestroyMatDescr(cusparse_matdescr_));
   if (curand_generator_)
     CURAND_CHECK(curandDestroyGenerator(curand_generator_));
+  if (d_labels) CUDA_CHECK(cudaFree(d_labels));
+  if (d_feats) CUDA_CHECK(cudaFree(d_feats));
+  if (norm_factor) CUDA_CHECK(cudaFree(norm_factor));
 }
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
@@ -136,12 +139,15 @@ size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
 }
 
 void Context::copy_data_to_device() {
-  CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
-  CUDA_CHECK(cudaMemcpy(d_labels, labels, n * sizeof(label_t),
-                        cudaMemcpyHostToDevice));
+  if (is_single_class) {
+    CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
+    CUDA_CHECK(cudaMemcpy(d_labels, labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
+  } else {
+    CUDA_CHECK(cudaMalloc((void**)&d_labels, n * num_classes * sizeof(label_t)));
+    CUDA_CHECK(cudaMemcpy(d_labels, labels, n * num_classes * sizeof(label_t), cudaMemcpyHostToDevice));
+  }
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
-  CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t),
-                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
   //print_device_vector(10, d_feats, "d_feats");
 }
 

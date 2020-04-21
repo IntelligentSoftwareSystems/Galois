@@ -529,6 +529,8 @@ __global__ void d_softmax_cross_entropy_warp(int len, int begin, int end,
         if (pid < len) p[warp_lane][pid] = data[base+pid];
       }
       __syncthreads();
+
+      // cross entropy derivative
       for (int i = 0; i < len; i += WARP_SIZE) {
         int pid = thread_lane + i;
         if (pid < len) {
@@ -538,6 +540,8 @@ __global__ void d_softmax_cross_entropy_warp(int len, int begin, int end,
         }
       }
       __syncthreads();
+
+      // softmax derivative
       for (int i = 0; i < len; i += WARP_SIZE) {
         int pid = thread_lane + i;
         if (pid < len) {
@@ -579,7 +583,47 @@ void d_softmax_cross_entropy_gpu(int len, int begin, int end,
 __global__ void d_sigmoid_cross_entropy_warp(int len, int begin, int end,
                                              const mask_t* masks, const label_t* labels,
                                              const float_t* data, float_t* grad) {
+  __shared__ float_t p[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  __shared__ float_t d[BLOCK_SIZE/WARP_SIZE][MAX_NUM_CLASSES];
+  const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
+  const int thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
+  const int warp_id     = thread_id   / WARP_SIZE;                // global warp index
+  const int warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
+  const int num_warps   = (BLOCK_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
 
+  for (int wid = warp_id; wid < end-begin; wid += num_warps) {
+    int id = begin + wid;
+    int base = id * len;	
+    if (masks[id] == 1) {
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) p[warp_lane][pid] = data[base+pid];
+      }
+      __syncthreads();
+
+      // cross entropy derivative
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          //if (p[warp_lane][pid] == 0)
+            d[warp_lane][pid] = -(float_t)labels[base+pid] / (p[warp_lane][pid] + 1e-10);
+          //else d[warp_lane][pid] = -(float_t)labels[pid] / 1e-10;
+        }
+      }
+      __syncthreads();
+
+      // sigmoid derivative
+      for (int i = 0; i < len; i += WARP_SIZE) {
+        int pid = thread_lane + i;
+        if (pid < len) {
+          float_t self = p[warp_lane][pid];
+          float_t dp = d[warp_lane][pid];
+          grad[base+pid] = dp * self * (float_t(1) - self);
+        }
+      }
+      __syncthreads();
+    }
+  }
 }
 
 void d_sigmoid_cross_entropy_gpu(int len, int begin, int end,
@@ -587,7 +631,7 @@ void d_sigmoid_cross_entropy_gpu(int len, int begin, int end,
                                  const float_t* out, float_t* diff) {
   d_sigmoid_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
       len, begin, end, masks, labels, out, diff);
-  CudaTest("solving d_softmax_cross_entropy_warp kernel failed");
+  CudaTest("solving d_sigmoid_cross_entropy_warp kernel failed");
 }
 
 __global__ void masked_avg_loss_kernel(int begin, int end, mask_t* masks,
