@@ -22,22 +22,21 @@ public:
   ~Context();
 
   size_t read_graph(std::string dataset_str, bool selfloop);
+  size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);
+  size_t read_graph_gpu(std::string dataset_str, bool selfloop);
   size_t read_labels(std::string dataset_str);
   size_t read_features(std::string dataset_str, std::string filetype = "bin");
+
   label_t get_label(size_t i) { return labels[i]; } // single-class (one-hot) label
   label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
   label_t* get_labels_ptr() { return labels; }
+  label_t* get_labels_device_ptr() { return d_labels; }
   float_t* get_in_ptr();
+  float_t* get_norm_factor() { return norm_factor; }
 
-  size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);
-  size_t read_graph_gpu(std::string dataset_str, bool selfloop);
   void copy_data_to_device(); // copy labels and input features
   void norm_factor_counting();
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
-
-  float_t* d_feats;            // input features on device
-  label_t* d_labels;           // labels on device
-  float_t* norm_factor;        // normalization constant based on graph structure
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
@@ -62,6 +61,9 @@ protected:
   bool is_selfloop_added;      // whether selfloop is added to the input graph
   label_t *labels;             // labels for classification: N x 1
   float_t* h_feats;            // input features: N x D
+  float_t* norm_factor;        // normalization constant based on graph structure
+  label_t* d_labels;           // labels on device
+  float_t* d_feats;            // input features on device
 #ifndef CPU_ONLY
   static cublasHandle_t cublas_handle_; // used to call cuBLAS
   static cusparseHandle_t cusparse_handle_; // used to call cuSPARSE

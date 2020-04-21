@@ -21,19 +21,19 @@ const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pub
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred) {
   float beta = 1.0;
-  std::vector<acc_t> true_positive(num_classes, 0);
-  std::vector<acc_t> false_positive(num_classes, 0);
-  std::vector<acc_t> false_negtive(num_classes, 0);
+  std::vector<int> true_positive(num_classes, 0);
+  std::vector<int> false_positive(num_classes, 0);
+  std::vector<int> false_negtive(num_classes, 0);
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
     if (masks[i] == 1) {
       for (size_t j = 0; j < num_classes; j++) {
         auto idx = i * num_classes + j;
         if (ground_truth[idx] == 1 && pred[idx] > 0.5) {
-          true_positive[j] ++;
+          __sync_fetch_and_add(&true_positive[j], 1);
         } else if (ground_truth[idx] == 0 && pred[idx] > 0.5) {
-          false_positive[j] ++;
+          __sync_fetch_and_add(&false_positive[j], 1);
         } else if (ground_truth[idx] == 1 && pred[idx] <= 0.5) {
-          false_negtive[j] ++;
+          __sync_fetch_and_add(&false_negtive[j], 1);
         }
       }
 	}
@@ -43,9 +43,9 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
   acc_t rNumerator = 0.0;
   acc_t rDenominator = 0.0;
   for (size_t i = 0; i < num_classes; i++) {
-    auto fn = false_negtive[i]; // false negtive
-    auto fp = false_positive[i]; // false positive
-	auto tp = true_positive[i]; // true positive
+    acc_t fn = (acc_t)false_negtive[i]; // false negtive
+    acc_t fp = (acc_t)false_positive[i]; // false positive
+	acc_t tp = (acc_t)true_positive[i]; // true positive
 	pNumerator = pNumerator + tp;
 	pDenominator = pDenominator + (tp + fp);
     rNumerator = rNumerator + tp;

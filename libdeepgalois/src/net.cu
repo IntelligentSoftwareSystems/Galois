@@ -48,22 +48,23 @@ acc_t masked_accuracy_gpu(int num_classes, int begin, int end, int count,
   return *(total_accuracy.cpu_rd_ptr()) / count;
 }
 
+typedef float f1count_t;
 __global__ void masked_f1_score_kernel(int num_classes, int begin,
                                        int end, mask_t* masks,
                                        float_t* preds, label_t* labels,
-                                       float_t* true_positive,
-                                       float_t* false_positive,
-                                       float_t* false_negtive) {
+                                       f1count_t* true_positive,
+                                       f1count_t* false_positive,
+                                       f1count_t* false_negtive) {
   CUDA_KERNEL_LOOP(i, end - begin) {
     if (masks[begin + i] == 1) {
       for (size_t j = 0; j < num_classes; j++) {
         auto idx = i * num_classes + j;
         if (labels[idx] == 1 && preds[idx] > 0.5) {
-          true_positive[j] ++;
+          atomicAdd(&true_positive[j], 1.0);
         } else if (labels[idx] == 0 && preds[idx] > 0.5) {
-          false_positive[j] ++;
+          atomicAdd(&false_positive[j], 1.0);
         } else if (labels[idx] == 1 && preds[idx] <= 0.5) {
-          false_negtive[j] ++;
+          atomicAdd(&false_negtive[j], 1.0);
         }
       }
 	}
@@ -74,35 +75,35 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
                           mask_t* masks, float_t* preds, label_t* labels) {
   float beta = 1.0;
   assert(count > 0);
-  float *h_tp = new float[num_classes];
-  float *h_fp = new float[num_classes];
-  float *h_fn = new float[num_classes];
-  float *d_tp, *d_fp, *d_fn;
+  f1count_t* h_tp = new f1count_t[num_classes];
+  f1count_t* h_fp = new f1count_t[num_classes];
+  f1count_t* h_fn = new f1count_t[num_classes];
+  f1count_t* d_tp, *d_fp, *d_fn;
   float_malloc_device(num_classes, d_tp);
   float_malloc_device(num_classes, d_fp);
   float_malloc_device(num_classes, d_fn);
   masked_f1_score_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
       num_classes, begin, end, masks, preds, labels, d_tp, d_fp, d_fn);
-  cudaMemcpy(&h_tp, d_tp, sizeof(bool), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&h_fp, d_fp, sizeof(bool), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&h_fn, d_fn, sizeof(bool), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_tp, d_tp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_fp, d_fp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_fn, d_fn, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost);
 
   acc_t pNumerator = 0.0;
   acc_t pDenominator = 0.0;
   acc_t rNumerator = 0.0;
   acc_t rDenominator = 0.0;
   for (size_t i = 0; i < num_classes; i++) {
-    auto fn = h_fn[i]; // false negtive
-    auto fp = h_fp[i]; // false positive
-	auto tp = h_tp[i]; // true positive
+    acc_t fn = (acc_t)h_fn[i]; // false negtive
+    acc_t fp = (acc_t)h_fp[i]; // false positive
+	acc_t tp = (acc_t)h_tp[i]; // true positive
 	pNumerator = pNumerator + tp;
 	pDenominator = pDenominator + (tp + fp);
     rNumerator = rNumerator + tp;
     rDenominator = rDenominator + (tp + fn);
   }
-  auto recallMicro = rNumerator / rDenominator;
+  acc_t recallMicro = rNumerator / rDenominator;
   acc_t precisionMicro = pNumerator / pDenominator;
-  auto fscoreMicro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
+  acc_t fscoreMicro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
                      ((beta * beta) * precisionMicro + recallMicro);
   float_free_device(d_tp);
   float_free_device(d_fp);
@@ -116,7 +117,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
   return masked_accuracy_gpu(num_classes, begin, end, count,
                              layers[NUM_CONV_LAYERS]->get_device_masks(),
                              layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
-                             context->d_labels);
+                             context->get_labels_device_ptr());
 }
 
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, 
@@ -124,7 +125,7 @@ acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
 	return masked_f1_score_gpu(num_classes, begin, end, count,
                              layers[NUM_CONV_LAYERS]->get_device_masks(),
                              layers[NUM_CONV_LAYERS - 1]->next()->get_data(),
-                             context->d_labels);
+                             context->get_labels_device_ptr());
 }
 
 } // end namespace
