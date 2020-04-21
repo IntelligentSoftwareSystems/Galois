@@ -129,8 +129,8 @@ cdef void not_visited_operator(Graph_CSR *graph, atomuint32_t *notVisited, GNode
         uint32_t *data
         uint32_t numNodes = graph[0].size()
     data = &graph[0].getData(n)
-    #if (data[0] >= numNodes):
-        #notVisited[0].fetch_add(1)
+    if (data[0] >= numNodes):
+        notVisited[0].fetch_add(1)
 
 cdef void max_dist_operator(Graph_CSR *graph, GReduceMax[uint32_t] *maxDist , GNodeCSR n):
     cdef: 
@@ -170,6 +170,9 @@ cdef bool verify_bfs(Graph_CSR *graph, GNodeCSR source):
 # Main callsite for Bfs
 #        
 def bfs(int numThreads, unsigned long source, string filename):
+    ## Hack: Need a better way to initialize shared
+    ## memory runtime.
+    sys = new SharedMemSys()
     cdef int new_numThreads = setActiveThreads(numThreads)
     gPrint(b"Hello this is gprint\n")
     if new_numThreads != numThreads:
