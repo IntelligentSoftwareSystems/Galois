@@ -39,7 +39,7 @@ public:
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
 
-  Graph* getGraphPointer() {
+  Graph* getCpuGraphPointer() {
     return graph_cpu;
   }
 

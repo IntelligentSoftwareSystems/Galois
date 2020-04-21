@@ -121,7 +121,7 @@ void Net::train(optimizer* opt, bool need_validate) {
     Tfw.start();
     train_loss = Net::fprop(train_begin, train_end, train_count, &train_mask[0]); // forward
 #ifdef CPU_ONLY
-    Graph *g = context->getGraphPointer();
+    Graph *g = context->getCpuGraphPointer();
 #else
 	CSRGraph *g = context->getGpuGraphPointer();
 #endif

@@ -3,7 +3,7 @@
 GALOIS_HOME=/net/ohm/export/cdgc/cxh/GaloisCpp
 LONESTARGNN=$GALOIS_HOME/build-gnn-cpu/lonestargnn
 GNNS="gcn"
-GRAPHS="cora citeseer pudmed flickr reddit"
+GRAPHS="cora citeseer pubmed flickr reddit"
 #GRAPHS="cora"
 EPOCHS="200"
 NTHREADS="56"

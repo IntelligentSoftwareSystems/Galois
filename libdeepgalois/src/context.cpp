@@ -94,7 +94,7 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   //*/
 }
 
-Graph* Context::getGraphPointer() {
+Graph* Context::getCpuGraphPointer() {
   return Context::graph_cpu;
 }
 
