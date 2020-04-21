@@ -29,7 +29,7 @@ typedef std::vector<VertexID> VertexList;
 #define TB_SIZE 256
 #define BLOCK_SIZE 256
 #define WARP_SIZE 32
-#define MAX_NUM_CLASSES 64
+#define MAX_NUM_CLASSES 128
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
 #define USE_CUSPARSE
 

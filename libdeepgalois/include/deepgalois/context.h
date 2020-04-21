@@ -59,6 +59,7 @@ protected:
   size_t num_classes;          // number of classes: E
   size_t feat_len;             // input feature length: D
   bool is_single_class;        // single-class (one-hot) or multi-class label
+  bool is_selfloop_added;      // whether selfloop is added to the input graph
   label_t *labels;             // labels for classification: N x 1
   float_t* h_feats;            // input features: N x D
 #ifndef CPU_ONLY

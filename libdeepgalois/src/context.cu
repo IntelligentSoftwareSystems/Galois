@@ -61,7 +61,10 @@ cusparseHandle_t Context::cusparse_handle_     = 0;
 cusparseMatDescr_t Context::cusparse_matdescr_ = 0;
 curandGenerator_t Context::curand_generator_   = 0;
 
-Context::Context() {
+Context::Context() : n(0), num_classes(0), feat_len(0), 
+  is_single_class(true), is_selfloop_added(false), 
+  labels(NULL), h_feats(NULL), norm_factor(NULL),
+  d_labels(NULL), d_feats(NULL) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -89,6 +92,10 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
 
 void Context::norm_factor_counting() {
   std::cout << "Pre-computing normalization factor (n=" << n << ") ... ";
+  if (!is_selfloop_added) {
+    std::cout << "Set -sl=1 to add selfloop\n";	  
+    exit(0);
+  }
 #ifdef USE_CUSPARSE
   int nnz = graph_gpu.nedges;
   CUDA_CHECK(cudaMalloc((void**)&norm_factor, nnz * sizeof(float_t)));
@@ -120,7 +127,10 @@ size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
   std::string filename = path + dataset_str + ".csgr";
   CSRGraph g;
   g.read(filename.c_str(), false);
-  if (selfloop) g.add_selfloop();
+  if (selfloop) {
+    g.add_selfloop();
+    is_selfloop_added = selfloop;
+  }
   g.copy_to_gpu(graph_gpu);
   return graph_gpu.nnodes;
 }

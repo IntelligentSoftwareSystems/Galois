@@ -7,7 +7,11 @@
 namespace deepgalois {
 
 #ifdef CPU_ONLY
-Context::Context() {}
+Context::Context() : n(0), num_classes(0), feat_len(0), 
+  is_single_class(true), is_selfloop_added(false), 
+  labels(NULL), h_feats(NULL), norm_factor(NULL),
+  d_labels(NULL), d_feats(NULL) {}
+
 Context::~Context() {
   if (labels) delete labels;
   if (h_feats) delete h_feats;
@@ -37,6 +41,7 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
       Graph graph_temp;
       galois::graphs::readGraph(graph_temp, filename);
       add_selfloop(graph_temp, *graph_cpu);
+      is_selfloop_added = selfloop;
     } else galois::graphs::readGraph(*graph_cpu, filename);
 // TODO dist version of self loop
   } else {

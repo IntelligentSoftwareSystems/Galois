@@ -321,6 +321,16 @@ __device__ void cross_entropy_device(int n, const label_t idx, const float_t* p,
   else loss -= logf(p[idx]);
 }
 
+// y: ground truth
+// p: predictions
+__device__ void cross_entropy_multi_device(int n, const label_t *y, const float_t* p, float_t& loss) {
+  for (int i = 0; i < n; i++) {
+    if (y[i] == 0) continue;
+    if (p[i] == float_t(0)) loss -= logf(float_t(1e-10)); // avoid NaN exception
+    else loss -= logf(p[i]);
+  }
+}
+
 // n: number of vectors
 // len: length of vectors
 // for each vector, do softmax to normalize the vector, and then compute a loss
@@ -360,7 +370,7 @@ __global__ void sigmoid_cross_entropy_kernel(int len, int begin, int end,
     int id = begin + i;
     if (masks[id] == 1) { // masked
       sigmoid_device(len, in_data + len*id, out_data + len*id);
-      cross_entropy_device(len, labels[id], out_data + len*id, loss[id]);
+      cross_entropy_multi_device(len, labels, out_data + len*id, loss[id]);
     }
   }
 }
