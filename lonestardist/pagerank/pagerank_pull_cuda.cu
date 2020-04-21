@@ -7,10 +7,9 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=True $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=False $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 struct ThreadWork t_work;
 bool enable_lb = true;
-#include "kernels/reduce.cuh"
 #include "pagerank_pull_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
@@ -109,40 +108,11 @@ __global__ void InitializeGraph_TB_LB(CSRGraph graph, unsigned int __begin, unsi
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
-  // FP: "43 -> 44;
+  // FP: "44 -> 45;
 }
-__global__ void Inspect_InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  index_type src_end;
-  // FP: "1 -> 2;
-  src_end = __end;
-  for (index_type src = __begin + tid; src < src_end; src += nthreads)
-  {
-    int index;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
-    if (pop)
-    {
-    }
-    if (!pop)
-    {
-      continue;
-    }
-    if (pop)
-    {
-      index = thread_work_wl.in_wl().push_range(1) ;
-      thread_src_wl.in_wl().push_range(1);
-      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
-      thread_src_wl.in_wl().dwl[index] = src;
-    }
-  }
-  // FP: "13 -> 14;
-}
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, bool enable_lb)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_nout, DynamicBitset& bitset_nout, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -169,58 +139,71 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
+    int index;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
     }
     // FP: "9 -> 10;
     // FP: "12 -> 13;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
     // FP: "13 -> 14;
-    __shared__ struct { ; } _np_closure [TB_SIZE];
+    int threshold = TOTAL_THREADS_1D;
     // FP: "14 -> 15;
-    // FP: "15 -> 16;
+    if (pop && (graph).getOutDegree(src) >= threshold)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+      pop = false;
+    }
+    // FP: "17 -> 18;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "18 -> 19;
+    __shared__ struct { ; } _np_closure [TB_SIZE];
+    // FP: "19 -> 20;
+    // FP: "20 -> 21;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "18 -> 19;
-    // FP: "19 -> 20;
+    // FP: "23 -> 24;
+    // FP: "24 -> 25;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "20 -> 21;
+    // FP: "25 -> 26;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "21 -> 22;
+    // FP: "26 -> 27;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "24 -> 25;
+    // FP: "29 -> 30;
     __syncthreads();
-    // FP: "25 -> 26;
+    // FP: "30 -> 31;
     while (true)
     {
-      // FP: "26 -> 27;
+      // FP: "31 -> 32;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "29 -> 30;
+      // FP: "34 -> 35;
       __syncthreads();
-      // FP: "30 -> 31;
+      // FP: "35 -> 36;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "31 -> 32;
+        // FP: "36 -> 37;
         __syncthreads();
-        // FP: "32 -> 33;
+        // FP: "37 -> 38;
         break;
       }
-      // FP: "34 -> 35;
+      // FP: "39 -> 40;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -229,19 +212,19 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "37 -> 38;
+      // FP: "42 -> 43;
       __syncthreads();
-      // FP: "38 -> 39;
+      // FP: "43 -> 44;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "39 -> 40;
+      // FP: "44 -> 45;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "42 -> 43;
+      // FP: "47 -> 48;
       assert(nps.tb.src < __kernel_tb_size);
-      // FP: "43 -> 44;
+      // FP: "48 -> 49;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -253,18 +236,18 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
           bitset_nout.set(dst);
         }
       }
-      // FP: "51 -> 52;
+      // FP: "56 -> 57;
       __syncthreads();
     }
-    // FP: "53 -> 54;
+    // FP: "58 -> 59;
 
-    // FP: "54 -> 55;
+    // FP: "59 -> 60;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "55 -> 56;
+      // FP: "60 -> 61;
       const int _np_laneid = cub::LaneId();
-      // FP: "56 -> 57;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      // FP: "61 -> 62;
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -293,28 +276,28 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
           }
         }
       }
-      // FP: "74 -> 75;
+      // FP: "79 -> 80;
       __syncthreads();
-      // FP: "75 -> 76;
+      // FP: "80 -> 81;
     }
 
-    // FP: "76 -> 77;
+    // FP: "81 -> 82;
     __syncthreads();
-    // FP: "77 -> 78;
+    // FP: "82 -> 83;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "78 -> 79;
+    // FP: "83 -> 84;
     while (_np.work())
     {
-      // FP: "79 -> 80;
+      // FP: "84 -> 85;
       int _np_i =0;
-      // FP: "80 -> 81;
+      // FP: "85 -> 86;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "81 -> 82;
+      // FP: "86 -> 87;
       __syncthreads();
-      // FP: "82 -> 83;
+      // FP: "87 -> 88;
 
-      // FP: "83 -> 84;
+      // FP: "88 -> 89;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type nbr;
@@ -327,15 +310,15 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
           bitset_nout.set(dst);
         }
       }
-      // FP: "92 -> 93;
+      // FP: "97 -> 98;
       _np.execute_round_done(ITSIZE);
-      // FP: "93 -> 94;
+      // FP: "98 -> 99;
       __syncthreads();
     }
-    // FP: "95 -> 96;
+    // FP: "100 -> 101;
     assert(threadIdx.x < __kernel_tb_size);
   }
-  // FP: "97 -> 98;
+  // FP: "102 -> 103;
 }
 __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value, HGAccumulator<unsigned int> active_vertices)
 {
@@ -451,40 +434,11 @@ __global__ void PageRank_TB_LB(CSRGraph graph, unsigned int __begin, unsigned in
       }
       current_work = current_work + nthreads;
     }
+    __syncthreads();
   }
-  // FP: "45 -> 46;
+  // FP: "46 -> 47;
 }
-__global__ void Inspect_PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  index_type src_end;
-  // FP: "1 -> 2;
-  src_end = __end;
-  for (index_type src = __begin + tid; src < src_end; src += nthreads)
-  {
-    int index;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) >= DEGREE_LIMIT)) ? true: false);
-    if (pop)
-    {
-    }
-    if (!pop)
-    {
-      continue;
-    }
-    if (pop)
-    {
-      index = thread_work_wl.in_wl().push_range(1) ;
-      thread_src_wl.in_wl().push_range(1);
-      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
-      thread_src_wl.in_wl().dwl[index] = src;
-    }
-  }
-  // FP: "13 -> 14;
-}
-__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, bool enable_lb)
+__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, PipeContextT<Worklist2> thread_work_wl, PipeContextT<Worklist2> thread_src_wl, bool enable_lb)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -511,59 +465,72 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
+    int index;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "7 -> 8;
     if (pop)
     {
     }
     // FP: "9 -> 10;
     // FP: "12 -> 13;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
     // FP: "13 -> 14;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    int threshold = TOTAL_THREADS_1D;
     // FP: "14 -> 15;
+    if (pop && (graph).getOutDegree(src) >= threshold)
+    {
+      index = thread_work_wl.in_wl().push_range(1) ;
+      thread_src_wl.in_wl().push_range(1);
+      thread_work_wl.in_wl().dwl[index] = (graph).getOutDegree(src);
+      thread_src_wl.in_wl().dwl[index] = src;
+      pop = false;
+    }
+    // FP: "17 -> 18;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "18 -> 19;
+    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    // FP: "19 -> 20;
     _np_closure[threadIdx.x].src = src;
-    // FP: "15 -> 16;
+    // FP: "20 -> 21;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "18 -> 19;
-    // FP: "19 -> 20;
+    // FP: "23 -> 24;
+    // FP: "24 -> 25;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "20 -> 21;
+    // FP: "25 -> 26;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "21 -> 22;
+    // FP: "26 -> 27;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "24 -> 25;
+    // FP: "29 -> 30;
     __syncthreads();
-    // FP: "25 -> 26;
+    // FP: "30 -> 31;
     while (true)
     {
-      // FP: "26 -> 27;
+      // FP: "31 -> 32;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "29 -> 30;
+      // FP: "34 -> 35;
       __syncthreads();
-      // FP: "30 -> 31;
+      // FP: "35 -> 36;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "31 -> 32;
+        // FP: "36 -> 37;
         __syncthreads();
-        // FP: "32 -> 33;
+        // FP: "37 -> 38;
         break;
       }
-      // FP: "34 -> 35;
+      // FP: "39 -> 40;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -572,20 +539,20 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "37 -> 38;
+      // FP: "42 -> 43;
       __syncthreads();
-      // FP: "38 -> 39;
+      // FP: "43 -> 44;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "39 -> 40;
+      // FP: "44 -> 45;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "42 -> 43;
+      // FP: "47 -> 48;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "43 -> 44;
+      // FP: "48 -> 49;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -600,18 +567,18 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
           }
         }
       }
-      // FP: "53 -> 54;
+      // FP: "58 -> 59;
       __syncthreads();
     }
-    // FP: "55 -> 56;
+    // FP: "60 -> 61;
 
-    // FP: "56 -> 57;
+    // FP: "61 -> 62;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "57 -> 58;
+      // FP: "62 -> 63;
       const int _np_laneid = cub::LaneId();
-      // FP: "58 -> 59;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      // FP: "63 -> 64;
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -644,28 +611,28 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
           }
         }
       }
-      // FP: "78 -> 79;
+      // FP: "83 -> 84;
       __syncthreads();
-      // FP: "79 -> 80;
+      // FP: "84 -> 85;
     }
 
-    // FP: "80 -> 81;
+    // FP: "85 -> 86;
     __syncthreads();
-    // FP: "81 -> 82;
+    // FP: "86 -> 87;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "82 -> 83;
+    // FP: "87 -> 88;
     while (_np.work())
     {
-      // FP: "83 -> 84;
+      // FP: "88 -> 89;
       int _np_i =0;
-      // FP: "84 -> 85;
+      // FP: "89 -> 90;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "85 -> 86;
+      // FP: "90 -> 91;
       __syncthreads();
-      // FP: "86 -> 87;
+      // FP: "91 -> 92;
 
-      // FP: "87 -> 88;
+      // FP: "92 -> 93;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type nbr;
@@ -682,16 +649,16 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
           }
         }
       }
-      // FP: "98 -> 99;
+      // FP: "103 -> 104;
       _np.execute_round_done(ITSIZE);
-      // FP: "99 -> 100;
+      // FP: "104 -> 105;
       __syncthreads();
     }
-    // FP: "101 -> 102;
+    // FP: "106 -> 107;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "103 -> 104;
+  // FP: "108 -> 109;
 }
 __global__ void PageRankSanity(CSRGraph graph, unsigned int __begin, unsigned int __end, float local_tolerance, float * p_residual, float * p_value, HGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance, HGAccumulator<float> DGAccumulator_sum, HGAccumulator<float> DGAccumulator_sum_residual, HGReduceMax<float> max_residual, HGReduceMax<float> max_value, HGReduceMin<float> min_residual, HGReduceMin<float> min_value)
 {
@@ -806,11 +773,10 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+  cudaDeviceSynchronize();
   if (enable_lb)
   {
-    t_work.reset_thread_work();
-    Inspect_InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
-    cudaDeviceSynchronize();
     int num_items = t_work.thread_work_wl.in_wl().nitems();
     if (num_items != 0)
     {
@@ -818,10 +784,9 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
       cudaDeviceSynchronize();
       InitializeGraph_TB_LB <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
       cudaDeviceSynchronize();
+      t_work.reset_thread_work();
     }
   }
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, __begin, __end, ctx->nout.data.gpu_wr_ptr(), *(ctx->nout.is_updated.gpu_rd_ptr()), enable_lb);
-  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -896,11 +861,10 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
+  cudaDeviceSynchronize();
   if (enable_lb)
   {
-    t_work.reset_thread_work();
-    Inspect_PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), t_work.thread_work_wl, t_work.thread_src_wl, enable_lb);
-    cudaDeviceSynchronize();
     int num_items = t_work.thread_work_wl.in_wl().nitems();
     if (num_items != 0)
     {
@@ -908,10 +872,9 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
       cudaDeviceSynchronize();
       PageRank_TB_LB <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), t_work.thread_prefix_work_wl.gpu_wr_ptr(), num_items, t_work.thread_src_wl);
       cudaDeviceSynchronize();
+      t_work.reset_thread_work();
     }
   }
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), enable_lb);
-  cudaDeviceSynchronize();
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -988,14 +951,14 @@ void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & 
   Shared<float> min_residualval  = Shared<float>(1);
   // FP: "25 -> 26;
   // FP: "26 -> 27;
-  *(min_residualval.cpu_wr_ptr()) = 0;
+  *(min_residualval.cpu_wr_ptr()) = 1073741823;
   // FP: "27 -> 28;
   _min_residual.rv = min_residualval.gpu_wr_ptr();
   // FP: "28 -> 29;
   Shared<float> min_valueval  = Shared<float>(1);
   // FP: "29 -> 30;
   // FP: "30 -> 31;
-  *(min_valueval.cpu_wr_ptr()) = 0;
+  *(min_valueval.cpu_wr_ptr()) = 1073741823;
   // FP: "31 -> 32;
   _min_value.rv = min_valueval.gpu_wr_ptr();
   // FP: "32 -> 33;

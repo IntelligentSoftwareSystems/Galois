@@ -6,7 +6,6 @@ import cgen
 G = Graph("graph")
 WL = Worklist()
 ast = Module([
-CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("cc_pull_cuda.cuh", system = False)], parse = False),
 Kernel("InitializeGraph", [G.param(), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('uint32_t *', 'p_comp_current')],
 [

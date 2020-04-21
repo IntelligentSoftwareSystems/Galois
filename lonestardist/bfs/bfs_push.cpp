@@ -133,6 +133,7 @@ struct InitializeGraph {
   }
 };
 
+template <bool async>
 struct FirstItr_BFS {
   Graph* graph;
 
@@ -168,7 +169,7 @@ struct FirstItr_BFS {
     }
 
     syncSubstrate->sync<writeDestination, readSource, Reduce_min_dist_current,
-                    Bitset_dist_current>("BFS");
+                    Bitset_dist_current, async>("BFS");
 
     galois::runtime::reportStat_Tsum(
         regionname, syncSubstrate->get_run_identifier("NumWorkItems"), __end - __begin);
@@ -207,7 +208,7 @@ struct BFS {
       active_vertices(_dga), work_edges(_work_edges) {}
 
   void static go(Graph& _graph) {
-    FirstItr_BFS::go(_graph);
+    FirstItr_BFS<async>::go(_graph);
 
     unsigned _num_iterations = 1;
 

@@ -46,7 +46,7 @@ static __device__ uint get_warpid(void) {
 // since cub::WarpScan doesn't work very well with disabled threads in the warp
 __device__ __forceinline__ void warp_active_count(int& first, int& offset,
                                                   int& total) {
-  unsigned int active = __ballot(1);
+  unsigned int active = __ballot_sync(0xffffffff, 1);
   total               = __popc(active);
   offset              = __popc(active & cub::LaneMaskLt());
   first               = __ffs(active) - 1; // we know active != 0
@@ -55,7 +55,7 @@ __device__ __forceinline__ void warp_active_count(int& first, int& offset,
 // since cub::WarpScan doesn't work very well with disabled threads in the warp
 __device__ __forceinline__ void
 warp_active_count_zero_active(int& first, int& offset, int& total) {
-  unsigned int active = __ballot(1);
+  unsigned int active = __ballot_sync(0xffffffff, 1);
   total               = __popc(active);
   offset              = __popc(active & cub::LaneMaskLt());
   first               = 0;

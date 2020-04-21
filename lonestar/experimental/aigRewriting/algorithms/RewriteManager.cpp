@@ -703,7 +703,6 @@ void RewriteManager::addNewSubgraph(ThreadContextData* threadCtx,
                                     bool updateLevel) {
 
   int fanoutNodesSize = fanoutNodes.size();
-  assert(oldNodeData.nFanout == fanoutNodesSize);
 
   aig::GNode fanoutNode;
   aig::GNode otherNode;
@@ -716,6 +715,7 @@ void RewriteManager::addNewSubgraph(ThreadContextData* threadCtx,
       aigGraph.getData(newNode, galois::MethodFlag::READ);
   aig::NodeData& oldNodeData =
       aigGraph.getData(oldNode, galois::MethodFlag::READ);
+  assert(oldNodeData.nFanout == fanoutNodesSize);
 
   // look at the fanouts of old node
   for (int i = 0; i < fanoutNodesSize; i++) {

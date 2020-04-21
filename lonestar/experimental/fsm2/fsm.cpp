@@ -17,35 +17,15 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Bag.h"
-#include "galois/Timer.h"
-#include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/runtime/Profile.h"
-#include <boost/iterator/transform_iterator.hpp>
-#include "Lonestar/common_types.h"
-
+#define USE_DFS
 #define ENABLE_LABEL
+#define EDGE_INDUCED
+#define CHUNK_SIZE 4
+#include "pangolin.h"
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining using DFS code";
 const char* url  = 0;
-namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<file type>"), cll::Required);
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<file name>"), cll::Required);
-static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
-static cll::opt<unsigned> minsup("minsup", cll::desc("minimum suuport (default value 0)"), cll::init(0));
-static cll::opt<unsigned> show("s", cll::desc("print out the frequent patterns"), cll::init(0));
-typedef galois::graphs::LC_CSR_Graph<int, int>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
-
-#include "Dfscode/miner.h"
-#include "Mining/util.h"
-#define CHUNK_SIZE 4
 
 typedef galois::substrate::PerThreadStorage<LocalStatus> Status;
 typedef galois::InsertBag<DFS> PatternQueue;
@@ -54,7 +34,7 @@ typedef std::deque<DFS> DFSQueue;
 void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &queue) {
 	int single_edge_dfscodes = 0;
 	int num_embeddings = 0;
-	printf("\n=============================== Init ===============================\n\n");
+	if (show) printf("\n=============================== Init ===============================\n\n");
 	// classify each edge into its single-edge pattern accodding to its (src_label, edge_label, dst_label)
 	for (auto src : graph) {
 		auto& src_label = graph.getData(src);
@@ -74,9 +54,10 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &q
 			}
 		}
 	}
-	int dfscodes_per_thread =  (int) ceil((single_edge_dfscodes * 1.0) / numThreads);
-	std::cout << "num_single_edge_patterns = " << single_edge_dfscodes << ", dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
-	std::cout << "num_embeddings = " << num_embeddings << std::endl; 
+	int dfscodes_per_thread = (int) ceil((single_edge_dfscodes * 1.0) / numThreads);
+	std::cout << "num_single_edge_patterns = " << single_edge_dfscodes << "\n";
+	if (show) std::cout << "dfscodes_per_thread = " << dfscodes_per_thread << std::endl; 
+	if (show) std::cout << "num_embeddings = " << num_embeddings << std::endl; 
 	// for each single-edge pattern, generate a DFS code and push it into the task queue
 	for(EmbeddingList_iterator3 fromlabel = pattern_map.begin(); fromlabel != pattern_map.end(); ++fromlabel) {
 		for(EmbeddingList_iterator2 elabel = fromlabel->second.begin(); elabel != fromlabel->second.end(); ++elabel) {
@@ -90,7 +71,7 @@ void init(Graph& graph, Miner& miner, PatternMap3D &pattern_map, PatternQueue &q
 
 void FsmSolver(Graph& graph, Miner& miner) {
 	Status status;
-	std::cout << "\n=============================== Start ===============================\n";
+	if (show) std::cout << "\n=============================== Start ===============================\n";
 	PatternMap3D pattern_map; // mapping patterns to their embedding list
 	PatternQueue task_queue; // task queue holding the DFScodes of patterns
 	init(graph, miner, pattern_map, task_queue); // insert single-edge patterns into the queue
@@ -104,7 +85,7 @@ void FsmSolver(Graph& graph, Miner& miner) {
 #endif
 	}
 
-	std::cout << "\n=============================== DFS ===============================\n";
+	if (show) std::cout << "\n=============================== DFS ===============================\n";
 	size_t total = 0;
 	galois::for_each(
 		galois::iterate(task_queue),
@@ -133,8 +114,8 @@ void FsmSolver(Graph& graph, Miner& miner) {
 	);
 	for(int i = 0; i < numThreads; i++)
 		total += status.getLocal(i)->frequent_patterns_count;
-	std::cout << "\n\tnum_frequent_patterns (minsup=" << minsup << "): " << total << "\n";
-	std::cout << "\n=============================== Done ===============================\n\n";
+	std::cout << "\n\tnum_frequent_patterns (minsup=" << minsup << "): " << total << "\n\n";
+	if (show) std::cout << "=============================== Done ===============================\n\n";
 }
  
 int main(int argc, char** argv) {
@@ -150,7 +131,7 @@ int main(int argc, char** argv) {
 	//std::cout << "k = " << k << std::endl;
 	//std::cout << "minsup = " << minsup << std::endl;
 	//std::cout << "num_threads = " << numThreads << std::endl;
-	Miner miner(&graph, k, minsup, numThreads, show);
+	Miner miner(&graph, k, minsup, numThreads, debug);
 	galois::StatTimer Tcomp("Compute");
 	Tcomp.start();
 	FsmSolver(graph, miner);

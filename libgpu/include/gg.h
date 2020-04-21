@@ -84,7 +84,7 @@ inline static __device__ __host__ int GG_MIN(int x, int y) {
 #include "ggc_rt.h"
 #include "instr.h"
 
-#include <util/mgpucontext.h>
+#include <moderngpu/context.hxx>
 
-extern mgpu::ContextPtr mgc;
+extern mgpu::context_t* mgc;
 #endif

@@ -256,6 +256,13 @@ specific commands vary by system) are:
 ```Shell
 c++ -std=c++14 app.cpp -I$INSTALL_DIR/include -L$INSTALL_DIR/lib -lgalois_shmem
 ```
+Third-Party Libraries and Licensing
+====================
+
+Galois includes some third party libraries that do not use the same license as
+Galois. This includes the bliss library (located in lonestar/include/Mining/bliss)
+and Modern GPU (located in libgpu/moderngpu). Please be aware of this when
+using Galois.
 
 Contact Us
 ==========

@@ -27,7 +27,6 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 uint32_t * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
-#include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
@@ -248,7 +247,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
       // FP: "64 -> 65;
       const int _np_laneid = cub::LaneId();
       // FP: "65 -> 66;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

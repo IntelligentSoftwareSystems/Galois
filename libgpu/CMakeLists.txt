@@ -6,8 +6,6 @@ add_dependencies(lib galois_gpu)
 target_sources(galois_gpu PRIVATE
   src/csr_graph.cu
   src/ggc_rt.cu
-  moderngpu/src/mgpucontext.cu
-  moderngpu/src/mgpuutil.cpp
 )
 
 target_include_directories(galois_gpu PUBLIC

@@ -112,6 +112,8 @@ extern cll::opt<bool> readFromFile;
 extern cll::opt<std::string> localGraphFileName;
 //! if true, the local graph structure will be saved to disk after partitioning
 extern cll::opt<bool> saveLocalGraph;
+//! file specifying blocking of masters
+extern cll::opt<std::string> mastersFile;
 
 // @todo command line argument for read balancing across hosts
 
@@ -144,7 +146,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case OEC:
   case IEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, inputFileTranspose,
+      mastersFile
     );
   case HOVC:
   case HIVC:
@@ -212,12 +215,14 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, false, inputFileTranspose,
+      mastersFile
     );
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false, inputFileTranspose,
+        mastersFile
       );
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "
@@ -339,12 +344,14 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   switch (partitionScheme) {
   case OEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose
+      inputFile, galois::CUSP_CSR, galois::CUSP_CSC, false, inputFileTranspose,
+      mastersFile
     );
   case IEC:
     if (inputFileTranspose.size()) {
       return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose
+        inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false, inputFileTranspose,
+        mastersFile
       );
     } else {
       GALOIS_DIE("Error: attempting incoming edge cut without transpose "

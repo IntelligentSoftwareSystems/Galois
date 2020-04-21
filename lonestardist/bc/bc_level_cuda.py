@@ -6,7 +6,6 @@ import cgen
 G = Graph("graph")
 WL = Worklist()
 ast = Module([
-CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("bc_level_cuda.cuh", system = False)], parse = False),
 Kernel("InitializeGraph", [G.param(), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('float *', 'p_betweeness_centrality'), ('float *', 'p_dependency'), ('ShortPathType *', 'p_num_shortest_paths')],
 [
@@ -304,7 +303,7 @@ CBlock(["*(DGAccumulator_maxval.cpu_wr_ptr()) = 0"]),
 CBlock(["_DGAccumulator_max.rv = DGAccumulator_maxval.gpu_wr_ptr()"]),
 CDecl([("Shared<float>", "DGAccumulator_minval", " = Shared<float>(1)")]),
 CDecl([("HGReduceMin<float>", "_DGAccumulator_min", "")]),
-CBlock(["*(DGAccumulator_minval.cpu_wr_ptr()) = 0"]),
+CBlock(["*(DGAccumulator_minval.cpu_wr_ptr()) = 1073741823"]),
 CBlock(["_DGAccumulator_min.rv = DGAccumulator_minval.gpu_wr_ptr()"]),
 Invoke("Sanity", ("ctx->gg", "__begin", "__end", "ctx->betweeness_centrality.data.gpu_wr_ptr()", "_DGAccumulator_sum", "_DGAccumulator_max", "_DGAccumulator_min")),
 CBlock(["check_cuda_kernel"], parse = False),
