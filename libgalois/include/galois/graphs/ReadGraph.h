@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_UTIL_H
-#define GALOIS_GRAPH_UTIL_H
+#ifndef GALOIS_GRAPHS_READGRAPH_H
+#define GALOIS_GRAPHS_READGRAPH_H
 
 #include "galois/Galois.h"
 #include "galois/graphs/FileGraph.h"

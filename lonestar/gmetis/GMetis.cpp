@@ -29,7 +29,7 @@
 #include <fstream>
 
 #include "Metis.h"
-#include "galois/graphs/Util.h"
+#include "galois/graphs/ReadGraph.h"
 #include "galois/Timer.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"

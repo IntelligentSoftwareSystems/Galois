@@ -23,8 +23,8 @@
  * Contains the implementation of BufferedGraph
  */
 
-#ifndef GALOIS_GRAPH_BUFGRAPH_H
-#define GALOIS_GRAPH_BUFGRAPH_H
+#ifndef GALOIS_GRAPHS_BUFGRAPH_H
+#define GALOIS_GRAPHS_BUFGRAPH_H
 #include <galois/gIO.h>
 #include <galois/Reduction.h>
 #include <boost/iterator/counting_iterator.hpp>
