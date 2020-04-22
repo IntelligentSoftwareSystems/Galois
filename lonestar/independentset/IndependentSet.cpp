@@ -329,7 +329,7 @@ struct PrioAlgo {
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<float> nedges;
-    galois::GReduceLogicalOR unmatched;
+    galois::GReduceLogicalOr unmatched;
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
 
     galois::do_all(galois::iterate(graph),
@@ -434,7 +434,7 @@ struct EdgeTiledPrioAlgo {
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<float> nedges;
-    galois::GReduceLogicalOR unmatched;
+    galois::GReduceLogicalOr unmatched;
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
     galois::InsertBag<EdgeTile> works;
     const int EDGE_TILE_SIZE = 64;
