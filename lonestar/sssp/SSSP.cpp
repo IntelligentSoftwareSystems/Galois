@@ -269,7 +269,7 @@ void topoAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
-  galois::GReduceLogicalOR changed;
+  galois::GReduceLogicalOr changed;
   size_t rounds = 0;
 
   do {
@@ -315,7 +315,7 @@ void topoTileAlgo(Graph& graph, const GNode& source) {
                  },
                  galois::steal(), galois::loopname("MakeTiles"));
 
-  galois::GReduceLogicalOR changed;
+  galois::GReduceLogicalOr changed;
   size_t rounds = 0;
 
   do {

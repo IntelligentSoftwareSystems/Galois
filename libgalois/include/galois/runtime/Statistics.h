@@ -332,9 +332,6 @@ using ScalarStatManager = BasicStatMap<ScalarStat<T>>;
 
 } // end namespace internal
 
-#define STAT_MANAGER_IMPL 0 // 0 or 1 or 2
-
-#if STAT_MANAGER_IMPL == 0
 
 class StatManager {
 
@@ -529,126 +526,14 @@ public:
   }
 
   void print(void);
-
-private:
 };
 
-#else
-
-class StatManager {
-
-  template <typename T>
-  struct StatManagerImpl {
-
-    using Str       = galois::gstl::Str;
-    using StrSet    = galois::gstl::Set<Str>;
-    using Stat      = galois::Accumulator<T>;
-    using StatMap   = galois::gstl::Map<std::tuple<Str*, Str*>, Stat*>> ;
-    using StatAlloc = galois::FixedSizeAllocator<Stat>;
-
-    StrSet symbols;
-    StatMap statMap;
-    StatAlloc statAlloc;
-    substrate::ThreadRWlock rwmutex;
-
-    ~StatManagerImpl(void) {
-
-      for (auto p : statMap) {
-        statAlloc.destruct(p.second);
-        statAlloc.deallocate(p.second, 1);
-      }
-    }
-
-    Stat& getOrInsertMapping(const Str& region, const Str& category) {
-
-      Stat* ret = nullptr;
-
-      auto readAndCheck = [&](void) {
-        const Str* ln  = nullptr;
-        const Str* cat = nullptr;
-
-        auto ia = symbols.find(region);
-
-        if (ia == symbols.end()) {
-          return false; // return early to save a check
-
-        } else {
-          ln = &(*ia);
-        }
-
-        auto ib = symbols.find(category);
-        readOrUpdate
-
-            if (ib == symbols.end()) {
-          return false;
-        }
-        else {
-          cat = &(*ib);
-        }
-
-        assert(ln && cat);
-
-        auto im = statMap.find(std::make_tuple(ln, cat));
-        assert(im != statMap.end() &&
-               "statMap lookup shouldn't fail when both symbols exist");
-
-        ret = im->second;
-
-        return true;
-      };
-
-      auto write = [&](void) {
-        auto p1       = symbols.insert(region);
-        const Str* ln = &(p->first);
-
-        auto p2        = symbols.insert(category);
-        const Str* cat = &(p->first);
-
-        auto tpl = std::make_tuple(ln, cat);
-
-        Stat* s = statAlloc.allocate(1);
-        statAlloc.construct(s);
-
-        auto p = statMap.emplace(tpl, s);
-        assert(p.second && "map insert shouldn't fail");
-
-        ret = s;
-      };
-
-      galois::substrate::readUpdateProtected(rwmutex, readAndCheck, write);
-
-      assert(ret, "readUpdateProtected shouldn't fail");
-
-      return *ret;
-    }
-
-    void addToStat(const Str& region, const Str& category, const T& val) {
-
-      Stat& stat = getOrInserMapping(region, category);
-      stat += val;
-    }
-  };
-
-protected:
-  static const char* const SEP = ", ";
-
-  StatManagerImpl<int64_t> intStats;
-  StatManagerImpl<double> fpStats;
-
-  void addToStat(const Str& region, const Str& category, int64_t val) {
-    intStats.addToStat(region, category, val);
-  }
-
-  void addToStat(const Str& region, const Str& category, double val) {
-    fpStats.addToStat(region, category, val);
-  }
-};
-
-#endif
 
 namespace internal {
+
 void setSysStatManager(StatManager* sm);
 StatManager* sysStatManager(void);
+
 } // namespace internal
 
 template <typename S1, typename S2, typename T>
