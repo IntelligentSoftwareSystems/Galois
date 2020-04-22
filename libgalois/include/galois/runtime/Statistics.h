@@ -143,9 +143,7 @@ public:
   using with_name = AggregStat<T, NamedStat<T>, Bases...>;
 
   void add(const T& val) {
-    using Expander = int[];
-
-    (void)Expander{0, ((void)Bases::add(val), 0)...};
+    (..., Bases::add(val));
   }
 };
 
