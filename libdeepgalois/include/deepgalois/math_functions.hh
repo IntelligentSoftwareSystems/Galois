@@ -41,6 +41,8 @@ void d_dropout_cpu(size_t n, const float scale, const float_t* in_diff,
 void relu_cpu(size_t n, const float_t* in, float_t* out);
 //! ReLU derivative; generally, 1 if data > 0, 0 otherwise
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
+void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out);
+void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, const float_t* data, float_t* out);
 
 // Loss function for single-class label (one-hot) data: softmax
 void softmax(const vec_t& input, vec_t& output);

@@ -178,7 +178,7 @@ void relu_cpu(size_t n, const float_t* in, float_t* out) {
   // TODO: vectorize
   galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
     out[i] = std::max(in[i], float_t(0));
-  }, galois::loopname("relu"));
+  }, galois::chunk_size<64>(), galois::loopname("relu"));
 }
 
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out) {
@@ -186,7 +186,22 @@ void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out) 
   // check if original data greater than 0; if so keep grad
   galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
     out[i] = data[i] > float_t(0) ? in[i] : float_t(0);
-  }, galois::loopname("d_relu"));
+  }, galois::chunk_size<64>(), galois::loopname("d_relu"));
+}
+
+void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out) {
+  // TODO: vectorize
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+    out[i] = in[i] > 0 ? in[i] : epsilon * in[i];
+  }, galois::chunk_size<64>(), galois::loopname("leaky_relu"));
+}
+
+void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, 
+                      const float_t* data, float_t* out) {
+  // TODO: vectorize
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+    out[i] = in[i] * (data[i] > float_t(0) ? float_t(1) : epsilon);
+  }, galois::chunk_size<64>(), galois::loopname("d_leaky_relu"));
 }
 
 void softmax(const vec_t& input, vec_t& output) {
