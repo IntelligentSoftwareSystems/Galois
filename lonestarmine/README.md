@@ -19,7 +19,7 @@ INPUT
 
 We support four input graph format: **gr**, **txt**, **adj**, **mtx**.
 For unlabeled graphs, we use the gr graph format, same as other Galois benchmarks.
-**Make sure that the graph is symmetric and contains no self-loop**.
+**Make sure that the graph is symmetric and contains no self-loop or redundant edges**.
 If not, use the convert tool in tools/graph-convert/ to convert the graph.
 We use **adj** format for labeled graphs as also used by Arabesque and RStream.
 The **adj** format takes as input graphs with the following formats:
