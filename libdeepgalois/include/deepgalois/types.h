@@ -24,6 +24,7 @@ typedef uint8_t mask_t; // mask is used to indicate different uses of labels:
 typedef uint32_t VertexID;
 typedef uint64_t EdgeID;
 typedef std::vector<VertexID> VertexList;
+typedef std::vector<size_t> dims_t; // dimentions type
 
 #define CHUNK_SIZE 256
 #define TB_SIZE 256
@@ -32,7 +33,6 @@ typedef std::vector<VertexID> VertexList;
 #define MAX_NUM_CLASSES 128
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
 #define USE_CUSPARSE
-
 
 #ifdef GALOIS_USE_DIST
 namespace deepgalois {

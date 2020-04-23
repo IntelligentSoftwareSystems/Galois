@@ -109,7 +109,7 @@ void d_dropout_gpu(const int n, const float scale, const float dropout_rate,
 
 // flattern data into 1D before feed into the ReLU operater
 __global__ void relu_kernel(const int n, const float_t* in, float_t* out) {
-  CUDA_KERNEL_LOOP(index, n) { out[index] = in[index] > 0 ? in[index] : 0; }
+  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] > 0 ? in[i] : 0; }
 }
 
 void relu_gpu(const int n, const float_t* in, float_t* out) {
@@ -119,9 +119,7 @@ void relu_gpu(const int n, const float_t* in, float_t* out) {
 
 __global__ void d_relu_kernel(const int n, const float_t* in_diff,
                               const float_t* data, float_t* out_diff) {
-  CUDA_KERNEL_LOOP(index, n) {
-    out_diff[index] = data[index] > 0 ? in_diff[index] : 0;
-  }
+  CUDA_KERNEL_LOOP(i, n) { out_diff[i] = data[i] > 0 ? in_diff[i] : 0; }
 }
 
 void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
@@ -129,6 +127,32 @@ void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
   d_relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, in_diff, data,
                                                           out_diff);
   CudaTest("solving d_relu kernel failed");
+}
+
+// flattern data into 1D before feed into the ReLU operater
+__global__ void leaky_relu_kernel(const int n, const float_t epsilon,
+                                  const float_t* in, float_t* out) {
+  CUDA_KERNEL_LOOP(i, n) { out[i] = in[i] > 0 ? in[i] : epsilon * in[i]; }
+}
+
+void leaky_relu_gpu(const int n, const float_t epsilon, 
+                    const float_t* in, float_t* out) {
+  leaky_relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, epsilon, in, out);
+  CudaTest("solving leaky_relu kernel failed");
+}
+
+__global__ void d_leaky_relu_kernel(const int n, const float_t epsilon, 
+    const float_t* in_diff, const float_t* data, float_t* out_diff) {
+  CUDA_KERNEL_LOOP(i, n) {
+    out_diff[i] = in_diff[i] * (data[i] > 0 ? 1.0 : epsilon);
+  }
+}
+
+void d_leaky_relu_gpu(const int n, const float_t epsilon, const float_t* in_diff, 
+                      const float_t* data, float_t* out_diff) {
+  d_leaky_relu_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      n, epsilon, in_diff, data, out_diff);
+  CudaTest("solving d_leaky_relu kernel failed");
 }
 
 __global__ void matmul_kernel(int x, int y, int z, const float_t* A,

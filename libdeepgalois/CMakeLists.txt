@@ -41,6 +41,8 @@ else()
     src/layers/graph_conv_layer.cu
     src/layers/softmax_loss_layer.cu
     src/layers/sigmoid_loss_layer.cu
+    src/layers/leaky_relu_layer.cu
+    src/layers/relu_layer.cu
     src/layers/aggregator.cu
     src/math_functions.cu
     src/optimizer.cu
@@ -58,25 +60,30 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 if(ENABLE_DIST_GALOIS)
 # do not link regular context.cpp; TODO do this conditional in cleaner way
 set(sources
-  src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
+  src/layers/sigmoid_loss_layer.cpp
+  src/layers/graph_conv_layer.cpp
+  src/layers/leaky_relu_layer.cpp
+  src/layers/relu_layer.cpp
   src/layers/aggregator.cpp
-  src/layers/layer.cpp
   src/math_functions.cpp
-  src/optimizer.cpp
+  src/layers/layer.cpp
   src/DistContext.cpp
+  src/optimizer.cpp
   src/utils.cpp
   src/node.cpp
   src/net.cpp
 )
 else()
 set(sources
-  src/layers/graph_conv_layer.cpp
   src/layers/softmax_loss_layer.cpp
   src/layers/sigmoid_loss_layer.cpp
+  src/layers/graph_conv_layer.cpp
+  src/layers/leaky_relu_layer.cpp
+  src/layers/relu_layer.cpp
   src/layers/aggregator.cpp
-  src/layers/layer.cpp
   src/math_functions.cpp
+  src/layers/layer.cpp
   src/optimizer.cpp
   src/context.cpp
   src/sampler.cpp

@@ -127,6 +127,10 @@ void vadd_gpu(const int n, const float_t* a, const float_t* b,
 void relu_gpu(const int n, const float_t* in, float_t* out); // ReLU
 void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
                 float_t* out_diff); // ReLU derivative
+void leaky_relu_gpu(const int n, const float_t epsilon, 
+                    const float_t* in, float_t* out); // Leaky ReLU
+void d_leaky_relu_gpu(const int n, const float_t epsilon, const float_t* in_diff, 
+                      const float_t* data, float_t* out_diff); // Leaky ReLU derivative
 void dropout_gpu(const int n, const float scale, const float dropout_rate,
                  const float_t* in, unsigned* masks, float_t* out); // dropout
 void d_dropout_gpu(const int n, const float scale, const float dropout_rate,
