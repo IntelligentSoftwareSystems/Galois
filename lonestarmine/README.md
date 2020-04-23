@@ -9,10 +9,17 @@ Pangolin: An Efficient and Flexible Graph Mining System on CPU and GPU, VLDB 202
 BUILD
 ===========
 
-1. Run cmake at BUILD directory `cd build; cmake -DUSE_PANGOLIN=1 ../`
-To enable GPU mining, do `cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
+1. Run cmake at BUILD directory: 
 
-2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
+`cd build; cmake -DUSE_PANGOLIN=1 ../`
+
+To enable GPU mining, use: 
+
+`cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
+
+2. Run make:
+
+`cd <BUILD>/lonestar/experimental/fsm; make -j`
 
 INPUT
 ===========
@@ -22,9 +29,8 @@ For unlabeled graphs, we use the gr graph format, same as other Galois benchmark
 **Make sure that the graph is symmetric and contains no self-loop or redundant edges**.
 If not, use the convert tool in tools/graph-convert/ to convert the graph.
 We use **adj** format for labeled graphs as also used by Arabesque and RStream.
-The **adj** format takes as input graphs with the following formats:
+The **adj** format takes as input graphs with the following formats (vertex labeled):
 
-* **Graphs label on vertex(default)**
 ```
 # <num vertices> <num edges>
 <vertex id> <vertex label> [<neighbour id1> <neighbour id2> ... <neighbour id n>]
@@ -32,11 +38,9 @@ The **adj** format takes as input graphs with the following formats:
 ...
 ```
 
-We currently do not support graphs label on edges
-
+We currently do not support graphs label on edges.
 Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
-
-For testing, we have prepared a test graph **citeseer** in $GALOIS_HOME/lonestarmine/test_data/
+For testing, we have prepared a test graph **citeseer** in $GALOIS_HOME/lonestarmine/test_data.
 
 RUN
 ===========
