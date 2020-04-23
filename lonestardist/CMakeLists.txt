@@ -177,8 +177,6 @@ add_subdirectory(kcore)
 add_subdirectory(pagerank)
 add_subdirectory(sgd)
 add_subdirectory(sssp)
-#add_subdirectory(kclique)
-
 add_subdirectory(partition)
 
 # currently tc only has a GPU implementation

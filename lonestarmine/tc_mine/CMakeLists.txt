@@ -1,0 +1,12 @@
+add_executable(tc_mine tc_mine.cpp)
+add_dependencies(apps tc_mine)
+target_link_libraries(tc_mine PRIVATE Galois::pangolin LLVMSupport)
+install(TARGETS tc_mine DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
+if (ENABLE_HETERO_GALOIS)
+  add_executable(tc_mine_gpu tc_mine_gpu.cpp tc_mine.cu)
+  add_dependencies(apps tc_mine_gpu)
+  target_link_libraries(tc_mine_gpu PRIVATE Galois::pangolin LLVMSupport)
+  target_compile_definitions(tc_mine_gpu PRIVATE __GALOIS_HET_CUDA__=1)
+  install(TARGETS tc_mine_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+endif()

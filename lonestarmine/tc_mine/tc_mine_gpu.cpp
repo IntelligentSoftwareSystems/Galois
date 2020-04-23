@@ -1,7 +1,7 @@
 // Copyright 2019, University of Texas at Austin
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #include "tc.h"
-#include "../lonestarmine.h"
+#include "lonestarmine.h"
 
 const char* name = "Triangle counting";
 const char* desc = "Counting triangles in an undirected graph";

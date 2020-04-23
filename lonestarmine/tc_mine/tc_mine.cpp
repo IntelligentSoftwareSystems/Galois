@@ -1,4 +1,4 @@
-#include "../lonestarmine.h"
+#include "lonestarmine.h"
 #include "BfsMining/vertex_miner.h"
 #define TRIANGLE
 

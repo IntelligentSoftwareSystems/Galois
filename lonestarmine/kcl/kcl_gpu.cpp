@@ -1,7 +1,7 @@
 // Copyright 2019, University of Texas at Austin
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #include "kcl.h"
-#include "../lonestarmine.h"
+#include "lonestarmine.h"
 
 const char* name = "k-cliques";
 const char* desc = "Listing all k-cliques in an undirected graph";

@@ -2,7 +2,7 @@
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #define EDGE_INDUCED
 #include "fsm.h"
-#include "../lonestarmine.h"
+#include "lonestarmine.h"
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in an undirected graph";
