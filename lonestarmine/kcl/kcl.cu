@@ -1,10 +1,10 @@
 // Copyright (c) 2019, Xuhao Chen
 #include "kcl.h"
-#include "timer.h"
-#include "cutils.h"
+#include "pangolin/timer.h"
+#include "pangolin/cutils.h"
 #define USE_SIMPLE
 #define USE_BASE_TYPES
-#include "miner.cuh"
+#include "pangolin/miner.cuh"
 #include <cub/cub.cuh>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>

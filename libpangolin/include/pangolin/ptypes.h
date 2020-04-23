@@ -1,8 +1,8 @@
 #pragma once
-#include "types.h"
-#include "edge_embedding.h"
-#include "quick_pattern.h"
-#include "canonical_graph.h"
+#include "pangolin/types.h"
+#include "pangolin/edge_embedding.h"
+#include "pangolin/quick_pattern.h"
+#include "pangolin/canonical_graph.h"
 
 typedef QuickPattern<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrQPattern; // structural quick pattern
 typedef CanonicalGraph<EdgeInducedEmbedding<StructuralElement>, StructuralElement> StrCPattern; // structural canonical pattern
@@ -28,4 +28,4 @@ public:
 	uint8_t get(VertexId pos) { return visited[pos]; }
 };
 typedef galois::substrate::PerThreadStorage<Status> StatusMT; // multi-threaded
-//*/
+*/

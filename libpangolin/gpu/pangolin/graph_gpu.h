@@ -12,9 +12,9 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-#include "types.cuh"
-#include "checker.h"
-#include "timer.h"
+#include "pangolin/types.cuh"
+#include "pangolin/checker.h"
+#include "pangolin/timer.h"
 
 struct Edge {
 	Edge(IndexT from, IndexT to) :

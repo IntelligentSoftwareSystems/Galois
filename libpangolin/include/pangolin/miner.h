@@ -1,8 +1,8 @@
 #ifndef MINER_HPP_
 #define MINER_HPP_
-#include "scan.h"
-#include "util.h"
-#include "embedding_queue.h"
+#include "pangolin/scan.h"
+#include "pangolin/util.h"
+#include "pangolin/embedding_queue.h"
 #include "bliss/uintseqhash.hh"
 #define CHUNK_SIZE 1
 

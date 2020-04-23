@@ -6,7 +6,7 @@
 //#include "bliss/utils.hh"
 //#include "bliss/bignum.hh"
 
-#include "element.h"
+#include "pangolin/element.h"
 
 template <typename ElementTy>
 class Embedding {

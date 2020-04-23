@@ -1,9 +1,9 @@
 #ifndef EMBEDDING_LIST_H_
 #define EMBEDDING_LIST_H_
-#include "gtypes.h"
-#include "base_embedding.h"
-#include "vertex_embedding.h"
-#include "edge_embedding.h"
+#include "pangolin/gtypes.h"
+#include "pangolin/base_embedding.h"
+#include "pangolin/vertex_embedding.h"
+#include "pangolin/edge_embedding.h"
 
 // Embedding list: SoA structure
 template <typename ElementType,typename EmbeddingType>

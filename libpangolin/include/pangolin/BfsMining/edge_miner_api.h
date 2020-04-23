@@ -1,5 +1,5 @@
 #pragma once
-#include "gtypes.h"
+#include "pangolin/gtypes.h"
 
 template <typename EmbeddingTy>
 class EdgeMinerAPI {

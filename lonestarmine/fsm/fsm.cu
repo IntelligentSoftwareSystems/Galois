@@ -1,14 +1,14 @@
 // Copyright (c) 2019, Xuhao Chen
 #include "fsm.h"
-#include "timer.h"
-#include "cutils.h"
+#include "pangolin/timer.h"
+#include "pangolin/cutils.h"
 #define USE_PID
 #define USE_DOMAIN
 #define EDGE_INDUCED
 #define ENABLE_LABEL
 #include <cub/cub.cuh>
-#include "miner.cuh"
-#include "bitsets.h"
+#include "pangolin/miner.cuh"
+#include "pangolin/bitsets.h"
 #include <thrust/scan.h>
 #include <thrust/extrema.h>
 #include <thrust/execution_policy.h>

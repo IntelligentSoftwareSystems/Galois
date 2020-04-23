@@ -1,4 +1,4 @@
-#include "vertex_embedding.h"
+#include "pangolin/vertex_embedding.h"
 
 std::ostream & operator<<(std::ostream & strm, const VertexInducedEmbedding& emb) {
 	if (emb.empty()) {

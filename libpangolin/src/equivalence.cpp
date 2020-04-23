@@ -1,4 +1,4 @@
-#include "equivalence.h"
+#include "pangolin/equivalence.h"
 
 std::ostream & operator<<(std::ostream & strm, const VertexPositionEquivalences& equ) {
 	if(equ.get_size() == 0) {

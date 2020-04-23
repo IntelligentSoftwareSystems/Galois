@@ -1,10 +1,10 @@
 #ifndef EDGE_MINER_H
 #define EDGE_MINER_H
-#include "miner.h"
-#include "quick_pattern.h"
-#include "canonical_graph.h"
-#include "domain_support.h"
-#include "embedding_list.h"
+#include "pangolin/miner.h"
+#include "pangolin/quick_pattern.h"
+#include "pangolin/canonical_graph.h"
+#include "pangolin/domain_support.h"
+#include "pangolin/BfsMining/embedding_list.h"
 
 template <typename ElementTy, typename EmbeddingTy, typename API, bool report_num_pattern>
 class EdgeMiner : public Miner<ElementTy,EmbeddingTy,false> {

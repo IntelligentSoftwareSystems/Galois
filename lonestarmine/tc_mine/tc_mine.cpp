@@ -1,12 +1,12 @@
 #include "lonestarmine.h"
-#include "BfsMining/vertex_miner.h"
+#include "pangolin/BfsMining/vertex_miner.h"
 #define TRIANGLE
 
 const char* name = "TC";
 const char* desc = "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
 const char* url  = 0;
 
-#include "BfsMining/vertex_miner_api.h"
+#include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI<BaseEmbedding> {
 public:
 	// toExtend (only extend the last vertex in the embedding)
@@ -31,5 +31,5 @@ public:
 		std::cout << "\n\ttotal_num_triangles = " << get_total_count() << "\n";
 	}
 };
-#include "BfsMining/engine.h"
+#include "pangolin/BfsMining/engine.h"
 

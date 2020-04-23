@@ -1,11 +1,11 @@
 // Copyright (c) 2019, Xuhao Chen
 #include "motif.h"
-#include "timer.h"
-#include "cutils.h"
+#include "pangolin/timer.h"
+#include "pangolin/cutils.h"
 #define USE_PID
 #define USE_SIMPLE
 #define VERTEX_INDUCED
-#include "miner.cuh"
+#include "pangolin/miner.cuh"
 #include <cub/cub.cuh>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>

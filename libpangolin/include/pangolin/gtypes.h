@@ -1,6 +1,6 @@
 #pragma once
 // Galois supported types
-#include "types.h"
+#include "pangolin/types.h"
 #include "galois/Bag.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"

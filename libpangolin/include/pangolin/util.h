@@ -1,9 +1,9 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include "scan.h"
-#include "mgraph.h"
-#include "res_man.h"
+#include "pangolin/scan.h"
+#include "pangolin/mgraph.h"
+#include "pangolin/res_man.h"
 
 namespace util {
 

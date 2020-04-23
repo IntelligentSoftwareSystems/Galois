@@ -1,5 +1,5 @@
 #pragma once
-#include "embedding.h"
+#include "pangolin/embedding.h"
 #include "bliss/uintseqhash.hh"
 
 // Vertex-induced embedding with hash value

@@ -9,7 +9,7 @@
  * All rights reserved.
  * Reused/revised under 3-BSD
  */
-#include "types.h"
+#include "pangolin/types.h"
 
 class VertexPositionEquivalences {
 friend std::ostream & operator<<(std::ostream & strm, const VertexPositionEquivalences& equ);
