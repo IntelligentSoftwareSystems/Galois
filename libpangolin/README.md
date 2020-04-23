@@ -50,10 +50,10 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./tc <path-to-graph> -t 40`
--`$ ./kcl <path-to-graph> -k=3 -t 40`
--`$ ./motif <path-to-graph> -k=3 -t 40`
--`$ ./fsm <path-to-graph> -k=3 -minsup=300 -t 40`
+- `$ ./tc <path-to-graph> -t 40`
+- `$ ./kcl <path-to-graph> -k=3 -t 40`
+- `$ ./motif <path-to-graph> -k=3 -t 40`
+- `$ ./fsm <path-to-graph> -k=3 -minsup=300 -t 40`
 
 PERFORMANCE
 ===========
