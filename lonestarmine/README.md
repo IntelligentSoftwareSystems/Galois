@@ -9,10 +9,17 @@ Pangolin: An Efficient and Flexible Graph Mining System on CPU and GPU, VLDB 202
 BUILD
 ===========
 
-1. Run cmake at BUILD directory `cd build; cmake -DUSE_PANGOLIN=1 ../`
-To enable GPU mining, do `cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
+1. Run cmake at BUILD directory: 
 
-2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
+`cd build; cmake -DUSE_PANGOLIN=1 ../`
+
+To enable GPU mining, use: 
+
+`cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
+
+2. Run make:
+
+`cd <BUILD>/lonestar/experimental/fsm; make -j`
 
 INPUT
 ===========
