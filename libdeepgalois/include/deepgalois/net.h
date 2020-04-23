@@ -18,10 +18,6 @@
 #include "deepgalois/DistContext.h"
 #endif
 
-
-
-#define NUM_CONV_LAYERS 2
-
 namespace deepgalois {
 
 // N: number of vertices, D: feature vector dimentions,
@@ -31,17 +27,15 @@ namespace deepgalois {
 class Net {
 public:
   Net() : is_single_class(true), num_samples(0), num_classes(0),
-          num_layers(0), num_epochs(0), 
+          num_conv_layers(0), num_layers(0), num_epochs(0),
+          learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
           train_begin(0), train_end(0), train_count(0),
           val_begin(0), val_end(0), val_count(0),
-          train_masks(NULL), val_masks(NULL), context(NULL) {}
-  #ifndef GALOIS_USE_DIST
-  void init(std::string dataset_str, unsigned epochs, unsigned hidden1, 
-            bool selfloop, bool is_single = true);
-  #else
-  void init(std::string dataset_str, unsigned epochs, unsigned hidden1,
-            bool selfloop, Graph* dGraph);
-  #endif
+          test_begin(0), test_end(0), test_count(0),
+          train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
+  void init(std::string dataset_str, unsigned num_conv, unsigned epochs,
+            unsigned hidden1, float lr, float dropout, float wd,
+            bool selfloop, bool is_single, Graph* dGraph);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
@@ -54,8 +48,7 @@ public:
 
   //! Add a convolution layer to the network
   void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
-                         bool bias = false, bool dropout = true,
-                         float_t dropout_rate = 0.5);
+                         bool bias = false, bool dropout = true);
 
   //! Save the context object to all layers of the network
   void set_contexts() {
@@ -93,8 +86,12 @@ protected:
   bool is_single_class;              // single-class (one-hot) or multi-class label
   size_t num_samples;                // number of samples: N
   size_t num_classes;                // number of vertex classes: E
-  size_t num_layers;                 // for now hard-coded: NUM_CONV_LAYERS + 1
+  size_t num_conv_layers;            // number of convolutional layers
+  size_t num_layers;                 // total number of layers (conv + output)
   unsigned num_epochs;               // number of epochs
+  float learning_rate;               // learning rate
+  float dropout_rate;                // dropout rate
+  float weight_decay;                // weighti decay for over-fitting
   size_t train_begin, train_end, train_count;
   size_t val_begin, val_end, val_count;
   size_t test_begin, test_end, test_count;

@@ -18,25 +18,22 @@ int main(int argc, char** argv) {
   LonestarGnnStart(argc, argv, name, desc, url);
   deepgalois::Net network; // the neural network to train
 
+  Graph* dGraph = NULL;
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
   Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
 
-#ifndef GALOIS_USE_DIST
   // read network, features, ground truth, initialize metadata
-  network.init(dataset, epochs, hidden1, add_selfloop, is_single_class);
-#else
-  network.init(dataset, epochs, hidden1, add_selfloop, dGraph);
-#endif
-  network.construct_layers(); // default setting for now; can be customized by
-                              // the user
+  network.init(dataset, num_conv_layers, epochs, hidden1, learning_rate, 
+               dropout_rate, weight_decay, add_selfloop, is_single_class, dGraph);
+  // default setting for now; can be customized by the user
+  network.construct_layers();
   network.print_layers_info();
+  deepgalois::ResourceManager rm; // tracks peak memory usage
 
-  // tracks peak memory usage
-  deepgalois::ResourceManager rm;
-
-  // the optimizer used to update parameters, see optimizer.h for more details
+  // the optimizer used to update parameters, 
+  // see optimizer.h for more details
   // optimizer *opt = new gradient_descent();
   // optimizer *opt = new adagrad();
   deepgalois::optimizer* opt = new deepgalois::adam();

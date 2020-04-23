@@ -27,6 +27,8 @@ void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
 //! do dot product of 2 vectors
 float_t dot(const vec_t& x, const vec_t& y);
+//! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
+float_t l2_norm(size_t n, const float_t* a);
 //! clear n elements of a vector
 void clear_cpu(size_t n, float_t* in);
 // dropout functions randomly remove weights
@@ -153,8 +155,8 @@ void sigmoid_cross_entropy_gpu(int len, int begin, int end, const float_t* in_da
 void d_sigmoid_cross_entropy_gpu(int len, int bengin, int end,
                                  const mask_t* masks, const label_t* labels,
                                  const float_t* out_data, float_t* diff);
-void scal_gpu(const int N, const float alpha, float* X);
-void add_scalar_gpu(const int N, const float_t alpha, float_t* Y);
+void scal_gpu(const int n, const float alpha, float* X);
+void add_scalar_gpu(const int n, const float_t alpha, float_t* Y);
 void rng_uniform_gpu(const int n, const float_t a, const float_t b, float_t* r);
 bool is_allocated_device(float_t* data);
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
@@ -162,4 +164,5 @@ void float_malloc_device(int n, float_t*& ptr);
 void float_free_device(float_t*& ptr);
 void float_copy_device(int n, float_t* h_ptr, float_t *d_ptr);
 acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t* loss);
+acc_t l2_norm_gpu(int n, float_t *tensor);
 #endif

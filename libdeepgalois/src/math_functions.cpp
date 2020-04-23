@@ -45,7 +45,7 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 #endif
 }
 
-const size_t vec_len = 8;
+const size_t vec_len = 8; // for 32-bit floating point in AVX2
 // vector add
 #if defined(__AVX__) || defined(__AVX2__)
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
@@ -76,6 +76,17 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
     _mm256_storeu_ps(&out[i], _mm256_mul_ps(_mm256_loadu_ps(&in[i]), scal));
   for (size_t i = alignedN; i < n; ++i) out[i] = alpha * in[i];
 }
+
+float_t l2_norm(size_t n, const float_t* in) {
+  const size_t alignedN = n - n % vec_len;
+  __m256 vsum = _mm256_set1_ps(0.0);
+  for (size_t i = 0; i < alignedN; i += vec_len) {
+    __m256 a = _mm256_loadu_ps(&in[i]);
+    vsum = _mm256_add_ps(vsum, _mm256_mul_ps(a, a));
+  }
+  __m256 sum = _mm256_hadd_ps(vsum, vsum);
+  return ((float_t*)&sum)[0] + ((float_t*)&sum)[2];;
+}
 #else
 // vector multiply scalar
 void mul_scalar(const float_t alpha, vec_t& Y) {
@@ -84,6 +95,12 @@ void mul_scalar(const float_t alpha, vec_t& Y) {
 
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
   for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
+}
+
+float_t l2_norm(size_t n, const float_t* a) {
+  float_t sum = 0.0;
+  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
+  return sum/2.0;
 }
 #endif
 
@@ -117,7 +134,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
   assert(masks.size() == out.size());
   // rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
   for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
   for (size_t i = 0; i < in.size(); ++i)
     out[i] = in[i] * masks[i] * scale;
 }
@@ -125,7 +142,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
 void dropout(const float scale, const float dropout_rate, const vec_t& in,
              std::vector<unsigned>& masks, float_t* out) {
   for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
   for (size_t i = 0; i < in.size(); ++i)
     out[i] = in[i] * masks[i] * scale;
 }
@@ -133,7 +150,7 @@ void dropout(const float scale, const float dropout_rate, const vec_t& in,
 void dropout_cpu(size_t n, const float scale, const float dropout_rate,
              const float_t* in, unsigned* masks, float_t* out) {
   galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-    masks[i] = deepgalois::bernoulli(dropout_rate);
+    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
     out[i] = in[i] * masks[i] * scale;
   }, galois::loopname("dropout"));
 }

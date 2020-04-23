@@ -52,7 +52,7 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
   }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("sigmoid-loss-bw"));
 }
 
-acc_t sigmoid_loss_layer::get_masked_loss() {
+acc_t sigmoid_loss_layer::get_prediction_loss() {
   assert(count_ > 0);
   AccumF total_loss;
   AccumU valid_sample_count;

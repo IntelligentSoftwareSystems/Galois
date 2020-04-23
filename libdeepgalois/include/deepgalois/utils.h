@@ -102,7 +102,7 @@ uniform_rand(T min, T max) {
 }
 
 inline bool bernoulli(float_t p) {
-  return uniform_rand(float_t(0), float_t(1)) <= p;
+  return uniform_rand(float_t(0), float_t(1)) > p;
 }
 
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 

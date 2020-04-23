@@ -58,7 +58,7 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
   // no weight sync required: this is all local graph information
 }
 
-acc_t softmax_loss_layer::get_masked_loss() {
+acc_t softmax_loss_layer::get_prediction_loss() {
   assert(count_ > 0);
   AccumF total_loss;
   AccumU valid_sample_count;

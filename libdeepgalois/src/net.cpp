@@ -6,15 +6,22 @@
 
 namespace deepgalois {
 
-#ifndef GALOIS_USE_DIST
-void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1, 
-               bool selfloop, bool is_single) {
-#else
-void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
-               bool selfloop, Graph* dGraph) {
-#endif
-#ifndef GALOIS_USE_DIST
+void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
+               unsigned hidden1, float lr, float dropout, float wd,
+               bool selfloop, bool is_single, Graph* dGraph) {
+  num_conv_layers = num_conv;
+  num_epochs = epochs;
+  learning_rate = lr;
+  dropout_rate = dropout;
+  weight_decay = wd;
   is_single_class = is_single;
+  galois::gPrint("Configuration: num_conv_layers ", num_conv_layers,
+                 ", num_epochs ", num_epochs,
+                 ", hidden1 ", hidden1,
+                 ", learning_rate ", learning_rate,
+                 ", dropout_rate ", dropout_rate,
+                 ", weight_decay ", weight_decay, "\n");
+#ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
   context->set_label_class(is_single);
   num_samples = context->read_graph(dataset_str, selfloop);
@@ -28,14 +35,14 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
 
   // read graph, get num nodes
   num_classes = context->read_labels(dataset_str);
-  num_epochs = epochs;
 
   //std::cout << "Reading label masks ... ";
   train_masks = new mask_t[num_samples];
   val_masks = new mask_t[num_samples];
   std::fill(train_masks, train_masks+num_samples, 0);
   std::fill(val_masks, val_masks+num_samples, 0);
-  // get testing and validation sets
+
+  // get training and validation sets
   if (dataset_str == "reddit") {
     train_begin = 0, train_count = 153431,
     train_end = train_begin + train_count;
@@ -70,7 +77,7 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
   // NOTE: train_begin/train_end are global IDs, train_masks is a local id
   // train count and val count are LOCAL counts
 
-  num_layers = NUM_CONV_LAYERS + 1;
+  num_layers = num_conv_layers + 1;
   // initialize feature metadata
   feature_dims.resize(num_layers + 1);
   feature_dims[0] =
@@ -88,15 +95,12 @@ void Net::init(std::string dataset_str, unsigned epochs, unsigned hidden1,
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
-#ifdef GALOIS_USE_DIST
-  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
-  std::string header = "[" + std::to_string(myID) + "] ";
-  std::string seperator = "\n";
-#else
-  //std::string header = "[" + std::to_string(0) + "] ";
-  //std::string seperator = "\n";
   std::string header = "";
   std::string seperator = " ";
+#ifdef GALOIS_USE_DIST
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  header = "[" + std::to_string(myID) + "] ";
+  seperator = "\n";
 #endif
 
   galois::gPrint("\nStart training...\n");
@@ -236,7 +240,11 @@ acc_t Net::fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
     layers[i]->forward();
     // TODO need to sync model between layers here
   }
-  return layers[num_layers - 1]->get_masked_loss();
+  // prediction error
+  auto loss = layers[num_layers - 1]->get_prediction_loss();
+  // Squared Norm Regularization to mitigate overfitting
+  loss += weight_decay * layers[0]->get_weight_decay_loss();
+  return loss;
 }
 
 void Net::construct_layers() {
@@ -265,9 +273,9 @@ void Net::append_out_layer(size_t layer_id) {
 
 //! Add a convolution layer to the network
 void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
-                            bool dropout, float_t dropout_rate) {
+                            bool dropout) {
   assert(dropout_rate < 1.0);
-  assert(layer_id < NUM_CONV_LAYERS);
+  assert(layer_id < num_conv_layers);
   std::vector<size_t> in_dims(2), out_dims(2);
   in_dims[0] = out_dims[0] = num_samples;
   in_dims[1]               = get_in_dim(layer_id);
@@ -327,7 +335,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
     if (masks[i] == 1) {
       // get prediction
       int preds = argmax(num_classes,
-      	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[i * num_classes]));
+      	    &(layers[num_conv_layers - 1]->next()->get_data()[i * num_classes]));
       // check prediction
       if ((label_t)preds == context->get_label(i))
         accuracy_all += 1.0;
@@ -342,7 +350,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
       if (masks[localID] == 1) {
         // get prediction
         int preds = argmax(num_classes,
-        	    &(layers[NUM_CONV_LAYERS - 1]->next()->get_data()[localID * num_classes]));
+        	    &(layers[num_conv_layers - 1]->next()->get_data()[localID * num_classes]));
         // check prediction
         if ((label_t)preds == context->get_label(localID))
           accuracy_all += 1.0;
@@ -361,7 +369,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
 }
 
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
-  auto preds = layers[NUM_CONV_LAYERS - 1]->next()->get_data();
+  auto preds = layers[num_conv_layers - 1]->next()->get_data();
   auto ground_truth = context->get_labels_ptr();
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes, ground_truth, preds);
 }

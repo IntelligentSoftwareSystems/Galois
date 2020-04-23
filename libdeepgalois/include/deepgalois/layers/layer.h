@@ -61,7 +61,8 @@ public:
   //! save context
   virtual void set_context(ContextType* ctx) { context = ctx; }
   //! return layer loss
-  virtual acc_t get_masked_loss() { return acc_t(0); }
+  virtual acc_t get_prediction_loss() { return acc_t(0); }
+  virtual acc_t get_weight_decay_loss() { return acc_t(0); }
 
   // main functions for layer work
   virtual void forward_propagation(const float_t* in_data,

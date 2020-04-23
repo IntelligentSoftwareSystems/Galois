@@ -31,7 +31,7 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data,
                               context->get_labels_device_ptr(), out_data, in_grad);
 }
 
-acc_t sigmoid_loss_layer::get_masked_loss() {
+acc_t sigmoid_loss_layer::get_prediction_loss() {
   return masked_avg_loss_gpu(begin_, end_, count_, d_masks_, loss);
 }
 

@@ -47,7 +47,11 @@ void graph_conv_layer::combine(size_t dim_x, size_t dim_y, const float_t* self, 
 // GPU forward: compute output features
 // NOTE: in_data will be used in back-prop, so it can not be modified
 void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
-  assert(z <= MAX_NUM_CLASSES); // currently only support feature length <= 128
+  if (z > MAX_NUM_CLASSES) {
+    std::cout << "Currently support maximum hidden feature length of " << MAX_NUM_CLASSES << "\n"; 
+	// currently only support feature length <= 128
+    exit(0);
+  }
   init_const_gpu(x*z, 0.0, out_temp);
   if (dropout_ && phase_ == deepgalois::net_phase::train)
     dropout_gpu(x * y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
@@ -81,6 +85,11 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   }
   if (level_ != 0 && dropout_)
     d_dropout_gpu(x * y, scale_, dropout_rate_, in_grad, dropout_mask, in_grad);
+}
+
+acc_t graph_conv_layer::get_weight_decay_loss() {
+  acc_t loss = l2_norm_gpu(y*z, d_W);
+  return loss;
 }
 
 } // namespace

@@ -659,3 +659,8 @@ acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t*
   return *(total_loss.cpu_rd_ptr()) / count;
 }
 
+acc_t l2_norm_gpu(int n, float_t * tensor) {
+  acc_t sum = 0.0;
+  return sum / 2.0;
+}
+
