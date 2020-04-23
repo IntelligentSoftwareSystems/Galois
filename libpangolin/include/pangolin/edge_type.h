@@ -1,5 +1,5 @@
 #pragma once
-#include "types.h"
+#include "pangolin/types.h"
 
 struct Edge {
 	VertexId src;

@@ -1,11 +1,11 @@
 // Copyright (c) 2019, Xuhao Chen
 #include "tc.h"
-#include "timer.h"
-#include "cutils.h"
+#include "pangolin/timer.h"
+#include "pangolin/cutils.h"
 #define USE_SIMPLE
 #define USE_BASE_TYPES
 #include <cub/cub.cuh>
-#include "miner.cuh"
+#include "pangolin/miner.cuh"
 typedef cub::BlockReduce<unsigned long long, BLOCK_SIZE> BlockReduce;
 
 __global__ void warp_edge(int m, CSRGraph graph, EmbeddingList emb_list, unsigned long long *total) {

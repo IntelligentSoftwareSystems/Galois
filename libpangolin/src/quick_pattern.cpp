@@ -1,6 +1,6 @@
-#include "quick_pattern.h"
-#include "vertex_embedding.h"
-#include "edge_embedding.h"
+#include "pangolin/quick_pattern.h"
+#include "pangolin/vertex_embedding.h"
+#include "pangolin/edge_embedding.h"
 
 template <typename EmbTy, typename EleTy>
 QuickPattern<EmbTy,EleTy>::QuickPattern(unsigned subgraph_size) {

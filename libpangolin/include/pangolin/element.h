@@ -14,7 +14,7 @@
  * Reused/revised under 3-BSD
  */
 
-#include "gtypes.h"
+#include "pangolin/gtypes.h"
 
 // This is the data structure used in RStream.
 // Each element contains 8 bytes, first 4 bytes is vertex id,

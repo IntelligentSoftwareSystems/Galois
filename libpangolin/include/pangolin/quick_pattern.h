@@ -10,8 +10,8 @@
  * Reused/revised under 3-BSD
  */
 
-#include "embedding.h"
-#include "equivalence.h"
+#include "pangolin/embedding.h"
+#include "pangolin/equivalence.h"
 #include "bliss/uintseqhash.hh"
 
 template <typename EmbTy, typename EleTy> class QuickPattern;

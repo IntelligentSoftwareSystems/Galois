@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "gtypes.h"
+#include "pangolin/gtypes.h"
 
 inline std::vector<IndexT> PrefixSum(const std::vector<IndexT> &vec) {
 	std::vector<IndexT> sums(vec.size() + 1);

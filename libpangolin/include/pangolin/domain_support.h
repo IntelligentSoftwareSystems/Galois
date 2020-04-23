@@ -10,7 +10,7 @@
  * Reused/revised under 3-BSD
  */
 
-#include "gtypes.h"
+#include "pangolin/gtypes.h"
 
 class DomainSupport {
 public:

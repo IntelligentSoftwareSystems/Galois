@@ -7,7 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-#include "types.h"
+#include "pangolin/types.h"
 
 struct MEdge {
 	IndexT src;

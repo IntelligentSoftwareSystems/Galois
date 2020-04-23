@@ -11,8 +11,8 @@
  */
 
 #define USE_DOMAIN // use domain support
-#include "embedding.h"
-#include "edge_type.h"
+#include "pangolin/embedding.h"
+#include "pangolin/edge_type.h"
 #include "bliss/graph.hh"
 
 typedef std::unordered_map<VertexId, BYTE> VertexMap;

@@ -1,6 +1,6 @@
 #include "galois/Galois.h"
-#include "res_man.h"
-#include "embedding_list.h"
+#include "pangolin/res_man.h"
+#include "pangolin/BfsMining/embedding_list.h"
 
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;

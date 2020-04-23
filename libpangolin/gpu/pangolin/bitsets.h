@@ -2,8 +2,8 @@
 #pragma once
 #include <cuda.h>
 #include <assert.h>
-#include "types.cuh"
-#include "cutils.h"
+#include "pangolin/types.cuh"
+#include "pangolin/cutils.h"
 
 class Bitsets {
 public:

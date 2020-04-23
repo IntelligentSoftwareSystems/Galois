@@ -1,5 +1,5 @@
 #pragma once
-#include "embedding.h"
+#include "pangolin/embedding.h"
 
 // Edge induced embedding
 template <typename ElementTy> class EdgeInducedEmbedding;
