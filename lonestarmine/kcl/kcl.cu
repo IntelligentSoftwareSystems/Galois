@@ -18,9 +18,9 @@ __global__ void extend_alloc(size_t begin, size_t end, unsigned level, unsigned 
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
 	__shared__ typename BlockReduce::TempStorage temp_storage;
 #ifdef USE_SHM
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 #else
-	IndexT emb[MAX_SIZE];
+	IndexT emb[PANGOLIN_MAX_SIZE];
 #endif
 	AccType local_num = 0;
 	if(pos < end - begin) {
@@ -59,7 +59,7 @@ __global__ void extend_alloc_lb(size_t begin, size_t end, unsigned level, unsign
 	__shared__ BlockScan::TempStorage temp_storage;
 	__shared__ int gather_offsets[SCRATCHSIZE];
 	__shared__ unsigned src[SCRATCHSIZE];
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	//IndexT emb[MAX_SIZE];
 
 	gather_offsets[threadIdx.x] = 0;
@@ -116,9 +116,9 @@ __global__ void extend_insert(size_t begin, size_t end, unsigned level, CSRGraph
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
 #ifdef USE_SHM
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 #else
-	IndexT emb[MAX_SIZE];
+	IndexT emb[PANGOLIN_MAX_SIZE];
 #endif
 	if(pos < end - begin) {
 #ifdef USE_SHM

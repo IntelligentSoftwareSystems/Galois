@@ -1,1 +1,0 @@
-mineApp(tc_mine)

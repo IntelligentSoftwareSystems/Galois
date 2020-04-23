@@ -77,8 +77,8 @@ inline __device__ bool is_edge_automorphism(unsigned size, IndexT *vids, history
 __global__ void extend_alloc(unsigned m, unsigned level, CSRGraph graph, EmbeddingList emb_list, IndexT *num_new_emb) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT vid[BLOCK_SIZE][MAX_SIZE];
-	__shared__ history_type his[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT vid[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
+	__shared__ history_type his[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < m) {
 		emb_list.get_edge_embedding(level, pos, vid[tid], his[tid]);
 		num_new_emb[pos] = 0;
@@ -99,8 +99,8 @@ __global__ void extend_alloc(unsigned m, unsigned level, CSRGraph graph, Embeddi
 __global__ void extend_insert(unsigned m, unsigned level, CSRGraph graph, EmbeddingList emb_list, IndexT *indices) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT vids[BLOCK_SIZE][MAX_SIZE];
-	__shared__ history_type his[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT vids[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
+	__shared__ history_type his[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < m) {
 		emb_list.get_edge_embedding(level, pos, vids[tid], his[tid]);
 		IndexT start = indices[pos];
@@ -237,8 +237,8 @@ __global__ void init_filter(unsigned m, EmbeddingList emb_list, IndexT *vid_list
 __global__ void aggregate_check(unsigned num_emb, unsigned level, CSRGraph graph, EmbeddingList emb_list, unsigned *pids, int nlabels, unsigned threshold, unsigned *ne) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT vids[BLOCK_SIZE][MAX_SIZE];
-	__shared__ history_type his[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT vids[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
+	__shared__ history_type his[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < num_emb) {
 		emb_list.get_edge_embedding(level, pos, vids[tid], his[tid]);
 		unsigned n = level+1;
@@ -286,8 +286,8 @@ __global__ void find_candidate_patterns(unsigned num_patterns, unsigned *ne, uns
 __global__ void aggregate(unsigned m, unsigned num_emb, unsigned level, CSRGraph graph, EmbeddingList emb_list, unsigned *pids, unsigned *ne, unsigned *id_map, int nlabels, unsigned threshold, Bitsets small_sets, Bitsets middle_sets, Bitsets large_sets) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT vids[BLOCK_SIZE][MAX_SIZE];
-	__shared__ history_type his[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT vids[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
+	__shared__ history_type his[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < num_emb) {
 		emb_list.get_edge_embedding(level, pos, vids[tid], his[tid]);
 		unsigned n = level+1;

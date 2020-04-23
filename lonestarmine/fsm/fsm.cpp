@@ -1,4 +1,4 @@
-#include "../lonestarmine.h"
+#include "lonestarmine.h"
 #include "BfsMining/edge_miner.h"
 
 const char* name = "FSM";

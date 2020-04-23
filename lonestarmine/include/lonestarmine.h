@@ -3,7 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include "llvm/Support/CommandLine.h"
-#ifndef ENABLE_GPU
+#ifndef __GALOIS_HET_CUDA__
 #include "galois/Galois.h"
 #endif
 
@@ -26,7 +26,7 @@ static cll::opt<bool> verify("v", llvm::cl::desc("do verification step (default 
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc, const char* url) {
 	//llvm::cl::SetVersionPrinter(LonestarPrintVersion);
 	llvm::cl::ParseCommandLineOptions(argc, argv);
-#ifndef ENABLE_GPU
+#ifndef __GALOIS_HET_CUDA__
 	numThreads = galois::setActiveThreads(numThreads);
 #endif
 	std::cout << "Copyright (C) 2020 The University of Texas at Austin\n";
@@ -41,9 +41,8 @@ void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
 		if (i != argc - 1)
 			cmdout << " ";
 	}
-#ifndef ENABLE_GPU
+#ifndef __GALOIS_HET_CUDA__
 	galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
 	galois::runtime::reportParam("(NULL)", "Threads", numThreads);
 #endif
 }
-
