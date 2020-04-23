@@ -58,28 +58,19 @@ CITATION
 
 Please cite the following paper if you use Pangolin:
 
+```
 @article{Pangolin,
-
 	title={Pangolin: An Efficient and Flexible Graph Mining System on CPU and GPU},
-
 	author={Xuhao Chen and Roshan Dathathri and Gurbinder Gill and Keshav Pingali},
-
 	year={2020},
-
 	journal = {Proc. VLDB Endow.},
-
 	issue_date = {August 2020},
-
 	volume = {13},
-
 	number = {8},
-
 	month = aug,
-
 	year = {2020},
-
 	numpages = {12},
-
 	publisher = {VLDB Endowment},
 }
+```
 
