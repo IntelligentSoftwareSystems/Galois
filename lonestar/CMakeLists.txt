@@ -32,6 +32,7 @@ function(add_test_scale type app)
   endforeach()
 endfunction(add_test_scale)
 
+add_subdirectory(aigRewriting)
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality) 
 add_subdirectory(bfs)
