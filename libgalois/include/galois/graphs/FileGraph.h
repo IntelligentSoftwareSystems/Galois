@@ -25,8 +25,8 @@
  * @todo finish up doxygen
  */
 
-#ifndef GALOIS_GRAPH_FILEGRAPH_H
-#define GALOIS_GRAPH_FILEGRAPH_H
+#ifndef GALOIS_GRAPHS_FILEGRAPH_H
+#define GALOIS_GRAPHS_FILEGRAPH_H
 
 #include "galois/Endian.h"
 #include "galois/MethodFlags.h"
