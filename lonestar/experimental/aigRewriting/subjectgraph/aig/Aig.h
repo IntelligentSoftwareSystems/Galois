@@ -22,7 +22,7 @@
 
 #include "galois/Galois.h"
 #include "galois/runtime/Statistics.h"
-#include "galois/graphs/First_SepInOut_Graph.h"
+#include "galois/graphs/Morph_SepInOut_Graph.h"
 
 #include <iostream>
 #include <vector>
@@ -37,7 +37,7 @@ struct NodeData;
 
 // Nodes hold a NodeData structure, edges hold a boolean value and are
 // directional with InOut distinction
-typedef galois::graphs::First_SepInOut_Graph<NodeData, bool, true, true> Graph;
+typedef galois::graphs::Morph_SepInOut_Graph<NodeData, bool, true, true> Graph;
 
 typedef Graph::GraphNode GNode;
 
