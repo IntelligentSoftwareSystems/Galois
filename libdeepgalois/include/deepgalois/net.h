@@ -67,10 +67,9 @@ public:
   }
 
   void bprop(); // back propogation
-  void normalize();
-  void regularize();
-  // update trainable weights after back-propagation
-  void update_weights(optimizer* opt);
+  void normalize(); // Scale gradient to counterbalance accumulation
+  void regularize(); // add weight decay
+  void update_weights(optimizer* opt); // update trainable weights after back-propagation
 
 protected:
   bool is_single_class;              // single-class (one-hot) or multi-class label

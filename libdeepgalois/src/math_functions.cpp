@@ -78,7 +78,8 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
 }
 
 // SAXPY stands for “Single-precision A*X Plus Y"
-float_t axpy(size_t n, const float_t a, float_t *x, float_t *y) {
+/*
+void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
   const size_t alignedN = n - n % vec_len;
   const __m256 alpha = _mm256_set1_ps(a);
   for (size_t i = 0; i < alignedN; i += vec_len) {
@@ -96,8 +97,9 @@ float_t l2_norm(size_t n, const float_t* in) {
     vsum = _mm256_add_ps(vsum, _mm256_mul_ps(a, a));
   }
   __m256 sum = _mm256_hadd_ps(vsum, vsum);
-  return ((float_t*)&sum)[0] + ((float_t*)&sum)[2];;
+  return (((float_t*)&sum)[0] + ((float_t*)&sum)[2]) / 2.0;
 }
+*/
 #else
 // vector multiply scalar
 void mul_scalar(const float_t alpha, vec_t& Y) {
@@ -108,16 +110,24 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
   for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
 }
 
-float_t axpy(size_t n, const float_t a, float_t *x, float_t *y) {
-  for (size_t i = 0; i < n; ++i) y[i] = a * x[i] + y[i];
+//void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
+//  for (size_t i = 0; i < n; ++i) y[i] = a * x[i] + y[i];
+//}
+
+//float_t l2_norm(size_t n, const float_t* a) {
+//  float_t sum = 0.0;
+//  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
+//  return sum / 2.0;
+//}
+#endif
+
+void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
+  cblas_saxpy(n, a, x, 1, y, 1);
 }
 
-float_t l2_norm(size_t n, const float_t* a) {
-  float_t sum = 0.0;
-  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
-  return sum/2.0;
+float_t l2_norm(size_t n, const float_t* x) {
+  return cblas_snrm2(n, x, 1);
 }
-#endif
 
 // dot product
 float_t dot(const vec_t& x, const vec_t& y) {

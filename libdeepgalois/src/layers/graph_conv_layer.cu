@@ -88,8 +88,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
-  acc_t loss = l2_norm_gpu(y*z, d_W);
-  return loss;
+  return l2_norm_gpu(y*z, d_W);
 }
 
 } // namespace

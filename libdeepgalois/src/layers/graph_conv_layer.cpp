@@ -125,11 +125,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
-  acc_t loss = 0.0;
-  for (size_t i = 0; i < y*z; i+=z) {
-    loss += math::l2_norm(z, &layer::W[i]);
-  }
-  return loss;
+  return math::l2_norm(y*z, &layer::W[0]);
 }
 
 #endif // end if CPU_ONLY

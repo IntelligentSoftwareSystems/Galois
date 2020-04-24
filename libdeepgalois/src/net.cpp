@@ -253,7 +253,27 @@ void Net::bprop() {
   }
 }
 
+// Scale gradient to counterbalance accumulation
+void Net::normalize() {
+}
+
+// add weight decay
+void Net::regularize() {
+  size_t layer_id = 0;
+  auto n = feature_dims[layer_id] * feature_dims[layer_id+1];
+#ifdef CPU_ONLY
+  // TODO: parallel
+  math::axpy(n, weight_decay, layers[layer_id]->get_weights_ptr(), 
+    layers[layer_id]->get_grads_ptr());
+#else
+  axpy_gpu(n, weight_decay, layers[layer_id]->get_weights_device_ptr(), 
+    layers[layer_id]->get_grads_device_ptr());
+#endif
+}
+
 void Net::update_weights(optimizer* opt) {
+  normalize();
+  regularize();
   for (size_t i = 0; i < num_layers; i++) {
     if (layers[i]->trainable()) {
       layers[i]->update_weight(opt);

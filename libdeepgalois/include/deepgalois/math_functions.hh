@@ -27,7 +27,7 @@ void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
 //! do dot product of 2 vectors
 float_t dot(const vec_t& x, const vec_t& y);
-float_t axpy(size_t n, const float_t a, float_t *x, float_t *y);
+void axpy(size_t n, const float_t a, float_t *x, float_t *y);
 //! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
 float_t l2_norm(size_t n, const float_t* a);
 //! clear n elements of a vector

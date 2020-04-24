@@ -79,6 +79,11 @@ public:
   std::string get_name() { return name_; }
 
   mask_t* get_device_masks() { return d_masks_; }
+  float_t* get_weights_ptr() { return &W[0]; }
+  float_t* get_weights_device_ptr() { return d_W; }
+  float_t* get_grads_ptr() { return &weight_grad[0]; }
+  float_t* get_grads_device_ptr() { return d_weight_grad; }
+
   //! debug print function
   void print_layer_info();
   virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
@@ -126,16 +131,15 @@ public:
 
   //! use optimizer to update weights given gradient (weight_grad)
   void update_weight(deepgalois::optimizer* opt) {
+    // std::cout << name_ << ": weight updating ... ";
     // vec_t diff;
     // prev()->merge_grads(&diff);
 #ifdef CPU_ONLY
-    // std::cout << name_ << ": weight updating ... ";
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
     bool parallel = (W.size() >= 512);
     opt->update(layer::weight_grad, layer::W, parallel); // W += grad
 #else
-	//std::cout << name_ << ": ";
     opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
 #endif
     // prev()->clear_grads();

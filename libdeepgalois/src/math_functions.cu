@@ -278,21 +278,20 @@ void scale_gpu(const int n, const float alpha, const float* x, float* y) {
 }
 
 __global__ void set_kernel(const int n, const float_t alpha, float_t* y) {
-  CUDA_KERNEL_LOOP(index, n) { y[index] = alpha; }
+  CUDA_KERNEL_LOOP(i, n) { y[i] = alpha; }
 }
 
-void set_gpu(const int n, const float_t alpha, float_t* Y) {
+void set_gpu(const int n, const float_t alpha, float_t* y) {
   if (alpha == 0) {
-    CUDA_CHECK(cudaMemset(Y, 0, sizeof(float_t) * n));
+    CUDA_CHECK(cudaMemset(y, 0, sizeof(float_t) * n));
     return;
   }
-  set_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, alpha, Y);
+  set_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, alpha, y);
   CudaTest("solving set kernel failed");
 }
 
-__global__ void add_scalar_kernel(const int n, const float_t alpha,
-                                  float_t* y) {
-  CUDA_KERNEL_LOOP(index, n) { y[index] += alpha; }
+__global__ void add_scalar_kernel(const int n, const float_t a, float_t* y) {
+  CUDA_KERNEL_LOOP(i, n) { y[i] += a; }
 }
 
 void add_scalar_gpu(const int n, const float_t alpha, float_t* Y) {
@@ -302,7 +301,7 @@ void add_scalar_gpu(const int n, const float_t alpha, float_t* Y) {
 
 __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
                             float_t* y) {
-  CUDA_KERNEL_LOOP(index, n) { y[index] = a[index] + b[index]; }
+  CUDA_KERNEL_LOOP(i, n) { y[i] = a[i] + b[i]; }
 }
 
 void vadd_gpu(const int n, const float_t* a, const float_t* b, float_t* y) {
@@ -316,8 +315,27 @@ __global__ void axpy_kernel(const int n, const float_t a, const float_t* x,
 }
 
 void axpy_gpu(const int n, const float_t a, const float_t* x, float_t* y) {
-  axpy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, a, x, y);
+  //axpy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, a, x, y);
+  CUBLAS_CHECK(cublasSaxpy(deepgalois::Context::cublas_handle(), n, &a, x, 1, y, 1));
   CudaTest("solving axpy kernel failed");
+}
+
+__global__ void l2_norm_kernel(const int n, const float_t* a, float_t *sum) {
+  CUDA_KERNEL_LOOP(i, n) {
+    float_t product = a[i] * a[i];
+    atomicAdd(sum, product);
+  }
+}
+
+acc_t l2_norm_gpu(int n, float_t* x) {
+  float_t sum = 0.0;
+  CUBLAS_CHECK(cublasSnrm2(deepgalois::Context::cublas_handle(), n, x, 1, &sum));
+  //float_t *d_sum;
+  //CUDA_CHECK(cudaMalloc((void**)&d_sum, sizeof(float_t));
+  //CUDA_CHECK(cudaMemcpy(d_sum, &sum, sizeof(acc_t), cudaMemcpyHostToDevice));
+  //l2_norm_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, x, d_sum);
+  //CUDA_CHECK(cudaMemcpy(d_sum, &sum, sizeof(float_t), cudaMemcpyDeviceToHost));
+  return (acc_t)sum / 2.0;
 }
 
 void copy_gpu(int len, const float_t* in, float_t* out) {
@@ -691,10 +709,5 @@ acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t*
   CudaTest("solving masked_avg_loss kernel failed");
   cudaDeviceSynchronize();
   return *(total_loss.cpu_rd_ptr()) / count;
-}
-
-acc_t l2_norm_gpu(int n, float_t * tensor) {
-  acc_t sum = 0.0;
-  return sum / 2.0;
 }
 
