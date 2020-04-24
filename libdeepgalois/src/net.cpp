@@ -80,11 +80,11 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   num_layers = num_conv_layers + 1;
   // initialize feature metadata
   feature_dims.resize(num_layers + 1);
-  feature_dims[0] =
-      context->read_features(dataset_str); // input feature dimension: D
-  feature_dims[1] = hidden1;               // hidden1 level embedding: 16
-  feature_dims[2] = num_classes;           // output embedding: E
-  feature_dims[3] = num_classes;           // normalized output embedding: E
+  feature_dims[0] = context->read_features(dataset_str); // input feature dimension: D
+  for (size_t i = 1; i < num_conv_layers; i++)
+    feature_dims[i] = hidden1;                  // hidden1 level embedding: 16
+  feature_dims[num_conv_layers] = num_classes;  // output embedding: E
+  feature_dims[num_layers] = num_classes;       // normalized output embedding: E
   layers.resize(num_layers);
 
 #ifndef CPU_ONLY
@@ -247,11 +247,27 @@ acc_t Net::fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
   return loss;
 }
 
+void Net::bprop() {
+  for (size_t i = num_layers; i != 0; i--) {
+    layers[i - 1]->backward();
+  }
+}
+
+void Net::update_weights(optimizer* opt) {
+  for (size_t i = 0; i < num_layers; i++) {
+    if (layers[i]->trainable()) {
+      layers[i]->update_weight(opt);
+    }
+  }
+}
+
 void Net::construct_layers() {
+  // append conv layers
   std::cout << "\nConstructing layers...\n";
-  append_conv_layer(0, true);                    // first conv layer
-  append_conv_layer(1);                          // hidden1 layer
-  append_out_layer(2);                           // output layer
+  for (size_t i = 0; i < num_conv_layers-1; i++)
+    append_conv_layer(i, true);                  // conv layers, act=true
+  append_conv_layer(num_conv_layers-1);          // the last hidden layer, act=false
+  append_out_layer(num_layers-1);                // output layer
   layers[0]->set_in_data(context->get_in_ptr()); // feed input data
   context->norm_factor_counting();
   set_contexts();

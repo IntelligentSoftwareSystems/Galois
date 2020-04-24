@@ -66,21 +66,11 @@ public:
       layers[i]->print_layer_info();
   }
 
-  // back propogation
-  void bprop() {
-    for (size_t i = num_layers; i != 0; i--) {
-      layers[i - 1]->backward();
-    }
-  }
-
+  void bprop(); // back propogation
+  void normalize();
+  void regularize();
   // update trainable weights after back-propagation
-  void update_weights(optimizer* opt) {
-    for (size_t i = 0; i < num_layers; i++) {
-      if (layers[i]->trainable()) {
-        layers[i]->update_weight(opt);
-      }
-    }
-  }
+  void update_weights(optimizer* opt);
 
 protected:
   bool is_single_class;              // single-class (one-hot) or multi-class label

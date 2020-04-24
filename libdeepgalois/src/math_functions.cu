@@ -281,12 +281,12 @@ __global__ void set_kernel(const int n, const float_t alpha, float_t* y) {
   CUDA_KERNEL_LOOP(index, n) { y[index] = alpha; }
 }
 
-void set_gpu(const int N, const float_t alpha, float_t* Y) {
+void set_gpu(const int n, const float_t alpha, float_t* Y) {
   if (alpha == 0) {
-    CUDA_CHECK(cudaMemset(Y, 0, sizeof(float_t) * N));
+    CUDA_CHECK(cudaMemset(Y, 0, sizeof(float_t) * n));
     return;
   }
-  set_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
+  set_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, alpha, Y);
   CudaTest("solving set kernel failed");
 }
 
@@ -295,8 +295,8 @@ __global__ void add_scalar_kernel(const int n, const float_t alpha,
   CUDA_KERNEL_LOOP(index, n) { y[index] += alpha; }
 }
 
-void add_scalar_gpu(const int N, const float_t alpha, float_t* Y) {
-  add_scalar_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, alpha, Y);
+void add_scalar_gpu(const int n, const float_t alpha, float_t* Y) {
+  add_scalar_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, alpha, Y);
   CudaTest("solving add_scalar kernel failed");
 }
 
@@ -305,13 +305,23 @@ __global__ void vadd_kernel(const int n, const float_t* a, const float_t* b,
   CUDA_KERNEL_LOOP(index, n) { y[index] = a[index] + b[index]; }
 }
 
-void copy_gpu(int len, const float_t* in, float_t* out) {
-  CUDA_CHECK(cudaMemcpy(out, in, len * sizeof(float_t), cudaMemcpyDeviceToDevice));
+void vadd_gpu(const int n, const float_t* a, const float_t* b, float_t* y) {
+  vadd_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, a, b, y);
+  CudaTest("solving vadd kernel failed");
 }
 
-void vadd_gpu(const int N, const float_t* a, const float_t* b, float_t* y) {
-  vadd_kernel<<<CUDA_GET_BLOCKS(N), CUDA_NUM_THREADS>>>(N, a, b, y);
-  CudaTest("solving vadd kernel failed");
+__global__ void axpy_kernel(const int n, const float_t a, const float_t* x,
+                            float_t* y) {
+  CUDA_KERNEL_LOOP(i, n) { y[i] = a * x[i] + y[i]; }
+}
+
+void axpy_gpu(const int n, const float_t a, const float_t* x, float_t* y) {
+  axpy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, a, x, y);
+  CudaTest("solving axpy kernel failed");
+}
+
+void copy_gpu(int len, const float_t* in, float_t* out) {
+  CUDA_CHECK(cudaMemcpy(out, in, len * sizeof(float_t), cudaMemcpyDeviceToDevice));
 }
 
 // TODO: use warp

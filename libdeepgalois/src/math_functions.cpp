@@ -77,6 +77,17 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
   for (size_t i = alignedN; i < n; ++i) out[i] = alpha * in[i];
 }
 
+// SAXPY stands for “Single-precision A*X Plus Y"
+float_t axpy(size_t n, const float_t a, float_t *x, float_t *y) {
+  const size_t alignedN = n - n % vec_len;
+  const __m256 alpha = _mm256_set1_ps(a);
+  for (size_t i = 0; i < alignedN; i += vec_len) {
+    __m256  product = _mm256_mul_ps(_mm256_loadu_ps(&x[i]), alpha);
+    _mm256_storeu_ps(&y[i], _mm256_add_ps(_mm256_loadu_ps(&y[i]), product));
+  }
+  for (size_t i = alignedN; i < n; ++i) y[i] = a * x[i] + y[i];
+}
+
 float_t l2_norm(size_t n, const float_t* in) {
   const size_t alignedN = n - n % vec_len;
   __m256 vsum = _mm256_set1_ps(0.0);
@@ -95,6 +106,10 @@ void mul_scalar(const float_t alpha, vec_t& Y) {
 
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
   for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
+}
+
+float_t axpy(size_t n, const float_t a, float_t *x, float_t *y) {
+  for (size_t i = 0; i < n; ++i) y[i] = a * x[i] + y[i];
 }
 
 float_t l2_norm(size_t n, const float_t* a) {

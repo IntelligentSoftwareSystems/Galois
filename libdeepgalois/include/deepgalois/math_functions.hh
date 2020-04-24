@@ -27,6 +27,7 @@ void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
 //! do dot product of 2 vectors
 float_t dot(const vec_t& x, const vec_t& y);
+float_t axpy(size_t n, const float_t a, float_t *x, float_t *y);
 //! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
 float_t l2_norm(size_t n, const float_t* a);
 //! clear n elements of a vector
@@ -124,8 +125,8 @@ int argmax(const size_t n, const float_t* x); // the arguments of the maxima
 bool isnan_gpu(int n, const float_t *array); // does array contain any 'nan' element
 void init_const_gpu(int n, float_t value, float_t *array);
 void copy_gpu(int len, const float_t* in, float_t* out);
-void vadd_gpu(const int n, const float_t* a, const float_t* b,
-              float_t* out);                                 // vector add
+void vadd_gpu(const int n, const float_t* a, const float_t* b, float_t* out); // vector add
+void axpy_gpu(const int n, const float_t a, const float_t* x, float_t* y); // axpy
 void relu_gpu(const int n, const float_t* in, float_t* out); // ReLU
 void d_relu_gpu(const int n, const float_t* in_diff, const float_t* data,
                 float_t* out_diff); // ReLU derivative
