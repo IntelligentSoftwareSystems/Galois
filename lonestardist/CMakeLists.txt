@@ -106,6 +106,7 @@ function(add_test_dist_and_verify app input type part N np)
 endfunction()
 
 function(add_test_dist_for_partitions app input type num_threads num_gpus part)
+  math(EXPR num_threads "${num_threads} / 3")
   set(partitions ${num_threads})
   set(thr ${num_threads})
   while (${thr} GREATER 1)
@@ -156,7 +157,7 @@ function(add_test_dist app input)
 
   set(num_threads ${NUM_TEST_THREADS})
 
-  foreach (part oec iec cvc cvc-iec hovc hivc)
+  foreach (part oec iec cvc cvc-iec)
     if (NOT ${X_NO_ASYNC})
       add_test_dist_for_partitions(${app} ${input} sync ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Sync)
       add_test_dist_for_partitions(${app} ${input} async ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Async)
