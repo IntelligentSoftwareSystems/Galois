@@ -84,7 +84,7 @@ public:
   DecEdge addAndNode(DecEdge eEdge0, DecEdge eEdge1);
   DecEdge addOrNode(DecEdge eEdge0, DecEdge eEdge1);
   DecEdge addXorNode(DecEdge eEdge0, DecEdge eEdge1, int Type);
-  DecEdge createEdge(int Node, int fCompl);
+  DecEdge createEdge(unsigned Node, unsigned fCompl);
 
   DecNode* getNodes();
   DecNode* getNode(int i);

@@ -835,7 +835,7 @@ DecEdge DecGraph::addXorNode(DecEdge eEdge0, DecEdge eEdge1, int Type) {
   return eNode;
 }
 
-DecEdge DecGraph::createEdge(int Node, int fCompl) {
+DecEdge DecGraph::createEdge(unsigned Node, unsigned fCompl) {
   DecEdge eEdge = {fCompl, Node};
   return eEdge;
 }
