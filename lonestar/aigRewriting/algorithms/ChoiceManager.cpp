@@ -25,7 +25,7 @@
 */
 
 #include "ChoiceManager.h"
-#include "galois/worklists/WorkListAlt.h"
+#include "galois/worklists/Chunk.h"
 
 #include <stdlib.h>
 #include <string.h>
