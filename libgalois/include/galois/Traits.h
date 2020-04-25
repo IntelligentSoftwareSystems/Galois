@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,7 +20,6 @@
 #ifndef GALOIS_TRAITS_H
 #define GALOIS_TRAITS_H
 
-#include "galois/gtuple.h"
 #include "galois/worklists/WorkList.h"
 
 #include <type_traits>
@@ -51,8 +50,6 @@ struct trait_has_svalue {
   T getValue() const { return V; }
 };
 
-// Utility
-
 /**
  * Utility function to simplify creating traits that take unnamed functions
  * (i.e., lambdas).
@@ -62,77 +59,106 @@ auto make_trait_with_args(Args... args) -> TT<Args...> {
   return TT<Args...>(args...);
 }
 
-namespace internal {
+/**
+ * True if Derived is derived from Base or is Base itself.
+ *
+ * A matching trait is any type that inherits from a trait.
+ */
+template <typename Base, typename Derived>
+constexpr bool at_least_base_of =
+    std::is_base_of<Base, Derived>::value || std::is_same<Base, Derived>::value;
 
-template <typename Tuple, typename TagsTuple, int... Is>
-struct indices_of_non_matching_tags_aux {
-  typedef int_seq<> type;
+/**
+ * Returns index of first matching trait in Tuple.
+ *
+ * This function is not well-defined if there is no matching trait.
+ */
+template <typename T, typename Tuple, size_t Int, size_t... Ints>
+constexpr size_t find_trait(std::index_sequence<Int, Ints...> /*seq*/) {
+  if constexpr (at_least_base_of<
+                    T, typename std::tuple_element<Int, Tuple>::type>) {
+    return Int;
+  } else {
+    return find_trait<T, Tuple>(std::index_sequence<Ints...>{});
+  }
+}
+
+template <typename T, typename Tuple>
+constexpr size_t find_trait() {
+  constexpr std::make_index_sequence<std::tuple_size<Tuple>::value> seq{};
+  return find_trait<T, Tuple>(seq);
+}
+
+/**
+ * Returns true if the tuple type contains the given trait T.
+ */
+template <typename T, typename... Ts>
+constexpr bool has_trait(std::tuple<Ts...>* /*tpl*/) {
+  return (... || at_least_base_of<T, Ts>);
+}
+
+template <typename T, typename Tuple>
+constexpr bool has_trait() {
+  return has_trait<T>(static_cast<Tuple*>(nullptr));
+}
+
+/**
+ * Returns the value associated with the given trait T in a tuple.
+ *
+ * This function is not well-defined when there is not matching trait.
+ */
+template <typename T, typename Tuple>
+constexpr auto get_trait_value(Tuple tpl) {
+  constexpr size_t match(find_trait<T, Tuple>());
+  return std::get<match>(tpl);
+}
+
+/**
+ * Returns the type associated with the given trait in a tuple.
+ */
+template <typename T, typename Tuple>
+struct get_trait_type {
+  using type = typename std::tuple_element<find_trait<T, Tuple>(), Tuple>::type;
 };
 
-template <bool Match, typename Tuple, typename TagsTuple, int I, int... Is>
-struct apply_indices_of_non_matching_tags {
-  typedef
-      typename indices_of_non_matching_tags_aux<Tuple, TagsTuple, Is...>::type
-          type;
-};
+// Fallback to enable_if tricks over if constexpr to play more nicely with
+// unused parameter warnings.
 
-template <typename Tuple, typename TagsTuple, int I, int... Is>
-struct apply_indices_of_non_matching_tags<false, Tuple, TagsTuple, I, Is...> {
-  typedef typename indices_of_non_matching_tags_aux<
-      Tuple, TagsTuple, Is...>::type::template append<I>::type type;
-};
+template <typename S, typename T, typename D>
+constexpr auto get_default_trait_value(
+    S /*source*/, T /*tag*/, D /*def*/,
+    typename std::enable_if<has_trait<T, S>()>::type* = nullptr) {
+  return std::make_tuple();
+}
 
-template <typename Tuple, typename TagsTuple, int I, int... Is>
-struct indices_of_non_matching_tags_aux<Tuple, TagsTuple, I, Is...> {
-  static const bool matches =
-      exists_by_supertype<typename std::tuple_element<I, TagsTuple>::type,
-                          Tuple>::value;
-  typedef typename apply_indices_of_non_matching_tags<matches, Tuple, TagsTuple,
-                                                      I, Is...>::type type;
-};
-
-template <typename Tuple, typename TagsTuple, typename Seq>
-struct indices_of_non_matching_tags {
-  typedef int_seq<> type;
-};
-
-template <typename Tuple, typename TagsTuple, int I, int... Is>
-struct indices_of_non_matching_tags<Tuple, TagsTuple, int_seq<I, Is...>> {
-  static const bool matches =
-      exists_by_supertype<typename std::tuple_element<I, TagsTuple>::type,
-                          Tuple>::value;
-  typedef typename apply_indices_of_non_matching_tags<matches, Tuple, TagsTuple,
-                                                      I, Is...>::type type;
-};
-
-} // namespace internal
+template <typename S, typename T, typename D>
+constexpr auto get_default_trait_value(
+    S source, T tag, D def,
+    typename std::enable_if<!has_trait<T, S>()>::type* = nullptr) {
+  return std::make_tuple(def);
+}
 
 /**
  * Returns a tuple that has an element from defaults[i] for every type
  * from tags[i] missing in source.
  */
-template <typename S, typename T, typename D,
-          typename Seq = typename make_int_seq<std::tuple_size<T>::value>::type,
-          typename ResSeq =
-              typename internal::indices_of_non_matching_tags<S, T, Seq>::type>
-typename tuple_elements<D, ResSeq>::type
-get_default_trait_values(S source, T tags, D defaults) {
-  return get_by_indices(defaults, ResSeq{});
+template <typename S, typename T, typename D>
+constexpr auto get_default_trait_values(std::index_sequence<> seq, S /*source*/,
+                                        T /*tags*/, D /*defaults*/) {
+  return std::make_tuple();
 }
 
-template <typename T, typename Tuple,
-          typename Seq =
-              typename make_int_seq<std::tuple_size<Tuple>::value - 1>::type>
-typename tuple_elements<Tuple, Seq>::type get_tuple_without(T rm_type,
-                                                            Tuple tpl) {
-  typedef
-      typename make_int_seq<subtype_index_nodup<T, Tuple>::value>::type Seq_pre;
-  typedef typename make_int_seq<std::tuple_size<Tuple>::value -
-                                subtype_index_nodup<T, Tuple>::value - 1>::type
-      Seq_post;
-  return std::tuple_cat(
-      get_by_offset<0>(tpl, Seq_pre{}),
-      get_by_offset<subtype_index_nodup<T, Tuple>::value + 1>(tpl, Seq_post{}));
+template <size_t... Ints, typename S, typename T, typename D>
+constexpr auto get_default_trait_values(std::index_sequence<Ints...> seq,
+                                        S source, T tags, D defaults) {
+  return std::tuple_cat(get_default_trait_value(source, std::get<Ints>(tags),
+                                                std::get<Ints>(defaults))...);
+}
+
+template <typename S, typename T, typename D>
+constexpr auto get_default_trait_values(S source, T tags, D defaults) {
+  constexpr std::make_index_sequence<std::tuple_size<T>::value> seq{};
+  return get_default_trait_values(seq, source, tags, defaults);
 }
 
 template <typename T>
@@ -316,27 +342,10 @@ struct chunk_size_tag {
   enum { MIN = 1, MAX = 4096 };
 };
 
-namespace internal {
-template <unsigned V, unsigned MIN, unsigned MAX>
-struct bring_within_limits {
-private:
-  constexpr static const unsigned LB = (V < MIN) ? MIN : V;
-  constexpr static const unsigned UB = (LB > MAX) ? MAX : LB;
-
-public:
-  static const unsigned value = UB;
-};
-
-template <unsigned V>
-struct regulate_chunk_size {
-  constexpr static const unsigned value =
-      bring_within_limits<V, chunk_size_tag::MIN, chunk_size_tag::MAX>::value;
-};
-} // namespace internal
-
 /**
- * specify chunk size for do_all_coupled & do_all_choice at compile time or
- * at runtime
+ * Specify chunk size for do_all_coupled & do_all_choice at compile time or at
+ * runtime.
+ *
  * For compile time, use the template argument, e.g., galois::chunk_size<16> ()
  * Additionally, user may provide a runtime argument, e.g,
  * galois::chunk_size<16> (8)
@@ -344,27 +353,20 @@ struct regulate_chunk_size {
  * Currently, only do_all_coupled can take advantage of the runtime argument.
  * TODO: allow runtime provision/tuning of chunk_size in other loop executors
  *
- * chunk size is regulated to be within [chunk_size_tag::MIN,
- * chunk_size_tag::MAX]
+ * chunk size is clamped to within [chunk_size_tag::MIN, chunk_size_tag::MAX]
  */
-
 template <unsigned SZ = 32>
-struct chunk_size :
-    // public trait_has_svalue<unsigned,
-    // internal::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>,
-    // chunk_size_tag {
-    public trait_has_value<unsigned>,
-    chunk_size_tag {
-
-  constexpr static const unsigned value =
-      internal::regulate_chunk_size<SZ>::value;
-
-  unsigned regulate(const unsigned cs) const {
-    return std::min(std::max(unsigned(chunk_size_tag::MIN), cs),
-                    unsigned(chunk_size_tag::MAX));
+struct chunk_size : public trait_has_value<unsigned>, chunk_size_tag {
+private:
+  constexpr static unsigned clamp(unsigned int v) {
+    return std::min(std::max(v, unsigned{chunk_size_tag::MIN}),
+                    unsigned{chunk_size_tag::MAX});
   }
 
-  chunk_size(unsigned cs = SZ) : trait_has_value(regulate(cs)) {}
+public:
+  constexpr static unsigned value = clamp(SZ);
+
+  chunk_size(unsigned cs = SZ) : trait_has_value(clamp(cs)) {}
 };
 
 typedef worklists::PerSocketChunkFIFO<chunk_size<>::value> defaultWL;
@@ -374,20 +376,17 @@ namespace internal {
 template <typename Tup>
 struct NeedStats {
   constexpr static const bool value =
-      !exists_by_supertype<no_stats_tag, Tup>::value &&
-      exists_by_supertype<loopname_tag, Tup>::value;
+      !has_trait<no_stats_tag, Tup>() && has_trait<loopname_tag, Tup>();
 };
 
 template <typename Tup>
-std::enable_if_t<galois::exists_by_supertype<loopname_tag, Tup>::value,
-                 const char*>
+std::enable_if_t<has_trait<loopname_tag, Tup>(), const char*>
 getLoopName(const Tup& t) {
-  return galois::get_by_supertype<loopname_tag>(t).value;
+  return get_trait_value<loopname_tag>(t).value;
 }
 
 template <typename Tup>
-std::enable_if_t<!galois::exists_by_supertype<loopname_tag, Tup>::value,
-                 const char*>
+std::enable_if_t<!has_trait<loopname_tag, Tup>(), const char*>
 getLoopName(const Tup& t) {
   return "ANON_LOOP";
 }
