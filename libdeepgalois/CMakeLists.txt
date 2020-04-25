@@ -42,6 +42,7 @@ else()
     src/layers/softmax_loss_layer.cu
     src/layers/sigmoid_loss_layer.cu
     src/layers/leaky_relu_layer.cu
+    src/layers/l2_norm_layer.cu
     src/layers/relu_layer.cu
     src/layers/aggregator.cu
     src/math_functions.cu
@@ -64,12 +65,14 @@ set(sources
   src/layers/sigmoid_loss_layer.cpp
   src/layers/graph_conv_layer.cpp
   src/layers/leaky_relu_layer.cpp
+  src/layers/l2_norm_layer.cpp
   src/layers/relu_layer.cpp
   src/layers/aggregator.cpp
   src/math_functions.cpp
   src/layers/layer.cpp
   src/DistContext.cpp
   src/optimizer.cpp
+  src/sampler.cpp
   src/utils.cpp
   src/node.cpp
   src/net.cpp
@@ -80,6 +83,7 @@ set(sources
   src/layers/sigmoid_loss_layer.cpp
   src/layers/graph_conv_layer.cpp
   src/layers/leaky_relu_layer.cpp
+  src/layers/l2_norm_layer.cpp
   src/layers/relu_layer.cpp
   src/layers/aggregator.cpp
   src/math_functions.cpp

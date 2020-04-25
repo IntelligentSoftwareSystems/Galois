@@ -26,7 +26,8 @@ namespace deepgalois {
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
 public:
-  Net() : is_single_class(true), num_samples(0), num_classes(0),
+  Net() : is_single_class(true), has_l2norm(false), has_dense(false),
+          num_samples(0), num_classes(0),
           num_conv_layers(0), num_layers(0), num_epochs(0),
           learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
           train_begin(0), train_end(0), train_count(0),
@@ -35,20 +36,26 @@ public:
           train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
   void init(std::string dataset_str, unsigned num_conv, unsigned epochs,
             unsigned hidden1, float lr, float dropout, float wd,
-            bool selfloop, bool is_single, Graph* dGraph);
+            bool selfloop, bool single, bool l2norm, bool dense, Graph* dGraph);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
+
   void construct_layers();
   void append_out_layer(size_t layer_id);
+  void append_l2norm_layer(size_t layer_id);
+  void append_dense_layer(size_t layer_id);
+  void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
+         bool bias = false, bool dropout = true); //! Add a convolution layer to the network
+
   void train(optimizer* opt, bool need_validate); // training
   double evaluate(std::string type, acc_t& loss, acc_t& acc); // inference
   void read_test_masks(std::string dataset, Graph* dGraph);
   acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks); // forward propagation
-
-  //! Add a convolution layer to the network
-  void append_conv_layer(size_t layer_id, bool act = false, bool norm = true,
-                         bool bias = false, bool dropout = true);
+  void bprop(); // back propogation
+  void normalize(); // Scale gradient to counterbalance accumulation
+  void regularize(); // add weight decay
+  void update_weights(optimizer* opt); // update trainable weights after back-propagation
 
   //! Save the context object to all layers of the network
   void set_contexts() {
@@ -66,13 +73,10 @@ public:
       layers[i]->print_layer_info();
   }
 
-  void bprop(); // back propogation
-  void normalize(); // Scale gradient to counterbalance accumulation
-  void regularize(); // add weight decay
-  void update_weights(optimizer* opt); // update trainable weights after back-propagation
-
 protected:
   bool is_single_class;              // single-class (one-hot) or multi-class label
+  bool has_l2norm;                   // whether the net contains an l2_norm layer
+  bool has_dense;                    // whether the net contains an dense layer
   size_t num_samples;                // number of samples: N
   size_t num_classes;                // number of vertex classes: E
   size_t num_conv_layers;            // number of convolutional layers

@@ -171,5 +171,7 @@ void float_malloc_device(int n, float_t*& ptr);
 void float_free_device(float_t*& ptr);
 void float_copy_device(int n, float_t* h_ptr, float_t *d_ptr);
 acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t* loss);
-acc_t l2_norm_gpu(int n, float_t *tensor);
+acc_t l2_norm_gpu(int n, const float_t *in);
+void l2_norm_gpu(size_t x, size_t y, const float_t* in, float_t *out);
+void d_l2_norm_gpu(size_t x, size_t y, const float_t* in_data, float_t *in_diff, float_t *out_diff);
 #endif

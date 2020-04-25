@@ -130,7 +130,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, 
                                        mask_t* masks, CSRGraph* g) {
 	return masked_f1_score_gpu(num_classes, begin, end, count, masks,
-                             layers[num_conv_layers - 1]->next()->get_data(),
+                             layers[num_conv_layers]->next()->get_data(),
                              context->get_labels_device_ptr());
 }
 

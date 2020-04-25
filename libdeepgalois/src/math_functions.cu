@@ -327,7 +327,7 @@ __global__ void l2_norm_kernel(const int n, const float_t* a, float_t *sum) {
   }
 }
 
-acc_t l2_norm_gpu(int n, float_t* x) {
+acc_t l2_norm_gpu(int n, const float_t* x) {
   float_t sum = 0.0;
   CUBLAS_CHECK(cublasSnrm2(deepgalois::Context::cublas_handle(), n, x, 1, &sum));
   //float_t *d_sum;
@@ -336,6 +336,13 @@ acc_t l2_norm_gpu(int n, float_t* x) {
   //l2_norm_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, x, d_sum);
   //CUDA_CHECK(cudaMemcpy(d_sum, &sum, sizeof(float_t), cudaMemcpyDeviceToHost));
   return (acc_t)sum / 2.0;
+}
+
+void l2_norm_gpu(size_t x, size_t y, const float_t* in, float_t *out) {
+}
+
+void d_l2_norm_gpu(size_t x, size_t y, const float_t* in_data, 
+                   float_t *in_diff, float_t *out_diff) {
 }
 
 void copy_gpu(int len, const float_t* in, float_t* out) {

@@ -13,49 +13,53 @@ const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pub
 // The formula for the F1 score is:
 // F1 = 2 * (precision * recall) / (precision + recall)
 // where precision = TP / (TP + FP), recall = TP / (TP + FN)
-// TP: true positive; FP: false positive; FN: false negtive.
+// TP: true positive; FP: false positive; FN: false negative.
 // In the multi-class and multi-label case, this is the weighted average of the F1 score of each class.
 // Please refer to https://sebastianraschka.com/faq/docs/multiclass-metric.html,
 // http://pageperso.lif.univ-mrs.fr/~francois.denis/IAAM1/scikit-learn-docs.pdf (p.1672)
 // and https://github.com/ashokpant/accuracy-evaluation-cpp/blob/master/src/evaluation.hpp
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred) {
-  float beta = 1.0;
-  std::vector<int> true_positive(num_classes, 0);
-  std::vector<int> false_positive(num_classes, 0);
-  std::vector<int> false_negtive(num_classes, 0);
-  galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
-    if (masks[i] == 1) {
-      for (size_t j = 0; j < num_classes; j++) {
-        auto idx = i * num_classes + j;
+  double precision_cls(0.), recall_cls(0.), f1_accum(0.);
+  int tp_accum(0), fn_accum(0), fp_accum(0), tn_accum(0);
+  for (size_t col = 0; col < num_classes; col++) {
+    int tp_cls(0), fp_cls(0), fn_cls(0), tn_cls(0);
+    for (size_t row = begin; row < end; row ++) {
+    //galois::do_all(galois::iterate(begin, end), [&](const auto& row) {
+      if (masks[row] == 1) {
+        auto idx = row * num_classes + col;
         if (ground_truth[idx] == 1 && pred[idx] > 0.5) {
-          __sync_fetch_and_add(&true_positive[j], 1);
+          //__sync_fetch_and_add(&tp_cls, 1);
+          tp_cls += 1;
         } else if (ground_truth[idx] == 0 && pred[idx] > 0.5) {
-          __sync_fetch_and_add(&false_positive[j], 1);
+          //__sync_fetch_and_add(&fp_cls, 1);
+          fp_cls += 1;
         } else if (ground_truth[idx] == 1 && pred[idx] <= 0.5) {
-          __sync_fetch_and_add(&false_negtive[j], 1);
+          //__sync_fetch_and_add(&fn_cls, 1);
+          fn_cls += 1;
+        } else if (ground_truth[idx] == 0 && pred[idx] <= 0.5) {
+          //__sync_fetch_and_add(&tn_cls, 1);
+          tn_cls += 1;
         }
       }
-	}
-  }, galois::loopname("MaskedF1Score"));
-  acc_t pNumerator = 0.0;
-  acc_t pDenominator = 0.0;
-  acc_t rNumerator = 0.0;
-  acc_t rDenominator = 0.0;
-  for (size_t i = 0; i < num_classes; i++) {
-    acc_t fn = (acc_t)false_negtive[i]; // false negtive
-    acc_t fp = (acc_t)false_positive[i]; // false positive
-	acc_t tp = (acc_t)true_positive[i]; // true positive
-	pNumerator = pNumerator + tp;
-	pDenominator = pDenominator + (tp + fp);
-    rNumerator = rNumerator + tp;
-    rDenominator = rDenominator + (tp + fn);
+    }
+    //}, galois::loopname("MaskedF1Score"));
+    tp_accum += tp_cls;
+    fn_accum += fn_cls;
+    fp_accum += fp_cls;
+    tn_accum += tn_cls;
+    precision_cls = tp_cls + fp_cls > 0 ? (double)tp_cls/(double)(tp_cls+fp_cls) : 0.;
+    recall_cls = tp_cls+fn_cls > 0 ? (double)tp_cls/(double)(tp_cls+fn_cls) : 0.;
+    f1_accum += recall_cls+precision_cls > 0. ? 2.*(recall_cls*precision_cls)/(recall_cls+precision_cls) : 0.;
   }
-  auto recallMicro = rNumerator / rDenominator;
-  acc_t precisionMicro = pNumerator / pDenominator;
-  auto fscoreMicro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
-                     ((beta * beta) * precisionMicro + recallMicro);
-  return fscoreMicro;
+  double f1_macro = f1_accum/(double)num_classes;
+  //double accuracy_mic = (double)(tp_accum+tn_accum)/(double)(tp_accum+tn_accum+fp_accum+fn_accum);
+  double precision_mic = tp_accum+fp_accum > 0 ? (double)tp_accum/(double)(tp_accum+fp_accum) : 0.;
+  double recall_mic = tp_accum+fn_accum > 0 ? (double)tp_accum/(double)(tp_accum+fn_accum) : 0.;
+  double f1_micro = recall_mic+precision_mic > 0. ? 2.*(recall_mic*precision_mic)/(recall_mic+precision_mic) : 0.;
+  std::cout << std::setprecision(3) << std::fixed <<
+      " (f1_micro: " << f1_micro << ", f1_macro: " << f1_macro << ") ";
+  return f1_micro;
 }
 
 #ifndef GALOIS_USE_DIST

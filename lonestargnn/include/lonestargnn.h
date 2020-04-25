@@ -28,7 +28,7 @@ static cll::opt<unsigned> hidden1("h",
     cll::desc("Number of units in hidden layer 1 (default value 16)"), cll::init(16));
 static cll::opt<float> learning_rate("lr", 
     cll::desc("Initial learning rate (default value 0.01)"), cll::init(0.01));
-static cll::opt<float> dropout_rate("d", 
+static cll::opt<float> dropout_rate("dr", 
     cll::desc("Dropout rate (1 - keep probability) (default value 0.5)"), cll::init(0.5));
 static cll::opt<float> weight_decay("wd",
     cll::desc("Weight for L2 loss on embedding matrix (default value 5e-4)"), cll::init(5e-4));
@@ -41,6 +41,8 @@ static cll::opt<bool> is_single_class("sc",
 static cll::opt<bool> do_validate("dv", cll::desc("enable validation"), cll::init(1));
 static cll::opt<bool> do_test("dt", cll::desc("enable test"), cll::init(1));
 static cll::opt<bool> add_selfloop("sl", cll::desc("add selfloop"), cll::init(0));
+static cll::opt<bool> add_l2norm("l2", cll::desc("add an l2_norm layer"), cll::init(0));
+static cll::opt<bool> add_dense("d", cll::desc("add an dense layer"), cll::init(0));
 
 //! standard global options to the benchmarks
 extern llvm::cl::opt<bool> skipVerify;

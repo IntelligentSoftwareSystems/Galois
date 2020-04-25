@@ -8,13 +8,16 @@ namespace deepgalois {
 
 void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
                unsigned hidden1, float lr, float dropout, float wd,
-               bool selfloop, bool is_single, Graph* dGraph) {
+               bool selfloop, bool single, bool l2norm, bool dense, Graph* dGraph) {
+  assert(num_conv > 0);
   num_conv_layers = num_conv;
   num_epochs = epochs;
   learning_rate = lr;
   dropout_rate = dropout;
   weight_decay = wd;
-  is_single_class = is_single;
+  is_single_class = single;
+  has_l2norm = l2norm;
+  has_dense = dense;
   galois::gPrint("Configuration: num_conv_layers ", num_conv_layers,
                  ", num_epochs ", num_epochs,
                  ", hidden1 ", hidden1,
@@ -23,7 +26,7 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
                  ", weight_decay ", weight_decay, "\n");
 #ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
-  context->set_label_class(is_single);
+  context->set_label_class(is_single_class);
   num_samples = context->read_graph(dataset_str, selfloop);
 #else
   context = new deepgalois::DistContext();
@@ -78,13 +81,19 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   // train count and val count are LOCAL counts
 
   num_layers = num_conv_layers + 1;
+  if (has_l2norm) num_layers ++;
+  if (has_dense) num_layers ++;
   // initialize feature metadata
   feature_dims.resize(num_layers + 1);
   feature_dims[0] = context->read_features(dataset_str); // input feature dimension: D
   for (size_t i = 1; i < num_conv_layers; i++)
-    feature_dims[i] = hidden1;                  // hidden1 level embedding: 16
-  feature_dims[num_conv_layers] = num_classes;  // output embedding: E
-  feature_dims[num_layers] = num_classes;       // normalized output embedding: E
+    feature_dims[i] = hidden1;                           // hidden1 level embedding: 16
+  feature_dims[num_conv_layers] = num_classes;           // output embedding: E
+  if (has_l2norm) 
+      feature_dims[num_conv_layers+1] = num_classes;     // l2 normalized embedding: E
+  if (has_dense) 
+      feature_dims[num_layers-1] = num_classes;          // MLP embedding: E
+  feature_dims[num_layers] = num_classes;                // normalized output embedding: E
   layers.resize(num_layers);
 
 #ifndef CPU_ONLY
@@ -287,10 +296,22 @@ void Net::construct_layers() {
   for (size_t i = 0; i < num_conv_layers-1; i++)
     append_conv_layer(i, true);                  // conv layers, act=true
   append_conv_layer(num_conv_layers-1);          // the last hidden layer, act=false
+  if (has_l2norm)
+    append_l2norm_layer(num_conv_layers);        // l2_norm layer
+  if (has_dense)
+    append_dense_layer(num_layers-2);            // dense layer
   append_out_layer(num_layers-1);                // output layer
   layers[0]->set_in_data(context->get_in_ptr()); // feed input data
   context->norm_factor_counting();
   set_contexts();
+}
+
+//! Add an l2_norm layer to the network
+void Net::append_l2norm_layer(size_t layer_id) {
+}
+
+//! Add an dense layer to the network
+void Net::append_dense_layer(size_t layer_id) {
 }
 
 //! Add an output layer to the network
@@ -405,7 +426,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
 }
 
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
-  auto preds = layers[num_conv_layers - 1]->next()->get_data();
+  auto preds = layers[num_conv_layers]->next()->get_data();
   auto ground_truth = context->get_labels_ptr();
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes, ground_truth, preds);
 }
