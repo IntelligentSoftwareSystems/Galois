@@ -135,7 +135,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     message(FATAL_ERROR "icpc must be 19.0.1 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd68;-wd981;-wd383;-wd869;-wd2196;-wd279;-wd2504;-wd2943;-wd32013;-wd3373>")
+  # Avoid warnings when using noinline for methods defined inside class defintion.
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd2196>")
 endif()
 
 if(CYGWIN)
