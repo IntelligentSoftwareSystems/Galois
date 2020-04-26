@@ -57,36 +57,38 @@ public:
   }
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
-  virtual void set_netphase(deepgalois::net_phase phase) {}
-  //! save context
-  virtual void set_context(ContextType* ctx) { context = ctx; }
-  //! return layer loss
+  void print_layer_info(); //! debug print function
+
+  // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }
   virtual acc_t get_weight_decay_loss() { return acc_t(0); }
-
-  // main functions for layer work
-  virtual void forward_propagation(const float_t* in_data,
-                                   float_t* out_data)                = 0;
-  virtual void back_propagation(const float_t* in_data, const float_t* out_data,
-                                float_t* out_grad, float_t* in_grad) = 0;
-
-  // is this layer trainable?
-  void set_trainable(bool trainable) { trainable_ = trainable; }
-  void set_labels_ptr(label_t *ptr) { labels = ptr; }
   bool trainable() const { return trainable_; }
-
-  // name metadata
-  void set_name(std::string name) { name_ = name; }
   std::string get_name() { return name_; }
-
   mask_t* get_device_masks() { return d_masks_; }
   float_t* get_weights_ptr() { return &W[0]; }
   float_t* get_weights_device_ptr() { return d_W; }
   float_t* get_grads_ptr() { return &weight_grad[0]; }
   float_t* get_grads_device_ptr() { return d_weight_grad; }
 
-  //! debug print function
-  void print_layer_info();
+  // set methods
+  virtual void set_netphase(deepgalois::net_phase phase) {}
+  virtual void set_context(ContextType* ctx) { context = ctx; }
+  void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
+  void set_labels_ptr(label_t *ptr) { labels = ptr; }
+  void set_name(std::string name) { name_ = name; } // name metadata
+#ifdef CPU_ONLY
+  void set_graph_ptr(Graph *ptr) { graph_cpu = ptr; }
+#else
+  void set_graph_ptr(CSRGraph *ptr) { graph_gpu = ptr; }
+#endif
+
+  //! set the data of the previous layer connected to this one
+  void set_in_data(float_t* data) {
+    prev_ = std::make_shared<deepgalois::edge>(this, input_dims[0], input_dims[1]);
+    prev_->set_data(data);
+    // no need to allocate memory for gradients, since this is the input layer.
+  }
+
   virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
                                size_t sample_count, mask_t* masks) {
     begin_ = sample_begin;
@@ -99,22 +101,18 @@ public:
 #endif
   }
 
-  //! set the data of the previous layer connected to this one
-  void set_in_data(float_t* data) {
-    prev_ = std::make_shared<deepgalois::edge>(this, input_dims[0], input_dims[1]);
-    prev_->set_data(data);
-    // no need to allocate memory for gradients, since this is the input layer.
-  }
-
   void add_edge() {
     // add an outgoing edge
     next_ = std::make_shared<deepgalois::edge>(this, output_dims[0], output_dims[1]);
     // allocate memory for intermediate feature vectors and gradients
     next_->alloc();
   }
-  void alloc_grad() {
-    // allocate memory for intermediate gradients
-  }
+
+  // main functions for layer work
+  virtual void forward_propagation(const float_t* in_data,
+                                   float_t* out_data)                = 0;
+  virtual void back_propagation(const float_t* in_data, const float_t* out_data,
+                                float_t* out_grad, float_t* in_grad) = 0;
 
   //! calls forward propagation using previous layer as input and writes
   //! to next layer as output
@@ -132,9 +130,6 @@ public:
 
   //! use optimizer to update weights given gradient (weight_grad)
   void update_weight(deepgalois::optimizer* opt) {
-    // std::cout << name_ << ": weight updating ... ";
-    // vec_t diff;
-    // prev()->merge_grads(&diff);
 #ifdef CPU_ONLY
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
@@ -168,6 +163,11 @@ protected:
   float_t* loss; // error for each vertex: N x 1
   ContextType* context;
   label_t* labels;
+#ifdef CPU_ONLY
+  Graph *graph_cpu;
+#else
+  CSRGraph *graph_gpu;
+#endif
 
 #ifdef GALOIS_USE_DIST
   // Used for synchronization of weight gradients

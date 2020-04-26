@@ -1,7 +1,7 @@
 /**
  * Based on common.hpp file of the Caffe deep learning library.
  */
-
+#include <set>
 #include "deepgalois/context.h"
 
 namespace deepgalois {
@@ -30,10 +30,7 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
   if (filetype == "el") {
     std::string filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());
-    LGraph lgraph;
-    lgraph.read_edgelist(filename.c_str(), true); // symmetrize
-    genGraph(lgraph, *graph_cpu);
-    lgraph.clean();
+    read_edgelist(filename.c_str(), true); // symmetrize
   } else if (filetype == "gr") {
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());
@@ -52,19 +49,6 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
   std::cout << "num_vertices " << graph_cpu->size() << " num_edges "
             << graph_cpu->sizeEdges() << "\n";
   return graph_cpu->size();
-}
-
-void Context::genGraph(LGraph& lg, Graph& g) {
-  g.allocateFrom(lg.num_vertices(), lg.num_edges());
-  g.constructNodes();
-  for (size_t i = 0; i < lg.num_vertices(); i++) {
-    g.getData(i)   = 1;
-    auto row_begin = lg.get_offset(i);
-    auto row_end   = lg.get_offset(i + 1);
-    g.fixEndEdge(i, row_end);
-    for (auto offset = row_begin; offset < row_end; offset++)
-      g.constructEdge(offset, lg.get_dest(offset), 0);
-  }
 }
 
 void Context::add_selfloop(Graph &og, Graph &g) {
@@ -99,12 +83,6 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   //*/
 }
 
-Graph* Context::getCpuGraphPointer() {
-  return Context::graph_cpu;
-}
-
-float_t* Context::get_in_ptr() { return h_feats; }
-
 void Context::norm_factor_counting() {
   norm_factor = new float_t[n];
   galois::do_all(galois::iterate((size_t)0, n),
@@ -115,6 +93,68 @@ void Context::norm_factor_counting() {
       else norm_factor[v] = 1.0 / temp;
     }, galois::loopname("NormCounting"));
 }
+
+void Context::read_edgelist(const char* filename, bool symmetrize, bool add_self_loop) {
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  size_t m, n;
+  in >> m >> n >> std::ws;
+  size_t num_vertices_ = m;
+  size_t num_edges_    = 0;
+  std::cout << "num_vertices " << num_vertices_ << "\n";
+  std::vector<std::set<uint32_t> > vertices(m);
+  for (size_t i = 0; i < n; i++) {
+    std::set<uint32_t> neighbors;
+    if (add_self_loop) neighbors.insert(i);
+    vertices.push_back(neighbors);
+  }
+  while (std::getline(in, line)) {
+    std::istringstream edge_stream(line);
+    VertexID u, v;
+    edge_stream >> u;
+    edge_stream >> v;
+    vertices[u].insert(v);
+    if (symmetrize) vertices[v].insert(u);
+  }
+  in.close();
+  for (size_t i = 0; i < n; i++) num_edges_ += vertices[i].size();
+  std::cout << "num_edges " << num_edges_ << "\n";
+
+  std::vector<uint32_t> degrees;
+  degrees.resize(num_vertices_);
+  std::fill(degrees.begin(), degrees.end(), 0);
+  for (size_t i = 0; i < num_vertices_; i++)
+    degrees[i] = vertices[i].size();
+  std::vector<uint32_t> offsets(degrees.size() + 1);
+  uint32_t total = 0;
+  for (size_t n = 0; n < degrees.size(); n++) {
+    offsets[n] = total;
+    total += degrees[n];
+  }
+  offsets[degrees.size()] = total;
+  degrees.clear();
+  assert(num_edges_ == offsets[num_vertices_]);
+  EdgeID *colidx_ = new EdgeID[num_edges_];
+  VertexID *rowptr_ = new VertexID[num_vertices_ + 1];
+  for (size_t i = 0; i < num_vertices_ + 1; i++)
+    rowptr_[i] = offsets[i];
+  for (size_t i = 0; i < num_vertices_; i++) {
+    for (auto dst : vertices[i])
+        colidx_[offsets[i]++] = dst;
+  }
+
+  graph_cpu->allocateFrom(num_vertices_, num_edges_);
+  graph_cpu->constructNodes();
+  for (size_t i = 0; i < num_vertices_; i++) {
+    auto row_begin = rowptr_[i];
+    auto row_end = rowptr_[i+1];
+    graph_cpu->fixEndEdge(i, row_end);
+    for (auto offset = row_begin; offset < row_end; offset++)
+      graph_cpu->constructEdge(offset, colidx_[offset], 0);
+  }
+}
+
 #endif
 
 // labels contain the ground truth (e.g. vertex classes) for each example

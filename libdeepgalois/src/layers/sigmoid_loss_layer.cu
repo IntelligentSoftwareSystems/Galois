@@ -19,7 +19,6 @@ sigmoid_loss_layer::~sigmoid_loss_layer() {
 
 void sigmoid_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
-  //label_t *labels = context->get_labels_device_ptr();
   init_const_gpu(input_dims[0], 0.0, loss);
   sigmoid_cross_entropy_gpu(input_dims[1], begin_, end_, in_data,
                             d_masks_, labels, loss, out_data);
@@ -28,7 +27,6 @@ void sigmoid_loss_layer::forward_propagation(const float_t* in_data,
 void sigmoid_loss_layer::back_propagation(const float_t* in_data,
                                           const float_t* out_data,
                                           float_t* out_grad, float_t* in_grad) {
-  //label_t *labels = context->get_labels_device_ptr();
   d_sigmoid_cross_entropy_gpu(input_dims[1], begin_, end_, d_masks_,
                               labels, out_data, in_grad);
 }

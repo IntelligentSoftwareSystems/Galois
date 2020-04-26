@@ -158,5 +158,4 @@ void Context::copy_data_to_device() {
   //float_copy_device(n*feat_len, &h_feats[0], d_feats);
 //}
 
-float_t* Context::get_in_ptr() { return d_feats; }
 } // namespace context

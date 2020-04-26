@@ -36,7 +36,7 @@ public:
   void init();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
-  void set_context(layer::ContextType* ctx) { context = ctx; norm_factor = ctx->get_norm_factor(); }
+  void set_context(layer::ContextType* ctx) { context = ctx; norm_factor = ctx->get_norm_factor_ptr(); }
   virtual acc_t get_weight_decay_loss();
   //! Uses weights contained in this layer to update in_data (results from previous)
   //! and save result to out_data

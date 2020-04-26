@@ -58,9 +58,9 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   else copy_gpu(x*y, in_data, in_temp); 
   if (y > z) {
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, d_W, 0.0, out_temp);
-    graph_conv_layer::aggregate(z, context->graph_gpu, out_temp, out_data);
+    graph_conv_layer::aggregate(z, *graph_gpu, out_temp, out_data);
   } else {
-    graph_conv_layer::aggregate(y, context->graph_gpu, in_temp, in_temp1);
+    graph_conv_layer::aggregate(y, *graph_gpu, in_temp, in_temp1);
     sgemm_gpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp1, d_W, 0.0, out_data);
   }
   if (act_) relu_gpu(x * z, out_data, out_data);
@@ -72,14 +72,14 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
                                         float_t* out_grad, float_t* in_grad) {
   if (act_) d_relu_gpu(x * z, out_grad, out_data, out_grad);
   if (y > z) {
-    graph_conv_layer::d_aggregate(z, context->graph_gpu, out_grad, out_temp);
+    graph_conv_layer::d_aggregate(z, *graph_gpu, out_grad, out_temp);
     if (level_ != 0)
       sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, d_W, 0.0, in_grad);
     sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, layer::d_weight_grad);
   } else {
     if (level_ != 0) {
       sgemm_gpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_grad, d_W, 0.0, in_temp);
-      graph_conv_layer::d_aggregate(y, context->graph_gpu, in_temp, in_grad);
+      graph_conv_layer::d_aggregate(y, *graph_gpu, in_temp, in_grad);
     }
     sgemm_gpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_grad, 0.0, layer::d_weight_grad);
   }

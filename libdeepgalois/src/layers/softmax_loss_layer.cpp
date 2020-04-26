@@ -17,8 +17,8 @@ softmax_loss_layer::~softmax_loss_layer() {
 }
 
 inline label_t softmax_loss_layer::get_label(size_t i) {
-  //return labels[i];
-  return context->get_label(i);
+  return labels[i];
+  //return context->get_label(i);
 }
 
 // TODO: need kernel fusion optimization

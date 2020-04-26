@@ -17,8 +17,8 @@ sigmoid_loss_layer::~sigmoid_loss_layer() {
 }
 
 inline label_t sigmoid_loss_layer::get_label(size_t i, size_t j) {
-  return context->get_label(i, j);
-  //return labels(i*input_dims[1]+j);
+  //return context->get_label(i, j);
+  return labels[i*input_dims[1]+j];
 }
 
 void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* out_data) {

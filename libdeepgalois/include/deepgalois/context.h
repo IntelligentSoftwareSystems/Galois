@@ -8,7 +8,6 @@
 #include "deepgalois/types.h"
 #include "deepgalois/utils.h"
 #ifdef CPU_ONLY
-#include "deepgalois/lgraph.h"
 #include "deepgalois/gtypes.h"
 #else
 #include "graph_gpu.h"
@@ -28,32 +27,35 @@ public:
   size_t read_features(std::string dataset_str, std::string filetype = "bin");
 
   label_t get_label(size_t i) { return labels[i]; } // single-class (one-hot) label
-  label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
-  label_t* get_labels_ptr() { return labels; }
-  label_t* get_labels_subg_ptr() { return labels_subg; }
-  label_t* get_labels_device_ptr() { return d_labels; }
-  float_t* get_in_ptr();
-  float_t* get_norm_factor() { return norm_factor; }
+  //label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
+  float_t* get_norm_factor_ptr() { return norm_factor; }
 
+  void set_label_class(bool is_single = true) { is_single_class = is_single; }
   void copy_data_to_device(); // copy labels and input features
   void norm_factor_counting();
-  void set_label_class(bool is_single = true) { is_single_class = is_single; }
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
   Graph* subgraph_cpu;
-  void genGraph(LGraph& lg, Graph& g);
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
-  Graph* getCpuGraphPointer();
-  Graph* getCpuSubgraphPointer() { return subgraph_cpu; };
+  Graph* getGraphPointer() { return graph_cpu; }
+  Graph* getSubgraphPointer() { return subgraph_cpu; };
+  float_t* get_in_ptr() { return h_feats; }
+  label_t* get_labels_ptr() { return labels; }
+  label_t* get_labels_subg_ptr() { return labels_subg; }
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
+  CSRGraph subgraph_gpu;
+  CSRGraph* getGraphPointer() { return &graph_gpu; }
+  CSRGraph* getSubgraphPointer() { return &subgraph_gpu; };
+  float_t* get_in_ptr() { return d_feats; }
+  label_t* get_labels_ptr() { return d_labels; }
+  label_t* get_labels_subg_ptr() { return d_labels_subg; }
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
   inline static cusparseHandle_t cusparse_handle() { return cusparse_handle_; }
   inline static cusparseMatDescr_t cusparse_matdescr() { return cusparse_matdescr_; }
   inline static curandGenerator_t curand_generator() { return curand_generator_; }
-  CSRGraph* getGpuGraphPointer() { return &graph_gpu; }
 #endif
 
 protected:
@@ -67,12 +69,17 @@ protected:
   float_t* h_feats;            // input features: N x D
   float_t* norm_factor;        // normalization constant based on graph structure
   label_t* d_labels;           // labels on device
+  label_t *d_labels_subg;      // labels for subgraph on device
   float_t* d_feats;            // input features on device
-#ifndef CPU_ONLY
+
+#ifdef CPU_ONLY
+  void read_edgelist(const char* filename, bool symmetrize = false, bool add_self_loop = false);
+#else
   static cublasHandle_t cublas_handle_; // used to call cuBLAS
   static cusparseHandle_t cusparse_handle_; // used to call cuSPARSE
   static cusparseMatDescr_t cusparse_matdescr_; // used to call cuSPARSE
   static curandGenerator_t curand_generator_; // used to generate random numbers on GPU
 #endif
 };
+
 } // end deepgalois namespace

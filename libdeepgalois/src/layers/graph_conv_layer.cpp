@@ -29,7 +29,7 @@ void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const 
   float_t *b = new float_t[len];
   mvmul(n, len, &Q[0], self, a);
   mvmul(n, len, &W[0], neighbors, b);
-  deepgalois::math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
+  math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
 }
 
 void graph_conv_layer::init() {
@@ -65,12 +65,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
   if (dropout_ && phase_ == deepgalois::net_phase::train) {
-    deepgalois::math::dropout_cpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
-    deepgalois::math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, &layer::W[0], 0.0, out_temp);
-  } else deepgalois::math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, &layer::W[0], 0.0, out_temp);
+    math::dropout_cpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
+    math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, &layer::W[0], 0.0, out_temp);
+  } else math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, &layer::W[0], 0.0, out_temp);
 
   // aggregate based on graph topology
-  graph_conv_layer::aggregate(z, *(context->graph_cpu), out_temp, out_data);
+  graph_conv_layer::aggregate(z, *graph_cpu, out_temp, out_data);
 #ifdef GALOIS_USE_DIST
   // TODO sync of out_data required here
   deepgalois::_syncVectorSize = z;
@@ -79,7 +79,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
                                           GraphConvSync>("AggSync");
 #endif
   // run relu activation on output if specified
-  if (act_) deepgalois::math::relu_cpu(x*z, out_data, out_data);
+  if (act_) math::relu_cpu(x*z, out_data, out_data);
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
@@ -87,12 +87,12 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
   // note; assumption here is that out_grad contains 1s or 0s via relu?
-  if (act_) deepgalois::math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
+  if (act_) math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
   //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
   // x*y NOTE: since graph is symmetric, the derivative is the same
   // this is the aggregate call
-  deepgalois::update_all(z, *(context->graph_cpu), out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+  deepgalois::update_all(z, *graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
 #ifdef GALOIS_USE_DIST
   // sync agg
   deepgalois::_syncVectorSize = z;
@@ -106,18 +106,17 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // this calculates gradients for the node predictions
   if (level_ != 0) { // no need to calculate in_grad for the first layer
     // derivative of matmul needs transposed matrix
-    deepgalois::math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0,
-                                out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
+    math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0,
+                    out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
     if (dropout_) {
-      deepgalois::math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask,
-                                      in_grad);
+      math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
     }
   }
 
   // calculate weight gradients using input data
   // multiplied by gradients from last back prop step
-  deepgalois::math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data,
-                              out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+  math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data,
+                  out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
 #ifdef GALOIS_USE_DIST
   layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
   //galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");

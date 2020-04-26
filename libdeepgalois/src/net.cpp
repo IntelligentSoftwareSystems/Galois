@@ -140,8 +140,8 @@ void Net::train(optimizer* opt, bool need_validate) {
     if (subgraph_sample_size && num_subg_remain == 0) {
 #ifdef CPU_ONLY
       VertexList vertices;
-      sampler->subgraph_sample(subgraph_sample_size, *(context->getCpuGraphPointer()),
-                               *(context->getCpuSubgraphPointer()), vertices, subgraph_masks);
+      sampler->subgraph_sample(subgraph_sample_size, *(context->getGraphPointer()),
+                               *(context->getSubgraphPointer()), vertices, subgraph_masks);
       lookup_labels(num_samples, subgraph_masks, context->get_labels_ptr(), context->get_labels_subg_ptr());
 #endif
       num_subg_remain += 1; // num_threads
@@ -154,19 +154,6 @@ void Net::train(optimizer* opt, bool need_validate) {
     // for use during backprop
     Tfw.start();
     double fw_time = evaluate("train", train_loss, train_acc);
-	/*
-    train_loss = Net::fprop(train_begin, train_end, train_count, train_masks); // forward
-#ifdef CPU_ONLY
-    Graph *g = context->getCpuGraphPointer();
-#else
-	CSRGraph *g = context->getGpuGraphPointer();
-#endif
-    if (is_single_class) {
-      train_acc = masked_accuracy(train_begin, train_end, train_count, train_masks, g); // predict
-    } else {
-      train_acc = masked_multi_class_accuracy(train_begin, train_end, train_count, train_masks, g); // predict
-    }
-	*/
     Tfw.stop();
 
     // backward: use intermediate features + ground truth to update layers
@@ -244,11 +231,7 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
 #endif
 
   loss = fprop(begin, end, count, masks);
-#ifdef CPU_ONLY
-  Graph* g = context->getCpuGraphPointer();
-#else
-  CSRGraph* g = context->getGpuGraphPointer();
-#endif
+  auto g = context->getGraphPointer();
   if (is_single_class) {
     acc = masked_accuracy(begin, end, count, masks, g);
   } else {
@@ -361,11 +344,7 @@ void Net::append_out_layer(size_t layer_id) {
     layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
   else
     layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
-#ifdef CPU_ONLY
   layers[layer_id]->set_labels_ptr(context->get_labels_ptr());
-#else
-  layers[layer_id]->set_labels_ptr(context->get_labels_device_ptr());
-#endif
   connect(layers[layer_id - 1], layers[layer_id]);
 }
 
@@ -380,6 +359,7 @@ void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
   out_dims[1]              = get_out_dim(layer_id);
   layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                           dropout_rate, in_dims, out_dims);
+  layers[layer_id]->set_graph_ptr(context->getGraphPointer());
   if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
 }
 
