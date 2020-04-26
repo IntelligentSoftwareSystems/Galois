@@ -10,6 +10,7 @@ public:
   std::string layer_type() const override {
     return std::string("sigmoid_loss");
   }
+  inline label_t get_label(size_t i, size_t j);
   virtual void forward_propagation(const float_t* in_data, float_t* out_data);
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);

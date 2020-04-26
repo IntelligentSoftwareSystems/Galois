@@ -8,7 +8,7 @@ public:
   ~Sampler() {}
 
   // sample a subgraph sg of size n from graph g
-  void subgraph_sampler(Graph &g, Graph &sg, size_t n);
+  void subgraph_sample(size_t n, Graph &g, Graph &sg, VertexList &vertex_set, mask_t *masks);
 
   // !API function for user-defined selection strategy
   virtual void select_vertices(Graph &g, VertexList &vertex_set, size_t n, size_t m);

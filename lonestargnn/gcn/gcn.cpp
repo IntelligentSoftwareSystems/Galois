@@ -27,7 +27,8 @@ int main(int argc, char** argv) {
   // read network, features, ground truth, initialize metadata
   network.init(dataset, num_conv_layers, epochs, hidden1, learning_rate, 
                dropout_rate, weight_decay, add_selfloop, 
-               is_single_class, add_l2norm, add_dense, dGraph);
+               is_single_class, add_l2norm, add_dense, 
+               neighbor_sample_sz, subgraph_sample_sz, dGraph);
   // default setting for now; can be customized by the user
   network.construct_layers();
   network.print_layers_info();

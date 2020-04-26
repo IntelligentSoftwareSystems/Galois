@@ -52,7 +52,7 @@ public:
         std::vector<size_t> out_dims)
       : node(in_dims.size(), out_dims.size()), level_(level), begin_(0),
         end_(0), num_dims(in_dims.size()), input_dims(in_dims),
-        output_dims(out_dims) {
+        output_dims(out_dims), labels(NULL) {
     add_edge();
   }
   virtual ~layer()                       = default;
@@ -72,6 +72,7 @@ public:
 
   // is this layer trainable?
   void set_trainable(bool trainable) { trainable_ = trainable; }
+  void set_labels_ptr(label_t *ptr) { labels = ptr; }
   bool trainable() const { return trainable_; }
 
   // name metadata
@@ -166,6 +167,7 @@ protected:
   mask_t* d_masks_;
   float_t* loss; // error for each vertex: N x 1
   ContextType* context;
+  label_t* labels;
 
 #ifdef GALOIS_USE_DIST
   // Used for synchronization of weight gradients

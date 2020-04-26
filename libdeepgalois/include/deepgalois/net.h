@@ -8,10 +8,12 @@
 #include "galois/Timer.h"
 #include "deepgalois/types.h"
 #include "deepgalois/gtypes.h"
+#include "deepgalois/layers/l2_norm_layer.h"
 #include "deepgalois/layers/graph_conv_layer.h"
 #include "deepgalois/layers/softmax_loss_layer.h"
 #include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/optimizer.h"
+#include "deepgalois/sampler.h"
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
 #else
@@ -27,6 +29,7 @@ namespace deepgalois {
 class Net {
 public:
   Net() : is_single_class(true), has_l2norm(false), has_dense(false),
+          neighbor_sample_size(0), subgraph_sample_size(0),
           num_samples(0), num_classes(0),
           num_conv_layers(0), num_layers(0), num_epochs(0),
           learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
@@ -36,7 +39,9 @@ public:
           train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
   void init(std::string dataset_str, unsigned num_conv, unsigned epochs,
             unsigned hidden1, float lr, float dropout, float wd,
-            bool selfloop, bool single, bool l2norm, bool dense, Graph* dGraph);
+            bool selfloop, bool single, bool l2norm, bool dense, 
+            unsigned neigh_sample_size = 0, unsigned subg_sample = 0, 
+            Graph* dGraph = NULL);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
@@ -77,6 +82,8 @@ protected:
   bool is_single_class;              // single-class (one-hot) or multi-class label
   bool has_l2norm;                   // whether the net contains an l2_norm layer
   bool has_dense;                    // whether the net contains an dense layer
+  unsigned neighbor_sample_size;     // neighbor sampling
+  unsigned subgraph_sample_size;     // subgraph sampling
   size_t num_samples;                // number of samples: N
   size_t num_classes;                // number of vertex classes: E
   size_t num_conv_layers;            // number of convolutional layers
@@ -95,16 +102,20 @@ protected:
   mask_t* d_val_masks;               // masks for validation on device
   mask_t* test_masks;                // masks for test
   mask_t* d_test_masks;              // masks for test on device
+  mask_t* subgraph_masks;            // masks for subgraph
   std::vector<size_t> feature_dims;  // feature dimnesions for each layer
   std::vector<layer*> layers;        // all the layers in the neural network
+  Sampler *sampler;
 #ifndef GALOIS_USE_DIST
   deepgalois::Context* context;
 #else
   deepgalois::DistContext* context;
 #endif
 
-  // comparing outputs with the ground truth (labels)
+  void lookup_labels(size_t n, mask_t *masks, const label_t *labels, label_t *sub_labels);
+
 #ifdef CPU_ONLY
+  // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
   acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
 #else

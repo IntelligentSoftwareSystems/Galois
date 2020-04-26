@@ -8,7 +8,8 @@ namespace deepgalois {
 
 void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
                unsigned hidden1, float lr, float dropout, float wd,
-               bool selfloop, bool single, bool l2norm, bool dense, Graph* dGraph) {
+               bool selfloop, bool single, bool l2norm, bool dense, 
+               unsigned neigh_sz, unsigned subg_sz, Graph* dGraph) {
   assert(num_conv > 0);
   num_conv_layers = num_conv;
   num_epochs = epochs;
@@ -18,6 +19,8 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   is_single_class = single;
   has_l2norm = l2norm;
   has_dense = dense;
+  neighbor_sample_size = neigh_sz;
+  subgraph_sample_size = subg_sz;
   galois::gPrint("Configuration: num_conv_layers ", num_conv_layers,
                  ", num_epochs ", num_epochs,
                  ", hidden1 ", hidden1,
@@ -28,6 +31,7 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   context = new deepgalois::Context();
   context->set_label_class(is_single_class);
   num_samples = context->read_graph(dataset_str, selfloop);
+  if (subgraph_sample_size) sampler = new deepgalois::Sampler();
 #else
   context = new deepgalois::DistContext();
   num_samples = dGraph->size();
@@ -103,6 +107,9 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #endif
 }
 
+void Net::lookup_labels(size_t n, mask_t *masks, const label_t *labels, label_t *sub_labels) {
+}
+
 void Net::train(optimizer* opt, bool need_validate) {
   std::string header = "";
   std::string seperator = " ";
@@ -118,6 +125,11 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::StatTimer Tbw("Train-Backward");
   galois::StatTimer Tval("Validation");
   double total_train_time = 0.0;
+  int num_subg_remain = 0;
+  if (subgraph_sample_size) {
+    subgraph_masks = new mask_t[num_samples];
+    std::copy(train_masks, train_masks+num_samples, subgraph_masks);
+  }
 
   Timer t_epoch;
   // run epochs
@@ -125,6 +137,15 @@ void Net::train(optimizer* opt, bool need_validate) {
     galois::gPrint(header, "Epoch ", std::setw(3), i, seperator);
     t_epoch.Start();
 
+    if (subgraph_sample_size && num_subg_remain == 0) {
+#ifdef CPU_ONLY
+      VertexList vertices;
+      sampler->subgraph_sample(subgraph_sample_size, *(context->getCpuGraphPointer()),
+                               *(context->getCpuSubgraphPointer()), vertices, subgraph_masks);
+      lookup_labels(num_samples, subgraph_masks, context->get_labels_ptr(), context->get_labels_subg_ptr());
+#endif
+      num_subg_remain += 1; // num_threads
+    }
     // training steps
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
@@ -200,6 +221,7 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
     end = train_end;
     count = train_count;
     masks = train_masks;
+    if (subgraph_sample_size) masks = subgraph_masks;
   } else if (type == "val") {
     begin = val_begin;
     end = val_end;
@@ -308,10 +330,24 @@ void Net::construct_layers() {
 
 //! Add an l2_norm layer to the network
 void Net::append_l2norm_layer(size_t layer_id) {
+  assert(layer_id > 0); // can not be the first layer
+  std::vector<size_t> in_dims(2), out_dims(2);
+  in_dims[0]       = num_samples;
+  in_dims[0]       = num_samples;
+  in_dims[1]       = get_in_dim(layer_id);
+  out_dims[1]      = get_out_dim(layer_id);
+  layers[layer_id] = new l2_norm_layer(layer_id, in_dims, out_dims);
 }
 
 //! Add an dense layer to the network
 void Net::append_dense_layer(size_t layer_id) {
+  assert(layer_id > 0); // can not be the first layer
+  std::vector<size_t> in_dims(2), out_dims(2);
+  in_dims[0]       = num_samples;
+  in_dims[0]       = num_samples;
+  in_dims[1]       = get_in_dim(layer_id);
+  out_dims[1]      = get_out_dim(layer_id);
+  //layers[layer_id] = new dense_layer(layer_id, in_dims, out_dims);
 }
 
 //! Add an output layer to the network
@@ -325,6 +361,11 @@ void Net::append_out_layer(size_t layer_id) {
     layers[layer_id] = new softmax_loss_layer(layer_id, in_dims, out_dims);
   else
     layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
+#ifdef CPU_ONLY
+  layers[layer_id]->set_labels_ptr(context->get_labels_ptr());
+#else
+  layers[layer_id]->set_labels_ptr(context->get_labels_device_ptr());
+#endif
   connect(layers[layer_id - 1], layers[layer_id]);
 }
 

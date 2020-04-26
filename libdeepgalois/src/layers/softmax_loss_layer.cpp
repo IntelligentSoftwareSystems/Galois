@@ -16,6 +16,11 @@ softmax_loss_layer::~softmax_loss_layer() {
   delete loss;
 }
 
+inline label_t softmax_loss_layer::get_label(size_t i) {
+  //return labels[i];
+  return context->get_label(i);
+}
+
 // TODO: need kernel fusion optimization
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
@@ -27,7 +32,7 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
       math::softmax(len, &in_data[len*i], &out_data[len*i]); // normalize using softmax
       // one hot encoded vector for the labels
       std::vector<acc_t> groundTruth(output_dims[1], 0.0); // ground truth
-      groundTruth[context->get_label(i)] = 1.0;            // one-hot
+      groundTruth[get_label(i)] = 1.0;            // one-hot
       // loss calculation
       loss[i] = math::cross_entropy(len, &groundTruth[0], &out_data[len*i]);
     }
@@ -46,7 +51,7 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
     if (masks_[i] == 1) { // masked
       vec_t norm_grad(len);
       std::vector<acc_t> groundTruth(len, 0.0);
-      groundTruth[context->get_label(i)] = 1.0;
+      groundTruth[get_label(i)] = 1.0;
       // use ground truth to determine derivative of cross entropy
       math::d_cross_entropy(len, &groundTruth[0], &out_data[len * i], &norm_grad[0]);
       // derviative softmax to gradient used in the next layer

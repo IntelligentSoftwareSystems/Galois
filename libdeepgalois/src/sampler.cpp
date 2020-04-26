@@ -114,8 +114,8 @@ void Sampler::select_vertices(Graph &g, VertexList &vertex_set, size_t n, size_t
 	}
 }
 
-void Sampler::subgraph_sampler(Graph &g, Graph&sg, size_t n) {
-	VertexList vertex_set(n);
+void Sampler::subgraph_sample(size_t n, Graph &g, Graph&sg, VertexList &vertex_set, mask_t *masks) {
+	vertex_set.resize(n);
 	select_vertices(g, vertex_set, n, m); 
 	generate_subgraph(vertex_set, g, sg);
 }

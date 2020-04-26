@@ -30,6 +30,7 @@ public:
   label_t get_label(size_t i) { return labels[i]; } // single-class (one-hot) label
   label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
   label_t* get_labels_ptr() { return labels; }
+  label_t* get_labels_subg_ptr() { return labels_subg; }
   label_t* get_labels_device_ptr() { return d_labels; }
   float_t* get_in_ptr();
   float_t* get_norm_factor() { return norm_factor; }
@@ -40,10 +41,12 @@ public:
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
+  Graph* subgraph_cpu;
   void genGraph(LGraph& lg, Graph& g);
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
   Graph* getCpuGraphPointer();
+  Graph* getCpuSubgraphPointer() { return subgraph_cpu; };
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
@@ -59,7 +62,8 @@ protected:
   size_t feat_len;             // input feature length: D
   bool is_single_class;        // single-class (one-hot) or multi-class label
   bool is_selfloop_added;      // whether selfloop is added to the input graph
-  label_t *labels;             // labels for classification: N x 1
+  label_t *labels;             // labels for classification. Single-class label: Nx1, multi-class label: NxE 
+  label_t *labels_subg;        // labels for subgraph
   float_t* h_feats;            // input features: N x D
   float_t* norm_factor;        // normalization constant based on graph structure
   label_t* d_labels;           // labels on device

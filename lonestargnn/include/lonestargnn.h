@@ -34,8 +34,6 @@ static cll::opt<float> weight_decay("wd",
     cll::desc("Weight for L2 loss on embedding matrix (default value 5e-4)"), cll::init(5e-4));
 static cll::opt<float> early_stopping("es",
     cll::desc("Tolerance for early stopping (# of epochs) (default value 10)"), cll::init(10));
-static cll::opt<unsigned> max_degree("md", 
-    cll::desc("Maximum size of the downsampled adjacency lists (default value 25)"), cll::init(25));
 static cll::opt<bool> is_single_class("sc", 
     cll::desc("single-class or multi-class label (default single)"), cll::init(1));
 static cll::opt<bool> do_validate("dv", cll::desc("enable validation"), cll::init(1));
@@ -43,6 +41,8 @@ static cll::opt<bool> do_test("dt", cll::desc("enable test"), cll::init(1));
 static cll::opt<bool> add_selfloop("sl", cll::desc("add selfloop"), cll::init(0));
 static cll::opt<bool> add_l2norm("l2", cll::desc("add an l2_norm layer"), cll::init(0));
 static cll::opt<bool> add_dense("d", cll::desc("add an dense layer"), cll::init(0));
+static cll::opt<unsigned> neighbor_sample_sz("ns", cll::desc("neighbor sampling size (default value 0)"), cll::init(0));
+static cll::opt<unsigned> subgraph_sample_sz("ss", cll::desc("subgraph sampling size (default value 0)"), cll::init(0));
 
 //! standard global options to the benchmarks
 extern llvm::cl::opt<bool> skipVerify;

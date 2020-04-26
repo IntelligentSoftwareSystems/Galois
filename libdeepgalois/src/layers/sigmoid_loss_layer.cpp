@@ -16,6 +16,11 @@ sigmoid_loss_layer::~sigmoid_loss_layer() {
   delete loss;
 }
 
+inline label_t sigmoid_loss_layer::get_label(size_t i, size_t j) {
+  return context->get_label(i, j);
+  //return labels(i*input_dims[1]+j);
+}
+
 void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
@@ -25,7 +30,7 @@ void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* ou
       math::sigmoid(len, &in_data[idx], &out_data[idx]); // normalize using sigmoid
       // one hot encoded vector for the labels
       float_t *ground_truth = new float_t[len];
-      for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)context->get_label(i, j);
+      for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)get_label(i, j);
       // loss calculation
       loss[i] = math::cross_entropy(len, ground_truth, &out_data[idx]);
 	  delete ground_truth;
@@ -41,7 +46,7 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
       size_t idx = len * i;
       float_t *norm_grad = new float_t[len];
       float_t *ground_truth = new float_t[len];
-      for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)context->get_label(i, j);
+      for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)get_label(i, j);
       // use ground truth to determine derivative of cross entropy
       math::d_cross_entropy(len, ground_truth, &out_data[idx], norm_grad);
       // derviative sigmoid to gradient used in the next layer
