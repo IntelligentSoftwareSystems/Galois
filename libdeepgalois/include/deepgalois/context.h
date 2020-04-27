@@ -6,7 +6,6 @@
 #include <string>
 #include <cassert>
 #include "deepgalois/types.h"
-#include "deepgalois/utils.h"
 #ifdef CPU_ONLY
 #include "deepgalois/gtypes.h"
 #else
@@ -15,6 +14,7 @@
 #endif
 
 namespace deepgalois {
+
 class Context {
 public:
   Context();
@@ -25,6 +25,8 @@ public:
   size_t read_graph_gpu(std::string dataset_str, bool selfloop);
   size_t read_labels(std::string dataset_str);
   size_t read_features(std::string dataset_str, std::string filetype = "bin");
+  size_t read_masks(std::string dataset_str, std::string mask_type,
+                    size_t n, size_t& begin, size_t& end, mask_t* masks);
 
   label_t get_label(size_t i) { return h_labels[i]; } // single-class (one-hot) label
   //label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label

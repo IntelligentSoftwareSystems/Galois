@@ -3,6 +3,7 @@
  */
 
 #include "deepgalois/net.h"
+#include "deepgalois/utils.h"
 
 namespace deepgalois {
 
@@ -74,11 +75,11 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #endif
   } else {
 #ifndef GALOIS_USE_DIST
-    train_count = read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks);
-    val_count = read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks);
+    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks);
+    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks);
 #else
-    train_count = read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
-    val_count = read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
+    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
+    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
 #endif
   }
 
@@ -426,9 +427,9 @@ void Net::read_test_masks(std::string dataset, Graph* dGraph) {
 #endif
   } else {
 #ifndef GALOIS_USE_DIST
-    test_count = deepgalois::read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks);
+    test_count = context->read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks);
 #else
-    test_count = deepgalois::read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks, dGraph);
+    test_count = context->read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks, dGraph);
 #endif
   }
 #ifndef CPU_ONLY

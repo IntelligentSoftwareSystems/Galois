@@ -10,7 +10,6 @@
  */
 
 #include "deepgalois/types.h"
-#include "deepgalois/utils.h"
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
 #else
@@ -69,7 +68,7 @@ public:
   float_t* get_grads_device_ptr() { return d_weight_grad; }
 
   // set methods
-  virtual void set_netphase(deepgalois::net_phase phase) {}
+  virtual void set_netphase(net_phase phase) {}
   virtual void set_context(ContextType* ctx) { context = ctx; }
   void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
   void set_labels_ptr(label_t *ptr) { labels = ptr; }

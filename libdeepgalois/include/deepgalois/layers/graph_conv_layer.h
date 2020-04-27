@@ -35,7 +35,7 @@ public:
   ~graph_conv_layer() {}
   void init();
   std::string layer_type() const override { return std::string("graph_conv"); }
-  void set_netphase(deepgalois::net_phase ctx) override { phase_ = ctx; }
+  void set_netphase(net_phase ctx) override { phase_ = ctx; }
   void set_context(layer::ContextType* ctx) { context = ctx; norm_factor = ctx->get_norm_factor_ptr(); }
   virtual acc_t get_weight_decay_loss();
   //! Uses weights contained in this layer to update in_data (results from previous)
@@ -64,7 +64,7 @@ private:
   bool dropout_; // whether to use dropout at first
   const float_t dropout_rate_;
   float_t scale_;
-  deepgalois::net_phase phase_;
+  net_phase phase_;
   size_t x;
   size_t y;
   size_t z;
@@ -76,22 +76,8 @@ private:
   float_t* norm_factor;   // normalization constant based on graph structure
 
   // Glorot & Bengio (AISTATS 2010)
-  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed=1) {
-    auto init_range = sqrt(6.0 / (dim_x + dim_y));
-    std::default_random_engine rng(seed);
-    std::uniform_real_distribution<float_t> dist(-init_range, init_range);
-    matrix.resize(dim_x * dim_y);
-    for (size_t i = 0; i < dim_x; ++i) {
-      for (size_t j = 0; j < dim_y; ++j)
-        matrix[i * dim_y + j] = dist(rng);
-    }
-  }
-  inline void zero_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix) {
-    matrix.resize(dim_x * dim_y);
-    for (size_t i = 0; i < dim_x; ++i) {
-      for (size_t j = 0; j < dim_y; ++j)
-        matrix[i * dim_y + j] = 0;
-    }
-  }
+  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed=1);
+  inline void zero_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix);
 };
+
 } // namespace

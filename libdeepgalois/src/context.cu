@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include "deepgalois/context.h"
 #include "deepgalois/math_functions.hh"
+#include "deepgalois/configs.h"
 
 // random seeding
 int64_t cluster_seedgen(void) {
@@ -62,9 +63,12 @@ cusparseMatDescr_t Context::cusparse_matdescr_ = 0;
 curandGenerator_t Context::curand_generator_   = 0;
 
 Context::Context() : n(0), num_classes(0), feat_len(0), 
-  is_single_class(true), is_selfloop_added(false), 
-  h_labels(NULL), h_feats(NULL), norm_factor(NULL),
-  d_labels(NULL), d_feats(NULL) {
+                     is_single_class(true), is_selfloop_added(false), 
+                     h_labels(NULL), h_labels_subg(NULL), 
+                     h_feats(NULL), h_feats_subg(NULL),
+                     d_labels(NULL), d_labels_subg(NULL),
+                     d_feats(NULL), d_feats_subg(NULL),
+                     norm_factor(NULL) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));

@@ -11,7 +11,7 @@ public:
   void subgraph_sample(size_t n, Graph &sg, mask_t *masks);
 
   // !API function for user-defined selection strategy
-  virtual void select_vertices(size_t nv, size_t n, int m, Graph &g, VertexList vertices, VertexList &vertex_set);
+  virtual void select_vertices(size_t nv, size_t n, int m, Graph &g, VertexList vertices, VertexSet &vertex_set);
 
   galois::runtime::iterable<galois::NoDerefIterator<Graph::edge_iterator> > neighbor_sampler(Graph &g, GNode v);
 
@@ -43,21 +43,13 @@ protected:
   Graph masked_graph;
   Graph *graph;
 
-  // Utility function to randomly select k items from [begin, end)
-  template <typename T = uint32_t>
-  T* select_k_items(T k, T begin, T end);
-
-  // Utility function to find ceiling of r in arr[l..h]
-  template <typename T = int>
-  inline T findCeil(std::vector<T> arr, T r, T l, T h);
-
-  // Utility function to select one element from n elements given a frequency (probability) distribution
-  template <typename T = int>
-  T select_one_item(T n, std::vector<T> dist);
-
   // Given a subset of vertices and a graph g, generate a subgraph sg from the graph g
-  void generate_subgraph(VertexList &vertex_set, Graph &g, Graph &sub);
+  void generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub);
   void generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph &mg);
+
+  void get_masked_degrees(size_t n, mask_t *masks, Graph &g, std::vector<uint32_t> &degrees);
+  void update_masks(size_t n, VertexSet vertices, mask_t *masks);
+  inline VertexList reindexing_vertice(VertexSet vertex_set);
 };
 
 }

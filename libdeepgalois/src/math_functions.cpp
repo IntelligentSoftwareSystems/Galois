@@ -2,6 +2,7 @@
 #include "galois/Timer.h"
 #include "galois/Galois.h"
 #include <immintrin.h>
+#include "deepgalois/utils.h"
 
 extern "C" {
 #include <cblas.h>

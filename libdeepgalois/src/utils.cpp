@@ -3,8 +3,41 @@
 
 namespace deepgalois {
 
-#define NUM_DATASETS 8
-const std::string dataset_names[NUM_DATASETS] = {"cora", "citeseer", "ppi", "pubmed", "flickr", "yelp", "reddit", "amazon"};
+// parallel prefix sum
+template <typename InTy, typename OutTy>
+OutTy* parallel_prefix_sum(const std::vector<InTy> &in) {
+  const size_t block_size = 1<<20;
+  const size_t num_blocks = (in.size() + block_size - 1) / block_size;
+  std::vector<OutTy> local_sums(num_blocks);
+  // count how many bits are set on each thread
+  galois::do_all(galois::iterate((size_t)0, num_blocks), [&](const size_t& block) {
+    OutTy lsum = 0;
+    size_t block_end = std::min((block + 1) * block_size, in.size());
+    for (size_t i=block * block_size; i < block_end; i++)
+      lsum += in[i];
+    local_sums[block] = lsum;
+  });
+  std::vector<OutTy> bulk_prefix(num_blocks+1);
+  OutTy total = 0;
+  for (size_t block=0; block < num_blocks; block++) {
+    bulk_prefix[block] = total;
+    total += local_sums[block];
+  }
+  bulk_prefix[num_blocks] = total;
+  OutTy *prefix = new OutTy[in.size() + 1];
+  galois::do_all(galois::iterate((size_t)0, num_blocks), [&](const size_t& block) {
+    OutTy local_total = bulk_prefix[block];
+    size_t block_end = std::min((block + 1) * block_size, in.size());
+    for (size_t i=block * block_size; i < block_end; i++) {
+      prefix[i] = local_total;
+      local_total += in[i];
+    }
+  });
+  prefix[in.size()] = bulk_prefix[num_blocks];
+  return prefix;
+}
+
+template uint32_t* parallel_prefix_sum<uint32_t, uint32_t>(const std::vector<uint32_t> &in);
 
 // Compute the F1 score, also known as balanced F-score or F-measure
 // The F1 score can be interpreted as a weighted average of the precision and recall, 
@@ -62,92 +95,4 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
   return f1_micro;
 }
 
-#ifndef GALOIS_USE_DIST
-//! Get masks from datafile where first line tells range of
-//! set to create mask from
-size_t read_masks(std::string dataset_str, std::string mask_type,
-                  size_t n, size_t& begin, size_t& end, mask_t* masks) {
-  bool dataset_found = false;
-  for (int i = 0; i < NUM_DATASETS; i++) {
-    if (dataset_str == dataset_names[i]) {
-      dataset_found = true;
-      break;
-    }
-  }
-  if (!dataset_found) {
-    std::cout << "Dataset currently not supported\n";
-    exit(1);
-  }
-  size_t i             = 0;
-  size_t sample_count  = 0;
-  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
-  // std::cout << "Reading " << filename << "\n";
-  std::ifstream in;
-  std::string line;
-  in.open(filename, std::ios::in);
-  in >> begin >> end >> std::ws;
-  while (std::getline(in, line)) {
-    std::istringstream mask_stream(line);
-    if (i >= begin && i < end) {
-      unsigned mask = 0;
-      mask_stream >> mask;
-      if (mask == 1) {
-        masks[i] = 1;
-        sample_count++;
-      }
-    }
-    i++;
-  }
-  std::cout << mask_type + "_mask range: [" << begin << ", " << end
-    << ") Number of valid samples: " << sample_count << " (" 
-    << (float)sample_count/(float)n*(float)100 << "\%)\n";
-  in.close();
-  return sample_count;
-}
-#else
-size_t read_masks(std::string dataset_str, std::string mask_type,
-                         size_t n, size_t& begin, size_t& end,
-                         mask_t* masks, Graph* dGraph) {
-  bool dataset_found = false;
-  for (int i = 0; i < NUM_DATASETS; i++) {
-    if (dataset_str == dataset_names[i]) {
-      dataset_found = true;
-      break;
-    }
-  }
-  if (!dataset_found) {
-    std::cout << "Dataset currently not supported\n";
-    exit(1);
-  }
-  size_t i             = 0;
-  size_t sample_count  = 0;
-  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
-
-  std::ifstream in;
-  std::string line;
-  in.open(filename, std::ios::in);
-  in >> begin >> end >> std::ws;
-  while (std::getline(in, line)) {
-    std::istringstream mask_stream(line);
-    if (i >= begin && i < end) {
-      unsigned mask = 0;
-      mask_stream >> mask;
-      if (mask == 1) {
-        // only bother if it's local
-        if (dGraph->isLocal(i)) {
-          masks[dGraph->getLID(i)] = 1;
-          sample_count++;
-        }
-      }
-    }
-    i++;
-  }
-  std::cout << mask_type + "_mask range: [" << begin << ", " << end
-    << ") Number of valid samples: " << sample_count << "("
-    << (float)sample_count/(float)n*(float)100 << "\%)\n";
-  in.close();
-  return sample_count;
-}
-#endif
-
-}
+} // end namespace

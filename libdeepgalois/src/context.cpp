@@ -2,14 +2,19 @@
  * Based on common.hpp file of the Caffe deep learning library.
  */
 #include "deepgalois/context.h"
+#include "deepgalois/utils.h"
+#include "deepgalois/configs.h"
 
 namespace deepgalois {
 
 #ifdef CPU_ONLY
 Context::Context() : n(0), num_classes(0), feat_len(0), 
   is_single_class(true), is_selfloop_added(false), 
-  h_labels(NULL), h_feats(NULL), norm_factor(NULL),
-  d_labels(NULL), d_feats(NULL) {}
+  h_labels(NULL), h_labels_subg(NULL), 
+  h_feats(NULL), h_feats_subg(NULL),
+  d_labels(NULL), d_labels_subg(NULL),
+  d_feats(NULL), d_feats_subg(NULL),
+  norm_factor(NULL) {}
 
 Context::~Context() {
   if (h_labels) delete h_labels;
@@ -251,6 +256,48 @@ size_t Context::read_features(std::string dataset_str, std::string filetype) {
     //for (auto j = 0; j < 6; j ++) 
       //std::cout << "feats[" << i << "][" << j << "] = " << h_feats[i*feat_len+j] << "\n";
   return feat_len;
+}
+
+//! Get masks from datafile where first line tells range of
+//! set to create mask from
+size_t Context::read_masks(std::string dataset_str, std::string mask_type,
+                  size_t n, size_t& begin, size_t& end, mask_t* masks) {
+  bool dataset_found = false;
+  for (int i = 0; i < NUM_DATASETS; i++) {
+    if (dataset_str == dataset_names[i]) {
+      dataset_found = true;
+      break;
+    }
+  }
+  if (!dataset_found) {
+    std::cout << "Dataset currently not supported\n";
+    exit(1);
+  }
+  size_t i             = 0;
+  size_t sample_count  = 0;
+  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
+  // std::cout << "Reading " << filename << "\n";
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  in >> begin >> end >> std::ws;
+  while (std::getline(in, line)) {
+    std::istringstream mask_stream(line);
+    if (i >= begin && i < end) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        masks[i] = 1;
+        sample_count++;
+      }
+    }
+    i++;
+  }
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << " (" 
+    << (float)sample_count/(float)n*(float)100 << "\%)\n";
+  in.close();
+  return sample_count;
 }
 
 /*

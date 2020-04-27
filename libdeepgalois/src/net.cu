@@ -2,6 +2,7 @@
 #include "deepgalois/cutils.h"
 #include "gg.h"
 #include "ggcuda.h"
+#include <iomanip>
 
 // the arguments of the maxima
 __device__ int argmax_device(const int n, const float_t* x) {
@@ -109,7 +110,7 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
     acc_t fn = (acc_t)h_fn[i]; // false negtive
     acc_t fp = (acc_t)h_fp[i]; // false positive
 	acc_t tp = (acc_t)h_tp[i]; // true positive
-	acc_t tn = (acc_t)h_tn[i]; // true positive
+	//acc_t tn = (acc_t)h_tn[i]; // true positive
 
     precisionMacro = precisionMacro + (tp / (tp + fp));
     recallMacro = recallMacro + (tp / (tp + fn));

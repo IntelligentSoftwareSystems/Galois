@@ -68,7 +68,7 @@ public:
       layers[i]->set_context(context);
   }
   //! set netphases for all layers in this network
-  void set_netphases(deepgalois::net_phase phase) {
+  void set_netphases(net_phase phase) {
     for (size_t i = 0; i < num_layers; i++)
       layers[i]->set_netphase(phase);
   }

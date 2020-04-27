@@ -1,4 +1,5 @@
 #include "deepgalois/layers/graph_conv_layer.h"
+#include "deepgalois/utils.h"
 
 namespace deepgalois {
 
@@ -17,6 +18,25 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
   init();
   assert(dropout_rate_ < 1.);
   scale_ = 1. / (1. - dropout_rate_);
+}
+
+inline void graph_conv_layer::rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed) {
+  auto init_range = sqrt(6.0 / (dim_x + dim_y));
+  std::default_random_engine rng(seed);
+  std::uniform_real_distribution<float_t> dist(-init_range, init_range);
+  matrix.resize(dim_x * dim_y);
+  for (size_t i = 0; i < dim_x; ++i) {
+    for (size_t j = 0; j < dim_y; ++j)
+      matrix[i * dim_y + j] = dist(rng);
+  }
+}
+
+inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix) {
+  matrix.resize(dim_x * dim_y);
+  for (size_t i = 0; i < dim_x; ++i) {
+    for (size_t j = 0; j < dim_y; ++j)
+      matrix[i * dim_y + j] = 0;
+  }
 }
 
 #ifdef CPU_ONLY
@@ -64,7 +84,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
-  if (dropout_ && phase_ == deepgalois::net_phase::train) {
+  if (dropout_ && phase_ == net_phase::train) {
     math::dropout_cpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
     math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, &layer::W[0], 0.0, out_temp);
   } else math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, &layer::W[0], 0.0, out_temp);

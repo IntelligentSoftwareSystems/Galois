@@ -15,11 +15,6 @@
 
 namespace deepgalois {
 
-const std::string path =
-    "/net/ohm/export/iss/inputs/Learning/"; // path to the input dataset
-
-enum class net_phase { train, test };
-
 //! tracks max mem usage with rusage
 // TODO use Galois's getrusage functionality
 class ResourceManager {
@@ -105,14 +100,76 @@ inline bool bernoulli(float_t p) {
   return uniform_rand(float_t(0), float_t(1)) > p;
 }
 
+// sequential prefix sum
+template <typename InTy = unsigned, typename OutTy = unsigned>
+inline std::vector<OutTy> prefix_sum(const std::vector<InTy> &in) {
+  std::vector<OutTy> prefix(in.size() + 1);
+  OutTy total = 0;
+  for (size_t i = 0; i < in.size(); i ++) {
+    prefix[i] = total;
+    total += (OutTy)in[i];
+  }
+  prefix[in.size()] = total;
+  return prefix;
+}
+
+template <typename InTy = unsigned, typename OutTy = unsigned>
+OutTy* parallel_prefix_sum(const std::vector<InTy> &in);
+
+// Utility function to randomly select k items from [begin, end)
+template <typename T = int>
+inline T* select_k_items(T k, T begin, T end) {
+    auto i = begin;
+  
+    // reservoir[] is the output array. Initialize  
+    // it with first k vertices 
+    T *reservoir = new T[k];
+    for (; i < k; i++) reservoir[i] = i;
+  
+    // Use a different seed value so that we don't get  
+    // same result each time we run this program  
+    srand(time(NULL));  
+  
+    // Iterate from the (k+1)th element to nth element  
+    for (; i < end; i++) {  
+        // Pick a random index from 0 to i.  
+        auto j = rand() % (i + 1);  
+  
+        // If the randomly picked index is smaller than k,  
+        // then replace the element present at the index  
+        // with new element from stream  
+        if (j < k) reservoir[j] = i;
+    }
+	return reservoir;
+}
+
+// Utility function to find ceiling of r in arr[l..h]
+template <typename T = int>
+inline T find_ceil(T *arr, T r, T l, T h) {  
+	T mid;
+	while (l < h) {
+		mid = l + ((h - l) >> 1); // Same as mid = (l+h)/2
+		(r > arr[mid]) ? (l = mid + 1) : (h = mid);
+	}
+	return (arr[l] >= r) ? l : -1;  
+} 
+
+// Utility function to select one element from n elements given a frequency (probability) distribution
+// https://www.geeksforgeeks.org/random-number-generator-in-arbitrary-probability-distribution-fashion/
+template <typename T = int>
+T select_one_item(T n, T *dist) {
+	T *offsets = new T[n];
+	offsets[0] = dist[0];
+	// compute the prefix sum of the distribution
+	for (T i = 1; i < n; ++i) offsets[i] = offsets[i-1] + dist[i];
+	// offsets[n-1] is sum of all frequencies
+	T sum = offsets[n-1];
+	T r = (rand() % sum) + 1;
+	// find which range r falls into, and return the index of the range
+	return find_ceil(offsets, r, 0, n - 1);
+}
+
 acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred);
 
-#ifdef GALOIS_USE_DIST
-size_t read_masks(std::string dataset_str, std::string mask_type,
-                  size_t n, size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
-#else
-size_t read_masks(std::string dataset_str, std::string mask_type,
-                  size_t n, size_t& begin, size_t& end, mask_t* masks);
-#endif
-}
+} // end namespace

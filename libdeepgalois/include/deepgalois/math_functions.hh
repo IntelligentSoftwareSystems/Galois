@@ -9,7 +9,6 @@
 #include <cstddef>
 #include <cstdint>
 #include "deepgalois/types.h"
-#include "deepgalois/utils.h"
 
 extern "C" {
 #include <cblas.h>

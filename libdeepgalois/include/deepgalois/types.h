@@ -28,6 +28,8 @@ typedef std::vector<VertexID> VertexList;
 typedef std::set<VertexID> VertexSet;
 typedef std::vector<size_t> dims_t; // dimentions type
 
+enum class net_phase { train, test };
+
 #define CHUNK_SIZE 256
 #define TB_SIZE 256
 #define BLOCK_SIZE 256

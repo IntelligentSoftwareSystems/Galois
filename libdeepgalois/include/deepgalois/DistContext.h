@@ -5,7 +5,6 @@
  */
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/types.h"
-#include "deepgalois/utils.h"
 #include "deepgalois/gtypes.h"
 
 namespace deepgalois {
@@ -28,10 +27,17 @@ public:
 
   //! save graph pointer to context object
   void saveGraph(Graph* dGraph);
+
   //! read labels of local nodes only
   size_t read_labels(std::string dataset_str);
+
   //! read features of local nodes only
   size_t read_features(std::string dataset_str);
+
+  //! read masks of local nodes only
+  size_t read_masks(std::string dataset_str, std::string mask_type,
+                    size_t n, size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
+
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
   void norm_factor_counting();

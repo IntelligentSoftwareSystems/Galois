@@ -1,4 +1,6 @@
 #include "deepgalois/DistContext.h"
+#include "deepgalois/utils.h"
+#include "deepgalois/configs.h"
 
 namespace deepgalois {
 DistContext::DistContext() {}
@@ -99,6 +101,50 @@ size_t DistContext::read_features(std::string dataset_str) {
                  feat_len, "\n");
 
   return feat_len;
+}
+
+size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
+                               size_t n, size_t& begin, size_t& end,
+                               mask_t* masks, Graph* dGraph) {
+  bool dataset_found = false;
+  for (int i = 0; i < NUM_DATASETS; i++) {
+    if (dataset_str == dataset_names[i]) {
+      dataset_found = true;
+      break;
+    }
+  }
+  if (!dataset_found) {
+    std::cout << "Dataset currently not supported\n";
+    exit(1);
+  }
+  size_t i             = 0;
+  size_t sample_count  = 0;
+  std::string filename = path + dataset_str + "-" + mask_type + "_mask.txt";
+
+  std::ifstream in;
+  std::string line;
+  in.open(filename, std::ios::in);
+  in >> begin >> end >> std::ws;
+  while (std::getline(in, line)) {
+    std::istringstream mask_stream(line);
+    if (i >= begin && i < end) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        // only bother if it's local
+        if (dGraph->isLocal(i)) {
+          masks[dGraph->getLID(i)] = 1;
+          sample_count++;
+        }
+      }
+    }
+    i++;
+  }
+  std::cout << mask_type + "_mask range: [" << begin << ", " << end
+    << ") Number of valid samples: " << sample_count << "("
+    << (float)sample_count/(float)n*(float)100 << "\%)\n";
+  in.close();
+  return sample_count;
 }
 
 float_t* DistContext::get_in_ptr() {
