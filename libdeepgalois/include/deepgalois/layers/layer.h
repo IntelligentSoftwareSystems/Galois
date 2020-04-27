@@ -52,9 +52,7 @@ public:
         std::vector<size_t> out_dims)
       : node(in_dims.size(), out_dims.size()), level_(level), begin_(0),
         end_(0), num_dims(in_dims.size()), input_dims(in_dims),
-        output_dims(out_dims), labels(NULL) {
-    add_edge();
-  }
+        output_dims(out_dims), labels(NULL) { }
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
   void print_layer_info(); //! debug print function
@@ -81,6 +79,7 @@ public:
 #else
   void set_graph_ptr(CSRGraph *ptr) { graph_gpu = ptr; }
 #endif
+  void update_dim_size(size_t sg_size) { input_dims[0] = output_dims[0] = sg_size; }
 
   //! set the data of the previous layer connected to this one
   void set_in_data(float_t* data) {

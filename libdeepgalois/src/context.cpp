@@ -1,7 +1,6 @@
 /**
  * Based on common.hpp file of the Caffe deep learning library.
  */
-#include <set>
 #include "deepgalois/context.h"
 
 namespace deepgalois {
@@ -9,11 +8,11 @@ namespace deepgalois {
 #ifdef CPU_ONLY
 Context::Context() : n(0), num_classes(0), feat_len(0), 
   is_single_class(true), is_selfloop_added(false), 
-  labels(NULL), h_feats(NULL), norm_factor(NULL),
+  h_labels(NULL), h_feats(NULL), norm_factor(NULL),
   d_labels(NULL), d_feats(NULL) {}
 
 Context::~Context() {
-  if (labels) delete labels;
+  if (h_labels) delete h_labels;
   if (h_feats) delete h_feats;
   if (norm_factor) delete norm_factor;
 }
@@ -174,10 +173,10 @@ size_t Context::read_labels(std::string dataset_str) {
   assert(m == n);
   if (is_single_class) {
     std::cout << "Using single-class (one-hot) labels\n";
-    labels = new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
+    h_labels = new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
   } else {
     std::cout << "Using multi-class labels\n";
-    labels = new label_t[m*num_classes]; // multi-class label for each vertex: N x E
+   h_labels = new label_t[m*num_classes]; // multi-class label for each vertex: N x E
   }
   unsigned v = 0;
   while (std::getline(in, line)) {
@@ -187,11 +186,11 @@ size_t Context::read_labels(std::string dataset_str) {
       label_stream >> x;
       if (is_single_class) {
         if (x != 0) {
-          labels[v] = idx;
+          h_labels[v] = idx;
           break;
         }
       } else {
-        labels[v*num_classes+idx] = x;
+        h_labels[v*num_classes+idx] = x;
       }
     }
     v++;

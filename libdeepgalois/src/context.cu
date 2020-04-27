@@ -63,7 +63,7 @@ curandGenerator_t Context::curand_generator_   = 0;
 
 Context::Context() : n(0), num_classes(0), feat_len(0), 
   is_single_class(true), is_selfloop_added(false), 
-  labels(NULL), h_feats(NULL), norm_factor(NULL),
+  h_labels(NULL), h_feats(NULL), norm_factor(NULL),
   d_labels(NULL), d_feats(NULL) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
@@ -141,10 +141,10 @@ size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
 void Context::copy_data_to_device() {
   if (is_single_class) {
     CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
-    CUDA_CHECK(cudaMemcpy(d_labels, labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
   } else {
     CUDA_CHECK(cudaMalloc((void**)&d_labels, n * num_classes * sizeof(label_t)));
-    CUDA_CHECK(cudaMemcpy(d_labels, labels, n * num_classes * sizeof(label_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * num_classes * sizeof(label_t), cudaMemcpyHostToDevice));
   }
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
   CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
@@ -153,7 +153,7 @@ void Context::copy_data_to_device() {
 
 //void Context::copy_data_to_device() {
   //float_malloc_device(n, d_labels);
-  //float_copy_device(n, labels, d_labels);
+  //float_copy_device(n, h_labels, d_labels);
   //float_malloc_device(n*feat_len, d_feats);
   //float_copy_device(n*feat_len, &h_feats[0], d_feats);
 //}

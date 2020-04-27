@@ -41,6 +41,7 @@ static cll::opt<bool> do_test("dt", cll::desc("enable test"), cll::init(1));
 static cll::opt<bool> add_selfloop("sl", cll::desc("add selfloop"), cll::init(0));
 static cll::opt<bool> add_l2norm("l2", cll::desc("add an l2_norm layer"), cll::init(0));
 static cll::opt<bool> add_dense("d", cll::desc("add an dense layer"), cll::init(0));
+static cll::opt<unsigned> val_interval("vi", cll::desc("validation interval (default value 1)"), cll::init(1));
 static cll::opt<unsigned> neighbor_sample_sz("ns", cll::desc("neighbor sampling size (default value 0)"), cll::init(0));
 static cll::opt<unsigned> subgraph_sample_sz("ss", cll::desc("subgraph sampling size (default value 0)"), cll::init(0));
 

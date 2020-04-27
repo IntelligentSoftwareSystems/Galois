@@ -95,6 +95,7 @@ protected:
   size_t train_begin, train_end, train_count;
   size_t val_begin, val_end, val_count;
   size_t test_begin, test_end, test_count;
+  int val_interval;
 
   mask_t* train_masks;               // masks for training
   mask_t* d_train_masks;             // masks for training on device
@@ -112,7 +113,8 @@ protected:
   deepgalois::DistContext* context;
 #endif
 
-  void lookup_labels(size_t n, mask_t *masks, const label_t *labels, label_t *sub_labels);
+  void lookup_labels(size_t n, const mask_t *masks, const label_t *labels, label_t *sub_labels);
+  void lookup_feats(size_t n, const mask_t *masks, const float_t *feats, float_t *sg_feats);
 
 #ifdef CPU_ONLY
   // comparing outputs with the ground truth (labels)

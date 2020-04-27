@@ -26,7 +26,7 @@ public:
   size_t read_labels(std::string dataset_str);
   size_t read_features(std::string dataset_str, std::string filetype = "bin");
 
-  label_t get_label(size_t i) { return labels[i]; } // single-class (one-hot) label
+  label_t get_label(size_t i) { return h_labels[i]; } // single-class (one-hot) label
   //label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
   float_t* get_norm_factor_ptr() { return norm_factor; }
 
@@ -41,15 +41,17 @@ public:
   //! returns pointer to the graph
   Graph* getGraphPointer() { return graph_cpu; }
   Graph* getSubgraphPointer() { return subgraph_cpu; };
-  float_t* get_in_ptr() { return h_feats; }
-  label_t* get_labels_ptr() { return labels; }
-  label_t* get_labels_subg_ptr() { return labels_subg; }
+  float_t* get_feats_ptr() { return h_feats; }
+  float_t* get_feats_subg_ptr() { return h_feats_subg; }
+  label_t* get_labels_ptr() { return h_labels; }
+  label_t* get_labels_subg_ptr() { return h_labels_subg; }
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   CSRGraph subgraph_gpu;
   CSRGraph* getGraphPointer() { return &graph_gpu; }
   CSRGraph* getSubgraphPointer() { return &subgraph_gpu; };
-  float_t* get_in_ptr() { return d_feats; }
+  float_t* get_feats_ptr() { return d_feats; }
+  float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }
   label_t* get_labels_subg_ptr() { return d_labels_subg; }
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
@@ -64,13 +66,15 @@ protected:
   size_t feat_len;             // input feature length: D
   bool is_single_class;        // single-class (one-hot) or multi-class label
   bool is_selfloop_added;      // whether selfloop is added to the input graph
-  label_t *labels;             // labels for classification. Single-class label: Nx1, multi-class label: NxE 
-  label_t *labels_subg;        // labels for subgraph
+  label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
+  label_t *h_labels_subg;      // labels for subgraph
   float_t* h_feats;            // input features: N x D
-  float_t* norm_factor;        // normalization constant based on graph structure
+  float_t* h_feats_subg;       // input features for subgraph
   label_t* d_labels;           // labels on device
   label_t *d_labels_subg;      // labels for subgraph on device
   float_t* d_feats;            // input features on device
+  float_t* d_feats_subg;       // input features for subgraph on device
+  float_t* norm_factor;        // normalization constant based on graph structure
 
 #ifdef CPU_ONLY
   void read_edgelist(const char* filename, bool symmetrize = false, bool add_self_loop = false);

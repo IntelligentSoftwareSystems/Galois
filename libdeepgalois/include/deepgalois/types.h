@@ -1,5 +1,6 @@
 #ifndef _GNN_TYPES_H_
 #define _GNN_TYPES_H_
+#include <set>
 #include <vector>
 #include <stdint.h>
 
@@ -24,6 +25,7 @@ typedef uint8_t mask_t; // mask is used to indicate different uses of labels:
 typedef uint32_t VertexID;
 typedef uint64_t EdgeID;
 typedef std::vector<VertexID> VertexList;
+typedef std::set<VertexID> VertexSet;
 typedef std::vector<size_t> dims_t; // dimentions type
 
 #define CHUNK_SIZE 256

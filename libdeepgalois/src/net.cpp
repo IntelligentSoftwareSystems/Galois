@@ -21,6 +21,7 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   has_dense = dense;
   neighbor_sample_size = neigh_sz;
   subgraph_sample_size = subg_sz;
+  val_interval = 1;
   galois::gPrint("Configuration: num_conv_layers ", num_conv_layers,
                  ", num_epochs ", num_epochs,
                  ", hidden1 ", hidden1,
@@ -107,7 +108,30 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #endif
 }
 
-void Net::lookup_labels(size_t n, mask_t *masks, const label_t *labels, label_t *sub_labels) {
+// generate labels for the subgraph
+void Net::lookup_labels(size_t n, const mask_t *masks, const label_t *labels, label_t *sg_labels) {
+  size_t count = 0;
+  for (size_t i = 0; i < n; i++) {
+    if (masks[i] == 1) {
+      if (is_single_class) {
+        sg_labels[count] = labels[i];
+      } else {
+        std::copy(labels+i*num_classes, labels+(i+1)*num_classes, sg_labels+count*num_classes);
+	  }
+      count ++;
+	}
+  }
+}
+
+void Net::lookup_feats(size_t n, const mask_t *masks, const float_t *feats, float_t *sg_feats) {
+  size_t count = 0;
+  size_t len = feature_dims[0];
+  for (size_t i = 0; i < n; i++) {
+    if (masks[i] == 1) {
+      std::copy(feats+i*len, feats+(i+1)*len, sg_feats+count*len);
+      count ++;
+	}
+  }
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
@@ -125,24 +149,37 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::StatTimer Tbw("Train-Backward");
   galois::StatTimer Tval("Validation");
   double total_train_time = 0.0;
+
   int num_subg_remain = 0;
+#ifdef CPU_ONLY
   if (subgraph_sample_size) {
     subgraph_masks = new mask_t[num_samples];
-    std::copy(train_masks, train_masks+num_samples, subgraph_masks);
+    sampler->set_masked_graph(train_begin, train_end, train_count, train_masks, context->getGraphPointer());
   }
-
+#endif
   Timer t_epoch;
   // run epochs
-  for (unsigned i = 0; i < num_epochs; i++) {
-    galois::gPrint(header, "Epoch ", std::setw(3), i, seperator);
+  for (unsigned ep = 0; ep < num_epochs; ep++) {
+    galois::gPrint(header, "Epoch ", std::setw(3), ep, seperator);
     t_epoch.Start();
 
     if (subgraph_sample_size && num_subg_remain == 0) {
 #ifdef CPU_ONLY
-      VertexList vertices;
-      sampler->subgraph_sample(subgraph_sample_size, *(context->getGraphPointer()),
-                               *(context->getSubgraphPointer()), vertices, subgraph_masks);
+      // generate subgraph
+      sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer()), subgraph_masks);
+      for (size_t i = 0; i < num_conv_layers-1; i++) {
+        layers[i]->set_graph_ptr(context->getSubgraphPointer());
+	  }
+      // update masks for subgraph
+      layers[num_layers - 1]->set_sample_mask(train_begin, train_end, train_count, subgraph_masks);
+
+      // update labels for subgraph
       lookup_labels(num_samples, subgraph_masks, context->get_labels_ptr(), context->get_labels_subg_ptr());
+      layers[num_layers-1]->set_labels_ptr(context->get_labels_subg_ptr());
+
+      // update features for subgraph
+      lookup_feats(num_samples, subgraph_masks, context->get_feats_ptr(), context->get_feats_subg_ptr());
+      layers[0]->set_in_data(context->get_feats_subg_ptr()); // feed input data
 #endif
       num_subg_remain += 1; // num_threads
     }
@@ -175,7 +212,7 @@ void Net::train(optimizer* opt, bool need_validate) {
     t_epoch.Stop();
     double epoch_time = t_epoch.Millisecs();
     total_train_time += epoch_time;
-    if (need_validate) {
+    if (need_validate && ep % val_interval == 0) {
       // Validation
       acc_t val_loss = 0.0, val_acc = 0.0;
       Tval.start();
@@ -306,7 +343,18 @@ void Net::construct_layers() {
   if (has_dense)
     append_dense_layer(num_layers-2);            // dense layer
   append_out_layer(num_layers-1);                // output layer
-  layers[0]->set_in_data(context->get_in_ptr()); // feed input data
+
+  // allocate memory for intermediate features and gradients
+  for (size_t i = 0; i < num_layers; i++) {
+    if (subgraph_sample_size)
+      layers[i]->update_dim_size(subgraph_sample_size);
+    layers[i]->add_edge();
+  }
+  for (size_t i = 1; i < num_layers; i++) {
+    connect(layers[i - 1], layers[i]);
+  }
+  layers[0]->set_in_data(context->get_feats_ptr()); // feed input data
+  // precompute the normalization constant based on graph structure
   context->norm_factor_counting();
   set_contexts();
 }
@@ -345,7 +393,6 @@ void Net::append_out_layer(size_t layer_id) {
   else
     layers[layer_id] = new sigmoid_loss_layer(layer_id, in_dims, out_dims);
   layers[layer_id]->set_labels_ptr(context->get_labels_ptr());
-  connect(layers[layer_id - 1], layers[layer_id]);
 }
 
 //! Add a convolution layer to the network
@@ -360,7 +407,6 @@ void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
   layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                           dropout_rate, in_dims, out_dims);
   layers[layer_id]->set_graph_ptr(context->getGraphPointer());
-  if (layer_id > 0) connect(layers[layer_id - 1], layers[layer_id]);
 }
 
 void Net::read_test_masks(std::string dataset, Graph* dGraph) {
