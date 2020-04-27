@@ -31,7 +31,7 @@
 #define D_GRAPH_LOADER_SYM
 
 #include "galois/graphs/CuSPPartitioner.h"
-#include "deepgalois/utils.h"
+#include "deepgalois/configs.h"
 
 /*******************************************************************************
  * Supported partitioning schemes

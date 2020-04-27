@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   Graph* dGraph = NULL;
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
-  Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
 
   // read network, features, ground truth, initialize metadata

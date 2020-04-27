@@ -40,12 +40,12 @@ protected:
   size_t end_;
   VertexList vertices_;
   mask_t *masks_;
-  Graph masked_graph;
+  Graph *masked_graph;
   Graph *graph;
 
   // Given a subset of vertices and a graph g, generate a subgraph sg from the graph g
   void generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub);
-  void generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph &mg);
+  void generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph *mg);
 
   void get_masked_degrees(size_t n, mask_t *masks, Graph &g, std::vector<uint32_t> &degrees);
   void update_masks(size_t n, VertexSet vertices, mask_t *masks);

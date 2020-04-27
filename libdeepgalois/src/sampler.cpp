@@ -11,7 +11,7 @@ namespace deepgalois {
 
 void Sampler::get_masked_degrees(size_t n, mask_t *masks, Graph &g, std::vector<uint32_t> &degrees) {
   assert(degrees.size() == n);
-  galois::do_all(galois::iterate(g), [&](const GNode src) {
+  galois::do_all(galois::iterate(size_t(0), n), [&](const GNode src) {
     if (masks[src] == 1) {
       for (const auto e : g.edges(src)) {
         const auto dst = g.getEdgeDst(e);
@@ -21,14 +21,16 @@ void Sampler::get_masked_degrees(size_t n, mask_t *masks, Graph &g, std::vector<
   }, galois::loopname("update_degrees"));
 }
 
-void Sampler::generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph &sub) {
+void Sampler::generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph *sub) {
   std::vector<uint32_t> degrees(n, 0);
   get_masked_degrees(n, masks, g, degrees);
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
   size_t ne = offsets[n];
-  sub.allocateFrom(n, ne);
-  sub.constructNodes();
-  galois::do_all(galois::iterate(sub), [&](const GNode src) {
+#ifndef GALOIS_USE_DIST
+  sub = new Graph();
+  sub->allocateFrom(n, ne);
+  sub->constructNodes();
+  galois::do_all(galois::iterate((size_t)0, n), [&](const GNode src) {
     g.fixEndEdge(src, offsets[src+1]);
     if (masks[src] == 1) {
       auto idx = offsets[src];
@@ -38,6 +40,7 @@ void Sampler::generate_masked_graph(size_t n, mask_t *masks, Graph &g, Graph &su
       }
     }
   }, galois::loopname("gen_subgraph"));
+#endif
 }
 
 // !API function for user-defined selection strategy
@@ -53,7 +56,7 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph &g, VertexList v
     frontier[i] = vertices[frontier_indices[i]];
   vertex_set.insert(frontier.begin(), frontier.end());
   int *degrees = new int[m];
-  galois::do_all(galois::iterate(g.begin(), g.end()), [&](const auto i) {
+  galois::do_all(galois::iterate(size_t(0), g.size()), [&](const auto i) {
     degrees[i] = (int)getDegree(g, frontier[i]);
   }, galois::loopname("compute_degrees"));
   for (size_t i = 0; i < n - m; i++) {
@@ -94,6 +97,7 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
   }
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
   auto ne = offsets[nv];
+#ifndef GALOIS_USE_DIST
   sub.allocateFrom(nv, ne);
   sub.constructNodes();
   VertexList old_ids(vertex_set.begin(), vertex_set.end()); // vertex ID mapping
@@ -105,15 +109,16 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
       g.constructEdge(offsets[i]+j, g.getEdgeDst(e), 0);
       j ++;
     }
-  }, galois::loopname("compute_degrees"));
+  }, galois::loopname("construct_graph"));
+#endif
 }
 
 void Sampler::subgraph_sample(size_t n, Graph&sg, mask_t *masks) {
   VertexSet vertex_set; // n = 9000 by default
-  select_vertices(count_, n, m_, masked_graph, vertices_, vertex_set); // m = 1000 by default
+  select_vertices(count_, n, m_, *masked_graph, vertices_, vertex_set); // m = 1000 by default
   update_masks(graph->size(), vertex_set, masks); // set masks for vertices in the vertex_set
-  generate_masked_graph(n, masks, masked_graph, sg); // remove edges whose destination is not masked
-  generate_subgraph(vertex_set, masked_graph, sg);
+  generate_masked_graph(n, masks, *masked_graph, &sg); // remove edges whose destination is not masked
+  generate_subgraph(vertex_set, *masked_graph, sg);
 }
 
 } // end namespace

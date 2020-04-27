@@ -10,18 +10,25 @@
 namespace deepgalois {
 
 class DistContext {
+protected:
   size_t localVertices;        // number of samples: N
   size_t num_classes;          // number of classes: E
   size_t feat_len;             // input feature length: D
-  std::vector<label_t> labels; // labels for classification: N x 1
-  vec_t h_feats;               // input features: N x D
   galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
-public:
-  // TODO why are these public
-  float_t* norm_factor; // normalization constant based on graph structure
-  Graph* graph_cpu; // the input graph, |V| = N
+  Graph* graph_cpu;            // the input graph, |V| = N
+  Graph* subgraph_cpu;
+  label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
+  label_t *h_labels_subg;      // labels for subgraph
+  float_t* h_feats;            // input features: N x D
+  float_t* h_feats_subg;       // input features for subgraph
+  label_t* d_labels;           // labels on device
+  label_t *d_labels_subg;      // labels for subgraph on device
+  float_t* d_feats;            // input features on device
+  float_t* d_feats_subg;       // input features for subgraph on device
+  float_t* norm_factor;        // normalization constant based on graph structure
 
+public:
   DistContext();
   ~DistContext();
 
@@ -42,18 +49,21 @@ public:
   // TODO this is a distributed operation
   void norm_factor_counting();
 
+  float_t* get_norm_factor_ptr() { return norm_factor; }
+  Graph* getGraphPointer() { return graph_cpu; }
+  Graph* getSubgraphPointer() { return subgraph_cpu; };
+  float_t* get_feats_ptr() { return h_feats; }
+  float_t* get_feats_subg_ptr() { return h_feats_subg; }
+  label_t* get_labels_ptr() { return h_labels; }
+  label_t* get_labels_subg_ptr() { return h_labels_subg; }
+
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
 
-  Graph* getGraphPointer() {
-    return graph_cpu;
-  }
 
   //! return label for some node
   //! NOTE: this is LID, not GID
-  label_t get_label(size_t i) {
-    return labels[i];
-  }
+  label_t get_label(size_t i) { return h_labels[i]; }
 
   //! returns pointer to the features of each local node
   float_t* get_in_ptr();

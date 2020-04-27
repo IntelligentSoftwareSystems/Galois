@@ -26,7 +26,7 @@ size_t DistContext::read_labels(std::string dataset_str) {
   in >> m >> num_classes >> std::ws;
   assert(m == dGraph->globalSize());
   // size of labels should be # local nodes
-  labels.resize(dGraph->size(), 0);
+  h_labels = new label_t[dGraph->size()]; // single-class (one-hot) label for each vertex: N x 1
 
   uint32_t foundVertices = 0;
   unsigned v = 0;
@@ -42,7 +42,7 @@ size_t DistContext::read_labels(std::string dataset_str) {
         label_stream >> x;
         if (x != 0) {
           // set local id
-          labels[dGraph->getLID(v)] = idx;
+          h_labels[dGraph->getLID(v)] = idx;
           foundVertices++;
           break;
         }
@@ -76,7 +76,7 @@ size_t DistContext::read_features(std::string dataset_str) {
   // header read
   in >> m >> feat_len >> std::ws;
   // use local size, not global size
-  h_feats.resize(dGraph->size() * feat_len, 0);
+  h_feats = new float_t[dGraph->size() * feat_len];
 
   // loop through all features
   while (std::getline(in, line)) {
