@@ -33,7 +33,7 @@ public:
                    std::vector<size_t> out_dims)
       : graph_conv_layer(level, false, true, false, true, 0.5, in_dims, out_dims) {}
   ~graph_conv_layer() {}
-  void init();
+  void malloc_and_init();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(net_phase ctx) override { phase_ = ctx; }
   void set_context(layer::ContextType* ctx) { context = ctx; norm_factor = ctx->get_norm_factor_ptr(); }
@@ -65,9 +65,6 @@ private:
   const float_t dropout_rate_;
   float_t scale_;
   net_phase phase_;
-  size_t x;
-  size_t y;
-  size_t z;
   float_t* out_temp; //!< intermediate data temporary
   float_t* in_temp;
   float_t* in_temp1;

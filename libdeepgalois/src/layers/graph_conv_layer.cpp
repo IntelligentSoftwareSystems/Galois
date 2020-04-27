@@ -10,12 +10,8 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
     : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),
       dropout_(dropout), dropout_rate_(dropout_rate) {
   assert(input_dims[0] == output_dims[0]); // num_vertices
-  x          = input_dims[0];
-  y          = input_dims[1];
-  z          = output_dims[1];
   trainable_ = true;
   name_      = layer_type() + "_" + std::to_string(level);
-  init();
   assert(dropout_rate_ < 1.);
   scale_ = 1. / (1. - dropout_rate_);
 }
@@ -52,7 +48,10 @@ void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const 
   math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
 }
 
-void graph_conv_layer::init() {
+void graph_conv_layer::malloc_and_init() {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
 #ifdef GALOIS_USE_DIST
   // setup gluon
   layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad,
@@ -81,6 +80,9 @@ void graph_conv_layer::init() {
 
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
@@ -106,6 +108,9 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
   // note; assumption here is that out_grad contains 1s or 0s via relu?
   if (act_) math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
   //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
@@ -144,7 +149,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
-  return math::l2_norm(y*z, &layer::W[0]);
+  return math::l2_norm(input_dims[1]*output_dims[1], &layer::W[0]);
 }
 
 #endif // end if CPU_ONLY

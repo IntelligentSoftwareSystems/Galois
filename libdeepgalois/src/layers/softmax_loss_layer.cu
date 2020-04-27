@@ -10,11 +10,14 @@ softmax_loss_layer::softmax_loss_layer(unsigned level,
     : layer(level, in_dims, out_dims) {
   trainable_ = false;
   name_      = layer_type() + "_" + std::to_string(level);
-  float_malloc_device(in_dims[0], loss);
 }
 
 softmax_loss_layer::~softmax_loss_layer() {
   float_free_device(loss);
+}
+
+void softmax_loss_layer::malloc_and_init() {
+  float_malloc_device(input_dims[0], loss);
 }
 
 void softmax_loss_layer::forward_propagation(const float_t* in_data,

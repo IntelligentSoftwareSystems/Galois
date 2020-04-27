@@ -39,6 +39,7 @@ public:
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
   Graph* subgraph_cpu;
+  void createSubgraph();
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
   Graph* getGraphPointer() { return graph_cpu; }

@@ -111,6 +111,7 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 
 // generate labels for the subgraph
 void Net::lookup_labels(size_t n, const mask_t *masks, const label_t *labels, label_t *sg_labels) {
+  if (sg_labels == NULL) sg_labels = new label_t[subgraph_sample_size];
   size_t count = 0;
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
@@ -127,6 +128,7 @@ void Net::lookup_labels(size_t n, const mask_t *masks, const label_t *labels, la
 void Net::lookup_feats(size_t n, const mask_t *masks, const float_t *feats, float_t *sg_feats) {
   size_t count = 0;
   size_t len = feature_dims[0];
+  if (sg_feats == NULL) sg_feats = new float_t[subgraph_sample_size*len];
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
       std::copy(feats+i*len, feats+(i+1)*len, sg_feats+count*len);
@@ -144,7 +146,6 @@ void Net::train(optimizer* opt, bool need_validate) {
   seperator = "\n";
 #endif
 
-  galois::gPrint("\nStart training...\n");
   galois::StatTimer Tupdate("Train-WeightUpdate");
   galois::StatTimer Tfw("Train-Forward");
   galois::StatTimer Tbw("Train-Backward");
@@ -154,10 +155,12 @@ void Net::train(optimizer* opt, bool need_validate) {
   int num_subg_remain = 0;
 #ifdef CPU_ONLY
   if (subgraph_sample_size) {
+    galois::gPrint("\nConstruct training vertex set induced graph...\n");
     subgraph_masks = new mask_t[num_samples];
     sampler->set_masked_graph(train_begin, train_end, train_count, train_masks, context->getGraphPointer());
   }
 #endif
+  galois::gPrint("\nStart training...\n");
   Timer t_epoch;
   // run epochs
   for (unsigned ep = 0; ep < num_epochs; ep++) {
@@ -167,7 +170,9 @@ void Net::train(optimizer* opt, bool need_validate) {
     if (subgraph_sample_size && num_subg_remain == 0) {
 #ifdef CPU_ONLY
       // generate subgraph
-      sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer()), subgraph_masks);
+      context->createSubgraph();
+      auto subgraph_ptr = context->getSubgraphPointer();
+      sampler->subgraph_sample(subgraph_sample_size, *(subgraph_ptr), subgraph_masks);
       for (size_t i = 0; i < num_conv_layers-1; i++) {
         layers[i]->set_graph_ptr(context->getSubgraphPointer());
 	  }
@@ -351,9 +356,10 @@ void Net::construct_layers() {
       layers[i]->update_dim_size(subgraph_sample_size);
     layers[i]->add_edge();
   }
-  for (size_t i = 1; i < num_layers; i++) {
+  for (size_t i = 1; i < num_layers; i++)
     connect(layers[i - 1], layers[i]);
-  }
+  for (size_t i = 0; i < num_layers; i++)
+    layers[i]->malloc_and_init();
   layers[0]->set_in_data(context->get_feats_ptr()); // feed input data
   // precompute the normalization constant based on graph structure
   context->norm_factor_counting();

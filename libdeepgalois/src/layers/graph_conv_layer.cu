@@ -2,7 +2,11 @@
 
 namespace deepgalois {
 
-void graph_conv_layer::init() {
+void graph_conv_layer::malloc_and_init() {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
+
   if (dropout_) CUDA_CHECK(cudaMalloc((void**)&dropout_mask, x * y * sizeof(unsigned)));
   //CUDA_CHECK(cudaMalloc((void**)&in_temp, x * y * sizeof(float_t)));
   float_malloc_device(x*y, in_temp);
@@ -47,6 +51,10 @@ void graph_conv_layer::combine(size_t dim_x, size_t dim_y, const float_t* self, 
 // GPU forward: compute output features
 // NOTE: in_data will be used in back-prop, so it can not be modified
 void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
+ 
   if (z > MAX_NUM_CLASSES) {
     std::cout << "Currently support maximum hidden feature length of " << MAX_NUM_CLASSES << "\n"; 
 	// currently only support feature length <= 128
@@ -70,6 +78,10 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
+  size_t x = input_dims[0];
+  size_t y = input_dims[1];
+  size_t z = output_dims[1];
+ 
   if (act_) d_relu_gpu(x * z, out_grad, out_data, out_grad);
   if (y > z) {
     graph_conv_layer::d_aggregate(z, *graph_gpu, out_grad, out_temp);
@@ -88,7 +100,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
-  return l2_norm_gpu(y*z, d_W);
+  return l2_norm_gpu(input_dims[1]*output_dims[1], d_W);
 }
 
 } // namespace

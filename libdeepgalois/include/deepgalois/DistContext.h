@@ -48,6 +48,7 @@ public:
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
   void norm_factor_counting();
+  void createSubgraph() {}
 
   float_t* get_norm_factor_ptr() { return norm_factor; }
   Graph* getGraphPointer() { return graph_cpu; }

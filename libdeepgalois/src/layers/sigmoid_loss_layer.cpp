@@ -9,11 +9,14 @@ sigmoid_loss_layer::sigmoid_loss_layer(unsigned level,
     : layer(level, in_dims, out_dims) {
   trainable_ = false;
   name_      = layer_type() + "_" + std::to_string(level);
-  loss = new float_t[in_dims[0]]; // error for each sample
 }
 
 sigmoid_loss_layer::~sigmoid_loss_layer() {
   delete loss;
+}
+
+void sigmoid_loss_layer::malloc_and_init() {
+  loss = new float_t[input_dims[0]]; // error for each sample
 }
 
 inline label_t sigmoid_loss_layer::get_label(size_t i, size_t j) {

@@ -55,6 +55,7 @@ public:
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
   void print_layer_info(); //! debug print function
+  virtual void malloc_and_init() {}
 
   // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }

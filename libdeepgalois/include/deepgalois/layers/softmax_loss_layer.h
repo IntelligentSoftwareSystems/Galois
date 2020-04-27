@@ -8,6 +8,7 @@ public:
                      std::vector<size_t> out_dims);
   ~softmax_loss_layer();
   std::string layer_type() const override { return std::string("softmax_loss"); }
+  void malloc_and_init();
   inline label_t get_label(size_t i);
   virtual void forward_propagation(const float_t* in_data, float_t* out_data);
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,

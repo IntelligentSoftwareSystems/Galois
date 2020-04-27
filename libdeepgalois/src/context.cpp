@@ -27,6 +27,10 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
+void Context::createSubgraph() {
+  subgraph_cpu = new Graph(); 
+}
+
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
