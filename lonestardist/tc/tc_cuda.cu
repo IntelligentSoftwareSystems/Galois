@@ -10,8 +10,7 @@ void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #include "tc_cuda.cuh"
 #include "moderngpu/kernel_segsort.hxx"
 #include <cuda_profiler_api.h>
-using namespace mgpu;
-standard_context_t context;
+mgpu::standard_context_t context;
 #define WARP_SIZE 32
 
 inline __device__ unsigned long intersect(CSRGraph graph, index_type u, index_type v) {
@@ -121,7 +120,7 @@ __global__ void warp(CSRGraph graph, unsigned begin, unsigned end, HGAccumulator
 }
 
 void sort_cuda(struct CUDA_Context* ctx) {
-        segmented_sort(ctx->gg.edge_dst, ctx->gg.nedges, (const int *) ctx->gg.row_start + 1, ctx->gg.nnodes - 1, less_t<int>(), context);
+        mgpu::segmented_sort(ctx->gg.edge_dst, ctx->gg.nedges, (const int *) ctx->gg.row_start + 1, ctx->gg.nnodes - 1, mgpu::less_t<int>(), context);
 }
 
 void TC_cuda(unsigned __begin, unsigned __end, unsigned long & num_local_triangles, struct CUDA_Context* ctx) {
