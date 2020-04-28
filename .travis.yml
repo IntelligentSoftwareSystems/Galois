@@ -18,7 +18,7 @@ matrix:
         - brew install openmpi llvm
         - mkdir build
         - export PATH=$PATH:/usr/local/opt/llvm/bin
-        - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON || exit 1
+        - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON -DGALOIS_LOW_MEM=ON || exit 1
     - env:
         - GCC_VER=7
       addons:
@@ -223,7 +223,7 @@ before_script:
   - export CMAKE_PREFIX_PATH=/usr/lib/llvm-7
   # Use apt-installed cmake rather than travis-provided one
   # (/usr/local/cmake-3.12.4/bin/cmake).
-  - /usr/bin/cmake -S . -B build -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_DIST_GALOIS=ON || exit 1
+  - /usr/bin/cmake -S . -B build -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_DIST_GALOIS=ON -DGALOIS_LOW_MEM=ON || exit 1
 
 script:
   - make -C build input
