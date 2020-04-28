@@ -63,9 +63,10 @@ llvm::cl::opt<std::string> statFile(
     llvm::cl::desc("ouput file to print stats to (default value empty)"),
     llvm::cl::init(""));
 
-static void LonestarGnnPrintVersion() {
-  std::cout << "LoneStarGNN Benchmark Suite v" << galois::getVersion() << " ("
-            << galois::getRevision() << ")\n";
+static void LonestarGnnPrintVersion(llvm::raw_ostream& out) {
+  out << "LoneStarGNN Benchmark Suite v" << galois::getVersion() << " ("
+      << galois::getRevision() << ")\n";
+  out.flush();
 }
 
 //! initialize lonestargnn benchmark
@@ -80,7 +81,7 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
 #endif
-  LonestarGnnPrintVersion();
+  LonestarGnnPrintVersion(llvm::outs());
   std::cout << "Copyright (C) " << galois::getCopyrightYear()
             << " The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
