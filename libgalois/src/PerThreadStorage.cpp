@@ -38,15 +38,21 @@ galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
 }
 
 #define MORE_MEM_HACK
+#ifdef GALOIS_LOW_MEM_FOOTPRINT
+// used for CI testing and other situations where galois memory
+// footprint needs to be low
+const size_t allocSize = 1 * (2 << 20); // 2MB
+inline void* alloc() { return malloc(allocSize); }
+#else
 #ifdef MORE_MEM_HACK
 const size_t allocSize =
     16 * (2 << 20); // galois::runtime::MM::hugePageSize * 16;
 inline void* alloc() { return malloc(allocSize); }
-
 #else
 const size_t allocSize = galois::runtime::MM::hugePageSize;
 inline void* alloc() { return galois::substrate::MM::pageAlloc(); }
 #endif
+#endif // GALOIS_LOW_MEM end if
 #undef MORE_MEM_HACK
 
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
