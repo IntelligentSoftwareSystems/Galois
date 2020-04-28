@@ -45,6 +45,7 @@ set(sources
         src/ParaMeter.cpp
         src/DynamicBitset.cpp
         src/Tracer.cpp
+        src/ThreadTimer.cpp
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -100,16 +101,19 @@ if (VTune_FOUND)
   target_link_libraries(galois_shmem PRIVATE ${VTune_LIBRARIES})
 endif()
 
+
+add_subdirectory(test)
+
 install(
   DIRECTORY include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
 )
 
 install(
   DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
 )

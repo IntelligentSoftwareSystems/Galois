@@ -109,8 +109,6 @@ matrix:
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-7
-            - gcc-8
-            - g++-8
             - cmake
             - libboost1.70-dev
             - libeigen3-dev
@@ -131,8 +129,6 @@ matrix:
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-8
-            - gcc-8
-            - g++-8
             - cmake
             - libboost1.70-dev
             - libeigen3-dev
@@ -153,8 +149,6 @@ matrix:
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-9
-            - gcc-9
-            - g++-9
             - cmake
             - libboost1.70-dev
             - libeigen3-dev
@@ -175,8 +169,6 @@ matrix:
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
-            - gcc-9
-            - g++-9
             - cmake
             - libboost1.70-dev
             - libeigen3-dev
@@ -198,8 +190,6 @@ matrix:
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-10
-            - gcc-9
-            - g++-9
             - cmake
             - libboost1.70-dev
             - libeigen3-dev

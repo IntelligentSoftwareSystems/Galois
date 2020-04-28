@@ -23,7 +23,6 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/gIO.h"
-#include "galois/util.h"
 
 #ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
@@ -195,6 +194,16 @@ void papiStop(V1& eventSets, V2& papiResults, V3& eventNames,
   });
 }
 
+template <typename C>
+void splitCSVstr(const std::string& inputStr, C& output,
+                 const char delim = ',') {
+  std::stringstream ss(inputStr);
+
+  for (std::string item; std::getline(ss, item, delim);) {
+    output.push_back(item);
+  }
+}
+
 } // end namespace internal
 
 template <typename F>
@@ -217,7 +226,7 @@ void profilePapi(const F& func, const char* region) {
 
   std::vector<std::string> eventNames;
 
-  galois::splitCSVstr(eventNamesCSV, eventNames);
+  internal::splitCSVstr(eventNamesCSV, eventNames);
 
   std::vector<int> papiEvents(eventNames.size());
 

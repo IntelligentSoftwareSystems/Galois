@@ -1,4 +1,4 @@
-mineApp(sgl sgl.cpp)
-#mineApp(sgl_dfs sgl_dfs.cpp)
-#mineApp(sgl_dfs_nc sgl_dfs_nc.cpp)
-#mineApp(sgl_edge_induced sgl_edge_induced.cpp)
+add_executable(sgl sgl.cpp)
+add_dependencies(apps sgl)
+target_link_libraries(sgl PRIVATE Galois::pangolin LLVMSupport)
+install(TARGETS sgl DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

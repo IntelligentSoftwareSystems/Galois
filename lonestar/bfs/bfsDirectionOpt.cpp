@@ -57,10 +57,6 @@ static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string>
-    filenameTranspose("filenameTranspose",
-              cll::desc("filenameTranspose for constructing inEdges"),
-              cll::init(""));
 
 static cll::opt<unsigned long long>
     startNode("startNode",
@@ -89,11 +85,16 @@ static cll::opt<unsigned int>
               cll::desc("Number of pages to preAlloc (default value 400)"),
               cll::init(400));
 
+static cll::opt<unsigned int>
+    numPrint("numPrint",
+              cll::desc("Print parents for the numPrint number of nodes for verification if verification is on (default value 10)"),
+              cll::init(10));
+
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { SyncDO = 0};
+enum Algo { SyncDO = 0, Async};
 
-const char* const ALGO_NAMES[] = {"SyncDO"};
+const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
 
 static cll::opt<Exec> execution(
     "exec",
@@ -103,12 +104,12 @@ static cll::opt<Exec> execution(
 
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-    cll::values(clEnumVal(SyncDO, "SyncDO")),
+    cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
     cll::init(SyncDO));
 
 using Graph =
     //galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-    galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true>;
+    galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
     //galois::graphs::B_LC_CSR_Graph<unsigned, void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
 
@@ -193,7 +194,8 @@ void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset, WL& wl,
   galois::do_all(galois::iterate(graph),
            [&](const GNode& src) {
               if(bitset.test(src))
-                pushWrap(wl, src);
+                //pushWrap(wl, src);
+		wl.push(src);
            },
            galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
            galois::loopname("BitsetToWl"));
@@ -242,12 +244,12 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   uint64_t old_workItemNum = 0;
   uint64_t numNodes = graph.size();
-  uint32_t c_pull = 0, c_push = 0;
+  //uint32_t c_pull = 0, c_push = 0;
   galois::GAccumulator<uint64_t> writes_pull, writes_push;
   writes_push.reset();
   writes_pull.reset();
-  std::vector<uint32_t> pull_levels;
-  pull_levels.reserve(10);
+  //std::vector<uint32_t> pull_levels;
+  //pull_levels.reserve(10);
 
   while (!next->empty()) {
 
@@ -257,8 +259,8 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
       WlToBitset(*curr, front_bitset);
       do {
-        c_pull++;
-        pull_levels.push_back(nextLevel);
+        //c_pull++;
+        //pull_levels.push_back(nextLevel);
 
         ++nextLevel;
         old_workItemNum = work_items.reduce();
@@ -273,7 +275,12 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
                    auto src = graph.getInEdgeDst(e);
 
                    if (front_bitset.test(src)) {
-                     ddata = nextLevel;
+                     /*
+                      * Currently assigning parents on the bfs path.
+                      * Assign nextLevel (uncomment below) 
+                      */
+                     //ddata = nextLevel;
+                     ddata = src;
                      next_bitset.set(dst);
                      work_items += 1;
                      break;
@@ -292,7 +299,7 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
       scout_count = 1;
     }
     else {
-      c_push++;
+      //c_push++;
       ++nextLevel;
       edges_to_check -= scout_count;
       work_items.reset();
@@ -305,8 +312,13 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
                if (ddata == BFS::DIST_INFINITY) {
                  Dist oldDist = ddata;
-                   if(__sync_bool_compare_and_swap(&ddata, oldDist, nextLevel)) {
-                     pushWrap(*next, dst);
+                    /* 
+                     * Currently assigning parents on the bfs path.
+                     * Assign nextLevel (uncomment below) 
+                     */
+                   //if(__sync_bool_compare_and_swap(&ddata, oldDist, nextLevel)) {
+                   if(__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
+                     next->push(dst);
                      work_items += (graph.edge_end(dst) - graph.edge_begin(dst));
                    }
                }
@@ -323,6 +335,54 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
   delete next;
 }
 
+template <bool CONCURRENT, typename T, typename P, typename R>
+void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
+               const R& edgeRange) {
+
+  namespace gwl = galois::worklists;
+  // typedef PerSocketChunkFIFO<CHUNK_SIZE> dFIFO;
+  using FIFO = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
+  using WL   = FIFO;
+
+  using Loop =
+      typename std::conditional<CONCURRENT, galois::ForEach,
+                                galois::WhileQ<galois::SerFIFO<T>>>::type;
+
+  Loop loop;
+
+  galois::GAccumulator<size_t> BadWork;
+  galois::GAccumulator<size_t> WLEmptyWork;
+
+  graph.getData(source) = 0;
+  galois::InsertBag<T> initBag;
+
+  if (CONCURRENT) {
+    pushWrap(initBag, source, "parallel");
+  } else {
+    pushWrap(initBag, source);
+  }
+
+  loop(galois::iterate(initBag),
+       [&](const GNode& src, auto& ctx) {
+         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+
+         for (auto ii : graph.edges(src)) {
+           GNode dst   = graph.getEdgeDst(ii);
+           auto& ddata = graph.getData(dst, flag);
+
+
+	if (ddata == BFS::DIST_INFINITY) {
+            Dist oldDist = ddata;
+            if(__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
+                ctx.push(dst);
+             }
+           }
+         }
+       },
+       galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+}
+
+
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
 
@@ -331,6 +391,11 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
     syncDOAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
                                    OutEdgeRangeFn{graph}, runID);
     break;
+  case Async:
+    asyncAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
+                                         OutEdgeRangeFn{graph});
+    break;
+
   default:
     std::cerr << "ERROR: unkown algo type" << std::endl;
   }
@@ -378,6 +443,14 @@ int main(int argc, char** argv) {
             << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
             << std::endl;
 
+  std::cout << "WARNING: This bfs version uses bi-directional CSR graph "
+            << "and assigns parent instead of the shortest distance from source\n";          
+  if(algo == Async) {
+    std::cout << "WARNING: Async bfs does not use direction optimization. " 
+              << "It uses Galois for_each for asynchronous execution which is advantageous " 
+              << "for large diameter graphs such as road networks\n";
+  }
+  
   std::cout << " Execution started\n";
   galois::StatTimer Tmain;
   Tmain.start();
@@ -413,14 +486,12 @@ int main(int argc, char** argv) {
   Tmain.stop();
   galois::reportPageAlloc("MeminfoPost");
 
-  std::cout << "Node " << reportNode << " has distance "
+  std::cout << "Node " << reportNode << " has parent "
             << graph.getData(report) << "\n";
 
   if (!skipVerify) {
-    if (BFS::verify(graph, source)) {
-      std::cout << "Verification successful.\n";
-    } else {
-      GALOIS_DIE("Verification failed");
+    for(GNode n = 0; n < numPrint; n++){
+    galois::gPrint("parent[", n, "] : ", graph.getData(n), "\n"); 
     }
   }
 

@@ -6,13 +6,11 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-#include "kernels/reduce.cuh"
+#include "moderngpu/kernel_reduce.hxx"
 #include "tc_cuda.cuh"
-#include "kernels/segmentedsort.cuh"
-#include "moderngpu.cuh"
-#include "util/mgpucontext.h"
+#include "moderngpu/kernel_segsort.hxx"
 #include <cuda_profiler_api.h>
-mgpu::ContextPtr mgc;
+mgpu::standard_context_t context;
 #define WARP_SIZE 32
 
 inline __device__ unsigned long intersect(CSRGraph graph, index_type u, index_type v) {
@@ -83,7 +81,6 @@ __global__ void warp(CSRGraph graph, unsigned begin, unsigned end, HGAccumulator
 	unsigned thread_id   = blockIdx.x * blockDim.x + threadIdx.x;
 	unsigned thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
 	unsigned warp_id     = thread_id   / WARP_SIZE;                // global warp index
-	unsigned warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
 	unsigned num_warps   = (TB_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
 
 	__shared__ cub::BlockReduce<unsigned long, TB_SIZE>::TempStorage num_local_triangles_ts;
@@ -123,8 +120,7 @@ __global__ void warp(CSRGraph graph, unsigned begin, unsigned end, HGAccumulator
 }
 
 void sort_cuda(struct CUDA_Context* ctx) {
-	mgc = mgpu::CreateCudaDevice(ctx->device);
-	mgpu::SegSortKeysFromIndices(ctx->gg.edge_dst, ctx->gg.nedges, (const int *) ctx->gg.row_start + 1, ctx->gg.nnodes - 1, *mgc);
+        mgpu::segmented_sort(ctx->gg.edge_dst, ctx->gg.nedges, (const int *) ctx->gg.row_start + 1, ctx->gg.nnodes - 1, mgpu::less_t<int>(), context);
 }
 
 void TC_cuda(unsigned __begin, unsigned __end, unsigned long & num_local_triangles, struct CUDA_Context* ctx) {

@@ -1,5 +1,5 @@
 Overview
-====================
+========
 
 [![CircleCI](https://circleci.com/gh/IntelligentSoftwareSystems/Galois.svg?style=svg)](https://circleci.com/gh/IntelligentSoftwareSystems/Galois)
 [![Build Status](https://travis-ci.org/IntelligentSoftwareSystems/Galois.svg?branch=master)](https://travis-ci.org/IntelligentSoftwareSystems/Galois)
@@ -25,7 +25,7 @@ Galois is released under the BSD-3-Clause license.
 
 
 Building Galois
-===========================
+===============
 
 You can checkout the latest release by typing (in a terminal):
 
@@ -41,7 +41,7 @@ git clone https://github.com/IntelligentSoftwareSystems/Galois
 ```
 
 Dependencies
---------------
+------------
 
 Galois builds, runs, and has been tested on GNU/Linux. Even though
 Galois may build on systems similar to Linux, we have not tested correctness or performance, so please
@@ -75,7 +75,7 @@ Here are the dependencies for the optional features:
 - Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
-- CUDA (>= 8.0) if you want to build distributed hetergeneous applications
+- CUDA (>= 8.0) if you want to build distributed heterogeneous applications
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
@@ -141,7 +141,7 @@ the tests for the core library and all the apps can be run by running:
 
 ```Shell
 make test
-# or alteratively
+# or alternatively
 ctest
 ```
 

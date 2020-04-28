@@ -29,6 +29,7 @@ jobs:
             mpich \
             zlib1g-dev
 
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -37,7 +38,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           # Run tests as non-root otherwise MPI will complain
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Ubuntu-18.04":
     docker:
@@ -62,6 +63,7 @@ jobs:
             openmpi-bin \
             ssh
 
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -69,7 +71,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-gcc":
     docker:
@@ -102,6 +104,7 @@ jobs:
           source /etc/profile.d/modules.sh
           module load mpi
 
+          chmod 755 /root
           useradd runner
           mkdir -p build
 
@@ -109,7 +112,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "CentOS-8-clang":
     docker:
@@ -136,6 +139,7 @@ jobs:
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -152,7 +156,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           # OpenMPI segfaults here issue #118
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2") || true
   "Arch":
     docker:
@@ -172,7 +176,7 @@ jobs:
             make \
             openmpi
 
-
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -180,7 +184,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Alpine":
     docker:
@@ -204,6 +208,7 @@ jobs:
             --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
             openmpi-dev
 
+          chmod 755 /root
           adduser -D runner
           mkdir -p /tmp/build
 
@@ -211,7 +216,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-gcc":
     docker:
@@ -230,6 +235,7 @@ jobs:
             mpich-devel \
             zlib-devel
 
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -240,7 +246,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Fedora-clang":
     docker:
@@ -260,6 +266,7 @@ jobs:
             zlib-devel
           # Get the "module" function set up before loading MPI.
 
+          chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
@@ -274,7 +281,7 @@ jobs:
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
-            && chown -R runner Testing \
+            && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
  
 workflows:

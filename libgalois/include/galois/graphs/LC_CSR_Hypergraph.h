@@ -17,13 +17,14 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
-#define GALOIS_GRAPH__LC_CSR_GRAPH_H
+#ifndef GALOIS_GRAPHS_LC_CSR_HYPERGRAPH_H
+#define GALOIS_GRAPHS_LC_CSR_HYPERGRAPH_H
 
 #include "galois/Galois.h"
 #include "galois/graphs/Details.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/GraphHelpers.h"
+#include "galois/PODResizeableArray.h"
 
 #include <type_traits>
 
@@ -763,6 +764,43 @@ public:
    * TODO: Find better way to do this
    */
   void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, std::vector<std::vector<uint32_t>>& edges_id){//, std::vector<std::vector<EdgeTy>>& edges_data) {
+    allocateFrom(numNodes, numEdges);
+    constructNodes();
+
+    galois::do_all(galois::iterate((uint32_t)0, numNodes),
+                  [&](uint32_t n) {
+                    edgeIndData[n] = prefix_sum[n];
+                    });
+
+    galois::do_all(galois::iterate((uint32_t)0, numNodes),
+                  [&](uint32_t n) {
+                    if( n == 0){
+                      if(edgeIndData[n] > 0){
+                        std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
+                        //std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin());
+                      }
+                    }
+                    else{
+                        if(edgeIndData[n] - edgeIndData[n-1] > 0){
+                          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin() + edgeIndData[n-1]);
+                       //   std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin() + edgeIndData[n-1]);
+                      }
+                      }
+                  });
+
+
+ galois::on_each(
+        [&](unsigned tid, unsigned total) {
+        std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
+
+          auto r = divideByNode(0, 1, tid, total).first;
+
+        //galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second, "\n");
+        this->setLocalRange(*r.first, *r.second);
+        }
+        );
+  }
+  void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, galois::gstl::Vector<galois::PODResizeableArray<uint32_t>>& edges_id){//, std::vector<std::vector<EdgeTy>>& edges_data) {
     allocateFrom(numNodes, numEdges);
     constructNodes();
 

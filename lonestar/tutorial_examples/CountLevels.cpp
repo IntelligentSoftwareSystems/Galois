@@ -53,22 +53,43 @@ static const unsigned int DIST_INFINITY =
 
 const galois::gstl::Vector<size_t>& countLevels(Graph& graph) {
 
+  using Vec = galois::gstl::Vector<size_t>;
+
   //! [Define GReducible]
-  galois::GVectorPerItemReduce<size_t, std::plus<size_t>> reducer;
+  auto merge = [](Vec& lhs, Vec&& rhs) -> Vec& {
+    Vec v(std::move(rhs));
+    if (lhs.size() < v.size()) {
+      lhs.resize(v.size());
+    }
+    auto ll = lhs.begin();
+    for (auto ii = v.begin(), ei = v.end(); ii != ei; ++ii, ++ll) {
+      *ll += *ii;
+    }
+    return lhs;
+  };
+
+  auto identity = []() -> Vec {
+    return Vec();
+  };
+
+  auto r = galois::make_reducible(merge, identity);
 
   galois::do_all(galois::iterate(graph), [&](GNode n) {
     LNode srcdata = graph.getData(n);
     if (srcdata.dist == DIST_INFINITY) {
       return;
     }
-    reducer.update(srcdata.dist, 1);
+
+    auto& vec = r.getLocal();
+    if (vec.size() <= srcdata.dist) {
+      vec.resize(srcdata.dist + 1);
+    }
+    vec[srcdata.dist] += 1;
   });
 
-  return reducer.reduce();
+  return r.reduce();
   //! [Define GReducible]
 }
-
-// constexpr static const unsigned CHUNK_SIZE = 16;
 
 void bfsSerial(Graph& graph, GNode source) {
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;

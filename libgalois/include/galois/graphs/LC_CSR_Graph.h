@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
-#define GALOIS_GRAPH__LC_CSR_GRAPH_H
+#ifndef GALOIS_GRAPHS_LC_CSR_GRAPH_H
+#define GALOIS_GRAPHS_LC_CSR_GRAPH_H
 
 #include "galois/Galois.h"
 #include "galois/graphs/Details.h"
@@ -26,7 +26,7 @@
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
-#include <fstream>
+#include<fstream>
 
 /*
  * Headers for boost serialization
@@ -831,7 +831,7 @@ public:
         }
         );
   }
-    
+  
  /**
   * Reads the GR files directly into in-memory
   * data-structures of LC_CSR graphs using freads.

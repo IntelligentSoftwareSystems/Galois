@@ -1,4 +1,4 @@
-#include "BfsMining/embedding_list.h"
+#include "pangolin/BfsMining/embedding_list.h"
 
 template <typename ElementType,typename EmbeddingType>
 void EmbeddingList<ElementType,EmbeddingType>::init(Graph& graph, unsigned max_size, bool is_dag) {

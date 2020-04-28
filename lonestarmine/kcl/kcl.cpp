@@ -1,11 +1,11 @@
-#include "../lonestarmine.h"
-#include "BfsMining/vertex_miner.h"
+#include "lonestarmine.h"
+#include "pangolin/BfsMining/vertex_miner.h"
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
 const char* url  = 0;
 
-#include "BfsMining/vertex_miner_api.h"
+#include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI<BaseEmbedding> {
 public:
 	// toExtend (only extend the last vertex in the embedding)
@@ -31,5 +31,5 @@ public:
 	}
 };
 
-#include "BfsMining/engine.h"
+#include "pangolin/BfsMining/engine.h"
 

@@ -18,6 +18,7 @@
  */
 
 #include "galois/Timer.h"
+#include "galois/runtime/Statistics.h"
 
 using namespace galois;
 
@@ -25,12 +26,12 @@ void Timer::start() { startT = clockTy::now(); }
 
 void Timer::stop() { stopT = clockTy::now(); }
 
-unsigned long Timer::get() const {
+uint64_t Timer::get() const {
   return std::chrono::duration_cast<std::chrono::milliseconds>(stopT - startT)
       .count();
 }
 
-unsigned long Timer::get_usec() const {
+uint64_t Timer::get_usec() const {
   return std::chrono::duration_cast<std::chrono::microseconds>(stopT - startT)
       .count();
 }
@@ -44,8 +45,8 @@ void TimeAccumulator::stop() {
   acc += ltimer.get_usec();
 }
 
-unsigned long TimeAccumulator::get() const { return acc / 1000; }
-unsigned long TimeAccumulator::get_usec() const { return acc; }
+uint64_t TimeAccumulator::get() const { return acc / 1000; }
+uint64_t TimeAccumulator::get_usec() const { return acc; }
 
 TimeAccumulator& TimeAccumulator::operator+=(const TimeAccumulator& rhs) {
   acc += rhs.acc;
@@ -55,4 +56,40 @@ TimeAccumulator& TimeAccumulator::operator+=(const TimeAccumulator& rhs) {
 TimeAccumulator& TimeAccumulator::operator+=(const Timer& rhs) {
   acc += rhs.get_usec();
   return *this;
+}
+
+
+StatTimer::StatTimer(const char* const name, const char* const region) {
+  const char *n = name ? name : "Time";
+  const char *r = region ? region : "(NULL)";
+
+  name_   = gstl::makeStr(n);
+  region_ = gstl::makeStr(r);
+
+  valid_ = false;
+}
+
+StatTimer::~StatTimer() {
+  if (valid_) {
+    stop();
+  }
+
+  // only report non-zero stat
+  if (TimeAccumulator::get()) {
+    galois::runtime::reportStat_Tmax(region_, name_, TimeAccumulator::get());
+  }
+}
+
+void StatTimer::start() {
+  TimeAccumulator::start();
+  valid_ = true;
+}
+
+void StatTimer::stop() {
+  valid_ = false;
+  TimeAccumulator::stop();
+}
+
+uint64_t StatTimer::get_usec() const {
+  return TimeAccumulator::get_usec();
 }

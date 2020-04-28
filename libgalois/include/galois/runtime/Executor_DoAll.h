@@ -49,7 +49,7 @@ class DoAllStealingExec {
   constexpr static const bool NEED_STATS =
       galois::internal::NeedStats<ArgsTuple>::value;
   constexpr static const bool MORE_STATS =
-      NEED_STATS && exists_by_supertype<more_stats_tag, ArgsTuple>::value;
+      NEED_STATS && has_trait<more_stats_tag, ArgsTuple>();
   constexpr static const bool USE_TERM = false;
 
   struct ThreadContext {
@@ -438,7 +438,7 @@ public:
   DoAllStealingExec(const R& _range, F _func, const ArgsTuple& argsTuple)
       : range(_range), func(_func),
         loopname(galois::internal::getLoopName(argsTuple)),
-        chunk_size(get_by_supertype<chunk_size_tag>(argsTuple).value),
+        chunk_size(get_trait_value<chunk_size_tag>(argsTuple).value),
         term(substrate::getSystemTermination(activeThreads)),
         totalTime(loopname, "Total"), initTime(loopname, "Init"),
         execTime(loopname, "Execute"), stealTime(loopname, "Steal"),
@@ -555,7 +555,7 @@ struct ChooseDoAllImpl<false> {
           static constexpr bool NEED_STATS =
               galois::internal::NeedStats<ArgsT>::value;
           static constexpr bool MORE_STATS =
-              NEED_STATS && exists_by_supertype<more_stats_tag, ArgsT>::value;
+              NEED_STATS && has_trait<more_stats_tag, ArgsT>();
 
           const char* const loopname = galois::internal::getLoopName(argsTuple);
 
@@ -598,10 +598,9 @@ struct ChooseDoAllImpl<false> {
 template <typename R, typename F, typename ArgsTuple>
 void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
 
-  static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const*, ArgsTuple>::value,
-                "old loopname");
-  static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
+  static_assert(!has_trait<char*, ArgsTuple>(), "old loopname");
+  static_assert(!has_trait<char const*, ArgsTuple>(), "old loopname");
+  static_assert(!has_trait<bool, ArgsTuple>(), "old steal");
 
   auto argsT = std::tuple_cat(
       argsTuple,
@@ -610,12 +609,12 @@ void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
 
   using ArgsT = decltype(argsT);
 
-  constexpr bool TIME_IT = exists_by_supertype<loopname_tag, ArgsT>::value;
+  constexpr bool TIME_IT = has_trait<loopname_tag, ArgsT>();
   CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(argsT));
 
   timer.start();
 
-  constexpr bool STEAL = exists_by_supertype<steal_tag, ArgsT>::value;
+  constexpr bool STEAL = has_trait<steal_tag, ArgsT>();
 
   OperatorReferenceType<decltype(std::forward<F>(func))> func_ref = func;
   internal::ChooseDoAllImpl<STEAL>::call(range, func_ref, argsT);

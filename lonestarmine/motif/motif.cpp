@@ -1,12 +1,12 @@
-#include "../lonestarmine.h"
-#include "BfsMining/vertex_miner.h"
+#include "lonestarmine.h"
+#include "pangolin/BfsMining/vertex_miner.h"
 
 const char* name = "Motif Counting";
 const char* desc = "Counts the vertex-induced motifs in a graph using BFS extension";
 const char* url  = 0;
 int num_patterns[3] = {2, 6, 21};
 
-#include "BfsMining/vertex_miner_api.h"
+#include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI<VertexEmbedding> {
 public:
 	// customized pattern classification method
@@ -27,5 +27,5 @@ public:
 	void print_output() { printout_motifs(); }
 };
 
-#include "BfsMining/engine.h"
+#include "pangolin/BfsMining/engine.h"
 
