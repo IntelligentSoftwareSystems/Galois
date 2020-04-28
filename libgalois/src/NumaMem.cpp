@@ -99,7 +99,7 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
                           // first place
                           if (beginLocation != endLocation) {
                             size_t beginByte = beginLocation * elementSize;
-                            size_t endByte;
+                            size_t endByte = 0;
 
                             if (endLocation != 0) {
                               // -1 since end * element will result in the first
