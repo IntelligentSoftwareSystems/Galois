@@ -167,6 +167,12 @@ function(add_test_dist app input)
     endif()
   endforeach()
 endfunction()
+
+# currently tc only has a GPU implementation
+if(ENABLE_HETERO_GALOIS)
+  add_subdirectory(tc)
+endif()
+
 add_subdirectory(bc)
 add_subdirectory(bfs)
 add_subdirectory(cc)
@@ -178,8 +184,3 @@ add_subdirectory(sssp)
 
 add_subdirectory(partition)
 
-# currently tc only has a GPU implementation
-if(ENABLE_HETERO_GALOIS)
-  # tc does not currently build
-  add_subdirectory(tc EXCLUDE_FROM_ALL)
-endif()
