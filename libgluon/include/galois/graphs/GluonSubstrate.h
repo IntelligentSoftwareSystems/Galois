@@ -166,7 +166,7 @@ private:
   void inline incrementEvilPhase() {
     ++galois::runtime::evilPhase;
     // limit defined by MPI or LCI
-    if (galois::runtime::evilPhase >= std::numeric_limits<int16_t>::max()) {
+    if (galois::runtime::evilPhase >= static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
       galois::runtime::evilPhase = 1;
     }
   }

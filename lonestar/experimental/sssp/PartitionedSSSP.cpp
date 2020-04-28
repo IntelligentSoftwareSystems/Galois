@@ -25,9 +25,7 @@
 #include "galois/UserContext.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#ifdef GALOIS_USE_EXP
 #include "galois/worklists/Partitioned.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 
 #include "LC_PartitionedInlineEdge_Graph.h"

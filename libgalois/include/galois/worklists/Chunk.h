@@ -56,7 +56,7 @@ struct squeue<false, PS, TQ> {
 //! Common functionality to all chunked worklists
 template <typename T, template <typename, bool> class QT, bool Distributed,
           bool IsStack, int ChunkSize, bool Concurrent>
-struct ChunkMaster : private boost::noncopyable {
+struct ChunkMaster {
   template <typename _T>
   using retype =
       ChunkMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
@@ -144,7 +144,9 @@ private:
 public:
   typedef T value_type;
 
-  ChunkMaster() {}
+  ChunkMaster() = default;
+  ChunkMaster(const ChunkMaster&) = delete;
+  ChunkMaster& operator=(const ChunkMaster&) = delete;
 
   void flush() {
     p& n = data.get();

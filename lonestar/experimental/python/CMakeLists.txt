@@ -1,29 +1,16 @@
-add_library(galois_python SHARED 
+add_library(galois_python SHARED
   PythonGraph.cpp
   PythonGraphReport.cpp
   PythonGraphSimulation.cpp
   ../graphsimulation/GraphSimulation.cpp
-  #AnalyzeBFS.cpp
-  #SearchSubgraph.cpp
-  #PageRank.cpp
-  #Filter.cpp
-  #Auxiliary.cpp
-  #Reachability.cpp
-  #Coarsen.cpp
-  $<TARGET_OBJECTS:gllvm_obj>
-  $<TARGET_OBJECTS:galois_shmem_obj> 
+  $<TARGET_OBJECTS:galois_shmem_obj>
 )
-target_include_directories(galois_python PUBLIC 
-  ${CMAKE_SOURCE_DIR}/libllvm/include
+target_include_directories(galois_python PUBLIC
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_SOURCE_DIR}/libgalois/experimental/include
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
-target_link_libraries(galois_python ${Boost_SERIALIZATION_LIBRARY_RELEASE})
-set_target_properties (galois_python PROPERTIES 
-  INTERFACE_POSITION_INDEPENDENT_CODE On 
-  POSITION_INDEPENDENT_CODE On
-)
+target_link_libraries(galois_python ${Boost_SERIALIZATION_LIBRARY_RELEASE} LLVMSupport)
 
 if (USE_VTUNE)
   find_package(VTune)
@@ -44,12 +31,3 @@ if(NUMA_FOUND)
 else()
   message(WARNING "No NUMA Support.  Likely poor performance")
 endif()
-
-#app(python_graph_test test.cpp)
-#target_include_directories(python_graph_test PUBLIC 
-#  ${CMAKE_SOURCE_DIR}/libllvm/include
-#  ${CMAKE_SOURCE_DIR}/libgalois/include
-#  ${CMAKE_SOURCE_DIR}/libgalois/experimental/include
-#  ${CMAKE_CURRENT_SOURCE_DIR}
-#)
-#target_link_libraries(python_graph_test galois_python)

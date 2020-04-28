@@ -60,14 +60,15 @@ unsigned CSRGraph::allocOnDevice(bool no_edge_data) {
 
   device_graph = true;
 
-  return (edge_dst && (no_edge_data || edge_data) && row_start && node_data);
+  assert(edge_dst && (no_edge_data || edge_data) && row_start && node_data);
+  return true;
 }
 
 void CSRGraphTex::copy_to_gpu(struct CSRGraphTex &copygraph) {
   copygraph.nnodes = nnodes;
   copygraph.nedges = nedges;
   
-  assert(copygraph.allocOnDevice(edge_data == NULL));
+  copygraph.allocOnDevice(edge_data == NULL);
 
   check_cuda(cudaMemcpy(copygraph.edge_dst, edge_dst, nedges * sizeof(index_type), cudaMemcpyHostToDevice));
   if (edge_data != NULL) check_cuda(cudaMemcpy(copygraph.edge_data, edge_data, nedges * sizeof(edge_data_type), cudaMemcpyHostToDevice));
@@ -252,7 +253,7 @@ void CSRGraph::copy_to_gpu(struct CSRGraph &copygraph) {
   copygraph.nnodes = nnodes;
   copygraph.nedges = nedges;
   
-  assert(copygraph.allocOnDevice(edge_data == NULL));
+  copygraph.allocOnDevice(edge_data == NULL);
 
   check_cuda(cudaMemcpy(copygraph.edge_dst, edge_dst, nedges * sizeof(index_type), cudaMemcpyHostToDevice));
   if (edge_data != NULL) check_cuda(cudaMemcpy(copygraph.edge_data, edge_data, nedges * sizeof(edge_data_type), cudaMemcpyHostToDevice));

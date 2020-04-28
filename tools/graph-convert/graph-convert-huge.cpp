@@ -32,7 +32,7 @@
 #include <iostream>
 #include <ios>
 #include <limits>
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 #include <random>
 #include <chrono>

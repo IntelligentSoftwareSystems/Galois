@@ -1,5 +1,4 @@
-dist: xenial
-sudo: false
+dist: bionic
 
 language: c++
 
@@ -16,80 +15,67 @@ matrix:
       before_script:
         - export CC=clang
         - export CXX=clang++
-        - brew install openmpi
+        - brew install openmpi llvm
         - mkdir build
-        - pushd build
-        - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
-    - env:
-        - GCC_VER=5
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-          packages:
-            - gcc-5
-            - g++-5
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
-    - env:
-        - GCC_VER=6
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-          packages:
-            - gcc-6
-            - g++-6
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
+        - export PATH=$PATH:/usr/local/opt/llvm/bin
+        - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_DIST_GALOIS=ON || exit 1
     - env:
         - GCC_VER=7
       addons:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-7
             - g++-7
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - GCC_VER=8
       addons:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-8
             - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - GCC_VER=9
       addons:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - GCC_VER=9
         - BUILD_TYPE=Debug
@@ -97,64 +83,19 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-9
             - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
-    - env:
-        - CLANG_VER=4.0
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-4.0 main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-          packages:
-            - clang-4.0
-            - gcc-5
-            - g++-5
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
-    - env:
-        - CLANG_VER=5.0
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-          packages:
-            - clang-5.0
-            - gcc-7
-            - g++-7
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
-    - env:
-        - CLANG_VER=6.0
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-6.0 main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-          packages:
-            - clang-6.0
-            - gcc-8
-            - g++-8
-            - cmake
-            - libboost-all-dev
-            - openmpi-bin
-            - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - CLANG_VER=7
       addons:
@@ -163,15 +104,18 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-7
-            - gcc-8
-            - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - CLANG_VER=8
       addons:
@@ -180,15 +124,18 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-8
-            - gcc-8
-            - g++-8
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
         - CLANG_VER=9
       addons:
@@ -197,74 +144,59 @@ matrix:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
             - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-9
-            - gcc-9
-            - g++-9
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
     - env:
-        - CLANG_VER=9
+        - CLANG_VER=10
+      addons:
+        apt:
+          sources:
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-10
+            - cmake
+            - libboost1.70-dev
+            - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
+    - env:
+        - CLANG_VER=10
         - BUILD_TYPE=Debug
       addons:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - clang-9
-            - gcc-9
-            - g++-9
+            - clang-10
             - cmake
-            - libboost-all-dev
+            - libboost1.70-dev
             - libeigen3-dev
             - openmpi-bin
             - libopenmpi-dev
-    - env:
-        - CLANG_VER=9
-        - CXXFLAGS="-stdlib=libc++"
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-          packages:
-            - clang-9
-            - libc++-9-dev
-            - libc++abi-9-dev
-            - gcc-9
-            - g++-9
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
-    - env:
-        - CLANG_VER=9
-        - BUILD_TYPE=Debug
-        - CXXFLAGS="-stdlib=libc++"
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-          packages:
-            - clang-9
-            - libc++-9-dev
-            - libc++abi-9-dev
-            - gcc-9
-            - g++-9
-            - cmake
-            - libboost-all-dev
-            - libeigen3-dev
-            - openmpi-bin
-            - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
 
 before_script:
   # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
@@ -286,13 +218,17 @@ before_script:
       export BUILD_TYPE=Release
     fi
   - mkdir build
-  - pushd build
-  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DNUM_TEST_THREADS=2 -DENABLE_DIST_GALOIS=ON .. || exit 1
+  # Use apt-installed llvm-7-dev rather than travis-provided one which is
+  # picked up through the local clang-7 install in /usr/local/clang-7.
+  - export CMAKE_PREFIX_PATH=/usr/lib/llvm-7
+  # Use apt-installed cmake rather than travis-provided one
+  # (/usr/local/cmake-3.12.4/bin/cmake).
+  - /usr/bin/cmake -S . -B build -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_DIST_GALOIS=ON || exit 1
 
 script:
-  - make input
-  - make -j2 || exit 1
-  - make test || true
+  - make -C build input
+  - cmake --build build --parallel 2 || exit 1
+  - (cd build && ctest -V --parallel 2 --label-regex quick) || exit 1
 
 notifications:
   email: false

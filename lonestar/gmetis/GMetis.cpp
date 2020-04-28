@@ -29,7 +29,7 @@
 #include <fstream>
 
 #include "Metis.h"
-#include "galois/graphs/Util.h"
+#include "galois/graphs/ReadGraph.h"
 #include "galois/Timer.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
@@ -46,13 +46,13 @@ static const char* url = "gMetis";
 static cll::opt<InitialPartMode> partMode(
     cll::desc("Choose a inital part mode:"),
     cll::values(clEnumVal(GGP, "GGP"), clEnumVal(GGGP, "GGGP (default)"),
-                clEnumVal(MGGGP, "MGGGP"), clEnumValEnd),
+                clEnumVal(MGGGP, "MGGGP")),
     cll::init(GGGP));
 static cll::opt<refinementMode> refineMode(
     cll::desc("Choose a refinement mode:"),
     cll::values(clEnumVal(BKL, "BKL"), clEnumVal(BKL2, "BKL2 (default)"),
-                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS"),
-                clEnumValEnd),
+                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS")
+                ),
     cll::init(BKL2));
 
 static cll::opt<bool>
@@ -309,10 +309,12 @@ int main(int argc, char** argv) {
       galois::LargeArray<uint64_t> transpose;
       transpose.create(g.size());
       uint64_t id = 0;
-      for (auto ii = perm2.begin(), ei = perm2.end(); ii != ei; ++ii)
-        transpose[*ii] = id++;
-      for (auto ii = transpose.begin(), ei = transpose.end(); ii != ei; ++ii)
-        file << *ii << "\n";
+      for (auto& ii : perm2) {
+        transpose[ii] = id++;
+      }
+      for (auto& ii : transpose) {
+        file << ii << "\n";
+      }
     }
   }
   return 0;

@@ -53,7 +53,7 @@ static cll::list<StatMode> statModeList(
                           "Histogram of neighbor offsets with sorted edges"),
                 clEnumVal(sparsityPattern, "Pattern of non-zeros when graph is "
                                            "interpreted as a sparse matrix"),
-                clEnumVal(summary, "Graph summary"), clEnumValEnd));
+                clEnumVal(summary, "Graph summary")));
 static cll::opt<int> numBins("numBins", cll::desc("Number of bins"),
                              cll::init(-1));
 static cll::opt<int> columns("columns", cll::desc("Columns for sparsity"),
@@ -175,7 +175,7 @@ int getLogIndex(ptrdiff_t x) {
     x = -x;
   }
 
-  while (x >>= 1) {
+  while ((x >>= 1) != 0) {
     ++logvalue;
   }
   return sign * logvalue;

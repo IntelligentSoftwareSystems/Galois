@@ -21,11 +21,6 @@
 #define GALOIS_LAZYOBJECT_H
 
 #include "galois/gIO.h"
-#include "galois/TypeTraits.h"
-
-// For consistent name, use boost rather than C++11
-// std::is_trivially_constuctible
-#include <boost/type_traits/has_trivial_constructor.hpp>
 
 #include <type_traits>
 #include <utility>
@@ -81,8 +76,10 @@ class LazyObject {
     CharData buf;
     T value_;
 
-    Data() {}
-    ~Data() {}
+    // Declare constructor explicitly because Data must be default
+    // constructable regardless of the constructability of T.
+    Data() {} // NOLINT(modernize-use-equals-default)
+    ~Data() {} // NOLINT(modernize-use-equals-default)
 
     T& value() { return value_; }
     const T& value() const { return value_; }

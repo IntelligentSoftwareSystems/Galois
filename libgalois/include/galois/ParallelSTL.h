@@ -266,26 +266,32 @@ template <class InputIterator, class T, typename BinaryOperation>
 T accumulate(InputIterator first, InputIterator last, const T& identity,
              const BinaryOperation& binary_op) {
 
-  GSimpleReducible<BinaryOperation, T> R(binary_op, identity);
+  auto id_fn = [=]() { return identity; };
 
-  do_all(galois::iterate(first, last), [&R](const T& v) { R.update(v); });
-  return R.reduce();
+  auto r = make_reducible(binary_op, id_fn);
+
+  do_all(galois::iterate(first, last), [&](const T& v) { r.update(v); });
+
+  return r.reduce();
 }
 
 template <class InputIterator, class T>
 T accumulate(InputIterator first, InputIterator last, const T& identity = T()) {
   return accumulate(first, last, identity, std::plus<T>());
 }
-template <class InputIterator, class MapFn, class T, class ReduceFn>
-T map_reduce(InputIterator first, InputIterator last, MapFn mapFn,
-             ReduceFn reduceFn, const T& identity) {
 
-  galois::GSimpleReducible<ReduceFn, T> reducer(reduceFn, identity);
+template <class InputIterator, class MapFn, class T, class ReduceFn>
+T map_reduce(InputIterator first, InputIterator last, MapFn map_fn,
+             ReduceFn reduce_fn, const T& identity) {
+
+  auto id_fn = [=]() { return identity; };
+
+  auto r = make_reducible(reduce_fn, id_fn);
 
   galois::do_all(galois::iterate(first, last),
-                 [&](const auto& v) { reducer.update(mapFn(v)); });
+                 [&](const auto& v) { r.update(map_fn(v)); });
 
-  return reducer.reduce();
+  return r.reduce();
 }
 
 template <typename I>

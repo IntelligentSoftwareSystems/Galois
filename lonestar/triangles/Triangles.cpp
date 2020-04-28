@@ -56,14 +56,22 @@ static cll::opt<Algo> algo(
                 clEnumValN(Algo::edgeiterator, "edgeiterator",
                            "Edge Iterator"),
                 clEnumValN(Algo::orderedCount, "orderedCount",
-                           "Ordered Simple Count (default)"),
-                clEnumValEnd),
+                           "Ordered Simple Count (default)")
+                ),
     cll::init(Algo::orderedCount));
+
+static cll::opt<bool>
+    relabel("relabel",
+              cll::desc("Relabel nodes of the graph (default value true)"),
+              cll::init(true));
+
+static cll::opt<bool>
+    storeRelabeledGraph("storeRelabeledGraph",
+              cll::desc("Write the relabeled graph to disk for future use with .gr.triangles extension (default value true)"),
+              cll::init(true));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
-// typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
-// typedef galois::graphs::LC_Linear_Graph<uint32_t,void> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -235,40 +243,48 @@ void nodeIteratingAlgo(Graph& graph) {
   std::cout << "Num Triangles: " << numTriangles.reduce() << "\n";
 }
 
+/**
+ * Lambda function to count triangles
+ */ 
+void orderedCountFunc(Graph& graph, GNode n, galois::GAccumulator<size_t> & numTriangles){
+    size_t numTriangles_local = 0;
+    for(auto it_v : graph.edges(n)){
+            auto v = graph.getEdgeDst(it_v);
+            if( v > n)
+                    break;
+            Graph::edge_iterator it_n =
+                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+
+            for(auto it_vv : graph.edges(v)){
+                    auto vv = graph.getEdgeDst(it_vv);
+                    if( vv > v)
+                            break;
+                    while(graph.getEdgeDst(it_n) < vv)
+                            it_n++;
+                    if(vv == graph.getEdgeDst(it_n)) {
+                            numTriangles_local += 1;
+                    }
+            }
+    }
+    numTriangles += numTriangles_local;
+
+}
+
 /*
  * Simple counting loop, instead of binary searching.
  */
 void orderedCountAlgo(Graph& graph) {
-
   galois::GAccumulator<size_t> numTriangles;
         galois::do_all(
             galois::iterate(graph),
             [&](const GNode& n) {
-              for(auto it_v : graph.edges(n)){
-                auto v = graph.getEdgeDst(it_v);
-                if( v > n)
-                  break;
-                Graph::edge_iterator it_n =
-                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-
-                for(auto it_vv : graph.edges(v)){
-                  auto vv = graph.getEdgeDst(it_vv);
-                  //std::cout << "-- vv : " << vv << "\n";
-                  if( vv > v)
-                    break;
-                  while(graph.getEdgeDst(it_n) < vv)
-                    it_n++;
-                  if(vv == graph.getEdgeDst(it_n)) {
-                    numTriangles += 1;
-                  }
-                }
-              }
+                orderedCountFunc(graph, n, numTriangles);
             },
             galois::chunk_size<CHUNK_SIZE>(),
             galois::steal(),
             galois::loopname("orderedCountAlgo"));
 
-  std::cout << "Num Triangles: " << numTriangles.reduce() << "\n";
+  galois::gPrint("Num Triangles: ", numTriangles.reduce(), "\n");
 }
 
 /**
@@ -380,20 +396,26 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   galois::do_all(galois::iterate(permuted),
                  [&](N x) { permuted.sortEdges<void>(x, IdLess<N, void>()); });
 
-  std::cout << "Writing new input file: " << triangleFilename << "\n";
-  permuted.toFile(triangleFilename);
+  if(storeRelabeledGraph) {
+    std::cout << "Writing new input file: " << triangleFilename << "\n";
+    permuted.toFile(triangleFilename);
+  }
   galois::graphs::readGraph(graph, permuted);
 }
 
 void readGraph(Graph& graph) {
-  if (inputFilename.find(".gr.triangles") !=
+  if (relabel && inputFilename.find(".gr.triangles") !=
       inputFilename.size() - strlen(".gr.triangles")) {
     // Not directly passed .gr.triangles file
     std::string triangleFilename = inputFilename + ".triangles";
     std::ifstream triangleFile(triangleFilename.c_str());
     if (!triangleFile.good()) {
       // triangles doesn't already exist, create it
+      galois::StatTimer Trelabel("GraphRelabelTimer");
+      galois::gPrint("WARNING: Sorted graph does not exist; Relabelling and Creating a sorted graph\n");
+      Trelabel.start();
       makeGraph(graph, triangleFilename);
+      Trelabel.stop();
     } else {
       // triangles does exist, load it
       galois::graphs::readGraph(graph, triangleFilename);

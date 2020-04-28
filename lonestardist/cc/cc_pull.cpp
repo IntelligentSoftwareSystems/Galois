@@ -29,6 +29,9 @@
 #ifdef __GALOIS_HET_CUDA__
 #include "cc_pull_cuda.h"
 struct CUDA_Context* cuda_ctx;
+#else
+enum { CPU, GPU_CUDA };
+int personality = CPU;
 #endif
 
 constexpr static const char* const REGION_NAME = "ConnectedComp";
@@ -49,7 +52,7 @@ static cll::opt<Exec> execution(
     "exec",
     cll::desc("Distributed Execution Model (default value Async):"),
     cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"), 
-    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)"), clEnumValEnd),
+    clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)")),
     cll::init(Async));
 
 /******************************************************************************/
@@ -80,8 +83,8 @@ struct InitializeGraph {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       std::string impl_str("InitializeGraph_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -89,9 +92,10 @@ struct InitializeGraph {
       InitializeGraph_allNodes_cuda(cuda_ctx);
 
       StatTimer_cuda.stop();
-    } else if (personality == CPU)
+#else
+      abort();
 #endif
-    {
+    } else if (personality == CPU) {
       galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()),
                      InitializeGraph{&_graph}, galois::no_stats(),
                      galois::loopname(
@@ -125,8 +129,8 @@ struct ConnectedComp {
     do {
       syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         std::string impl_str("ConnectedComp_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -134,13 +138,16 @@ struct ConnectedComp {
         ConnectedComp_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
-      } else if (personality == CPU)
+#else
+        abort();
 #endif
-        galois::do_all(galois::iterate(nodesWithEdges),
-                       ConnectedComp(&_graph, dga), galois::steal(),
-                       galois::no_stats(),
-                       galois::loopname(
-                           syncSubstrate->get_run_identifier("ConnectedComp").c_str()));
+      } else if (personality == CPU) {
+        galois::do_all(
+            galois::iterate(nodesWithEdges), ConnectedComp(&_graph, dga),
+            galois::steal(), galois::no_stats(),
+            galois::loopname(
+                syncSubstrate->get_run_identifier("ConnectedComp").c_str()));
+      }
 
       syncSubstrate->sync<writeSource, readDestination, Reduce_min_comp_current,
                   Bitset_comp_current, async>("ConnectedComp");
@@ -192,17 +199,20 @@ struct ConnectedCompSanityCheck {
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
     dga.reset();
 
-#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       uint64_t sum;
       ConnectedCompSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
-    } else
+#else
+      abort();
 #endif
+    } else {
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
                                      _graph.masterNodesRange().end()),
                      ConnectedCompSanityCheck(&_graph, dga), galois::no_stats(),
                      galois::loopname("ConnectedCompSanityCheck"));
+    }
 
     uint64_t num_components = dga.reduce();
 
@@ -279,12 +289,15 @@ int main(int argc, char** argv) {
     ConnectedCompSanityCheck::go(*hg, active_vertices64);
 
     if ((run + 1) != numRuns) {
-#ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
         bitset_comp_current_reset_cuda(cuda_ctx);
-      } else
+#else
+        abort();
 #endif
+      } else {
         bitset_comp_current.reset();
+      }
 
       (*syncSubstrate).set_num_run(run + 1);
       InitializeGraph::go((*hg));
@@ -296,17 +309,15 @@ int main(int argc, char** argv) {
 
   // Verify
   if (verify) {
-#ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) {
-#endif
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         if ((*hg).isOwned((*hg).getGID(*ii)))
           galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
                                        (*hg).getData(*ii).comp_current);
       }
-#ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
+#ifdef __GALOIS_HET_CUDA__
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         if ((*hg).isOwned((*hg).getGID(*ii)))
@@ -314,8 +325,10 @@ int main(int argc, char** argv) {
               "% %\n", (*hg).getGID(*ii),
               get_node_comp_current_cuda(cuda_ctx, *ii));
       }
-    }
+#else
+    abort();
 #endif
+    }
   }
 
   return 0;

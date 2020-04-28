@@ -69,8 +69,8 @@ const char* const ALGO_NAMES[] = {"AsyncTile", "Async",      "SyncTile",
 static cll::opt<Exec> execution(
     "exec",
     cll::desc("Choose SERIAL or PARALLEL execution (default value PARALLEL):"),
-    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL"),
-                clEnumValEnd),
+    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL")
+                ),
     cll::init(PARALLEL));
 
 static cll::opt<Algo> algo(
@@ -78,7 +78,7 @@ static cll::opt<Algo> algo(
     cll::values(clEnumVal(AsyncTile, "AsyncTile"), clEnumVal(Async, "Async"),
                 clEnumVal(SyncTile, "SyncTile"), clEnumVal(Sync, "Sync"),
                 clEnumVal(Sync2pTile, "Sync2pTile"),
-                clEnumVal(Sync2p, "Sync2p"), clEnumValEnd),
+                clEnumVal(Sync2p, "Sync2p")),
     cll::init(SyncTile));
 
 using Graph =
@@ -408,10 +408,10 @@ int main(int argc, char** argv) {
   }
 
   auto it = graph.begin();
-  std::advance(it, startNode);
+  std::advance(it, startNode.getValue());
   source = *it;
   it     = graph.begin();
-  std::advance(it, reportNode);
+  std::advance(it, reportNode.getValue());
   report = *it;
 
   size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());

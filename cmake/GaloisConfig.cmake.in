@@ -1,0 +1,33 @@
+# Config file for the Galois package
+#
+# It exports the following targets:
+#   Galois::shmem
+#   Galois::dist
+#   ...
+#   (see GaloisTargets.cmake for all of them)
+#
+# It defines the following variables for legacy importing:
+#   Galois_INCLUDE_DIRS
+#   Galois_LIBRARIES
+#   Galois_LIBRARY_DIRS
+#   Galois_BIN_DIRS
+include(CMakeFindDependencyMacro)
+
+@PACKAGE_INIT@
+
+set_and_check(Galois_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set_and_check(Galois_LIBRARY_DIRS "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+set_and_check(Galois_BIN_DIRS "@PACKAGE_CMAKE_INSTALL_BINDIR@")
+set(Galois_LIBRARIES galois_shmem)
+
+find_dependency(Threads REQUIRED)
+find_dependency(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
+if (@ENABLE_DIST_GALOIS@)
+  find_dependency(MPI REQUIRED)
+endif()
+
+get_filename_component(GALOIS_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+if(NOT Galois::shmem)
+  include("${GALOIS_CMAKE_DIR}/GaloisTargets.cmake")
+endif()

@@ -89,7 +89,6 @@ namespace galois {
                                     EdgeData, PartitionPolicy>;
 
     // TODO @todo bring back graph saving/reading functionality?
-    std::string localGraphName = "";
 
     if (!symmetricGraph) {
       // out edges or in edges

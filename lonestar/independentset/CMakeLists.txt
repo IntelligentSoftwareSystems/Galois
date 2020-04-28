@@ -1,4 +1,5 @@
-app(independentset EXP_OPT)
-
+add_executable(independentset IndependentSet.cpp)
+add_dependencies(apps independentset)
+target_link_libraries(independentset PRIVATE Galois::shmem lonestar)
+install(TARGETS independentset DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 add_test_scale(small independentset "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")
-#add_test_scale(web independentset "${BASEINPUT}/random/r4-2e26.gr")

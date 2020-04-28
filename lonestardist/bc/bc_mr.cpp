@@ -549,7 +549,7 @@ int main(int argc, char** argv) {
 
   // set vector size in node data
   if (vectorSize == 0) {
-    vectorSize = numSourcesPerRound;
+    vectorSize = numSourcesPerRound.getValue();
   }
   GALOIS_ASSERT(vectorSize >= numSourcesPerRound);
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,9 +26,9 @@
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
 #include "galois/ParallelSTL.h"
+#include "galois/runtime/config.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Executor_ForEach.h"
-#include "galois/runtime/ForEachTraits.h"
 #include "galois/runtime/LoopStatistics.h"
 #include "galois/runtime/Range.h"
 #include "galois/runtime/Statistics.h"
@@ -458,26 +458,20 @@ struct OptionsCommon {
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
-  static const bool needStats = galois::internal::NeedStats<ArgsTy>::value;
-  static const bool needsPush =
-      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static const bool needsAborts =
-      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static const bool needsPia =
-      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak =
-      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+  constexpr static bool needStats = galois::internal::NeedStats<ArgsTy>::value;
+  constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
+  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
 
-  static const bool hasBreak =
-      exists_by_supertype<det_parallel_break_tag, ArgsTy>::value;
-  static const bool hasId = exists_by_supertype<det_id_tag, ArgsTy>::value;
+  constexpr static bool hasBreak = has_trait<det_parallel_break_tag, ArgsTy>();
+  constexpr static bool hasId    = has_trait<det_id_tag, ArgsTy>();
 
-  static const bool useLocalState =
-      exists_by_supertype<local_state_tag, ArgsTy>::value;
-  static const bool hasFixedNeighborhood =
-      exists_by_supertype<fixed_neighborhood_tag, ArgsTy>::value;
-  static const bool hasIntentToRead =
-      exists_by_supertype<intent_to_read_tag, ArgsTy>::value;
+  constexpr static bool useLocalState = has_trait<local_state_tag, ArgsTy>();
+  constexpr static bool hasFixedNeighborhood =
+      has_trait<fixed_neighborhood_tag, ArgsTy>();
+  constexpr static bool hasIntentToRead =
+      has_trait<intent_to_read_tag, ArgsTy>();
 
   static const int ChunkSize             = 32;
   static const unsigned InitialNumRounds = 100;
@@ -507,20 +501,19 @@ template <typename T, typename FunctionTy, typename ArgsTy>
 struct OptionsBase<T, FunctionTy, ArgsTy, true>
     : public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
-  typedef typename get_type_by_supertype<neighborhood_visitor_tag,
-                                         ArgsTy>::type::type function1_type;
+  typedef typename get_trait_type<neighborhood_visitor_tag, ArgsTy>::type::type
+      function1_type;
 
   function1_type fn1;
 
   OptionsBase(FunctionTy f, ArgsTy a)
-      : SuperTy(f, a),
-        fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) {}
+      : SuperTy(f, a), fn1(get_trait_value<neighborhood_visitor_tag>(a).value) {
+  }
 };
 
 template <typename T, typename FunctionTy, typename ArgsTy>
-using Options =
-    OptionsBase<T, FunctionTy, ArgsTy,
-                exists_by_supertype<neighborhood_visitor_tag, ArgsTy>::value>;
+using Options = OptionsBase<T, FunctionTy, ArgsTy,
+                            has_trait<neighborhood_visitor_tag, ArgsTy>()>;
 
 template <typename OptionsTy, bool Enable>
 class DAGManagerBase {
@@ -690,7 +683,7 @@ template <typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  typedef typename get_type_by_supertype<
+  typedef typename get_trait_type<
       local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
 
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
@@ -746,17 +739,16 @@ public:
 
 template <typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
-  typedef
-      typename get_type_by_supertype<det_parallel_break_tag,
-                                     typename OptionsTy::args_type>::type::type
-          BreakFn;
+  typedef typename get_trait_type<det_parallel_break_tag,
+                                  typename OptionsTy::args_type>::type::type
+      BreakFn;
   BreakFn breakFn;
   substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
 public:
   BreakManagerBase(const OptionsTy& o)
-      : breakFn(get_by_supertype<det_parallel_break_tag>(o.args).value),
+      : breakFn(get_trait_value<det_parallel_break_tag>(o.args).value),
         barrier(getBarrier(activeThreads)) {}
 
   bool checkBreak() {
@@ -949,13 +941,14 @@ struct IdManagerBase {
 template <typename OptionsTy>
 class IdManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename get_type_by_supertype<
-      det_id_tag, typename OptionsTy::args_type>::type::type IdFn;
+  typedef
+      typename get_trait_type<det_id_tag,
+                              typename OptionsTy::args_type>::type::type IdFn;
   IdFn idFn;
 
 public:
   IdManagerBase(const OptionsTy& o)
-      : idFn(get_by_supertype<det_id_tag>(o.args).value) {}
+      : idFn(get_trait_value<det_id_tag>(o.args).value) {}
   uintptr_t id(const value_type& x) { return idFn(x); }
 };
 
@@ -1367,6 +1360,8 @@ class Executor : public BreakManager<OptionsTy>,
   substrate::CacheLineStorage<volatile long> outerDone;
   substrate::CacheLineStorage<volatile long> hasNewWork;
 
+  int runFunction(ThreadLocalData& tld, Context* ctx);
+
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
   void go();
@@ -1498,6 +1493,28 @@ void Executor<OptionsTy>::go() {
 }
 
 template <typename OptionsTy>
+int Executor<OptionsTy>::runFunction(ThreadLocalData& tld, Context* ctx) {
+  int result = 0;
+#ifdef GALOIS_USE_LONGJMP_ABORT
+  if ((result = setjmp(execFrame)) == 0) {
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  try {
+#endif
+    tld.fn1(ctx->item.val, tld.facing.data());
+#ifdef GALOIS_USE_LONGJMP_ABORT
+  } else {
+    clearConflictLock();
+  }
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  } catch (const ConflictFlag& flag) {
+    clearConflictLock();
+    result = flag;
+  }
+#endif
+  return result;
+}
+
+template <typename OptionsTy>
 bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld) {
   auto& local = this->getLocalWindowManager();
   bool retval = false;
@@ -1517,23 +1534,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld) {
     setThreadContext(ctx);
 
     this->allocLocalState(tld.facing, tld.fn2);
-    int result = 0;
-#ifdef GALOIS_USE_LONGJMP_ABORT
-    if ((result = setjmp(execFrame)) == 0) {
-#else
-    try {
-#endif
-      tld.fn1(ctx->item.val, tld.facing.data());
-#ifdef GALOIS_USE_LONGJMP_ABORT
-    } else {
-      clearConflictLock();
-    }
-#else
-    } catch (const ConflictFlag& flag) {
-      clearConflictLock();
-      result = flag;
-    }
-#endif
+    int result = runFunction(tld, ctx);
     // FIXME:    clearReleasable();
     tld.facing.resetFirstPass();
     ctx->resetFirstPass();
@@ -1572,7 +1573,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP_ABORT
   if ((result = setjmp(execFrame)) == 0) {
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   try {
 #endif
     tld.fn2(ctx->item.val, tld.facing.data());
@@ -1580,7 +1581,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   } else {
     clearConflictLock();
   }
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   } catch (const ConflictFlag& flag) {
     clearConflictLock();
     result = flag;

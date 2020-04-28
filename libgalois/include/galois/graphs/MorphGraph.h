@@ -23,8 +23,8 @@
  * Contains MorphGraph and associated helpers.
  */
 
-#ifndef GALOIS_GRAPH_MORPHGRAPH_H
-#define GALOIS_GRAPH_MORPHGRAPH_H
+#ifndef GALOIS_GRAPHS_MORPHGRAPH_H
+#define GALOIS_GRAPHS_MORPHGRAPH_H
 
 //#define AUX_MAP
 
@@ -72,7 +72,7 @@ struct UEdgeInfoBase<NTy, ETy, true> {
     assert(N);
     return N;
   }
-  inline NTy* const first() const {
+  inline const NTy* first() const {
     assert(N);
     return N;
   }
@@ -103,7 +103,7 @@ struct UEdgeInfoBase<NTy, ETy, false> {
     assert(N);
     return (NTy*)((uintptr_t)N & ~1);
   }
-  inline NTy* const first() const {
+  inline const NTy* first() const {
     assert(N);
     return (NTy*)((uintptr_t)N & ~1);
   }
@@ -122,7 +122,7 @@ struct UEdgeInfoBase<NTy, void, true> {
 
   NTy* N;
   inline NTy* first() { return N; }
-  inline NTy* const first() const { return N; }
+  inline const NTy* first() const { return N; }
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
@@ -137,7 +137,7 @@ struct UEdgeInfoBase<NTy, void, false> {
 
   NTy* N;
   inline NTy* first() { return (NTy*)((uintptr_t)N & ~1); }
-  inline NTy* const first() const { return (NTy*)((uintptr_t)N & ~1); }
+  inline const NTy* first() const { return (NTy*)((uintptr_t)N & ~1); }
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>

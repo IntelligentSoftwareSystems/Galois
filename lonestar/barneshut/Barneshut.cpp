@@ -95,14 +95,12 @@ struct BoundingBox {
       : min(std::numeric_limits<double>::max()),
         max(std::numeric_limits<double>::min()) {}
 
-  void merge(const BoundingBox& other) {
-    min.pairMin(other.min);
-    max.pairMax(other.max);
-  }
+  BoundingBox merge(const BoundingBox& other) const {
+    BoundingBox copy(*this);
 
-  void merge(const Point& other) {
-    min.pairMin(other);
-    max.pairMax(other);
+    copy.min.pairMin(other.min);
+    copy.max.pairMax(other.max);
+    return copy;
   }
 
   double diameter() const { return (max - min).minDim(); }
@@ -480,17 +478,22 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
   for (int step = 0; step < ntimesteps; step++) {
 
-    auto MB = [](BoundingBox& lhs, const Point& rhs) { lhs.merge(rhs); };
+    auto mergeBoxes = [](const BoundingBox& lhs, const BoundingBox& rhs) {
+      return lhs.merge(rhs);
+    };
+
+    auto identity = []() {
+      return BoundingBox();
+    };
 
     // Do tree building sequentially
-    galois::GBigReducible<decltype(MB), BoundingBox> boxes(MB);
+    auto boxes = galois::make_reducible(mergeBoxes, identity);
 
     galois::do_all(galois::iterate(pBodies),
-                   [&boxes](const Body* b) { boxes.update(b->pos); },
+                   [&boxes](const Body* b) { boxes.update(BoundingBox(b->pos)); },
                    galois::loopname("reduceBoxes"));
 
-    BoundingBox box = boxes.reduce(
-        [](BoundingBox& lhs, BoundingBox& rhs) { lhs.merge(rhs); });
+    BoundingBox box = boxes.reduce();
 
     Tree t;
     BuildOctree treeBuilder{t};

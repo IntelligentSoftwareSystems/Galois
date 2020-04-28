@@ -160,7 +160,7 @@ protected:
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
     if (galois::runtime::evilPhase >=
-        std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
+        static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
     }
   }
@@ -170,7 +170,7 @@ protected:
     unsigned result = galois::runtime::evilPhase + 1;
 
     // limit defined by MPI or LCI
-    if (result >= std::numeric_limits<int16_t>::max()) {
+    if (result >= static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
       return 1;
     } else {
       return result;

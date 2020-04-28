@@ -1,1 +1,1 @@
-app(boruvka-merge BoruvkaMerge.cpp EXP_OPT)
+app(boruvka-merge BoruvkaMerge.cpp)

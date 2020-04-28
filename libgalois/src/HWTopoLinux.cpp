@@ -73,6 +73,7 @@ static unsigned getNumaNode(cpuinfo& c) {
   if (!warnOnce) {
     warnOnce = true;
     numaAvail = numa_available() >= 0;
+    numaAvail = numaAvail && numa_num_configured_nodes() > 0;
     if (!numaAvail)
       galois::gWarn("Numa support configured but not present at runtime.  "
                     "Assuming numa topology matches socket topology.");
