@@ -176,10 +176,19 @@ jobs:
       run: |
         mkdir -p $HOME/build/dumps
 
-        GRAPH_LOCATION=$HOME/.cache/graph
-        if [[ ! -d "$GRAPH_LOCATION" ]]; then
+        GRAPH_FILE="$HOME/.cache/graph/inputs.tar.gz"
+        GRAPH_LOCATION="$HOME/.cache/graph/inputs"
+        INPUT_URL="http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz"
+        mkdir -p "$(dirname \"$GRAPH_FILE\")"
+        if [[ ! -f "$GRAPH_FILE.timestamp" ]]; then
+          touch -t 197001010000 "$GRAPH_FILE.timestamp"
+        fi
+        curl -fL --time-cond "$GRAPH_FILE.timestamp" --output "$GRAPH_FILE" "$INPUT_URL"
+        if [[ "$GRAPH_FILE" -nt "GRAPH_FILE.timestamp" ]]; then
+          rm -rf "$GRAPH_LOCATION"
           mkdir -p "$GRAPH_LOCATION"
-          curl -fL http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz | tar -C "$GRAPH_LOCATION" -xz -f -
+          tar -C "$GRAPH_LOCATION" -xz -f "$GRAPH_FILE"
+          touch -r "$GRAPH_FILE" "$GRAPH_FILE.timestamp"
         fi
     - name: install C++ dependencies
       run: |
@@ -212,7 +221,7 @@ jobs:
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DENABLE_DIST_GALOIS=on \
           -DUSE_ARCH=none \
-          -DGRAPH_LOCATION=$HOME/.cache/graph
+          -DGRAPH_LOCATION=$HOME/.cache/graph/inputs
     - name: build
       run: |
         cmake --build $HOME/build --parallel 4
