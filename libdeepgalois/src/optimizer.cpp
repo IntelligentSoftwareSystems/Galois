@@ -1,5 +1,6 @@
 #include "deepgalois/optimizer.h"
 #include "galois/Galois.h"
+#include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
 

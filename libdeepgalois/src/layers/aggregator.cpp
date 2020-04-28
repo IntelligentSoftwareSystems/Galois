@@ -11,7 +11,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
   auto& rangeObj = g.allNodesRange();
   galois::do_all(galois::iterate(rangeObj), [&](const auto src) {
   #endif
-    deepgalois::math::clear_cpu(len , &out[src * len]);
+    math::clear_cpu(len , &out[src * len]);
     float_t a = 0.0;
     float_t b = 0.0;
     // get normalization factor if needed
@@ -24,14 +24,12 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
         b = a * norm_factor[dst];
         vec_t neighbor(len);
         // scale the neighbor's data using the normalization factor
-        deepgalois::math::mul_scalar(len, b, &in[dst * len], &neighbor[0]);
-        // use scaled data to update
-        deepgalois::math::vadd_cpu(len, &out[src * len], &neighbor[0],
-                                   &out[src * len]); // out[src] += in[dst]
+        math::mul_scalar(len, b, &in[dst * len], &neighbor[0]);
+        // use scaled data to update; out[src] += in[dst]
+        math::vadd_cpu(len, &out[src * len], &neighbor[0],  &out[src * len]);
       } else {
-        // add embeddings from neighbors together
-        deepgalois::math::vadd_cpu(len, &out[src * len], &in[dst * len],
-                                   &out[src * len]); // out[src] += in[dst]
+        // add embeddings from neighbors together; out[src] += in[dst]
+        math::vadd_cpu(len, &out[src * len], &in[dst * len], &out[src * len]);
       }
     }
   }, galois::steal(), galois::no_stats(), galois::loopname("update_all"));
@@ -40,8 +38,8 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
 void deepgalois::update_all_csrmm(size_t len, Graph& g, const float_t* in, float_t* out,
                                   bool norm, const float_t* norm_factor) {
   unsigned n = g.size();
-  deepgalois::math::clear_cpu(n*len, out);
-  //csrmm_cpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, 
-  //          (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, out);
+  math::clear_cpu(n*len, out);
+  math::csrmm_cpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, 
+            (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, out);
 }
 #endif

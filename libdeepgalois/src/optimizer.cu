@@ -14,7 +14,20 @@ __global__ void update_kernel(const int n, float_t alpha, float_t b1,
   }
 }
 
-void deepgalois::adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+namespace deepgalois {
+
+template <int N>
+template <int Index>
+float_t* stateful_optimizer<N>::get_gpu(const size_t n, const float_t *key) {
+  static_assert(Index < N, "index out of range");
+  if (!is_allocated_device(dE_[Index][key])) {
+    float_malloc_device(n, dE_[Index][key]);
+    init_const_gpu(n, 0.0, dE_[Index][key]);
+  }
+  return dE_[Index][key];
+}
+
+void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
   //std::cout << "updating weights on GPU, n = " << n << "\n";
   //print_device_vector(10, dW, "dW");
   float_t* cache = get_gpu<0>(n, W);
@@ -24,4 +37,6 @@ void deepgalois::adam::update_gpu(const size_t n, const float_t* dW, float_t* W)
       n, alpha, b1, b2, b1_t, b2_t, eps, cache, velocity, dW, W);
   b1_t *= b1;
   b2_t *= b2;
+}
+
 }

@@ -16,9 +16,6 @@
 #include <algorithm>
 #include <unordered_map>
 #include "deepgalois/types.h"
-#ifndef CPU_ONLY
-#include "deepgalois/math_functions.hh"
-#endif
 
 namespace deepgalois {
 
@@ -41,10 +38,8 @@ struct optimizer {
 template <int N>
 struct stateful_optimizer : public optimizer {
   void reset() override {
-    for (auto& e : E_)
-      e.clear();
+    for (auto& e : E_) e.clear();
   }
-
 protected:
   template <int Index>
   vec_t& get(const vec_t& key) {
@@ -56,14 +51,7 @@ protected:
   std::unordered_map<const vec_t*, vec_t> E_[N];
 #ifndef CPU_ONLY
   template <int Index>
-  float_t *get_gpu(const size_t n, const float_t *key) {
-    static_assert(Index < N, "index out of range");
-    if (!is_allocated_device(dE_[Index][key])) {
-      float_malloc_device(n, dE_[Index][key]);
-      init_const_gpu(n, 0.0, dE_[Index][key]);
-    }
-    return dE_[Index][key];
-  }
+  float_t *get_gpu(const size_t n, const float_t *key);
   std::unordered_map<const float_t*, float_t*> dE_[N];
 #endif
 };

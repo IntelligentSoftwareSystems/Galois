@@ -96,8 +96,15 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList v
     }
     if (j == degree) galois::gPrint("Not found from ", degree, " neighbors\n");
   }
-  galois::gPrint("Done selection, vertex_set size: ", vertex_set.size(), "\n");
   assert(n == vertex_set.size());
+  galois::gPrint("Done selection, vertex_set size: ", vertex_set.size(), ", set: ( ");
+  int counter = 0;
+  for (int i : vertex_set) {
+    counter ++;
+    if (counter > 16 && counter < n-16) continue;
+    galois::gPrint(i, " ");
+  }
+  galois::gPrint(" )\n");
 }
 
 void Sampler::update_masks(size_t n, VertexSet vertices, mask_t *masks) {

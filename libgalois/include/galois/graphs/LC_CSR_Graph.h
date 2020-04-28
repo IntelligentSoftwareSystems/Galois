@@ -323,6 +323,9 @@ public:
     ar >> edgeData;
   }
 
+  // cxh
+  uint64_t* row_start_ptr() { return &edgeIndData[0]; }
+  uint32_t* edge_dst_ptr() { return &edgeDst[0]; }
   /**
    * Accesses the "prefix sum" of this graph; takes advantage of the fact
    * that edge_end(n) is basically prefix_sum[n] (if a prefix sum existed +

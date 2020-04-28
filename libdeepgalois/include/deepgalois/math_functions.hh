@@ -10,15 +10,16 @@
 #include <cstdint>
 #include "deepgalois/types.h"
 
+#ifdef USE_MKL
+#include <mkl.h>
+#else  // If use MKL, simply include the MKL header
 extern "C" {
 #include <cblas.h>
-//#include <clapack.h>
 }
-
-// TODO namespace
-
+#endif
 
 namespace deepgalois {
+
 namespace math {
 //! add 2 arrays for n elements
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
@@ -27,6 +28,7 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
 //! do dot product of 2 vectors
 float_t dot(const vec_t& x, const vec_t& y);
 void axpy(size_t n, const float_t a, float_t *x, float_t *y);
+int argmax(const size_t n, const float_t* x); // the arguments of the maxima
 //! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
 float_t l2_norm(size_t n, const float_t* a);
 //! clear n elements of a vector
@@ -118,7 +120,6 @@ void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
 void transpose2D(const tensor_t& in, tensor_t& out);
 void transpose2D1D(const tensor_t& in, vec_t& out);
 int argmax(const size_t n, const vec_t& x);   // the arguments of the maxima
-int argmax(const size_t n, const float_t* x); // the arguments of the maxima
 
 // GPU operators
 bool isnan_gpu(int n, const float_t *array); // does array contain any 'nan' element

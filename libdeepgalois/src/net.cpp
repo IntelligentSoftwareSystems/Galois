@@ -4,6 +4,7 @@
 
 #include "deepgalois/net.h"
 #include "deepgalois/utils.h"
+#include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
 
@@ -84,6 +85,10 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #endif
   }
 
+  if (subgraph_sample_size > train_count) {
+    galois::gPrint("FATAL: subgraph size can not be larger than the size of training set\n");
+    exit(1);
+  }
   // NOTE: train_begin/train_end are global IDs, train_masks is a local id
   // train count and val count are LOCAL counts
 
@@ -440,7 +445,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
 #ifndef GALOIS_USE_DIST
     if (masks[i] == 1) {
       // get prediction
-      int preds = argmax(num_classes,
+      int preds = math::argmax(num_classes,
       	    &(layers[num_conv_layers - 1]->next()->get_data()[i * num_classes]));
       // check prediction
       if ((label_t)preds == context->get_label(i))
@@ -455,7 +460,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
       uint32_t localID = dGraph->getLID(i);
       if (masks[localID] == 1) {
         // get prediction
-        int preds = argmax(num_classes,
+        int preds = math::argmax(num_classes,
         	    &(layers[num_conv_layers - 1]->next()->get_data()[localID * num_classes]));
         // check prediction
         if ((label_t)preds == context->get_label(localID))

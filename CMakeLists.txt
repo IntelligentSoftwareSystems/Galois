@@ -16,6 +16,8 @@ set(GALOIS_COPYRIGHT_YEAR "2018") # Also in COPYRIGHT
 #set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
 #link_directories(LIBUNWIND_DIR MPIP_DIR)
 
+SET(OPENBLAS_ROOT /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build)
+SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.0)
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release")
@@ -37,6 +39,7 @@ set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single mach
 ###### General features ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
+set(USE_MKL_BLAS OFF CACHE BOOL "Use MKL for BLAS")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
@@ -317,6 +320,17 @@ if(USE_VTUNE)
     add_definitions(-DGALOIS_USE_VTUNE)
   else()
     message(WARNING "VTune not found")
+  endif()
+endif()
+
+if(USE_MKL_BLAS)
+  SET(MKL_ROOT /opt/apps/sysnet/intel/17.0/mkl)
+  find_package(MKL)
+  message(STATUS "MKL: ${MKL_INCLUDE_DIRS}")
+  if (MKL_FOUND)
+    include_directories(${MKL_INCLUDE_DIRS})
+  else()
+    message(WARNING "MKL not found")
   endif()
 endif()
 

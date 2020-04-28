@@ -1,4 +1,5 @@
 #include "deepgalois/layers/l2_norm_layer.h"
+#include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
 

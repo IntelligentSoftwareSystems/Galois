@@ -1,4 +1,5 @@
 #include "deepgalois/layers/softmax_loss_layer.h"
+#include "deepgalois/math_functions.hh"
 #include "gg.h"
 #include "ggcuda.h"
 

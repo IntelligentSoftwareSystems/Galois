@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 2.8)
 
-# open blas
-SET(OPENBLAS_INC /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/include)
-SET(OPENBLAS_LIB /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build/lib)
-include_directories(${OPENBLAS_INC})
-link_directories(${OPENBLAS_LIB})
+SET(BLAS_INC_DIR ${OPENBLAS_ROOT}/include)
+SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib)
+set(BLAS_LIB -lopenblas)
+if(USE_MKL_BLAS)
+  SET(BLAS_INC_DIR ${MKL_ROOT}/include)
+  SET(BLAS_LIB_DIR ${MKL_ROOT}/lib/intel64)
+  set(BLAS_LIB "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_MKL")
+endif()
+
+# blas library
+include_directories(${BLAS_INC_DIR})
+link_directories(${BLAS_LIB_DIR})
+message(STATUS "BLAS_INC_DIR: ${BLAS_INC_DIR}")
+message(STATUS "BLAS_LIB_DIR: ${BLAS_LIB_DIR}")
 
 # galois base libs
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
@@ -19,9 +29,7 @@ else()
   include_directories("${CUB_ROOT}")
   set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
   include_directories("${MGPU_ROOT}/src")
-
-  SET(CUDA_INC /org/centers/cdgc/cuda/cuda-10.0/include)
-  include_directories(${CUDA_INC})
+  include_directories(${CUDA_HOME}/include)
   include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
 
   find_package(CUDA REQUIRED)
@@ -32,9 +40,7 @@ else()
   #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_61,code=sm_61)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_70,code=sm_70)
   #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -G -Xcompiler -rdynamic)
-  #set(CUDA_INCLUDE_DIRS /org/centers/cdgc/cuda/cuda-10.0/include ${CUDA_INCLUDE_DIRS})
-  SET(CUDA_LIB /org/centers/cdgc/cuda/cuda-10.0/lib64/)
-  link_directories(${CUDA_LIB})
+  link_directories(${CUDA_HOME}/lib64)
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
 
   set(CUDA_SOURCES
@@ -100,7 +106,7 @@ endif()
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem gllvm)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
-target_link_libraries(dg_cpu -lopenblas)
+target_link_libraries(dg_cpu ${BLAS_LIB})
 target_include_directories(dg_cpu PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include

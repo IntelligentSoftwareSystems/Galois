@@ -4,10 +4,13 @@
 #include <immintrin.h>
 #include "deepgalois/utils.h"
 
+#ifdef USE_MKL
+#include <mkl.h>
+#else  // If use MKL, simply include the MKL header
 extern "C" {
 #include <cblas.h>
-//#include <clapack.h>
 }
+#endif
 
 #define NOT_IMPLEMENTED                \
   do {                                 \
@@ -38,9 +41,11 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 #ifdef USE_MKL
   const char *matdescra = "GXXCX";//6 bytes
   const char transa = 'N';
-  mkl_scsrmm (&transa, &M , &N, &K, &alpha , matdescra,
-    A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1,
-    B, &N, &beta , C, &N);
+  printf("Calling Intel MKL\n");
+  exit(1);
+  mkl_scsrmm(&transa, &M , &N, &K, &alpha , matdescra,
+             A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1,
+             B, &N, &beta , C, &N);
 #else
   NOT_IMPLEMENTED;
 #endif
@@ -124,6 +129,18 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
 
 void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
   cblas_saxpy(n, a, x, 1, y, 1);
+}
+
+int argmax(const size_t n, const float_t* x) {
+  float_t max = x[0];
+  int max_ind = 0;
+  for (size_t i = 1; i < n; i++) {
+    if (x[i] > max) {
+      max_ind = i;
+      max     = x[i];
+    }
+  }
+  return max_ind;
 }
 
 float_t l2_norm(size_t n, const float_t* x) {
@@ -548,20 +565,6 @@ int argmax(const size_t n, const vec_t& x) {
   }
   return max_ind;
 }
-
-int argmax(const size_t n, const float_t* x) {
-  float_t max = x[0];
-  int max_ind = 0;
-  for (size_t i = 1; i < n; i++) {
-    if (x[i] > max) {
-      max_ind = i;
-      max     = x[i];
-    }
-  }
-  return max_ind;
-}
-
-
 
 void d_mvmul(vec_t& in_diff, vec_t& h_in, tensor_t& out_diff) {
   vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff

@@ -1,4 +1,5 @@
 #include "deepgalois/layers/graph_conv_layer.h"
+#include "deepgalois/math_functions.hh"
 #include "deepgalois/utils.h"
 
 namespace deepgalois {
@@ -40,13 +41,21 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   // normalization constant based on graph structure
   float_t* norm_consts = context->get_norm_factor_ptr();
+#ifdef USE_MKL
+  update_all_csrmm(len, g, in, out, norm_, norm_consts);
+#else
   update_all(len, g, in, out, norm_, norm_consts);
+#endif
 }
 
 // since graph is symmetric, the derivative is the same
 void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   float_t* norm_consts = context->get_norm_factor_ptr();
+#ifdef USE_MKL
+  update_all_csrmm(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
+#else
   update_all(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
+#endif
 }
 
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {

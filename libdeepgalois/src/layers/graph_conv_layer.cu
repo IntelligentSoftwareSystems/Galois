@@ -1,4 +1,5 @@
 #include "deepgalois/layers/graph_conv_layer.h"
+#include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
 

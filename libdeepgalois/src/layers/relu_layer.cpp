@@ -1,4 +1,5 @@
 #include "deepgalois/layers/relu_layer.h"
+#include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
 

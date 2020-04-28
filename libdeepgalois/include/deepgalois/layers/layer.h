@@ -16,7 +16,6 @@
 #include "deepgalois/DistContext.h"
 #endif
 #include "deepgalois/optimizer.h"
-#include "deepgalois/math_functions.hh"
 #include "deepgalois/layers/node.h"
 #ifdef GALOIS_USE_DIST
 #include "galois/graphs/GluonSubstrate.h"
