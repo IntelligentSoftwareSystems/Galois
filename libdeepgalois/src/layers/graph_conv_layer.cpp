@@ -37,7 +37,15 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t
 
 #ifdef CPU_ONLY
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
-  deepgalois::update_all(len, g, in, out, norm_, norm_factor);
+  // normalization constant based on graph structure
+  float_t* norm_consts = context->get_norm_factor_ptr();
+  update_all(len, g, in, out, norm_, norm_consts);
+}
+
+// since graph is symmetric, the derivative is the same
+void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
+  float_t* norm_consts = context->get_norm_factor_ptr();
+  update_all(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
 }
 
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {
@@ -83,6 +91,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
+  //std::cout << "x=" << x << ", y=" << y << ", z=" << z << "\n";
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W (not implemented yet)
@@ -115,9 +124,8 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   if (act_) math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
   //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
-  // x*y NOTE: since graph is symmetric, the derivative is the same
   // this is the aggregate call
-  deepgalois::update_all(z, *graph_cpu, out_grad, out_temp, norm_, norm_factor); // x*x; x*z -> x*z
+  graph_conv_layer::d_aggregate(z, *graph_cpu, out_grad, out_temp);
 #ifdef GALOIS_USE_DIST
   // sync agg
   deepgalois::_syncVectorSize = z;

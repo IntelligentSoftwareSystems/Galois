@@ -36,7 +36,6 @@ public:
   void malloc_and_init();
   std::string layer_type() const override { return std::string("graph_conv"); }
   void set_netphase(net_phase ctx) override { phase_ = ctx; }
-  void set_context(layer::ContextType* ctx) { context = ctx; norm_factor = ctx->get_norm_factor_ptr(); }
   virtual acc_t get_weight_decay_loss();
   //! Uses weights contained in this layer to update in_data (results from previous)
   //! and save result to out_data
@@ -48,14 +47,13 @@ public:
   // user-defined aggregate function
 #ifdef CPU_ONLY
   virtual void aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
+  void d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
 #else
   virtual void aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
+  void d_aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
 #endif
   // user-defined combine function
   virtual void combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out);
-#ifndef CPU_ONLY
-  void d_aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
-#endif
 
 private:
   bool act_;     // whether to use activation function at the end
@@ -70,7 +68,6 @@ private:
   float_t* in_temp1;
   float_t* trans_data;    // y*x
   unsigned* dropout_mask; // x*y
-  float_t* norm_factor;   // normalization constant based on graph structure
 
   // Glorot & Bengio (AISTATS 2010)
   inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed=1);

@@ -47,7 +47,7 @@ public:
 
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
-  void norm_factor_counting();
+  void norm_factor_counting(size_t g_size);
   void createSubgraph() {}
   void gen_subgraph_labels(size_t m, const mask_t *masks) {}
   void gen_subgraph_feats(size_t m, const mask_t *masks) {}
@@ -62,7 +62,6 @@ public:
 
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
-
 
   //! return label for some node
   //! NOTE: this is LID, not GID

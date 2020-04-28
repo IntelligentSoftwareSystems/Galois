@@ -97,7 +97,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
-void Context::norm_factor_counting() {
+void Context::norm_factor_counting(size_t g_size) {
   std::cout << "Pre-computing normalization factor (n=" << n << ") ... ";
   if (!is_selfloop_added) {
     std::cout << "Set -sl=1 to add selfloop\n";	  

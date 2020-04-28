@@ -32,6 +32,7 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
   context->set_label_class(is_single_class);
+  context->set_use_subgraph(subgraph_sample_size > 0);
   num_samples = context->read_graph(dataset_str, selfloop);
   if (subgraph_sample_size) sampler = new deepgalois::Sampler();
 #else
@@ -158,6 +159,8 @@ void Net::train(optimizer* opt, bool need_validate) {
       // update features for subgraph
       context->gen_subgraph_feats(subgraph_sample_size, subgraph_masks);
       layers[0]->set_feats_ptr(context->get_feats_subg_ptr()); // feed input data
+
+      context->norm_factor_counting(subgraph_sample_size);
 #endif
       num_subg_remain += 1; // num_threads
     }
@@ -334,7 +337,7 @@ void Net::construct_layers() {
     layers[i]->malloc_and_init();
   layers[0]->set_in_data(context->get_feats_ptr()); // feed input data
   // precompute the normalization constant based on graph structure
-  context->norm_factor_counting();
+  if (!subgraph_sample_size) context->norm_factor_counting(num_samples);
   set_contexts();
 }
 

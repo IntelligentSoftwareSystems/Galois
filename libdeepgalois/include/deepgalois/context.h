@@ -33,8 +33,9 @@ public:
   float_t* get_norm_factor_ptr() { return norm_factor; }
 
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
+  void set_use_subgraph(bool use_subg) { use_subgraph = use_subg; }
   void copy_data_to_device(); // copy labels and input features
-  void norm_factor_counting();
+  void norm_factor_counting(size_t g_size);
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
@@ -71,6 +72,7 @@ protected:
   size_t feat_len;             // input feature length: D
   bool is_single_class;        // single-class (one-hot) or multi-class label
   bool is_selfloop_added;      // whether selfloop is added to the input graph
+  bool use_subgraph;           // whether to use subgraph
   label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
   label_t *h_labels_subg;      // labels for subgraph
   float_t* h_feats;            // input features: N x D

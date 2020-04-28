@@ -8,8 +8,9 @@
 namespace deepgalois {
 
 #ifdef CPU_ONLY
-Context::Context() : n(0), num_classes(0), feat_len(0), 
-  is_single_class(true), is_selfloop_added(false), 
+Context::Context() : n(0), num_classes(0), 
+  feat_len(0), is_single_class(true), 
+  is_selfloop_added(false), use_subgraph(false),
   h_labels(NULL), h_labels_subg(NULL), 
   h_feats(NULL), h_feats_subg(NULL),
   d_labels(NULL), d_labels_subg(NULL),
@@ -119,15 +120,16 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   //*/
 }
 
-void Context::norm_factor_counting() {
-  norm_factor = new float_t[n];
-  galois::do_all(galois::iterate((size_t)0, n),
-    [&](auto v) {
-      auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
-      float_t temp = std::sqrt(float_t(degree));
-      if (temp == 0.0) norm_factor[v] = 0.0;
-      else norm_factor[v] = 1.0 / temp;
-    }, galois::loopname("NormCounting"));
+void Context::norm_factor_counting(size_t g_size) {
+  Graph *g = graph_cpu;
+  if (use_subgraph) g = subgraph_cpu;
+  if (norm_factor == NULL) norm_factor = new float_t[g_size];
+  galois::do_all(galois::iterate((size_t)0, g_size), [&](auto v) {
+    auto degree  = std::distance(g->edge_begin(v), g->edge_end(v));
+    float_t temp = std::sqrt(float_t(degree));
+    if (temp == 0.0) norm_factor[v] = 0.0;
+    else norm_factor[v] = 1.0 / temp;
+  }, galois::loopname("NormCounting"));
 }
 
 void Context::read_edgelist(const char* filename, bool symmetrize, bool add_self_loop) {
