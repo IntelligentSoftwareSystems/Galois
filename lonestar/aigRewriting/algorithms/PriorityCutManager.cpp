@@ -40,11 +40,12 @@ namespace algorithm {
 
 PriCutManager::PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool compTruth, bool deterministic, bool verbose) 
 			:
-      aig(aig), aigGraph(aig.getGraph()), K(K), C(C), nThreads(nThreads),
-			compTruth(compTruth), deterministic(deterministic), verbose(verbose),
+      aig(aig), aigGraph(aig.getGraph()), K(K), C(C),
       nWords(Functional32::wordNum(K)),
       nNodes(std::distance(aig.getGraph().begin(), aig.getGraph().end()) - aig.getNumOutputs()),
+      nThreads(nThreads),
       cutPoolSize(nNodes / nThreads),
+      compTruth(compTruth), deterministic(deterministic), verbose(verbose),
       perThreadData(cutPoolSize, K, compTruth, C, nWords) {
 
 	nLUTs = 0;
@@ -586,29 +587,28 @@ int PriCutManager::sortCompare(PriCut * lhsCut, PriCut * rhsCut) {
 					return 1;
 			return 0;
 		}
-		if ( this->sortMode == SortMode::DELAY_OLD ) { // delay old
-			if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-					return -1;
-			if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-					return 1;
-			if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-					return -1;
-			if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-					return 1;
-			if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-					return -1;
-			if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-					return 1;
-			if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-					return -1;
-			if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-					return 1;
-			if ( lhsCut->nLeaves < rhsCut->nLeaves )
-					return -1;
-			if ( lhsCut->nLeaves > rhsCut->nLeaves )
-					return 1;
-			return 0;
-		}
+                assert(this->sortMode == SortMode::DELAY_OLD);
+		if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
+				return -1;
+		if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
+				return 1;
+		if ( lhsCut->area < rhsCut->area - this->fEpsilon )
+				return -1;
+		if ( lhsCut->area > rhsCut->area + this->fEpsilon )
+				return 1;
+		if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
+				return -1;
+		if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
+				return 1;
+		if ( lhsCut->power < rhsCut->power - this->fEpsilon )
+				return -1;
+		if ( lhsCut->power > rhsCut->power + this->fEpsilon )
+				return 1;
+		if ( lhsCut->nLeaves < rhsCut->nLeaves )
+				return -1;
+		if ( lhsCut->nLeaves > rhsCut->nLeaves )
+				return 1;
+		return 0;
 	}
 }
 
@@ -1339,8 +1339,7 @@ struct KPriCutOperator {
     if (nodeData.type == aig::NodeType::AND) {
 
       // Touching outgoing neighobors to acquire their locks
-      for (auto edge : aigGraph.out_edges(node)) {
-      }
+      aigGraph.out_edges(node);
 
       // Combine Cuts
       auto inEdgeIt          = aigGraph.in_edge_begin(node);
@@ -1400,8 +1399,7 @@ struct KPriCutOperator {
       if (nodeData.type == aig::NodeType::PI) {
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
-        for (auto outEdge : aigGraph.out_edges(node)) {
-        }
+        aigGraph.out_edges(node);
 
         if ( cutMan.getNodePriCuts()[nodeData.id] == nullptr ) {
 					// Set the trivial cut
@@ -1444,7 +1442,7 @@ void runKPriCutOperator(PriCutManager& cutMan) {
 	bool verbose = cutMan.getVerboseFlag();
 	int nAreaRecovery =2, nAreaFlow = 1, nLocalArea = 1;
 	aig::Aig & aig = cutMan.getAig();
-	aig::Graph & aigGraph = aig.getGraph();
+//	aig::Graph & aigGraph = aig.getGraph();
 
 
 	if ( verbose ) { 

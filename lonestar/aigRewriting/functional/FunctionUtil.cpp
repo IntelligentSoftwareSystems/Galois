@@ -144,6 +144,7 @@ word* FunctionUtil::prim(std::istringstream& expression) {
   }
 
   default:
+    return nullptr;
     break;
   }
 }

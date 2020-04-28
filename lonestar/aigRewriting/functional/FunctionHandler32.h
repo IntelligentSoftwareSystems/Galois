@@ -274,7 +274,7 @@ std::string toCubeString( word* function, int nWords, int nVars) {
 	int nRows;
 
 	if ( nWords == 1 ) {
-		nRows = 2 << nVars-1;
+		nRows = 2 << (nVars-1);
 		mask = 1;
 		for (int j = 0; j < nRows; j++) {
 			if ( function[0] & mask ) {
