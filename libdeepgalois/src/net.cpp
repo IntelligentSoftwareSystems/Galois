@@ -109,34 +109,6 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
 #endif
 }
 
-// generate labels for the subgraph
-void Net::lookup_labels(size_t n, const mask_t *masks, const label_t *labels, label_t *sg_labels) {
-  if (sg_labels == NULL) sg_labels = new label_t[subgraph_sample_size];
-  size_t count = 0;
-  for (size_t i = 0; i < n; i++) {
-    if (masks[i] == 1) {
-      if (is_single_class) {
-        sg_labels[count] = labels[i];
-      } else {
-        std::copy(labels+i*num_classes, labels+(i+1)*num_classes, sg_labels+count*num_classes);
-	  }
-      count ++;
-	}
-  }
-}
-
-void Net::lookup_feats(size_t n, const mask_t *masks, const float_t *feats, float_t *sg_feats) {
-  size_t count = 0;
-  size_t len = feature_dims[0];
-  if (sg_feats == NULL) sg_feats = new float_t[subgraph_sample_size*len];
-  for (size_t i = 0; i < n; i++) {
-    if (masks[i] == 1) {
-      std::copy(feats+i*len, feats+(i+1)*len, sg_feats+count*len);
-      count ++;
-	}
-  }
-}
-
 void Net::train(optimizer* opt, bool need_validate) {
   std::string header = "";
   std::string seperator = " ";
@@ -180,12 +152,12 @@ void Net::train(optimizer* opt, bool need_validate) {
       layers[num_layers - 1]->set_sample_mask(train_begin, train_end, train_count, subgraph_masks);
 
       // update labels for subgraph
-      lookup_labels(num_samples, subgraph_masks, context->get_labels_ptr(), context->get_labels_subg_ptr());
+      context->gen_subgraph_labels(subgraph_sample_size, subgraph_masks);
       layers[num_layers-1]->set_labels_ptr(context->get_labels_subg_ptr());
 
       // update features for subgraph
-      lookup_feats(num_samples, subgraph_masks, context->get_feats_ptr(), context->get_feats_subg_ptr());
-      layers[0]->set_in_data(context->get_feats_subg_ptr()); // feed input data
+      context->gen_subgraph_feats(subgraph_sample_size, subgraph_masks);
+      layers[0]->set_feats_ptr(context->get_feats_subg_ptr()); // feed input data
 #endif
       num_subg_remain += 1; // num_threads
     }

@@ -48,6 +48,8 @@ public:
   float_t* get_feats_subg_ptr() { return h_feats_subg; }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return h_labels_subg; }
+  void gen_subgraph_labels(size_t m, const mask_t *masks);
+  void gen_subgraph_feats(size_t m, const mask_t *masks);
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   CSRGraph subgraph_gpu;

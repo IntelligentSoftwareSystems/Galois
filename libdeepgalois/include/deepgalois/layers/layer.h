@@ -73,6 +73,7 @@ public:
   virtual void set_context(ContextType* ctx) { context = ctx; }
   void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
   void set_labels_ptr(label_t *ptr) { labels = ptr; }
+  void set_feats_ptr(float_t *ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
 #ifdef CPU_ONLY
   void set_graph_ptr(Graph *ptr) { graph_cpu = ptr; }

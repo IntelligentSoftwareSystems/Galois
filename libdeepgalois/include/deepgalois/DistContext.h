@@ -49,6 +49,8 @@ public:
   // TODO this is a distributed operation
   void norm_factor_counting();
   void createSubgraph() {}
+  void gen_subgraph_labels(size_t m, const mask_t *masks) {}
+  void gen_subgraph_feats(size_t m, const mask_t *masks) {}
 
   float_t* get_norm_factor_ptr() { return norm_factor; }
   Graph* getGraphPointer() { return graph_cpu; }

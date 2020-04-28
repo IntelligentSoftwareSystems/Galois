@@ -113,9 +113,6 @@ protected:
   deepgalois::DistContext* context;
 #endif
 
-  void lookup_labels(size_t n, const mask_t *masks, const label_t *labels, label_t *sub_labels);
-  void lookup_feats(size_t n, const mask_t *masks, const float_t *feats, float_t *sg_feats);
-
 #ifdef CPU_ONLY
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);

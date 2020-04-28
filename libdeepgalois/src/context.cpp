@@ -31,6 +31,34 @@ void Context::createSubgraph() {
   subgraph_cpu = new Graph(); 
 }
 
+// generate labels for the subgraph, m is subgraph size
+void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
+  if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
+  size_t count = 0;
+  for (size_t i = 0; i < n; i++) {
+    if (masks[i] == 1) {
+      if (is_single_class) {
+        h_labels_subg[count] = h_labels[i];
+      } else {
+        std::copy(h_labels+i*num_classes, h_labels+(i+1)*num_classes, h_labels_subg+count*num_classes);
+	  }
+      count ++;
+	}
+  }
+}
+
+// generate input features for the subgraph, m is subgraph size
+void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
+  size_t count = 0;
+  if (h_feats_subg == NULL) h_feats_subg = new float_t[m*feat_len];
+  for (size_t i = 0; i < n; i++) {
+    if (masks[i] == 1) {
+      std::copy(h_feats+i*feat_len, h_feats+(i+1)*feat_len, h_feats_subg+count*feat_len);
+      count ++;
+	}
+  }
+}
+
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
