@@ -59,6 +59,7 @@ static cll::opt<unsigned int>
 enum Algo {
   deltaTile = 0,
   deltaStep,
+  deltaStepBarrier,
   serDeltaTile,
   serDelta,
   dijkstraTile,
@@ -67,7 +68,7 @@ enum Algo {
   topoTile
 };
 
-const char* const ALGO_NAMES[] = {"deltaTile", "deltaStep",    "serDeltaTile",
+const char* const ALGO_NAMES[] = {"deltaTile", "deltaStep",  "deltaStepBarrier",  "serDeltaTile",
                                   "serDelta",  "dijkstraTile", "dijkstra",
                                   "topo",      "topoTile"};
 
@@ -75,6 +76,7 @@ static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm:"),
          cll::values(clEnumVal(deltaTile, "deltaTile"),
                      clEnumVal(deltaStep, "deltaStep"),
+                     clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
                      clEnumVal(serDeltaTile, "serDeltaTile"),
                      clEnumVal(serDelta, "serDelta"),
                      clEnumVal(dijkstraTile, "dijkstraTile"),
@@ -105,7 +107,12 @@ using ReqPushWrap          = SSSP::ReqPushWrap;
 using OutEdgeRangeFn       = SSSP::OutEdgeRangeFn;
 using TileRangeFn          = SSSP::TileRangeFn;
 
-template <typename T, typename P, typename R>
+namespace gwl = galois::worklists;
+using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
+using OBIM    = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>;
+using OBIM_Barrier = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>::with_barrier<true>::type;
+
+template <typename T, typename OBIMTy = OBIM, typename P, typename R>
 void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
                    const R& edgeRange) {
 
@@ -113,11 +120,6 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
   galois::GAccumulator<size_t> BadWork;
   //! [reducible for self-defined stats]
   galois::GAccumulator<size_t> WLEmptyWork;
-
-  namespace gwl = galois::worklists;
-
-  using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
-  using OBIM    = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>;
 
   graph.getData(source) = 0;
 
@@ -138,36 +140,24 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
 
                      for (auto ii : edgeRange(item)) {
 
-                       GNode dst          = graph.getEdgeDst(ii);
-                       auto& ddist        = graph.getData(dst, flag);
-                       Dist ew            = graph.getEdgeData(ii, flag);
-                       const Dist newDist = sdata + ew;
-
-                       while (true) {
-                         Dist oldDist = ddist;
-
-                         if (oldDist <= newDist) {
-                           break;
-                         }
-
-                         if (ddist.compare_exchange_weak(
-                                 oldDist, newDist, std::memory_order_relaxed)) {
-
-                           if (TRACK_WORK) {
-                             //! [per-thread contribution of self-defined stats]
-                             if (oldDist != SSSP::DIST_INFINITY) {
-                               BadWork += 1;
-                             }
-                             //! [per-thread contribution of self-defined stats]
-                           }
-
-                           pushWrap(ctx, dst, newDist);
-                           break;
-                         }
-                       }
+                      GNode dst          = graph.getEdgeDst(ii);
+                      auto& ddist        = graph.getData(dst, flag);
+                      Dist ew            = graph.getEdgeData(ii, flag);
+                      const Dist newDist = sdata + ew;
+                      Dist oldDist = galois::atomicMin<uint32_t>(ddist, newDist);
+                      if (newDist < oldDist){
+                        if (TRACK_WORK) {
+                          //! [per-thread contribution of self-defined stats]
+                          if (oldDist != SSSP::DIST_INFINITY) {
+                            BadWork += 1;
+                          }
+                          //! [per-thread contribution of self-defined stats]
+                        }
+                        pushWrap(ctx, dst, newDist);
+                      }
                      }
                    },
-                   galois::wl<OBIM>(UpdateRequestIndexer{stepShift}),
+                   galois::wl<OBIMTy>(UpdateRequestIndexer{stepShift}),
                    galois::no_conflicts(), galois::loopname("SSSP"));
 
   if (TRACK_WORK) {
@@ -279,7 +269,7 @@ void topoAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
-  galois::GReduceLogicalOR changed;
+  galois::GReduceLogicalOr changed;
   size_t rounds = 0;
 
   do {
@@ -325,7 +315,7 @@ void topoTileAlgo(Graph& graph, const GNode& source) {
                  },
                  galois::steal(), galois::loopname("MakeTiles"));
 
-  galois::GReduceLogicalOR changed;
+  galois::GReduceLogicalOr changed;
   size_t rounds = 0;
 
   do {
@@ -439,6 +429,13 @@ int main(int argc, char** argv) {
   case topoTile:
     topoTileAlgo(graph, source);
     break;
+    
+  case deltaStepBarrier:
+    std::cout << "Using OBIM with barrier\n";
+    deltaStepAlgo<UpdateRequest, OBIM_Barrier>(graph, source, ReqPushWrap(),
+                                 OutEdgeRangeFn{graph});
+    break;
+  
   default:
     std::abort();
   }

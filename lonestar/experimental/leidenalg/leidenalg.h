@@ -63,7 +63,7 @@ struct Node{
 	uint64_t external_edge_wt;
 };
 
-typedef uint32_t EdgeTy;
+typedef uint64_t EdgeTy;
 using Graph =
     galois::graphs::LC_CSR_Graph<Node, EdgeTy>::with_no_lockable<false>::type::with_numa_alloc<true>::type;
 
@@ -467,9 +467,9 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   double cur_gain = 0;
   double max_gain = 0;
   double eix = counter[0] - self_loop_wt;
-  double ax = c_info[sc].degree_wt - degree_wt;
+//  double ax = c_info[sc].degree_wt - degree_wt;
   double eiy = 0;
-  double ay = 0;
+  //double ay = 0;
 
 	double size_x = c_info[sc].flatSize;
 	double new_size_x = size_x - (double) flatSize;
@@ -478,7 +478,7 @@ uint64_t maxCPMQuality(std::map<uint64_t, uint64_t> &cluster_local_map, std::vec
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
-      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+      //ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
 			double size_y = c_info[stored_already->first].flatSize;
 			double new_size_y = size_y + (double) flatSize;
 
@@ -508,9 +508,9 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
   double cur_gain = 0;
   double max_gain = 0;
   double eix = counter[0] - self_loop_wt;
-  double ax = c_info[sc].degree_wt - degree_wt;
+ // double ax = c_info[sc].degree_wt - degree_wt;
   double eiy = 0;
-  double ay = 0;
+  //double ay = 0;
 
 	double size_x = c_info[sc].flatSize;
 	double size_y = 0;
@@ -522,7 +522,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
   auto stored_already = cluster_local_map.begin();
   do {
     if(sc != stored_already->first) {
-      ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
+    //  ay = c_info[stored_already->first].degree_wt; // Degree wt of cluster y
 
 			size_y = c_info[stored_already->first].flatSize;
 			new_size_y = size_y + (double)flatSize;
@@ -542,7 +542,7 @@ uint64_t maxCPMQualityWithoutSwaps(std::map<uint64_t, uint64_t> &cluster_local_m
       
 			cur_gain = 2.0f * (double)(eiy - eix) + 0.5f*resolution*((double)(size_x*(size_x - 1) + size_y*(size_y - 1)) - (double)((new_size_x)*(new_size_x-1) + (new_size_y)*(new_size_y-1)));
 
-      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && (stored_already->first > max_index))) {
+      if( (cur_gain > max_gain) ||  ((cur_gain == max_gain) && (cur_gain != 0) && ((int64_t) stored_already->first > max_index))) {
         max_gain = cur_gain;
         max_index = stored_already->first;
       }
@@ -709,6 +709,8 @@ uint64_t renumberClustersContiguouslyArray(largeArray &arr) {
      }
     }
   }
+
+	return num_unique_clusters;
 }
 
 

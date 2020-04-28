@@ -131,8 +131,12 @@ void DistStatManager::combineAtHost_0_helper(void) {
           b, syncTypePhase);
     }
   }
+}
 
-  ++syncTypePhase;
+void DistStatManager::combineAtHost_0_helper2(void) {
+  const bool IS_HOST0 = getHostID() == 0;
+
+  size_t syncTypePhase = 0;
   for (auto i = Base::fpBegin(), end_i = Base::fpEnd(); i != end_i; ++i) {
     Str ln;
     Str cat;
@@ -217,8 +221,10 @@ void DistStatManager::receiveAtHost_0_helper(void) {
       }
     } while (p);
   }
+}
 
-  ++syncTypePhase;
+void DistStatManager::receiveAtHost_0_helper2(void) {
+  size_t syncTypePhase = 0;
   {
     decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
     do {
@@ -278,7 +284,21 @@ void DistStatManager::combineAtHost_0(void) {
       receiveAtHost_0_helper();
     }
   };
-  galois::runtime::evilPhase += 2; // because there are 4 syncTypePhases, not 2
+
+  galois::DGTerminator<unsigned int> td2;
+
+  // host 0 reads stats from Base class
+  // other hosts send stats to host 0
+  combineAtHost_0_helper2();
+  getSystemNetworkInterface().flush();
+
+  // barrier
+  while (td2.reduce()) {
+    if (getHostID() == 0) {
+      // receive from other hosts
+      receiveAtHost_0_helper2();
+    }
+  };
 }
 
 bool DistStatManager::printingHostVals(void) {

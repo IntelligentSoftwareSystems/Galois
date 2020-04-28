@@ -18,7 +18,6 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
-#include "galois/ConditionalReduction.h"
 
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/graphs/B_LC_CSR_Graph.h"
@@ -98,29 +97,44 @@ namespace gwl = galois::worklists;
 using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
 using OBIM    = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, PSchunk>;
 
+template <typename T, bool enable>
+struct Counter: public T {
+  std::string name;
+
+  Counter(std::string s): name(std::move(s)) { }
+
+  ~Counter() {
+    galois::runtime::reportStat_Single("(NULL)", name, this->reduce());
+  }
+};
+
+template <typename T>
+struct Counter<T, false> {
+  Counter(std::string s) { }
+
+  template <typename... Args>
+  void update(Args... args) { }
+};
+
 struct BetweenessCentralityAsync {
   Graph& graph;
 
   BetweenessCentralityAsync(Graph& _graph) : graph(_graph) {}
 
-  using Counter = ConditionalAccumulator<galois::GAccumulator<unsigned long>,
-                                         BC_COUNT_ACTIONS>;
-  Counter spfuCount;
-  Counter updateSigmaP1Count;
-  Counter updateSigmaP2Count;
-  Counter firstUpdateCount;
-  Counter correctNodeP1Count;
-  Counter correctNodeP2Count;
-  Counter noActionCount;
+  using SumCounter = Counter<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
+  SumCounter spfuCount{"SP&FU"};
+  SumCounter updateSigmaP1Count{"UpdateSigmaBefore"};
+  SumCounter updateSigmaP2Count{"RealUS"};
+  SumCounter firstUpdateCount{"First Update"};
+  SumCounter correctNodeP1Count{"CorrectNodeBefore"};
+  SumCounter correctNodeP2Count{"Real CN"};
+  SumCounter noActionCount{"NoAction"};
 
-  using MaxCounter = ConditionalAccumulator<galois::GReduceMax<unsigned long>,
+  using MaxCounter = Counter<galois::GReduceMax<unsigned long>,
                                             BC_COUNT_ACTIONS>;
-  MaxCounter largestNodeDist;
+  MaxCounter largestNodeDist{"Largest node distance"};
 
-  using LeafCounter =
-      ConditionalAccumulator<galois::GAccumulator<unsigned long>,
-                             BC_COUNT_LEAVES>;
-  LeafCounter leafCount;
+  using LeafCounter = Counter<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
 
   void correctNode(uint32_t dstID, BCEdge& ed) {
     NodeType& dstData = graph.getData(dstID);
@@ -370,6 +384,7 @@ struct BetweenessCentralityAsync {
   }
 
   void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {
+    LeafCounter leafCount{"leaf nodes in DAG"};
     galois::do_all(galois::iterate(0u, nnodes),
                    [&](auto i) {
                      NodeType& n = graph.getData(i);
@@ -434,15 +449,6 @@ int main(int argc, char** argv) {
   galois::gInfo("Note that optimal chunk size may differ depending on input "
                 "graph");
   galois::runtime::reportStat_Single("BCAsync", "ChunkSize", CHUNK_SIZE);
-
-  bcExecutor.spfuCount.reset();
-  bcExecutor.updateSigmaP1Count.reset();
-  bcExecutor.updateSigmaP2Count.reset();
-  bcExecutor.firstUpdateCount.reset();
-  bcExecutor.correctNodeP1Count.reset();
-  bcExecutor.correctNodeP2Count.reset();
-  bcExecutor.noActionCount.reset();
-  bcExecutor.largestNodeDist.reset();
 
   galois::reportPageAlloc("MemAllocPre");
   galois::gInfo("Going to pre-allocate pages");
@@ -520,12 +526,7 @@ int main(int argc, char** argv) {
     bcExecutor.dagConstruction(forwardPhaseWL);
     forwardPhaseWL.clear();
 
-    bcExecutor.leafCount.reset();
     bcExecutor.findLeaves(backwardPhaseWL, nnodes);
-
-    if (bcExecutor.leafCount.isActive()) {
-      galois::gPrint(bcExecutor.leafCount.reduce(), " leaf nodes in DAG\n");
-    }
 
     double backupSrcBC = active.bc;
     bcExecutor.dependencyBackProp(backwardPhaseWL);
@@ -545,21 +546,6 @@ int main(int argc, char** argv) {
   galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
   galois::reportPageAlloc("MemAllocPost");
-
-  // one counter active -> all of them are active (since all controlled by same
-  // ifdef)
-  if (bcExecutor.spfuCount.isActive()) {
-    galois::gPrint("SP&FU ", bcExecutor.spfuCount.reduce(),
-                   "\nUpdateSigmaBefore ",
-                   bcExecutor.updateSigmaP1Count.reduce(), "\nRealUS ",
-                   bcExecutor.updateSigmaP2Count.reduce(), "\nFirst Update ",
-                   bcExecutor.firstUpdateCount.reduce(), "\nCorrectNodeBefore ",
-                   bcExecutor.correctNodeP1Count.reduce(), "\nReal CN ",
-                   bcExecutor.correctNodeP2Count.reduce(), "\nNoAction ",
-                   bcExecutor.noActionCount.reduce(), "\n");
-    galois::gPrint("Largest node distance is ",
-                   bcExecutor.largestNodeDist.reduce(), "\n");
-  }
 
   // prints out first 10 node BC values
   if (!skipVerify) {

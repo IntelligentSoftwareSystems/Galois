@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_OCGRAPH_H
-#define GALOIS_GRAPH_OCGRAPH_H
+#ifndef GALOIS_GRAPHS_OCGRAPH_H
+#define GALOIS_GRAPHS_OCGRAPH_H
 
 #include "galois/optional.h"
 #include "galois/LazyObject.h"

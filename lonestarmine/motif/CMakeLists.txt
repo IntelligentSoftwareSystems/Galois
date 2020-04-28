@@ -1,0 +1,12 @@
+add_executable(motif motif.cpp)
+add_dependencies(apps motif)
+target_link_libraries(motif PRIVATE Galois::pangolin LLVMSupport)
+install(TARGETS motif DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
+if (ENABLE_HETERO_GALOIS)
+  add_executable(motif_gpu motif_gpu.cpp motif.cu)
+  add_dependencies(apps motif_gpu)
+  target_link_libraries(motif_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
+  target_compile_definitions(motif_gpu PRIVATE __GALOIS_HET_CUDA__=1)
+  install(TARGETS motif_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+endif()

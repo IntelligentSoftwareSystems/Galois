@@ -6,7 +6,6 @@ import cgen
 G = Graph("graph")
 WL = Worklist()
 ast = Module([
-CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("pagerank_push_cuda.cuh", system = False)], parse = False),
 Kernel("ResetGraph", [G.param(), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('float *', 'p_delta'), ('uint32_t *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
@@ -239,11 +238,11 @@ CBlock(["*(max_valueval.cpu_wr_ptr()) = 0"]),
 CBlock(["_max_value.rv = max_valueval.gpu_wr_ptr()"]),
 CDecl([("Shared<float>", "min_residualval", " = Shared<float>(1)")]),
 CDecl([("HGReduceMin<float>", "_min_residual", "")]),
-CBlock(["*(min_residualval.cpu_wr_ptr()) = 0"]),
+CBlock(["*(min_residualval.cpu_wr_ptr()) = 1073741823"]),
 CBlock(["_min_residual.rv = min_residualval.gpu_wr_ptr()"]),
 CDecl([("Shared<float>", "min_valueval", " = Shared<float>(1)")]),
 CDecl([("HGReduceMin<float>", "_min_value", "")]),
-CBlock(["*(min_valueval.cpu_wr_ptr()) = 0"]),
+CBlock(["*(min_valueval.cpu_wr_ptr()) = 1073741823"]),
 CBlock(["_min_value.rv = min_valueval.gpu_wr_ptr()"]),
 Invoke("PageRankSanity", ("ctx->gg", "__begin", "__end", "local_tolerance", "ctx->residual.data.gpu_wr_ptr()", "ctx->value.data.gpu_wr_ptr()", "_DGAccumulator_residual_over_tolerance", "_DGAccumulator_sum", "_DGAccumulator_sum_residual", "_max_residual", "_max_value", "_min_residual", "_min_value")),
 CBlock(["check_cuda_kernel"], parse = False),

@@ -79,7 +79,7 @@ namespace galois {
   galois::graphs::DistGraph<NodeData, EdgeData>* cuspPartitionGraph(
         std::string graphFile, CUSP_GRAPH_TYPE inputType,
         CUSP_GRAPH_TYPE outputType, bool symmetricGraph=false,
-        std::string transposeGraphFile="",
+        std::string transposeGraphFile="", std::string masterBlockFile="",
         bool cuspAsync=true, uint32_t cuspStateRounds=100,
         galois::graphs::MASTERS_DISTRIBUTION readPolicy=galois::graphs::BALANCED_EDGES_OF_MASTERS,
         uint32_t nodeWeight=0, uint32_t edgeWeight=0
@@ -121,13 +121,13 @@ namespace galois {
 
       return new DistGraphConstructor(inputToUse, net.ID, net.Num, cuspAsync,
                                       cuspStateRounds, useTranspose, readPolicy,
-                                      nodeWeight, edgeWeight);
+                                      nodeWeight, edgeWeight, masterBlockFile);
     } else {
       // symmetric graph path: assume the passed in graphFile is a symmetric
       // graph; output is also symmetric
       return new DistGraphConstructor(graphFile, net.ID, net.Num, cuspAsync,
                                       cuspStateRounds, false, readPolicy,
-                                      nodeWeight, edgeWeight);
+                                      nodeWeight, edgeWeight, masterBlockFile);
     }
   }
 } // end namespace galois

@@ -6,8 +6,6 @@ add_dependencies(lib galois_gpu)
 target_sources(galois_gpu PRIVATE
   src/csr_graph.cu
   src/ggc_rt.cu
-  moderngpu/src/mgpucontext.cu
-  moderngpu/src/mgpuutil.cpp
 )
 
 target_include_directories(galois_gpu PUBLIC
@@ -16,35 +14,33 @@ target_include_directories(galois_gpu PUBLIC
 )
 install(
   DIRECTORY include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
 
 target_include_directories(galois_gpu PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/moderngpu/include>
-  $<INSTALL_INTERFACE:include/galois/gpu/moderngpu>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/moderngpu/src>
+  $<INSTALL_INTERFACE:include/galois/gpu/moderngpu/src>
 )
 install(
-  DIRECTORY moderngpu/include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu/moderngpu"
+  DIRECTORY ${PROJECT_SOURCE_DIR}/external/moderngpu
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/moderngpu"
   COMPONENT dev
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
 
 target_include_directories(galois_gpu PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cub>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/cub>
   $<INSTALL_INTERFACE:include/galois/gpu/cub>
 )
 install(
-  DIRECTORY cub/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu/cub"
+  DIRECTORY ${PROJECT_SOURCE_DIR}/external/cub
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/cub"
   COMPONENT dev
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
 
 target_compile_definitions(galois_gpu PRIVATE _FORCE_INLINES)
-target_include_directories(galois_gpu PRIVATE moderngpu)
+target_compile_options(galois_gpu PUBLIC "$<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>")
 set_property(TARGET galois_gpu PROPERTY CUDA_STANDARD 14)
 
 install(TARGETS galois_gpu

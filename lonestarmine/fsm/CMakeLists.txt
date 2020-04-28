@@ -1,0 +1,12 @@
+add_executable(fsm fsm.cpp)
+add_dependencies(apps fsm)
+target_link_libraries(fsm PRIVATE Galois::pangolin LLVMSupport)
+install(TARGETS fsm DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
+if (ENABLE_HETERO_GALOIS)
+  add_executable(fsm_gpu fsm_gpu.cpp fsm.cu)
+  add_dependencies(apps fsm_gpu)
+  target_link_libraries(fsm_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
+  target_compile_definitions(fsm_gpu PRIVATE __GALOIS_HET_CUDA__=1)
+  install(TARGETS fsm_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+endif()

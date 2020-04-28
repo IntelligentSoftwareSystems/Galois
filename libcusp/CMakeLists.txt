@@ -12,7 +12,7 @@ target_link_libraries(galois_cusp INTERFACE galois_dist_async)
 
 install(
   DIRECTORY include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
 )

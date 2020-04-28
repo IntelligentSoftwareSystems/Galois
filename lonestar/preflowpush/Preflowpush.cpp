@@ -316,7 +316,7 @@ struct PreflowPush {
 
     auto detBreakFn = [&, this](void) -> bool {
       if (this->global_relabel_interval > 0 &&
-          counter.peekLocal() >= relabel_interval) {
+          counter.getLocal() >= relabel_interval) {
         this->should_global_relabel = true;
         return true;
       } else {
@@ -370,7 +370,7 @@ struct PreflowPush {
 
           counter += increment;
           if (this->global_relabel_interval > 0 &&
-              counter.peekLocal() >= relabel_interval) { // local check
+              counter.getLocal() >= relabel_interval) { // local check
 
             this->should_global_relabel = true;
             ctx.breakLoop();

@@ -23,8 +23,8 @@
  * Contains the LC_Morph_Graph class.
  */
 
-#ifndef GALOIS_GRAPH_LC_MORPH_GRAPH_H
-#define GALOIS_GRAPH_LC_MORPH_GRAPH_H
+#ifndef GALOIS_GRAPHS_LC_MORPH_GRAPH_H
+#define GALOIS_GRAPHS_LC_MORPH_GRAPH_H
 
 #include "galois/Bag.h"
 #include "galois/LargeArray.h"

@@ -126,6 +126,7 @@ struct InitializeGraph {
   }
 };
 
+template <bool async>
 struct FirstItr_SSSP {
   Graph* graph;
   FirstItr_SSSP(Graph* _graph) : graph(_graph) {}
@@ -159,7 +160,7 @@ struct FirstItr_SSSP {
     }
 
     syncSubstrate->sync<writeDestination, readSource, Reduce_min_dist_current,
-                Bitset_dist_current>("SSSP");
+                Bitset_dist_current, async>("SSSP");
 
     galois::runtime::reportStat_Tsum(
         "SSSP", "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
@@ -199,7 +200,7 @@ struct SSSP {
       active_vertices(_dga), work_edges(_work_edges) {}
 
   void static go(Graph& _graph) {
-    FirstItr_SSSP::go(_graph);
+    FirstItr_SSSP<async>::go(_graph);
 
     unsigned _num_iterations = 1;
 
