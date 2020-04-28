@@ -173,7 +173,7 @@ aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
       // bestTruth = 0xFFFF & *this->cutMan.readTruth( cut );
       // bestNodesSaved = nodesSaved;
       // collect fanins in the
-      for (i = 0; i < threadCtx->currentFanins.size(); i++) {
+      for (size_t i = 0; i < threadCtx->currentFanins.size(); i++) {
         threadCtx->bestFanins[i]    = threadCtx->currentFanins[i];
         threadCtx->bestFaninsPol[i] = threadCtx->currentFaninsPol[i];
       }

@@ -71,7 +71,7 @@ private:
   std::vector<GNode> nodes;
   std::vector<std::pair<int, int>> nodesTravId;
   std::vector<std::unordered_multimap<unsigned, GNode>> nodesFanoutMap;
-	int idCounter;
+	size_t idCounter;
 	float expansionRate;
 
 
@@ -87,8 +87,8 @@ public:
 
 	void resize(int m, int i, int l, int o, int a, bool hasSymbols);
 	void resizeNodeVectors(int size);
-	void expandNodeVectors(int extraSize);
-	int getNextId();
+	void expandNodeVectors(size_t extraSize);
+	size_t getNextId();
 	GNode createAND(GNode lhsAnd, GNode rhsAnd, bool lhsAndPol, bool rhsAndPol);
 
 	void insertNodeInFanoutMap(GNode andNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol);

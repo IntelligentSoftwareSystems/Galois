@@ -61,20 +61,20 @@ void Aig::resizeNodeVectors(int size) {
   this->nodesFanoutMap.resize(size);
 }
 
-void Aig::expandNodeVectors(int extraSize) {
+void Aig::expandNodeVectors(size_t extraSize) {
 	this->idCounter = this->nodes.size();
-	int nNodes = this->idCounter + extraSize;
+	size_t nNodes = this->idCounter + extraSize;
   this->nodes.resize(nNodes);
   this->nodesTravId.resize(nNodes);
   this->nodesFanoutMap.resize(nNodes);
 }
 
-int Aig::getNextId() {
+size_t Aig::getNextId() {
 	if (this->idCounter == nodes.size()) {
-		int extraSize = (int) (this->nodes.size() * this->expansionRate);
+		size_t extraSize = (size_t) (float(this->nodes.size()) * this->expansionRate);
 		expandNodeVectors(extraSize);
 	}
-	int nextId = this->idCounter++;
+	size_t nextId = this->idCounter++;
 	return nextId;
 }
 
@@ -658,19 +658,19 @@ std::string Aig::toDot() {
 
   // Preprocess PI, LATCH and PO names
   std::unordered_map<int, std::string> piNames;
-  for (int i = 0; i < this->inputNodes.size(); i++) {
+  for (size_t i = 0; i < this->inputNodes.size(); i++) {
     aig::NodeData& nodeData = graph.getData(this->inputNodes[i], galois::MethodFlag::READ);
     piNames.insert(std::make_pair(nodeData.id, this->inputNames[i]));
   }
 
  	std::unordered_map<int, std::string> latchNames;
-  for (int i = 0; i < this->latchNodes.size(); i++) {
+  for (size_t i = 0; i < this->latchNodes.size(); i++) {
     aig::NodeData& nodeData = graph.getData(this->latchNodes[i], galois::MethodFlag::READ);
     latchNames.insert(std::make_pair(nodeData.id, this->latchNames[i]));
   }
 
   std::unordered_map<int, std::string> poNames;
-  for (int i = 0; i < this->outputNodes.size(); i++) {
+  for (size_t i = 0; i < this->outputNodes.size(); i++) {
     aig::NodeData& nodeData = graph.getData(this->outputNodes[i], galois::MethodFlag::READ);
     poNames.insert(std::make_pair(nodeData.id, this->outputNames[i]));
   }

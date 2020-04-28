@@ -54,7 +54,7 @@ public:
 
   virtual ~ReconvDrivenCut();
 
-  void run(int cutSizeLimit);
+  void run(size_t cutSizeLimit);
 };
 
 } /* namespace algorithm */
