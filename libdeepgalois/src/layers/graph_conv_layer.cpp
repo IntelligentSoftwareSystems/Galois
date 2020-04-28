@@ -36,6 +36,7 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t
 }
 
 #ifdef CPU_ONLY
+// aggregate based on graph topology
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   // normalization constant based on graph structure
   float_t* norm_consts = context->get_norm_factor_ptr();
@@ -84,6 +85,7 @@ void graph_conv_layer::malloc_and_init() {
   in_temp  = new float_t[x * y];
   out_temp = new float_t[x * z];
   trans_data = new float_t[y * x]; // y*x
+  if (y <= z) in_temp1 = new float_t[x * y];
 }
 
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
@@ -92,22 +94,26 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   size_t y = input_dims[1];
   size_t z = output_dims[1];
   //std::cout << "x=" << x << ", y=" << y << ", z=" << z << "\n";
+
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
-  // else: aggregate first then mult W (not implemented yet)
-  if (dropout_ && phase_ == net_phase::train) {
+  // else: aggregate first then mult W
+  if (dropout_ && phase_ == net_phase::train)
     math::dropout_cpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
-    math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, &layer::W[0], 0.0, out_temp);
-  } else math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_data, &layer::W[0], 0.0, out_temp);
+  else math::copy_cpu(x*y, in_data, in_temp); 
 
-  // aggregate based on graph topology
-  graph_conv_layer::aggregate(z, *graph_cpu, out_temp, out_data);
+  if (y > z) {
+    math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp, &layer::W[0], 0.0, out_temp);
+    aggregate(z, *graph_cpu, out_temp, out_data);
+  } else {
+    aggregate(y, *graph_cpu, in_temp, in_temp1);
+    math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp1, &layer::W[0], 0.0, out_data);
+  }
 #ifdef GALOIS_USE_DIST
   // TODO sync of out_data required here
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync = out_data;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny,
-                                          GraphConvSync>("AggSync");
+  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>("AggSync");
 #endif
   // run relu activation on output if specified
   if (act_) math::relu_cpu(x*z, out_data, out_data);
@@ -122,34 +128,36 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   size_t z = output_dims[1];
   // note; assumption here is that out_grad contains 1s or 0s via relu?
   if (act_) math::d_relu_cpu(x*z, out_grad, out_data, out_grad);
-  //else deepgalois::math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
+  //else math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
-  // this is the aggregate call
-  graph_conv_layer::d_aggregate(z, *graph_cpu, out_grad, out_temp);
+  if (y > z) {
+    d_aggregate(z, *graph_cpu, out_grad, out_temp);
+    // at this point, out_temp has the derivative of data from last step to
+    // use for both updating gradients for features and gradients for weights
+    // this calculates gradients for the node predictions
+    if (level_ != 0) // no need to calculate in_grad for the first layer
+      // derivative of matmul needs transposed matrix
+      math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
+    // calculate weight gradients using input data; multiplied by gradients from last back prop step
+    math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
+  } else {
+    if (level_ != 0) {
+      math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_grad, &W[0], 0.0, in_temp);
+      d_aggregate(y, *graph_cpu, in_temp, in_grad);
+    }
+    math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_grad, 0.0, &layer::weight_grad[0]);
+  }
+
 #ifdef GALOIS_USE_DIST
   // sync agg
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync = out_temp;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny,
-                                          GraphConvSync>("AggSyncBack");
+  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>("AggSyncBack");
 #endif
 
-  // at this point, out_temp has the derivative of data from last step to
-  // use for both updating gradients for features and gradients for weights
-  // this calculates gradients for the node predictions
-  if (level_ != 0) { // no need to calculate in_grad for the first layer
-    // derivative of matmul needs transposed matrix
-    math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0,
-                    out_temp, &W[0], 0.0, in_grad); // x*z; z*y -> x*y
-    if (dropout_) {
-      math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
-    }
-  }
+  if (level_ != 0 && dropout_)
+    math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
 
-  // calculate weight gradients using input data
-  // multiplied by gradients from last back prop step
-  math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data,
-                  out_temp, 0.0, &layer::weight_grad[0]); // y*x; x*z; y*z
 #ifdef GALOIS_USE_DIST
   layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
   //galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
