@@ -7,6 +7,6 @@
 # thrown in the code written using these forward declarations
 # are forwarded properly into the Galois library rather than
 # being converted into Python exceptions.
-cdef extern from "galois/graphs/Util.h" namespace "galois::graphs" nogil:
+cdef extern from "galois/graphs/ReadGraph.h" namespace "galois::graphs" nogil:
     #void readGraph[G, A](G &, A&&...)
     void readGraph(...)

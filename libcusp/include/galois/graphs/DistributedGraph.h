@@ -32,6 +32,7 @@
 
 #include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
+#include "galois/OutIndexView.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/DynamicBitset.h"
 #include "galois/OutIndexView.h"
@@ -459,7 +460,7 @@ protected:
 
   //! reader assignment from a file
   //! corresponds to master assignment if using an edge cut
-  void readersFromFile(galois::graphs::OfflineGraph& g, std::string filename) {
+  void readersFromFile(galois::OutIndexView& g, std::string filename) {
     // read file lines
     std::ifstream mappings(filename);
     std::string curLine;
@@ -528,8 +529,8 @@ protected:
       } else if (h == numHosts - 1) {
         GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
                       gid2host[h].first, " ", gid2host[h - 1].second);
-        GALOIS_ASSERT(gid2host[h].second == g.size(),
-                      gid2host[h].second, " ", g.size());
+        GALOIS_ASSERT(gid2host[h].second == g.num_nodes(),
+                      gid2host[h].second, " ", g.num_nodes());
       } else {
         GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
                       gid2host[h].first, " ", gid2host[h - 1].second);
