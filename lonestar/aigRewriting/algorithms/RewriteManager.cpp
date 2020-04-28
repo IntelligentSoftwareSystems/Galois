@@ -27,7 +27,7 @@
 
 #include "RewriteManager.h"
 
-#include "galois/worklists/WorkListAlt.h"
+#include "galois/worklists/Chunk.h"
 
 //#include "galois/runtime/profile.h"
 

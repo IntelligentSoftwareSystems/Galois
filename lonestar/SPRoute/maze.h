@@ -121,11 +121,11 @@ typedef struct
 #define FIFO_CHUNK_SIZE 4
 #define OBIM_delta 20
     
-auto RequestIndexer = [&](const pq_grid& top) {
+auto RequestIndexer = [](const pq_grid& top) {
     return (unsigned int)(top.d1_push) / max(OBIM_delta, (int)(costheight / (2*slope)));
 };
 
-auto RequestIndexerLate = [&](const lateUpdateReq& top) {
+auto RequestIndexerLate = [](const lateUpdateReq& top) {
     return (unsigned int)(top.d1_push) / OBIM_delta;
 };
 

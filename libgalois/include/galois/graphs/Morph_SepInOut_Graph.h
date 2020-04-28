@@ -17,35 +17,32 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_FIRST_SEPINOUT_GRAPH_H
-#define GALOIS_GRAPH_FIRST_SEPINOUT_GRAPH_H
-
-//#define AUX_MAP
-
-#include "galois/Bag.h"
-#include "galois/gstl.h"
-#ifdef AUX_MAP
-#include "galois/PerThreadContainer.h"
-#else
-#include "galois/substrate/CacheLineStorage.h"
-#include "galois/substrate/SimpleLock.h"
-#endif
-#include "galois/graphs/FileGraph.h"
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
-#include "llvm/ADT/SmallVector.h"
-
-#include <boost/functional.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/container/small_vector.hpp>
+#ifndef GALOIS_GRAPH_MORPH_SEPINOUT_GRAPH_H
+#define GALOIS_GRAPH_MORPH_SEPINOUT_GRAPH_H
 
 #include <algorithm>
 #include <map>
 #include <set>
 #include <type_traits>
 #include <vector>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/functional.hpp>
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+
+#include "galois/Bag.h"
+#include "galois/Galois.h"
+#include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/gstl.h"
+
+#ifdef AUX_MAP
+#include "galois/PerThreadContainer.h"
+#else
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#endif
 
 namespace galois {
 //! Parallel graph data structures.
@@ -69,7 +66,7 @@ struct UEdgeInfoBase<NTy, ETy, true> {
     assert(N);
     return N;
   }
-  inline NTy* const first() const {
+  inline NTy const* first() const {
     assert(N);
     return N;
   }
@@ -100,7 +97,7 @@ struct UEdgeInfoBase<NTy, ETy, false> {
     assert(N);
     return (NTy*)((uintptr_t)N & ~1);
   }
-  inline NTy* const first() const {
+  inline NTy const* first() const {
     assert(N);
     return (NTy*)((uintptr_t)N & ~1);
   }
@@ -119,7 +116,7 @@ struct UEdgeInfoBase<NTy, void, true> {
 
   NTy* N;
   inline NTy* first() { return N; }
-  inline NTy* const first() const { return N; }
+  inline NTy const* first() const { return N; }
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
@@ -134,7 +131,7 @@ struct UEdgeInfoBase<NTy, void, false> {
 
   NTy* N;
   inline NTy* first() { return (NTy*)((uintptr_t)N & ~1); }
-  inline NTy* const first() const { return (NTy*)((uintptr_t)N & ~1); }
+  inline NTy const* first() const { return (NTy*)((uintptr_t)N & ~1); }
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
@@ -192,7 +189,7 @@ struct EdgeFactory<void, false> {
  *   ... // Definition of node data
  * };
  *
- * typedef galois::graphs::First_SepInOut_Graph<Node,int,true> Graph;
+ * typedef galois::graphs::Morph_SepInOut_Graph<Node,int,true> Graph;
  *
  * // Create graph
  * Graph g;
@@ -236,33 +233,33 @@ struct EdgeFactory<void, false> {
 template <typename NodeTy, typename EdgeTy, bool Directional,
           bool InOut = false, bool HasNoLockable = false,
           bool SortedNeighbors = false, typename FileEdgeTy = EdgeTy>
-class First_SepInOut_Graph : private boost::noncopyable {
+class Morph_SepInOut_Graph : private boost::noncopyable {
 public:
   //! If true, do not use abstract locks in graph
   template <bool _has_no_lockable>
   struct with_no_lockable {
-    typedef First_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
+    typedef Morph_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
                                  _has_no_lockable, SortedNeighbors, FileEdgeTy>
         type;
   };
 
   template <typename _node_data>
   struct with_node_data {
-    typedef First_SepInOut_Graph<_node_data, EdgeTy, Directional, InOut,
+    typedef Morph_SepInOut_Graph<_node_data, EdgeTy, Directional, InOut,
                                  HasNoLockable, SortedNeighbors, FileEdgeTy>
         type;
   };
 
   template <typename _edge_data>
   struct with_edge_data {
-    typedef First_SepInOut_Graph<NodeTy, _edge_data, Directional, InOut,
+    typedef Morph_SepInOut_Graph<NodeTy, _edge_data, Directional, InOut,
                                  HasNoLockable, SortedNeighbors, FileEdgeTy>
         type;
   };
 
   template <typename _file_edge_data>
   struct with_file_edge_data {
-    typedef First_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
+    typedef Morph_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
                                  HasNoLockable, SortedNeighbors,
                                  _file_edge_data>
         type;
@@ -270,14 +267,14 @@ public:
 
   template <bool _directional>
   struct with_directional {
-    typedef First_SepInOut_Graph<NodeTy, EdgeTy, _directional, InOut,
+    typedef Morph_SepInOut_Graph<NodeTy, EdgeTy, _directional, InOut,
                                  HasNoLockable, SortedNeighbors, FileEdgeTy>
         type;
   };
 
   template <bool _sorted_neighbors>
   struct with_sorted_neighbors {
-    typedef First_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
+    typedef Morph_SepInOut_Graph<NodeTy, EdgeTy, Directional, InOut,
                                  HasNoLockable, _sorted_neighbors, FileEdgeTy>
         type;
   };
@@ -335,7 +332,7 @@ private:
 
   class gNode : public internal::NodeInfoBase<NodeTy, !HasNoLockable>,
                 public gNodeTypes {
-    friend class First_SepInOut_Graph;
+    friend class Morph_SepInOut_Graph;
     typedef internal::NodeInfoBase<NodeTy, !HasNoLockable> NodeInfo;
     typename gNodeTypes::EdgesTy edges;
     typename gNodeTypes::EdgesTy in_edges;
@@ -416,7 +413,7 @@ private:
     iterator createEdgeWithReuse(gNode* N, EdgeTy* v, bool inEdge,
                                  Args&&... args) {
       auto& edgelist = (inEdge) ? in_edges : edges;
-      // First check for holes
+      // Morph check for holes
       iterator ii, ei;
       if (SortedNeighbors) {
         // If neighbors are sorted, find acceptable range for insertion.
@@ -1006,9 +1003,9 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  internal::EdgesIterator<First_SepInOut_Graph>
+  internal::EdgesIterator<Morph_SepInOut_Graph>
   out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return internal::EdgesIterator<First_SepInOut_Graph>(*this, N, mflag);
+    return internal::EdgesIterator<Morph_SepInOut_Graph>(*this, N, mflag);
   }
 
   /**
