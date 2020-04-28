@@ -1,4 +1,8 @@
-set(sources
+add_library(pangolin STATIC)
+add_library(Galois::pangolin ALIAS pangolin)
+add_dependencies(lib pangolin)
+
+target_sources(pangolin PRIVATE
   src/equivalence.cpp
   src/quick_pattern.cpp
   src/base_embedding.cpp
@@ -6,18 +10,27 @@ set(sources
   src/BfsMining/embedding_list.cpp
 )
 
-add_library(pangolin STATIC ${sources})
-
-target_link_libraries(pangolin galois_shmem gllvm)
+target_include_directories(pangolin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
 target_include_directories(pangolin PUBLIC
-  ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libpangolin/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/bliss>
+  $<INSTALL_INTERFACE:include>
 )
 
-set_target_properties (pangolin PROPERTIES
-  INTERFACE_POSITION_INDEPENDENT_CODE On
-  POSITION_INDEPENDENT_CODE On
-)
+target_link_libraries(pangolin PUBLIC galois_shmem)
+
+if (ENABLE_HETERO_GALOIS)
+  add_library(pangolin_gpu INTERFACE)
+  add_library(Galois::pangolin_gpu ALIAS pangolin_gpu)
+  add_dependencies(lib pangolin_gpu)
+
+  target_include_directories(pangolin_gpu INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/gpu>
+    $<INSTALL_INTERFACE:include>
+  )
+
+  target_link_libraries(pangolin_gpu INTERFACE galois_shmem galois_gpu)
+endif()

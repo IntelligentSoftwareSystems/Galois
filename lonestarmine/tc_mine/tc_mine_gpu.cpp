@@ -1,10 +1,10 @@
 // Copyright 2019, University of Texas at Austin
 // Authors: Xuhao Chen <cxh@utexas.edu>
-#include "kcl.h"
+#include "tc.h"
 #include "lonestarmine.h"
 
-const char* name = "k-cliques";
-const char* desc = "Listing all k-cliques in an undirected graph";
+const char* name = "Triangle counting";
+const char* desc = "Counting triangles in an undirected graph";
 const char* url  = 0;
 
 int main(int argc, char** argv) {
@@ -14,8 +14,8 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 	AccType total = 0;
-	kcl_gpu_solver(filename, k, total);
-	std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
+	tc_gpu_solver(filename, total);
+	std::cout << "\n\ttotal_num_triangles = " << total << "\n\n";
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-#include "base_embedding.h"
+#include "pangolin/base_embedding.h"
 
 std::ostream & operator<<(std::ostream & strm, const BaseEmbedding& emb) {
 	if (emb.empty()) {
