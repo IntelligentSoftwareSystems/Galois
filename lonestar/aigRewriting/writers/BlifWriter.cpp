@@ -64,13 +64,13 @@ void BlifWriter::writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan
 	this->blifFile << ".model " << designName << std::endl;
 
 	this->blifFile << ".inputs ";
-	for ( int i = 0; i < aig.getInputNodes().size(); i++ ) {	
+	for ( size_t i = 0; i < aig.getInputNodes().size(); i++ ) {
 		this->blifFile << "pi" << std::setfill('0') << std::setw(nDigitsPIs) <<  i << " ";
 	}
 	this->blifFile << std::endl;
 
 	this->blifFile << ".outputs ";
-	for ( int i = 0; i < aig.getOutputNodes().size(); i++ ) {	
+	for ( size_t i = 0; i < aig.getOutputNodes().size(); i++ ) {
 		this->blifFile << "po" << std::setfill('0') << std::setw(nDigitsPOs) << i << " ";
 	}	
 	this->blifFile << std::endl;
@@ -110,7 +110,7 @@ void BlifWriter::writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan
 	}
 
 	// Define PO poloarities	
-	for ( int i = 0; i < aig.getOutputNodes().size(); i++ ) {
+	for ( size_t i = 0; i < aig.getOutputNodes().size(); i++ ) {
 	
     auto inEdgeIt = aigGraph.in_edge_begin( aig.getOutputNodes()[i] );
 		bool outEdgePolarity = aigGraph.getEdgeData( inEdgeIt, galois::MethodFlag::READ );

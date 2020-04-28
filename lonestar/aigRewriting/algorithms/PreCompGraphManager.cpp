@@ -453,8 +453,8 @@ PreCompGraphManager::~PreCompGraphManager() {
   if (!this->classes.empty()) {
     ForestNode* node;
     DecGraph* decGraph;
-    for (int i = 0; i < classes.size(); i++) {
-      for (int j = 0; j < classes[i].size(); j++) {
+    for (size_t i = 0; i < classes.size(); i++) {
+      for (size_t j = 0; j < classes[i].size(); j++) {
         node     = classes[i][j];
         decGraph = (DecGraph*)node->pNext;
         delete decGraph;
@@ -589,11 +589,13 @@ void PreCompGraphManager::getVolumeRec(ForestNode* node, int* volume) {
 }
 
 void PreCompGraphManager::incTravId() {
-
-  if (this->nTravIds++ < 0x8FFFFFFF) {
+  // no overflow
+  auto result = this->nTravIds++;
+  if (this->nTravIds > result) {
     return;
   }
 
+  // overflow detected; reset the counters
   for (int i = 0; i < this->forestSize; i++) {
     forest[i].TravId = 0;
   }
@@ -639,12 +641,12 @@ void PreCompGraphManager::processDecompositionGraphs() {
     }
   }
   // compute decomposition forms for each node and verify them
-  for (int i = 0; i < classes.size(); i++) {
+  for (size_t i = 0; i < classes.size(); i++) {
 
     // Print the number of precomputed structures for each of the 222 fucntions
     // std::cout << i << " " << classes[i].size() << std::endl;
 
-    for (int j = 0; j < classes[i].size(); j++) {
+    for (size_t j = 0; j < classes[i].size(); j++) {
       node        = classes[i][j];
       decGraph    = processNode(node);
       node->pNext = (ForestNode*)decGraph;

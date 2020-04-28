@@ -317,7 +317,7 @@ void rdCut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose) {
 
   int numThreads = galois::setActiveThreads(nThreads);
 
-  int K = 4;
+  size_t K = 4;
 
   if (verbose) {
     std::cout << "############# Configurations ############## " << std::endl;

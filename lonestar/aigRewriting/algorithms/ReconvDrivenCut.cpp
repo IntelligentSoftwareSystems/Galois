@@ -70,11 +70,11 @@ struct ReconvergenceDrivenCut {
 
   aig::Graph& aigGraph;
   PerThreadRDCutData& perThreadRDCutData;
-  int cutSizeLimit;
+  size_t cutSizeLimit;
 
   ReconvergenceDrivenCut(aig::Graph& aigGraph,
                          PerThreadRDCutData& perThreadRDCutData,
-                         int cutSizeLimit)
+                         size_t cutSizeLimit)
       : aigGraph(aigGraph), perThreadRDCutData(perThreadRDCutData),
         cutSizeLimit(cutSizeLimit) {}
 
@@ -229,7 +229,7 @@ struct ReconvergenceDrivenCut {
   }
 };
 
-void ReconvDrivenCut::run(int cutSizeLimit) {
+void ReconvDrivenCut::run(size_t cutSizeLimit) {
 
   aig::Graph& aigGraph = this->aig.getGraph();
 
