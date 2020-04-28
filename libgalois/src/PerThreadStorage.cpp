@@ -42,15 +42,33 @@ galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
 // used for CI testing and other situations where galois memory
 // footprint needs to be low
 const size_t allocSize = 1 * (2 << 20); // 2MB
-inline void* alloc() { return malloc(allocSize); }
+inline void* alloc() {
+  void* toReturn = malloc(allocSize);
+  if (toReturn == nullptr) {
+    GALOIS_DIE("Out of memory in per thread storage allocation");
+  }
+  return toReturn;
+}
 #else
 #ifdef MORE_MEM_HACK
 const size_t allocSize =
     16 * (2 << 20); // galois::runtime::MM::hugePageSize * 16;
-inline void* alloc() { return malloc(allocSize); }
+inline void* alloc() {
+  void* toReturn = malloc(allocSize);
+  if (toReturn == nullptr) {
+    GALOIS_DIE("Out of memory in per thread storage allocation");
+  }
+  return toReturn;
+}
 #else
 const size_t allocSize = galois::runtime::MM::hugePageSize;
-inline void* alloc() { return galois::substrate::MM::pageAlloc(); }
+inline void* alloc() {
+  void* toReturn = galois::substrate::MM::pageAlloc()
+  if (toReturn == nullptr) {
+    GALOIS_DIE("Out of memory in per thread storage allocation");
+  }
+  return toReturn;
+}
 #endif
 #endif // GALOIS_LOW_MEM end if
 #undef MORE_MEM_HACK
