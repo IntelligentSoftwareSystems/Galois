@@ -74,7 +74,7 @@ struct OrderedStepStats : public StepStatsBase {
     parallelism += par;
   }
 
-  void dump(FILE* out, const char* loopname) const {
+  void dump(FILE* out, const char* loopname) {
     Base::dump(out, loopname, step, parallelism.reduce(), wlSize, 0ul);
   }
 };
@@ -96,7 +96,7 @@ struct UnorderedStepStats : public StepStatsBase {
     nhSize.reset();
   }
 
-  void dump(FILE* out, const char* loopname) const {
+  void dump(FILE* out, const char* loopname) {
     Base::dump(out, loopname, step, parallelism.reduce(), wlSize.reduce(),
                nhSize.reduce());
   }
@@ -238,7 +238,7 @@ private:
   const char* loopname;
   FILE* m_statsFile;
   FixedSizeAllocator<IterationContext> m_iterAlloc;
-  galois::GReduceLogicalOR m_broken;
+  galois::GReduceLogicalOr m_broken;
 
   IterationContext* newIteration(const T& item) {
     IterationContext* it = m_iterAlloc.allocate(1);
