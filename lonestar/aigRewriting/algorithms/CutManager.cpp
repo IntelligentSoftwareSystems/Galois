@@ -42,11 +42,13 @@ CutManager::CutManager(aig::Aig& aig, int K, int C, int nThreads,
                        bool compTruth)
     :
 
-      aig(aig), K(K), C(C), nThreads(nThreads), compTruth(compTruth),
+      aig(aig), K(K), C(C),
       nWords(Functional32::wordNum(K)),
       nNodes(std::distance(aig.getGraph().begin(), aig.getGraph().end()) -
              aig.getNumOutputs()),
+      nThreads(nThreads),
       cutPoolSize(nNodes / nThreads),
+      compTruth(compTruth),
       perThreadCutPool(cutPoolSize, K, compTruth), perThreadCutList(K),
       perThreadAuxTruth(nWords) {
 
@@ -698,8 +700,7 @@ struct KCutOperator {
     if (nodeData.type == aig::NodeType::AND) {
 
       // Touching outgoing neighobors to acquire their locks
-      for (auto edge : aigGraph.out_edges(node)) {
-      }
+      aigGraph.out_edges(node);
 
       // Combine Cuts
       auto inEdgeIt          = aigGraph.in_edge_begin(node);
@@ -735,8 +736,7 @@ struct KCutOperator {
       if (nodeData.type == aig::NodeType::PI) {
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
-        for (auto outEdge : aigGraph.out_edges(node)) {
-        }
+        aigGraph.out_edges(node);
 
 				//ctx.cautiousPoint();
 

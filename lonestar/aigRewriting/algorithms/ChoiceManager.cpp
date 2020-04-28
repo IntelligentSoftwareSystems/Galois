@@ -59,8 +59,8 @@ void ChoiceManager::createNodeChoices(ThreadLocalDataCH* thData, aig::GNode node
   unsigned phase;
   unsigned truth;
   bool isOutputCompl = false;
-  int requiredLevel  = 0;
- 	int nSubgraphs;
+//  int requiredLevel  = 0;
+// 	int nSubgraphs;
 	int addedChoices = 0;
   int i;
 	Cut* cut = nullptr;
@@ -153,7 +153,7 @@ void ChoiceManager::createNodeChoices(ThreadLocalDataCH* thData, aig::GNode node
 bool ChoiceManager::updateAig(ThreadLocalDataCH* thData, aig::GNode rootNode, aig::NodeData& rootData, DecGraph* decGraph, bool isOutputCompl) {
 
   aig::GNode choiceNode;
-  aig::GNode auxNode;
+//  aig::GNode auxNode;
   aig::Graph& aigGraph = this->aig.getGraph();
 
   bool isDecGraphComplemented = isOutputCompl ? (bool)decGraph->getRootEdge().fCompl ^ 1
@@ -219,7 +219,7 @@ bool ChoiceManager::updateAig(ThreadLocalDataCH* thData, aig::GNode rootNode, ai
  * for the fanins (cut's leaves) should be assigned to thData->decNodeFun[ decNode.id ]. */
 bool ChoiceManager::decGraphToAigTry(ThreadLocalDataCH* thData, DecGraph* decGraph) {
 
-  DecNode* decNode;
+  DecNode* decNode = nullptr;
   DecNode* lhsNode;
   DecNode* rhsNode;
   aig::GNode curAnd;
@@ -289,7 +289,7 @@ bool ChoiceManager::decGraphToAigTry(ThreadLocalDataCH* thData, DecGraph* decGra
  * for the fanins (cut's leaves) should be assigned to thData->decNodeFun[ decNode.id ]. */
 aig::GNode ChoiceManager::decGraphToAigCreate(ThreadLocalDataCH* thData, DecGraph* decGraph) {
 
-  DecNode* decNode;
+  DecNode* decNode = nullptr;
   DecNode* lhsNode;
   DecNode* rhsNode;
   aig::GNode curAnd;
@@ -357,10 +357,12 @@ void ChoiceManager::lockFaninCone(aig::Graph& aigGraph, aig::GNode node, Cut* cu
 
   auto inEdgeIt      = aigGraph.in_edge_begin(node);
   aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
-  aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
+//  aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
+  aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
   inEdgeIt++;
   aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
-  aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
+//  aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
+  aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
 
   lockFaninCone(aigGraph, lhsNode, cut);
   lockFaninCone(aigGraph, rhsNode, cut);
@@ -400,7 +402,8 @@ struct ChoiceOperator {
 		}
 
 	  // Touching outgoing neighobors to acquire their locks
-    for (auto outEdge : aigGraph.out_edges(node)) {}
+	  aigGraph.out_edges(node);
+//    for (auto outEdge : aigGraph.out_edges(node)) {}
 
     if (nodeData.type == aig::NodeType::AND) {
 			ThreadLocalDataCH* thData = chMan.getPerThreadDataCH().getLocal();

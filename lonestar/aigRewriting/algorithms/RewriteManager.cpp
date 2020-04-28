@@ -233,11 +233,11 @@ void RewriteManager::lockFaninCone(aig::Graph& aigGraph, aig::GNode node,
 
   auto inEdgeIt      = aigGraph.in_edge_begin(node);
   aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
-  aig::NodeData& lhsData =
+//  aig::NodeData& lhsData =
       aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
   inEdgeIt++;
   aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
-  aig::NodeData& rhsData =
+//  aig::NodeData& rhsData =
       aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
 
   lockFaninCone(aigGraph, lhsNode, cut);
@@ -348,7 +348,7 @@ DecGraph* RewriteManager::evaluateCut(ThreadContextData* threadCtx,
   // copy the leaves
   for (int i = 0; i < 4; i++) { // each deGraph has eactly 4 inputs (vars).
     aig::GNode fanin = threadCtx->currentFanins[i];
-    aig::NodeData& faninData =
+//    aig::NodeData& faninData =
         aigGraph.getData(fanin, galois::MethodFlag::READ);
     threadCtx->decNodeFunc[i] = fanin;
     // threadCtx->decNodeLevel[i] = faninData.level;
@@ -536,12 +536,12 @@ aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
     auto inEdge         = aigGraph.in_edge_begin(mffcNode);
 
     aig::GNode lhsNode = aigGraph.getEdgeDst(inEdge);
-    aig::NodeData& lhsNodeData =
+//    aig::NodeData& lhsNodeData =
         aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
     bool lhsNodePol = aigGraph.getEdgeData(inEdge);
     inEdge++;
     aig::GNode rhsNode = aigGraph.getEdgeDst(inEdge);
-    aig::NodeData& rhsNodeData =
+//    aig::NodeData& rhsNodeData =
         aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
     bool rhsNodePol = aigGraph.getEdgeData(inEdge);
 
@@ -589,7 +589,7 @@ aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
 aig::GNode RewriteManager::decGraphToAig(ThreadContextData* threadCtx,
                                          DecGraph* decGraph) {
 
-  DecNode* decNode;
+  DecNode* decNode = nullptr;
   DecNode* lhsNode;
   DecNode* rhsNode;
   aig::GNode curAnd;
@@ -880,8 +880,7 @@ struct RewriteOperator {
         for (auto outEdge : aigGraph.out_edges(node)) {
           aig::GNode fanoutNode = aigGraph.getEdgeDst(outEdge);
           fanoutNodes.push_back(fanoutNode);
-          for (auto inEdge : aigGraph.in_edges(fanoutNode)) {
-          }
+          aigGraph.in_edges(fanoutNode);
         }
 
         ThreadContextData* threadCtx =
@@ -932,8 +931,7 @@ struct RewriteOperator {
 
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
-        for (auto outEdge : aigGraph.out_edges(node)) {
-        }
+        aigGraph.out_edges(node);
 
         if (nodeData.counter == 2) {
           nodeData.counter += 1;
@@ -966,8 +964,7 @@ struct RewriteOperator {
 
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
-        for (auto outEdge : aigGraph.out_edges(node)) {
-        }
+        aigGraph.out_edges(node);
 
         // Set the trivial cut
         nodeData.counter      = 3;
