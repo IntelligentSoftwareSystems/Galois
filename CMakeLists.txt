@@ -6,9 +6,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 include(GNUInstallDirs)
 
-# TODO; this is GNN related; find better way to do than hardcode
-SET(OPENBLAS_ROOT /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build)
-SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.0)
 
 file(STRINGS config/version.txt GALOIS_VERSION)
 string(REGEX REPLACE "[ \t\n]" "" GALOIS_VERSION ${GALOIS_VERSION})
@@ -47,6 +44,9 @@ set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture
 
 set(USE_DEEPGALOIS OFF CACHE BOOL "Use gnn apps as well as the DeepGalois library")
 set(USE_MKL_BLAS OFF CACHE BOOL "Use MKL for BLAS")
+# TODO; this is GNN related; find better way to do than hardcode
+SET(OPENBLAS_ROOT /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build)
+SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.0)
 
 # This option is automatically handled by CMake.
 # It makes add_library build a shared lib unless STATIC is explicitly specified.

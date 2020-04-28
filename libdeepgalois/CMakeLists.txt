@@ -104,11 +104,10 @@ set(sources
 endif()
 
 add_library(dg_cpu STATIC ${sources})
-target_link_libraries(dg_cpu galois_shmem gllvm)
+target_link_libraries(dg_cpu galois_shmem)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
 target_link_libraries(dg_cpu ${BLAS_LIB})
 target_include_directories(dg_cpu PUBLIC
-  ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
