@@ -47,6 +47,15 @@ inline void* alloc() {
   return toReturn;
 }
 
+constexpr unsigned MAX_SIZE = 30;
+// PerBackend storage is typically cache-aligned. Simplify bookkeeping at the
+// expense of fragmentation by restricting all allocations to be cache-aligned.
+constexpr unsigned MIN_SIZE = 7;
+
+static_assert((1 << MIN_SIZE) == GALOIS_CACHE_LINE_SIZE);
+
+galois::substrate::PerBackend::PerBackend() { freeOffsets.resize(MAX_SIZE); }
+
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
   while ((1U << i) < size) {
