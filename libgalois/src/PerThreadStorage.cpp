@@ -18,6 +18,7 @@
  */
 
 #include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/PageAlloc.h"
 
 #include "galois/gIO.h"
 #include <mutex>
