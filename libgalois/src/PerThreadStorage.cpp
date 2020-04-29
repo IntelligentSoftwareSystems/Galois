@@ -38,17 +38,17 @@ galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
 }
 
 #ifdef MORE_MEM_HACK
-const size_t allocSize =
+const size_t ptAllocSize =
     16 * (2 << 20); // galois::runtime::MM::hugePageSize * 16;
 inline void* alloc() {
-  void* toReturn = malloc(allocSize);
+  void* toReturn = malloc(ptAllocSize);
   if (toReturn == nullptr) {
     GALOIS_DIE("Out of memory in per thread storage allocation");
   }
   return toReturn;
 }
 #else
-const size_t allocSize = galois::substrate::allocSize();
+const size_t ptAllocSize = galois::substrate::allocSize();
 inline void* alloc() {
   // alloc a single page, don't prefault
   void* toReturn = galois::substrate::allocPages(1, false);
@@ -71,11 +71,11 @@ unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
 }
 
 unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
-  unsigned retval = allocSize;
+  unsigned retval = ptAllocSize;
   unsigned ll     = nextLog2(sz);
   unsigned size   = (1 << ll);
 
-  if ((nextLoc + size) <= allocSize) {
+  if ((nextLoc + size) <= ptAllocSize) {
     // simple path, where we allocate bump ptr style
     retval = __sync_fetch_and_add(&nextLoc, size);
   } else if (!invalid) {
@@ -111,7 +111,7 @@ unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
     }
   }
 
-  assert(retval != allocSize);
+  assert(retval != ptAllocSize);
 
   return retval;
 }
@@ -147,7 +147,7 @@ void galois::substrate::PerBackend::initCommon(unsigned maxT) {
 char* galois::substrate::PerBackend::initPerThread(unsigned maxT) {
   initCommon(maxT);
   char* b = heads[ThreadPool::getTID()] = (char*)alloc();
-  memset(b, 0, allocSize);
+  memset(b, 0, ptAllocSize);
   return b;
 }
 
@@ -157,7 +157,7 @@ char* galois::substrate::PerBackend::initPerSocket(unsigned maxT) {
   unsigned leader = ThreadPool::getLeader();
   if (id == leader) {
     char* b = heads[id] = (char*)alloc();
-    memset(b, 0, allocSize);
+    memset(b, 0, ptAllocSize);
     return b;
   } else {
     // wait for leader to fix up socket
