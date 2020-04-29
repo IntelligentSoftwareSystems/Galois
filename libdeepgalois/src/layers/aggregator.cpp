@@ -37,9 +37,13 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
 
 void deepgalois::update_all_csrmm(size_t len, Graph& g, const float_t* in, float_t* out,
                                   bool norm, const float_t* norm_factor) {
+  galois::StatTimer Tcsrmm("CSRMM-MKL");
+  //galois::gPrint("csrmm mkl\n");
+  Tcsrmm.start();
   unsigned n = g.size();
   math::clear_cpu(n*len, out);
   math::csrmm_cpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, 
             (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, out);
+  Tcsrmm.stop();
 }
 #endif

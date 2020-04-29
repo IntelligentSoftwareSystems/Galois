@@ -96,10 +96,6 @@ uniform_rand(T min, T max) {
   return dst(random_generator::get_instance()());
 }
 
-inline bool bernoulli(float_t p) {
-  return uniform_rand(float_t(0), float_t(1)) > p;
-}
-
 // sequential prefix sum
 template <typename InTy = unsigned, typename OutTy = unsigned>
 inline std::vector<OutTy> prefix_sum(const std::vector<InTy> &in) {

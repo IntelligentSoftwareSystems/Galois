@@ -1,7 +1,9 @@
 #include "deepgalois/math_functions.hh"
 #include "galois/Timer.h"
 #include "galois/Galois.h"
+#include <random>
 #include <immintrin.h>
+#include <boost/random.hpp>
 #include "deepgalois/utils.h"
 
 #ifdef USE_MKL
@@ -18,7 +20,29 @@ extern "C" {
     exit(1);                           \
   } while(0);
 
+std::default_random_engine generator;
+std::uniform_real_distribution<float_t> distribution(0.0,1.0);
+/*
+typedef boost::mt19937 rng_t;
+inline rng_t* deepgalois_rng() {
+  return static_cast<rng_t*>(Context::rng_stream().generator());
+}
+
+void rng_bernoulli(size_t n, const float_t p, uint8_t* r) {
+  boost::bernoulli_distribution<float_t> random_distribution(p);
+  boost::variate_generator<rng_t*, boost::bernoulli_distribution<float_t> >
+      variate_generator(deepgalois_rng(), random_distribution);
+  for (size_t i = 0; i < n; ++i)
+    r[i] = variate_generator();
+}
+*/
 namespace deepgalois {
+
+inline uint8_t bernoulli(float_t p) {
+  //return uniform_rand(float_t(0), float_t(1)) > p ? 1 : 0;
+  return distribution(generator) > p ? 1 : 0;
+}
+
 namespace math {
 
 //! wrapper function to call cblas_sgemm
@@ -41,8 +65,7 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 #ifdef USE_MKL
   const char *matdescra = "GXXCX";//6 bytes
   const char transa = 'N';
-  printf("Calling Intel MKL\n");
-  exit(1);
+  //printf("Calling Intel MKL\n"); exit(1);
   mkl_scsrmm(&transa, &M , &N, &K, &alpha , matdescra,
              A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1,
              B, &N, &beta , C, &N);
@@ -168,53 +191,38 @@ void clear(vec_t& in) {
 }
 
 void clear_cpu(size_t n, float_t* in) {
-  for (size_t i = 0; i < n; i++) in[i] = 0;
+  //for (size_t i = 0; i < n; i++) in[i] = 0;
+  std::fill(in, in+n, 0);
   // memset(in, 0, n*sizeof(float_t));
 }
 
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& masks, vec_t& out) {
-  assert(masks.size() == out.size());
-  // rng_bernoulli(1. - dropout_rate, masks); // Create random numbers
-  for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
-  for (size_t i = 0; i < in.size(); ++i)
-    out[i] = in[i] * masks[i] * scale;
+void dropout(size_t m, float scale, float dropout_rate, 
+             const float_t* in, mask_t* masks, float_t* out) {
+  for (size_t i = 0; i < m; ++i)
+    masks[i] = deepgalois::bernoulli(dropout_rate);
+  for (size_t i = 0; i < m; ++i)
+    out[i] = in[i] * (float_t)masks[i] * scale;
 }
 
-void dropout(const float scale, const float dropout_rate, const vec_t& in,
-             std::vector<unsigned>& masks, float_t* out) {
-  for (size_t i = 0; i < in.size(); ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
-  for (size_t i = 0; i < in.size(); ++i)
-    out[i] = in[i] * masks[i] * scale;
-}
-
-void dropout_cpu(size_t n, const float scale, const float dropout_rate,
-             const float_t* in, unsigned* masks, float_t* out) {
-  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-    masks[i] = deepgalois::bernoulli(dropout_rate)?1:0;
-    out[i] = in[i] * masks[i] * scale;
+void dropout_cpu(size_t n, size_t m, float scale, float dropout_rate,
+             const float_t* in, mask_t* masks, float_t* out) {
+  for (size_t i = 0; i < n*m; ++i)
+    masks[i] = deepgalois::bernoulli(dropout_rate);
+  galois::do_all(galois::iterate((size_t)0, n*m), [&](const auto& i) {
+    out[i] = in[i] * (float_t)masks[i] * scale;
   }, galois::loopname("dropout"));
 }
 
-void d_dropout(const float scale, const vec_t& in_diff,
-               std::vector<unsigned>& masks, vec_t& out_diff) {
-  for (size_t i = 0; i < in_diff.size(); ++i)
-    out_diff[i] = in_diff[i] * masks[i] * scale;
+void d_dropout(size_t m, float scale, const float_t* in, mask_t* masks, float_t* out) {
+  for (size_t i = 0; i < m; ++i)
+    out[i] = in[i] * (float_t)masks[i] * scale;
 }
 
-void d_dropout_cpu(size_t n, const float scale, const float_t* in,
-               unsigned* masks, float_t* out) {
-  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-    out[i] = in[i] * masks[i] * scale;
+void d_dropout_cpu(size_t n, size_t m, float scale, const float_t* in,
+                   mask_t* masks, float_t* out) {
+  galois::do_all(galois::iterate((size_t)0, n*m), [&](const auto& i) {
+    out[i] = in[i] * (float_t)masks[i] * scale;
   }, galois::loopname("d_dropout"));
-}
-
-void relu(const vec_t& in, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i) {
-    out[i] = std::max(in[i], (float_t)0);
-  }
 }
 
 void relu_cpu(size_t n, const float_t* in, float_t* out) {
@@ -374,15 +382,6 @@ void matmul1D1D(const size_t dim_x, const size_t dim_y, const size_t dim_z,
 }
 
 // TODO make parallel
-void transpose(size_t x, size_t y, const vec_t& in, vec_t& out) {
-  for (size_t i = 0; i < y; i++) {
-    for (size_t j = 0; j < x; j++) {
-      out[i * x + j] = in[j * y + i];
-    }
-  }
-}
-
-// TODO make parallel
 void transpose(size_t x, size_t y, const float_t* in, float_t* out) {
   for (size_t i = 0; i < y; i++) {
     for (size_t j = 0; j < x; j++) {
@@ -390,51 +389,6 @@ void transpose(size_t x, size_t y, const float_t* in, float_t* out) {
     }
   }
 }
-} // deepgalois
-} // math
-
-
-
-// vector subtract
-void vsub(const vec_t& in_a, const vec_t& in_b, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i)
-    out[i] = in_a[i] - in_b[i];
-}
-
-// vector multiply
-void vmul(const vec_t& in_a, const vec_t& in_b, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i)
-    out[i] = in_a[i] * in_b[i];
-}
-
-// vector divide
-void vdiv(const vec_t& in_a, const vec_t& in_b, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i) {
-    assert(in_b[i] != 0);
-    out[i] = in_a[i] / in_b[i];
-  }
-}
-
-// vector add scalar
-void add_scalar(const float_t alpha, vec_t& Y) {
-  for (size_t i = 0; i < Y.size(); ++i)
-    Y[i] += alpha;
-}
-
-// vector subtract scalar
-void sub_scalar(const float_t alpha, vec_t& Y) {
-  for (size_t i = 0; i < Y.size(); ++i)
-    Y[i] -= alpha;
-}
-
-
-// vector divide scalar
-void div_scalar(const float_t alpha, vec_t& Y) {
-  assert(alpha != 0);
-  for (size_t i = 0; i < Y.size(); ++i)
-    Y[i] /= alpha;
-}
-
 
 // matrix-vector multiply
 void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector) {
@@ -445,143 +399,14 @@ void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, 
   }
 }
 
-// vector-vector multiply
-void vvmul(const vec_t& a, const vec_t& b, tensor_t& out) {
-  size_t m = a.size();
-  size_t n = b.size();
-  for (size_t i = 0; i < m; ++i) {
-    for (size_t j = 0; j < n; ++j) {
-      out[i][j] += a[i] * b[j];
-    }
+float reduce_mean(size_t n, const float_t* x) {
+  float_t sum = 0.;
+  for (size_t i = 0; i < n; i++) {
+    sum += (float_t)x[i];
   }
+  return sum / (float_t)n;
 }
 
-// matrix addition
-void matadd(size_t x, size_t y, const tensor_t& A, const tensor_t& B,
-            tensor_t& C) {
-  for (size_t i = 0; i < x; ++i)
-    for (size_t j = 0; j < y; ++j)
-      C[i][j] = A[i][j] + B[i][j];
-}
-
-// TODO: vectorize
-void copy2D1D(const tensor_t& in, vec_t& out) {
-  size_t x = in.size();
-  size_t y = in[0].size();
-  auto ptr = &out[0];
-  for (size_t i = 0; i < x; i++) {
-    std::copy(in[i].begin(), in[i].end(), ptr);
-    ptr += y;
-  }
-}
-
-
-
-void matmul2D(const tensor_t& A, const tensor_t& B, tensor_t& C) {
-  // A: x*z; B: z*y; C: x*y
-  size_t dim_x = A.size();
-  size_t dim_y = C[0].size();
-  size_t dim_z = A[0].size();
-  assert(C.size() == dim_x);
-  assert(B.size() == dim_z);
-  assert(B[0].size() == dim_y);
-
-  for (size_t i = 0; i < dim_x; ++i) {
-    for (size_t j = 0; j < dim_y; ++j) {
-      C[i][j] = 0;
-      for (size_t k = 0; k < dim_z; ++k) {
-        C[i][j] += A[i][k] * B[k][j];
-      }
-    }
-  }
-}
-
-
-void matmul2D1D(const size_t dim_y, const tensor_t& A, const vec_t& B,
-                vec_t& C) {
-  // A: x*z; B: z*y; C: x*y
-  size_t dim_x = A.size();
-  size_t dim_z = A[0].size();
-  assert(B.size() == dim_z * dim_y);
-  assert(C.size() == dim_x * dim_y);
-  vec_t A1D(dim_x * dim_z);
-  copy2D1D(A, A1D);
-  deepgalois::math::matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C[0]);
-}
-
-void matmul(const tensor_t& A, const vec_t& B, tensor_t& C) {
-  // A: x*z; B: z*y; C: x*y
-  size_t dim_x = C.size();
-  size_t dim_y = C[0].size();
-  size_t dim_z = A[0].size();
-  assert(A.size() == dim_x);
-  assert(B.size() == dim_y * dim_z);
-  vec_t A1D(dim_x * dim_z);
-  vec_t C1D(dim_x * dim_y, 0);
-  auto ptr = &A1D[0];
-  for (size_t i = 0; i < dim_x; i++) {
-    std::copy(A[i].begin(), A[i].end(), ptr);
-    ptr += dim_z;
-  }
-  deepgalois::math::matmul1D1D(dim_x, dim_y, dim_z, &A1D[0], &B[0], &C1D[0]);
-  for (size_t i = 0; i < dim_x; i++) {
-    for (size_t j = 0; j < dim_y; ++j) {
-      C[i][j] = C1D[i * dim_y + j];
-    }
-  }
-}
-
-void transpose2D(const tensor_t& in, tensor_t& out) {
-  size_t x = in.size();
-  size_t y = in[0].size();
-  for (size_t i = 0; i < y; i++) {
-    for (size_t j = 0; j < x; j++) {
-      out[i][j] = in[j][i];
-    }
-  }
-}
-
-// TODO: vectorize
-void transpose2D1D(const tensor_t& in, vec_t& out) {
-  size_t x = in.size();
-  size_t y = in[0].size();
-  assert(out.size() == x * y);
-  for (size_t i = 0; i < y; i++) {
-    for (size_t j = 0; j < x; j++) {
-      out[i * x + j] = in[j][i];
-    }
-  }
-}
-
-
-int argmax(const size_t n, const vec_t& x) {
-  float_t max = x[0];
-  int max_ind = 0;
-  for (size_t i = 1; i < n; i++) {
-    if (x[i] > max) {
-      max_ind = i;
-      max     = x[i];
-    }
-  }
-  return max_ind;
-}
-
-void d_mvmul(vec_t& in_diff, vec_t& h_in, tensor_t& out_diff) {
-  vvmul(h_in, in_diff, out_diff); // transposed feature matrix X^T times in_diff
-}
-
-void d_vadd(vec_t& in_diff, vec_t& out_diff) {
-  for (size_t i = 0; i < out_diff.size(); ++i)
-    out_diff[i] = in_diff[i];
-}
-
-float reduce_mean(const vec_t& x) {
-  size_t n = x.size();
-  assert(n > 0);
-  float sum = (float)x[0];
-  for (size_t i = 1; i < n; i++) {
-    sum += (float)x[i];
-  }
-  return sum / (float)n;
-}
+} // end namespace math
+} // end namespace deepgalois
 

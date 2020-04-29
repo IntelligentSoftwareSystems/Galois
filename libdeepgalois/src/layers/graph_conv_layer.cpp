@@ -13,7 +13,7 @@ graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
   assert(input_dims[0] == output_dims[0]); // num_vertices
   trainable_ = true;
   name_      = layer_type() + "_" + std::to_string(level);
-  assert(dropout_rate_ < 1.);
+  assert(dropout_rate_ >= 0. && dropout_rate_ < 1.);
   scale_ = 1. / (1. - dropout_rate_);
 }
 
@@ -61,8 +61,8 @@ void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in, floa
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {
   float_t *a = new float_t[len];
   float_t *b = new float_t[len];
-  mvmul(n, len, &Q[0], self, a);
-  mvmul(n, len, &W[0], neighbors, b);
+  math::mvmul(n, len, &Q[0], self, a);
+  math::mvmul(n, len, &W[0], neighbors, b);
   math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
 }
 
@@ -90,7 +90,7 @@ void graph_conv_layer::malloc_and_init() {
   // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);
 
-  if (dropout_) dropout_mask = new unsigned[x * y];
+  if (dropout_) dropout_mask = new mask_t[x * y];
   in_temp  = new float_t[x * y];
   out_temp = new float_t[x * z];
   trans_data = new float_t[y * x]; // y*x
@@ -108,7 +108,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W
   if (dropout_ && phase_ == net_phase::train)
-    math::dropout_cpu(x*y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
+    math::dropout_cpu(x, y, scale_, dropout_rate_, in_data, dropout_mask, in_temp);
   else math::copy_cpu(x*y, in_data, in_temp); 
 
   if (y > z) {
@@ -165,7 +165,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
 #endif
 
   if (level_ != 0 && dropout_)
-    math::d_dropout_cpu(x*y, scale_, in_grad, dropout_mask, in_grad);
+    math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
 
 #ifdef GALOIS_USE_DIST
   layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");

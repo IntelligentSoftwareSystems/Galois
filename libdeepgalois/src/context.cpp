@@ -4,8 +4,19 @@
 #include "deepgalois/context.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/configs.h"
+#include <boost/thread.hpp>
 
 namespace deepgalois {
+
+// Make sure each thread can have different values.
+static boost::thread_specific_ptr<Context> thread_instance_;
+
+Context& Context::Get() {
+  if (!thread_instance_.get()) {
+    thread_instance_.reset(new Context());
+  }
+  return *(thread_instance_.get());
+}
 
 #ifdef CPU_ONLY
 Context::Context() : n(0), num_classes(0), 
@@ -129,15 +140,28 @@ void Context::add_selfloop(Graph &og, Graph &g) {
 void Context::norm_factor_counting(size_t g_size) {
   auto g = getGraphPointer();
   auto subg = getSubgraphPointer();
-  g->degree_counting();
   if (use_subgraph) g = subg;
+  g->degree_counting();
+#ifdef USE_MKL
+  if (norm_factor == NULL) norm_factor = new float_t[g->sizeEdges()];
+  galois::do_all(galois::iterate((size_t)0, g_size), [&](auto i) {
+    float_t c_i = std::sqrt(float_t(g->get_degree(i)));
+    for (auto e = g->edge_begin(i); e != g->edge_end(i); e++) {
+      const auto j = g->getEdgeDst(e);
+      float_t c_j = std::sqrt(float_t(g->get_degree(j)));
+      if (c_i == 0.0 || c_j == 0.0) norm_factor[e] = 0.0;
+      else norm_factor[e] = 1.0 / (c_i * c_j);
+    }
+  }, galois::loopname("NormCountingEdge"));
+#else
   if (norm_factor == NULL) norm_factor = new float_t[g_size];
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto v) {
     auto degree  = g->get_degree(v);
     float_t temp = std::sqrt(float_t(degree));
     if (temp == 0.0) norm_factor[v] = 0.0;
     else norm_factor[v] = 1.0 / temp;
-  }, galois::loopname("NormCounting"));
+  }, galois::loopname("NormCountingVertex"));
+#endif
 }
 
 void Context::read_edgelist(const char* filename, bool symmetrize, bool add_self_loop) {
