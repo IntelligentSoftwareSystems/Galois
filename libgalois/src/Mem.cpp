@@ -35,7 +35,7 @@ thread_local SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 SizedHeapFactory::SizedHeap*
 SizedHeapFactory::getHeapForSize(const size_t size) {
   if (size == 0)
-    return 0;
+    return nullptr;
   return Base::getInstance()->getHeap(size);
 }
 
@@ -62,7 +62,7 @@ SizedHeapFactory::SizedHeap* SizedHeapFactory::getHeap(const size_t size) {
   }
 }
 
-Pow_2_BlockHeap::Pow_2_BlockHeap(void) throw() : heapTable() {
+Pow_2_BlockHeap::Pow_2_BlockHeap(void) noexcept : heapTable() {
   populateTable();
 }
 
