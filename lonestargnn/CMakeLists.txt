@@ -5,7 +5,7 @@ if(ENABLE_HETERO_GALOIS)
   include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
 endif()
 
-SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib)
+SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib64)
 if(USE_MKL_BLAS)
   SET(BLAS_LIB_DIR "${MKL_ROOT}/lib/intel64")
 endif()

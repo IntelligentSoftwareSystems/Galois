@@ -45,7 +45,6 @@ set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture
 set(USE_DEEPGALOIS OFF CACHE BOOL "Use gnn apps as well as the DeepGalois library")
 set(USE_MKL_BLAS OFF CACHE BOOL "Use MKL for BLAS")
 # TODO; this is GNN related; find better way to do than hardcode
-SET(OPENBLAS_ROOT /net/ohm/export/cdgc/cxh/OpenBLAS-faraday/build)
 SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.0)
 
 # This option is automatically handled by CMake.
@@ -267,6 +266,17 @@ if(USE_MKL_BLAS)
     include_directories(${MKL_INCLUDE_DIRS})
   else()
     message(WARNING "MKL not found")
+  endif()
+endif()
+
+SET(OPENBLAS_ROOT /org/centers/cdgc/openblas/gcc8.1)
+if(USE_OPENBLAS)
+  find_package(OpenBLAS)
+  message(STATUS "OpenBLAS: ${OPENBLAS_INCLUDE_DIRS}")
+  if (OPENBLAS_FOUND)
+    include_directories(${OPENBLAS_INCLUDE_DIRS})
+  else()
+    message(WARNING "OpenBLAS not found")
   endif()
 endif()
 

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 
-SET(BLAS_INC_DIR ${OPENBLAS_ROOT}/include)
-SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib)
-set(BLAS_LIB -lopenblas)
+SET(BLAS_INC_DIR ${OPENBLAS_ROOT}/include/openblas)
+SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib64)
+set(BLAS_LIB "-lopenblas -lpthread")
 if(USE_MKL_BLAS)
   SET(BLAS_INC_DIR ${MKL_ROOT}/include)
   SET(BLAS_LIB_DIR ${MKL_ROOT}/lib/intel64)
