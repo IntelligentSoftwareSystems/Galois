@@ -3,11 +3,6 @@ add_library(Galois::shmem ALIAS galois_shmem)
 set_target_properties(galois_shmem PROPERTIES EXPORT_NAME shmem)
 add_dependencies(lib galois_shmem)
 
-# reduce galois memory footprint
-if (GALOIS_LOW_MEM)
-  target_compile_definitions(galois_shmem PRIVATE GALOIS_LOW_MEM_FOOTPRINT=1)
-endif()
-
 configure_file(src/Version.cpp.in Version.cpp @ONLY)
 configure_file(include/galois/runtime/config.h.in include/galois/runtime/config.h)
 

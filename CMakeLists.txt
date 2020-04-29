@@ -24,7 +24,6 @@ endif()
 ###### Distributed-heterogeneous features ######
 set(ENABLE_DIST_GALOIS OFF CACHE BOOL "Enable distributed features")
 set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
-set(GALOIS_LOW_MEM OFF CACHE BOOL "If set, reduces per thread stroage initial allocation")
 set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
