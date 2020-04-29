@@ -1,6 +1,11 @@
 #ifndef GALOIS_RUNTIME_CONFIG_H
 #define GALOIS_RUNTIME_CONFIG_H
 
-#cmakedefine GALOIS_USE_LONGJMP_ABORT
+#if !(defined(GALOIS_USE_LONGJMP_ABORT) || defined(GALOIS_USE_EXCEPTION_ABORT))
+#define GALOIS_USE_LONGJMP_ABORT
+#endif
+#if !(defined(GALOIS_USE_LONGJMP_ABORT) ^ defined(GALOIS_USE_EXCEPTION_ABORT))
+#error Exactly one of GALOIS_USE_LONGJMP_ABORT or GALOIS_USE_EXCEPTION_ABORT must be defined.
+#endif
 
 #endif

@@ -21,7 +21,7 @@
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 
-#include "llvm/Support/CommandLine.h"
+#include <llvm/Support/CommandLine.h>
 
 #include <boost/mpl/if.hpp>
 #include <algorithm>
@@ -36,7 +36,6 @@
 
 #include <fcntl.h>
 #include <cstdlib>
-#include <boost/algorithm/string.hpp> 
 
 // TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {
@@ -333,35 +332,22 @@ void outputPermutation(const T& perm) {
   }
 }
 
-/**
- * Custom spliting of a line in the input text file.
- * To be used for reading edges in edgelist format (src dst edge_weight) or 
- * csv format (src,dst,edge_weight). 
- * 
- * @param line : single line from a file
- * @param iss  : std::stringStream to be returned with split parts
- * @param delim: Custom delimiter; [space] for edgelist, [,] for CSV 
- */
-void splitString(std::string line, std::vector<std::string> &result, std::stringstream &iss, std::string delim) {
-  boost::split(result, line, boost::is_any_of(delim)); 
-  // Populate
-  std::copy(result.begin(), result.end(),std::ostream_iterator<std::string>(iss,"\n"));
-  return;
+void skipLine(std::ifstream& infile) {
+  infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }
 
+
 /**
- * Common function to convert formats similar to edgelist by passing
- * custom delimiter:
+ * Common parsing for edgelist style text files.
  * 
- * Edgelist: delim:[space]
- * src dst weight
- * 
- * CSV: delim: [,] (NOTE: First line (labels) in CSV is ignored)
- * src,dst,weight 
- * 
+ * src dst [weight]
+ * ...
+ *
+ * If delim is set, this function expects that each entry is separated by delim
+ * surrounded by optional whitespace.
  */
 template <typename EdgeTy>
-void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& infilename, const std::string& outfilename, std::string delim) {
+void convertEdgelist(const std::string& infilename, const std::string& outfilename, const bool skipFirstLine, std::optional<char> delim) {
     typedef galois::graphs::FileGraphWriter Writer;
     typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
@@ -372,28 +358,56 @@ void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& i
 
     size_t numNodes = 0;
     size_t numEdges = 0;
+    size_t lineNumber = 0;
 
-    std::vector<std::string> result; 
-    std::string line;
-    if(skipFirstLine){
-      std::getline(infile, line);
-      galois::gPrint("WARNING: First line is assumed to contain labels and is ignored\n");
-      galois::gPrint("First Line : " , line, "\n");
+    if (skipFirstLine) {
+      galois::gWarn("first line is assumed to contain labels and will be ignored\n");
+      skipLine(infile);
+      ++lineNumber;
     }
-    while (std::getline(infile, line)) {
-      std::stringstream iss;
-      // Populate
-      splitString(line, result, iss, delim);
-      size_t src;
-      size_t dst;
-      edge_value_type data;
 
-      iss >> src >> dst;
-      
-      if (EdgeData::has_value)
-        iss >> data;
-        
-    
+    const bool hasDelim = static_cast<bool>(delim);
+    std::optional<size_t> skippedLine;
+    std::string line;
+    char readDelim;
+
+    for (; std::getline(infile, line); ++lineNumber) {
+      std::stringstream iss(line);
+
+      size_t src;
+      if (!(iss >> src)) {
+        skippedLine = lineNumber;
+        continue;
+      }
+
+      if (hasDelim) {
+        if (!(iss >> readDelim) || readDelim != delim) {
+          skippedLine = lineNumber;
+          continue;
+        }
+      }
+
+      size_t dst;
+      if (!(iss >> dst)) {
+        skippedLine = lineNumber;
+        continue;
+      }
+
+      edge_value_type data{};
+      if (EdgeData::has_value) {
+        if (hasDelim) {
+          if (!(iss >> readDelim) || readDelim != delim) {
+            skippedLine = lineNumber;
+            continue;
+          }
+        }
+
+        if (!(iss >> data)) {
+          skippedLine = lineNumber;
+          continue;
+        }
+      }
+
       if (infile) {
         ++numEdges;
         if (src > numNodes)
@@ -403,34 +417,55 @@ void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& i
       }
     }
 
+    if (skippedLine) {
+      galois::gWarn("ignored at least one line (line ", *skippedLine, ") because it did not match the expected format\n");
+    }
+
     numNodes++;
     p.setNumNodes(numNodes);
     p.setNumEdges(numEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
     edgeData.create(numEdges);
 
-    galois::gPrint(numNodes, " , ", numEdges, "\n");
     infile.clear();
     infile.seekg(0, std::ios::beg);
     p.phase1();
 
-    result.clear(); 
-    line.clear();
-    if(skipFirstLine){
-      std::getline(infile, line); /* Ignore first line */
+    if (skipFirstLine) {
+      skipLine(infile);
     }
+
     while (std::getline(infile, line)) {
       std::stringstream iss(line);
-      // Populate
-      splitString(line, result, iss, delim);
+
       size_t src;
+      if (!(iss >> src)) {
+        continue;
+      }
+
+      if (hasDelim) {
+        if (!(iss >> readDelim) || readDelim != delim) {
+          continue;
+        }
+      }
+
       size_t dst;
-      edge_value_type data;
+      if (!(iss >> dst)) {
+        continue;
+      }
 
-      iss >> src >> dst;
+      edge_value_type data{};
+      if (EdgeData::has_value) {
+        if (hasDelim) {
+          if (!(iss >> readDelim) || readDelim != delim) {
+            continue;
+          }
+        }
 
-      if (EdgeData::has_value)
-        iss >> data;
+        if (!(iss >> data)) {
+          continue;
+        }
+      }
 
       if (infile) {
         p.incrementDegree(src);
@@ -441,23 +476,41 @@ void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& i
     infile.seekg(0, std::ios::beg);
     p.phase2();
 
-    result.clear(); 
-    line.clear();
-    if(skipFirstLine){
-      std::getline(infile, line); /* Ignore first line */
+    if (skipFirstLine){
+      skipLine(infile);
     }
+
     while (std::getline(infile, line)) {
       std::stringstream iss(line);
-      // Populate
-      splitString(line, result, iss, delim);
+
       size_t src;
+      if (!(iss >> src)) {
+        continue;
+      }
+
+      if (hasDelim) {
+        if (!(iss >> readDelim) || readDelim != delim) {
+          continue;
+        }
+      }
+
       size_t dst;
+      if (!(iss >> dst)) {
+        continue;
+      }
+
       edge_value_type data{};
+      if (EdgeData::has_value) {
+        if (hasDelim) {
+          if (!(iss >> readDelim) || readDelim != delim) {
+            continue;
+          }
+        }
 
-      iss >> src >> dst;
-
-      if (EdgeData::has_value)
-        iss >> data;
+        if (!(iss >> data)) {
+          continue;
+        }
+      }
 
       if (infile) {
         edgeData.set(p.addNeighbor(src, dst), data);
@@ -472,8 +525,12 @@ void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& i
 
     p.toFile(outfilename);
     printStatus(numNodes, numEdges);
-  }
+}
 
+template <typename EdgeTy>
+void convertEdgelist(const std::string& infilename, const std::string& outfilename, const bool skipFirstLine) {
+  convertEdgelist<EdgeTy>(infilename, outfilename, skipFirstLine, std::optional<char>());
+}
 
 /**
  * Assumption: First line has labels
@@ -483,12 +540,7 @@ void edgelistStyleWithCustomDelim(const bool skipFirstLine, const std::string& i
 struct CSV2Gr : public Conversion {
   template <typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-
-    /**
-     * WARNING: First line is assumed to contain labels and is ignored;
-     * The first bool arg to edgelistStyleWithCustomDelim is skipFirstLine=True
-     */
-    edgelistStyleWithCustomDelim<EdgeTy>(true, infilename, outfilename, ",");
+    convertEdgelist<EdgeTy>(infilename, outfilename, true, ',');
   }
 };
 
@@ -500,7 +552,7 @@ struct CSV2Gr : public Conversion {
 struct Edgelist2Gr : public Conversion {
   template <typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    edgelistStyleWithCustomDelim<EdgeTy>(false, infilename, outfilename, "\t ");
+    convertEdgelist<EdgeTy>(infilename, outfilename, false);
   }
 };
 
@@ -517,25 +569,33 @@ struct Edgelist2Binary : public Conversion {
     size_t numNodes = 0;
     size_t numEdges = 0;
 
-    uint32_t bufferSize = 10000;
-    std::vector<uint32_t> buffer(bufferSize);
+    std::vector<uint32_t> buffer(10000);
     uint32_t counter = 0;
+    bool skippedLine = false;
     while (infile) {
-      // size_t src;
-      // size_t dst;
       uint32_t src;
-      uint32_t dst;
+      if (!(infile >> src)) {
+        skipLine(infile);
+        skippedLine = true;
+        continue;
+      }
 
-      infile >> src >> dst;
+      uint32_t dst;
+      if (!(infile >> dst)) {
+        skipLine(infile);
+        skippedLine = true;
+        continue;
+      }
 
       buffer[counter++] = src;
       buffer[counter++] = dst;
-      if (counter == bufferSize) {
+      if (counter == buffer.size()) {
         // flush it to the output file.
         outfile.write(reinterpret_cast<char*>(&buffer[0]),
                       sizeof(uint32_t) * counter);
         counter = 0;
       }
+
       if (infile) {
         ++numEdges;
         if (src > numNodes)
@@ -551,6 +611,10 @@ struct Edgelist2Binary : public Conversion {
       // flush it to the output file.
       outfile.write(reinterpret_cast<char*>(&buffer[0]),
                     sizeof(uint32_t) * counter);
+    }
+
+    if (skippedLine) {
+      galois::gWarn("ignored at least one line because it did not match the expected format\n");
     }
 
     printStatus(numNodes, numEdges);
@@ -590,7 +654,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
         if (infile.peek() != '%') {
           break;
         }
-        infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        skipLine(infile);
       }
 
       // Read header
@@ -649,7 +713,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
                        static_cast<edge_value_type>(weight));
         }
 
-        infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        skipLine(infile);
       }
 
       infile.peek();
@@ -728,7 +792,7 @@ struct Nodelist2Gr : public HasOnlyVoidSpecialization {
           numNodes = src;
         numEdges += numNeighbors;
       }
-      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      skipLine(infile);
     }
 
     numNodes++;
@@ -747,7 +811,7 @@ struct Nodelist2Gr : public HasOnlyVoidSpecialization {
       if (infile) {
         p.incrementDegree(src, numNeighbors);
       }
-      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      skipLine(infile);
     }
 
     infile.clear();
@@ -766,7 +830,7 @@ struct Nodelist2Gr : public HasOnlyVoidSpecialization {
           p.addNeighbor(src, dst);
       }
 
-      infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      skipLine(infile);
     }
 
     p.finish<void>();
@@ -1086,11 +1150,7 @@ struct UniformDistribution {};
 
 template <typename T>
 struct UniformDistribution<T, true> {
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_int_distribution<T> dist;
-#else
-  std::uniform_int<T> dist;
-#endif
 
   UniformDistribution(int a, int b) : dist(a, b) {}
   template <typename Gen>
@@ -1101,11 +1161,7 @@ struct UniformDistribution<T, true> {
 
 template <typename T>
 struct UniformDistribution<T, false> {
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
   std::uniform_real_distribution<T> dist;
-#else
-  std::uniform_real<T> dist;
-#endif
 
   UniformDistribution(int a, int b) : dist(a, b) {}
   template <typename Gen>
@@ -1119,7 +1175,8 @@ struct RandomizeEdgeWeights : public HasNoVoidSpecialization {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
 
-    Graph graph, outgraph;
+    Graph graph;
+    Graph outgraph;
 
     graph.fromFile(infilename);
     OutEdgeTy* edgeData    = outgraph.fromGraph<OutEdgeTy>(graph);
@@ -2161,7 +2218,7 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
         if (infile.peek() == 'p') {
           break;
         }
-        infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        skipLine(infile);
       }
 
       // Read header
@@ -2197,14 +2254,15 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
       }
 
       for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
-        uint32_t cur_id, neighbor_id;
+        uint32_t cur_id;
+        uint32_t neighbor_id;
         int32_t weight;
         std::string tmp;
         infile >> tmp;
 
         if (tmp.compare("a") != 0) {
           --edge_num;
-          infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+          skipLine(infile);
           continue;
         }
 
@@ -2223,7 +2281,7 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
           edgeData.set(p.addNeighbor(cur_id - 1, neighbor_id - 1), weight);
         }
 
-        infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        skipLine(infile);
       }
 
       infile.peek();
@@ -2897,7 +2955,7 @@ struct Svmlight2Gr : public HasNoVoidSpecialization {
             continue;
           }
           if (c == '#') {
-            infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            skipLine(infile);
           }
           if (c == '#' || c == '\n') {
             break;
@@ -2930,10 +2988,6 @@ struct Svmlight2Gr : public HasNoVoidSpecialization {
     }
   }
 };
-
-// TODO: retest which conversions don't work with xlc
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-#endif
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;

@@ -32,6 +32,7 @@
 
 #include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
+#include "galois/OutIndexView.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/DynamicBitset.h"
 #include "galois/OutIndexView.h"
@@ -455,6 +456,88 @@ protected:
     }
 
     return numNodes_to_divide;
+  }
+
+  //! reader assignment from a file
+  //! corresponds to master assignment if using an edge cut
+  void readersFromFile(galois::OutIndexView& g, std::string filename) {
+    // read file lines
+    std::ifstream mappings(filename);
+    std::string curLine;
+
+    unsigned timesToRead = id + 1;
+
+    for (unsigned i = 0; i < timesToRead; i++) {
+      std::getline(mappings, curLine);
+    }
+
+    //galois::gPrint("[", id, "] Read line: ", curLine, "\n");
+    std::vector<char> modifyLine(curLine.begin(), curLine.end());
+    char* tokenizedString = modifyLine.data();
+    char* token;
+    token = strtok(tokenizedString, " ");
+
+    // loop 6 more times
+    for (unsigned i = 0; i < 6; i++) {
+      token = strtok(NULL, " ");
+    }
+    std::string left(token);
+
+    // 3 more times for right
+    for (unsigned i = 0; i < 3; i++) {
+      token = strtok(NULL, " ");
+    }
+    std::string right(token);
+
+    //galois::gPrint("[", id, "] Left: ", left, ", Right: ", right, "\n");
+
+    gid2host.resize(numHosts);
+    gid2host[id].first  = std::stoul(left);
+    gid2host[id].second = std::stoul(right) + 1;
+    galois::gPrint("[", id, "] Left: ", gid2host[id].first, ", Right: ",
+                   gid2host[id].second, "\n");
+
+    /////////////////////////
+    // send/recv from other hosts
+    /////////////////////////
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) continue;
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, gid2host[id]);
+      net.sendTagged(h, galois::runtime::evilPhase, b);
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      do {
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      galois::runtime::gDeserialize(b, gid2host[p->first]);
+      ++received;
+    }
+    increment_evilPhase();
+
+    // sanity checking assignment
+    for (unsigned h = 0; h < numHosts; h++) {
+      if (h == 0) {
+        GALOIS_ASSERT(gid2host[h].first == 0);
+      } else if (h == numHosts - 1) {
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
+                      gid2host[h].first, " ", gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == g.num_nodes(),
+                      gid2host[h].second, " ", g.num_nodes());
+      } else {
+        GALOIS_ASSERT(gid2host[h].first == gid2host[h - 1].second,
+                      gid2host[h].first, " ", gid2host[h - 1].second);
+        GALOIS_ASSERT(gid2host[h].second == gid2host[h + 1].first,
+                      gid2host[h].second, " ", gid2host[h + 1].first);
+      }
+    }
   }
 
   uint32_t G2L(uint64_t gid) const {

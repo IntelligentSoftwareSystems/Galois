@@ -28,7 +28,6 @@ float * P_DELTA;
 uint32_t * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
-#include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
@@ -167,7 +166,7 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *nout_is_updated, 
       // FP: "54 -> 55;
       const int _np_laneid = cub::LaneId();
       // FP: "55 -> 56;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -395,7 +394,7 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
       // FP: "56 -> 57;
       const int _np_laneid = cub::LaneId();
       // FP: "57 -> 58;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

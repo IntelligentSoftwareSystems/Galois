@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_SPATIALTREE_H
-#define GALOIS_GRAPH_SPATIALTREE_H
+#ifndef GALOIS_GRAPHS_SPATIALTREE_H
+#define GALOIS_GRAPHS_SPATIALTREE_H
 
 namespace galois {
 namespace graphs {

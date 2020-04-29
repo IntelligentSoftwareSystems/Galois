@@ -27,7 +27,6 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 unsigned int * P_CURRENT_DEGREE;
 uint8_t * P_FLAG;
 unsigned int * P_TRIM;
-#include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_KCoreStep1 = TB_SIZE;
 static const int __tb_InitializeGraph2 = TB_SIZE;
@@ -151,7 +150,7 @@ __global__ void InitializeGraph2(CSRGraph graph,
       // FP: "54 -> 55;
       const int _np_laneid = cub::LaneId();
       // FP: "55 -> 56;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -389,7 +388,7 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
     {
       const int warpid = threadIdx.x / 32;
       const int _np_laneid = cub::LaneId();
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {

@@ -1,30 +1,32 @@
+# no editor files
+*~
+*.backup
+/.dir-locals.el
 *.orig
 *.patch
-.*.swo
-*.pyc
-*.backup
-
-# no temp files
-*~
-*.swp
-
-# no cscope/ctags files
-cscope.out
-tags
-.vscode
+/.project
 .settings
-compile_commands.json
-.clangd/
+.*.swo
+*.swp
+.vscode
 
+# no tool generated files
+.clang-complete
+.clangd
+compile_commands.json
+cscope.out
 /GPATH
 /GRTAGS
 /GTAGS
-/build*
-/results
-/.project
-/.dir-locals.el
 .tags*
-
-.clang-complete
-.clangd
+tags
 .ycm_extra_conf.py
+
+# no build files
+/build*
+
+# no python build artifacts
+*.pyc
+/python/galois.egg-info
+/python/galois/*.so
+/_skbuild

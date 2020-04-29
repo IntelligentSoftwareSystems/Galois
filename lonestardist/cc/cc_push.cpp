@@ -111,6 +111,7 @@ struct InitializeGraph {
 };
 
 
+template <bool async>
 struct FirstItr_ConnectedComp {
   Graph* graph;
   FirstItr_ConnectedComp(Graph* _graph) : graph(_graph) {}
@@ -137,7 +138,7 @@ struct FirstItr_ConnectedComp {
     }
 
     syncSubstrate->sync<writeDestination, readSource, Reduce_min_comp_current,
-                Bitset_comp_current>("ConnectedComp");
+                Bitset_comp_current, async>("ConnectedComp");
 
     galois::runtime::reportStat_Tsum(
         REGION_NAME, "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
@@ -174,7 +175,7 @@ struct ConnectedComp {
   void static go(Graph& _graph) {
     using namespace galois::worklists;
 
-    FirstItr_ConnectedComp::go(_graph);
+    FirstItr_ConnectedComp<async>::go(_graph);
 
     unsigned _num_iterations = 1;
     DGTerminatorDetector dga;

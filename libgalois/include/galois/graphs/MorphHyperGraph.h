@@ -23,8 +23,8 @@
  * Contains MorphGraph and associated helpers.
  */
 
-#ifndef GALOIS_GRAPH_MORPHGRAPH_H
-#define GALOIS_GRAPH_MORPHGRAPH_H
+#ifndef GALOIS_GRAPHS_MORPHHYPERGRAPH_H
+#define GALOIS_GRAPHS_MORPHHYPERGRAPH_H
 
 //#define AUX_MAP
 

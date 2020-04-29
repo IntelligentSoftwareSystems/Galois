@@ -7,9 +7,8 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ tb_lb=False $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=False $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ dyn_lb=False $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 bool enable_lb = false;
-#include "kernels/reduce.cuh"
 #include "pagerank_push_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 __global__ void ResetGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value)
@@ -127,7 +126,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "9 -> 10;
-    bool pop  = src < __end && ((( src < (graph).nnodes ) && ( (graph).getOutDegree(src) < DEGREE_LIMIT)) ? true: false);
+    bool pop  = src < __end && ((( src < (graph).nnodes )) ? true: false);
     // FP: "10 -> 11;
     if (pop)
     {
@@ -231,7 +230,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
       // FP: "63 -> 64;
       const int _np_laneid = cub::LaneId();
       // FP: "64 -> 65;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -575,14 +574,14 @@ void PageRankSanity_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & 
   Shared<float> min_residualval  = Shared<float>(1);
   // FP: "25 -> 26;
   // FP: "26 -> 27;
-  *(min_residualval.cpu_wr_ptr()) = 0;
+  *(min_residualval.cpu_wr_ptr()) = 1073741823;
   // FP: "27 -> 28;
   _min_residual.rv = min_residualval.gpu_wr_ptr();
   // FP: "28 -> 29;
   Shared<float> min_valueval  = Shared<float>(1);
   // FP: "29 -> 30;
   // FP: "30 -> 31;
-  *(min_valueval.cpu_wr_ptr()) = 0;
+  *(min_valueval.cpu_wr_ptr()) = 1073741823;
   // FP: "31 -> 32;
   _min_value.rv = min_valueval.gpu_wr_ptr();
   // FP: "32 -> 33;

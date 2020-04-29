@@ -20,7 +20,7 @@
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "Metis.h"
+#include "bipart.h"
 #include "galois/AtomicHelpers.h"
 #include <set>
 #include <iostream>
@@ -31,7 +31,7 @@ namespace {
 // This is only used on the terminal graph (find graph)
 // Should workd for hmetis
 
-__attribute__((unused)) int calculate_cutsize(GGraph& g) {
+/*int calculate_cutsize(GGraph& g) {
 
   GNodeBag bag;
   galois::do_all(galois::iterate(g.getNets()),
@@ -50,9 +50,9 @@ __attribute__((unused)) int calculate_cutsize(GGraph& g) {
         },
         galois::loopname("cutsize"));
   return std::distance(bag.begin(), bag.end());
-}
+}*/
 
-__attribute__((unused)) int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
+/*int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
 
   GNodeBag bag;
   galois::do_all(galois::iterate(g.getNets()),
@@ -71,11 +71,12 @@ __attribute__((unused)) int calculate_cutsize(GGraph& g, std::map<GNode, unsigne
         },
         galois::steal(), galois::loopname("cutsize"));
   return std::distance(bag.begin(), bag.end());
-}
+}*/
 void projectPart(MetisGraph* Graph) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
-  galois::do_all(galois::iterate(fineGraph->cellList()),
+  galois::do_all(
+      galois::iterate(fineGraph->hedges, fineGraph->size()),
                  [&](GNode n) {
                    auto parent = fineGraph->getData(n).getParent();
                    auto& cn      = coarseGraph->getData(parent);
@@ -91,8 +92,9 @@ void initGains(GGraph& g, int pass) {
   std::string name = "initgain";
   std::string fetsref = "FETSREF_";// + std::to_string(pass);
 
-  galois::do_all(galois::iterate(g.cellList()),
-        [&](GNode n) {
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
+                 [&](GNode n) {
               g.getData(n).FS.store(0);
               g.getData(n).TE.store(0);
         },
@@ -101,10 +103,10 @@ void initGains(GGraph& g, int pass) {
   typedef std::map<GNode, int> mapTy;
   typedef galois::substrate::PerThreadStorage<mapTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
-  galois::do_all(galois::iterate(g.getNets()),
+  galois::do_all(galois::iterate(size_t{0},g.hedges),
         [&](GNode n) {
-           int p1=0;
-						int p2 = 0;
+            int p1=0;
+	    int p2 = 0;
             for (auto x : g.edges(n)) {
               auto cc = g.getEdgeDst(x);
               int part = g.getData(cc).getPart();
@@ -135,7 +137,7 @@ void initGains(GGraph& g, int pass) {
 }
 
 void unlock(GGraph& g) {
-    galois::do_all(galois::iterate(g.cellList()),
+    galois::do_all(galois::iterate(g.hedges, g.size()),
                 [&](GNode n) {
     g.getData(n).counter = 0;
   },
@@ -144,7 +146,7 @@ void unlock(GGraph& g) {
 }
 
 __attribute__((unused)) void unlocked(GGraph& g) {
-    galois::do_all(galois::iterate(g.cellList()),
+    galois::do_all(galois::iterate(g.hedges, g.size()),
                 [&](GNode n) {
     g.getData(n).setLocked(false);
   },
@@ -164,14 +166,14 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g.cellList()), 
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
   [&](GNode n) {
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
        accum += g.getData(n).getWeight();
   },
   galois::loopname("make balance"));
-  //std::cout<<"weight of 0 : "<< nodeSize.reduce() - accum.reduce()<<"  1: "<<accum.reduce()<<"\n";
   unsigned pass = 0;
  // std::cout<<"cut parallel "<<calculate_cutsize(g)<<"\n";
  // initGain(g);
@@ -184,7 +186,8 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
     GNodeBag nodelisto;
     unsigned zeroW = 0;
     unsigned oneW = 0;
-    galois::do_all(galois::iterate(g.cellList()), 
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
           if (g.getData(n).FS == 0 && g.getData(n).TE == 0) return;
           int gain = g.getData(n).getGain();
@@ -264,12 +267,13 @@ __attribute__((unused)) unsigned hash(unsigned int val)
 
 void parallel_make_balance(GGraph& g, float tol, int p) {
 
-  unsigned Size = std::distance(g.cellList().begin(), g.cellList().end());
+  unsigned Size = g.hnodes;
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g.cellList()),
-  [&](GNode n) {
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
+      [&](GNode n) {
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
        accum += g.getData(n).getWeight();
@@ -301,7 +305,8 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
     if (bal < lo) {
 	
 	//placing each node in an appropriate bucket using the gain by weight ratio
-	galois::do_all(galois::iterate(g.cellList()),
+  galois::do_all(
+      galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
 
           float  gain = ((float) g.getData(n).getGain())/ ((float) g.getData(n).getWeight());
@@ -408,9 +413,9 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
     else {
 
 	//placing each node in an appropriate bucket using the gain by weight ratio
-    	galois::do_all(galois::iterate(g.cellList()),
+      galois::do_all(
+          galois::iterate(g.hedges, g.size()),
       [&](GNode n) {
-
           float  gain = ((float) g.getData(n).getGain())/ ((float) g.getData(n).getWeight());
           unsigned pp = g.getData(n).getPart();
           if (pp == 1) {
@@ -517,18 +522,18 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
 }
 __attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
 
- unsigned Size = std::distance(g.cellList().begin(), g.cellList().end());
+ unsigned Size = g.hnodes;
 
   galois::GAccumulator<unsigned int> accum;
   galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g.cellList()),
+  galois::do_all(galois::iterate(g),
   [&](GNode n) {
+     if (n < g.hedges) return;
      nodeSize += g.getData(n).getWeight();
      if (g.getData(n).getPart() > 0)
        accum += g.getData(n).getWeight();
   },
   galois::loopname("make balance"));
-  //std::cout<<"weight of 0 : "<< nodeSize.reduce() - accum.reduce()<<"  1: "<<accum.reduce()<<"\n";
   const int hi = (1 + tol) * nodeSize.reduce() / (2 + tol);
   const int lo = nodeSize.reduce() - hi;
   int bal = accum.reduce();
@@ -542,7 +547,7 @@ __attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
     std::set<GNode> nodelistz;
     std::set<GNode> nodelisto;
     if (bal < lo) {
-      for (auto b : g.getNets()) {
+      for (size_t b = 0; b < g.hedges; b++) {
         for (auto n : g.edges(b)) {
           auto node = g.getEdgeDst(n);
           unsigned pp = g.getData(node).getPart();
@@ -573,7 +578,7 @@ __attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
     }
 	
     else {
-      for (auto b : g.getNets()) {
+      for (GNode b = 0; b < g.hedges; b++) {
         for (auto n : g.edges(b)) {
           auto node = g.getEdgeDst(n);
           unsigned pp = g.getData(node).getPart();
