@@ -19,7 +19,7 @@
 
 #include "galois/substrate/PerThreadStorage.h"
 
-//#include "galois/runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 #include <mutex>
 
@@ -48,16 +48,16 @@ inline void* alloc() {
   return toReturn;
 }
 #else
-const size_t allocSize = galois::runtime::MM::hugePageSize;
+const size_t allocSize = galois::substrate::allocSize();
 inline void* alloc() {
-  void* toReturn = galois::substrate::MM::pageAlloc()
+  // alloc a single page, don't prefault
+  void* toReturn = galois::substrate::allocPages(1, false);
   if (toReturn == nullptr) {
     GALOIS_DIE("Out of memory in per thread storage allocation");
   }
   return toReturn;
 }
 #endif
-#undef MORE_MEM_HACK
 
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
