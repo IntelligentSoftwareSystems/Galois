@@ -54,6 +54,7 @@ else()
     src/math_functions.cu
     src/optimizer.cu
     src/context.cu
+    src/lgraph.cu
     src/node.cu
     src/net.cu
   )

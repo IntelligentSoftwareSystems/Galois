@@ -45,7 +45,7 @@ set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture
 set(USE_DEEPGALOIS OFF CACHE BOOL "Use gnn apps as well as the DeepGalois library")
 set(USE_MKL_BLAS OFF CACHE BOOL "Use MKL for BLAS")
 # TODO; this is GNN related; find better way to do than hardcode
-SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.0)
+SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.2)
 
 # This option is automatically handled by CMake.
 # It makes add_library build a shared lib unless STATIC is explicitly specified.
@@ -356,14 +356,12 @@ if (ENABLE_HETERO_GALOIS)
 
   add_subdirectory(libgpu)
 endif()
-add_subdirectory(libpangolin)
 
 # Applications (apps)
 add_subdirectory(lonestar)
 if (ENABLE_DIST_GALOIS)
   add_subdirectory(lonestardist)
 endif()
-add_subdirectory(lonestarmine)
 
 add_subdirectory(scripts)
 add_subdirectory(inputs)

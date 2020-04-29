@@ -28,6 +28,10 @@ typedef std::vector<VertexID> VertexList;
 typedef std::set<VertexID> VertexSet;
 typedef std::vector<size_t> dims_t; // dimentions type
 
+typedef uint32_t index_t; // index type
+typedef float_t edata_t;  // edge data type
+typedef float_t vdata_t;  // vertex data type
+
 enum class net_phase { train, test };
 
 #define CHUNK_SIZE 256

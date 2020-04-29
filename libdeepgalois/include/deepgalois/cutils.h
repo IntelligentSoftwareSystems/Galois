@@ -53,6 +53,8 @@ inline const char* cublasGetErrorString(cublasStatus_t error) {
   case CUBLAS_STATUS_LICENSE_ERROR:
     return "CUBLAS_STATUS_LICENSE_ERROR";
 #endif
+  default:
+    break;
   }
   return "Unknown cublas status";
 }
@@ -79,6 +81,8 @@ inline const char* cusparseGetErrorString(cusparseStatus_t error) {
       return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
   case CUSPARSE_STATUS_ZERO_PIVOT:
         return "CUSPARSE_STATUS_ZERO_PIVOT";
+  default:
+    break;
   }
   return "Unknown cusparse status";
 }
@@ -111,6 +115,8 @@ inline const char* curandGetErrorString(curandStatus_t error) {
     return "CURAND_STATUS_ARCH_MISMATCH";
   case CURAND_STATUS_INTERNAL_ERROR:
     return "CURAND_STATUS_INTERNAL_ERROR";
+  default:
+    break;
   }
   return "Unknown curand status";
 }
