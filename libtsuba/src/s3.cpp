@@ -83,6 +83,28 @@ struct FilePart {
   uint8_t* dest;
 };
 
+static void
+PrepareObjectRequest(Aws::S3::Model::GetObjectRequest* object_request,
+                     const std::string& bucket, const std::string& object,
+                     FilePart part) {
+  object_request->SetBucket(bucket);
+  object_request->SetKey(object);
+  std::ostringstream range;
+  /* Knock one byte off the end because range in AWS S3 API is inclusive */
+  range << "bytes=" << part.start << "-" << part.end - 1;
+  object_request->SetRange(range.str());
+
+  object_request->SetResponseStreamFactory([part]() {
+    auto* bufferStream = Aws::New<Aws::Utils::Stream::DefaultUnderlyingStream>(
+        kAwsTag, Aws::MakeUnique<Aws::Utils::Stream::PreallocatedStreamBuf>(
+                     kAwsTag, part.dest, part.end - part.start + 1));
+    if (bufferStream == nullptr) {
+      abort();
+    }
+    return bufferStream;
+  });
+}
+
 int S3DownloadRange(const std::string& bucket, const std::string& object,
                     uint64_t start, uint64_t size, uint8_t* result_buf) {
   auto s3_client = GetS3Client();
@@ -97,6 +119,28 @@ int S3DownloadRange(const std::string& bucket, const std::string& object,
         FilePart{.start = start, .end = end, .dest = result_buf});
     start += kS3BufSize;
     result_buf += kS3BufSize; /* NOLINT */
+  }
+
+  if (parts.empty()) {
+    return 0;
+  }
+
+  if (parts.size() == 1) {
+    /* skip all of the thread management overhead if we only have one request */
+    Aws::S3::Model::GetObjectRequest request;
+    PrepareObjectRequest(&request, bucket, object, parts[0]);
+    Aws::S3::Model::GetObjectOutcome outcome = s3_client->GetObject(request);
+    if (outcome.IsSuccess()) {
+      /* result_buf should have the data here */
+    } else {
+      /* TODO there are likely some errors we can handle gracefully
+       * i.e., with retries */
+      const auto& error = outcome.GetError();
+      std::cout << "ERROR: " << error.GetExceptionName() << ": "
+                << error.GetMessage() << std::endl;
+      abort();
+    }
+    return 0;
   }
 
   std::mutex m;
@@ -125,23 +169,7 @@ int S3DownloadRange(const std::string& bucket, const std::string& object,
       };
   for (auto& part : parts) {
     Aws::S3::Model::GetObjectRequest object_request;
-    object_request.SetBucket(bucket);
-    object_request.SetKey(object);
-    std::ostringstream range;
-    range << "bytes=" << part.start << "-" << part.end;
-    object_request.SetRange(range.str());
-
-    object_request.SetResponseStreamFactory([&]() {
-      auto* bufferStream =
-          Aws::New<Aws::Utils::Stream::DefaultUnderlyingStream>(
-              kAwsTag,
-              Aws::MakeUnique<Aws::Utils::Stream::PreallocatedStreamBuf>(
-                  kAwsTag, part.dest, part.end - part.start + 1));
-      if (bufferStream == nullptr) {
-        abort();
-      }
-      return bufferStream;
-    });
+    PrepareObjectRequest(&object_request, bucket, object, part);
     s3_client->GetObjectAsync(object_request, callback);
   }
 
