@@ -15,6 +15,7 @@
 
 #include "tsuba_internal.h"
 #include "s3.h"
+#include "SegmentedBufferView.h"
 
 namespace tsuba {
 
@@ -77,16 +78,10 @@ int S3Open(const std::string& bucket, const std::string& object) {
   return fd;
 }
 
-struct FilePart {
-  uint64_t start;
-  uint64_t end;
-  uint8_t* dest;
-};
-
 static void
 PrepareObjectRequest(Aws::S3::Model::GetObjectRequest* object_request,
                      const std::string& bucket, const std::string& object,
-                     FilePart part) {
+                     SegmentedBufferView::BufPart part) {
   object_request->SetBucket(bucket);
   object_request->SetKey(object);
   std::ostringstream range;
@@ -108,19 +103,9 @@ PrepareObjectRequest(Aws::S3::Model::GetObjectRequest* object_request,
 int S3DownloadRange(const std::string& bucket, const std::string& object,
                     uint64_t start, uint64_t size, uint8_t* result_buf) {
   auto s3_client = GetS3Client();
-  std::vector<FilePart> parts;
-
-  uint64_t last = start + size;
-  while (start < last) {
-    uint64_t sz = std::min(last - start, kS3BufSize);
-    /* Range in AWS S3 API is inclusive */
-    uint64_t end = start + sz - 1;
-    parts.emplace_back(
-        FilePart{.start = start, .end = end, .dest = result_buf});
-    start += kS3BufSize;
-    result_buf += kS3BufSize; /* NOLINT */
-  }
-
+  SegmentedBufferView bufView(start, result_buf, size, kS3BufSize);
+  std::vector<SegmentedBufferView::BufPart> parts(bufView.begin(),
+                                                  bufView.end());
   if (parts.empty()) {
     return 0;
   }
