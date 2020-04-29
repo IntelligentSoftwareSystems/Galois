@@ -26,8 +26,9 @@ public:
   ~LearningGraph() { dealloc(); }
   void init(index_t nv, index_t ne) { num_vertices_ = nv; num_edges_ = ne; }
   void readGraph(std::string path, std::string dataset);
-  index_t size() { return num_vertices_; }
-  index_t sizeEdges() { return num_edges_; }
+  void readGraphFromGRFile(const std::string& filename);
+  size_t size() { return (size_t)num_vertices_; }
+  size_t sizeEdges() { return (size_t)num_edges_; }
   index_t getDegree(index_t vid) { return degrees_[vid]; }
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t get_degree(index_t vid) { return degrees_[vid]; }

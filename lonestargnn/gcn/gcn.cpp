@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   LonestarGnnStart(argc, argv, name, desc, url);
   deepgalois::Net network; // the neural network to train
 
-  Graph* dGraph = NULL;
+  deepgalois::Graph* dGraph = NULL;
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
   dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);

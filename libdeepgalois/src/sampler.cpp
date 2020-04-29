@@ -3,10 +3,6 @@
 #include <time.h> 
 #include <vector>
 
-inline unsigned getDegree(Graph *g, GNode v) {
-	return std::distance(g->edge_begin(v), g->edge_end(v));
-}
-
 namespace deepgalois {
 
 void Sampler::set_masked_graph(size_t begin, size_t end, size_t count, mask_t *masks, Graph *g) {
@@ -29,9 +25,9 @@ void Sampler::set_masked_graph(size_t begin, size_t end, size_t count, mask_t *m
 
 void Sampler::get_masked_degrees(size_t n, mask_t *masks, Graph *g, std::vector<uint32_t> &degrees) {
   assert(degrees.size() == n);
-  galois::do_all(galois::iterate(size_t(0), n), [&](const GNode src) {
+  galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
     if (masks[src] == 1) {
-      for (const auto e : g->edges(src)) {
+      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
         const auto dst = g->getEdgeDst(e);
         if (masks[dst] == 1) degrees[src] ++;
       }
@@ -48,11 +44,11 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
 #ifndef GALOIS_USE_DIST
   sub.allocateFrom(n, ne);
   sub.constructNodes();
-  galois::do_all(galois::iterate((size_t)0, n), [&](const GNode src) {
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto src) {
     sub.fixEndEdge(src, offsets[src+1]);
     if (masks[src] == 1) {
       auto idx = offsets[src];
-      for (const auto e : g->edges(src)) {
+      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
         const auto dst = g->getEdgeDst(e);
         if (masks[dst] == 1) sub.constructEdge(idx++, dst, 0);
       }
@@ -77,7 +73,7 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList v
   galois::gPrint("vertex_set size: ", vertex_set.size(), "\n");
   int *degrees = new int[m];
   galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
-    degrees[i] = (int)getDegree(g, frontier[i]);
+    degrees[i] = (int)g->get_degree(frontier[i]);
   }, galois::loopname("compute_degrees"));
   for (size_t i = 0; i < n - m; i++) {
     auto pos = select_one_item((int)m, degrees);
@@ -89,7 +85,7 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList v
       auto dst = g->getEdgeDst(g->edge_begin(u) + neighbor_id);
       if (vertex_set.find(dst) == vertex_set.end()) {
         frontier[pos] = dst;
-        degrees[pos] = getDegree(g, frontier[pos]);
+        degrees[pos] = g->get_degree(frontier[pos]);
         vertex_set.insert(dst);
         break;
       }
@@ -129,7 +125,7 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
   VertexList new_ids = reindexing_vertice(graph->size(), vertex_set);
   std::vector<uint32_t> degrees(nv, 0); // degrees of vertices in the subgraph
   for (auto v : vertex_set) {
-	degrees[new_ids[v]] = std::distance(g.edge_begin(v), g.edge_end(v));
+	degrees[new_ids[v]] = g.get_degree(v);
   }
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
   auto ne = offsets[nv];
@@ -142,7 +138,7 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
     sub.fixEndEdge(i, offsets[i+1]);
     unsigned j = 0;
     auto old_id = old_ids[i];
-    for (auto e : g.edges(old_id)) {
+    for (auto e = g.edge_begin(old_id); e != g.edge_end(old_id); e++) {
       sub.constructEdge(offsets[i]+j, g.getEdgeDst(e), 0);
       j ++;
     }

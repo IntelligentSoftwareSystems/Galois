@@ -17,7 +17,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
     // get normalization factor if needed
     if (norm) a = norm_factor[src];
     // gather neighbors' embeddings
-    for (const auto e : g.edges(src)) {
+    for (auto e = g.edge_begin(src); e != g.edge_end(src); e++) {
       const auto dst = g.getEdgeDst(e);
       if (norm) {
         // normalize b as well

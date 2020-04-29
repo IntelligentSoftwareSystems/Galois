@@ -30,7 +30,6 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
 
 void Context::createSubgraph() {
   subgraph_cpu = new Graph(); 
-  lsubgraph = new LearningGraph(); 
 }
 
 // generate labels for the subgraph, m is subgraph size
@@ -62,25 +61,27 @@ void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
 }
 
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
+  std::string filename = path + dataset_str + ".csgr";
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
   if (filetype == "el") {
-    std::string filename = path + dataset_str + ".el";
+    filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());
     read_edgelist(filename.c_str(), true); // symmetrize
   } else if (filetype == "bin") {
-    lgraph = new LearningGraph();
-    lgraph->readGraph(path, dataset_str);
+    graph_cpu->readGraphFromGRFile(filename);
   } else if (filetype == "gr") {
     graph_cpu = new Graph(); 
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());
     if (selfloop) {
       Graph graph_temp;
-      galois::graphs::readGraph(graph_temp, filename);
+      //galois::graphs::readGraph(graph_temp, filename);
+      graph_temp.readGraphFromGRFile(filename);
       add_selfloop(graph_temp, *graph_cpu);
       is_selfloop_added = selfloop;
-    } else galois::graphs::readGraph(*graph_cpu, filename);
+    //} else galois::graphs::readGraph(*graph_cpu, filename);
+    } else graph_cpu->readGraphFromGRFile(filename);
 // TODO dist version of self loop
   } else {
     printf("Unkown file format\n");

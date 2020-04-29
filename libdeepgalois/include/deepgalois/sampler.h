@@ -13,11 +13,11 @@ public:
   // !API function for user-defined selection strategy
   virtual void select_vertices(size_t nv, size_t n, int m, Graph* g, VertexList vertices, VertexSet &vertex_set);
 
-  galois::runtime::iterable<galois::NoDerefIterator<Graph::edge_iterator> > neighbor_sampler(Graph &g, GNode v);
+  galois::runtime::iterable<galois::NoDerefIterator<edge_iterator> > neighbor_sampler(Graph &g, VertexID v);
 
-  Graph::edge_iterator sampled_edge_begin(Graph &g, GNode v) { return g.edge_begin(v); }
+  edge_iterator sampled_edge_begin(Graph &g, VertexID v) { return g.edge_begin(v); }
 
-  Graph::edge_iterator sampled_edge_end(Graph &g, GNode v) { return g.edge_end(v); }
+  edge_iterator sampled_edge_end(Graph &g, VertexID v) { return g.edge_end(v); }
 
   void set_masked_graph(size_t begin, size_t end, size_t count, mask_t* masks, Graph* g);
 

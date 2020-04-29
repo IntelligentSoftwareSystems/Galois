@@ -33,7 +33,7 @@ void LearningGraph::fixEndEdge(index_t vid, index_t row_end) {
 void LearningGraph::constructEdge(index_t eid, index_t dst, edata_t edata) {
 }
 
-void degree_counting() {
+void LearningGraph::degree_counting() {
 /*
   degrees = new uint32_t[num_vertices_];
   galois::do_all(galois::iterate(begin(), end()), [&] (auto v) {
@@ -44,6 +44,9 @@ void degree_counting() {
 
 void LearningGraph::readGraph(std::string path, std::string dataset) {
   std::string filename = path + dataset + ".csgr";
+}
+
+void LearningGraph::readGraphFromGRFile(const std::string& filename) {
   std::ifstream ifs;
   ifs.open(filename);
   int masterFD = open(filename.c_str(), O_RDONLY);
