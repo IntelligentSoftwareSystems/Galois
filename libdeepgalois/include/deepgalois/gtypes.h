@@ -21,8 +21,8 @@ using AccuracyAccum = galois::DGAccumulator<acc_t>;
 typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
 #else
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
-    true>::type ::with_no_lockable<true>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<void, void, false, false, false, void, uint64_t, uint64_t>::
+    with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 #endif
 #else
 using Graph = galois::graphs::DistGraph<char, void>;

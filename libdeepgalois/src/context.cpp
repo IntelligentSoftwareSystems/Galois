@@ -30,6 +30,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
 
 void Context::createSubgraph() {
   subgraph_cpu = new Graph(); 
+  lsubgraph = new LearningGraph(); 
 }
 
 // generate labels for the subgraph, m is subgraph size
@@ -63,7 +64,6 @@ void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
 size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop) {
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
-  graph_cpu = new Graph(); 
   if (filetype == "el") {
     std::string filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());
@@ -72,6 +72,7 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     lgraph = new LearningGraph();
     lgraph->readGraph(path, dataset_str);
   } else if (filetype == "gr") {
+    graph_cpu = new Graph(); 
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());
     if (selfloop) {
@@ -86,9 +87,10 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     exit(1);
   }
   Tread.stop();
-  std::cout << "num_vertices " << graph_cpu->size() << " num_edges "
-            << graph_cpu->sizeEdges() << "\n";
-  return graph_cpu->size();
+  auto g = getGraphPointer();
+  std::cout << "num_vertices " << g->size() << " num_edges "
+            << g->sizeEdges() << "\n";
+  return g->size();
 }
 
 void Context::add_selfloop(Graph &og, Graph &g) {
@@ -124,11 +126,13 @@ void Context::add_selfloop(Graph &og, Graph &g) {
 }
 
 void Context::norm_factor_counting(size_t g_size) {
-  Graph *g = graph_cpu;
-  if (use_subgraph) g = subgraph_cpu;
+  auto g = getGraphPointer();
+  auto subg = getSubgraphPointer();
+  g->degree_counting();
+  if (use_subgraph) g = subg;
   if (norm_factor == NULL) norm_factor = new float_t[g_size];
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto v) {
-    auto degree  = std::distance(g->edge_begin(v), g->edge_end(v));
+    auto degree  = g->get_degree(v);
     float_t temp = std::sqrt(float_t(degree));
     if (temp == 0.0) norm_factor[v] = 0.0;
     else norm_factor[v] = 1.0 / temp;
@@ -185,14 +189,15 @@ void Context::read_edgelist(const char* filename, bool symmetrize, bool add_self
         colidx_[offsets[i]++] = dst;
   }
 
-  graph_cpu->allocateFrom(num_vertices_, num_edges_);
-  graph_cpu->constructNodes();
+  auto g = getGraphPointer();
+  g->allocateFrom(num_vertices_, num_edges_);
+  g->constructNodes();
   for (size_t i = 0; i < num_vertices_; i++) {
     auto row_begin = rowptr_[i];
     auto row_end = rowptr_[i+1];
-    graph_cpu->fixEndEdge(i, row_end);
+    g->fixEndEdge(i, row_end);
     for (auto offset = row_begin; offset < row_end; offset++)
-      graph_cpu->constructEdge(offset, colidx_[offset], 0);
+      g->constructEdge(offset, colidx_[offset], 0);
   }
 }
 

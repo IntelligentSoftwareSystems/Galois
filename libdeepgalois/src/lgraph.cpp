@@ -10,11 +10,6 @@
 #include <cassert>
 
 namespace deepgalois {
-
-LearningGraph::LearningGraph() : is_device(false), num_vertices_(0), num_edges_(0),
-                                 rowptr_(NULL), colidx_(NULL), degrees_(NULL),
-                                 vertex_data_(NULL), edge_data_(NULL) {}
-
 void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
   const unsigned nsteps = 10;
   unsigned ineachstep = (maxii / nsteps);
@@ -24,6 +19,27 @@ void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
     printf("\t%3d%%\r", progress);
     fflush(stdout);
   }
+}
+
+void LearningGraph::allocateFrom(index_t nv, index_t ne) {
+}
+
+void LearningGraph::constructNodes() {
+}
+
+void LearningGraph::fixEndEdge(index_t vid, index_t row_end) {
+}
+
+void LearningGraph::constructEdge(index_t eid, index_t dst, edata_t edata) {
+}
+
+void degree_counting() {
+/*
+  degrees = new uint32_t[num_vertices_];
+  galois::do_all(galois::iterate(begin(), end()), [&] (auto v) {
+    degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
+  }, galois::loopname("DegreeCounting"));
+*/
 }
 
 void LearningGraph::readGraph(std::string path, std::string dataset) {
@@ -56,15 +72,15 @@ void LearningGraph::readGraph(std::string path, std::string dataset) {
   __attribute__((unused)) uint64_t version = le64toh(*fptr++);
   assert(version == 1);
   uint64_t sizeEdgeTy = le64toh(*fptr++);
-  uint64_t numNodes = le64toh(*fptr++);
+  uint64_t nv = le64toh(*fptr++);
   uint64_t numEdges = le64toh(*fptr++);
   uint64_t *outIdx = fptr;
-  fptr += numNodes;
+  fptr += nv;
   uint32_t *fptr32 = (uint32_t*)fptr;
   uint32_t *outs = fptr32; 
   fptr32 += numEdges;
   if (numEdges % 2) fptr32 += 1;
-  num_vertices_ = numNodes;
+  num_vertices_ = nv;
   num_edges_ = numEdges;
   if (sizeEdgeTy != 0) {
     std::cout << "LearningGraph: currently edge data not supported.\n";
@@ -118,4 +134,15 @@ void LearningGraph::readGraph(std::string path, std::string dataset) {
             << masterLength/1000.0/runtime << " MB/s)\n\n"; 
 }
 
+#ifdef CPU_ONLY
+void LearningGraph::dealloc() {
+  assert (!is_device);
+  free(rowptr_);
+  free(colidx_);
+  free(degrees_);
+  if (vertex_data_ != NULL) free(vertex_data_);
+  if (edge_data_ != NULL) free(edge_data_);
 }
+#endif
+
+} // end namespace

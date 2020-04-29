@@ -1,4 +1,13 @@
 
+void LearningGraph::dealloc() {
+  assert(is_device);
+  CUDA_CHECK(cudaFree(colidx_));
+  CUDA_CHECK(cudaFree(rowptr_));
+  CUDA_CHECK(cudaFree(degrees_));
+  if (edge_data != NULL) CUDA_CHECK(cudaFree(edge_data));
+  if (vertex_data != NULL) CUDA_CHECK(cudaFree(vertex_data));
+}
+
 void LearningGraph::allocOnDevice(bool no_edge_data_) {
   if (colidx_ != NULL) return true;  
   CUDA_CHECK(cudaMalloc((void **) &colidx_, num_edges_ * sizeof(index_type)));
