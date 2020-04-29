@@ -4,10 +4,11 @@
  * Contains the entry points for interfacing with the tsuba storage server
  */
 
-#include <aws/core/Aws.h>
 #include <mutex>
 #include <unordered_map>
 #include <fstream>
+#include <iostream>
+#include <cassert>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -16,8 +17,6 @@
 #include "tsuba/tsuba.h"
 #include "s3.h"
 #include "tsuba_internal.h"
-
-static Aws::SDKOptions sdk_options;
 
 namespace tsuba {
 
@@ -114,11 +113,8 @@ public:
 static std::mutex allocated_memory_mutex;
 static std::unordered_map<uint8_t*, MappingDesc> allocated_memory;
 
-EXPORT_SYM int TsubaInit() {
-  Aws::InitAPI(sdk_options);
-  return 0;
-}
-EXPORT_SYM void TsubaFini() { Aws::ShutdownAPI(sdk_options); }
+EXPORT_SYM int TsubaInit() { return S3Init(); }
+EXPORT_SYM void TsubaFini() { return S3Fini(); }
 
 EXPORT_SYM int TsubaOpen(const char* uri) {
   auto [bucket_name, object_name] = S3SplitUri(std::string(uri));

@@ -1,3 +1,4 @@
+#include <aws/core/Aws.h>
 #include <memory>
 #include <regex>
 #include <string_view>
@@ -17,11 +18,20 @@
 
 namespace tsuba {
 
+static Aws::SDKOptions sdk_options;
+
 static constexpr const char* kDefaultS3Region = "us-east-2";
 static constexpr const char* kAwsTag          = "TsubaS3Client";
 static const std::regex kS3UriRegex("s3://([-a-z0-9.]+)/(.+)");
 static const std::string_view kTmpTag("/tmp/tsuba_s3.XXXXXX");
 static constexpr const uint64_t kS3BufSize = MB(5);
+
+int S3Init() {
+  Aws::InitAPI(sdk_options);
+  return 0;
+}
+
+void S3Fini() { Aws::ShutdownAPI(sdk_options); }
 
 static inline std::shared_ptr<Aws::S3::S3Client> GetS3Client() {
   Aws::Client::ClientConfiguration cfg;

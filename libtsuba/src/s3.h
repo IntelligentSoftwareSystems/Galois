@@ -6,6 +6,8 @@
 
 namespace tsuba {
 
+int S3Init();
+void S3Fini();
 int S3Open(const std::string& bucket, const std::string& object);
 
 std::pair<std::string, std::string> S3SplitUri(const std::string& /*uri*/);
