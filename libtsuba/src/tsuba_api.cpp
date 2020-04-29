@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "tsuba/tsuba.h"
 #include "s3.h"
@@ -45,6 +47,11 @@ static int DoReadS3Part(const char* filename, uint8_t* buf, uint64_t begin,
                         uint64_t size) {
   auto [bucket, object] = S3SplitUri(filename);
   return S3DownloadRange(bucket, object, begin, size, buf);
+}
+
+static int DoWriteS3(const char* filename, const uint8_t* buf, uint64_t size) {
+  auto [bucket, object] = S3SplitUri(filename);
+  return S3UploadOverwrite(bucket, object, buf, size);
 }
 
 static uint8_t* AllocAndReadS3(const char* filename, uint64_t begin,
@@ -124,6 +131,21 @@ EXPORT_SYM int TsubaOpen(const char* uri) {
   return S3Open(bucket_name, object_name);
 }
 
+EXPORT_SYM int TsubaStore(const char* uri, const uint8_t* data, uint64_t size) {
+  if (!TsubaIsUri(uri)) {
+    std::ofstream ofile(uri);
+    if (!ofile.good()) {
+      return -1;
+    }
+    ofile.write(reinterpret_cast<const char*>(data), size); /* NOLINT */
+    if (!ofile.good()) {
+      return -1;
+    }
+    return 0;
+  }
+  return DoWriteS3(uri, data, size);
+}
+
 EXPORT_SYM int TsubaPeek(const char* filename, uint8_t* result_buffer,
                          uint64_t begin, uint64_t size) {
   if (!TsubaIsUri(filename)) {
@@ -142,6 +164,19 @@ EXPORT_SYM int TsubaPeek(const char* filename, uint8_t* result_buffer,
     return 0;
   }
   return DoReadS3Part(filename, result_buffer, begin, size);
+}
+
+EXPORT_SYM int TsubaStat(const char* filename, TsubaStatBuf* s_buf) {
+  if (!TsubaIsUri(filename)) {
+    struct stat local_s_buf;
+    if (int ret = stat(filename, &local_s_buf); ret) {
+      return ret;
+    }
+    s_buf->size = local_s_buf.st_size;
+    return 0;
+  }
+  auto [bucket_name, object_name] = S3SplitUri(std::string(filename));
+  return S3GetSize(bucket_name, object_name, &s_buf->size);
 }
 
 EXPORT_SYM uint8_t* TsubaMmap(const char* filename, uint64_t begin,
