@@ -97,6 +97,7 @@ set(sources
   src/optimizer.cpp
   src/context.cpp
   src/sampler.cpp
+  src/lgraph.cpp
   src/utils.cpp
   src/node.cpp
   src/net.cpp

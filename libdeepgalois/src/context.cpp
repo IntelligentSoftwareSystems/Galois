@@ -68,6 +68,9 @@ size_t Context::read_graph_cpu(std::string dataset_str, std::string filetype, bo
     std::string filename = path + dataset_str + ".el";
     printf("Reading .el file: %s\n", filename.c_str());
     read_edgelist(filename.c_str(), true); // symmetrize
+  } else if (filetype == "bin") {
+    lgraph = new LearningGraph();
+    lgraph->readGraph(path, dataset_str);
   } else if (filetype == "gr") {
     std::string filename = path + dataset_str + ".csgr";
     printf("Reading .gr file: %s\n", filename.c_str());

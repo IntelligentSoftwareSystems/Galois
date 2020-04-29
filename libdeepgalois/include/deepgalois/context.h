@@ -7,6 +7,7 @@
 #include <cassert>
 #include "deepgalois/types.h"
 #ifdef CPU_ONLY
+#include "deepgalois/lgraph.h"
 #include "deepgalois/gtypes.h"
 #else
 #include "graph_gpu.h"
@@ -39,6 +40,7 @@ public:
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
+  LearningGraph* lgraph;
   Graph* subgraph_cpu;
   void createSubgraph();
   void add_selfloop(Graph &og, Graph &g);
