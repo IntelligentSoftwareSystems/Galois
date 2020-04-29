@@ -6,7 +6,7 @@ namespace galois {
 int OutIndexView::Bind() {
   struct GRHeader header;
   int err;
-  if (err = TsubaPeek(filename_, header); err) {
+  if (err = TsubaPeek(filename_, &header); err) {
     perror(filename_.c_str());
     return err;
   }

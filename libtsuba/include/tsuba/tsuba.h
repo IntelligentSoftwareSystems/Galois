@@ -20,10 +20,10 @@ static inline bool TsubaIsUri(std::string_view uri) {
 }
 
 template <typename StrType, typename T>
-static inline int TsubaPeek(const StrType& filename, T& obj) {
+static inline int TsubaPeek(const StrType& filename, T* obj) {
   return TsubaPeek(filename.c_str(),
-                   reinterpret_cast<uint8_t*>(&obj), /* NOLINT */
-                   0, sizeof(obj));
+                   reinterpret_cast<uint8_t*>(obj), /* NOLINT */
+                   0, sizeof(*obj));
 }
 
 #endif
