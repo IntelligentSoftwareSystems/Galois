@@ -36,7 +36,9 @@
 enum Algo {
   bspJacobi,
   bsp,
+#if 0
   bspCoreThenTruss,
+#endif
 };
 
 namespace cll = llvm::cl;
@@ -57,9 +59,11 @@ static cll::opt<Algo> algo(
     cll::values(
         clEnumValN(Algo::bspJacobi, "bspJacobi",
                    "Bulk-synchronous parallel with separated edge removal"),
-        clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"),
+        clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)")
+#if 0
         clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss",
                    "Compute k-1 core and then k-truss")
+#endif
         ),
     cll::init(Algo::bsp));
 
@@ -522,6 +526,11 @@ struct BSPTrussAlgo {
   } ///< End operator()
 };  ///< End struct BSPTrussAlgo
 
+#if 0
+NOTE that each nodes of the k-truss should have at least (k-1) edges.
+However, nodes which are in (k-1)-core can have more htan (k-1) edges.
+Removing (k-1) core can remove more edges than the correctly pruned graph.
+
 /**
  * BSPCoreAlgo:
  * 1. Keep nodes w/ degree >= k and remove all edges for nodes whose degree < k.
@@ -602,6 +611,7 @@ struct BSPCoreThenTrussAlgo {
     TTruss.stop();
   } ///< End operator().
 };  ///< End struct BSPCoreThenTrussAlgo.
+#endif
 
 template <typename Algo>
 void run() {
@@ -662,9 +672,11 @@ int main(int argc, char** argv) {
   case bsp:
     run<BSPTrussAlgo>();
     break;
+#if 0
   case bspCoreThenTruss:
     run<BSPCoreThenTrussAlgo>();
     break;
+#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();
