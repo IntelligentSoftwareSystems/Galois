@@ -81,8 +81,8 @@ void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float a
   cblas_sgemv(CblasRowMajor, TransA, M, N, alpha, A, N, x, 1, beta, y, 1);
 }
 
+const size_t vec_len = 8; // for 32-bit floating point in AVX2; TODO AVX512
 /*
-const size_t vec_len = 8; // for 32-bit floating point in AVX2
 // vector add
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
 #ifdef __AVX2__
@@ -140,7 +140,18 @@ float_t l2_norm(size_t n, const float_t* a) {
 */
 
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* y) {
+#ifdef USE_MKL
   vsAdd(n, a, b, y);
+#else
+#ifdef __AVX2__
+  const size_t alignedN = n - n % vec_len;
+  for (size_t i = 0; i < alignedN; i += vec_len)
+    _mm256_storeu_ps(&y[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
+  for (size_t i = alignedN; i < n; ++i) y[i] = a[i] + b[i];
+#else
+  for (size_t i = 0; i < n; ++i) y[i] = a[i] + b[i];
+#endif
+#endif
 }
 
 void scal(size_t n, const float_t alpha, float_t* x) {
