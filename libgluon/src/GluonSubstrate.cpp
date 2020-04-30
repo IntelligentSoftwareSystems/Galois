@@ -53,16 +53,3 @@ cll::opt<DataCommMode> enforce_metadata(
 //! Enforced data mode. Using non-cll type because it can be used directly by
 //! the GPU.
 DataCommMode enforce_data_mode;
-
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-//! Command line definition for bare_mpi
-cll::opt<BareMPI> bare_mpi(
-    "bare_mpi", cll::desc("Type of bare MPI"),
-    cll::values(clEnumValN(noBareMPI, "no", "Do not us bare MPI (default)"),
-                clEnumValN(nonBlockingBareMPI, "nonBlocking",
-                           "Use non-blocking bare MPI"),
-                clEnumValN(oneSidedBareMPI, "oneSided",
-                           "Use one-sided bare MPI")
-                ),
-    cll::init(noBareMPI), cll::Hidden);
-#endif

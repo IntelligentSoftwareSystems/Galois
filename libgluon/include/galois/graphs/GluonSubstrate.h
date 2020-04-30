@@ -49,8 +49,8 @@ extern cll::opt<bool> partitionAgnostic;
 //! Specifies what format to send metadata in
 extern cll::opt<DataCommMode> enforce_metadata;
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-//! bare_mpi type to use
-extern cll::opt<BareMPI> bare_mpi;
+//! bare_mpi type to use; see options in runtime/BareMPI.h
+BareMPI bare_mpi = BareMPI::noBareMPI;
 #endif
 
 //! Enumeration for specifiying write location for sync calls
