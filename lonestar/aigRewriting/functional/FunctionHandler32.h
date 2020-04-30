@@ -47,66 +47,66 @@ namespace Functional32 {
 
 typedef unsigned int word;
 
-static inline void copy(word* result, word* original, int nWords);
-static inline void NOT(word* result, word* original, int nWords);
-static inline void AND(word* result, word* lhs, word* rhs, int nWords);
-static inline void NAND(word* result, word* lhs, word* rhs, int nWords);
-static inline void OR(word* result, word* lhs, word* rhs, int nWords);
-static inline void XOR(word* result, word* lhs, word* rhs, int nWords);
-static inline bool isConstZero(word* function, int nVars);
-static inline bool isConstOne(word* function, int nVars);
-static inline int countOnes(unsigned uWord);
-static inline int wordNum(int nVars);
-static void truthStretch(word* result, word* input, int inVars, int nVars,
+inline void copy(word* result, word* original, int nWords);
+inline void NOT(word* result, word* original, int nWords);
+inline void AND(word* result, word* lhs, word* rhs, int nWords);
+inline void NAND(word* result, word* lhs, word* rhs, int nWords);
+inline void OR(word* result, word* lhs, word* rhs, int nWords);
+inline void XOR(word* result, word* lhs, word* rhs, int nWords);
+inline bool isConstZero(word* function, int nVars);
+inline bool isConstOne(word* function, int nVars);
+inline int countOnes(unsigned uWord);
+inline int wordNum(int nVars);
+inline void truthStretch(word* result, word* input, int inVars, int nVars,
                          unsigned phase);
-static void swapAdjacentVars(word* result, word* input, int nVars, int iVar);
-static std::string toCubeString( word* function, int nWords, int nVars);
-static std::string toHex(word* function, int nWords);
-static std::string toBin(word* function, int nWords);
+inline void swapAdjacentVars(word* result, word* input, int nVars, int iVar);
+inline std::string toCubeString( word* function, int nWords, int nVars);
+inline std::string toHex(word* function, int nWords);
+inline std::string toBin(word* function, int nWords);
 
-void copy(word* result, word* original, int nWords) {
+inline void copy(word* result, word* original, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = original[i];
   }
 }
 
-void NOT(word* result, word* original, int nWords) {
+inline void NOT(word* result, word* original, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = ~(original[i]);
   }
 }
 
-void AND(word* result, word* lhs, word* rhs, int nWords) {
+inline void AND(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] & rhs[i];
   }
 }
 
-void NAND(word* result, word* lhs, word* rhs, int nWords) {
+inline void NAND(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = ~(lhs[i] & rhs[i]);
   }
 }
 
-void OR(word* result, word* lhs, word* rhs, int nWords) {
+inline void OR(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] | rhs[i];
   }
 }
 
-void XOR(word* result, word* lhs, word* rhs, int nWords) {
+inline void XOR(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] ^ rhs[i];
   }
 }
 
-bool isConstZero(word* function, int nVars) {
+inline bool isConstZero(word* function, int nVars) {
 
   word* pFunction = function;
   word* pLimit    = pFunction + wordNum(nVars);
@@ -120,7 +120,7 @@ bool isConstZero(word* function, int nVars) {
   return true;
 }
 
-bool isConstOne(word* function, int nVars) {
+inline bool isConstOne(word* function, int nVars) {
 
   word* pFunction = function;
   word* pLimit    = pFunction + wordNum(nVars);
@@ -135,7 +135,7 @@ bool isConstOne(word* function, int nVars) {
   return true;
 }
 
-int countOnes(unsigned uWord) {
+inline int countOnes(unsigned uWord) {
 
     uWord = (uWord & 0x55555555) + ((uWord>>1) & 0x55555555);
     uWord = (uWord & 0x33333333) + ((uWord>>2) & 0x33333333);
@@ -144,7 +144,7 @@ int countOnes(unsigned uWord) {
     return  (uWord & 0x0000FFFF) + (uWord>>16);
 }
 
-int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
+inline int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
 
 inline void truthStretch(word* result, word* input, int inVars, int nVars,
                   unsigned phase) {
@@ -177,7 +177,7 @@ inline void truthStretch(word* result, word* input, int inVars, int nVars,
   }
 }
 
-void swapAdjacentVars(word* result, word* input, int nVars, int iVar) {
+inline void swapAdjacentVars(word* result, word* input, int nVars, int iVar) {
 
   static unsigned PMasks[4][3] = {{0x99999999, 0x22222222, 0x44444444},
                                   {0xC3C3C3C3, 0x0C0C0C0C, 0x30303030},
