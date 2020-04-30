@@ -226,7 +226,7 @@ void setupHeapLate(int netID, int edgeID, galois::InsertBag<lateUpdateReq>& pq1,
 {
     int i, j, d, numNodes, n1, n2, x1, y1, x2, y2;
     int nbr, nbrX, nbrY, cur, edge;
-    int grid, x_grid, y_grid;
+    int x_grid, y_grid;
     int queuehead, queuetail, *queue;
     Bool *visited;
     TreeEdge *treeedges;
@@ -563,24 +563,20 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight, 
     for(int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
     {
 
-        int l, netID;
-        float total_usage;
-        float  overflow;
+        int netID;
 
         // maze routing for multi-source, multi-destination
-        Bool preD, hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        Bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, crossX, crossY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of;
         int origENG, edgeREC;
 
-        float costL1, costL2,  *dtmp;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -601,7 +597,6 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight, 
         OrderNetEdge* netEO = thread_local_storage->netEO_p;
 
         bool** inRegion = thread_local_storage->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->inRegion_alloc;
 
         galois::InsertBag<lateUpdateReq> pq1;
         std::vector<int> v2;
@@ -690,16 +685,11 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight, 
                         xmax = n1x;
                     }
                     
-                    shifted = FALSE;
                     int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-                    segWidth = xmax - xmin;
-                    segHeight = ymax - ymin;
                     regionX1 = max(0, xmin - enlarge);
                     regionX2 = min(xGrid-1, xmax + enlarge);
                     regionY1 = max(0, ymin - enlarge);
                     regionY2 = min(yGrid-1, ymax + enlarge);
-                    regionWidth = regionX2 - regionX1 + 1;
-                    regionHeight = regionY2 - regionY1 + 1;
                     //std::cout << "region size" << regionWidth << ", " << regionHeight << std::endl;
                     // initialize d1[][] and d2[][] as BIG_INT
                     timer_init_int.start();
@@ -1132,7 +1122,6 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight, 
                         if(n1>=deg && (E1x!=n1x || E1y!=n1y))
                         // n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
                             endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -1257,7 +1246,6 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight, 
                         if(n2>=deg && (E2x!=n2x || E2y!=n2y))
                         // n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
                             endpt2 = treeedges[corrEdge[E2y][E2x]].n2;

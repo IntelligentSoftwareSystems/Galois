@@ -118,7 +118,7 @@ void ripupSegZ(Segment *seg)
 void newRipup(TreeEdge* treeedge, TreeNode *treenodes, int x1, int y1, int x2, int y2)
 {
 	short *gridsX, *gridsY;
-    int i, j, grid, Zpoint, ymin, ymax, xmin, n1, n2;
+    int i, j, grid, Zpoint, ymin, ymax, xmin;
     RouteType ripuptype;
 
     if(treeedge->len==0) 
@@ -126,8 +126,6 @@ void newRipup(TreeEdge* treeedge, TreeNode *treenodes, int x1, int y1, int x2, i
 		return ; // not ripup for degraded edge
 	}
 
-	n1 = treeedge->n1;
-	n2 = treeedge->n2;
 
 
         
@@ -232,8 +230,7 @@ void newRipup(TreeEdge* treeedge, TreeNode *treenodes, int x1, int y1, int x2, i
 
 Bool newRipupType2(TreeEdge* treeedge, TreeNode *treenodes, int x1, int y1, int x2, int y2, int deg)
 {
-    int i, j, grid, Zpoint, ymin, ymax, xmin, n1, n2;
-    int *gridsX, *gridsY;
+    int i, grid,  ymin, ymax, n1, n2;
     RouteType ripuptype;
 	Bool needRipup = FALSE;
 
@@ -343,7 +340,7 @@ void printEdgeVEC(TreeEdge* treeedge)
 Bool newRipupCheckProb(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
 	short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     
 	if(treeedge->len==0) {
@@ -428,7 +425,7 @@ Bool newRipupCheckProb(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ri
 Bool newRipupCheck(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
 	short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     
 	if(treeedge->len==0) {
@@ -500,7 +497,7 @@ Bool newRipupCheck(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_
 Bool newRipupCheck_M1M2(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
     short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     
     if(treeedge->len==0) {
@@ -576,9 +573,8 @@ Bool newRipupCheck_M1M2(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int r
 Bool newRipupCheck_atomic(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
     short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
-    bool break_edge_loop = false;
     int break_edge = 0;
     
     if(treeedge->len==0) {
@@ -668,7 +664,7 @@ Bool newRipupCheck_sort(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int r
 	bool& is_horizontal, int& grid_pos)
 {
 	short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     treeedge->ripup = false;
 	if(treeedge->len==0) {
@@ -750,7 +746,7 @@ Bool newRipupCheck_sort(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int r
 Bool newRipupCheck_nosub(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
 	short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     
 	if(treeedge->len==0) {
@@ -828,9 +824,8 @@ Bool newRipupCheck_nosub(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int 
 Bool newRipup3DType3(int netID, int edgeID)
 {
 	short *gridsX, *gridsY, *gridsL;
-    int i, k, grid, Zpoint, ymin, ymax, xmin, lv, lh, n1a, n2a, hl, bl, hid, bid, deg;
+    int i, k, grid, ymin, xmin, n1a, n2a, hl, bl, hid, bid, deg;
    
-    RouteType ripuptype;
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 

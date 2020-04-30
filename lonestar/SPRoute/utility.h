@@ -28,7 +28,7 @@ void printEdge(int netID, int edgeID)
 void plotTree(int netID)
 {
 	short *gridsX, *gridsY;
-    int i, j, grid, Zpoint, n1, n2, x1, x2, y1, y2, ymin, ymax, xmin, xmax;
+    int i, j, Zpoint, n1, n2, x1, x2, y1, y2, ymin, ymax, xmin, xmax;
     
     RouteType routetype;
     TreeEdge *treeedge;
@@ -148,11 +148,9 @@ void getlen()
 {
     int i, edgeID, totlen=0;
     TreeEdge *treeedge;
-    TreeNode *treenodes;
     
     for(i=0; i<numValidNets; i++)
     {
-        treenodes = sttrees[i].nodes;
         for(edgeID=0; edgeID<2*sttrees[i].deg-3; edgeID++)
         {
             treeedge = &(sttrees[i].edges[edgeID]);
@@ -170,11 +168,9 @@ void getlen()
 void ConvertToFull3DType2 () 
 {
 	short *gridsX,*gridsY,*gridsL, tmpX[MAXLEN], tmpY[MAXLEN],tmpL[MAXLEN];
-	int i, k, netID, edgeID, routeLen, n1a, n2a;
-	int n1, n2,  newCNT, numVIA,deg, j;
-	Route *route;
+	int k, netID, edgeID, routeLen;
+	int  newCNT, numVIA,deg, j;
 	TreeEdge *treeedges, *treeedge;
-    TreeNode *treenodes;
 
 	numVIA = 0;
 	
@@ -183,7 +179,6 @@ void ConvertToFull3DType2 ()
 	{
 		treeedges=sttrees[netID].edges;
 		deg=sttrees[netID].deg;
-		treenodes=sttrees[netID].nodes;
 
 		for(edgeID = 0 ; edgeID < 2*deg-3; edgeID++)
 		{
@@ -193,8 +188,6 @@ void ConvertToFull3DType2 ()
 				newCNT = 0;
 				routeLen =  treeedge->route.routelen;
 //				printf("netID %d, edgeID %d, len %d\n",netID, edgeID, routeLen);
-				n1a = treeedge->n1a;
-				n2a = treeedge->n2a;
 				gridsX = treeedge->route.gridsX;
 				gridsY = treeedge->route.gridsY;
 				gridsL = treeedge->route.gridsL;
@@ -287,24 +280,20 @@ void ConvertToFull3DType2 ()
 static int comparePVMINX (const void *a, const void *b)
 {
 	if (((OrderNetPin*)a)->minX > ((OrderNetPin*)b)->minX) return 1;
-	if (((OrderNetPin*)a)->minX == ((OrderNetPin*)b)->minX) return 0;
-	if (((OrderNetPin*)a)->minX < ((OrderNetPin*)b)->minX) return -1;
+	else if (((OrderNetPin*)a)->minX == ((OrderNetPin*)b)->minX) return 0;
+    else return -1;
 }
-
-
 
 static int comparePVPV (const void *a, const void *b)
 {
 	if (((OrderNetPin*)a)->npv > ((OrderNetPin*)b)->npv) return 1;
-	if (((OrderNetPin*)a)->npv == ((OrderNetPin*)b)->npv) return 0;
-	if (((OrderNetPin*)a)->npv < ((OrderNetPin*)b)->npv) return -1;
+    else if (((OrderNetPin*)a)->npv == ((OrderNetPin*)b)->npv) return 0;
+    else return -1;
 }
-
 
 void netpinOrderInc()
 {
-	int i, j, d, n1, n2, x1, y1, x2, y2, ind, l, totalLength,xmin;
-	TreeEdge *treeedges, *treeedge ;
+	int j, d, ind, totalLength,xmin;
     TreeNode *treenodes;
 	StTree* stree;
 
@@ -323,8 +312,6 @@ void netpinOrderInc()
 
 	treeOrderPV = (OrderNetPin*) malloc(numValidNets*sizeof(OrderNetPin));
 
-
-	i = 0;
 	for(j=0; j<numValidNets; j++)
 	{
 		xmin = BIG_INT;
@@ -356,9 +343,8 @@ void netpinOrderInc()
 void fillVIA()
 {
 	short tmpX[MAXLEN], tmpY[MAXLEN],*gridsX,*gridsY,*gridsL, tmpL[MAXLEN];
-	int i, k, netID, edgeID, routeLen, n1a, n2a;
+	int k, netID, edgeID, routeLen, n1a, n2a;
 	int n1, n2,  newCNT, numVIAT1, numVIAT2,deg, j;
-	Route *route;
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
@@ -499,10 +485,9 @@ void fillVIA()
 int threeDVIA ()
 {
 	short *gridsL;
-	int netID, d, k, edgeID,nodeID,deg, numpoints, n1, n2, corN;
-	int routeLen, n1a, n2a, numVIA, j;
+	int netID, edgeID, deg;
+	int routeLen,  numVIA, j;
 	TreeEdge *treeedges, *treeedge;
-	TreeNode *treenodes;
 	
 	numVIA = 0;
 
@@ -510,7 +495,6 @@ int threeDVIA ()
 	{
 		treeedges=sttrees[netID].edges;
 		deg=sttrees[netID].deg;
-		treenodes=sttrees[netID].nodes;
 
 		for(edgeID = 0 ; edgeID < 2*deg-3; edgeID++)
 		{
@@ -547,8 +531,8 @@ void assignEdge(int netID, int edgeID, Bool processDIR)
 {
 
 	short  *gridsX, *gridsY, *gridsL;
-	int i, j, k , l, length, grid, min_x, min_y, routelen, n1a, n2a, last_layer;
-	int min_result, endLayer;
+	int i, k , l, grid, min_x, min_y, routelen, n1a, n2a, last_layer;
+	int min_result, endLayer = 0;
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
@@ -870,23 +854,18 @@ void assignEdge(int netID, int edgeID, Bool processDIR)
 
 void newLayerAssignmentV4() 
 {
-	Bool assigned, inOne, BIdir;
-	short *gridsX, *gridsY, *gridsL;
-	int i, j,k, l, netID, edgeID, nodeID, routeLen, min_y, min_x;
-	int grid,numError, preFH, preFV, n1, n2, connectionCNT, deg, tmpLayer;
+	short  *gridsL;
+	int i, k, netID, edgeID, nodeID, routeLen;
+	int n1, n2, connectionCNT, deg;
 
-	int zigP[MAXLEN], dirZig[MAXLEN],numZig, curX, nextX, preD, curD, zigHead, zigTail, preBH, preBV, n1a, n2a;
-	int quehead, quetail, numNodes;
+	int n1a, n2a;
+	int quehead, quetail;
 	int edgeQueue[5000];
-	int nodeIndex[5000];
-	int trash;
 	int sumcheck = 0;
 
-	int pinINDs[5000];
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 	
-	numError = 0;
 
 	for (netID = 0; netID < numValidNets; netID++) {
 		treeedges = sttrees[netID].edges;
@@ -915,7 +894,6 @@ void newLayerAssignmentV4()
 		treenodes = sttrees[netID].nodes;
 		deg = sttrees[netID].deg;
 		quehead = quetail = 0;
-		numNodes = 2*deg-2;
 
 		for (nodeID = 0; nodeID < deg; nodeID ++) {
 			for (k = 0; k < treenodes[nodeID].conCNT; k++) {
@@ -1043,14 +1021,10 @@ void newLayerAssignmentV4()
 
 void newLA ()
 {
-	int netID, i,d, k, edgeID,nodeID,deg, numpoints, n1, n2, corN,  tmpX[MAXLEN], tmpY[MAXLEN],*gridsX,*gridsY,*gridsL, tmpL[MAXLEN], routeLen, n1a, n2a;;
-	int n1x, n1y, n1l, n2x, n2y, n2l,  grid, numError, preH, preV, min_y, min_x,connectionCNT;
-	Route *route;
-	Bool redundant, newCNT, numVIA, j, l, distance;;
+	int netID, d, k, edgeID,deg, numpoints, n1, n2;
+	Bool redundant;
 	TreeEdge *treeedges, *treeedge;
 	TreeNode *treenodes;
-	Bool assigned, inOne;
-	int zigP[MAXLEN], dirZig[MAXLEN],numZig, curX, nextX, preD, curD,tmpLayer;
 
 
 	for(netID=0;netID<numValidNets;netID++)
@@ -1135,7 +1109,6 @@ void newLA ()
 	printf("node processing\n");
 	newLayerAssignmentV4();
 	printf("layer assignment\n");
-	numVIA = 0;
 	ConvertToFull3DType2() ;
 
 
@@ -1182,8 +1155,8 @@ void checkRoute3D()
 {
 	short  *gridsX, *gridsY, *gridsL;
     int i, netID, edgeID,nodeID, edgelength;
-    int n1, n2, x1, y1, x2, y2, l1, l2, deg;
-    int cnt, Zpoint, distance;
+    int n1, n2, x1, y1, x2, y2, deg;
+    int distance;
 	Bool gridFlag;
     TreeEdge *treeedge;
     TreeNode *treenodes;
@@ -1264,10 +1237,9 @@ void checkRoute3D()
 void write3D()
 {
 	short *gridsX, *gridsY, *gridsL;
-	int netID, d, i,k, edgeID,nodeID,deg, lastX, lastY,lastL, xreal, yreal,l, routeLen;
+	int netID, i, edgeID,deg, lastX, lastY,lastL, xreal, yreal, routeLen;
 	TreeEdge *treeedges, *treeedge;
 	FILE *fp;
-	TreeNode *nodes;
 	TreeEdge edge;
 	
 	fp=fopen("output.out", "w");
@@ -1282,8 +1254,6 @@ void write3D()
 		treeedges=sttrees[netID].edges;
 		deg=sttrees[netID].deg;
 		
-
-		nodes = sttrees[netID].nodes;
 		for(edgeID = 0 ; edgeID < 2*deg-3; edgeID++)
 		{
 			edge = sttrees[netID].edges[edgeID];
@@ -1313,25 +1283,18 @@ void write3D()
 	fclose(fp);
 }
 
-
-
-
-
 static int compareTEL (const void *a, const void *b)
 {
 	if (((OrderTree*)a)->xmin < ((OrderTree*)b)->xmin) return 1;
-	if (((OrderTree*)a)->xmin == ((OrderTree*)b)->xmin) return 0;
-	if (((OrderTree*)a)->xmin > ((OrderTree*)b)->xmin) return -1;
+    else if (((OrderTree*)a)->xmin == ((OrderTree*)b)->xmin) return 0;
+    else return -1;
 }
-
-
 
 void StNetOrder()
 {
 	short *gridsX, *gridsY;
-	int i, j, d, n1, n2, x1, y1, x2, y2, ind, l, grid, min_x, min_y;
+	int i, j, d, ind, grid, min_x, min_y;
 	TreeEdge *treeedges, *treeedge;
-    TreeNode *treenodes;
 	StTree* stree;
 
 	numTreeedges = 0;
@@ -1383,9 +1346,8 @@ void StNetOrder()
 void recoverEdge(int netID, int edgeID)
 {
 	short *gridsX, *gridsY, *gridsL;
-    int i, k, grid, Zpoint, ymin, ymax, xmin, lv, lh, n1a, n2a, hl, bl, hid, bid, deg;
+    int i, grid, ymin, xmin, n1a, n2a;
     int  connectionCNT, routeLen;
-    RouteType ripuptype;
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
@@ -1407,7 +1369,6 @@ void recoverEdge(int netID, int edgeID)
 	gridsY = treeedge->route.gridsY;
 	gridsL = treeedge->route.gridsL;
 
-	deg =  sttrees[netID].deg;
 
 	n1a = treeedge->n1a;
 	n2a = treeedge->n2a;
@@ -1469,13 +1430,11 @@ void recoverEdge(int netID, int edgeID)
  
 void checkUsage()
 {
-	short *gridsX, *gridsY, *gridsL, tmp_gridsX[XRANGE], tmp_gridsY[XRANGE];
-	int netID, d, i,k, edgeID,nodeID,deg, lastX, lastY,lastL, xreal, yreal,l, routeLen;
-	int j, grid ,xmin,ymin, cnt;
+	short *gridsX, *gridsY;
+	int netID, i,k, edgeID,deg;
+	int j, cnt;
 	Bool redsus;
 	TreeEdge *treeedges, *treeedge;
-	FILE *fp;
-	TreeNode *nodes;
 	TreeEdge edge;
 	
 
@@ -1484,7 +1443,6 @@ void checkUsage()
 		treeedges=sttrees[netID].edges;
 		deg=sttrees[netID].deg;
 		
-		nodes = sttrees[netID].nodes;
 		for(edgeID = 0 ; edgeID < 2*deg-3; edgeID++)
 		{
 			edge = sttrees[netID].edges[edgeID];
@@ -1523,21 +1481,15 @@ void checkUsage()
 			}
 		}
 	}
-
-
 	printf("usage checked\n");
 }
-
-
 
 static int compareEdgeLen (const void *a, const void *b)
 {
 	if (((OrderNetEdge*)a)->length < ((OrderNetEdge*)b)->length) return 1;
-	if (((OrderNetEdge*)a)->length == ((OrderNetEdge*)b)->length) return 0;
-	if (((OrderNetEdge*)a)->length > ((OrderNetEdge*)b)->length) return -1;
+    else if (((OrderNetEdge*)a)->length == ((OrderNetEdge*)b)->length) return 0;
+    else return -1;
 }
-
-
 
 void netedgeOrderDec(int netID, OrderNetEdge* netEO)
 {
@@ -1592,11 +1544,11 @@ void printTree2D(int netID)
 
 Bool checkRoute2DTree(int netID)
 {
-	Bool STHwrong, gridFlag, outrangeFlag;
+	Bool STHwrong, gridFlag;
 	short *gridsX, *gridsY;
     int i, edgeID, edgelength;
     int n1, n2, x1, y1, x2, y2;
-    int cnt, Zpoint, distance;
+    int distance;
     TreeEdge *treeedge;
     TreeNode *treenodes;
     
@@ -1618,7 +1570,6 @@ Bool checkRoute2DTree(int netID)
         gridsY = treeedge->route.gridsY;
 
 		gridFlag = FALSE;
-		outrangeFlag = FALSE;
 
 		if (treeedge->len < 0) { 
 			printf("rip upped edge without edge len re assignment\n");
@@ -1674,13 +1625,12 @@ Bool checkRoute2DTree(int netID)
 
 
 
-void writeRoute3D(char routingfile3D[])
+void writeRoute3D(const char* routingfile3D)
 {
 	short *gridsX, *gridsY, *gridsL;
-	int netID, d, i,k, edgeID,nodeID,deg, lastX, lastY,lastL, xreal, yreal,l, routeLen;
+	int netID, i, edgeID, deg, routeLen;
 	TreeEdge *treeedges, *treeedge;
 	FILE *fp;
-	TreeNode *nodes;
 	TreeEdge edge;
 	
 	fp=fopen(routingfile3D, "w");
@@ -1696,8 +1646,6 @@ void writeRoute3D(char routingfile3D[])
 		treeedges=sttrees[netID].edges;
 		deg=sttrees[netID].deg;
 		
-
-		nodes = sttrees[netID].nodes;
 		for(edgeID = 0 ; edgeID < 2*deg-3; edgeID++)
 		{
 			edge = sttrees[netID].edges[edgeID];
@@ -1789,7 +1737,7 @@ struct wire
 };
 
 
-static int ordercost(const void *a,  const void *b)
+/*static int ordercost(const void *a,  const void *b)
 {
     struct TD *pa, *pb;
     
@@ -1826,7 +1774,7 @@ static int orderhSpan(const void *a,  const void *b)
     if (pa->hSpan > pb->hSpan) return 1;
     return 0;
    // return ((struct Segment*)a->x1-(struct Segment*)b->x1);
-}
+}*/
 
 // binary search to map the new coordinates to original coordinates
 
@@ -1836,17 +1784,12 @@ static int orderhSpan(const void *a,  const void *b)
 // Copy Routing Solution for the best routing solution so far
 void copyRS (void)
 {
-	int i,j,netID,p,q, k, edgeID, numEdges, xmin, xmax, ymin, ymax, numNodes;
-	int n1, n2, x1,x2,y1,y2;
-
-	TreeEdge *treeedges, *treeedge;
-    TreeNode *treenodes;
+	int i,j,netID, edgeID, numEdges, numNodes;
 
 	if (sttreesBK != NULL) {
 		for(netID=0; netID<numValidNets; netID++) {
 
 			numEdges = 2 * sttreesBK[netID].deg -3;
-			treeedges = sttreesBK[netID].edges;
 			for(edgeID=0; edgeID<numEdges; edgeID++)
 			{
 				if(sttreesBK[netID].edges[edgeID].len>0)
@@ -1881,7 +1824,6 @@ void copyRS (void)
 
 		sttreesBK[netID].edges = (TreeEdge*) malloc(numEdges*sizeof(TreeEdge));
 
-		treeedges = sttrees[netID].edges;
 		for(edgeID=0; edgeID<numEdges; edgeID++)
 		{
 			sttreesBK[netID].edges[edgeID].len = sttrees[netID].edges[edgeID].len;
@@ -1908,11 +1850,7 @@ void copyRS (void)
 void copyBR ()
 {
 	short *gridsX, *gridsY;
-	int i,j,netID,p,q, k, edgeID, numEdges, xmin, xmax, ymin, ymax, numNodes, grid, min_y, min_x;
-	int n1, n2, x1,x2,y1,y2;
-
-	TreeEdge *treeedges, *treeedge;
-    TreeNode *treenodes;
+	int i,j,netID, edgeID, numEdges, numNodes, grid, min_y, min_x;
 
 	if (sttreesBK != NULL) {
 
@@ -1921,7 +1859,6 @@ void copyBR ()
 
 		for(netID=0; netID<numValidNets; netID++) {
 			numEdges = 2 * sttrees[netID].deg -3;
-			treeedges = sttrees[netID].edges;
 			for(edgeID=0; edgeID<numEdges; edgeID++)
 			{
 				if(sttrees[netID].edges[edgeID].len>0)
@@ -1956,7 +1893,6 @@ void copyBR ()
 
 			sttrees[netID].deg = sttreesBK[netID].deg;
 
-			treeedges = sttreesBK[netID].edges;
 			for(edgeID=0; edgeID<numEdges; edgeID++)
 			{
 				sttrees[netID].edges[edgeID].len = sttreesBK[netID].edges[edgeID].len;
@@ -2021,7 +1957,6 @@ void copyBR ()
 		}
 		for(netID=0; netID<numValidNets; netID++) {
 			numEdges = 2 * sttrees[netID].deg -3;
-			treeedges = sttrees[netID].edges;
 			for(edgeID=0; edgeID<numEdges; edgeID++)
 			{
 				if(sttrees[netID].edges[edgeID].len>0)
@@ -2052,17 +1987,12 @@ void copyBR ()
 
 void freeRR (void)
 {
-	int i,j,netID,p,q, k, edgeID, numEdges, xmin, xmax, ymin, ymax, numNodes;
-	int n1, n2, x1,x2,y1,y2;
-
-	TreeEdge *treeedges, *treeedge;
-    TreeNode *treenodes;
+	int netID, edgeID, numEdges;
 
 	if (sttreesBK != NULL) {
 		for(netID=0; netID<numValidNets; netID++) {
 
 			numEdges = 2 * sttreesBK[netID].deg -3;
-			treeedges = sttreesBK[netID].edges;
 			for(edgeID=0; edgeID<numEdges; edgeID++)
 			{
 				if(sttreesBK[netID].edges[edgeID].len>0)

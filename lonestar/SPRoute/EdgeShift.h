@@ -16,7 +16,7 @@
 
 int edgeShift(Tree *t, int net)
 {
-    int i, j, k, l, m, deg, root, x, y, n, nx, ny, n1, n2, n3;
+    int i, j, k, l, m, deg, root = 0, x, y, n, n1, n2, n3;
     int maxX, minX, maxY, minY, maxX1, minX1, maxY1, minY1, maxX2, minX2, maxY2, minY2, bigX, smallX, bigY, smallY, grid, grid1, grid2;
     int nbr[MAXNETDEG*2][3], nbrCnt[MAXNETDEG*2];
     int pairCnt, pairN1[MAXNETDEG], pairN2[MAXNETDEG];
@@ -440,7 +440,7 @@ int edgeShiftNew(Tree *t, int net)
 {
     int i, j, n;
     int deg, pairCnt, pairN1[MAXNETDEG], pairN2[MAXNETDEG], cur_pairN1, cur_pairN2;
-    int N1nbrH, N1nbrV, N2nbrH, N2nbrV, bestBenefit, iter;
+    int N1nbrH, N1nbrV, N2nbrH, N2nbrV, iter;
     int numShift;
     Bool isPair;
 //printf("net[%d]\n", net); getchar();   
