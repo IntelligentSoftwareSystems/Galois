@@ -59,15 +59,13 @@ static cll::opt<Algo> algo(
                    "Bulk-synchronous parallel with separated edge removal"),
         clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"),
         clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss",
-                   "Compute k-1 core and then k-truss")
-        ),
+                   "Compute k-1 core and then k-truss")),
     cll::init(Algo::bsp));
 
 //! Set LSB of an edge weight to indicate the removal of the edge.
 using Graph =
-    galois::graphs::LC_CSR_Graph<void, uint32_t>::
-    template with_numa_alloc<true>::type::
-    template with_no_lockable<true>::type;
+    galois::graphs::LC_CSR_Graph<void, uint32_t>::template with_numa_alloc<
+        true>::type::template with_no_lockable<true>::type;
 
 using GNode   = Graph::GraphNode;
 using Edge    = std::pair<GNode, GNode>;
@@ -271,13 +269,14 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   //! Initializa all edges to valid.
-  galois::do_all(galois::iterate(g),
-                 [&g](typename Graph::GraphNode N) {
-                   for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
-                     g.getEdgeData(e) = valid;
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(g),
+      [&g](typename Graph::GraphNode N) {
+        for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
+          g.getEdgeData(e) = valid;
+        }
+      },
+      galois::steal());
 }
 
 /**
@@ -285,7 +284,9 @@ void initialize(Graph& g) {
  */
 template <typename Graph>
 void reportKTruss(Graph& g) {
-  if (outName.empty()) { return; }
+  if (outName.empty()) {
+    return;
+  }
 
   std::ofstream of(outName);
   if (!of.is_open()) {
@@ -415,16 +416,17 @@ struct BSPTrussJacobiAlgo {
 
     //! Symmetry breaking:
     //! Consider only edges (i, j) where i < j.
-    galois::do_all(galois::iterate(g),
-                   [&](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   }, galois::steal());
+    galois::do_all(
+        galois::iterate(g),
+        [&](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
 
     while (true) {
       galois::do_all(galois::iterate(*cur),
@@ -436,14 +438,13 @@ struct BSPTrussJacobiAlgo {
       }
 
       //! Mark unsupported edges as removed.
-      galois::do_all(galois::iterate(unsupported),
-                     [&](Edge e) {
-                       g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) =
-                           removed;
-                       g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) =
-                           removed;
-                     },
-                     galois::steal());
+      galois::do_all(
+          galois::iterate(unsupported),
+          [&](Edge e) {
+            g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
+            g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
+          },
+          galois::steal());
 
       unsupported.clear();
       cur->clear();
@@ -490,23 +491,22 @@ struct BSPTrussAlgo {
 
     //! Symmetry breaking:
     //! Consider only edges (i, j) where i < j.
-    galois::do_all(galois::iterate(g),
-                   [&g, cur](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(g),
+        [&g, cur](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
     curSize = std::distance(cur->begin(), cur->end());
 
     //! Remove unsupported edges until no more edges can be removed.
     while (true) {
-      galois::do_all(galois::iterate(*cur),
-                     KeepSupportedEdges{g, k - 2, *next},
+      galois::do_all(galois::iterate(*cur), KeepSupportedEdges{g, k - 2, *next},
                      galois::steal());
       nextSize = std::distance(next->begin(), next->end());
 
@@ -556,8 +556,8 @@ struct BSPCoreAlgo {
     NodeVec *cur = &work[0], *next = &work[1];
     size_t curSize = g.size(), nextSize;
 
-    galois::do_all(galois::iterate(g),
-                   KeepValidNodes{g, k, *next}, galois::steal());
+    galois::do_all(galois::iterate(g), KeepValidNodes{g, k, *next},
+                   galois::steal());
     nextSize = std::distance(next->begin(), next->end());
 
     while (curSize != nextSize) {
@@ -565,8 +565,8 @@ struct BSPCoreAlgo {
       curSize = nextSize;
       std::swap(cur, next);
 
-      galois::do_all(galois::iterate(*cur),
-                     KeepValidNodes{g, k, *next}, galois::steal());
+      galois::do_all(galois::iterate(*cur), KeepValidNodes{g, k, *next},
+                     galois::steal());
       nextSize = std::distance(next->begin(), next->end());
     }
   }
@@ -615,7 +615,10 @@ void run() {
   std::cout << "Running " << algo.name() << " algorithm for maximal "
             << trussNum << "-truss" << std::endl;
 
-  //TODO how to preallocate memory?
+  size_t approxEdgeData = 4 * (graph.size() + graph.sizeEdges());
+  galois::preAlloc(numThreads +
+                   4 * (approxEdgeData) / galois::runtime::pagePoolSize());
+  // TODO how to preallocate memory?
   galois::reportPageAlloc("MeminfoPre");
 
   initialize(graph);
