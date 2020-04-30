@@ -5,4 +5,4 @@ add_dependencies(apps SPRoute)
 target_link_libraries(SPRoute PRIVATE Galois::shmem lonestar)
 install(TARGETS SPRoute DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
-add_test_scale(small1 SPRoute "${BASEINPUT}/eda/routing/test.gr" --flute "${BASEINPUT}/eda/routing/")
+add_test_scale(small1 SPRoute "${BASEINPUT}/eda/routing/test.gr" --flute "${BASEINPUT}/eda/routing/" NOT_QUICK)
