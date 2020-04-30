@@ -609,7 +609,7 @@ void run() {
   Algo algo;
 
   std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename, true);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges" << std::endl;
   std::cout << "Running " << algo.name() << " algorithm for maximal "

@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  galois::graphs::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename, true);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);

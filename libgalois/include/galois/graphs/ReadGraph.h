@@ -41,27 +41,32 @@ void readGraph(GraphTy& graph, Args&&... args) {
 
 template <typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag,
-                       const std::string& filename) {
+                       const std::string& filename,
+                       const bool readUnweighted = false) {
   FileGraph f;
   f.fromFileInterleaved<typename GraphTy::file_edge_data_type>(filename);
-  readGraphDispatch(graph, tag, f);
+  readGraphDispatch(graph, tag, f, readUnweighted);
 }
 
 template <typename GraphTy>
 struct ReadGraphConstructFrom {
   GraphTy& graph;
   FileGraph& f;
+  bool readUnweighted = false;
   ReadGraphConstructFrom(GraphTy& g, FileGraph& _f) : graph(g), f(_f) {}
+  ReadGraphConstructFrom(GraphTy& g, FileGraph& _f, bool _readUnweighted)
+                         : graph(g), f(_f), readUnweighted(_readUnweighted) {}
   void operator()(unsigned tid, unsigned total) {
-    graph.constructFrom(f, tid, total);
+    graph.constructFrom(f, tid, total, readUnweighted);
   }
 };
 
 template <typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
+void readGraphDispatch(GraphTy& graph, read_default_graph_tag,
+                       FileGraph& f, const bool readUnweighted = false) {
   graph.allocateFrom(f);
 
-  ReadGraphConstructFrom<GraphTy> reader(graph, f);
+  ReadGraphConstructFrom<GraphTy> reader(graph, f, readUnweighted);
   galois::on_each(reader);
 }
 
