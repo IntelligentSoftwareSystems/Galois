@@ -72,7 +72,7 @@ double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v
     { 
         sum_x = sum_x + x.at(m); 
         sum_y = sum_y + y.at(m); 
-        sum_XY = sum_xy + x.at(m) * y.at(m); 
+        sum_xy = sum_xy + x.at(m) * y.at(m); 
         squareSum_x = squareSum_x + x.at(m) * x.at(m); 
         squareSum_x = squareSum_y + y.at(m) * y.at(m); 
     } 
