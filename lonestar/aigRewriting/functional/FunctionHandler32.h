@@ -146,7 +146,7 @@ int countOnes(unsigned uWord) {
 
 int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
 
-void truthStretch(word* result, word* input, int inVars, int nVars,
+inline void truthStretch(word* result, word* input, int inVars, int nVars,
                   unsigned phase) {
 
   unsigned* pTemp;
@@ -231,7 +231,7 @@ void swapAdjacentVars(word* result, word* input, int nVars, int iVar) {
   }
 }
 
-std::string toBin(word* function, int nWords) {
+inline std::string toBin(word* function, int nWords) {
 
   if (function != nullptr) {
 
@@ -254,7 +254,7 @@ std::string toBin(word* function, int nWords) {
     return "nullptr";
   }
 }
-std::string toHex(word* function, int nWords) {
+inline std::string toHex(word* function, int nWords) {
 
   std::stringstream result;
 
@@ -267,7 +267,7 @@ std::string toHex(word* function, int nWords) {
   return result.str();
 }
 
-std::string toCubeString( word* function, int nWords, int nVars) {
+inline std::string toCubeString( word* function, int nWords, int nVars) {
 
 	std::stringstream cubes;
 	word mask, cube;

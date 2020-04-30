@@ -248,7 +248,6 @@ int RewriteManager::labelMFFC(ThreadContextData* threadCtx, aig::GNode node,
                               int threadId, int travId) {
 
   aig::Graph& aigGraph = this->aig.getGraph();
-  int nConeSize1, nConeSize2;
 
   threadCtx->currentCutMFFCIds.clear();
 
@@ -259,14 +258,19 @@ int RewriteManager::labelMFFC(ThreadContextData* threadCtx, aig::GNode node,
 
   threadCtx->currentCutMFFCIds.insert(nodeData.id);
 
+  int nConeSize1;
+
   nConeSize1 = refDerefMFFCNodes(threadCtx, node, threadId, travId, false,
                                  true); // dereference
+#ifndef NDEBUG
+  int nConeSize2;
+
   nConeSize2 = refDerefMFFCNodes(threadCtx, node, threadId, travId, true,
                                  false); // reference
 
   assert(nConeSize1 == nConeSize2);
   assert(nConeSize1 > 0);
-
+#endif
   return nConeSize1;
 }
 

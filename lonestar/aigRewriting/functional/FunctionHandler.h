@@ -56,49 +56,49 @@ typedef unsigned long word;
 
 enum Order { SMALLER, LARGER, NOTCOMPARABLE, EQUAL };
 
-static void createLiterals(
+inline void createLiterals(
     std::vector<std::string>& varSet,
     std::unordered_map<std::string, std::pair<word*, unsigned int>>& literals,
     BitVectorPool& functionPool);
-static inline bool less(word* lhs, word* rhs, int nWords);
-static inline bool equals(word* lhs, word* rhs, int nWords);
-static inline bool diff(word* lhs, word* rhs, int nWords);
-static inline void copy(word* result, word* original, int nWords);
-static inline void NOT(word* result, word* original, int nWords);
-static inline void AND(word* result, word* lhs, word* rhs, int nWords);
-static inline void OR(word* result, word* lhs, word* rhs, int nWords);
-static inline void XOR(word* result, word* lhs, word* rhs, int nWords);
-static inline void MUX(word* result, word* zero, word* one, word* sel, int nWords);
-static void cofactor0(word* result, word* original, int nWords, int iVar);
-static void cofactor1(word* result, word* original, int nWords, int iVar);
-static int getSupport(word* function, int nVars);
-static int getPolarizedSupport(word* function, int nVars);
-static bool hasVar(word* functin, int nVars, int iVar);
-static bool hasVarTruth6(word* function, int iVar);
-static bool posVar6(word t, int iVar);
-static bool negVar6(word t, int iVar);
-static bool posVar(word* function, int nVars, int iVar);
-static bool negVar(word* function, int nVars, int iVar);
-static bool isUnate(word* function, int nVars);
-static bool isPosUnate(word* function, int nVars);
-static inline bool isConstZero(word* function, int nVars);
-static inline bool isConstOne(word* function, int nVars);
-static Order order(word* sub, word* target, int nWords);
-static int getHammingDist(word* f1, word* f2, int nWords);
-static inline int oneCounter(unsigned long int word);
-static int wordNum(int nVars);
-static bool isOdd(word* function);
-static std::string toBin(word* function, int nWords);
-static std::string toHex(word* function, int nWords);
-static std::string supportToBin(unsigned int support);
+inline bool less(word* lhs, word* rhs, int nWords);
+inline bool equals(word* lhs, word* rhs, int nWords);
+inline bool diff(word* lhs, word* rhs, int nWords);
+inline void copy(word* result, word* original, int nWords);
+inline void NOT(word* result, word* original, int nWords);
+inline void AND(word* result, word* lhs, word* rhs, int nWords);
+inline void OR(word* result, word* lhs, word* rhs, int nWords);
+inline void XOR(word* result, word* lhs, word* rhs, int nWords);
+inline void MUX(word* result, word* zero, word* one, word* sel, int nWords);
+inline void cofactor0(word* result, word* original, int nWords, int iVar);
+inline void cofactor1(word* result, word* original, int nWords, int iVar);
+inline int getSupport(word* function, int nVars);
+inline int getPolarizedSupport(word* function, int nVars);
+inline bool hasVar(word* functin, int nVars, int iVar);
+inline bool hasVarTruth6(word* function, int iVar);
+inline bool posVar6(word t, int iVar);
+inline bool negVar6(word t, int iVar);
+inline bool posVar(word* function, int nVars, int iVar);
+inline bool negVar(word* function, int nVars, int iVar);
+inline bool isUnate(word* function, int nVars);
+inline bool isPosUnate(word* function, int nVars);
+inline bool isConstZero(word* function, int nVars);
+inline bool isConstOne(word* function, int nVars);
+inline Order order(word* sub, word* target, int nWords);
+inline int getHammingDist(word* f1, word* f2, int nWords);
+inline int oneCounter(unsigned long int word);
+inline int wordNum(int nVars);
+inline bool isOdd(word* function);
+inline std::string toBin(word* function, int nWords);
+inline std::string toHex(word* function, int nWords);
+inline std::string supportToBin(unsigned int support);
 
-const word truths6[6] = {0xAAAAAAAAAAAAAAAA, 0xCCCCCCCCCCCCCCCC,
-                         0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00,
-                         0xFFFF0000FFFF0000, 0xFFFFFFFF00000000};
+inline constexpr word truths6[6] = {0xAAAAAAAAAAAAAAAA, 0xCCCCCCCCCCCCCCCC,
+                                    0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00,
+                                    0xFFFF0000FFFF0000, 0xFFFFFFFF00000000};
 
-const word truths6Neg[6] = {0x5555555555555555, 0x3333333333333333,
-                            0x0F0F0F0F0F0F0F0F, 0x00FF00FF00FF00FF,
-                            0x0000FFFF0000FFFF, 0x00000000FFFFFFFF};
+inline constexpr word truths6Neg[6] = {0x5555555555555555, 0x3333333333333333,
+                                       0x0F0F0F0F0F0F0F0F, 0x00FF00FF00FF00FF,
+                                       0x0000FFFF0000FFFF, 0x00000000FFFFFFFF};
 
 class FunctionHasher {
   int nWords;
@@ -140,24 +140,24 @@ using FunctionSet =
 using FunctionDataMap =
     std::unordered_map<word*, FunctionData, FunctionHasher, FunctionComparator>;
 
-static void computeAllCubeCofactors(BitVectorPool& functionPool,
+inline void computeAllCubeCofactors(BitVectorPool& functionPool,
                                     FunctionSet& cubeCofactors, word* function,
                                     int nVars);
-static void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
+inline void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
                                        FunctionSet& cubeCofactors,
                                        word* function, int nVars, int nWords,
                                        int iVar, bool isPrevVarCofactored);
-static void
+inline void
 computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
                                    FunctionDataMap& cubeCofactorData,
                                    word* function, int nVars);
-static void computeAllCubeCofactorsWithSupportRec(
+inline void computeAllCubeCofactorsWithSupportRec(
     BitVectorPool& functionPool, FunctionDataMap& cubeCofactorData,
     word* function, int nVars, int nWords, int iVar);
-static void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
+inline void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
                              int nVars, unsigned int occurencesInc);
 
-void createLiterals(
+inline void createLiterals(
     std::vector<std::string>& varSet,
     std::unordered_map<std::string, std::pair<word*, unsigned int>>& literals,
     BitVectorPool& functionPool) {
@@ -210,7 +210,7 @@ void createLiterals(
   //	std::cout << std::endl;
 }
 
-bool less(word* lhs, word* rhs, int nWords) {
+inline bool less(word* lhs, word* rhs, int nWords) {
 
   if ((lhs == nullptr) || (rhs == nullptr)) {
     return false;
@@ -228,7 +228,7 @@ bool less(word* lhs, word* rhs, int nWords) {
   return false;
 }
 
-bool equals(word* lhs, word* rhs, int nWords) {
+inline bool equals(word* lhs, word* rhs, int nWords) {
 
   if ((lhs == nullptr) || (rhs == nullptr)) {
     return false;
@@ -243,7 +243,7 @@ bool equals(word* lhs, word* rhs, int nWords) {
   return true;
 }
 
-bool diff(word* lhs, word* rhs, int nWords) {
+inline bool diff(word* lhs, word* rhs, int nWords) {
 
   if ((lhs == nullptr) || (rhs == nullptr)) {
     return false;
@@ -258,49 +258,49 @@ bool diff(word* lhs, word* rhs, int nWords) {
   return false;
 }
 
-void copy(word* result, word* original, int nWords) {
+inline void copy(word* result, word* original, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = original[i];
   }
 }
 
-void NOT(word* result, word* original, int nWords) {
+inline void NOT(word* result, word* original, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = ~(original[i]);
   }
 }
 
-void AND(word* result, word* lhs, word* rhs, int nWords) {
+inline void AND(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] & rhs[i];
   }
 }
 
-void OR(word* result, word* lhs, word* rhs, int nWords) {
+inline void OR(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] | rhs[i];
   }
 }
 
-void XOR(word* result, word* lhs, word* rhs, int nWords) {
+inline void XOR(word* result, word* lhs, word* rhs, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] ^ rhs[i];
   }
 }
 
-void MUX(word* result, word* zero, word* one, word* sel, int nWords) {
+inline void MUX(word* result, word* zero, word* one, word* sel, int nWords) {
 
   for (int i = 0; i < nWords; i++) {
     result[i] = (zero[i] & ~sel[i]) | (one[i] & sel[i]);
   }
 }
 
-void cofactor0(word* result, word* original, int nWords, int iVar) {
+inline void cofactor0(word* result, word* original, int nWords, int iVar) {
 
   if (nWords == 1) {
     result[0] = ((original[0] & truths6Neg[iVar]) << (1 << iVar)) |
@@ -328,7 +328,7 @@ void cofactor0(word* result, word* original, int nWords, int iVar) {
   }
 }
 
-void cofactor1(word* result, word* original, int nWords, int iVar) {
+inline void cofactor1(word* result, word* original, int nWords, int iVar) {
 
   if (nWords == 1) {
     result[0] = (original[0] & truths6[iVar]) |
@@ -356,7 +356,7 @@ void cofactor1(word* result, word* original, int nWords, int iVar) {
   }
 }
 
-void computeAllCubeCofactors(BitVectorPool& functionPool,
+inline void computeAllCubeCofactors(BitVectorPool& functionPool,
                              FunctionSet& cubeCofactors, word* function,
                              int nVars) {
   bool isPrevVarCofactored = true;
@@ -366,7 +366,7 @@ void computeAllCubeCofactors(BitVectorPool& functionPool,
                              nWords, iVar, isPrevVarCofactored);
 }
 
-void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
+inline void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
                                 FunctionSet& cubeCofactors, word* function,
                                 int nVars, int nWords, int iVar,
                                 bool isPrevVarCofactored) {
@@ -413,7 +413,7 @@ void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
                              iVar - 1, true);
 }
 
-void computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
+inline void computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
                                         FunctionDataMap& cubeCofactorData,
                                         word* function, int nVars) {
   int nWords = wordNum(nVars);
@@ -422,7 +422,7 @@ void computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
                                         function, nVars, nWords, iVar);
 }
 
-void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
+inline void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
                                            FunctionDataMap& cubeCofactorData,
                                            word* function, int nVars,
                                            int nWords, int iVar) {
@@ -458,7 +458,7 @@ void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
                                         nVars, nWords, iVar - 1);
 }
 
-void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
+inline void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
                       int nVars, unsigned int occurencesInc) {
 
   auto it = cubeCofactorData.find(function);
@@ -473,7 +473,7 @@ void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
   }
 }
 
-bool hasVar(word* function, int nVars, int iVar) {
+inline bool hasVar(word* function, int nVars, int iVar) {
 
   word* t    = function;
   int nWords = wordNum(nVars);
@@ -503,20 +503,20 @@ bool hasVar(word* function, int nVars, int iVar) {
   }
 }
 
-bool hasVarTruth6(word* function, int iVar) {
+inline bool hasVarTruth6(word* function, int iVar) {
   word t = function[0];
   return ((t >> (1 << iVar)) & truths6Neg[iVar]) != (t & truths6Neg[iVar]);
 }
 
-bool posVar6(word t, int iVar) {
+inline bool posVar6(word t, int iVar) {
   return ((t >> (1 << iVar)) & t & truths6Neg[iVar]) == (t & truths6Neg[iVar]);
 }
 
-bool negVar6(word t, int iVar) {
+inline bool negVar6(word t, int iVar) {
   return ((t << (1 << iVar)) & t & truths6[iVar]) == (t & truths6[iVar]);
 }
 
-bool posVar(word* function, int nVars, int iVar) {
+inline bool posVar(word* function, int nVars, int iVar) {
 
   assert(iVar < nVars);
 
@@ -549,7 +549,7 @@ bool posVar(word* function, int nVars, int iVar) {
   }
 }
 
-bool negVar(word* function, int nVars, int iVar) {
+inline bool negVar(word* function, int nVars, int iVar) {
 
   assert(iVar < nVars);
 
@@ -581,7 +581,7 @@ bool negVar(word* function, int nVars, int iVar) {
   }
 }
 
-bool isUnate(word* function, int nVars) {
+inline bool isUnate(word* function, int nVars) {
 
   for (int i = 0; i < nVars; i++) {
     if (!negVar(function, nVars, i) && !posVar(function, nVars, i)) {
@@ -591,7 +591,7 @@ bool isUnate(word* function, int nVars) {
   return true;
 }
 
-bool isPosUnate(word* function, int nVars) {
+inline bool isPosUnate(word* function, int nVars) {
 
   for (int i = 0; i < nVars; i++) {
     if (!posVar(function, nVars, i)) {
@@ -601,7 +601,7 @@ bool isPosUnate(word* function, int nVars) {
   return true;
 }
 
-int getSupport(word* function, int nVars) {
+inline int getSupport(word* function, int nVars) {
 
   int v, Supp = 0;
   for (v = 0; v < nVars; v++) {
@@ -612,7 +612,7 @@ int getSupport(word* function, int nVars) {
   return Supp;
 }
 
-int getPolarizedSupport(word* function, int nVars) {
+inline int getPolarizedSupport(word* function, int nVars) {
 
   int v, Supp = 0;
   for (v = 0; v < nVars; v++) {
@@ -626,7 +626,7 @@ int getPolarizedSupport(word* function, int nVars) {
   return Supp;
 }
 
-bool isConstZero(word* function, int nVars) {
+inline bool isConstZero(word* function, int nVars) {
 
   word* pFunction = function;
   word* pLimit    = pFunction + wordNum(nVars);
@@ -640,7 +640,7 @@ bool isConstZero(word* function, int nVars) {
   return true;
 }
 
-bool isConstOne(word* function, int nVars) {
+inline bool isConstOne(word* function, int nVars) {
 
   word* pFunction = function;
   word* pLimit    = pFunction + wordNum(nVars);
@@ -655,7 +655,7 @@ bool isConstOne(word* function, int nVars) {
   return true;
 }
 
-Order order(word* sub, word* target, int nWords) {
+inline Order order(word* sub, word* target, int nWords) {
 
   if (equals(sub, target, nWords)) {
     return Order::EQUAL;
@@ -688,7 +688,7 @@ Order order(word* sub, word* target, int nWords) {
     return Order::LARGER;
 }
 
-int getHammingDist(word* f1, word* f2, int nWords) {
+inline int getHammingDist(word* f1, word* f2, int nWords) {
 
   unsigned long int currentWord;
   int count = 0;
@@ -703,7 +703,7 @@ int getHammingDist(word* f1, word* f2, int nWords) {
 
 // This is better when most bits in word are 0. It uses 3 arithmetic operations
 // and one comparison/branch per "1" bit in word.
-int oneCounter(unsigned long int word) {
+inline int oneCounter(unsigned long int word) {
 
   int count;
   for (count = 0; word; count++) {
@@ -712,11 +712,11 @@ int oneCounter(unsigned long int word) {
   return count;
 }
 
-int wordNum(int nVars) { return nVars <= 6 ? 1 : 1 << (nVars - 6); }
+inline int wordNum(int nVars) { return nVars <= 6 ? 1 : 1 << (nVars - 6); }
 
-bool isOdd(word* function) { return (function[0] & 1) != 0; }
+inline bool isOdd(word* function) { return (function[0] & 1) != 0; }
 
-std::string toBin(word* function, int nWords) {
+inline std::string toBin(word* function, int nWords) {
 
   if (function != nullptr) {
 
@@ -740,7 +740,7 @@ std::string toBin(word* function, int nWords) {
   }
 }
 
-std::string toHex(word* function, int nWords) {
+inline std::string toHex(word* function, int nWords) {
 
   std::stringstream result;
 
@@ -753,7 +753,7 @@ std::string toHex(word* function, int nWords) {
   return result.str();
 }
 
-std::string supportToBin(unsigned int support) {
+inline std::string supportToBin(unsigned int support) {
   word ptr[1];
   ptr[0] = support;
   return Functional::toBin(ptr, 1);
