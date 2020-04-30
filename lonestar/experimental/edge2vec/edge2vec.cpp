@@ -56,9 +56,29 @@ void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std
 		v.push_back(vec); 
 }
 
+double sigmoid(double pears) {
+    return 1 / (1 + exp(-pears)); //exact sig
+    //return (pears / (1 + abs(pears))); //fast sigmoid
+    
+}
 
 double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v){
-
+    int sum_x = 0, sum_y = 0, sum_xy = 0, squareSum_x = 0, squareSum_y = 0;
+    std::vector<uint32_t> X = v[i];
+    std::vector<uint32_t> Y = v[j];
+    for (int m = 0; m < X.size(); i++) 
+    { 
+        sum_X = sum_X + X.at(m); 
+        sum_Y = sum_Y + Y.at(m); 
+        sum_XY = sum_XY + X.at(m) * Y.at(m); 
+        squareSum_X = squareSum_X + X.at(m) * X.at(m); 
+        squareSum_Y = squareSum_Y + Y.at(m) * Y.at(m); 
+    } 
+  
+    double corr = (double)(n * sum_XY - sum_X * sum_Y)  
+                  / sqrt((n * squareSum_X - sum_X * sum_X)  
+                      * (n * squareSum_Y - sum_Y * sum_Y)); 
+    return corr;
 	
 }
 
