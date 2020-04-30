@@ -33,103 +33,58 @@
 #include "maze_finegrain_lateupdate.h"
 #include "maze_lock.h"
 
-static const char* name = "parallel fastroute on galois";
-static const char* desc =
-    "parallel fastroute on galois";
-static const char* url = "parallel fastroute on galois";
+static const char* name = "SPRoute";
 
-//namespace cll = llvm::cl;
-//static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static const char* desc =
+    "A Scalable Parallel global router with a hybrid parallel algorithm which "
+    "combines net-level parallelism and fine-grain parallelism";
+
+static const char* url = "SPRoute";
+
+namespace cll = llvm::cl;
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+
+static cll::opt<std::string> outfile("o", cll::desc("output file"), cll::init(""));
 
 int main(int argc, char** argv)
 {
 //    char benchFile[FILESTRLEN];
-    char routingFile[STRINGLEN];
-    char degreeFile[STRINGLEN];
-	char optionS[STRINGLEN];
-    clock_t t1, t2, t3, t4;
-    float gen_brk_Time, reading_Time, P1_Time, P2_Time, P3_Time, maze_Time, totalTime, congestionmap_time;
-    int iter, last_totalOverflow, diff_totalOverflow, enlarge, ripup_threshold;
-    int i, j,past_overflow,cur_overflow;
-    int L_afterSTOP;
+    clock_t t1, t2, t3;
+    float gen_brk_Time, reading_Time;
+    int enlarge, ripup_threshold;
+    int i;
     int ESTEP1,CSTEP1, thStep1;
     int ESTEP2,CSTEP2, thStep2;
-	int ESTEP3,CSTEP3, thStep3, tUsage, CSTEP4;
+	int ESTEP3,CSTEP3, tUsage;
 	int Ripvalue, LVIter, cost_step;
 	int maxOverflow, past_cong, last_cong, finallength, numVia, ripupTH3D, newTH, healingTrigger;
-	int updateType, minofl, minoflrnd, mazeRound, upType, cost_type, bmfl, bwcnt;
-	Bool goingLV, healingNeed, noADJ, extremeNeeded, needOUTPUT;
+	int minofl, minoflrnd = 0, mazeRound, upType, cost_type, bmfl, bwcnt;
+	bool goingLV, noADJ, needOUTPUT;
 
-    Bool input, WriteOut;
-    input=WriteOut=0;
-    numThreads = atoi(argv[5]);
-    cout << " nthreads: " << numThreads << endl;
+    needOUTPUT = false;
 
-	if(1)//strcmp(*argv,"./SPRoute")==0)
-	{
-		//argc--;  argv++;
-		if(argc==0)
-		{
-			printf("--SPRoute --\n");
-			printf("Usage: ./SPRoute  <input> -o <output>\n");
-		}
-	} else {
-		printf("--SPRoute --\n");
-		printf("Usage: ./SPRoute  <input> <output>\n");
+    /*string outFile;
+    for(int i = 1; i < argc; i++) {
+        string tmp(argv[i]);
+        if(tmp == "-t")
+            numThreads = atoi(argv[i+1]);
+        else if(tmp == "-o") {
+            outFile = string(argv[i+1]);
+            needOUTPUT = true;
+        }
+        else if(tmp == "-h" || tmp == "--help") {
+	        printf("Usage: ./SPRoute  <input> -o <output> -t <nthreads> \n");
+            exit(1);
+        }
+    }*/
+    
+    galois::SharedMemSys G;
+    LonestarStart(argc, argv, name, desc, url);
+    galois::preAlloc(numThreads * 2);
 
-		while(argc)
-		{
-			argc--; argv++;
-		}
-	}    
-  
-
-   if(argc != 1)
-   {
-      strcpy(benchFile, argv[1]);
-      cout << benchFile << endl;
-      input=1;
-      
-   } else {
-	   printf("Usage: ./SPRoute  <input> -o <output> -t <nthreads> \n");
-   }
-
-   if(argc)
-   {
-   		
-		strcpy(optionS, argv[2]);
-		//argv++; argc--;
-		cout << optionS << endl;
-		if (strcmp(optionS,"-o")==0 )
-		{
-			if(argc)
-		   {
-		   	  
-			  strcpy(routingFile, argv[3]);
-			  //argv++; argc--;
-			  cout << routingFile << endl;
-			  
-			  WriteOut=1;
-			  needOUTPUT = TRUE;
-		   } else {
-			   printf("No output file specified\n");
-			   exit(0);
-		   }
-		} else {
-			printf("output option not recognized,  SPRoute will not generate output file\n");
-			needOUTPUT = FALSE;
-		}
-   } else {
-	   printf("No output file specified, SPRoute will not generate output file\n");
-	   needOUTPUT = FALSE;
-   }
-
-   galois::SharedMemSys G;
-   argc = argc - 3;
-   argv = argv + 3;
-   LonestarStart(argc, argv, name, desc, url);
-   galois::preAlloc(numThreads * 2);
-
+    if(outfile != "") {
+        needOUTPUT = true;
+    }
 	LB=0.9;
 	UB=1.3;
 
@@ -143,21 +98,16 @@ int main(int argc, char** argv)
 	CSTEP1=2;//5
 	CSTEP2=2;//3
 	CSTEP3=5;//15
-	CSTEP4 = 1000;
 	COSHEIGHT=4;
 	L=0;
 	VIA=2;
-	L_afterSTOP=1;
 	Ripvalue=-1;
 	ripupTH3D = 10;
 	goingLV = TRUE;
 	noADJ = FALSE;
 	thStep1 = 10;
 	thStep2 = 4;
-	healingNeed = FALSE;
-	updateType = 0;
 	LVIter = 3;
-	extremeNeeded = FALSE;
 	mazeRound = 500;
 	bmfl = BIG_INT;
 	minofl = BIG_INT;
@@ -176,22 +126,19 @@ int main(int argc, char** argv)
     
    int finegrain = false;
    int thread_choice = 0;
-   int thread_steps[6] = {28,14,8,4,1};
-   int thread_livelock_limit[6] = {1,1,1,1,1};
+   //int thread_steps[6] = {28,14,8,4,1};
+   //int thread_livelock_limit[6] = {1,1,1,1,1};
    bool extrarun = false;
    int thread_livelock = 0;
 
-    if(input==1)
+    if(1)
 	{
 		t1 = clock();
-		printf("\nReading %s ...\n", benchFile);
-		readFile(benchFile);
+		printf("\nReading %s ...\n", filename.c_str());
+		readFile(filename.c_str());
 		printf("\nReading Lookup Table ...\n");
 		readLUT();
 		printf("\nDone reading table\n\n");  
-
-		
-
 
 		t2 = clock();
 		reading_Time = (float)(t2-t1)/CLOCKS_PER_SEC;
@@ -275,37 +222,9 @@ int main(int argc, char** argv)
 		InitLastUsage(upType);
 
 		galois::InsertBag<int> net_shuffle[40]; //6*6
-		OrderNetEdge* netEO = (OrderNetEdge*)calloc(2000, sizeof(OrderNetEdge));
-		/*for(int netID = 0; netID < numValidNets; netID++)
-		{
-			int deg = sttrees[netID].deg;
-
-	        netedgeOrderDec(netID, netEO);
-
-	        TreeEdge* treeedges = sttrees[netID].edges;
-	        TreeNode* treenodes = sttrees[netID].nodes;
-	        // loop for all the tree edges (2*deg-3)
-	        //int num_edges = 2*deg-3;
-
-	        int x_sum = 0, y_sum = 0;
-
-	        for(int nodeID=0; nodeID<deg; nodeID++)
-	        {
-	            x_sum += treenodes[nodeID].x;
-	            y_sum += treenodes[nodeID].y;
-	        } 
-	        int x_mean = x_sum / 6;
-	        int y_mean = y_sum / 6;
-
-	        int x_block = x_mean / (xGrid / 6);
-            if(x_block > 6) x_block = 6;
-            int y_block = y_mean / (yGrid / 6);
-            if(y_block > 6) y_block = 6;
-
-	        net_shuffle[x_block * 6 + y_block].push(netID);
-
-		}*/
-		PRINT_HEAT = 0;
+		//OrderNetEdge* netEO = (OrderNetEdge*)calloc(2000, sizeof(OrderNetEdge));
+		
+        PRINT_HEAT = 0;
 		//checkUsageCorrectness();
 		galois::StatTimer roundtimer("round");
 		unsigned long oldtime = 0;
@@ -370,8 +289,8 @@ int main(int argc, char** argv)
 				}
 			}
 
-			 
-			enlarge = min (enlarge, xGrid/2);
+            int maxGrid = max(xGrid + 1, yGrid + 1);			 
+			enlarge = min (enlarge, maxGrid/2);
 			//std::cout << "costheight : " << costheight << " enlarge: " << enlarge << std::endl; 
 			costheight+=cost_step;
 			//std::cout << "costheight : " << costheight << " enlarge: " << enlarge << std::endl; 
@@ -403,8 +322,8 @@ int main(int argc, char** argv)
 
 			//getOverflow2Dmaze(&maxOverflow , & tUsage); 
 
-			printf("iteration %d, enlarge %d, costheight %d, threshold %d via cost %d \nlog_coef %f, healingTrigger %d cost_step %d slope %d L %f cost_type %d updatetype %d OBIM delta %d\n",
-				i,enlarge,costheight,mazeedge_Threshold, VIA,LOGIS_COF, healingTrigger, cost_step, slope, L ,cost_type, upType, max(OBIM_delta, (int)(costheight / (2*slope))));
+			printf("iteration %d, enlarge %d, costheight %d, threshold %d via cost %d \nlog_coef %f, healingTrigger %d cost_step %d slope %d L %f cost_type %d OBIM delta %d\n",
+				i,enlarge,costheight,mazeedge_Threshold, VIA,LOGIS_COF, healingTrigger, cost_step, slope, L ,cost_type, max(OBIM_delta, (int)(costheight / (2*slope))));
 			//L = 2; 
 			roundtimer.start();
 			galois::runtime::profileVtune( [&] (void) {
@@ -419,35 +338,13 @@ int main(int argc, char** argv)
 				{
 					mazeRouteMSMD(i,enlarge, costheight, ripup_threshold,mazeedge_Threshold, !(i%3), cost_type, net_shuffle);
 				}
-				/*if(finegrain == 0)
-				{
-					
- 					mazeRouteMSMD(i,enlarge, costheight, ripup_threshold,mazeedge_Threshold, !(i%3), cost_type, net_shuffle);
-					
-				}
-				else if(finegrain >= 1 && finegrain <= 4)
-				{
-					cout << "concurrentNets:" << concurrentNets[finegrain] << endl;
-					mazeRouteMSMD_finegrain_concurrent(i,enlarge, costheight, ripup_threshold,mazeedge_Threshold, !(i%3), cost_type, concurrentNets[finegrain]);
-				}
-				else if(finegrain == 5)
-				{
-					printf("finegrain\n"); 
-					mazeRouteMSMD_finegrain_spinlock(i,enlarge, costheight, ripup_threshold,mazeedge_Threshold, !(i%3), cost_type, net_shuffle);
-				}
-				else {
-					cout<<"unkown finegraph parameter: "<< finegrain <<  endl;
-				}*/
-			}, "mazeroute");
+            }, "mazeroute");
 			roundtimer.stop();
 			cout << "round : " << i << " time(ms): " << roundtimer.get() - oldtime << " acc time(ms): " << roundtimer.get() << endl;
 			oldtime = roundtimer.get();
-			//checkUsageCorrectness();
+            
             last_cong = past_cong;
- 
 			past_cong = getOverflow2Dmaze(&maxOverflow , & tUsage); 
-			//if(i == 1)
-			//	break;
             int nthreads_tmp = numThreads;
 			if(past_cong > last_cong && !extrarun)  // Michael
 			{ 
@@ -586,7 +483,6 @@ int main(int argc, char** argv)
 					}
 					if(bmfl < 72)
 						break;
-
 				}
 			} else {
 				bwcnt ++;
@@ -624,8 +520,8 @@ int main(int argc, char** argv)
 
 		printf("maze routing finished\n");
          
-		t4 = clock();
-		maze_Time = (float)(t4-t3)/CLOCKS_PER_SEC;
+		//t4 = clock();
+		//maze_Time = (float)(t4-t3)/CLOCKS_PER_SEC;
 		//printf("P3 runtime: %f sec\n", maze_Time);
 
 		printf("Final 2D results: \n");
@@ -669,15 +565,15 @@ int main(int argc, char** argv)
 		numVia= threeDVIA ();
 		checkRoute3D();
 		if (needOUTPUT) {
-			writeRoute3D(routingFile);
+			writeRoute3D(outfile.c_str());
 		}
 		
 	}//Input ==1
 
 
 
-	t4 = clock();
-	maze_Time = (float)(t4-t1)/CLOCKS_PER_SEC;
+	//t4 = clock();
+	//maze_Time = (float)(t4-t1)/CLOCKS_PER_SEC;
 	printf("Final routing length : %d\n",finallength);
 	printf("Final number of via  : %d\n",numVia);
 	printf("Final total length 1 : %d\n\n",finallength+numVia);

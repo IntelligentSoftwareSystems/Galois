@@ -152,7 +152,7 @@ void routeSegL(Segment *seg)
                  costL2 += tmp;
         }
 
-        printf("costL1 is %d, costL2 is %d\n",costL1,costL2);
+        printf("costL1 is %f, costL2 is %f\n",costL1,costL2);
 
         if(costL1<costL2)
         {
@@ -190,7 +190,7 @@ void routeSegL(Segment *seg)
 // First time L-route, based on 0.5-0.5 estimation
 void routeSegLFirstTime(Segment *seg)
 {
-    int i, vedge, hedge, grid;
+    int i, vedge, hedge;
     float costL1, costL2, tmp;
     int ymin, ymax;
     
@@ -328,7 +328,7 @@ void routeLAll(Bool firstTime)
 void newrouteL(int netID, RouteType ripuptype, Bool viaGuided)
 {
     int i, j, d, n1, n2, x1, y1, x2, y2, grid, grid1;
-    float costL1, costL2, tmp;
+    float costL1 = 0, costL2 = 0, tmp;
     int ymin, ymax;
     TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
@@ -499,7 +499,7 @@ void newrouteL(int netID, RouteType ripuptype, Bool viaGuided)
 // route all segments with L, firstTime: TRUE, first newrouteLAll, FALSE - not first
 void newrouteLAll(Bool firstTime, Bool viaGuided) 
 {
-    int i, j, l;
+    int i;
 
     
     if(firstTime)
@@ -520,10 +520,9 @@ void newrouteLAll(Bool firstTime, Bool viaGuided)
 
 void newrouteZ_edge(int netID, int edgeID)
 {
-    int i, j, n, n1, n2, x1, y1, x2, y2, vedge, hedge, segWidth, segHeight, bestZ, grid, grid1, grid2, ymin, ymax;
+    int i, j, n1, n2, x1, y1, x2, y2, segWidth, bestZ, grid, grid1, grid2, ymin, ymax;
     float tmp, bestcost, btTEST;
     Bool HVH; // the shape of Z routing (TRUE - HVH, FALSE - VHV)
-    Bool y1Smaller;  // TRUE - y1<y2, FALSE y1>y2
     TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
@@ -551,15 +550,12 @@ void newrouteZ_edge(int netID, int edgeID)
             {
                 ymin = y1;
                 ymax = y2;
-                y1Smaller = TRUE;
             }
             else
             {
                 ymin = y2;
                 ymax = y1;
-                y1Smaller = FALSE;
             }
-            segHeight = ymax - ymin;
 
             // compute the cost for all Z routing
 
@@ -683,7 +679,7 @@ void newrouteZ_edge(int netID, int edgeID)
 // Z-route, rip-up the previous route according to the ripuptype
 void newrouteZ(int netID, int threshold)
 {
-    int ind, i, j, d, n, n1, n2, x1, y1, x2, y2, vedge, hedge, segWidth, segHeight, bestZ, grid, grid1, grid2, ymin, ymax, n1a, n2a, status1, status2;
+    int ind, i, j, d, n1, n2, x1, y1, x2, y2, segWidth, segHeight, bestZ, grid, grid1, grid2, ymin, ymax, n1a, n2a, status1, status2;
     float tmp, bestcost, btTEST;
     Bool HVH; // the shape of Z routing (TRUE - HVH, FALSE - VHV)
     Bool y1Smaller;  // TRUE - y1<y2, FALSE y1>y2
@@ -1046,7 +1042,7 @@ void newrouteZ(int netID, int threshold)
 
 			} 
 
-		} else if ( d == 2 && sttrees[netID].edges[ind].len>threshold > 4)  { 
+		} else if ( d == 2 && sttrees[netID].edges[ind].len>threshold)  { 
 			newrouteZ_edge(netID,ind);
 		}// if non-degraded edge
 //        else
@@ -1058,8 +1054,7 @@ void newrouteZ(int netID, int threshold)
 // route all segments with L, firstTime: TRUE, first newrouteLAll, FALSE - not first
 void newrouteZAll(int threshold) 
 {
-    int i, j;
-    int n1, n2, x1, y1, x2, y2;
+    int i;
     
     for(i=0; i<numValidNets; i++)
     {
@@ -1072,7 +1067,7 @@ void newrouteZAll(int threshold)
 // Ripup the original route and do Monotonic routing within bounding box
 void routeMonotonic(int netID, int edgeID, int threshold)
 {
-    int i, j, cnt, x, y, xl, yl, xr, yr, n1, n2, x1, y1, x2, y2, grid, xGrid_1, ind_i, ind_j, ind_x; 
+    int i, j, cnt, x, xl, yl, xr, yr, n1, n2, x1, y1, x2, y2, grid, xGrid_1, ind_i, ind_j, ind_x; 
     int vedge, hedge, segWidth, segHeight, curX, curY;
     int gridsX[XRANGE+YRANGE], gridsY[XRANGE+YRANGE];
     float **cost, tmp;
@@ -1321,14 +1316,12 @@ void routeMonotonicAll(int threshold)
 
 void spiralRoute(int netID, int edgeID)
 {
-    int  j, d, n1, n2, x1, y1, x2, y2, grid, grid1, n1a, n2a;
-    float costL1, costL2, tmp;
+    int  j, n1, n2, x1, y1, x2, y2, grid, grid1, n1a, n2a;
+    float costL1 = 0, costL2 = 0, tmp;
     int ymin, ymax;
     TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
-
-    d = sttrees[netID].deg;
 	treeedges = sttrees[netID].edges;
 	treenodes = sttrees[netID].nodes;
     
@@ -1528,15 +1521,12 @@ void spiralRoute(int netID, int edgeID)
 
 void spiralRouteAll ()
 {
-	int netID, i,d, k, edgeID,nodeID,deg, numpoints, n1, n2, corN,  tmpX[MAXLEN], tmpY[MAXLEN],*gridsX,*gridsY,*gridsL, tmpL[MAXLEN], routeLen, n1a, n2a;;
-	int numError, preH, preV, min_y, min_x,connectionCNT, na;
-	Route *route;
-	Bool redundant, newCNT, numVIA, j, l, distance;;
+	int netID, d, k, edgeID,nodeID,deg, numpoints, n1, n2;
+	int na;
+	Bool redundant;
 	TreeEdge *treeedges, *treeedge;
 	TreeNode *treenodes;
-	Bool assigned, inOne;
-	int curX, nextX, preD, curD,tmpLayer;
-	int quehead, quetail, numNodes;
+	int quehead, quetail;
 	int edgeQueue[5000];
 
 
@@ -1633,8 +1623,6 @@ void spiralRouteAll ()
 		deg = sttrees[netID].deg;
 		quehead = quetail = 0;
 
-		numNodes = 2*deg-2;
-
 		for (nodeID = 0; nodeID < deg; nodeID ++) {
 			treenodes[nodeID].assigned = TRUE;
 			for (k = 0; k < treenodes[nodeID].conCNT; k++) {
@@ -1705,10 +1693,10 @@ void spiralRouteAll ()
 void routeLVEnew(int netID, int edgeID, int threshold, int enlarge)
 {
     int i, j, cnt, xmin, xmax, ymin, ymax, n1, n2, x1, y1, x2, y2, grid, xGrid_1, deg, yminorig, ymaxorig; 
-    int vedge, hedge, bestp1x, bestp1y;
+    int vedge, hedge, bestp1x = 0, bestp1y = 0;
     int gridsX[XRANGE+YRANGE], gridsY[XRANGE+YRANGE];
     float tmp1, tmp2, tmp3, tmp4, tmp, best;
-	Bool LH1, LH2, BL1, BL2;
+	Bool LH1, LH2, BL1 = false, BL2 = false;
 	TreeEdge *treeedges, *treeedge;
     TreeNode *treenodes;
 
