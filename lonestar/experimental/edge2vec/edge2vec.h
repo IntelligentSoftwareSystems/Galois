@@ -6,6 +6,8 @@ constexpr galois::MethodFlag flag_read_lock = galois::MethodFlag::READ;
 constexpr galois::MethodFlag flag_write_lock = galois::MethodFlag::WRITE;
 
 typedef uint32_t NodeTy;
+//typedef uint32_t EdgeTy;
+
 
 struct EdgeTy{
 

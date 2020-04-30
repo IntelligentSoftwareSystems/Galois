@@ -26,6 +26,78 @@ namespace cll = llvm::cl;
 
 static const char* name = "edge2vec";
 
+static cll::opt<uint32_t> N("N",
+  cll::desc("Number of iterations"),
+  cll::init(10));
+
+static cll::opt<uint32_t> walk_length("Walk Length",
+  cll::desc("Length of random walk"),
+  cll::init(50));
+
+static cll::opt<double> p("Walk Length",
+  cll::desc("Length of random walk"),
+  cll::init(50));
+
+void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std::vector<uint32_t>>& walks, uint32_t num_edge_types){
+
+	galois::InsertBag<std::vector<uint32_t>> bag;
+	galois::do_all(galois::iterate(walks),
+	[&](std::vector<uint32_t>& walk){
+	
+		std::vector<uint32_t> vec(num_edge_types+1, 0);
+		
+		for(auto type:walk)
+			vec[type]++;
+
+		bag.push(vec);
+	});	
+
+	for(auto vec:bag)
+		v.push_back(vec); 
+}
+
+
+double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v){
+
+	
+}
+
+void computeM(std::vector<std::vector<uint32_t>>& v, std::vector<std::vector<double> >& M,uint32_t num_edge_types){
+
+	galois::do_all(galois::iterate((uint32_t) 1, num_edge_types+1),
+	[&](uint32_t i){
+
+		for(uint32_t j=1;j<=num_edge_types;j++){
+			
+			double pearson_corr = pearsonCorr(i,j, v);
+			double sigmoid = sigmoid(pearson_corr);
+
+			M[i][j] = sigmoid;
+		}
+	});
+}
+
+//function generateTransitionMatrix
+//M should have all entries set to 1
+void generateTransitionMatrix(Graph& graph, std::vector<std::vector<double> >& M, uint32_t N,
+uint32_t walk_length,
+double p, double q, uint32_t num_edge_types){
+
+	while(N>0){
+		N--;
+		
+		//E step; generate walks
+		galois::InsertBag<std::vector<uint32_t>> walks;
+		heteroRandomWalk(graph, M, walks, walk_length, p, q);
+		
+		//M step
+		uint32_t size = std::distance(walks.begin(), walks.end());
+		std::vector<std::vector<uint32_t>> v;
+		computeVectors(v, walks, num_edge_types);
+
+		computeM(v, M);		
+	}
+}
 
 //function HeteroRandomWalk
 void heteroRandomWalk(Graph& graph, std::vector<std::vector<double> >& M, 
@@ -146,7 +218,63 @@ int main(int argc, char** argv) {
 
 	std::ifstream f(filename.c_str());
 	//read graph
-	
 
+  uint32_t nodes;
+	uint32_t edges;
+
+	std::string line;
+  std::getline(f, line);
+  std::stringstream ss(line);
+
+	ss >> edges >> nodes;
+
+	std::vector<std::vector<uint32_t> > edges_id(nodes);
+  std::vector<std::vector<EdgeTy> > edges_data(nodes);
+  std::vector<uint32_t> prefix_edges(nodes);
+
+	uint64_t max_type = 0;
+
+	while(std::getline(f, line)){
+	
+		std::stringstream ss(line);
+		uint32_t src, dst, type;
+		ss >> src >> dst >> type;
+
+		edges_id[src-1].push_back(dst-1);
+		EdgeTy edgeTy;
+
+		edgeTy.weight = 1;
+		edgeTy.type = type;
+
+		if(type > max_type)
+			max_type = type;
+
+		edges_data[src-1].push_back(edgeTy);
+	}
+
+	f.close();
+
+	galois::do_all(galois::iterate(uint32_t{0}, nodes),
+    [&](uint32_t c){
+      prefix_edges[c] = edges_id[c].size();
+  });
+	
+	for (uint32_t c = 1; c < nodes; ++c) {
+    prefix_edges[c] += prefix_edges[c - 1];
+  }	
+
+	graph.constructFrom(nodes, edges, prefix_edges, edges_id, edges_data);
+
+	//transition matrix
+	std::vector<std::vector<double>> M(max_type+1);
+
+	//initialize transition matrix
+	for(uint32_t i=0;i<=max_type;i++){
+		for(uint32_t j=0;j<=max_type;j++)
+			M[i].push_back(1.0f);
+	}	
+	
+	generateTransitionMatrix(graph, M, N, walk_length,
+double p, double q, uint32_t num_edge_types)		
 	return 0;
 }
