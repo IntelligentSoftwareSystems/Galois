@@ -35,7 +35,6 @@
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
 #include "galois/DynamicBitset.h"
-#include "llvm/Support/CommandLine.h"
 
 /*
  * Headers for boost serialization
