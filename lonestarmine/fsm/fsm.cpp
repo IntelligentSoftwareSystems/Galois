@@ -16,7 +16,7 @@ public:
 		EdgeMiner<LabeledElement,EdgeEmbedding,MyAPI,true>(ms, nt) {
 		assert(ms > 1);
 		if (filetype == "gr") {
-			printf("ERROR: gr is not acceptable for FSM. Use adj instead.\n");
+			printf("ERROR: gr file is not acceptable for FSM. Add -ft=adj and use adj file instead.\n");
 			exit(1);
 		}
 		set_threshold(minsup);
