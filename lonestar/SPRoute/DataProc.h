@@ -132,21 +132,20 @@ using namespace std;
 
 
 
-void readFile(char benchFile[])
+void readFile(const char* benchFile)
 {
     FILE *fp;
     int i, j, k;
-    int pinX, pinY, pinL, netID, numPins, pinInd, grid, newnetID, invalid_netID, segcount, minwidth;
+    int pinX, pinY, pinL, netID, numPins, pinInd = 0, grid, newnetID, invalid_netID, segcount, minwidth;
     float pinX_in,pinY_in;
     int maxDeg = 0;
     int pinXarray[MAXNETDEG], pinYarray[MAXNETDEG], pinLarray[MAXNETDEG];
     char netName[STRINGLEN];
     Bool remove;
     int numAdjust, x1, x2, y1, y2, l1, l2, cap, reduce, reducedCap;
-    int adjust,net;
+    int net;
     int TC;
 
-    adjust=0;
     net=0;
     
     fp=fopen(benchFile, "r");
@@ -518,10 +517,10 @@ void init_usage()
 
 void freeAllMemory()
 {
-    int i, j, deg, numEdges, edgeID;
+    int deg, numEdges, edgeID;
 	TreeEdge  *treeedge;
     
-    for(i=0; i<numValidNets; i++)
+    for(int i=0; i<numValidNets; i++)
     {
         free(nets[i]->pinX);
         free(nets[i]->pinY);
@@ -537,11 +536,11 @@ void freeAllMemory()
     free(v_edges3D);
     free(segOrder);
     
-    for(i=0; i<numValidNets; i++)
+    for(int i=0; i<numValidNets; i++)
         free(trees[i].branch);
     free(trees);
 
-    for(i=0; i<numValidNets; i++)
+    for(int i=0; i<numValidNets; i++)
     {
 		deg = sttrees[i].deg;
 		numEdges = 2*deg-3;
