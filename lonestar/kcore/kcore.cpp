@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause
+ * BSD License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,59 +25,65 @@
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
+constexpr static const char* const url         = 0;
 constexpr static const char* const REGION_NAME = "k-core";
+constexpr static const char* const name        = "k-core";
+constexpr static const char* const desc        = "Finds the k-core of a graph, "
+                                                 "defined as the subgraph where"
+                                                 " all vertices have degree at "
+                                                 "least k.";
 
-/******************************************************************************/
-/* Declaration of command line arguments */
-/******************************************************************************/
+/*******************************************************************************
+ * Declaration of command line arguments
+ ******************************************************************************/
 namespace cll = llvm::cl;
 
 enum Algo { Async = 0, Sync };
 
-//! Input file: should be symmetric graph
+//! Input file: should be symmetric graph.
 static cll::opt<std::string> inputFilename(cll::Positional,
                                           cll::desc("<input file (symmetric)>"),
                                           cll::Required);
 
-//! Choose algorithm: worklist vs. sync
+//! Choose algorithm: worklist vs. sync.
 static cll::opt<Algo> algo("algo",
-    cll::desc("Choose an algorithm (default Sync):"),
-    cll::values(clEnumVal(Async, "Asynchronous"), clEnumVal(Sync, "Synchronous")
-                ),
-    cll::init(Sync));
+       cll::desc("Choose an algorithm (default Sync):"),
+       cll::values(clEnumVal(Async, "Asynchronous"),
+                   clEnumVal(Sync, "Synchronous")), cll::init(Sync));
 
-//! Required k specification for k-core
+//! Required k specification for k-core.
 static cll::opt<unsigned int> k_core_num("kcore", cll::desc("k-core value"),
                                          cll::Required);
 
 //! Flag that forces user to be aware that they should be passing in a
-//! symmetric graph
+//! symmetric graph.
 static cll::opt<bool> symmetricGraph("symmetricGraph",
   cll::desc("Flag should be used to make user aware they should be passing a "
-            "symmetric graph to this program"),
-  cll::init(false));
+            "symmetric graph to this program"), cll::init(false));
 
-/******************************************************************************/
-/* Graph structure declarations + other inits */
-/******************************************************************************/
-// Node deadness can be derived from current degree and k value, so no field
-// necessary
+/*******************************************************************************
+ * Graph structure declarations + other inits
+ ******************************************************************************/
+
+//! Node deadness can be derived from current degree and k value, so no field
+//! necessary.
 struct NodeData {
   std::atomic<uint32_t> currentDegree;
 };
 
-//! Typedef for graph used, CSR graph
+//! Typedef for graph used, CSR graph (edge-type is void).
 using Graph =
   galois::graphs::LC_CSR_Graph<NodeData, void>::with_no_lockable<true>::type;
-//! Typedef for node type in the CSR graph
+//! Typedef for node type in the CSR graph.
 using GNode = Graph::GraphNode;
 
-//! Chunksize for for_each worklist: best chunksize will depend on input
+//! Chunksize for for_each worklist: best chunksize will depend on input.
 constexpr static const unsigned CHUNK_SIZE = 64u;
 
-/******************************************************************************/
-/* Functions for running the algorithm */
-/******************************************************************************/
+/*******************************************************************************
+ * Functions for running the algorithm
+ ******************************************************************************/
+
 /**
  * Initialize degree fields in graph with current degree. Since symmetric,
  * out edge count is equivalent to in-edge count.
@@ -85,12 +91,12 @@ constexpr static const unsigned CHUNK_SIZE = 64u;
  * @param graph Graph to initialize degrees in
  */
 void degreeCounting(Graph& graph) {
-  galois::do_all(
-    galois::iterate(graph.begin(), graph.end()),
-    [&] (GNode curNode) {
-      NodeData& curData = graph.getData(curNode);
-      curData.currentDegree.store(std::distance(graph.edge_begin(curNode),
-                                                graph.edge_end(curNode)));
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+                 [&] (GNode curNode) {
+                   NodeData& curData = graph.getData(curNode);
+                   curData.currentDegree.store(std::distance(
+                                               graph.edge_begin(curNode),
+                                               graph.edge_end(curNode)));
     },
     galois::loopname("DegreeCounting"),
     galois::no_stats()
@@ -105,22 +111,21 @@ void degreeCounting(Graph& graph) {
  */
 void setupInitialWorklist(Graph& graph,
                           galois::InsertBag<GNode>& initialWorklist) {
-  galois::do_all(
-    galois::iterate(graph.begin(), graph.end()),
-    [&] (GNode curNode) {
-      NodeData& curData = graph.getData(curNode);
-      if (curData.currentDegree < k_core_num) {
-        // dead node, add to initialWorklist for processing later
-        initialWorklist.emplace(curNode);
-      }
-    },
-    galois::loopname("InitialWorklistSetup"),
-    galois::no_stats()
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+                 [&] (GNode curNode) {
+                   NodeData& curData = graph.getData(curNode);
+                   if (curData.currentDegree < k_core_num) {
+                     //! Dead node, add to initialWorklist for processing later.
+                     initialWorklist.emplace(curNode);
+                   }
+                 },
+                 galois::loopname("InitialWorklistSetup"),
+                 galois::no_stats()
   );
 }
 
 /**
- * Starting with initial dead nodes as current worklist; degree decrement;
+ * Starting with initial dead nodes as current worklist; decrement degree;
  * add to next worklist; switch next with current and repeat until worklist
  * is empty (i.e. no more dead nodes).
  *
@@ -130,26 +135,27 @@ void syncCascadeKCore(Graph& graph) {
   galois::InsertBag<GNode>* current = new galois::InsertBag<GNode>;
   galois::InsertBag<GNode>* next = new galois::InsertBag<GNode>;
 
-  // worklist setup
+  //! Setup worklist.
   setupInitialWorklist(graph, *next);
 
   while (!next->empty()) {
-    // make "next" into current
+    //! Make "next" into current.
     std::swap(current, next);
     next->clear();
 
     galois::do_all(
       galois::iterate(*current),
       [&] (GNode deadNode) {
-        // decrement degree of all neighbors
+        //! Decrement degree of all neighbors.
         for (auto e : graph.edges(deadNode)) {
           GNode dest = graph.getEdgeDst(e);
           NodeData& destData = graph.getData(dest);
-          uint32_t oldDegree = galois::atomicSubtract(destData.currentDegree, 1u);
+          uint32_t oldDegree = galois::atomicSubtract(
+                                        destData.currentDegree, 1u);
 
           if (oldDegree == k_core_num) {
-            // this thread was responsible for putting degree of destination
-            // below threshold: add to worklist
+            //! This thread was responsible for putting degree of destination
+            //! below threshold; add to worklist.
             next->emplace(dest);
           }
         }
@@ -165,8 +171,8 @@ void syncCascadeKCore(Graph& graph) {
 }
 
 /**
- * Starting with initial dead nodes, degree decrement and add to worklist
- * as they drop below k threshold until worklist is empty (i.e. no more dead
+ * Starting with initial dead nodes, decrement degree and add to worklist
+ * as they drop below 'k' threshold until worklist is empty (i.e. no more dead
  * nodes).
  *
  * @param graph Graph to operate on
@@ -176,15 +182,15 @@ void asyncCascadeKCore(Graph& graph, galois::InsertBag<GNode>& initialWorklist) 
   galois::for_each(
     galois::iterate(initialWorklist),
     [&] (GNode deadNode, auto& ctx) {
-      // decrement degree of all neighbors
+      //! Decrement degree of all neighbors.
       for (auto e : graph.edges(deadNode)) {
         GNode dest = graph.getEdgeDst(e);
         NodeData& destData = graph.getData(dest);
         uint32_t oldDegree = galois::atomicSubtract(destData.currentDegree, 1u);
 
         if (oldDegree == k_core_num) {
-          // this thread was responsible for putting degree of destination
-          // below threshold: add to worklist
+          //! This thread was responsible for putting degree of destination
+          //! below threshold: add to worklist.
           ctx.push(dest);
         }
       }
@@ -195,9 +201,10 @@ void asyncCascadeKCore(Graph& graph, galois::InsertBag<GNode>& initialWorklist) 
   );
 }
 
-/******************************************************************************/
-/* Sanity check operators */
-/******************************************************************************/
+/*******************************************************************************
+ * Sanity check operators
+ ******************************************************************************/
+
 /**
  * Print number of nodes that are still alive.
  *
@@ -223,15 +230,9 @@ void kCoreSanity(Graph& graph) {
                  aliveNodes.reduce(), "\n");
 }
 
-/******************************************************************************/
-/* Main method for running */
-/******************************************************************************/
-
-constexpr static const char* const name = "k-core";
-constexpr static const char* const desc = "Finds the k-core of a graph, defined "
-                                          "as the subgraph where all vertices "
-                                          "have degree at least k.";
-constexpr static const char* const url  = 0;
+/*******************************************************************************
+ * Main method for running
+ ******************************************************************************/
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -242,7 +243,7 @@ int main(int argc, char** argv) {
                "aware this program needs to be passed a symmetric graph.");
   }
 
-  // some initial stat reporting
+  //! Some initial stat reporting.
   galois::gInfo("Worklist chunk size of ", CHUNK_SIZE, ": best size may depend"
                 " on input.");
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize", CHUNK_SIZE);
@@ -251,27 +252,27 @@ int main(int argc, char** argv) {
   galois::StatTimer totalTimer("TotalTime", REGION_NAME);
   totalTimer.start();
 
-  // graph reading from disk
+  //! Read graph from disk.
   galois::StatTimer graphReadingTimer("GraphConstructTime", REGION_NAME);
   graphReadingTimer.start();
   Graph graph;
   galois::graphs::readGraph(graph, inputFilename);
   graphReadingTimer.stop();
 
-  // preallocate pages in memory so allocation doesn't occur during compute
+  //! Preallocate pages in memory so allocation doesn't occur during compute.
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(std::max(
-    (size_t)galois::getActiveThreads() * (graph.size() / 1000000),
-    std::max(10u, galois::getActiveThreads()) * (size_t)10
+    (size_t) galois::getActiveThreads() * (graph.size() / 1000000),
+    std::max(10u, galois::getActiveThreads()) * (size_t) 10
   ));
   preallocTime.stop();
   galois::reportPageAlloc("MemAllocMid");
 
-  // intialization of degrees
+  //! Intialization of degrees.
   degreeCounting(graph);
 
-  // here begins main computation
+  //! Begins main computation.
   galois::StatTimer runtimeTimer;
 
   runtimeTimer.start();
@@ -279,16 +280,16 @@ int main(int argc, char** argv) {
   if (algo == Async) {
     galois::gInfo("Running asynchronous k-core with k-core number ",
                   k_core_num);
-    // worklist setup of initial dead ndoes
+    //! Worklist setup of initial dead ndoes.
     galois::InsertBag<GNode> initialWorklist;
     setupInitialWorklist(graph, initialWorklist);
-    // actual work; propagate deadness by decrementing degrees and adding dead
-    // nodes to worklist
+    //! Actual work; propagate deadness by decrementing degrees and adding dead
+    //! nodes to worklist.
     asyncCascadeKCore(graph, initialWorklist);
   } else if (algo == Sync) {
     galois::gInfo("Running synchronous k-core with k-core number ",
                   k_core_num);
-    // synchronous k-core
+    //! Synchronous k-core.
     syncCascadeKCore(graph);
   } else {
     GALOIS_DIE("Invalid specification of k-core algorithm");
@@ -299,7 +300,7 @@ int main(int argc, char** argv) {
   totalTimer.stop();
   galois::reportPageAlloc("MemAllocPost");
 
-  // sanity check
+  //! Sanity check.
   if (!skipVerify) {
     kCoreSanity(graph);
   }
