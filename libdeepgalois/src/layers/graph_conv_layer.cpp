@@ -61,8 +61,8 @@ void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in, floa
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self, const float_t* neighbors, float_t* out) {
   float_t *a = new float_t[len];
   float_t *b = new float_t[len];
-  math::mvmul(n, len, &Q[0], self, a);
-  math::mvmul(n, len, &W[0], neighbors, b);
+  math::mvmul(CblasNoTrans, n, len, 1.0, &Q[0], self, 0.0, a);
+  math::mvmul(CblasNoTrans, n, len, 1.0, &W[0], neighbors, 0.0, b);
   math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
 }
 
@@ -72,8 +72,7 @@ void graph_conv_layer::malloc_and_init() {
   size_t z = output_dims[1];
 #ifdef GALOIS_USE_DIST
   // setup gluon
-  layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad,
-                                                        y * z);
+  layer::gradientGraph = new deepgalois::GluonGradients(layer::weight_grad, y * z);
   layer::syncSub =
     new galois::graphs::GluonSubstrate<deepgalois::GluonGradients>(
       *layer::gradientGraph, layer::gradientGraph->myHostID(),

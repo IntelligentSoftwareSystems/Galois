@@ -21,57 +21,6 @@ extern "C" {
 namespace deepgalois {
 
 namespace math {
-//! add 2 arrays for n elements
-void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
-
-//! multiply n elements of vector by scalar
-void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out);
-
-//! do dot product of 2 vectors
-float_t dot(const vec_t& x, const vec_t& y);
-void axpy(size_t n, const float_t a, float_t *x, float_t *y);
-int argmax(const size_t n, const float_t* x); // the arguments of the maxima
-
-//! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
-float_t l2_norm(size_t n, const float_t* a);
-
-//! clear n elements of a vector
-void clear_cpu(size_t n, float_t* in);
-
-// dropout functions randomly remove weights
-void dropout_cpu(size_t n, size_t m, float scale, float dropout_rate, const float_t* in, mask_t* mask, float_t* out);
-
-// dropout derivative: use existing dropouts in masks instead of generating them;
-void d_dropout_cpu(size_t n, size_t m, float scale, const float_t* in, mask_t* mask, float_t* out);
-
-//! ReLU = keep if positive
-void relu_cpu(size_t n, const float_t* in, float_t* out);
-
-//! ReLU derivative; generally, 1 if data > 0, 0 otherwise
-void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
-
-void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out);
-void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, const float_t* data, float_t* out);
-
-// Loss function for single-class label (one-hot) data: softmax
-void softmax(const vec_t& input, vec_t& output);
-void softmax(size_t n, const float_t* input, float_t* output);
-void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
-
-float_t cross_entropy(const vec_t& y, const vec_t& p);
-float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
-void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d);
-void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
-
-// Loss function for multi-class label (one-hot) data: sigmoid
-void sigmoid(const vec_t& input, vec_t& output);
-void sigmoid(size_t n, const float_t* input, float_t* output);
-void d_sigmoid(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp);
-void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
-
-//! copy vector from in -> out; first len elements
-void copy_cpu(size_t len, const float_t* in, float_t* out);
 
 // single-precision dense matrix multiply
 void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
@@ -84,14 +33,69 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 	           const int* A_idx_ptr, const int* A_nonzero_idx,
                const float* B, const float beta, float* C);
 
+// matrix-vector multiply
+void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float alpha, 
+           const float* A, const float* x, const float beta, float* y);
+
+//! add 2 arrays for n elements
+void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out);
+
+//! multiply n elements of vector by scalar
+void scal(size_t n, const float_t alpha, float_t* x);
+void scale(size_t n, const float_t alpha, const float_t* x, float_t* y);
+void mul_scalar(size_t n, const float_t alpha, const float_t* x, float_t* y);
+
+//! do dot product of 2 vectors
+float_t dot(size_t n, const float_t* x, const float_t* y);
+
+// SAXPY stands for “Single-precision A*X Plus Y"
+void axpy(size_t n, const float_t a, float_t *x, float_t *y);
+
+// Returns the index of the maximum value
+int argmax(const size_t n, const float_t* x); // the arguments of the maxima
+
+//! Computes half the L2 norm of a tensor without the sqrt: output = sum(t ** 2) / 2
+float_t l2_norm(size_t n, const float_t* a);
+
+//! clear n elements of a vector
+void clear_cpu(size_t n, float_t* in);
+
+//! copy vector from in -> out; first len elements
+void copy_cpu(size_t len, const float_t* in, float_t* out);
+
+// dropout functions randomly remove weights
+void dropout_cpu(size_t n, size_t m, float scale, float dropout_rate, const float_t* in, mask_t* mask, float_t* out);
+
+// dropout derivative: use existing dropouts in masks instead of generating them;
+void d_dropout_cpu(size_t n, size_t m, float scale, const float_t* in, mask_t* mask, float_t* out);
+
+//! ReLU = keep if positive; and ReLU derivative: 1 if data > 0, 0 otherwise
+void relu_cpu(size_t n, const float_t* in, float_t* out);
+void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
+
+// Leaky ReLU
+void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out);
+void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, const float_t* data, float_t* out);
+
+// Loss function for single-class label (one-hot) data: softmax
+void softmax(size_t n, const float_t* input, float_t* output);
+void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
+
+// Cross entropy
+float_t cross_entropy(size_t n, const float_t* y, const float_t* p);
+void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d);
+
+// Loss function for multi-class label (one-hot) data: sigmoid
+void sigmoid(size_t n, const float_t* input, float_t* output);
+void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp);
+
 // dropout functions randomly remove weights
 void dropout(float scale, float dropout_rate, const float_t* in, mask_t* mask, float_t* out);
 void d_dropout(const float scale, const float_t* in, mask_t* mask, float_t* out);
 
 //! transposes a matrix (malloc'd array)
 void transpose(size_t x, size_t y, const float_t* in, float_t* out);
-void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in, float_t *out);
-
+ 
 } // math
 } // deepgalois
 

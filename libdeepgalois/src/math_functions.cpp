@@ -74,28 +74,25 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 #endif
 }
 
+// matrix-vector multiply
+void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float alpha, 
+           const float* A, const float* x, const float beta, float* y) {
+  cblas_sgemv(CblasRowMajor, TransA, M, N, alpha, A, N, x, 1, beta, y, 1);
+}
+
+/*
 const size_t vec_len = 8; // for 32-bit floating point in AVX2
 // vector add
-#if defined(__AVX__) || defined(__AVX2__)
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
+#ifdef __AVX2__
   const size_t alignedN = n - n % vec_len;
   for (size_t i = 0; i < alignedN; i += vec_len)
     _mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]), _mm256_loadu_ps(&b[i])));
   for (size_t i = alignedN; i < n; ++i) out[i] = a[i] + b[i];
-}
-
-void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
-  size_t n = out.size();
-  vadd_cpu(n, &a[0], &b[0], &out[0]);
-}
 #else
-void vadd(const vec_t& a, const vec_t& b, vec_t& out) {
-  for (size_t i = 0; i < out.size(); ++i) out[i] = a[i] + b[i];
-}
-void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
   for (size_t i = 0; i < n; ++i) out[i] = a[i] + b[i];
-}
 #endif
+}
 
 #if defined(__AVX__) || defined(__AVX2__)
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
@@ -107,7 +104,6 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) 
 }
 
 // SAXPY stands for “Single-precision A*X Plus Y"
-/*
 void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
   const size_t alignedN = n - n % vec_len;
   const __m256 alpha = _mm256_set1_ps(a);
@@ -128,27 +124,32 @@ float_t l2_norm(size_t n, const float_t* in) {
   __m256 sum = _mm256_hadd_ps(vsum, vsum);
   return (((float_t*)&sum)[0] + ((float_t*)&sum)[2]) / 2.0;
 }
-*/
 #else
 // vector multiply scalar
-void mul_scalar(const float_t alpha, vec_t& Y) {
-  for (size_t i = 0; i < Y.size(); ++i) Y[i] *= alpha;
-}
-
 void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out) {
   for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
 }
 
-//void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
-//  for (size_t i = 0; i < n; ++i) y[i] = a * x[i] + y[i];
-//}
-
-//float_t l2_norm(size_t n, const float_t* a) {
-//  float_t sum = 0.0;
-//  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
-//  return sum / 2.0;
-//}
+float_t l2_norm(size_t n, const float_t* a) {
+  float_t sum = 0.0;
+  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
+  return sum / 2.0;
+}
 #endif
+*/
+
+void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* y) {
+  vsAdd(n, a, b, y);
+}
+
+void scal(size_t n, const float_t alpha, float_t* x) {
+  cblas_sscal(n, alpha, x, 1);
+}
+
+void scale(size_t n, const float_t alpha, const float_t* x, float_t* y) {
+  cblas_scopy(n, x, 1, y, 1);
+  cblas_sscal(n, alpha, y, 1);
+}
 
 void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
   cblas_saxpy(n, a, x, 1, y, 1);
@@ -166,28 +167,14 @@ int argmax(const size_t n, const float_t* x) {
   return max_ind;
 }
 
+// l2 normalization
 float_t l2_norm(size_t n, const float_t* x) {
   return cblas_snrm2(n, x, 1);
 }
 
 // dot product
-float_t dot(const vec_t& x, const vec_t& y) {
-  float_t sum = 0;
-  for (size_t i = 0; i < x.size(); ++i)
-    sum += x[i] * y[i];
-  return sum;
-}
-
 float_t dot(size_t n, const float_t* x, const float_t* y) {
-  float_t sum = 0;
-  for (size_t i = 0; i < n; ++i)
-    sum += x[i] * y[i];
-  return sum;
-}
-
-void clear(vec_t& in) {
-  for (size_t i = 0; i < in.size(); i++)
-    in[i] = 0;
+  return cblas_sdot(n, x, 1, y, 1);
 }
 
 void clear_cpu(size_t n, float_t* in) {
@@ -255,17 +242,6 @@ void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in,
   }, galois::chunk_size<64>(), galois::loopname("d_leaky_relu"));
 }
 
-void softmax(const vec_t& input, vec_t& output) {
-  const float_t max = *std::max_element(input.begin(), input.end());
-  float_t denominator(0);
-  for (size_t i = 0; i < input.size(); i++) {
-    output[i] = std::exp(input[i] - max);
-    denominator += output[i];
-  }
-  for (size_t i = 0; i < input.size(); i++)
-    output[i] /= denominator;
-}
-
 void softmax(size_t n, const float_t* input, float_t* output) {
   const float_t max = *std::max_element(input, input + n);
   float_t denominator(0);
@@ -275,20 +251,6 @@ void softmax(size_t n, const float_t* input, float_t* output) {
   }
   for (size_t i = 0; i < n; i++)
     output[i] /= denominator;
-}
-
-void d_softmax(const vec_t& y, const vec_t& p, vec_t& dy, const vec_t& dp) {
-  auto n = y.size();
-  vec_t df(n, 0);
-  for (size_t i = 0; i < n; i++) {
-    for (size_t j = 0; j < n; j++) {
-      // float_t delta_ij = i == j? 1 : 0;
-      // df[i] += p[j] * (delta_ij - p[i]);
-      df[j] = (j == i) ? p[i] * (float_t(1) - p[i]) : -p[j] * p[i];
-    }
-    // dy = dp * (gradient of softmax)
-    dy[i] = dot(dp, df);
-  }
 }
 
 void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
@@ -305,20 +267,6 @@ void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
 // cross-entropy loss function for multi-class classification
 // y: ground truth
 // p: predicted probability
-float_t cross_entropy(const vec_t& y, const vec_t& p) {
-  auto n = y.size();
-  assert(n > 0);
-  float_t loss = 0.0;
-  for (size_t i = 0; i < n; i++) {
-    if (y[i] == float_t(0))
-      continue;
-    if (p[i] == float_t(0))
-      loss -= y[i] * std::log(float_t(1e-10));
-    else loss -= y[i] * std::log(p[i]);
-  }
-  return loss;
-}
-
 float_t cross_entropy(size_t n, const float_t* y, const float_t* p) {
   float_t loss = 0.0;
   for (size_t i = 0; i < n; i++) {
@@ -332,13 +280,6 @@ float_t cross_entropy(size_t n, const float_t* y, const float_t* p) {
   return loss;
 }
 
-void d_cross_entropy(const vec_t& y, const vec_t& p, vec_t& d) {
-  auto n = y.size();
-  for (size_t i = 0; i < n; i++) {
-    d[i] = -y[i] / (p[i] + float_t(1e-10));
-  }
-}
-
 void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d) {
   for (size_t i = 0; i < n; i++) {
     d[i] = -y[i] / (p[i] + float_t(1e-10));
@@ -350,11 +291,6 @@ void d_cross_entropy(size_t n, const float_t* y, const float_t* p, float_t* d) {
 inline float_t sigmoid_func(float_t x) { return 1./(1.+expf(-x)); }
 
 // Sigmoid
-void sigmoid(const vec_t& in, vec_t &out) {
-  for (size_t i = 0; i < in.size(); ++i)
-    out[i] = sigmoid_func(in[i]);
-}
-
 void sigmoid(size_t n, const float_t* in, float_t* out) {
   for (size_t i = 0; i < n; i++) {
     out[i] = 1. / (1. + expf(-in[i]));
@@ -367,12 +303,10 @@ void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const 
   }
 }
 
-void copy1D1D(const vec_t& in, vec_t& out) {
-  std::copy(in.begin(), in.end(), &out[0]);
-}
-
-void copy_cpu(size_t len, const float_t* in, float_t* out) {
-  std::copy(in, in + len, out);
+void copy_cpu(size_t n, const float_t* in, float_t* out) {
+  //std::copy(in, in + n, out);
+  //memcpy(out, in, sizeof(float_t) * n);
+  cblas_scopy(n, in, 1, out, 1);
 }
 
 // num rows in A, C; num columns in B, C; num columns in A, rows in B
@@ -386,15 +320,6 @@ void transpose(size_t x, size_t y, const float_t* in, float_t* out) {
   for (size_t i = 0; i < y; i++) {
     for (size_t j = 0; j < x; j++) {
       out[i * x + j] = in[j * y + i];
-    }
-  }
-}
-
-// matrix-vector multiply
-void mvmul(size_t m, size_t n, const float_t *matrix, const float_t *in_vector, float_t *out_vector) {
-  for (size_t i = 0; i < m; ++i) {
-    for (size_t j = 0; j < n; ++j) {
-      out_vector[i] += matrix[i * n + j] * in_vector[j];
     }
   }
 }

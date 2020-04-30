@@ -1,5 +1,6 @@
 #include "deepgalois/lgraph.h"
 #include "deepgalois/utils.h"
+#include "galois/Galois.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -22,24 +23,33 @@ void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
 }
 
 void LearningGraph::allocateFrom(index_t nv, index_t ne) {
+  num_vertices_ = nv;
+  num_edges_ = ne;
+  printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
+  rowptr_ = new index_t[num_vertices_+1];
+  colidx_ = new index_t[num_edges_];
+  rowptr_[0] = 0;
 }
 
 void LearningGraph::constructNodes() {
 }
 
 void LearningGraph::fixEndEdge(index_t vid, index_t row_end) {
+  rowptr_[vid+1] = row_end;
 }
 
 void LearningGraph::constructEdge(index_t eid, index_t dst, edata_t edata) {
+  assert(dst < num_vertices_);
+  assert(eid < num_edges_);
+  colidx_[eid] = dst;
 }
 
 void LearningGraph::degree_counting() {
-/*
-  degrees = new uint32_t[num_vertices_];
-  galois::do_all(galois::iterate(begin(), end()), [&] (auto v) {
-    degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
+  if (degrees_ != NULL) return;
+  degrees_ = new index_t[num_vertices_];
+  galois::do_all(galois::iterate(size_t(0), size_t(num_vertices_)), [&] (auto v) {
+    degrees_[v] = rowptr_[v+1] - rowptr_[v];
   }, galois::loopname("DegreeCounting"));
-*/
 }
 
 void LearningGraph::readGraph(std::string path, std::string dataset) {
@@ -76,15 +86,15 @@ void LearningGraph::readGraphFromGRFile(const std::string& filename) {
   assert(version == 1);
   uint64_t sizeEdgeTy = le64toh(*fptr++);
   uint64_t nv = le64toh(*fptr++);
-  uint64_t numEdges = le64toh(*fptr++);
+  uint64_t ne = le64toh(*fptr++);
   uint64_t *outIdx = fptr;
   fptr += nv;
   uint32_t *fptr32 = (uint32_t*)fptr;
   uint32_t *outs = fptr32; 
-  fptr32 += numEdges;
-  if (numEdges % 2) fptr32 += 1;
+  fptr32 += ne;
+  if (ne % 2) fptr32 += 1;
   num_vertices_ = nv;
-  num_edges_ = numEdges;
+  num_edges_ = ne;
   if (sizeEdgeTy != 0) {
     std::cout << "LearningGraph: currently edge data not supported.\n";
     exit(1);

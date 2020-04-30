@@ -22,9 +22,9 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
       if (norm) {
         // normalize b as well
         b = a * norm_factor[dst];
-        vec_t neighbor(len);
+        float_t* neighbor = new float_t[len];
         // scale the neighbor's data using the normalization factor
-        math::mul_scalar(len, b, &in[dst * len], &neighbor[0]);
+        math::scale(len, b, &in[dst * len], neighbor);
         // use scaled data to update; out[src] += in[dst]
         math::vadd_cpu(len, &out[src * len], &neighbor[0],  &out[src * len]);
       } else {

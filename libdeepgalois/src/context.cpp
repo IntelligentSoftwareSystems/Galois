@@ -142,8 +142,9 @@ void Context::norm_factor_counting(size_t g_size) {
   auto subg = getSubgraphPointer();
   if (use_subgraph) g = subg;
   g->degree_counting();
+  if (norm_factor != NULL) free(norm_factor);
 #ifdef USE_MKL
-  if (norm_factor == NULL) norm_factor = new float_t[g->sizeEdges()];
+  norm_factor = new float_t[g->sizeEdges()];
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto i) {
     float_t c_i = std::sqrt(float_t(g->get_degree(i)));
     for (auto e = g->edge_begin(i); e != g->edge_end(i); e++) {
@@ -154,7 +155,7 @@ void Context::norm_factor_counting(size_t g_size) {
     }
   }, galois::loopname("NormCountingEdge"));
 #else
-  if (norm_factor == NULL) norm_factor = new float_t[g_size];
+  norm_factor = new float_t[g_size];
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto v) {
     auto degree  = g->get_degree(v);
     float_t temp = std::sqrt(float_t(degree));

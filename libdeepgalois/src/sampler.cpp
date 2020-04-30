@@ -54,6 +54,7 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
       }
     }
   }, galois::loopname("gen_subgraph"));
+  sub.degree_counting();
 #endif
 }
 
@@ -143,6 +144,7 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
       j ++;
     }
   }, galois::loopname("construct_graph"));
+  sub.degree_counting();
 #endif
 }
 
