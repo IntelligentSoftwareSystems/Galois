@@ -29,6 +29,7 @@
 #define D_GRAPH_LOADER
 
 #include "galois/graphs/CuSPPartitioner.h"
+#include "llvm/Support/CommandLine.h"
 
 /*******************************************************************************
  * Supported partitioning schemes
