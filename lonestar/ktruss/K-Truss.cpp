@@ -618,7 +618,6 @@ void run() {
   size_t approxEdgeData = 4 * (graph.size() + graph.sizeEdges());
   galois::preAlloc(numThreads +
                    4 * (approxEdgeData) / galois::runtime::pagePoolSize());
-  // TODO how to preallocate memory?
   galois::reportPageAlloc("MeminfoPre");
 
   initialize(graph);
