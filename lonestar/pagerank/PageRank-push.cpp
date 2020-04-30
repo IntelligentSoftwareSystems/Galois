@@ -25,15 +25,21 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 
-// These implementations are based on the Push-based PageRank computation
-// (Algorithm 4) as described in the PageRank Europar 2015 paper.
+/**
+ * These implementations are based on the Push-based PageRank computation
+ * (Algorithm 4) as described in the PageRank Europar 2015 paper.
+ *
+ * WHANG, Joyce Jiyoung, et al. Scalable data-driven pagerank: Algorithms,
+ * system issues, and lessons learned. In: European Conference on Parallel
+ * Processing. Springer, Berlin, Heidelberg, 2015. p. 438-450.
+ */
 
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
 
 constexpr static const unsigned CHUNK_SIZE = 16;
 
-enum Algo { Async, Sync }; // Async has better asbolute performance.
+enum Algo { Async, Sync }; ///< Async has better asbolute performance.
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Async, "Async"),
@@ -75,7 +81,7 @@ void asyncPageRank(Graph& graph) {
                                        graph.edge_end(src, flag));
           if (src_nout > 0) {
             PRTy delta = oldResidual * ALPHA / src_nout;
-            // for each out-going neighbors
+            //! For each out-going neighbors.
             for (auto jj : graph.edges(src, flag)) {
               GNode dst    = graph.getEdgeDst(jj);
               LNode& ddata = graph.getData(dst, flag);
@@ -111,7 +117,6 @@ void syncPageRank(Graph& graph) {
 
   size_t iter = 0;
   for (; !activeNodes.empty() && iter < maxIterations; ++iter) {
-
     galois::do_all(
         galois::iterate(activeNodes),
         [&](const GNode& src) {
@@ -133,7 +138,7 @@ void syncPageRank(Graph& graph) {
 
             assert(beg <= end);
 
-            // Edge tiling for large outdegree nodes
+            //! Edge tiling for large outdegree nodes.
             if ((end - beg) > EDGE_TILE_SIZE) {
               for (; beg + EDGE_TILE_SIZE < end;) {
                 auto ne = beg + EDGE_TILE_SIZE;
@@ -157,14 +162,14 @@ void syncPageRank(Graph& graph) {
         [&](const Update& up) {
           constexpr const galois::MethodFlag flag =
               galois::MethodFlag::UNPROTECTED;
-          // for each out-going neighbors
+          //! For each out-going neighbors.
           for (auto jj = up.beg; jj != up.end; ++jj) {
             GNode dst    = graph.getEdgeDst(jj);
             LNode& ddata = graph.getData(dst, flag);
             auto old     = atomicAdd(ddata.residual, up.delta);
-            // if fabs(old) is greater than tolerance, then it would
-            // already have been processed in the previous do_all
-            // loop
+            //! If fabs(old) is greater than tolerance, then it would
+            //! already have been processed in the previous do_all
+            //! loop.
             if ((old <= tolerance) && (old + up.delta >= tolerance)) {
               activeNodes.push(dst);
             }

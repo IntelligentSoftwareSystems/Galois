@@ -50,7 +50,7 @@ typedef typename Graph::GraphNode GNode;
 using DeltaArray    = galois::LargeArray<PRTy>;
 using ResidualArray = galois::LargeArray<PRTy>;
 
-//! [example of no_stats]
+//! Initialize nodes for the topological algorithm.
 void initNodeDataTopological(Graph& g) {
   galois::do_all(
       galois::iterate(g),
@@ -61,8 +61,8 @@ void initNodeDataTopological(Graph& g) {
       },
       galois::no_stats(), galois::loopname("initNodeData"));
 }
-//! [example of no_stats]
 
+//! Initialize nodes for the residual algorithm.
 void initNodeDataResidual(Graph& g, DeltaArray& delta,
                           ResidualArray& residual) {
   galois::do_all(
@@ -77,8 +77,8 @@ void initNodeDataResidual(Graph& g, DeltaArray& delta,
       galois::no_stats(), galois::loopname("initNodeData"));
 }
 
-// Computing outdegrees in the tranpose graph is equivalent to computing the
-// indegrees in the original graph
+//! Computing outdegrees in the tranpose graph is equivalent to computing the
+//! indegrees in the original graph.
 void computeOutDeg(Graph& graph) {
   galois::StatTimer outDegreeTimer("computeOutDegFunc");
   outDegreeTimer.start();
@@ -113,7 +113,13 @@ void computeOutDeg(Graph& graph) {
   outDegreeTimer.stop();
 }
 
-//! [scalarreduction]
+/**
+ * It does not calculate the pagerank for each iteration,
+ * but only calculate the residual to be added from the previous pagerank to
+ * the current one.
+ * If the residual is smaller than the tolerance, that is not reflected to
+ * the next pagerank.
+ */
 void computePRResidual(Graph& graph, DeltaArray& delta,
                        ResidualArray& residual) {
   unsigned int iterations = 0;
@@ -126,6 +132,8 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
           auto& sdata = graph.getData(src);
           delta[src]  = 0;
 
+          //! Only the residual higher than tolerance will be reflected
+          //! to the pagerank.
           if (residual[src] > tolerance) {
             PRTy oldResidual = residual[src];
             residual[src]    = 0.0;
@@ -164,22 +172,23 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
       break;
     }
     accum.reset();
-  } // end while(true)
+  } ///< End while(true).
 
   if (iterations >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iterations << " iterations"
               << std::endl;
   }
 }
-//! [scalarreduction]
 
-// PageRank pull topological
+/**
+ * PageRank pull topological.
+ * Always calculate the new pagerank for each iteration.
+ */
 void computePRTopological(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
   while (true) {
-
     galois::do_all(
         galois::iterate(graph),
         [&](const GNode& src) {
@@ -198,14 +207,14 @@ void computePRTopological(Graph& graph) {
             sum += ddata.value / ddata.nout;
           }
 
-          // New value of pagerank after computing contributions from
-          // incoming edges in the original graph
+          //! New value of pagerank after computing contributions from
+          //! incoming edges in the original graph.
           float value = sum * ALPHA + (1.0 - ALPHA);
-          // Find the delta in new and old pagerank values
+          //! Find the delta in new and old pagerank values.
           float diff = std::fabs(value - sdata.value);
 
-          // Do not update pagerank before the diff is computed since
-          // there is a data dependence on the pagerank value
+          //! Do not update pagerank before the diff is computed since
+          //! there is a data dependence on the pagerank value.
           sdata.value = value;
           max_delta.update(diff);
         },
@@ -224,7 +233,7 @@ void computePRTopological(Graph& graph) {
     }
     max_delta.reset();
 
-  } // end while(true)
+  } ///< End while(true).
 
   if (iteration >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iteration << " iterations"
@@ -298,7 +307,7 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  // Sanity checking code
+  //! Sanity checking code.
   galois::GReduceMax<PRTy> maxRank;
   galois::GReduceMin<PRTy> minRank;
   galois::GAccumulator<PRTy> distanceSum;
