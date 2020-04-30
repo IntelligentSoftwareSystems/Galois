@@ -46,12 +46,16 @@ static const char* desc =
     "Computes the maximal k-trusses for a given undirected graph";
 static const char* url = "k_truss";
 
-static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input graph (symmetric)>"),
+                                      cll::Required);
+
 static cll::opt<unsigned int>
     trussNum("trussNum", cll::desc("report trussNum-trusses"), cll::Required);
+
 static cll::opt<std::string>
     outName("o", cll::desc("output file for the edgelist of resulting truss"));
+
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -61,6 +65,14 @@ static cll::opt<Algo> algo(
         clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss",
                    "Compute k-1 core and then k-truss")),
     cll::init(Algo::bsp));
+
+//! Flag that forces user to be aware that they should be passing in a
+//! symmetric graph
+static cll::opt<bool> symmetricGraph(
+    "symmetricGraph",
+    cll::desc("Flag should be used to make user aware they should be passing a "
+              "symmetric graph to this program"),
+    cll::init(false));
 
 //! Set LSB of an edge weight to indicate the removal of the edge.
 using Graph =
@@ -649,6 +661,11 @@ void run() {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("User did not pass in symmetric graph flag signifying they are "
+               "aware this program needs to be passed a symmetric graph.");
+  }
 
   if (2 > trussNum) {
     std::cerr << "trussNum >= 2" << std::endl;
