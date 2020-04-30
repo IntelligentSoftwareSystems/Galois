@@ -116,7 +116,7 @@ double p, double q){
 		
 			if(walk.size() == 1){
 				
-				uint32_t curr = walk[0];
+				//uint32_t curr = walk[0];
 
 				//random value between 0 and 1
 				double prob = distribution(generator);	
@@ -172,7 +172,7 @@ double p, double q){
 
 					if(next == prev)
 						alpha = 1.0f/p;
-					else if(graph.edges(next).find(prev) != graph.edges(next).end() || graph.edges(prev).find(next) != graph.edges(prev).end() )
+					else if(graph.findEdge(next, prev) != graph.edge_end(next) || graph.findEdge(prev,next) != graph.edge_end(prev) )
 						alpha = 1.0f;
 					else
 						alpha = 1.0f/q;
@@ -227,11 +227,11 @@ double p, double q, uint32_t num_edge_types){
 		heteroRandomWalk(graph, M, walks, walk_length, p, q);
 		
 		//M step
-		uint32_t size = std::distance(walks.begin(), walks.end());
+		//uint32_t size = std::distance(walks.begin(), walks.end());
 		std::vector<std::vector<uint32_t>> v;
 		computeVectors(v, walks, num_edge_types);
 
-		computeM(v, M);		
+		computeM(v, M, num_edge_types);		
 	}
 }
 
@@ -245,7 +245,7 @@ int main(int argc, char** argv) {
 	//read graph
 
   uint32_t nodes;
-	uint32_t edges;
+  uint64_t edges;
 
 	std::string line;
   std::getline(f, line);
@@ -255,7 +255,7 @@ int main(int argc, char** argv) {
 
 	std::vector<std::vector<uint32_t> > edges_id(nodes);
   std::vector<std::vector<EdgeTy> > edges_data(nodes);
-  std::vector<uint32_t> prefix_edges(nodes);
+  std::vector<uint64_t> prefix_edges(nodes);
 
 	uint64_t max_type = 0;
 
@@ -299,7 +299,6 @@ int main(int argc, char** argv) {
 			M[i].push_back(1.0f);
 	}	
 	
-	generateTransitionMatrix(graph, M, N, walk_length,
-double p, double q, uint32_t num_edge_types)		
+	generateTransitionMatrix(graph, M, N, walk_length, p, q, num_edge_types);	
 	return 0;
 }
