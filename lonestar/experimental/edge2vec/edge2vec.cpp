@@ -26,6 +26,8 @@ namespace cll = llvm::cl;
 
 static const char* name = "edge2vec";
 
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
 static cll::opt<uint32_t> N("N",
   cll::desc("Number of iterations"),
   cll::init(10));
@@ -64,18 +66,18 @@ double sigmoid(double pears) {
 
 double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v){
     int sum_x = 0, sum_y = 0, sum_xy = 0, squareSum_x = 0, squareSum_y = 0;
-    std::vector<uint32_t> X = v[i];
-    std::vector<uint32_t> Y = v[j];
-    for (int m = 0; m < X.size(); m++) 
+    std::vector<uint32_t> x = v[i];
+    std::vector<uint32_t> y = v[j];
+    for (uint32_t m = 0; m < x.size(); m++) 
     { 
         sum_x = sum_x + x.at(m); 
         sum_y = sum_y + y.at(m); 
         sum_XY = sum_xy + x.at(m) * y.at(m); 
-        squareSum_X = squareSum_x + x.at(m) * x.at(m); 
-        squareSum_Y = squareSum_y + y.at(m) * y.at(m); 
+        squareSum_x = squareSum_x + x.at(m) * x.at(m); 
+        squareSum_x = squareSum_y + y.at(m) * y.at(m); 
     } 
   
-    double corr = (double)(n * sum_xy - sum_x * sum_y)  
+    double corr = (double)(x.size() * sum_xy - sum_x * sum_y)  
                   / sqrt((n * squareSum_x - sum_x * sum_x)  
                       * (n * squareSum_y - sum_y * sum_y)); 
     return corr;
