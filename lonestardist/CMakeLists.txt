@@ -88,7 +88,7 @@ function(add_test_dist_and_verify app input type part N np)
   set(suffix "-${app}-${type}-${input}-${part}-${np}")
   if (EXISTS ${output})
     add_test(run${suffix} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
-    add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${OUTPUT} output_${HOSTNAME}_*.log)
+    add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${output} output_${HOSTNAME}_*.log)
   else()
     add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
   endif()
@@ -99,8 +99,6 @@ function(add_test_dist_and_verify app input type part N np)
 
 
   # Don't run dist tests in CI since they are broken in too many cases right now.
-  return()
-
   if (NOT ${X_NOT_QUICK})
     set_tests_properties(run${suffix}
       PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
@@ -108,6 +106,11 @@ function(add_test_dist_and_verify app input type part N np)
 endfunction()
 
 function(add_test_dist_for_partitions app input type num_threads num_gpus part)
+  # spawn at most 5 processes/use at most 5 threads during testing
+  if (${num_threads} GREATER 5)
+    set(num_threads 5)
+  endif()
+
   set(partitions ${num_threads})
   set(thr ${num_threads})
   while (${thr} GREATER 1)
@@ -158,7 +161,7 @@ function(add_test_dist app input)
 
   set(num_threads ${NUM_TEST_THREADS})
 
-  foreach (part oec iec cvc cvc-iec hovc hivc)
+  foreach (part oec iec cvc cvc-iec)
     if (NOT ${X_NO_ASYNC})
       add_test_dist_for_partitions(${app} ${input} sync ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Sync)
       add_test_dist_for_partitions(${app} ${input} async ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Async)
