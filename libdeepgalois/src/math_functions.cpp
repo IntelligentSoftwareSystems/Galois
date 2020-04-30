@@ -63,6 +63,7 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 	           const int* A_idx_ptr, const int* A_nnz_idx,
                const float* B, const float beta, float* C) {
 #ifdef USE_MKL
+  mkl_set_num_threads(56);
   const char *matdescra = "GXXCX";//6 bytes
   const char transa = 'N';
   //printf("Calling Intel MKL\n"); exit(1);
