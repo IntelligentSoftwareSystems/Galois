@@ -26,6 +26,9 @@ namespace cll = llvm::cl;
 
 static const char* name = "edge2vec";
 
+static const char* desc =
+    "Preprocessing part of Node2vec";
+static const char* url = "edge2vec";
 static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input file>"), cll::Required);
 static cll::opt<uint32_t> N("N",
@@ -58,7 +61,7 @@ void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std
 		v.push_back(vec); 
 }
 
-double sigmoid(double pears) {
+double sigmoidCal(double pears) {
     return 1 / (1 + exp(-pears)); //exact sig
     //return (pears / (1 + abs(pears))); //fast sigmoid
     
@@ -78,8 +81,8 @@ double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v
     } 
   
     double corr = (double)(x.size() * sum_xy - sum_x * sum_y)  
-                  / sqrt((n * squareSum_x - sum_x * sum_x)  
-                      * (n * squareSum_y - sum_y * sum_y)); 
+                  / sqrt((x.size() * squareSum_x - sum_x * sum_x)  
+                      * (x.size() * squareSum_y - sum_y * sum_y)); 
     return corr;
 	
 }
@@ -92,35 +95,12 @@ void computeM(std::vector<std::vector<uint32_t>>& v, std::vector<std::vector<dou
 		for(uint32_t j=1;j<=num_edge_types;j++){
 			
 			double pearson_corr = pearsonCorr(i,j, v);
-			double sigmoid = sigmoid(pearson_corr);
+			double sigmoid = sigmoidCal(pearson_corr);
 
 			M[i][j] = sigmoid;
 		}
 	});
 }
-
-//function generateTransitionMatrix
-//M should have all entries set to 1
-void generateTransitionMatrix(Graph& graph, std::vector<std::vector<double> >& M, uint32_t N,
-uint32_t walk_length,
-double p, double q, uint32_t num_edge_types){
-
-	while(N>0){
-		N--;
-		
-		//E step; generate walks
-		galois::InsertBag<std::vector<uint32_t>> walks;
-		heteroRandomWalk(graph, M, walks, walk_length, p, q);
-		
-		//M step
-		uint32_t size = std::distance(walks.begin(), walks.end());
-		std::vector<std::vector<uint32_t>> v;
-		computeVectors(v, walks, num_edge_types);
-
-		computeM(v, M);		
-	}
-}
-
 //function HeteroRandomWalk
 void heteroRandomWalk(Graph& graph, std::vector<std::vector<double> >& M, 
 galois::InsertBag<std::vector<uint32_t>>& bag, uint32_t walk_length,
@@ -230,6 +210,29 @@ double p, double q){
 			}//end if-else loop
 		}//end while
 	});
+}
+
+
+//function generateTransitionMatrix
+//M should have all entries set to 1
+void generateTransitionMatrix(Graph& graph, std::vector<std::vector<double> >& M, uint32_t N,
+uint32_t walk_length,
+double p, double q, uint32_t num_edge_types){
+
+	while(N>0){
+		N--;
+		
+		//E step; generate walks
+		galois::InsertBag<std::vector<uint32_t>> walks;
+		heteroRandomWalk(graph, M, walks, walk_length, p, q);
+		
+		//M step
+		uint32_t size = std::distance(walks.begin(), walks.end());
+		std::vector<std::vector<uint32_t>> v;
+		computeVectors(v, walks, num_edge_types);
+
+		computeM(v, M);		
+	}
 }
 
 int main(int argc, char** argv) {
