@@ -39,9 +39,18 @@ static cll::opt<uint32_t> walk_length("Walk Length",
   cll::desc("Length of random walk"),
   cll::init(50));
 
-static cll::opt<double> p("Walk Length",
-  cll::desc("Length of random walk"),
-  cll::init(50));
+static cll::opt<double> p("p from the paper",
+  cll::desc("p from the paper"),
+  cll::init(1));
+static cll::opt<double> q("q from the paper",
+  cll::desc("q"),
+  cll::init(1));
+static cll::opt<double> num_walk("number of walk",
+  cll::desc("number of walk"),
+  cll::init(1));
+static cll::opt<double> num_edge_types("number edge type",
+  cll::desc("number of edge types"),
+  cll::init(3));
 
 void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std::vector<uint32_t>>& walks, uint32_t num_edge_types){
 
@@ -299,6 +308,6 @@ int main(int argc, char** argv) {
 			M[i].push_back(1.0f);
 	}	
 	
-	generateTransitionMatrix(graph, M, N, walk_length, p, q, num_edge_types);	
+	generateTransitionMatrix(graph, M, N, walk_length, p,  q,  num_edge_types);		
 	return 0;
 }
