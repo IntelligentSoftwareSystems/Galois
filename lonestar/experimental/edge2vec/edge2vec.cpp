@@ -66,18 +66,18 @@ double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v
     int sum_x = 0, sum_y = 0, sum_xy = 0, squareSum_x = 0, squareSum_y = 0;
     std::vector<uint32_t> X = v[i];
     std::vector<uint32_t> Y = v[j];
-    for (int m = 0; m < X.size(); i++) 
+    for (int m = 0; m < X.size(); m++) 
     { 
-        sum_X = sum_X + X.at(m); 
-        sum_Y = sum_Y + Y.at(m); 
-        sum_XY = sum_XY + X.at(m) * Y.at(m); 
-        squareSum_X = squareSum_X + X.at(m) * X.at(m); 
-        squareSum_Y = squareSum_Y + Y.at(m) * Y.at(m); 
+        sum_x = sum_x + x.at(m); 
+        sum_y = sum_y + y.at(m); 
+        sum_XY = sum_xy + x.at(m) * y.at(m); 
+        squareSum_X = squareSum_x + x.at(m) * x.at(m); 
+        squareSum_Y = squareSum_y + y.at(m) * y.at(m); 
     } 
   
-    double corr = (double)(n * sum_XY - sum_X * sum_Y)  
-                  / sqrt((n * squareSum_X - sum_X * sum_X)  
-                      * (n * squareSum_Y - sum_Y * sum_Y)); 
+    double corr = (double)(n * sum_xy - sum_x * sum_y)  
+                  / sqrt((n * squareSum_x - sum_x * sum_x)  
+                      * (n * squareSum_y - sum_y * sum_y)); 
     return corr;
 	
 }
