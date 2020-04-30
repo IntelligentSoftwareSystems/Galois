@@ -44,7 +44,14 @@ void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag,
                        const std::string& filename,
                        const bool readUnweighted = false) {
   FileGraph f;
-  f.fromFileInterleaved<typename GraphTy::file_edge_data_type>(filename);
+  if (readUnweighted) {
+    //! If user specifies that the input graph is unweighted,
+    //! the file graph also should be aware of this.
+    //! Note that the application still could use the edge data array.
+    f.fromFileInterleaved<void>(filename);
+  } else {
+    f.fromFileInterleaved<typename GraphTy::file_edge_data_type>(filename);
+  }
   readGraphDispatch(graph, tag, f, readUnweighted);
 }
 
