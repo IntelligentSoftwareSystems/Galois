@@ -106,9 +106,14 @@ function(add_test_dist_and_verify app input type part N np)
 endfunction()
 
 function(add_test_dist_for_partitions app input type num_threads num_gpus part)
-  # spawn at most 5 processes/use at most 5 threads during testing
-  if (${num_threads} GREATER 5)
-    set(num_threads 5)
+  # cut threads in system in half first
+  if (${num_threads} GREATER 1)
+    math(EXPR num_threads "${num_threads} / 2")
+  endif()
+
+  # spawn at most 8 processes/use at most 8 threads during testing
+  if (${num_threads} GREATER 8)
+    set(num_threads 8)
   endif()
 
   set(partitions ${num_threads})
