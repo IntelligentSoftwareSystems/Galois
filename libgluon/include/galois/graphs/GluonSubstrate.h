@@ -83,8 +83,7 @@ namespace graphs {
  *
  * @tparam GraphTy User graph to handle communication for
  */
-template <typename GraphTy, bool PartitionAgnostic=false,
-          DataCommMode EnforcedMetadata=DataCommMode::noData>
+template <typename GraphTy>
 class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
   //! Synchronization type
@@ -102,10 +101,12 @@ private:
   bool transposed;  //!< Marks if passed in graph is transposed or not.
   bool isVertexCut;  //!< Marks if passed in graph's partitioning is vertex cut.
   std::pair<unsigned, unsigned> cartesianGrid;  //!< cartesian grid (if any)
+  bool partitionAgnostic; //!< true if communication should ignore partitioning
+  DataCommMode substrateDataMode; //!< datamode to enforce
   const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
-  bool isCartCut;
+  bool isCartCut; //!< True of graph is a cartesian cut
 
   // bitvector status hasn't been maintained
   //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be
@@ -408,14 +409,25 @@ public:
    *
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
+   * @param _transposed True if the graph is transposed
    */
   GluonSubstrate(GraphTy& _userGraph, unsigned host, unsigned numHosts,
-       bool _transposed,
-       std::pair<unsigned, unsigned> _cartesianGrid=std::make_pair(0u, 0u))
-      : galois::runtime::GlobalObject(this), userGraph(_userGraph), id(host),
-        transposed(_transposed), isVertexCut(userGraph.is_vertex_cut()),
-        cartesianGrid(_cartesianGrid), numHosts(numHosts), num_run(0),
-        num_round(0), currentBVFlag(nullptr),
+            bool _transposed,
+            std::pair<unsigned, unsigned> _cartesianGrid=std::make_pair(0u, 0u),
+            bool _partitionAgnostic=false,
+            DataCommMode _enforcedDataMode=DataCommMode::noData)
+      : galois::runtime::GlobalObject(this),
+        userGraph(_userGraph),
+        id(host),
+        transposed(_transposed),
+        isVertexCut(userGraph.is_vertex_cut()),
+        cartesianGrid(_cartesianGrid),
+        partitionAgnostic(_partitionAgnostic),
+        substrateDataMode(_enforcedDataMode),
+        numHosts(numHosts),
+        num_run(0),
+        num_round(0),
+        currentBVFlag(nullptr),
         mirrorNodes(userGraph.getMirrorNodes()) {
     if (cartesianGrid.first != 0 && cartesianGrid.second != 0) {
       GALOIS_ASSERT(cartesianGrid.first * cartesianGrid.second == numHosts,
@@ -432,7 +444,7 @@ public:
 
     // set this global value for use on GPUs mostly
     // TODO find a better way to do this without globals
-    enforcedDataMode = EnforcedMetadata;
+    enforcedDataMode = _enforcedDataMode;
 
     initBareMPI();
     // master setup from mirrors done by setupCommunication call
@@ -575,7 +587,7 @@ private:
                            galois::PODResizeableArray<unsigned int>& offsets,
                            size_t& bit_set_count,
                            DataCommMode& data_mode) const {
-    if (EnforcedMetadata != onlyData) {
+    if (substrateDataMode != onlyData) {
       bitset_comm.reset();
       std::string syncTypeStr =
           (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -681,7 +693,7 @@ private:
    * @param b OUTPUT: Buffer that will hold data to send
    */
   template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, 
+      SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
       typename VecTy, bool async,
       typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void getSendBuffer(std::string loopName, unsigned x,
@@ -1773,21 +1785,21 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      if (EnforcedMetadata == gidsData) {
+      if (substrateDataMode == gidsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (EnforcedMetadata == offsetsData) {
+      } else if (substrateDataMode == offsetsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (EnforcedMetadata == bitsetData) {
+      } else if (substrateDataMode == bitsetData) {
         size_t bitset_alloc_size =
             ((num + 63) / 64) * sizeof(uint64_t);
         b.reserve(sizeof(DataCommMode)
@@ -3028,7 +3040,7 @@ public:
 
     Tsync.start();
 
-    if (PartitionAgnostic) {
+    if (partitionAgnostic) {
       sync_any_to_any<SyncFnTy, BitsetFnTy, async>(loopName);
     } else {
       if (writeLocation == writeSource) {
@@ -3619,10 +3631,8 @@ public:
 #endif
 };
 
-template <typename GraphTy, bool PartitionAgnostic,
-          DataCommMode EnforcedMetadata>
-constexpr const char* const galois::graphs::GluonSubstrate<GraphTy,
-                              PartitionAgnostic, EnforcedMetadata>::RNAME;
+template <typename GraphTy>
+constexpr const char* const galois::graphs::GluonSubstrate<GraphTy>::RNAME;
 } // end namespace graphs
 } // end namespace galois
 
