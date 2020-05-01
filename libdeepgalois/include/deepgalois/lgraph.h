@@ -15,6 +15,7 @@ protected:
   index_t *degrees_;
   vdata_t *vertex_data_;
   edata_t *edge_data_;
+  std::vector<std::vector<size_t>> mirrorNodes;
 
 public:
   typedef size_t iterator;
@@ -51,6 +52,13 @@ public:
   void constructNodes();
   void fixEndEdge(index_t vid, index_t row_end);
   void constructEdge(index_t eid, index_t dst, edata_t edata);
+
+  bool isLocal(index_t vid);
+  index_t getLID(index_t vid);
+  bool is_vertex_cut();
+  std::vector<std::vector<size_t>>& getMirrorNodes();
+  uint64_t numMasters();
+  uint64_t globalSize();
 };
 
 }

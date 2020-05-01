@@ -12,6 +12,20 @@
 
 namespace deepgalois {
 
+bool LearningGraph::isLocal(index_t vid) { return true; }
+
+index_t LearningGraph::getLID(index_t vid) { return 0; }
+
+bool LearningGraph::is_vertex_cut() {return true; }
+
+std::vector<std::vector<size_t>>& LearningGraph::getMirrorNodes() {
+  return mirrorNodes;
+}
+
+uint64_t LearningGraph::numMasters() { return 0; }
+
+uint64_t LearningGraph::globalSize() { return 0; }
+
 void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
   const unsigned nsteps = 10;
   unsigned ineachstep = (maxii / nsteps);

@@ -85,6 +85,7 @@ set(sources
   src/DistContext.cpp
   src/optimizer.cpp
   src/sampler.cpp
+  src/lgraph.cpp
   src/utils.cpp
   src/node.cpp
   src/net.cpp
