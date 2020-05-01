@@ -659,10 +659,10 @@ aig::GNode RewriteManager::createAndNode(ThreadContextData* threadCtx,
 
   auto idIt =
       threadCtx->bestCutMFFCIds.begin(); // reuse an ID from deleted MFFC
-  int id = (*idIt);
+  auto id = (*idIt);
   threadCtx->bestCutMFFCIds.erase(
       idIt); // remove the reused ID from the available IDs set
-  assert(id < this->aig.getNodes().size());
+  assert(id < int(this->aig.getNodes().size()));
 
   newAndData.id      = id;
   newAndData.type    = aig::NodeType::AND;
