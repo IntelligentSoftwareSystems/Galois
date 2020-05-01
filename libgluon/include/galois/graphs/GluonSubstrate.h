@@ -44,8 +44,6 @@
 
 namespace cll = llvm::cl;
 
-//! Specifies if synchronization should be partition agnostic
-extern cll::opt<bool> partitionAgnostic;
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 //! bare_mpi type to use; see options in runtime/BareMPI.h
 BareMPI bare_mpi = BareMPI::noBareMPI;

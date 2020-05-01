@@ -19,17 +19,11 @@
 
 /**
  * @file GluonSubstrate.cpp
- * Contains command line argument defines for the distributed runtime.
+ * Contains the enforced datamode global for use by GPUs.
+ *
+ * TODO get rid of this file/global.
  */
 
-#include <galois/graphs/GluonSubstrate.h>
-
-namespace cll = llvm::cl;
-
-//! Command line definition for partitionAgnostic
-cll::opt<bool>
-    partitionAgnostic("partitionAgnostic",
-                      cll::desc("Do not use partition-aware optimizations"),
-                      cll::init(false), cll::Hidden);
+#include "galois/graphs/GluonSubstrate.h"
 
 DataCommMode enforcedDataMode = DataCommMode::noData;

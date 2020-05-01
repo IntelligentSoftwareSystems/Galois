@@ -41,6 +41,27 @@ cll::opt<bool> verify("verify",
                                 "to file (default false)"),
                       cll::init(false));
 
+cll::opt<bool>
+    partitionAgnostic("partitionAgnostic",
+                      cll::desc("Do not use partition-aware optimizations"),
+                      cll::init(false), cll::Hidden);
+
+// TODO: use enums
+cll::opt<DataCommMode> commMetadata(
+    "metadata", cll::desc("Communication metadata"),
+    cll::values(clEnumValN(noData, "auto",
+                           "Dynamically choose the metadata"),
+                clEnumValN(bitsetData, "bitset", "Use bitset metadata always"),
+                clEnumValN(offsetsData, "offsets",
+                           "Use offsets metadata always"),
+                clEnumValN(gidsData, "gids", "Use global IDs metadata always"),
+                clEnumValN(onlyData, "none",
+                           "Do not use any metadata (sends "
+                           "non-updated values)")
+                ),
+    cll::init(noData), cll::Hidden);
+
+
 #ifdef __GALOIS_HET_CUDA__
 std::string personality_str(Personality p) {
   switch (p) {
