@@ -270,11 +270,10 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
 #endif
 
   loss = fprop(begin, end, count, masks);
-  auto g = context->getGraphPointer();
   if (is_single_class) {
-    acc = masked_accuracy(begin, end, count, masks, g);
+    acc = masked_accuracy(begin, end, count, masks);
   } else {
-    acc = masked_multi_class_accuracy(begin, end, count, masks, g);
+    acc = masked_multi_class_accuracy(begin, end, count, masks);
   }
   t_eval.Stop();
   return t_eval.Millisecs();

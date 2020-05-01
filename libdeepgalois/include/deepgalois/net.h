@@ -119,8 +119,8 @@ protected:
 #ifdef CPU_ONLY
   Sampler *sampler;
   // comparing outputs with the ground truth (labels)
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
-  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
+  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
+  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
 #else
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, CSRGraph *gGraph);
   acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, CSRGraph *gGraph);
