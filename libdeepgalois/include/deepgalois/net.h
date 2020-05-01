@@ -5,18 +5,19 @@
 #define _MODEL_H_
 
 #include <random>
-#include "galois/Timer.h"
 #include "deepgalois/types.h"
-#include "deepgalois/gtypes.h"
 #include "deepgalois/layers/l2_norm_layer.h"
 #include "deepgalois/layers/graph_conv_layer.h"
 #include "deepgalois/layers/softmax_loss_layer.h"
 #include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/optimizer.h"
+#ifdef CPU_ONLY
 #include "deepgalois/sampler.h"
+#endif
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
 #else
+#include "deepgalois/gtypes.h"
 #include "deepgalois/DistContext.h"
 #endif
 
@@ -40,8 +41,10 @@ public:
   void init(std::string dataset_str, unsigned num_conv, unsigned epochs,
             unsigned hidden1, float lr, float dropout, float wd,
             bool selfloop, bool single, bool l2norm, bool dense, 
-            unsigned neigh_sample_size = 0, unsigned subg_sample = 0, 
-            Graph* dGraph = NULL);
+            unsigned neigh_sample_size = 0, unsigned subg_sample = 0);
+#ifdef GALOIS_USE_DIST
+  void dist_init(Graph* dGraph);
+#endif
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
@@ -55,7 +58,7 @@ public:
 
   void train(optimizer* opt, bool need_validate); // training
   double evaluate(std::string type, acc_t& loss, acc_t& acc); // inference
-  void read_test_masks(std::string dataset, Graph* dGraph);
+  void read_test_masks(std::string dataset);
   acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks); // forward propagation
   void bprop(); // back propogation
   void normalize(); // Scale gradient to counterbalance accumulation
@@ -106,14 +109,15 @@ protected:
   mask_t* subgraph_masks;            // masks for subgraph
   std::vector<size_t> feature_dims;  // feature dimnesions for each layer
   std::vector<layer*> layers;        // all the layers in the neural network
-  Sampler *sampler;
 #ifndef GALOIS_USE_DIST
   deepgalois::Context* context;
 #else
   deepgalois::DistContext* context;
+  Graph* dGraph;
 #endif
 
 #ifdef CPU_ONLY
+  Sampler *sampler;
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);
   acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph);

@@ -4,10 +4,10 @@
 #include "deepgalois/context.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/configs.h"
-#include <boost/thread.hpp>
+//#include <boost/thread.hpp>
 
 namespace deepgalois {
-
+/*
 // Make sure each thread can have different values.
 static boost::thread_specific_ptr<Context> thread_instance_;
 
@@ -17,7 +17,7 @@ Context& Context::Get() {
   }
   return *(thread_instance_.get());
 }
-
+*/
 #ifdef CPU_ONLY
 Context::Context() : n(0), num_classes(0), 
   feat_len(0), is_single_class(true), 

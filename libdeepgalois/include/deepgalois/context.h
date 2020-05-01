@@ -6,7 +6,7 @@
 #include <string>
 #include <cassert>
 #include "deepgalois/types.h"
-#include <boost/shared_ptr.hpp>
+//#include <boost/shared_ptr.hpp>
 #ifdef CPU_ONLY
 #include "deepgalois/gtypes.h"
 #else
@@ -16,13 +16,10 @@
 
 namespace deepgalois {
 
-using boost::shared_ptr;
-
 class Context {
 public:
   Context();
   ~Context();
-  static Context& Get();
 
   size_t read_graph(std::string dataset_str, bool selfloop);
   size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);
@@ -69,7 +66,7 @@ public:
   inline static cusparseMatDescr_t cusparse_matdescr() { return cusparse_matdescr_; }
   inline static curandGenerator_t curand_generator() { return curand_generator_; }
 #endif
-
+/*
   // This random number generator facade hides boost and CUDA rng
   // implementation from one another (for cross-platform compatibility).
   class RNG {
@@ -81,9 +78,10 @@ public:
     void* generator();
    private:
     class Generator;
-    shared_ptr<Generator> generator_;
+    boost::shared_ptr<Generator> generator_;
   };
 
+  static Context& Get();
   // Getters for boost rng, curand, and cublas handles
   inline static RNG& rng_stream() {
     if (!Get().random_generator_) {
@@ -91,7 +89,7 @@ public:
     }
     return *(Get().random_generator_);
   }
-
+*/
 protected:
   size_t n;                    // number of samples: N
   size_t num_classes;          // number of classes: E
@@ -108,7 +106,7 @@ protected:
   float_t* d_feats;            // input features on device
   float_t* d_feats_subg;       // input features for subgraph on device
   float_t* norm_factor;        // normalization constant based on graph structure
-  shared_ptr<RNG> random_generator_;
+  //boost::shared_ptr<RNG> random_generator_;
 
 #ifdef CPU_ONLY
   void read_edgelist(const char* filename, bool symmetrize = false, bool add_self_loop = false);

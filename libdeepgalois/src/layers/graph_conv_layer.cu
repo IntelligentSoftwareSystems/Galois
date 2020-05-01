@@ -8,7 +8,7 @@ void graph_conv_layer::malloc_and_init() {
   size_t y = input_dims[1];
   size_t z = output_dims[1];
 
-  if (dropout_) CUDA_CHECK(cudaMalloc((void**)&dropout_mask, x * y * sizeof(unsigned)));
+  if (dropout_) CUDA_CHECK(cudaMalloc((void**)&dropout_mask, x * y * sizeof(mask_t)));
   //CUDA_CHECK(cudaMalloc((void**)&in_temp, x * y * sizeof(float_t)));
   float_malloc_device(x*y, in_temp);
   init_const_gpu(x*y, 0.0, in_temp);

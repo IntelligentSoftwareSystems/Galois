@@ -1,7 +1,7 @@
 #pragma once
 #include "deepgalois/types.h"
 #include <string>
-#include <boost/iterator/counting_iterator.hpp>
+//#include <boost/iterator/counting_iterator.hpp>
 
 namespace deepgalois {
 
@@ -17,8 +17,8 @@ protected:
   edata_t *edge_data_;
 
 public:
-  //typedef index_t* iterator;
-  using iterator = boost::counting_iterator<index_t>;
+  typedef size_t iterator;
+  //using iterator = boost::counting_iterator<index_t>;
   LearningGraph(bool use_gpu) : is_device(use_gpu), num_vertices_(0), num_edges_(0),
                                 rowptr_(NULL), colidx_(NULL), degrees_(NULL),
                                 vertex_data_(NULL), edge_data_(NULL) {}

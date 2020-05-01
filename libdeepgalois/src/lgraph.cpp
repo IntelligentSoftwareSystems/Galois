@@ -11,6 +11,7 @@
 #include <cassert>
 
 namespace deepgalois {
+
 void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
   const unsigned nsteps = 10;
   unsigned ineachstep = (maxii / nsteps);

@@ -109,7 +109,7 @@ set(sources
 )
 endif()
 
-set(BOOST_LIBRARIES "-lboost_system -lboost_thread")
+#set(BOOST_LIBRARIES "-lboost_system -lboost_thread")
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})

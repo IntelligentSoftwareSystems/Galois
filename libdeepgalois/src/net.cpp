@@ -2,6 +2,7 @@
  * Based on the net.hpp file from Caffe deep learning framework.
  */
 
+#include "galois/Timer.h"
 #include "deepgalois/net.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/math_functions.hh"
@@ -11,7 +12,7 @@ namespace deepgalois {
 void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
                unsigned hidden1, float lr, float dropout, float wd,
                bool selfloop, bool single, bool l2norm, bool dense, 
-               unsigned neigh_sz, unsigned subg_sz, Graph* dGraph) {
+               unsigned neigh_sz, unsigned subg_sz) {
   assert(num_conv > 0);
   num_conv_layers = num_conv;
   num_epochs = epochs;
@@ -32,21 +33,14 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
                  ", weight_decay ", weight_decay, "\n");
 #ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
-  context->set_label_class(is_single_class);
-  context->set_use_subgraph(subgraph_sample_size > 0);
   num_samples = context->read_graph(dataset_str, selfloop);
-  if (subgraph_sample_size) sampler = new deepgalois::Sampler();
-#else
-  context = new deepgalois::DistContext();
-  num_samples = dGraph->size();
-  context->saveGraph(dGraph);
-  // TODO self loop setup?
-  context->initializeSyncSubstrate();
+  context->set_label_class(is_single_class);
 #endif
 
   // read graph, get num nodes
   num_classes = context->read_labels(dataset_str);
 
+#ifndef GALOIS_USE_DIST
   //std::cout << "Reading label masks ... ";
   train_masks = new mask_t[num_samples];
   val_masks = new mask_t[num_samples];
@@ -59,31 +53,13 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
     train_end = train_begin + train_count;
     val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
     // TODO do all can be used below
-#ifndef GALOIS_USE_DIST
     for (size_t i = train_begin; i < train_end; i++) train_masks[i] = 1;
     for (size_t i = val_begin; i < val_end; i++) val_masks[i] = 1;
-#else
-    // find local ID from global ID, set if it exists
-    for (size_t i = train_begin; i < train_end; i++) {
-      if (dGraph->isLocal(i)) {
-        train_masks[dGraph->getLID(i)] = 1;
-      }
-    }
-    for (size_t i = val_begin; i < val_end; i++) {
-      if (dGraph->isLocal(i)) {
-        val_masks[dGraph->getLID(i)] = 1;
-      }
-    }
-#endif
   } else {
-#ifndef GALOIS_USE_DIST
     train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks);
     val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks);
-#else
-    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
-    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
-#endif
   }
+#endif
 
   if (subgraph_sample_size > train_count) {
     galois::gPrint("FATAL: subgraph size can not be larger than the size of training set\n");
@@ -108,12 +84,52 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   feature_dims[num_layers] = num_classes;                // normalized output embedding: E
   layers.resize(num_layers);
 
-#ifndef CPU_ONLY
+#ifdef CPU_ONLY
+  context->set_use_subgraph(subgraph_sample_size > 0);
+  if (subgraph_sample_size) sampler = new deepgalois::Sampler();
+#else
   copy_masks_device(num_samples, train_masks, d_train_masks);
   copy_masks_device(num_samples, val_masks, d_val_masks);
   context->copy_data_to_device(); // copy labels and input features to the device
 #endif
 }
+
+#ifdef GALOIS_USE_DIST
+void Net::dist_init(Graph* graph) {
+  dGraph = graph;
+  context = new deepgalois::DistContext();
+  num_samples = dGraph->size();
+  context->saveGraph(dGraph);
+  // TODO self loop setup?
+  context->initializeSyncSubstrate();
+
+  //std::cout << "Reading label masks ... ";
+  train_masks = new mask_t[num_samples];
+  val_masks = new mask_t[num_samples];
+  std::fill(train_masks, train_masks+num_samples, 0);
+  std::fill(val_masks, val_masks+num_samples, 0);
+
+  if (dataset_str == "reddit") {
+    train_begin = 0, train_count = 153431,
+    train_end = train_begin + train_count;
+    val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
+    // find local ID from global ID, set if it exists
+    for (size_t i = train_begin; i < train_end; i++) {
+      if (dGraph->isLocal(i)) {
+        train_masks[dGraph->getLID(i)] = 1;
+      }
+    }
+    for (size_t i = val_begin; i < val_end; i++) {
+      if (dGraph->isLocal(i)) {
+        val_masks[dGraph->getLID(i)] = 1;
+      }
+    }
+  } else {
+    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
+    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
+  }
+}
+#endif
 
 void Net::train(optimizer* opt, bool need_validate) {
   std::string header = "";
@@ -396,7 +412,7 @@ void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias,
   layers[layer_id]->set_graph_ptr(context->getGraphPointer());
 }
 
-void Net::read_test_masks(std::string dataset, Graph* dGraph) {
+void Net::read_test_masks(std::string dataset) {
   test_masks = new mask_t[num_samples];
   if (dataset == "reddit") {
     test_begin = 177262;
@@ -430,7 +446,7 @@ void Net::read_test_masks(std::string dataset, Graph* dGraph) {
  * @param end GLOBAL end
  * @param count GLOBAL training count
  */
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
 #ifndef GALOIS_USE_DIST
   AccumF accuracy_all;
 #else
@@ -479,7 +495,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
   return accuracy_all.reduce() / (acc_t)count;
 }
 
-acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, Graph* dGraph) {
+acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
   auto preds = layers[num_conv_layers]->next()->get_data();
   auto ground_truth = context->get_labels_ptr();
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes, ground_truth, preds);

@@ -1,10 +1,9 @@
-#include "deepgalois/math_functions.hh"
-#include "galois/Timer.h"
-#include "galois/Galois.h"
 #include <random>
 #include <immintrin.h>
-#include <boost/random.hpp>
+#include "galois/Timer.h"
+#include "galois/Galois.h"
 #include "deepgalois/utils.h"
+#include "deepgalois/math_functions.hh"
 
 #ifdef USE_MKL
 #include <mkl.h>
@@ -23,6 +22,7 @@ extern "C" {
 std::default_random_engine generator;
 std::uniform_real_distribution<float_t> distribution(0.0,1.0);
 /*
+#include <boost/random.hpp>
 typedef boost::mt19937 rng_t;
 inline rng_t* deepgalois_rng() {
   return static_cast<rng_t*>(Context::rng_stream().generator());

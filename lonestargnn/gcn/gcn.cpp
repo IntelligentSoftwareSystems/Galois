@@ -18,17 +18,17 @@ int main(int argc, char** argv) {
   LonestarGnnStart(argc, argv, name, desc, url);
   deepgalois::Net network; // the neural network to train
 
-  deepgalois::Graph* dGraph = NULL;
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
-  dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  deepgalois::Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  network.dist_init(dGraph);
 #endif
 
   // read network, features, ground truth, initialize metadata
   network.init(dataset, num_conv_layers, epochs, hidden1, learning_rate, 
                dropout_rate, weight_decay, add_selfloop, 
                is_single_class, add_l2norm, add_dense, 
-               neighbor_sample_sz, subgraph_sample_sz, dGraph);
+               neighbor_sample_sz, subgraph_sample_sz);
   // default setting for now; can be customized by the user
   network.construct_layers();
   network.print_layers_info();
@@ -47,11 +47,7 @@ int main(int argc, char** argv) {
   if (do_test) {
     // test using test samples
     galois::gPrint("\n");
-#ifndef GALOIS_USE_DIST
-    network.read_test_masks(dataset, NULL);
-#else
-    network.read_test_masks(dataset, dGraph);
-#endif
+    network.read_test_masks(dataset);
     galois::StatTimer Ttest("Test");
     Ttest.start();
     acc_t test_loss = 0.0, test_acc = 0.0;
