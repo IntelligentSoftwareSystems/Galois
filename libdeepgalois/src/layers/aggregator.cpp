@@ -4,13 +4,13 @@
 #ifdef CPU_ONLY
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
-  // zero out the output data
   #ifndef GALOIS_USE_DIST
   galois::do_all(galois::iterate(size_t(0), g.size()),[&](const auto src) {
   #else
   auto& rangeObj = g.allNodesRange();
   galois::do_all(galois::iterate(rangeObj), [&](const auto src) {
   #endif
+    // zero out the output data
     math::clear_cpu(len , &out[src * len]);
     float_t a = 0.0;
     float_t b = 0.0;
@@ -22,9 +22,10 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
       if (norm) {
         // normalize b as well
         b = a * norm_factor[dst];
-        float_t* neighbor = new float_t[len];
+        //float_t* neighbor = new float_t[len]; // this is super slow
+        vec_t neighbor(len);
         // scale the neighbor's data using the normalization factor
-        math::scale(len, b, &in[dst * len], neighbor);
+        math::scale(len, b, &in[dst * len], &neighbor[0]);
         // use scaled data to update; out[src] += in[dst]
         math::vadd_cpu(len, &out[src * len], &neighbor[0],  &out[src * len]);
       } else {
