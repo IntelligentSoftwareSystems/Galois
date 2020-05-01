@@ -538,7 +538,7 @@ void batch_get_shared_field(struct CUDA_Context_Common* ctx,
 
   // ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2"),
   // timer3("timer3"), timer4("timer 4"); timer.start();
-  if (enforce_data_mode != onlyData) {
+  if (enforcedDataMode != onlyData) {
     // timer1.start();
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
     ctx->is_updated.cpu_rd_ptr()->reset();

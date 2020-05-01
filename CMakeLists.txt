@@ -300,7 +300,7 @@ add_subdirectory(lonestar)
 if (ENABLE_DIST_GALOIS)
   add_subdirectory(lonestardist)
 endif()
-add_subdirectory(lonestarmine)
+#add_subdirectory(lonestarmine)
 
 add_subdirectory(scripts)
 add_subdirectory(inputs)
