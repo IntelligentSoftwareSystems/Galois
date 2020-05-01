@@ -32,24 +32,4 @@ cll::opt<bool>
                       cll::desc("Do not use partition-aware optimizations"),
                       cll::init(false), cll::Hidden);
 
-// TODO: use enums
-//! Command line definition for enforce_metadata
-cll::opt<DataCommMode> enforce_metadata(
-    "metadata", cll::desc("Communication metadata"),
-    cll::values(clEnumValN(noData, "auto",
-                           "Dynamically choose the metadata "
-                           "automatically"),
-                clEnumValN(bitsetData, "bitset", "Use bitset metadata always"),
-                clEnumValN(offsetsData, "offsets",
-                           "Use offsets metadata always"),
-                clEnumValN(gidsData, "gids", "Use global IDs metadata always"),
-                clEnumValN(onlyData, "none",
-                           "Do not use any metadata (sends "
-                           "non-updated values)")
-                //clEnumValN(neverOnlyData, "neverOnlyData",
-                //           "Never send onlyData"),
-                ),
-    cll::init(noData), cll::Hidden);
-//! Enforced data mode. Using non-cll type because it can be used directly by
-//! the GPU.
-DataCommMode enforce_data_mode;
+DataCommMode enforcedDataMode = DataCommMode::noData;

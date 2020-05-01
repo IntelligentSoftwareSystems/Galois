@@ -46,12 +46,12 @@ namespace cll = llvm::cl;
 
 //! Specifies if synchronization should be partition agnostic
 extern cll::opt<bool> partitionAgnostic;
-//! Specifies what format to send metadata in
-extern cll::opt<DataCommMode> enforce_metadata;
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 //! bare_mpi type to use; see options in runtime/BareMPI.h
 BareMPI bare_mpi = BareMPI::noBareMPI;
 #endif
+
+extern DataCommMode enforcedDataMode;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -83,7 +83,8 @@ namespace graphs {
  *
  * @tparam GraphTy User graph to handle communication for
  */
-template <typename GraphTy>
+template <typename GraphTy, bool PartitionAgnostic=false,
+          DataCommMode EnforcedMetadata=DataCommMode::noData>
 class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
   //! Synchronization type
@@ -429,7 +430,10 @@ public:
       isCartCut = false;
     }
 
-    enforce_data_mode = enforce_metadata;
+    // set this global value for use on GPUs mostly
+    // TODO find a better way to do this without globals
+    enforcedDataMode = EnforcedMetadata;
+
     initBareMPI();
     // master setup from mirrors done by setupCommunication call
     masterNodes.resize(numHosts);
@@ -571,7 +575,7 @@ private:
                            galois::PODResizeableArray<unsigned int>& offsets,
                            size_t& bit_set_count,
                            DataCommMode& data_mode) const {
-    if (enforce_data_mode != onlyData) {
+    if (EnforcedMetadata != onlyData) {
       bitset_comm.reset();
       std::string syncTypeStr =
           (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -1769,21 +1773,21 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      if (enforce_data_mode == gidsData) {
+      if (EnforcedMetadata == gidsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (enforce_data_mode == offsetsData) {
+      } else if (EnforcedMetadata == offsetsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (enforce_data_mode == bitsetData) {
+      } else if (EnforcedMetadata == bitsetData) {
         size_t bitset_alloc_size =
             ((num + 63) / 64) * sizeof(uint64_t);
         b.reserve(sizeof(DataCommMode)
@@ -3024,7 +3028,7 @@ public:
 
     Tsync.start();
 
-    if (partitionAgnostic) {
+    if (PartitionAgnostic) {
       sync_any_to_any<SyncFnTy, BitsetFnTy, async>(loopName);
     } else {
       if (writeLocation == writeSource) {
@@ -3615,8 +3619,10 @@ public:
 #endif
 };
 
-template <typename GraphTy>
-constexpr const char* const galois::graphs::GluonSubstrate<GraphTy>::RNAME;
+template <typename GraphTy, bool PartitionAgnostic,
+          DataCommMode EnforcedMetadata>
+constexpr const char* const galois::graphs::GluonSubstrate<GraphTy,
+                              PartitionAgnostic, EnforcedMetadata>::RNAME;
 } // end namespace graphs
 } // end namespace galois
 
