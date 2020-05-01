@@ -83,24 +83,28 @@ function(add_test_dist_and_verify app input type part N np)
   math(EXPR t "(${N} / ${np})")
   string(REPLACE "_" ";" app_list ${app})
   list(GET app_list 0 app_id)
-  set(OUTPUT ${BASEOUTPUT}/${input}.${app_id})
+  set(output ${BASEOUTPUT}/${input}.${app_id})
 
-  if (EXISTS ${OUTPUT})
-    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} --env GALOIS_DO_NOT_BIND_THREADS 1 ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
-    add_test(verify-${app}-${type}-${input}-${part}-${np} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${OUTPUT} output_${HOSTNAME}_*.log)
+  set(suffix "-${app}-${type}-${input}-${part}-${np}")
+  if (EXISTS ${output})
+    add_test(run${suffix} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
+    add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${OUTPUT} output_${HOSTNAME}_*.log)
   else()
-    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} --env GALOIS_DO_NOT_BIND_THREADS 1 ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
+    add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
   endif()
 
   if (${X_GPU})
-    set_tests_properties(run-${app}-${type}-${input}-${part}-${np} PROPERTIES RUN_SERIAL true)
+    set_tests_properties(run${suffix} PROPERTIES RUN_SERIAL true)
   endif()
 
+
   # Don't run dist tests in CI since they are broken in too many cases right now.
-  #if (NOT ${X_NOT_QUICK})
-  #  set_tests_properties(run-${app}-${type}-${input}-${part}-${np}
-  #    PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
-  #endif()
+  return()
+
+  if (NOT ${X_NOT_QUICK})
+    set_tests_properties(run${suffix}
+      PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
+  endif()
 endfunction()
 
 function(add_test_dist_for_partitions app input type num_threads num_gpus part)
@@ -163,6 +167,12 @@ function(add_test_dist app input)
     endif()
   endforeach()
 endfunction()
+
+# currently tc only has a GPU implementation
+if(ENABLE_HETERO_GALOIS)
+  add_subdirectory(tc)
+endif()
+
 add_subdirectory(bc)
 add_subdirectory(bfs)
 add_subdirectory(cc)
@@ -170,11 +180,5 @@ add_subdirectory(kcore)
 add_subdirectory(pagerank)
 add_subdirectory(sgd)
 add_subdirectory(sssp)
-#add_subdirectory(kclique)
-
 add_subdirectory(partition)
 
-# currently tc only has a GPU implementation
-if(ENABLE_HETERO_GALOIS)
-  add_subdirectory(tc)
-endif()

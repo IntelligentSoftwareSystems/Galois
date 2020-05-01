@@ -32,7 +32,7 @@
 #include <unordered_set>
 
 #include "bipart.h"
-#include "galois/graphs/Util.h"
+#include "galois/graphs/ReadGraph.h"
 #include "galois/Timer.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"

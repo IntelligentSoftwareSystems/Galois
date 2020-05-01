@@ -20,7 +20,6 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
-#include "galois/gtuple.h"
 #include "galois/Reduction.h"
 #include "galois/PerThreadContainer.h"
 #include "galois/Traits.h"
@@ -75,7 +74,7 @@ struct OrderedStepStats : public StepStatsBase {
     parallelism += par;
   }
 
-  void dump(FILE* out, const char* loopname) const {
+  void dump(FILE* out, const char* loopname) {
     Base::dump(out, loopname, step, parallelism.reduce(), wlSize, 0ul);
   }
 };
@@ -97,7 +96,7 @@ struct UnorderedStepStats : public StepStatsBase {
     nhSize.reset();
   }
 
-  void dump(FILE* out, const char* loopname) const {
+  void dump(FILE* out, const char* loopname) {
     Base::dump(out, loopname, step, parallelism.reduce(), wlSize.reduce(),
                nhSize.reduce());
   }
@@ -203,20 +202,15 @@ template <class T, class FunctionTy, class ArgsTy>
 class ParaMeterExecutor {
 
   using value_type = T;
-  using GenericWL  = typename get_type_by_supertype<wl_tag, ArgsTy>::type::type;
+  using GenericWL  = typename get_trait_type<wl_tag, ArgsTy>::type::type;
   using WorkListTy = typename GenericWL::template retype<T>;
   using dbg        = galois::debug<1>;
 
-  static const bool needsStats =
-      !exists_by_supertype<no_stats_tag, ArgsTy>::value;
-  static const bool needsPush =
-      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static const bool needsAborts =
-      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static const bool needsPia =
-      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak =
-      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+  constexpr static bool needsStats = !has_trait<no_stats_tag, ArgsTy>();
+  constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
+  constexpr static bool needsPia = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
 
   struct IterationContext {
     T item;
@@ -244,7 +238,7 @@ private:
   const char* loopname;
   FILE* m_statsFile;
   FixedSizeAllocator<IterationContext> m_iterAlloc;
-  galois::GReduceLogicalOR m_broken;
+  galois::GReduceLogicalOr m_broken;
 
   IterationContext* newIteration(const T& item) {
     IterationContext* it = m_iterAlloc.allocate(1);

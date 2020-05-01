@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
-#define GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
+#ifndef GALOIS_GRAPHS_LC_INLINEEDGE_GRAPH_H
+#define GALOIS_GRAPHS_LC_INLINEEDGE_GRAPH_H
 
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"

@@ -203,7 +203,7 @@ struct LabelPropAlgo {
   }
 
   void operator()(Graph& graph) {
-    galois::GReduceLogicalOR changed;
+    galois::GReduceLogicalOr changed;
     do {
       changed.reset();
       galois::do_all(
@@ -1079,13 +1079,27 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   using GNode          = typename Graph::GraphNode;
   using component_type = typename Graph::node_data_type::component_type;
 
-  using ReducerMap =
-      galois::GMapPerItemReduce<component_type, int, std::plus<int>>;
-  using Map = typename ReducerMap::container_type;
+  using Map = galois::gstl::Map<component_type, int>;
 
-  using ComponentSizePair = std::pair<component_type, int>;
+  auto reduce = [](Map& lhs, Map&& rhs) -> Map& {
+    Map v{std::move(rhs)};
 
-  ReducerMap accumMap;
+    for (auto& kv : v) {
+      if (lhs.count(kv.first) == 0) {
+        lhs[kv.first] = 0;
+      }
+      lhs[kv.first] += kv.second;
+    }
+
+    return lhs;
+  };
+
+  auto mapIdentity = []() {
+    return Map();
+  };
+
+  auto accumMap = galois::make_reducible(reduce, mapIdentity);
+
   galois::GAccumulator<size_t> accumReps;
 
   galois::do_all(galois::iterate(graph),
@@ -1106,12 +1120,14 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
 
                    // Don't add reps to table to avoid adding components of size
                    // 1
-                   accumMap.update(n.component(), 1);
+                   accumMap.update(Map{std::make_pair(n.component(), 1)});
                  },
                  galois::loopname("CountLargest"));
 
   Map& map    = accumMap.reduce();
   size_t reps = accumReps.reduce();
+
+  using ComponentSizePair = std::pair<component_type, int>;
 
   auto sizeMax = [](const ComponentSizePair& a, const ComponentSizePair& b) {
     if (a.second > b.second) {
@@ -1120,9 +1136,11 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
     return b;
   };
 
-  using MaxComp =
-      galois::GSimpleReducible<decltype(sizeMax), ComponentSizePair>;
-  MaxComp maxComp(sizeMax);
+  auto identity = []() {
+    return ComponentSizePair{};
+  };
+  
+  auto maxComp = galois::make_reducible(sizeMax, identity);
 
   galois::do_all(galois::iterate(map),
                  [&](const ComponentSizePair& x) { maxComp.update(x); });
@@ -1132,8 +1150,9 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   // Compensate for dropping representative node of components
   double ratio       = graph.size() - reps + map.size();
   size_t largestSize = largest.second + 1;
-  if (ratio)
+  if (ratio) {
     ratio = largestSize / ratio;
+  }
 
   std::cout << "Total components: " << reps << "\n";
   std::cout << "Number of non-trivial components: " << map.size()

@@ -1,11 +1,11 @@
 // Copyright (c) 2019, Xuhao Chen
 #include "motif.h"
-#include "timer.h"
-#include "cutils.h"
+#include "pangolin/timer.h"
+#include "pangolin/cutils.h"
 #define USE_PID
 #define USE_SIMPLE
 #define VERTEX_INDUCED
-#include "miner.cuh"
+#include "pangolin/miner.cuh"
 #include <cub/cub.cuh>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
@@ -32,7 +32,7 @@ void printout_motifs(int npatterns, AccType *accumulators) {
 __global__ void extend_alloc(unsigned m, unsigned level, CSRGraph graph, EmbeddingList emb_list, IndexT *num_new_emb) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < m) {
 		IndexT num = 0;
 		emb_list.get_embedding(level, pos, emb[tid]);
@@ -53,7 +53,7 @@ __global__ void extend_alloc(unsigned m, unsigned level, CSRGraph graph, Embeddi
 __global__ void extend_insert(unsigned m, unsigned max_size, unsigned level, CSRGraph graph, EmbeddingList emb_list, IndexT *indices) {
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < m) {
 		emb_list.get_embedding(level, pos, emb[tid]);
 		IndexT start = indices[pos];
@@ -78,7 +78,7 @@ __global__ void aggregate(unsigned m, unsigned level, unsigned npatterns, CSRGra
 	unsigned tid = threadIdx.x;
 	unsigned pos = blockIdx.x * blockDim.x + threadIdx.x;
 	//__shared__ typename BlockReduce::TempStorage temp_storage;
-	__shared__ IndexT emb[BLOCK_SIZE][MAX_SIZE];
+	__shared__ IndexT emb[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	AccType local_num[6];
 	for (int i = 0; i < npatterns; i++) local_num[i] = 0;
 	if(pos < m) {

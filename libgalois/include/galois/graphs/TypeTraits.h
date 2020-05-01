@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_TYPETRAITS_H
-#define GALOIS_GRAPH_TYPETRAITS_H
+#ifndef GALOIS_GRAPHS_TYPETRAITS_H
+#define GALOIS_GRAPHS_TYPETRAITS_H
 
 #include <boost/mpl/has_xxx.hpp>
 

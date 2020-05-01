@@ -1,5 +1,5 @@
-#include "../lonestarmine.h"
-#include "BfsMining/vertex_miner.h"
+#include "lonestarmine.h"
+#include "pangolin/BfsMining/vertex_miner.h"
 
 const char* name = "Sgl";
 const char* desc = "Listing edge-induced subgraphs of a given pattern in a graph using BFS extension";
@@ -12,7 +12,7 @@ uint32_t automorph_group_id[4] = {0, 1, 0, 1}; // 4-cycle
 uint32_t automorph_group_id[4] = {0, 0, 1, 1}; // diamond
 #endif
 
-#include "BfsMining/vertex_miner_api.h"
+#include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI: public VertexMinerAPI<BaseEmbedding> {
 public:
 	static inline bool toAddOrdered(unsigned n, Graph &g, const BaseEmbedding &emb, unsigned pos, VertexId dst, Graph &pattern) {
@@ -50,5 +50,5 @@ public:
 	}
 };
 
-#include "BfsMining/engine.h"
+#include "pangolin/BfsMining/engine.h"
 
