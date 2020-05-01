@@ -46,6 +46,7 @@ else()
   #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -G -Xcompiler -rdynamic)
   link_directories(${CUDA_HOME}/lib64)
   link_directories(${CMAKE_SOURCE_DIR}/libgpu)
+  message(STATUS "CUDA_LIB_DIR: ${CUDA_HOME}/lib64")
 
   set(CUDA_SOURCES
     src/layers/graph_conv_layer.cu

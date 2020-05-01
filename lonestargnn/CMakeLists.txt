@@ -1,8 +1,10 @@
 include_directories(${CMAKE_SOURCE_DIR}/lonestargnn/include)
 include_directories(${CMAKE_SOURCE_DIR}/libdeepgalois/include)
 include_directories(${CUDA_HOME}/include)
+link_directories(${CUDA_HOME}/lib64)
 if(ENABLE_HETERO_GALOIS)
   include_directories(${CMAKE_SOURCE_DIR}/libgpu/include)
+  link_directories(${INTEL_LIBS_DIR})
 endif()
 
 SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib64)
@@ -10,7 +12,6 @@ if(USE_MKL_BLAS)
   SET(BLAS_LIB_DIR "${MKL_ROOT}/lib/intel64")
 endif()
 link_directories(${BLAS_LIB_DIR})
-link_directories(${INTEL_LIBS_DIR})
 
 if(NOT ENABLE_HETERO_GALOIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")

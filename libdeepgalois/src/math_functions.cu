@@ -28,11 +28,11 @@ bool isnan_gpu(int n, const float_t *array) {
   return h_result;
 }
 
-void gpu_rng_uniform(const int n, float_t* r) {
+void gpu_rng_uniform(size_t n, float_t* r) {
   CURAND_CHECK(curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
 }
 
-void rng_uniform_gpu(const int n, const float_t a, const float_t b, float_t* r) {
+void rng_uniform_gpu(size_t n, const float_t a, const float_t b, float_t* r) {
   CURAND_CHECK(curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
   const float range = b - a;
   if (range != float_t(1))

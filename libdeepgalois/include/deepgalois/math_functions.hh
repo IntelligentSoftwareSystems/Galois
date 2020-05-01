@@ -142,7 +142,7 @@ void d_sigmoid_cross_entropy_gpu(int len, int bengin, int end,
                                  const float_t* out_data, float_t* diff);
 void scal_gpu(const int n, const float alpha, float* X);
 void add_scalar_gpu(const int n, const float_t alpha, float_t* Y);
-void rng_uniform_gpu(const int n, const float_t a, const float_t b, float_t* r);
+void rng_uniform_gpu(size_t n, const float_t a, const float_t b, float_t* r);
 bool is_allocated_device(float_t* data);
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks);
 void float_malloc_device(int n, float_t*& ptr);
