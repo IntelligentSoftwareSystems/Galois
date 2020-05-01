@@ -56,3 +56,5 @@ add_subdirectory(tutorial_examples)
 add_subdirectory(ktruss)
 add_subdirectory(clustering)
 
+add_subdirectory(analytics)
+add_subdirectory(scientific)
