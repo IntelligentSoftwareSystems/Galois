@@ -686,6 +686,9 @@ inline Order order(word* sub, word* target, int nWords) {
 
   if (larger)
     return Order::LARGER;
+
+  assert(false); // Should never happen
+  return Order::NOTCOMPARABLE;
 }
 
 inline int getHammingDist(word* f1, word* f2, int nWords) {
