@@ -34,21 +34,6 @@ int LIMIT;
 bool FLAG = false;
 namespace {
 
-#ifndef NDEBUG
-__attribute__((unused)) void assertAllMatched(GNode node, GGraph* graph) {
-  for (auto jj : graph->edges(node))
-    assert(node == graph->getEdgeDst(jj) ||
-           graph->getData(graph->getEdgeDst(jj)).isMatched());
-}
-
-__attribute__((unused)) void assertNoMatched(GGraph* graph) {
-  for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
-    assert(!graph->getData(*nn).isMatched());
-}
-#endif
-
-
-typedef galois::GAccumulator<unsigned> Pcounter;
 
 
 int hash(unsigned val) {

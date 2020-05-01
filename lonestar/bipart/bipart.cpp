@@ -77,6 +77,9 @@ static cll::opt<unsigned> csize(cll::Positional,
 static cll::opt<unsigned> refiter(cll::Positional,
                                    cll::desc("<number of iterations in ref>"),
                                    cll::Required);
+static cll::opt<unsigned> numPartitions(cll::Positional,
+                                   cll::desc("<number of partitions>"),
+                                   cll::Required);
 static cll::opt<double> imbalance(
     "balance",
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
@@ -110,7 +113,7 @@ static cll::opt<double> imbalance(
 /**
  * Partitioning 
  */
-void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
+void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo, unsigned K) {
   galois::StatTimer TM;
   TM.start();
 
@@ -121,13 +124,13 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
 
  galois::StatTimer T2("PartitionSEP");
   T2.start();
-  partition(mcg);
+  partition(mcg, K);
   T2.stop();
 
 
   galois::StatTimer T3("Refine");
   T3.start();
-  refine(mcg, refineTo);
+  refine(mcg, refineTo, K);
   T3.stop();
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
@@ -138,25 +141,19 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
 int computingCut(GGraph& g) {
 
   GNodeBag bag;
-  galois::do_all(galois::iterate(g),
+  galois::GAccumulator<unsigned> edgecut;
+  galois::do_all(galois::iterate((size_t)0,g.hedges),
         [&](GNode n) {
-          if (g.hedges <= n) return;
+          std::set<unsigned> nump;
           for (auto cell : g.edges(n)) {
             auto c = g.getEdgeDst(cell);
             int part = g.getData(c).getPart();
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int partc = g.getData(cc).getPart();
-              if (partc != part) {
-                bag.push(n);
-                return;
-              }
-
-            }
+            nump.insert(part);
           }
+          edgecut += (nump.size() - 1);
         },
         galois::loopname("cutsize"));
-  return std::distance(bag.begin(), bag.end());
+  return edgecut.reduce();
 }
 
 int computingBalance(GGraph& g) {
@@ -281,7 +278,142 @@ int main(int argc, char** argv) {
   std::cout<<"\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
-  Partition(&metisGraph, csize, refiter);
+//  Partition(&metisGraph, csize, refiter);
+  galois::do_all(
+    galois::iterate(graph.hedges, graph.size()),
+    [&](GNode item) {
+      //accum += g->getData(item).getWeight();
+      graph.getData(item, galois::MethodFlag::UNPROTECTED).initRefine(0, true);
+      graph.getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
+    },
+    galois::loopname("initPart"));
+  
+  const int k = numPartitions;
+  //calculating number of iterations/levels required
+  int num = log2(k)+1;
+
+  int kValue[k];
+  for (int i = 0; i < k; i++)kValue[i] = 0;
+
+  kValue[0] = k;
+  //running it level by level
+ 
+  std::set<int> toProcess;
+  std::set<int> toProcessNew;
+  toProcess.insert(0);
+  for (int level = 0; level<num; level++) {
+    //calling Partition for each partition number
+    for (auto i : toProcess) {
+      if (kValue[i] > 1) {	
+         MetisGraph metisG;
+         GGraph& gr = *metisG.getGraph();
+         std::vector<GNode> nodesvec;
+         std::vector<GNode> hedgevec;
+         for (GNode n = graph.hedges; n < graph.size(); n++){
+          int pp = graph.getData(n).getPart();
+          if (kValue[pp] > 1 && pp == i) {
+            nodesvec.push_back(n);
+      }
+    }
+    //unsigned nodesize = nodesvec.size();
+    std::map<GNode, unsigned> nodemap;
+    std::map<GNode, unsigned> edgemap;
+    unsigned ed = 0;
+    for (GNode h = 0; h < graph.hedges; h++) {	
+      bool flag = true;
+      auto c = graph.edges(h).begin();
+      GNode dst = graph.getEdgeDst(*c);
+      unsigned nPart = graph.getData(dst).getPart();
+      unsigned ii = i;
+      if (nPart != ii) continue;
+      for (auto n : graph.edges(h)){
+        if (graph.getData(graph.getEdgeDst(n)).getPart() != nPart) {
+          flag = false;
+	  break;
+	}
+      }
+
+      if (flag && kValue[nPart] > 1) {
+        hedgevec.push_back(h);
+        edgemap[h] = ed++;
+      }
+    } 
+    unsigned id = hedgevec.size();
+    for (auto n : nodesvec) { 
+       nodemap[n] = id++;
+    }
+    unsigned totalnodes = hedgevec.size() + nodesvec.size();
+    galois::gstl::Vector<galois::PODResizeableArray<uint32_t> > edges_ids(totalnodes);
+    std::vector<uint64_t> pre_edges(totalnodes);
+    unsigned edges = 0;
+    for (auto h : hedgevec) {
+      for (auto v : graph.edges(h)) {
+        auto vv = graph.getEdgeDst(v);
+        uint32_t newid = edgemap[h];
+        unsigned nm = nodemap[vv];
+        edges_ids[newid].push_back(nm);
+      }
+    }
+    galois::GAccumulator<uint64_t> num_edges_acc;
+    galois::do_all(galois::iterate(uint32_t{0}, totalnodes),
+                [&](uint32_t c){
+                  pre_edges[c] = edges_ids[c].size();
+                  num_edges_acc += prefix_edges[c];
+                },
+                galois::steal());
+    edges = num_edges_acc.reduce(); 
+    for (uint64_t c = 1; c < totalnodes; ++c) {
+      pre_edges[c] += pre_edges[c - 1];
+    }
+  gr.constructFrom(totalnodes, edges, pre_edges, edges_ids);//, edges_data);
+  gr.hedges = hedgevec.size();
+  gr.hnodes = nodesvec.size();
+  galois::do_all(galois::iterate(gr),
+                  [&](GNode n) {
+                    if (n < gr.hedges)
+                      gr.getData(n).netnum = n+1;
+                    else
+                      gr.getData(n).netnum = INT_MAX;
+                    gr.getData(n).netrand = INT_MAX;
+                    gr.getData(n).netval = INT_MAX;
+                    gr.getData(n).nodeid = n+1;
+  
+  });
+        //GGraph* gr = metisGraph[i].getGraph();
+        Partition(&metisG, 25, 2, kValue[i]);
+        MetisGraph *mcg = &metisG;
+
+        while (mcg->getCoarserGraph() != NULL) {
+          mcg = mcg->getCoarserGraph();
+        }
+
+        while(mcg->getFinerGraph() != NULL && mcg->getFinerGraph()->getFinerGraph() != NULL){
+          mcg = mcg->getFinerGraph();
+          delete mcg->getCoarserGraph();
+        }
+			
+	  //GGraph& gg = *metisGraph[i].getGraph();
+	  int tmp = kValue[i];
+	  kValue[i] = (tmp + 1)/2;
+	  kValue[i+(tmp+1)/2] = (tmp)/2;
+	  toProcessNew.insert(i);
+	  toProcessNew.insert(i + (tmp+1)/2);
+	  for (GNode v : nodesvec) {
+            GNode n = nodemap[v];
+            unsigned pp = gr.getData(n).getPart();
+	     if (pp == 0) {
+	       graph.getData(v).setPart(i);
+	     }
+	     else if (pp == 1){
+	       graph.getData(v).setPart(i+(tmp+1)/2);
+	     }
+         }
+      }
+    }
+	
+    toProcess = toProcessNew;
+    toProcessNew.clear();
+} 
   //std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
   galois::runtime::reportStat_Single("HyPar", "Edge Cut", computingCut(graph));
   galois::runtime::reportStat_Single("HyParzo", "zero-one", computingBalance(graph));
