@@ -24,6 +24,7 @@
 #include "galois/graphs/Details.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/GraphHelpers.h"
+#include "galois/PODResizeableArray.h"
 
 #include <type_traits>
 #include<fstream>
