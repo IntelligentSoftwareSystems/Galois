@@ -98,7 +98,6 @@ function(add_test_dist_and_verify app input type part N np)
   endif()
 
 
-  # Don't run dist tests in CI since they are broken in too many cases right now.
   if (NOT ${X_NOT_QUICK})
     set_tests_properties(run${suffix}
       PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
