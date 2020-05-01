@@ -1,4 +1,7 @@
 #include <random>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
 #include <immintrin.h>
 #include "galois/Timer.h"
 #include "galois/Galois.h"
@@ -19,8 +22,6 @@ extern "C" {
     exit(1);                           \
   } while(0);
 
-std::default_random_engine generator;
-std::uniform_real_distribution<float_t> distribution(0.0,1.0);
 /*
 #include <boost/random.hpp>
 typedef boost::mt19937 rng_t;
@@ -36,14 +37,17 @@ void rng_bernoulli(size_t n, const float_t p, uint8_t* r) {
     r[i] = variate_generator();
 }
 */
+
+std::default_random_engine generator;
+std::uniform_real_distribution<float_t> distribution(0.0,1.0);
+
 namespace deepgalois {
 
+namespace math {
+
 inline uint8_t bernoulli(float_t p) {
-  //return uniform_rand(float_t(0), float_t(1)) > p ? 1 : 0;
   return distribution(generator) > p ? 1 : 0;
 }
-
-namespace math {
 
 //! wrapper function to call cblas_sgemm
 void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
@@ -79,6 +83,26 @@ void csrmm_cpu(const int M, const int N, const int K, const int nnz,
 void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float alpha, 
            const float* A, const float* x, const float beta, float* y) {
   cblas_sgemv(CblasRowMajor, TransA, M, N, alpha, A, N, x, 1, beta, y, 1);
+}
+
+inline void rng_uniform_cpu(size_t n, float_t* r) {
+#ifdef USE_MKL
+  VSLStreamStatePtr stream;	 
+  // Initializing the streams
+  vslNewStream(&stream, VSL_BRNG_SOBOL, 1);
+  // Generating
+  vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n, r, 0.0f, 1.0f);
+  // Deleting the streams
+  vslDeleteStream(&stream);
+#else
+  for (size_t i = 0; i < n; ++i) {
+    r[i] = distribution(generator);
+  }
+  //galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+  //  unsigned short xi[3];
+  //  r[i] = erand48(xi);
+  //}, galois::loopname("randomMaskGen"));
+#endif
 }
 
 const size_t vec_len = 8; // for 32-bit floating point in AVX2; TODO AVX512
@@ -198,16 +222,37 @@ void clear_cpu(size_t n, float_t* in) {
 void dropout(size_t m, float scale, float dropout_rate, 
              const float_t* in, mask_t* masks, float_t* out) {
   for (size_t i = 0; i < m; ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
+    masks[i] = bernoulli(dropout_rate);
   for (size_t i = 0; i < m; ++i)
     out[i] = in[i] * (float_t)masks[i] * scale;
 }
 
 void dropout_cpu(size_t n, size_t m, float scale, float dropout_rate,
              const float_t* in, mask_t* masks, float_t* out) {
-  for (size_t i = 0; i < n*m; ++i)
-    masks[i] = deepgalois::bernoulli(dropout_rate);
-  galois::do_all(galois::iterate((size_t)0, n*m), [&](const auto& i) {
+  size_t len = n * m;
+/*
+#ifdef USE_MKL
+  vec_t rands(len);
+  rng_uniform_cpu(len, &rands[0]);
+  galois::do_all(galois::iterate((size_t)0, len), [&](const auto& i) {
+    masks[i] = rands[i] > dropout_rate ? 1 : 0;
+  }, galois::loopname("randomMaskGen"));
+*/
+/*
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
+    auto idx = i * m;
+    vec_t rands(m);
+    rng_uniform_cpu(m, &rands[0]);
+    for (size_t j = 0; j < m; ++j)
+      masks[idx+j] = rands[j] > dropout_rate ? 1 : 0;
+  }, galois::loopname("dropout"));
+#else
+*/
+  for (size_t i = 0; i < len; ++i) {
+    masks[i] = bernoulli(dropout_rate);
+  }
+//#endif
+  galois::do_all(galois::iterate((size_t)0, len), [&](const auto& i) {
     out[i] = in[i] * (float_t)masks[i] * scale;
   }, galois::loopname("dropout"));
 }
