@@ -261,6 +261,15 @@ double p, double q){
 	});
 }
 
+void printM(std::vector<std::vector<double> >& M, uint32_t num_edge_types){
+
+	for(uint32_t i =0; i<= num_edge_types;i++){
+		for(uint32_t j =0;j<= num_edge_types;j++)
+			std::cout << M[i][j] << " " ;
+		
+		std::cout << std::endl;
+	}
+}
 
 //function generateTransitionMatrix
 //M should have all entries set to 1
@@ -297,6 +306,8 @@ galois::InsertBag<std::vector<uint32_t>>& nodeWalks){
 
 						
 		computeM(transformedV, means, M, num_edge_types);		
+
+		printM(M, num_edge_types);
 	}
 }
 
@@ -372,6 +383,9 @@ int main(int argc, char** argv) {
 
 	graph.constructFrom(nodes, 2*edges, prefix_edges, edges_id, edges_data);
 
+	galois::StatTimer T("end2end");
+  T.start();
+
 	//transition matrix
 	std::vector<std::vector<double>> M(max_type+1);
 
@@ -383,7 +397,10 @@ int main(int argc, char** argv) {
 
 	galois::InsertBag<std::vector<uint32_t>> walks;
 	generateTransitionMatrix(graph, M, N, walk_length, p,  q,  max_type, walks);
-	
+
+	T.stop();
+	std::cout <<"total time:" << T.get() << std::endl;
+
 	printWalks(walks);
 		
 	return 0;
