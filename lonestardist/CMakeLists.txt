@@ -166,7 +166,7 @@ function(add_test_dist app input)
 
   set(num_threads ${NUM_TEST_THREADS})
 
-  foreach (part oec iec cvc cvc-iec)
+  foreach (part oec iec cvc cvc-iec hovc hivc)
     if (NOT ${X_NO_ASYNC})
       add_test_dist_for_partitions(${app} ${input} sync ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Sync)
       add_test_dist_for_partitions(${app} ${input} async ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Async)
