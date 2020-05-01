@@ -48,9 +48,6 @@ static cll::opt<double> q("q from the paper",
 static cll::opt<double> num_walk("number of walk",
   cll::desc("number of walk"),
   cll::init(1));
-static cll::opt<double> num_edge_types("number edge type",
-  cll::desc("number of edge types"),
-  cll::init(3));
 
 void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std::vector<uint32_t>>& walks, uint32_t num_edge_types){
 
@@ -70,40 +67,80 @@ void computeVectors(std::vector<std::vector<uint32_t>>& v, galois::InsertBag<std
 		v.push_back(vec); 
 }
 
+void transformVectors(std::vector<std::vector<uint32_t>>& v, std::vector<std::vector<uint32_t>>& transformedV, uint32_t num_edge_types){
+
+	uint32_t rows= v.size();
+	
+	for(uint32_t j=0;j<=num_edge_types;j++)
+		for(uint32_t i=0;i<rows;i++){
+			transformedV[j].push_back(v[i][j]);
+		}
+}
+
 double sigmoidCal(double pears) {
     return 1 / (1 + exp(-pears)); //exact sig
     //return (pears / (1 + abs(pears))); //fast sigmoid
     
 }
 
-double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v){
-    int sum_x = 0, sum_y = 0, sum_xy = 0, squareSum_x = 0, squareSum_y = 0;
+void computeMeans(std::vector<std::vector<uint32_t>>& v, std::vector<double>& means, uint32_t num_edge_types){
+
+	galois::do_all(galois::iterate((uint32_t) 1, num_edge_types+1),
+  [&](uint32_t i){
+		
+			uint32_t sum = 0;
+			for(auto n:v[i])
+				sum += n;
+
+			means[i] = ((double) sum)/(v[i].size());
+		});	
+}
+double pearsonCorr(uint32_t i, uint32_t j, std::vector<std::vector<uint32_t>>& v, std::vector<double>& means){
+   // int sum_x = 0, sum_y = 0, sum_xy = 0, squareSum_x = 0, squareSum_y = 0;
     std::vector<uint32_t> x = v[i];
     std::vector<uint32_t> y = v[j];
+
+		double sum = 0.0f;
+		double sig1 = 0.0f;
+		double sig2 = 0.0f;
+
     for (uint32_t m = 0; m < x.size(); m++) 
     { 
-        sum_x = sum_x + x.at(m); 
-        sum_y = sum_y + y.at(m); 
-        sum_xy = sum_xy + x.at(m) * y.at(m); 
-        squareSum_x = squareSum_x + x.at(m) * x.at(m); 
-        squareSum_x = squareSum_y + y.at(m) * y.at(m); 
+				sum += ((double)x[m] - means[i])*((double)y[m] - means[j]);
+        //sum_x = sum_x + x.at(m); 
+        //sum_y = sum_y + y.at(m); 
+        //sum_xy = sum_xy + x.at(m) * y.at(m); 
+        //squareSum_x = squareSum_x + x.at(m) * x.at(m); 
+        //squareSum_x = squareSum_y + y.at(m) * y.at(m);
+        sig1 += ((double)x[m] - means[i])*((double)x[m] - means[i]);
+				sig2 += ((double)y[m] - means[j])*((double)y[m] - means[j]); 
     } 
   
-    double corr = (double)(x.size() * sum_xy - sum_x * sum_y)  
-                  / sqrt((x.size() * squareSum_x - sum_x * sum_x)  
-                      * (x.size() * squareSum_y - sum_y * sum_y)); 
+		sum = sum/((double) x.size()) ;
+
+		sig1 = sig1/((double) x.size());
+		sig1 = sqrt(sig1);
+
+		sig2 = sig2/((double) x.size());
+    sig2 = sqrt(sig2);
+
+    //double corr = (double)(x.size() * sum_xy - sum_x * sum_y)  
+      //            / sqrt((x.size() * squareSum_x - sum_x * sum_x)  
+        //              * (x.size() * squareSum_y - sum_y * sum_y));
+        //
+    double corr = sum/(sig1*sig2) ; 
     return corr;
 	
 }
 
-void computeM(std::vector<std::vector<uint32_t>>& v, std::vector<std::vector<double> >& M,uint32_t num_edge_types){
+void computeM(std::vector<std::vector<uint32_t>>& v, std::vector<double>& means, std::vector<std::vector<double> >& M,uint32_t num_edge_types){
 
 	galois::do_all(galois::iterate((uint32_t) 1, num_edge_types+1),
 	[&](uint32_t i){
 
 		for(uint32_t j=1;j<=num_edge_types;j++){
 			
-			double pearson_corr = pearsonCorr(i,j, v);
+			double pearson_corr = pearsonCorr(i,j, v, means);
 			double sigmoid = sigmoidCal(pearson_corr);
 
 			M[i][j] = sigmoid;
@@ -226,21 +263,46 @@ double p, double q){
 //M should have all entries set to 1
 void generateTransitionMatrix(Graph& graph, std::vector<std::vector<double> >& M, uint32_t N,
 uint32_t walk_length,
-double p, double q, uint32_t num_edge_types){
+double p, double q, uint32_t num_edge_types,
+galois::InsertBag<std::vector<uint32_t>>& walks){
 
 	while(N>0){
+		std::cout << "N: " << N << std::endl;
 		N--;
 		
+		galois::StatTimer T("walk");
+  T.start();
 		//E step; generate walks
-		galois::InsertBag<std::vector<uint32_t>> walks;
+		walks.clear();
+		//galois::InsertBag<std::vector<uint32_t>> walks;
 		heteroRandomWalk(graph, M, walks, walk_length, p, q);
-		
+		T.stop();
+		std::cout << "wal time: " << T.get() << std::endl; 		
+
 		//M step
 		//uint32_t size = std::distance(walks.begin(), walks.end());
 		std::vector<std::vector<uint32_t>> v;
 		computeVectors(v, walks, num_edge_types);
 
-		computeM(v, M, num_edge_types);		
+		 std::vector<std::vector<uint32_t>> transformedV(num_edge_types+1);
+		transformVectors(v, transformedV, num_edge_types);
+
+		std::vector<double> means(num_edge_types+1);
+		computeMeans(transformedV, means,  num_edge_types);
+
+						
+		computeM(transformedV, means, M, num_edge_types);		
+	}
+}
+
+void printWalks(galois::InsertBag<std::vector<uint32_t>>& walks){
+
+	std::ofstream f("walks.txt");
+
+	for(auto walk:walks){
+		for(auto node: walk)	
+			f << node << " " ;
+		f << std::endl;	
 	}
 }
 
@@ -271,8 +333,8 @@ int main(int argc, char** argv) {
 	while(std::getline(f, line)){
 	
 		std::stringstream ss(line);
-		uint32_t src, dst, type;
-		ss >> src >> dst >> type;
+		uint32_t src, dst, type, id;
+		ss >> src >> dst >> type >> id;
 
 		edges_id[src-1].push_back(dst-1);
 		EdgeTy edgeTy;
@@ -307,7 +369,11 @@ int main(int argc, char** argv) {
 		for(uint32_t j=0;j<=max_type;j++)
 			M[i].push_back(1.0f);
 	}	
+
+	galois::InsertBag<std::vector<uint32_t>> walks;
+	generateTransitionMatrix(graph, M, N, walk_length, p,  q,  max_type, walks);
 	
-	generateTransitionMatrix(graph, M, N, walk_length, p,  q,  num_edge_types);		
+	printWalks(walks);
+		
 	return 0;
 }
