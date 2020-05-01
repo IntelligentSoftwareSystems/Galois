@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
   }
   // edges = #edges, hedgecount = how many edges each node has, edges_id: for each node, which ndoes it is connected to
   // edges_data: data for each edge = 1
-  graph.constructFrom(nodes+hedges, edges, prefix_edges, edges_id);//, edges_data);
+  graph.constructFrom(nodes+hedges, edges, prefix_edges, edges_id, edges_data);
   galois::do_all(galois::iterate(graph),
                   [&](GNode n) {
                     if (n < hedges)
@@ -344,6 +344,7 @@ int main(int argc, char** argv) {
     }
     unsigned totalnodes = hedgevec.size() + nodesvec.size();
     galois::gstl::Vector<galois::PODResizeableArray<uint32_t> > edges_ids(totalnodes);
+    std::vector<std::vector<EdgeTy> > edge_data(totalnodes);
     std::vector<uint64_t> pre_edges(totalnodes);
     unsigned edges = 0;
     for (auto h : hedgevec) {
@@ -365,7 +366,7 @@ int main(int argc, char** argv) {
     for (uint64_t c = 1; c < totalnodes; ++c) {
       pre_edges[c] += pre_edges[c - 1];
     }
-  gr.constructFrom(totalnodes, edges, pre_edges, edges_ids);//, edges_data);
+  gr.constructFrom(totalnodes, edges, pre_edges, edges_ids, edge_data);
   gr.hedges = hedgevec.size();
   gr.hnodes = nodesvec.size();
   galois::do_all(galois::iterate(gr),
