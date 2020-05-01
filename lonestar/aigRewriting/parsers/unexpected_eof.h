@@ -33,7 +33,7 @@
 
 class unexpected_eof : public std::exception {
   unsigned l, c;
-  std::string msg;
+  std::string full_msg;
 
 public:
   unexpected_eof(unsigned l, unsigned c);
