@@ -149,7 +149,7 @@ void computeM(std::vector<std::vector<uint32_t>>& v, std::vector<double>& means,
 }
 //function HeteroRandomWalk
 void heteroRandomWalk(Graph& graph, std::vector<std::vector<double> >& M, 
-galois::InsertBag<std::vector<uint32_t>>& bag, uint32_t walk_length,
+galois::InsertBag<std::vector<uint32_t>>& bag, galois::InsertBag<std::vector<uint32_t>>& nodeWalks, uint32_t walk_length,
 double p, double q){
 
 	galois::do_all(galois::iterate(graph),
@@ -255,6 +255,9 @@ double p, double q){
 				T.push_back(type);		
 			}//end if-else loop
 		}//end while
+
+		nodeWalks.push(walk);		
+		bag.push(T);
 	});
 }
 
@@ -264,8 +267,9 @@ double p, double q){
 void generateTransitionMatrix(Graph& graph, std::vector<std::vector<double> >& M, uint32_t N,
 uint32_t walk_length,
 double p, double q, uint32_t num_edge_types,
-galois::InsertBag<std::vector<uint32_t>>& walks){
+galois::InsertBag<std::vector<uint32_t>>& nodeWalks){
 
+	std::cout << "legth:" << walk_length << std::endl;
 	while(N>0){
 		std::cout << "N: " << N << std::endl;
 		N--;
@@ -273,12 +277,13 @@ galois::InsertBag<std::vector<uint32_t>>& walks){
 		galois::StatTimer T("walk");
   T.start();
 		//E step; generate walks
-		walks.clear();
-		//galois::InsertBag<std::vector<uint32_t>> walks;
-		heteroRandomWalk(graph, M, walks, walk_length, p, q);
+		nodeWalks.clear();
+		galois::InsertBag<std::vector<uint32_t>> walks;
+		heteroRandomWalk(graph, M, walks, nodeWalks, walk_length, p, q);
 		T.stop();
 		std::cout << "wal time: " << T.get() << std::endl; 		
 
+		std::cout << "size: " << std::distance(nodeWalks.begin(), nodeWalks.end()) << std::endl;
 		//M step
 		//uint32_t size = std::distance(walks.begin(), walks.end());
 		std::vector<std::vector<uint32_t>> v;
@@ -301,7 +306,7 @@ void printWalks(galois::InsertBag<std::vector<uint32_t>>& walks){
 
 	for(auto walk:walks){
 		for(auto node: walk)	
-			f << node << " " ;
+			f << node+1 << " " ;
 		f << std::endl;	
 	}
 }
@@ -337,15 +342,21 @@ int main(int argc, char** argv) {
 		ss >> src >> dst >> type >> id;
 
 		edges_id[src-1].push_back(dst-1);
-		EdgeTy edgeTy;
+		edges_id[dst-1].push_back(src-1);
+	
+		EdgeTy edgeTy1, edgeTy2;
 
-		edgeTy.weight = 1;
-		edgeTy.type = type;
+		edgeTy1.weight = 1;
+		edgeTy1.type = type;
+
+		edgeTy2.weight = 1;
+    edgeTy2.type = type;
 
 		if(type > max_type)
 			max_type = type;
 
-		edges_data[src-1].push_back(edgeTy);
+		edges_data[src-1].push_back(edgeTy1);
+		edges_data[dst-1].push_back(edgeTy2);
 	}
 
 	f.close();
@@ -359,7 +370,7 @@ int main(int argc, char** argv) {
     prefix_edges[c] += prefix_edges[c - 1];
   }	
 
-	graph.constructFrom(nodes, edges, prefix_edges, edges_id, edges_data);
+	graph.constructFrom(nodes, 2*edges, prefix_edges, edges_id, edges_data);
 
 	//transition matrix
 	std::vector<std::vector<double>> M(max_type+1);
