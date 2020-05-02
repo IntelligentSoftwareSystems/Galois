@@ -1,5 +1,3 @@
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-error>")
-
 file(GLOB Sources 
   subjectgraph/aig/*.cpp
   algorithms/*.cpp
