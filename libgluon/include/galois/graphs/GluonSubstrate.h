@@ -40,9 +40,6 @@
 #endif
 
 #include "galois/runtime/BareMPI.h"
-#include "llvm/Support/CommandLine.h"
-
-namespace cll = llvm::cl;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 //! bare_mpi type to use; see options in runtime/BareMPI.h

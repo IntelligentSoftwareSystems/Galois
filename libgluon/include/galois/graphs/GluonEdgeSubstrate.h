@@ -42,9 +42,6 @@
 #endif
 
 #include "galois/runtime/BareMPI.h"
-#include "llvm/Support/CommandLine.h"
-
-namespace cll = llvm::cl;
 
 //! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
