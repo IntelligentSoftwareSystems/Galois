@@ -43,6 +43,7 @@
 
 #include "galois/runtime/BareMPI.h"
 
+// TODO make not global
 //! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
 
@@ -364,7 +365,6 @@ public:
                                                 RNAME);
       edgeSubstrateSetupTimer.start();
 
-      // TODO make not global
       // set global
       enforcedDataMode = _substrateDataMode;
 

@@ -46,6 +46,8 @@
 BareMPI bare_mpi = BareMPI::noBareMPI;
 #endif
 
+// TODO find a better way to do this without globals
+//! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
 
 //! Enumeration for specifiying write location for sync calls
@@ -101,7 +103,7 @@ private:
   const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
-  bool isCartCut; //!< True of graph is a cartesian cut
+  bool isCartCut; //!< True if graph is a cartesian cut
 
   // bitvector status hasn't been maintained
   //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be
@@ -438,7 +440,6 @@ public:
     }
 
     // set this global value for use on GPUs mostly
-    // TODO find a better way to do this without globals
     enforcedDataMode = _enforcedDataMode;
 
     initBareMPI();
