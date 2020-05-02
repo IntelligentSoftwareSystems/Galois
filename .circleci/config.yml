@@ -128,12 +128,11 @@ jobs:
             eigen3-devel \
             llvm-devel \
             llvm-static \
+            llvm-toolset \
             make \
             ncurses-devel \
-            openmpi-devel \
             wget \
             zlib-devel
-          yum module -y -q install llvm-toolset
 
           wget -O - https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0-Linux-x86_64.tar.gz | tar -xz -f - -C /usr/local
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
@@ -143,21 +142,16 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          # Make the "module" command work in this shell session.
-          source /etc/profile.d/modules.sh
-          module load mpi
           cmake \
             -S . \
             -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DENABLE_DIST_GALOIS=ON
+            -DCMAKE_CXX_COMPILER=clang++
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-          # OpenMPI segfaults here issue #118
-          (cd /tmp/build \
+          cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2") || true
+            && su runner -c "ctest -V --label-regex quick --parallel 2"
   "Arch":
     docker:
       - image: archlinux/base
