@@ -38,7 +38,6 @@ cdef void Initialize(Graph_CSR *g, unsigned long source):
         data = &g[0].getData(n)
         if(n == source):
             data[0] = 0
-            gPrint(b"Srouce\n")
         else:
             data[0] = numNodes
         
@@ -174,7 +173,6 @@ def bfs(int numThreads, unsigned long source, string filename):
     ## memory runtime.
     sys = new SharedMemSys()
     cdef int new_numThreads = setActiveThreads(numThreads)
-    gPrint(b"Hello this is gprint\n")
     if new_numThreads != numThreads:
         print("Warning, using fewer threads than requested")
     
