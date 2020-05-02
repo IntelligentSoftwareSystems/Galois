@@ -151,7 +151,7 @@ float_t* DistContext::get_in_ptr() {
   return &h_feats[0];
 }
 
-void DistContext::norm_factor_counting(size_t g_size) {
+void DistContext::norm_factor_computing(size_t g_size) {
   // TODO: this is a distributed operation
 
   // create for now, TODO need to actually fill it in

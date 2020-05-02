@@ -162,17 +162,17 @@ void Net::train(optimizer* opt, bool need_validate) {
     t_epoch.Start();
 
     if (subgraph_sample_size && num_subg_remain == 0) {
+      for (size_t i = 0; i < num_layers; i++) layers[i]->update_dim_size(subgraph_sample_size);
 #ifdef CPU_ONLY
       // generate subgraph
       context->createSubgraph();
       auto subgraph_ptr = context->getSubgraphPointer();
       sampler->subgraph_sample(subgraph_sample_size, *(subgraph_ptr), subgraph_masks);
-      for (size_t i = 0; i < num_conv_layers-1; i++) {
+      context->norm_factor_computing(1);
+      for (size_t i = 0; i < num_conv_layers; i++) {
         layers[i]->set_graph_ptr(context->getSubgraphPointer());
+        layers[i]->set_norm_consts_ptr(context->get_norm_factors_subg_ptr());
 	  }
-      // update masks for subgraph
-      layers[num_layers - 1]->set_sample_mask(train_begin, train_end, train_count, subgraph_masks);
-
       // update labels for subgraph
       context->gen_subgraph_labels(subgraph_sample_size, subgraph_masks);
       layers[num_layers-1]->set_labels_ptr(context->get_labels_subg_ptr());
@@ -180,8 +180,6 @@ void Net::train(optimizer* opt, bool need_validate) {
       // update features for subgraph
       context->gen_subgraph_feats(subgraph_sample_size, subgraph_masks);
       layers[0]->set_feats_ptr(context->get_feats_subg_ptr()); // feed input data
-
-      context->norm_factor_counting(subgraph_sample_size);
 #endif
       num_subg_remain += 1; // num_threads
     }
@@ -215,6 +213,17 @@ void Net::train(optimizer* opt, bool need_validate) {
     double epoch_time = t_epoch.Millisecs();
     total_train_time += epoch_time;
     if (need_validate && ep % val_interval == 0) {
+      if (subgraph_sample_size) { // switch to the original graph
+        for (size_t i = 0; i < num_layers; i++) layers[i]->update_dim_size(num_samples);
+#ifdef CPU_ONLY
+        for (size_t i = 0; i < num_conv_layers; i++) {
+          layers[i]->set_graph_ptr(context->getGraphPointer());
+          layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
+	    }
+        layers[num_layers-1]->set_labels_ptr(context->get_labels_ptr());
+        layers[0]->set_feats_ptr(context->get_feats_ptr()); // feed input data
+#endif
+      }
       // Validation
       acc_t val_loss = 0.0, val_acc = 0.0;
       Tval.start();
@@ -247,7 +256,13 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
     end = train_end;
     count = train_count;
     masks = train_masks;
-    if (subgraph_sample_size) masks = subgraph_masks;
+    if (subgraph_sample_size) {
+      // update masks for subgraph
+      masks = NULL;
+      begin = 0;
+      end = subgraph_sample_size;
+      count = subgraph_sample_size;
+    }
   } else if (type == "val") {
     begin = val_begin;
     end = val_end;
@@ -270,10 +285,17 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
 #endif
 
   loss = fprop(begin, end, count, masks);
-  if (is_single_class) {
-    acc = masked_accuracy(begin, end, count, masks);
+  float_t* predictions = layers[num_layers - 1]->next()->get_data();
+  label_t* labels;
+  if (subgraph_sample_size) {
+    labels = context->get_labels_subg_ptr();
   } else {
-    acc = masked_multi_class_accuracy(begin, end, count, masks);
+    labels = context->get_labels_ptr();
+  }
+  if (is_single_class) {
+    acc = masked_accuracy(begin, end, count, masks, predictions, labels);
+  } else {
+    acc = masked_multi_class_accuracy(begin, end, count, masks, predictions, labels);
   }
   t_eval.Stop();
   return t_eval.Millisecs();
@@ -347,8 +369,6 @@ void Net::construct_layers() {
 
   // allocate memory for intermediate features and gradients
   for (size_t i = 0; i < num_layers; i++) {
-    if (subgraph_sample_size)
-      layers[i]->update_dim_size(subgraph_sample_size);
     layers[i]->add_edge();
   }
   for (size_t i = 1; i < num_layers; i++)
@@ -357,7 +377,9 @@ void Net::construct_layers() {
     layers[i]->malloc_and_init();
   layers[0]->set_in_data(context->get_feats_ptr()); // feed input data
   // precompute the normalization constant based on graph structure
-  if (!subgraph_sample_size) context->norm_factor_counting(num_samples);
+  context->norm_factor_computing(0);
+  for (size_t i = 0; i < num_conv_layers; i++)
+    layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
   set_contexts();
 }
 
@@ -445,7 +467,7 @@ void Net::read_test_masks(std::string dataset) {
  * @param end GLOBAL end
  * @param count GLOBAL training count
  */
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth) {
 #ifndef GALOIS_USE_DIST
   AccumF accuracy_all;
 #else
@@ -458,12 +480,11 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
 
   galois::do_all(galois::iterate(begin, end), [&](const auto& i) {
 #ifndef GALOIS_USE_DIST
-    if (masks[i] == 1) {
+    if (masks == NULL || masks[i] == 1) { // use sampled graph when masks is NULL
       // get prediction
-      int preds = math::argmax(num_classes,
-      	    &(layers[num_conv_layers - 1]->next()->get_data()[i * num_classes]));
+      auto pred = math::argmax(num_classes, preds+i*num_classes);
       // check prediction
-      if ((label_t)preds == context->get_label(i))
+      if ((label_t)pred == ground_truth[i])
         accuracy_all += 1.0;
     }
 #else
@@ -475,10 +496,9 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
       uint32_t localID = dGraph->getLID(i);
       if (masks[localID] == 1) {
         // get prediction
-        int preds = math::argmax(num_classes,
-        	    &(layers[num_conv_layers - 1]->next()->get_data()[localID * num_classes]));
+        auto preds = math::argmax(num_classes, preds+localID*num_classes);
         // check prediction
-        if ((label_t)preds == context->get_label(localID))
+        if ((label_t)preds == ground_truth[localID])
           accuracy_all += 1.0;
       }
     }
@@ -494,9 +514,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
   return accuracy_all.reduce() / (acc_t)count;
 }
 
-acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks) {
-  auto preds = layers[num_conv_layers]->next()->get_data();
-  auto ground_truth = context->get_labels_ptr();
+acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth) {
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes, ground_truth, preds);
 }
 #endif

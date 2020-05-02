@@ -26,12 +26,15 @@ Context::Context() : n(0), num_classes(0),
   h_feats(NULL), h_feats_subg(NULL),
   d_labels(NULL), d_labels_subg(NULL),
   d_feats(NULL), d_feats_subg(NULL),
-  norm_factor(NULL) {}
+  norm_factors(NULL) {}
 
 Context::~Context() {
   if (h_labels) delete h_labels;
+  if (h_labels_subg) delete h_labels_subg;
   if (h_feats) delete h_feats;
-  if (norm_factor) delete norm_factor;
+  if (h_feats_subg) delete h_feats_subg;
+  if (norm_factors) delete norm_factors;
+  if (norm_factors_subg) delete norm_factors_subg;
 }
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
@@ -137,30 +140,56 @@ void Context::add_selfloop(Graph &og, Graph &g) {
   //*/
 }
 
-void Context::norm_factor_counting(size_t g_size) {
-  auto g = getGraphPointer();
-  auto subg = getSubgraphPointer();
-  if (use_subgraph) g = subg;
-  g->degree_counting();
-  if (norm_factor != NULL) free(norm_factor);
+void Context::alloc_norm_factor() {
+  Graph* g = getGraphPointer();
+  if (norm_factors == NULL)
 #ifdef USE_MKL
-  norm_factor = new float_t[g->sizeEdges()];
+    norm_factors = new float_t[g->sizeEdges()];
+#else
+    norm_factors = new float_t[g->size()];
+#endif
+}
+
+void Context::alloc_subgraph_norm_factor() {
+  Graph* g = getSubgraphPointer();
+  if (norm_factors_subg == NULL)
+#ifdef USE_MKL
+    norm_factors_subg = new float_t[g->sizeEdges()];
+#else
+    norm_factors_subg = new float_t[g->size()];
+#endif
+}
+
+void Context::norm_factor_computing(bool is_subgraph) {
+  Graph* g;
+  float_t *constants;
+  if (!is_subgraph) {
+    g = getGraphPointer();
+    alloc_norm_factor();
+    constants = norm_factors;
+  } else {
+    g = getSubgraphPointer();
+    alloc_subgraph_norm_factor();
+    constants = norm_factors_subg;
+  }
+  auto g_size = g->size();
+  g->degree_counting();
+#ifdef USE_MKL
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto i) {
     float_t c_i = std::sqrt(float_t(g->get_degree(i)));
     for (auto e = g->edge_begin(i); e != g->edge_end(i); e++) {
       const auto j = g->getEdgeDst(e);
       float_t c_j = std::sqrt(float_t(g->get_degree(j)));
-      if (c_i == 0.0 || c_j == 0.0) norm_factor[e] = 0.0;
-      else norm_factor[e] = 1.0 / (c_i * c_j);
+      if (c_i == 0.0 || c_j == 0.0) constants[e] = 0.0;
+      else constants[e] = 1.0 / (c_i * c_j);
     }
   }, galois::loopname("NormCountingEdge"));
 #else
-  norm_factor = new float_t[g_size];
   galois::do_all(galois::iterate((size_t)0, g_size), [&](auto v) {
     auto degree  = g->get_degree(v);
     float_t temp = std::sqrt(float_t(degree));
-    if (temp == 0.0) norm_factor[v] = 0.0;
-    else norm_factor[v] = 1.0 / temp;
+    if (temp == 0.0) constants[v] = 0.0;
+    else constants[v] = 1.0 / temp;
   }, galois::loopname("NormCountingVertex"));
 #endif
 }

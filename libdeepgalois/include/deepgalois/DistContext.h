@@ -26,7 +26,7 @@ protected:
   label_t *d_labels_subg;      // labels for subgraph on device
   float_t* d_feats;            // input features on device
   float_t* d_feats_subg;       // input features for subgraph on device
-  float_t* norm_factor;        // normalization constant based on graph structure
+  float_t* norm_factors;       // normalization constant based on graph structure
 
 public:
   DistContext();
@@ -47,12 +47,12 @@ public:
 
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
-  void norm_factor_counting(size_t g_size);
+  void norm_factor_computing(size_t g_size);
   void createSubgraph() {}
   void gen_subgraph_labels(size_t m, const mask_t *masks) {}
   void gen_subgraph_feats(size_t m, const mask_t *masks) {}
 
-  float_t* get_norm_factor_ptr() { return norm_factor; }
+  float_t* get_norm_factors_ptr() { return norm_factors; }
   Graph* getGraphPointer() { return graph_cpu; }
   Graph* getSubgraphPointer() { return subgraph_cpu; };
   float_t* get_feats_ptr() { return h_feats; }

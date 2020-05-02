@@ -165,11 +165,11 @@ void LearningGraph::readGraphFromGRFile(const std::string& filename) {
 #ifdef CPU_ONLY
 void LearningGraph::dealloc() {
   assert (!is_device);
-  free(rowptr_);
-  free(colidx_);
-  free(degrees_);
-  if (vertex_data_ != NULL) free(vertex_data_);
-  if (edge_data_ != NULL) free(edge_data_);
+  if (rowptr_ != NULL) delete rowptr_;
+  if (colidx_ != NULL) delete colidx_;
+  if (degrees_ != NULL) delete degrees_;
+  if (vertex_data_ != NULL) delete vertex_data_;
+  if (edge_data_ != NULL) delete edge_data_;
 }
 #endif
 

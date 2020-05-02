@@ -118,13 +118,10 @@ protected:
 
 #ifdef CPU_ONLY
   Sampler *sampler;
-  // comparing outputs with the ground truth (labels)
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
-  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
-#else
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
-  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks);
 #endif
+  // comparing outputs with the ground truth (labels)
+  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth);
+  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth);
 };
 
 } // namespace deepgalois

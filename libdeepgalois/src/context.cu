@@ -25,7 +25,7 @@ int64_t cluster_seedgen(void) {
 }
 
 // computing normalization factor for each vertex
-__global__ void norm_factor_counting_node(int n, CSRGraph graph, float_t* norm_fac) {
+__global__ void norm_factor_computing_node(int n, CSRGraph graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(i, n) {
     float_t temp = sqrt(float_t(graph.getOutDegree(i)));
     if (temp == 0.0) norm_fac[i] = 0.0;
@@ -35,7 +35,7 @@ __global__ void norm_factor_counting_node(int n, CSRGraph graph, float_t* norm_f
 
 // TODO: make sure self-loop added for each vertex
 // computing normalization factor for each edge
-__global__ void norm_factor_counting_edge(int n, CSRGraph graph, float_t* norm_fac) {
+__global__ void norm_factor_computing_edge(int n, CSRGraph graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(src, n) {
     assert(src < n);
     float_t d_src = float_t(graph.getOutDegree(src));
@@ -97,7 +97,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
-void Context::norm_factor_counting(size_t g_size) {
+void Context::norm_factor_computing(bool is_subgraph) {
   std::cout << "Pre-computing normalization factor (n=" << n << ") ... ";
   if (!is_selfloop_added) {
     std::cout << "Set -sl=1 to add selfloop\n";	  
@@ -107,14 +107,14 @@ void Context::norm_factor_counting(size_t g_size) {
   int nnz = graph_gpu.nedges;
   CUDA_CHECK(cudaMalloc((void**)&norm_factor, nnz * sizeof(float_t)));
   init_const_gpu(nnz, 0.0, norm_factor);
-  norm_factor_counting_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+  norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, graph_gpu, norm_factor);
 #else
   CUDA_CHECK(cudaMalloc((void**)&norm_factor, n * sizeof(float_t)));
-  norm_factor_counting_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+  norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       n, graph_gpu, norm_factor);
 #endif
-  CudaTest("solving norm_factor_counting kernel failed");
+  CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";
 }
 /*

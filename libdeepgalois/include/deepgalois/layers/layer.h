@@ -72,6 +72,7 @@ public:
   void set_context(ContextType* ctx) { context = ctx; }
   void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
   void set_labels_ptr(label_t *ptr) { labels = ptr; }
+  void set_norm_consts_ptr(float_t *ptr) { norm_consts = ptr; }
   void set_feats_ptr(float_t *ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
 #ifdef CPU_ONLY
@@ -79,7 +80,7 @@ public:
 #else
   void set_graph_ptr(CSRGraph *ptr) { graph_gpu = ptr; }
 #endif
-  void update_dim_size(size_t sg_size) { input_dims[0] = output_dims[0] = sg_size; }
+  void update_dim_size(size_t g_size) { input_dims[0] = output_dims[0] = g_size; }
 
   //! set the data of the previous layer connected to this one
   void set_in_data(float_t* data) {
@@ -93,11 +94,15 @@ public:
     begin_ = sample_begin;
     end_   = sample_end;
     count_ = sample_count;
+    use_mask = false;
+    if (masks != NULL) {
+      use_mask = true;
 #ifdef CPU_ONLY
-    masks_ = masks;
+      masks_ = masks;
 #else
-	d_masks_ = masks;
+      d_masks_ = masks;
 #endif
+    }
   }
 
   void add_edge() {
@@ -151,6 +156,7 @@ protected:
   std::vector<size_t> output_dims; // output dimentions
   std::string name_;               // name of this layer
   bool trainable_;                 // is this layer trainable
+  bool use_mask;
   vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
   vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x
            // 16, layer1: 16 x E
@@ -162,6 +168,7 @@ protected:
   float_t* loss; // error for each vertex: N x 1
   ContextType* context;
   label_t* labels;
+  float_t* norm_consts;
 #ifdef CPU_ONLY
   Graph *graph_cpu;
 #else

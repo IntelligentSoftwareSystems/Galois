@@ -31,11 +31,11 @@ void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
-    if (masks_[i] == 1) { // masked
+    if (!use_mask || masks_[i] == 1) { // masked
       // output is normalized input for this layer
       math::softmax(len, &in_data[len*i], &out_data[len*i]); // normalize using softmax
       // one hot encoded vector for the labels
-      std::vector<acc_t> groundTruth(output_dims[1], 0.0); // ground truth
+      vec_t groundTruth(output_dims[1], 0.0); // ground truth
       groundTruth[get_label(i)] = 1.0;            // one-hot
       // loss calculation
       loss[i] = math::cross_entropy(len, &groundTruth[0], &out_data[len*i]);
@@ -52,7 +52,7 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
   // note: out_grad is ignored because it shouldn't exist (this is output layer)
   size_t len = layer::input_dims[1];
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
-    if (masks_[i] == 1) { // masked
+    if (!use_mask || masks_[i] == 1) { // masked
       vec_t norm_grad(len);
       std::vector<acc_t> groundTruth(len, 0.0);
       groundTruth[get_label(i)] = 1.0;
@@ -74,11 +74,12 @@ acc_t softmax_loss_layer::get_prediction_loss() {
   total_loss.reset();
   valid_sample_count.reset();
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
-    if (masks_[i]) {
+    if (!use_mask || masks_[i]) {
       total_loss += loss[i];
       valid_sample_count += 1;
     }
   }, galois::chunk_size<64>(), galois::steal(), galois::loopname("getMaskedLoss"));
+  //std::cout << "begin = " << begin_ << " end = " << end_ << " count = " << count_ << " valid_count = " << valid_sample_count.reduce() << "\n";
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
 }

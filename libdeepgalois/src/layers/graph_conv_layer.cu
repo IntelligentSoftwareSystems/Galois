@@ -31,7 +31,6 @@ void graph_conv_layer::malloc_and_init() {
 }
 
 void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
-  float_t* norm_factor = context->get_norm_factor_ptr();
   #ifdef USE_CUSPARSE
   deepgalois::update_all_csrmm(len, g, in, out, norm_, norm_factor);
   #else
@@ -40,7 +39,6 @@ void graph_conv_layer::aggregate(size_t len, CSRGraph& g, const float_t* in, flo
 }
 
 void graph_conv_layer::d_aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out) {
-  float_t* norm_factor = context->get_norm_factor_ptr();
 #ifdef USE_CUSPARSE
   deepgalois::update_all_csrmm(len, g, in, out, norm_, norm_factor);
 #else

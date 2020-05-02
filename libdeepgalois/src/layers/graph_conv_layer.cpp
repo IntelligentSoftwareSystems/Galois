@@ -40,7 +40,6 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t
 // aggregate based on graph topology
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   // normalization constant based on graph structure
-  float_t* norm_consts = context->get_norm_factor_ptr();
 #ifdef USE_MKL
   update_all_csrmm(len, g, in, out, norm_, norm_consts);
 #else
@@ -50,7 +49,6 @@ void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_
 
 // since graph is symmetric, the derivative is the same
 void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
-  float_t* norm_consts = context->get_norm_factor_ptr();
 #ifdef USE_MKL
   update_all_csrmm(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
 #else
@@ -101,6 +99,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
+  //std::cout << "layer: " << name_ << "\n";
   //std::cout << "x=" << x << ", y=" << y << ", z=" << z << "\n";
 
   // input: x*y; W: y*z; output: x*z

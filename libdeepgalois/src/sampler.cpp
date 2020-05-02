@@ -140,7 +140,9 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
     unsigned j = 0;
     auto old_id = old_ids[i];
     for (auto e = g.edge_begin(old_id); e != g.edge_end(old_id); e++) {
-      sub.constructEdge(offsets[i]+j, g.getEdgeDst(e), 0);
+      auto dst = new_ids[g.getEdgeDst(e)];
+      assert(dst < nv);
+      sub.constructEdge(offsets[i]+j, dst, 0);
       j ++;
     }
   }, galois::loopname("construct_graph"));
