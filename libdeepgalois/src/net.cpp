@@ -9,12 +9,13 @@
 
 namespace deepgalois {
 
-void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
+void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs,
                unsigned hidden1, float lr, float dropout, float wd,
                bool selfloop, bool single, bool l2norm, bool dense, 
                unsigned neigh_sz, unsigned subg_sz) {
-  assert(num_conv > 0);
-  num_conv_layers = num_conv;
+  assert(n_conv > 0);
+  num_threads = nt;
+  num_conv_layers = n_conv;
   num_epochs = epochs;
   learning_rate = lr;
   dropout_rate = dropout;
@@ -25,7 +26,9 @@ void Net::init(std::string dataset_str, unsigned num_conv, unsigned epochs,
   neighbor_sample_size = neigh_sz;
   subgraph_sample_size = subg_sz;
   val_interval = 1;
-  galois::gPrint("Configuration: num_conv_layers ", num_conv_layers,
+  num_subgraphs = num_threads;
+  galois::gPrint("Configuration: num_threads ", num_threads, 
+                 ", num_conv_layers ", num_conv_layers,
                  ", num_epochs ", num_epochs,
                  ", hidden1 ", hidden1,
                  ", learning_rate ", learning_rate,
@@ -149,8 +152,9 @@ void Net::train(optimizer* opt, bool need_validate) {
   int num_subg_remain = 0;
 #ifdef CPU_ONLY
   if (subgraph_sample_size) {
+    context->createSubgraphs(num_subgraphs);
+    subgraphs_masks = new mask_t[num_samples*num_subgraphs];
     galois::gPrint("\nConstruct training vertex set induced graph...\n");
-    subgraph_masks = new mask_t[num_samples];
     sampler->set_masked_graph(train_begin, train_end, train_count, train_masks, context->getGraphPointer());
   }
 #endif
@@ -161,28 +165,46 @@ void Net::train(optimizer* opt, bool need_validate) {
     galois::gPrint(header, "Epoch ", std::setw(3), ep, seperator);
     t_epoch.Start();
 
-    if (subgraph_sample_size && num_subg_remain == 0) {
-      for (size_t i = 0; i < num_layers; i++) layers[i]->update_dim_size(subgraph_sample_size);
-#ifdef CPU_ONLY
-      // generate subgraph
-      context->createSubgraph();
-      auto subgraph_ptr = context->getSubgraphPointer();
-      sampler->subgraph_sample(subgraph_sample_size, *(subgraph_ptr), subgraph_masks);
-      context->norm_factor_computing(1);
+    if (subgraph_sample_size) {
+      if (num_subg_remain == 0) {
+        galois::gPrint("Generating subgraphs (mini-batches) ... ");
+        Timer t_subgen;
+        t_subgen.Start();
+        // generate subgraphs
+        for (int sid = 0; sid < num_subgraphs; sid++) {
+        //galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
+          sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples]);
+        }//, galois::loopname("subgraph_gen"));
+        num_subg_remain = num_subgraphs;
+        t_subgen.Stop();
+        galois::gPrint("Done, time: ", t_subgen.Millisecs(), "\n");
+      }
+      for (int i = 0; i < num_subgraphs; i++) {
+        //auto sg_ptr = context->getSubgraphPointer(i);
+        //galois::gPrint("\tsubgraph[", i, "]: num_v ", sg_ptr->size(), " num_e ", sg_ptr->sizeEdges(), "\n");
+      }
+      num_subg_remain--;
+      int sg_id = num_subg_remain;
+      auto subgraph_ptr = context->getSubgraphPointer(sg_id);
+      num_vertices_sg = subgraph_ptr->size();
+      galois::gPrint("Subgraph num_vertices: ", num_vertices_sg, 
+          ", num_edges: ", subgraph_ptr->sizeEdges(), "\n");
+      for (size_t i = 0; i < num_layers; i++)
+        layers[i]->update_dim_size(num_vertices_sg);
+      context->norm_factor_computing(1, sg_id);
       for (size_t i = 0; i < num_conv_layers; i++) {
-        layers[i]->set_graph_ptr(context->getSubgraphPointer());
+        layers[i]->set_graph_ptr(subgraph_ptr);
         layers[i]->set_norm_consts_ptr(context->get_norm_factors_subg_ptr());
 	  }
       // update labels for subgraph
-      context->gen_subgraph_labels(subgraph_sample_size, subgraph_masks);
+      context->gen_subgraph_labels(num_vertices_sg, &subgraphs_masks[sg_id*num_samples]);
       layers[num_layers-1]->set_labels_ptr(context->get_labels_subg_ptr());
 
       // update features for subgraph
-      context->gen_subgraph_feats(subgraph_sample_size, subgraph_masks);
+      context->gen_subgraph_feats(num_vertices_sg, &subgraphs_masks[sg_id*num_samples]);
       layers[0]->set_feats_ptr(context->get_feats_subg_ptr()); // feed input data
-#endif
-      num_subg_remain += 1; // num_threads
-    }
+	}
+
     // training steps
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
@@ -260,8 +282,8 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
       // update masks for subgraph
       masks = NULL;
       begin = 0;
-      end = subgraph_sample_size;
-      count = subgraph_sample_size;
+      end = num_vertices_sg;
+      count = num_vertices_sg;
     }
   } else if (type == "val") {
     begin = val_begin;

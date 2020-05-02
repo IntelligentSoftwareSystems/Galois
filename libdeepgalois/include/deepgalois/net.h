@@ -31,14 +31,14 @@ class Net {
 public:
   Net() : is_single_class(true), has_l2norm(false), has_dense(false),
           neighbor_sample_size(0), subgraph_sample_size(0),
-          num_samples(0), num_classes(0),
+          num_threads(1), num_samples(0), num_classes(0),
           num_conv_layers(0), num_layers(0), num_epochs(0),
           learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
           train_begin(0), train_end(0), train_count(0),
           val_begin(0), val_end(0), val_count(0),
           test_begin(0), test_end(0), test_count(0),
           train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
-  void init(std::string dataset_str, unsigned num_conv, unsigned epochs,
+  void init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs,
             unsigned hidden1, float lr, float dropout, float wd,
             bool selfloop, bool single, bool l2norm, bool dense, 
             unsigned neigh_sample_size = 0, unsigned subg_sample = 0);
@@ -87,6 +87,7 @@ protected:
   bool has_dense;                    // whether the net contains an dense layer
   unsigned neighbor_sample_size;     // neighbor sampling
   unsigned subgraph_sample_size;     // subgraph sampling
+  int num_threads;                   // number of threads
   size_t num_samples;                // number of samples: N
   size_t num_classes;                // number of vertex classes: E
   size_t num_conv_layers;            // number of convolutional layers
@@ -99,6 +100,8 @@ protected:
   size_t val_begin, val_end, val_count;
   size_t test_begin, test_end, test_count;
   int val_interval;
+  int num_subgraphs;
+  int num_vertices_sg;
 
   mask_t* train_masks;               // masks for training
   mask_t* d_train_masks;             // masks for training on device
@@ -106,7 +109,7 @@ protected:
   mask_t* d_val_masks;               // masks for validation on device
   mask_t* test_masks;                // masks for test
   mask_t* d_test_masks;              // masks for test on device
-  mask_t* subgraph_masks;            // masks for subgraph
+  mask_t* subgraphs_masks;           // masks for subgraphs
   std::vector<size_t> feature_dims;  // feature dimnesions for each layer
   std::vector<layer*> layers;        // all the layers in the neural network
 #ifndef GALOIS_USE_DIST

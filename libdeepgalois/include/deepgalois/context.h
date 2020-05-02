@@ -37,22 +37,22 @@ public:
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
   void set_use_subgraph(bool use_subg) { use_subgraph = use_subg; }
   void copy_data_to_device(); // copy labels and input features
-  void norm_factor_computing(bool is_subgraph);
+  void norm_factor_computing(bool is_subgraph, int subg_id = 0);
+  void gen_subgraph_labels(size_t m, const mask_t *masks);
+  void gen_subgraph_feats(size_t m, const mask_t *masks);
+  void createSubgraphs(int num_subgraphs);
 
 #ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
-  Graph* subgraph_cpu;
-  void createSubgraph();
+  std::vector<Graph*> subgraphs_cpu;
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
   Graph* getGraphPointer() { return graph_cpu; }
-  Graph* getSubgraphPointer() { return subgraph_cpu; };
+  Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return h_feats_subg; }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return h_labels_subg; }
-  void gen_subgraph_labels(size_t m, const mask_t *masks);
-  void gen_subgraph_feats(size_t m, const mask_t *masks);
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   CSRGraph subgraph_gpu;
@@ -86,7 +86,7 @@ protected:
   float_t* norm_factors;       // normalization constant based on graph structure
   float_t* norm_factors_subg;  // normalization constant for subgraph
   void alloc_norm_factor();
-  void alloc_subgraph_norm_factor();
+  void alloc_subgraph_norm_factor(int subg_id);
 
 #ifdef CPU_ONLY
   void read_edgelist(const char* filename, bool symmetrize = false, bool add_self_loop = false);

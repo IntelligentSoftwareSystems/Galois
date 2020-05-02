@@ -40,7 +40,7 @@ void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
 void LearningGraph::allocateFrom(index_t nv, index_t ne) {
   num_vertices_ = nv;
   num_edges_ = ne;
-  printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
+  //printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
   rowptr_ = new index_t[num_vertices_+1];
   colidx_ = new index_t[num_edges_];
   rowptr_[0] = 0;

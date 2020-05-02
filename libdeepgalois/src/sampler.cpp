@@ -6,7 +6,7 @@
 namespace deepgalois {
 
 void Sampler::set_masked_graph(size_t begin, size_t end, size_t count, mask_t *masks, Graph *g) {
-  galois::gPrint("Set masked graph: begin=", begin, ", end=", end, ", count=", count, "\n");
+  //galois::gPrint("Set masked graph: begin=", begin, ", end=", end, ", count=", count, "\n");
   begin_ = begin;
   end_ = end;
   count_ = count;
@@ -40,7 +40,7 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
   get_masked_degrees(n, masks, g, degrees);
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
   size_t ne = offsets[n];
-  galois::gPrint("Generate masked graph: num_vertices=", n, ", num_edges=", ne, "\n");
+  //galois::gPrint("Generate masked graph: num_vertices=", n, ", num_edges=", ne, "\n");
 #ifndef GALOIS_USE_DIST
   sub.allocateFrom(n, ne);
   sub.constructNodes();
@@ -64,14 +64,14 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
 // n: number of vertices in the subgraph;
 // m: number of vertices in the frontier.
 void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList vertices, VertexSet &vertex_set) {
-  galois::gPrint("Select a vertex set of size ", n, " from ", nv, " vertices, graph size: ", g->size(), "\n");
+  //galois::gPrint("Select a vertex set of size ", n, " from ", nv, " vertices, graph size: ", g->size(), "\n");
   assert(nv == vertices.size());
   auto frontier_indices = deepgalois::select_k_items(m, 0, (int)nv); // randomly select m vertices from vertices as frontier
   VertexList frontier(m);
   for (int i = 0; i < m; i++)
     frontier[i] = vertices[frontier_indices[i]];
   vertex_set.insert(frontier.begin(), frontier.end());
-  galois::gPrint("vertex_set size: ", vertex_set.size(), "\n");
+  //galois::gPrint("vertex_set size: ", vertex_set.size(), "\n");
   int *degrees = new int[m];
   galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
     degrees[i] = (int)g->get_degree(frontier[i]);
@@ -93,7 +93,8 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList v
     }
     if (j == degree) galois::gPrint("Not found from ", degree, " neighbors\n");
   }
-  assert(n == vertex_set.size());
+  /*
+  assert(n == vertex_set.size()); // size of vertex_set could be slightly smaller than n
   galois::gPrint("Done selection, vertex_set size: ", vertex_set.size(), ", set: ( ");
   unsigned counter = 0;
   for (int i : vertex_set) {
@@ -102,10 +103,11 @@ void Sampler::select_vertices(size_t nv, size_t n, int m, Graph *g, VertexList v
     galois::gPrint(i, " ");
   }
   galois::gPrint(" )\n");
+  */
 }
 
 void Sampler::update_masks(size_t n, VertexSet vertices, mask_t *masks) {
-  galois::gPrint("Updating masks, size = ", vertices.size(), "\n");
+  //galois::gPrint("Updating masks, size = ", vertices.size(), "\n");
   std::fill(masks, masks+n, 0);
   for (auto v : vertices) masks[v] = 1;
 }
@@ -130,7 +132,7 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
   }
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
   auto ne = offsets[nv];
-  galois::gPrint("Generate subgraph: num_vertices=", nv, ", num_edges=", ne, "\n");
+  //galois::gPrint("Generate subgraph: num_vertices=", nv, ", num_edges=", ne, "\n");
 #ifndef GALOIS_USE_DIST
   sub.allocateFrom(nv, ne);
   sub.constructNodes();

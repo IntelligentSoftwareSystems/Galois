@@ -92,6 +92,15 @@ Context::~Context() {
   if (norm_factor) CUDA_CHECK(cudaFree(norm_factor));
 }
 
+void Context::createSubgraphs(int n_sg) {
+}
+
+void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
+}
+
+void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
+}
+
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   n = read_graph_gpu(dataset_str, selfloop);
   return n;

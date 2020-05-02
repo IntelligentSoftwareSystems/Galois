@@ -26,7 +26,7 @@ Context::Context() : n(0), num_classes(0),
   h_feats(NULL), h_feats_subg(NULL),
   d_labels(NULL), d_labels_subg(NULL),
   d_feats(NULL), d_feats_subg(NULL),
-  norm_factors(NULL) {}
+  norm_factors(NULL), norm_factors_subg(NULL) {}
 
 Context::~Context() {
   if (h_labels) delete h_labels;
@@ -42,8 +42,10 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
-void Context::createSubgraph() {
-  subgraph_cpu = new Graph(); 
+void Context::createSubgraphs(int num_subgraphs) {
+  subgraphs_cpu.resize(num_subgraphs);
+  for (int i = 0; i < num_subgraphs; i++)
+    subgraphs_cpu[i] = new Graph(); 
 }
 
 // generate labels for the subgraph, m is subgraph size
@@ -150,8 +152,8 @@ void Context::alloc_norm_factor() {
 #endif
 }
 
-void Context::alloc_subgraph_norm_factor() {
-  Graph* g = getSubgraphPointer();
+void Context::alloc_subgraph_norm_factor(int subg_id) {
+  Graph* g = getSubgraphPointer(subg_id);
   if (norm_factors_subg == NULL)
 #ifdef USE_MKL
     norm_factors_subg = new float_t[g->sizeEdges()];
@@ -160,7 +162,7 @@ void Context::alloc_subgraph_norm_factor() {
 #endif
 }
 
-void Context::norm_factor_computing(bool is_subgraph) {
+void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
   Graph* g;
   float_t *constants;
   if (!is_subgraph) {
@@ -168,8 +170,8 @@ void Context::norm_factor_computing(bool is_subgraph) {
     alloc_norm_factor();
     constants = norm_factors;
   } else {
-    g = getSubgraphPointer();
-    alloc_subgraph_norm_factor();
+    g = getSubgraphPointer(subg_id);
+    alloc_subgraph_norm_factor(subg_id);
     constants = norm_factors_subg;
   }
   auto g_size = g->size();
