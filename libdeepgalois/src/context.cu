@@ -68,7 +68,7 @@ Context::Context() : n(0), num_classes(0), feat_len(0),
                      h_feats(NULL), h_feats_subg(NULL),
                      d_labels(NULL), d_labels_subg(NULL),
                      d_feats(NULL), d_feats_subg(NULL),
-                     norm_factor(NULL) {
+                     norm_factors(NULL) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -89,7 +89,7 @@ Context::~Context() {
     CURAND_CHECK(curandDestroyGenerator(curand_generator_));
   if (d_labels) CUDA_CHECK(cudaFree(d_labels));
   if (d_feats) CUDA_CHECK(cudaFree(d_feats));
-  if (norm_factor) CUDA_CHECK(cudaFree(norm_factor));
+  if (norm_factors) CUDA_CHECK(cudaFree(norm_factors));
 }
 
 void Context::createSubgraphs(int n_sg) {
@@ -106,7 +106,7 @@ size_t Context::read_graph(std::string dataset_str, bool selfloop) {
   return n;
 }
 
-void Context::norm_factor_computing(bool is_subgraph) {
+void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
   std::cout << "Pre-computing normalization factor (n=" << n << ") ... ";
   if (!is_selfloop_added) {
     std::cout << "Set -sl=1 to add selfloop\n";	  
@@ -114,14 +114,12 @@ void Context::norm_factor_computing(bool is_subgraph) {
   }
 #ifdef USE_CUSPARSE
   int nnz = graph_gpu.nedges;
-  CUDA_CHECK(cudaMalloc((void**)&norm_factor, nnz * sizeof(float_t)));
-  init_const_gpu(nnz, 0.0, norm_factor);
-  norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, norm_factor);
+  CUDA_CHECK(cudaMalloc((void**)&norm_factors, nnz * sizeof(float_t)));
+  init_const_gpu(nnz, 0.0, norm_factors);
+  norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, graph_gpu, norm_factors);
 #else
-  CUDA_CHECK(cudaMalloc((void**)&norm_factor, n * sizeof(float_t)));
-  norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, norm_factor);
+  CUDA_CHECK(cudaMalloc((void**)&norm_factors, n * sizeof(float_t)));
+  norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, graph_gpu, norm_factors);
 #endif
   CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";

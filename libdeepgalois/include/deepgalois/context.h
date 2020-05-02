@@ -55,9 +55,9 @@ public:
   label_t* get_labels_subg_ptr() { return h_labels_subg; }
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
-  CSRGraph subgraph_gpu;
+  std::vector<CSRGraph*> subgraphs_gpu;
   CSRGraph* getGraphPointer() { return &graph_gpu; }
-  CSRGraph* getSubgraphPointer() { return &subgraph_gpu; };
+  CSRGraph* getSubgraphPointer(int id) { return subgraphs_gpu[id]; };
   float_t* get_feats_ptr() { return d_feats; }
   float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }

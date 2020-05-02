@@ -87,8 +87,8 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs
   feature_dims[num_layers] = num_classes;                // normalized output embedding: E
   layers.resize(num_layers);
 
-#ifdef CPU_ONLY
   context->set_use_subgraph(subgraph_sample_size > 0);
+#ifdef CPU_ONLY
   if (subgraph_sample_size) sampler = new deepgalois::Sampler();
 #else
   copy_masks_device(num_samples, train_masks, d_train_masks);
@@ -173,7 +173,9 @@ void Net::train(optimizer* opt, bool need_validate) {
         // generate subgraphs
         for (int sid = 0; sid < num_subgraphs; sid++) {
         //galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
+#ifdef CPU_ONLY
           sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples]);
+#endif
         }//, galois::loopname("subgraph_gen"));
         num_subg_remain = num_subgraphs;
         t_subgen.Stop();

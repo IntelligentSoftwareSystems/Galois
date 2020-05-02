@@ -175,6 +175,8 @@ struct CSRGraph {
 	__device__ __host__ edge_data_type *edge_data_ptr() { return edge_data; }
 	__device__ __host__ const edge_data_type *edge_data_ptr() const { return edge_data; }
 
+  size_t size() { return size_t(nnodes); }
+  size_t sizeEdges() { return size_t(nedges); }
   index_type nnodes, nedges;
   index_type* row_start; // row_start[node] points into edge_dst, node starts at
                          // 0, row_start[nnodes] = nedges
