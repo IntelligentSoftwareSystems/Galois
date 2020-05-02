@@ -106,24 +106,20 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
     for(int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
     {
 
-        int l, netID;
-        float total_usage;
-        float  overflow;
+        int netID;
 
         // maze routing for multi-source, multi-destination
-        Bool preD, hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        Bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, crossX, crossY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of;
         int origENG, edgeREC;
 
-        float costL1, costL2,  *dtmp;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -144,7 +140,6 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
         OrderNetEdge* netEO = thread_local_storage->netEO_p;
 
         bool** inRegion = thread_local_storage->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->inRegion_alloc;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -233,31 +228,18 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                         xmax = n1x;
                     }
                     
-                    shifted = FALSE;
                     int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-                    segWidth = xmax - xmin;
-                    segHeight = ymax - ymin;
                     regionX1 = max(0, xmin - enlarge);
                     regionX2 = min(xGrid-1, xmax + enlarge);
                     regionY1 = max(0, ymin - enlarge);
                     regionY2 = min(yGrid-1, ymax + enlarge);
-                    regionWidth = regionX2 - regionX1 + 1;
-                    regionHeight = regionY2 - regionY1 + 1;
-                    //std::cout << "region size" << regionWidth << ", " << regionHeight << std::endl;
-                    // initialize d1[][] and d2[][] as BIG_INT
                     for(i=regionY1; i<=regionY2; i++)
                     {
                         for(j=regionX1; j<=regionX2; j++)
                         {
                             d1[i][j] = BIG_INT;
-                            
-                            /*d2[i][j] = BIG_INT;
-                            hyperH[i][j] = FALSE;
-                            hyperV[i][j] = FALSE;*/
                         }
                     }
-                    //memset(hyperH, 0, xGrid * yGrid * sizeof(bool));
-                    //memset(hyperV, 0, xGrid * yGrid * sizeof(bool));
                     for(i=regionY1; i<=regionY2; i++)
                     {
                         for(j=regionX1; j<=regionX2; j++)
@@ -320,9 +302,6 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
 
                         if(d1_push > return_dist + OBIM_delta)
                         {
-                            //printf("netID: %d early break\n", netID);
-                            //if(netID == 2 && edgeID == 26) 
-                            //    printf("break! curX curY %d %d, d1_push: %f, curr_d1: %f return_d: %f\n", curX, curY, d1_push, curr_d1, return_dist.load());
                             //ctx.breakLoop();
                         }
                         galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);
@@ -330,8 +309,6 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                         {
                             if(pop_heap2[ind1]!=false)
                             {
-                                //if(netID == 2 && edgeID == 26) 
-                                //    printf("reach! curX curY %d %d, d1_push: %f, curr_d1: %f return_d: %f\n", curX, curY, d1_push, curr_d1, return_dist.load());
                                 return_ind1.store(ind1);
                                 return_dist.store(d1_push);                            
                             }
@@ -658,7 +635,6 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                         if(n1>=deg && (E1x!=n1x || E1y!=n1y))
                         // n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
                             endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -783,7 +759,6 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                         if(n2>=deg && (E2x!=n2x || E2y!=n2y))
                         // n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
                             endpt2 = treeedges[corrEdge[E2y][E2x]].n2;
@@ -932,35 +907,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                     timer_adjusttree.stop();
 
                     // update edge usage
-                  
 
-                    /*for(i=0; i<pre_length; i++)
-                    {
-                        if(pre_gridsX[i]==pre_gridsX[i+1]) // a vertical edge
-                        {
-                            if(i != pre_length - 1)
-                                min_y = min(pre_gridsY[i], pre_gridsY[i+1]);
-                            else
-                                min_y = pre_gridsY[i];
-                            //v_edges[min_y*xGrid+gridsX[i]].usage += 1;
-                            //galois::atomicAdd(v_edges[min_y*xGrid+gridsX[i]].usage, (short unsigned)1);
-                            //printf("x y %d %d i %d \n", pre_gridsX[i], min_y, i);
-                            v_edges[min_y*xGrid+pre_gridsX[i]].usage.fetch_sub((short int)1, std::memory_order_relaxed);
-                            //if(v_edges[min_y*xGrid+pre_gridsX[i]].usage < 0) printf("V negative! %d \n", i);
-                        }
-                        else ///if(gridsY[i]==gridsY[i+1])// a horizontal edge
-                        {
-                            if(i != pre_length - 1)
-                                min_x = min(pre_gridsX[i], pre_gridsX[i+1]);
-                            else
-                                min_x = pre_gridsX[i];
-                            //h_edges[gridsY[i]*(xGrid-1)+min_x].usage += 1;
-                            //galois::atomicAdd(h_edges[gridsY[i]*(xGrid-1)+min_x].usage, (short unsigned)1);
-                            //printf("x y %d %d i %d\n", min_x, pre_gridsY[i], i);
-                            h_edges[pre_gridsY[i]*(xGrid-1)+min_x].usage.fetch_sub((short int)1, std::memory_order_relaxed);
-                            //if(h_edges[pre_gridsY[i]*(xGrid-1)+min_x].usage < 0) printf("H negative! %d \n", i);
-                        }
-                    }*/
                     timer_updateusage.start();
                         for(i=0; i<cnt_n1n2-1; i++)
                         {
@@ -980,23 +927,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight, int ripup_t
                             }
                         }
                     timer_updateusage.stop();
-                    /*if(LOCK){
-                        for(i=0; i<cnt_n1n2-1; i++)
-                        {
-                            if(gridsX[i]==gridsX[i+1]) // a vertical edge
-                            {
-                                min_y = min(gridsY[i], gridsY[i+1]);
-                                v_edges[min_y*xGrid+gridsX[i]].releaseLock();
-                            }
-                            else ///if(gridsY[i]==gridsY[i+1])// a horizontal edge
-                            {
-                                min_x = min(gridsX[i], gridsX[i+1]);
-                                h_edges[gridsY[i]*(xGrid-1)+min_x].releaseLock();
-                            }
-                        }
-                    }*/
-                    //printf("netID %d edgeID %d src %d %d dst %d %d routelen: %d\n", netID, edgeID, n1x, n1y, n2x, n2y, cnt_n1n2);
-                    timer_checkroute2dtree.start();
+                   timer_checkroute2dtree.start();
                         if ( checkRoute2DTree(netID) ) {
                             reInitTree(netID);
                             return;
@@ -1120,24 +1051,20 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
     for(int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
     {
 
-        int l, netID;
-        float total_usage;
-        float  overflow;
+        int netID;
 
         // maze routing for multi-source, multi-destination
-        Bool preD, hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        Bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, crossX, crossY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of;
         int origENG, edgeREC;
 
-        float costL1, costL2,  *dtmp;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -1158,7 +1085,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
         OrderNetEdge* netEO = thread_local_storage->netEO_p;
 
         bool** inRegion = thread_local_storage->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->inRegion_alloc;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -1247,16 +1173,11 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                         xmax = n1x;
                     }
                     
-                    shifted = FALSE;
                     int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-                    segWidth = xmax - xmin;
-                    segHeight = ymax - ymin;
                     regionX1 = max(0, xmin - enlarge);
                     regionX2 = min(xGrid-1, xmax + enlarge);
                     regionY1 = max(0, ymin - enlarge);
                     regionY2 = min(yGrid-1, ymax + enlarge);
-                    regionWidth = regionX2 - regionX1 + 1;
-                    regionHeight = regionY2 - regionY1 + 1;
                     //std::cout << "region size" << regionWidth << ", " << regionHeight << std::endl;
                     // initialize d1[][] and d2[][] as BIG_INT
                     //timer_init_int.start();
@@ -1315,11 +1236,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                     std::atomic<float> return_dist;
                     return_dist = (float)BIG_INT;
 
-                    //timer_init.stop();
-                    //timer_foreach.start();
-
-
-                    
                     galois::for_each(galois::iterate(pq1), 
                         [&] (const auto& top, auto& ctx)
                         //while( pop_heap2[ind1]==FALSE) // stop until the grid position been popped out from both heap1 and heap2
@@ -1335,17 +1251,11 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
 
                             float curr_d1 = d1[curY][curX];
                             float d1_push = top.d1_push;
-                            //if(netID == 2 && edgeID == 26) 
-                            //printf("netID: %d edgeID:%d curX curY %d %d, d1_push: %f, curr_d1: %f\n", netID, edgeID, curX, curY, d1_push, curr_d1);
 
                             if(d1_push > return_dist + OBIM_delta)
                             {
-                                //printf("netID: %d early break\n", netID);
-                                //if(netID == 2 && edgeID == 26) 
-                                //    printf("break! curX curY %d %d, d1_push: %f, curr_d1: %f return_d: %f\n", curX, curY, d1_push, curr_d1, return_dist.load());
                                 //ctx.breakLoop();
                             }
-                            //galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);
                             if(d1_push == curr_d1 && d1_push < return_dist.load())
                             {
                                 if(pop_heap2[ind1]!=false)
@@ -1367,22 +1277,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                 }
                                 //curr_d1 = d1_push;
                                 
-                                /*grid = curY*xGrid + curX - 1;
-                                if(curX>regionX1)
-                                    galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);
-
-                                grid = curY*xGrid + curX + 1;
-                                if(curX<regionX2)
-                                    galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);
-
-                                grid = (curY - 1)*xGrid + curX;
-                                if(curY>regionY1)
-                                    galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);
-
-                                grid = (curY + 1)*xGrid + curX;
-                                if(curY<regionY2)
-                                    galois::runtime::acquire(&data[grid], galois::MethodFlag::WRITE);*/
-
                                 int preX, preY;
                                 if(curr_d1 != 0)
                                 {
@@ -1406,18 +1300,11 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                 bool tmpH = false; 
                                 bool tmpV = false;
 
-                                //if(curX>regionX1)
-                                //    data[curY*xGrid+curX-1].lock();
-
-                                //data[curY*(xGrid-1)+curX].lock();
-
-
                                 if(curX>regionX1)
                                 {
                                     grid = curY*(xGrid-1)+curX-1;
                                     
-                                    //printf("grid: %d %d usage: %d red:%d last:%d sum%f %d\n",
-                                    //    grid%xGrid, grid/xGrid, h_edges[grid].usage.load(), h_edges[grid].red, h_edges[grid].last_usage, L , h_edges[grid].usage.load() + h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                                    tmpX = curX - 1; // the left neighbor
                                     if((preY==curY)||(curr_d1==0))
                                     {
                                         tmp = curr_d1 + h_costTable[h_edges[grid].usage+h_edges[grid].red+(int)(L*h_edges[grid].last_usage)];
@@ -1428,27 +1315,13 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                         
                                             if (tmp_cost < curr_d1 + VIA && 
                                                 d1[curY][tmpX] > tmp_cost + h_costTable[h_edges[grid].usage+h_edges[grid].red+(int)(L*h_edges[grid].last_usage)]) {
-                                                //hyperH[curY][curX] = TRUE; //Michael
                                                 tmpH = true;
                                             } 
-                                                
-
                                         }
                                         tmp = curr_d1 + VIA + h_costTable[h_edges[grid].usage+h_edges[grid].red+(int)(L*h_edges[grid].last_usage)];
                                         
                                     }
-                                    tmpX = curX - 1; // the left neighbor
 
-                                    /*if(d1[curY][tmpX]>=BIG_INT) // left neighbor not been put into heap1
-                                    {
-                                        d1[curY][tmpX] = tmp;
-                                        parentX3[curY][tmpX] = curX;
-                                        parentY3[curY][tmpX] = curY;
-                                        HV[curY][tmpX] = FALSE;
-                                        pq1.push(&(d1[curY][tmpX]));
-                                    }
-                                    else */
-                                    //galois::runtime::acquire(&data[curY * yGrid + tmpX], galois::MethodFlag::WRITE);
                                     if(d1[curY][tmpX]>tmp && tmp < return_dist)
                                     {
                                         
@@ -1460,12 +1333,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                             parentY3[curY][tmpX] = curY;
                                             HV[curY][tmpX] = FALSE;
                                             ctx.push(pq_grid(&(d1[curY][tmpX]), tmp));
-                                            //pq1.push({&(d1[curY][tmpX]), tmp});
-                                            //pq_grid grid_push = {&(d1[curY][tmpX]), tmp};
-                                            
-                                            //ctx.push(lateUpdateReq(&(d1[curY][tmpX]), tmp, true, curX, curY, false));
-                                            
-                                            //printf("left push Y: %d X: %d tmp: %f HV: false hyperH: %d\n", curY, tmpX, tmp, true);
                                         }
                                         data[curY*xGrid+curX-1].unlock();
                                     }
@@ -1474,9 +1341,8 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
 
                                 if(curX<regionX2)
                                 {
-                                    //data[curY*xGrid+curX+1].lock();
                                     grid = curY*(xGrid-1)+curX;
-                                    //printf("grid: %d %d usage: %d red:%d last:%d L:%f sum:%d\n",grid%xGrid, grid/xGrid, h_edges[grid].usage.load(), h_edges[grid].red, h_edges[grid].last_usage, L , h_edges[grid].usage.load() + h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                                    tmpX = curX + 1; // the right neighbor
                                     if((preY==curY)||(curr_d1==0))
                                     {
                                         tmp = curr_d1 + h_costTable[h_edges[grid].usage+h_edges[grid].red+(int)(L*h_edges[grid].last_usage)];
@@ -1493,7 +1359,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                         }                                   
                                         tmp = curr_d1 + VIA +h_costTable[h_edges[grid].usage+h_edges[grid].red+(int)(L*h_edges[grid].last_usage)];
                                     }
-                                    tmpX = curX + 1; // the right neighbor
 
                                     /*if(d1[curY][tmpX]>=BIG_INT) // right neighbor not been put into heap1
                                     {
@@ -1524,23 +1389,13 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                         data[curY*xGrid+curX+1].unlock();
                                     }
                                 }
-                                //data[curY*(xGrid-1)+curX].lock();
                                 hyperH[curY][curX] = tmpH;
 
-                                //data[curY*(xGrid-1)+curX].unlock();
-
-                                //bottom
-
-                                //if(curY>regionY1)
-                                //   data[(curY-1)*xGrid+curX].lock();
-
-                                //data[curY*(xGrid-1)+curX].lock();
-                                
                                 if(curY>regionY1)
                                 {
                                     grid = (curY-1)*xGrid+curX;
-                                    //printf("grid: %d %d usage: %d red:%d last:%d sum%f %d\n",
-                                    //    grid%xGrid, grid/xGrid, v_edges[grid].usage.load(), v_edges[grid].red, v_edges[grid].last_usage, L , v_edges[grid].usage.load() + v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                                    
+                                    tmpY = curY - 1; // the bottom neighbor
                                     if((preX==curX)||(curr_d1==0))
                                     {   
                                         tmp = curr_d1 + v_costTable[v_edges[grid].usage+v_edges[grid].red+(int)(L*v_edges[grid].last_usage)];
@@ -1559,19 +1414,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                         }
                                         tmp = curr_d1 + VIA+ v_costTable[v_edges[grid].usage+v_edges[grid].red+(int)(L*v_edges[grid].last_usage)];
                                     }
-                                    tmpY = curY - 1; // the bottom neighbor
 
-                                    /*if(d1[tmpY][curX]>=BIG_INT) // bottom neighbor not been put into heap1
-                                    {
-                                        d1[tmpY][curX] = tmp;
-                                        parentX1[tmpY][curX] = curX;
-                                        parentY1[tmpY][curX] = curY;
-                                        HV[tmpY][curX] = TRUE;
-                                        pq1.push(&(d1[tmpY][curX]));
-
-                                    }
-                                    else */
-                                    //galois::runtime::acquire(&data[tmpY * yGrid + curX], galois::MethodFlag::WRITE);
                                     if(d1[tmpY][curX]>tmp && tmp < return_dist) {
                                         
                                         
@@ -1583,10 +1426,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                             parentY1[tmpY][curX] = curY;
                                             HV[tmpY][curX] = TRUE;
                                             ctx.push(pq_grid(&(d1[tmpY][curX]), tmp));
-                                            
-                                            
-
-                                            //printf("bottom push Y: %d X: %d tmp: %f HV: false hyperH: %d\n", tmpY, curX, tmp, true);
                                         }
                                         data[(curY - 1)*xGrid+curX].unlock();
                                     }
@@ -1596,8 +1435,8 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                 {
                                     
                                     grid = curY*xGrid+curX;
-                                    //printf("grid: %d %d usage: %d red:%d last:%d sum%f %d\n",
-                                    //    grid%xGrid, grid/xGrid, v_edges[grid].usage.load(), v_edges[grid].red, v_edges[grid].last_usage, L , v_edges[grid].usage.load() + v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                                    
+                                    tmpY = curY + 1; // the top neighbor
                                     if((preX==curX)||(curr_d1==0))
                                     {   
                                         tmp = curr_d1 + v_costTable[v_edges[grid].usage+v_edges[grid].red +(int)(L*v_edges[grid].last_usage)];
@@ -1616,18 +1455,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                         }
                                         tmp = curr_d1 + VIA +v_costTable[v_edges[grid].usage+v_edges[grid].red+(int)(L*v_edges[grid].last_usage)];
                                     }
-                                    tmpY = curY + 1; // the top neighbor
 
-                                    /*if(d1[tmpY][curX]>=BIG_INT) // top neighbor not been put into heap1
-                                    {
-                                        d1[tmpY][curX] = tmp;
-                                        parentX1[tmpY][curX] = curX;
-                                        parentY1[tmpY][curX] = curY;
-                                        HV[tmpY][curX] = TRUE;
-                                        pq1.push(&(d1[tmpY][curX]));
-                                    }
-                                    else*/ 
-                                    //galois::runtime::acquire(&data[tmpY * yGrid + curX], galois::MethodFlag::WRITE);
                                     if(d1[tmpY][curX]>tmp && tmp < return_dist) {
                                         
                                         data[(curY+1)*xGrid+curX].lock();
@@ -1638,15 +1466,11 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                                             parentY1[tmpY][curX] = curY;
                                             HV[tmpY][curX] = TRUE;                              
                                             ctx.push(pq_grid(&(d1[tmpY][curX]), tmp));
-                                            
-                                            //printf("top push Y: %d X: %d tmp: %f HV: false hyperH: %d\n", tmpY, curX, tmp, true);
-                                            //pq1.push({&(d1[tmpY][curX]), tmp});
                                         }
                                         data[(curY+1)*xGrid+curX].unlock();
                                     }
                                 }
                                 hyperV[curY][curX] = tmpV;
-                                //data[curY*xGrid+curX].unlock();
                             }
                         },
                         //galois::wl<galois::worklists::ParaMeter<>>(),
@@ -1674,27 +1498,14 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                     acc_dist += return_dist;
                     max_dist = (max_dist >= return_dist.load())? max_dist : return_dist.load();
 
-                    //if(netID == 2 && edgeID == 26) 
-                    //    printf("crossX %d crossY %d return_d: %f\n", crossX, crossY, return_dist.load());
-                    //timer_traceback.start();
                         while(d1[curY][curX]!=0) // loop until reach subtree1
                         {
-                            if(cnt > 2000) {
-                                cout<< "Y: " << curY <<" X:" << curX << " hyperH: " << hyperH[curY][curX];
-                                cout << " hyperV:" << hyperV[curY][curX] << " HV: " << HV[curY][curX];
-                                cout << " d1: " << d1[curY][curX] << endl;
-                                cout << " deadloop return!" << endl;
-                                //reInitTree(netID);
-                                //return;
-                            }
-
                             hypered = FALSE;
                             if (cnt != 0 ) {
                                 if (curX !=tmpX && hyperH[curY][curX]) {
                                     curX = 2*curX - tmpX;
                                     hypered = TRUE;
                                 }
-                                //printf("hyperV[153][134]: %d\n", hyperV[curY][curX]);
                                 if (curY !=tmpY && hyperV[curY][curX]) {
                                     curY = 2*curY - tmpY;
                                     hypered = TRUE;
@@ -1741,16 +1552,10 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
 
                         edge_n1n2 = edgeID;
 
-                    //timer_traceback.stop();
                     
-                    //if(netID == 14628)
-                    //    printf("netID %d edgeID %d src %d %d dst %d %d routelen: %d\n", netID, edgeID, E1x, E1y, E2x, E2y, cnt_n1n2);
-                    // (1) consider subtree1
-                    //timer_adjusttree.start();
                         if(n1>=deg && (E1x!=n1x || E1y!=n1y))
                         // n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
                             endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -1875,7 +1680,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                         if(n2>=deg && (E2x!=n2x || E2y!=n2y))
                         // n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
                             endpt2 = treeedges[corrEdge[E2y][E2x]].n2;
@@ -2026,33 +1830,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                     // update edge usage
                   
 
-                    /*for(i=0; i<pre_length; i++)
-                    {
-                        if(pre_gridsX[i]==pre_gridsX[i+1]) // a vertical edge
-                        {
-                            if(i != pre_length - 1)
-                                min_y = min(pre_gridsY[i], pre_gridsY[i+1]);
-                            else
-                                min_y = pre_gridsY[i];
-                            //v_edges[min_y*xGrid+gridsX[i]].usage += 1;
-                            //galois::atomicAdd(v_edges[min_y*xGrid+gridsX[i]].usage, (short unsigned)1);
-                            //printf("x y %d %d i %d \n", pre_gridsX[i], min_y, i);
-                            v_edges[min_y*xGrid+pre_gridsX[i]].usage.fetch_sub((short int)1, std::memory_order_relaxed);
-                            //if(v_edges[min_y*xGrid+pre_gridsX[i]].usage < 0) printf("V negative! %d \n", i);
-                        }
-                        else ///if(gridsY[i]==gridsY[i+1])// a horizontal edge
-                        {
-                            if(i != pre_length - 1)
-                                min_x = min(pre_gridsX[i], pre_gridsX[i+1]);
-                            else
-                                min_x = pre_gridsX[i];
-                            //h_edges[gridsY[i]*(xGrid-1)+min_x].usage += 1;
-                            //galois::atomicAdd(h_edges[gridsY[i]*(xGrid-1)+min_x].usage, (short unsigned)1);
-                            //printf("x y %d %d i %d\n", min_x, pre_gridsY[i], i);
-                            h_edges[pre_gridsY[i]*(xGrid-1)+min_x].usage.fetch_sub((short int)1, std::memory_order_relaxed);
-                            //if(h_edges[pre_gridsY[i]*(xGrid-1)+min_x].usage < 0) printf("H negative! %d \n", i);
-                        }
-                    }*/
                     //timer_updateusage.start();
                         acc_length += cnt_n1n2;
                         max_length = (max_length >= cnt_n1n2)? max_length : cnt_n1n2;
@@ -2074,22 +1851,6 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight, in
                             }
                         }
                     //timer_updateusage.stop();
-                    /*if(LOCK){
-                        for(i=0; i<cnt_n1n2-1; i++)
-                        {
-                            if(gridsX[i]==gridsX[i+1]) // a vertical edge
-                            {
-                                min_y = min(gridsY[i], gridsY[i+1]);
-                                v_edges[min_y*xGrid+gridsX[i]].releaseLock();
-                            }
-                            else ///if(gridsY[i]==gridsY[i+1])// a horizontal edge
-                            {
-                                min_x = min(gridsX[i], gridsX[i+1]);
-                                h_edges[gridsY[i]*(xGrid-1)+min_x].releaseLock();
-                            }
-                        }
-                    }*/
-                    //printf("netID %d edgeID %d src %d %d dst %d %d routelen: %d\n", netID, edgeID, n1x, n1y, n2x, n2y, cnt_n1n2);
                     //timer_checkroute2dtree.start();
                         if ( checkRoute2DTree(netID) ) {
                             reInitTree(netID);
@@ -2202,24 +1963,20 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight, int r
     for(int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
     {
 
-        int l, netID;
-        float total_usage;
-        float  overflow;
+        int netID;
 
         // maze routing for multi-source, multi-destination
-        Bool preD, hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        Bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, crossX, crossY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of;
         int origENG, edgeREC;
 
-        float costL1, costL2,  *dtmp;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -2240,7 +1997,6 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight, int r
         OrderNetEdge* netEO = thread_local_storage->netEO_p;
 
         bool** inRegion = thread_local_storage->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->inRegion_alloc;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -2329,16 +2085,11 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight, int r
                         xmax = n1x;
                     }
                     
-                    shifted = FALSE;
                     int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-                    segWidth = xmax - xmin;
-                    segHeight = ymax - ymin;
                     regionX1 = max(0, xmin - enlarge);
                     regionX2 = min(xGrid-1, xmax + enlarge);
                     regionY1 = max(0, ymin - enlarge);
                     regionY2 = min(yGrid-1, ymax + enlarge);
-                    regionWidth = regionX2 - regionX1 + 1;
-                    regionHeight = regionY2 - regionY1 + 1;
                     //std::cout << "region size" << regionWidth << ", " << regionHeight << std::endl;
                     // initialize d1[][] and d2[][] as BIG_INT
                     for(i=regionY1; i<=regionY2; i++)
@@ -2785,7 +2536,6 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight, int r
                         if(n1>=deg && (E1x!=n1x || E1y!=n1y))
                         // n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
                             endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -2910,7 +2660,6 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight, int r
                         if(n2>=deg && (E2x!=n2x || E2y!=n2y))
                         // n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
                         {
-                            shifted = TRUE;
                             // find the endpoints of the edge E1 is on
                             endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
                             endpt2 = treeedges[corrEdge[E2y][E2x]].n2;

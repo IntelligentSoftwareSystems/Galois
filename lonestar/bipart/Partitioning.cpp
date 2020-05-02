@@ -106,7 +106,7 @@ void initGain(GGraph& g) {
 } // namespace
 
 // Final
-void partition(MetisGraph* mcg) {
+void partition(MetisGraph* mcg, unsigned K) {
   GGraph* g = mcg->getGraph();
   galois::GAccumulator<unsigned int> accum;
   int waccum;
@@ -143,7 +143,10 @@ void partition(MetisGraph* mcg) {
       galois::loopname("initones")); 
   unsigned newSize = accum.reduce();
   waccum = accum.reduce() - accumZ.reduce();
-  unsigned targetWeight = accum.reduce() / 2;
+  //unsigned targetWeight = accum.reduce() / 2;
+  unsigned kvalue = (K+1) / 2;
+  unsigned targetWeight0 = (accum.reduce() * kvalue) / K;
+  unsigned targetWeight1 = accum.reduce() - targetWeight0;
 
   if (static_cast<long>(accumZ.reduce()) > waccum) {
   int gain = waccum;
@@ -175,11 +178,11 @@ void partition(MetisGraph* mcg) {
     //std::cout<<" weight "<<g->getData(zz).getWeight()<<"\n";
     
     i++;
-    if (gain >= static_cast<long>(targetWeight)) break;
+    if (gain >= static_cast<long>(targetWeight1)) break;
    if(i > sqrt(newSize)) break;
   }
 	
-    if (gain >= static_cast<long>(targetWeight)) break;
+    if (gain >= static_cast<long>(targetWeight1)) break;
     //updateGain(*g,zz);
 
   }
@@ -218,11 +221,11 @@ else {
   gain += g->getData(zz).getWeight();
     
     i++;
-    if (gain >= static_cast<long>(targetWeight)) break;
+    if (gain >= static_cast<long>(targetWeight0)) break;
     if(i > sqrt(newSize)) break;
   }
 	
-   if (gain >= static_cast<long>(targetWeight)) break;
+   if (gain >= static_cast<long>(targetWeight0)) break;
 
    //updateGain(*g,zz);
   }

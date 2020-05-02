@@ -4,7 +4,7 @@
 Bool newRipupCheck_lock(TreeEdge* treeedge, int x1, int y1, int x2, int y2,int ripup_threshold, int netID, int edgeID)
 {
 	short *gridsX, *gridsY;
-    int i, grid, Zpoint, ymin, xmin, max_usageH, max_usageV;
+    int i, grid, ymin, xmin;
     Bool needRipup = FALSE;
     Bool needRipup2 = FALSE;
     
@@ -207,20 +207,19 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
         int grid, netID;
 
         // maze routing for multi-source, multi-destination
-        bool hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpX, tmpY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpX, tmpY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int ind1, tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
-        int pre_length, pre_gridsX[XRANGE], pre_gridsY[XRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of, tmp_grid;
+        int tmp_grid;
         int preX,preY, origENG, edgeREC;
 
-        float costL1, costL2, tmp, *dtmp, tmp_cost;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        float tmp, tmp_cost;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -241,7 +240,7 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
         OrderNetEdge* netEO = thread_local_storage->getLocal()->netEO_p;
 
         bool** inRegion = thread_local_storage->getLocal()->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->getLocal()->inRegion_alloc;
+        //bool* inRegion_alloc = thread_local_storage->getLocal()->inRegion_alloc;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -300,13 +299,7 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
 				// ripup the routing for the edge
 				if(enter)
 				{
-                    pre_length = treeedge->route.routelen;
-                    for(int i = 0; i < pre_length; i++)
-                    {
-                        pre_gridsY[i] = treeedge->route.gridsY[i];
-                        pre_gridsX[i] = treeedge->route.gridsX[i];
-                        //printf("i %d x %d y %d\n", i, pre_gridsX[i], pre_gridsY[i]);
-                    }
+                    
                     //if(netID == 252163 && edgeID == 51)
                     //    printf("netID %d edgeID %d src %d %d dst %d %d\n", netID, edgeID, n1x, n1y, n2x, n2y);
 					if(n1y<=n2y)
@@ -327,16 +320,11 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
 						xmax = n1x;
 					}
 					
-					shifted = FALSE;
 					int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-					segWidth = xmax - xmin;
-					segHeight = ymax - ymin;
 					regionX1 = max(0, xmin - enlarge);
 					regionX2 = min(xGrid-1, xmax + enlarge);
 					regionY1 = max(0, ymin - enlarge);
 					regionY2 = min(yGrid-1, ymax + enlarge);
-					regionWidth = regionX2 - regionX1 + 1;
-					regionHeight = regionY2 - regionY1 + 1;
 
 					// initialize d1[][] and d2[][] as BIG_INT
 					for(i=regionY1; i<=regionY2; i++)
@@ -652,7 +640,6 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
 					if(n1>=deg && (E1x!=n1x || E1y!=n1y))
 					// n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
 					{
-						shifted = TRUE;
 						// find the endpoints of the edge E1 is on
 						endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
 						endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -777,7 +764,6 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight, int ripup_thresh
 					if(n2>=deg && (E2x!=n2x || E2y!=n2y))
 					// n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
 					{
-						shifted = TRUE;
 						// find the endpoints of the edge E1 is on
 						endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
 						endpt2 = treeedges[corrEdge[E2y][E2x]].n2;
@@ -1076,20 +1062,19 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
         int grid, netID;
 
         // maze routing for multi-source, multi-destination
-        bool hypered, enter, shifted;
-        int i, j, k, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpX, tmpY, tmpi, min_x, min_y, num_edges;
-        int segWidth, segHeight, regionX1, regionX2, regionY1, regionY2, regionWidth, regionHeight;
+        bool hypered, enter;
+        int i, j, deg, edgeID, n1, n2, n1x, n1y, n2x, n2y, ymin, ymax, xmin, xmax, curX, curY, crossX, crossY, tmpX, tmpY, tmpi, min_x, min_y, num_edges;
+        int regionX1, regionX2, regionY1, regionY2;
         int ind1, tmpind, gridsX[XRANGE], gridsY[YRANGE], tmp_gridsX[XRANGE], tmp_gridsY[YRANGE];
-        int pre_length, pre_gridsX[XRANGE], pre_gridsY[XRANGE];
         int endpt1, endpt2, A1, A2,  B1, B2, C1, C2, D1, D2, cnt, cnt_n1n2;
         int edge_n1n2, edge_n1A1, edge_n1A2, edge_n1C1, edge_n1C2, edge_A1A2, edge_C1C2;
         int edge_n2B1, edge_n2B2, edge_n2D1, edge_n2D2, edge_B1B2, edge_D1D2;
         int E1x, E1y, E2x, E2y;
-        int tmp_of, tmp_grid;
+        int tmp_grid;
         int preX,preY, origENG, edgeREC;
 
-        float costL1, costL2, tmp, *dtmp, tmp_cost;
-        TreeEdge *treeedges, *treeedge, *cureedge;
+        float tmp, tmp_cost;
+        TreeEdge *treeedges, *treeedge;
         TreeNode *treenodes;
 
 
@@ -1110,7 +1095,7 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
         OrderNetEdge* netEO = thread_local_storage->getLocal()->netEO_p;
 
         bool** inRegion = thread_local_storage->getLocal()->inRegion_p;
-        bool* inRegion_alloc = thread_local_storage->getLocal()->inRegion_alloc;
+        //bool* inRegion_alloc = thread_local_storage->getLocal()->inRegion_alloc;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -1170,13 +1155,7 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
 				// ripup the routing for the edge
 				if(enter)
 				{
-                    pre_length = treeedge->route.routelen;
-                    for(int i = 0; i < pre_length; i++)
-                    {
-                        pre_gridsY[i] = treeedge->route.gridsY[i];
-                        pre_gridsX[i] = treeedge->route.gridsX[i];
-                        //printf("i %d x %d y %d\n", i, pre_gridsX[i], pre_gridsY[i]);
-                    }
+                    
                     //if(netID == 252163 && edgeID == 51)
                     //    printf("netID %d edgeID %d src %d %d dst %d %d\n", netID, edgeID, n1x, n1y, n2x, n2y);
 					if(n1y<=n2y)
@@ -1197,16 +1176,11 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
 						xmax = n1x;
 					}
 					
-					shifted = FALSE;
 					int enlarge = min(origENG, (iter/6 +3) * treeedge->route.routelen ); //michael, this was global variable
-					segWidth = xmax - xmin;
-					segHeight = ymax - ymin;
 					regionX1 = max(0, xmin - enlarge);
 					regionX2 = min(xGrid-1, xmax + enlarge);
 					regionY1 = max(0, ymin - enlarge);
 					regionY2 = min(yGrid-1, ymax + enlarge);
-					regionWidth = regionX2 - regionX1 + 1;
-					regionHeight = regionY2 - regionY1 + 1;
 
 					// initialize d1[][] and d2[][] as BIG_INT
 					for(i=regionY1; i<=regionY2; i++)
@@ -1522,7 +1496,6 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
 					if(n1>=deg && (E1x!=n1x || E1y!=n1y))
 					// n1 is not a pin and E1!=n1, then make change to subtree1, otherwise, no change to subtree1
 					{
-						shifted = TRUE;
 						// find the endpoints of the edge E1 is on
 						endpt1 = treeedges[corrEdge[E1y][E1x]].n1;
 						endpt2 = treeedges[corrEdge[E1y][E1x]].n2;
@@ -1647,7 +1620,6 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight, int ripup_thresh
 					if(n2>=deg && (E2x!=n2x || E2y!=n2y))
 					// n2 is not a pin and E2!=n2, then make change to subtree2, otherwise, no change to subtree2
 					{
-						shifted = TRUE;
 						// find the endpoints of the edge E1 is on
 						endpt1 = treeedges[corrEdge[E2y][E2x]].n1;
 						endpt2 = treeedges[corrEdge[E2y][E2x]].n2;
