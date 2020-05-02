@@ -204,15 +204,12 @@ jobs:
             musl-dev \
             openssh-client \
             zlib-dev
-          apk add --no-cache --no-progress \
-            --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
-            openmpi-dev
 
           chmod 755 /root
           adduser -D runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
