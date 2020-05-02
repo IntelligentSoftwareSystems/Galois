@@ -258,7 +258,7 @@ double p, double q){
 
 		nodeWalks.push(walk);		
 		bag.push(T);
-	});
+	}, galois::steal());
 }
 
 void printM(std::vector<std::vector<double> >& M, uint32_t num_edge_types){
@@ -290,15 +290,13 @@ galois::InsertBag<std::vector<uint32_t>>& nodeWalks){
 		galois::InsertBag<std::vector<uint32_t>> walks;
 		heteroRandomWalk(graph, M, walks, nodeWalks, walk_length, p, q);
 		T.stop();
-		std::cout << "wal time: " << T.get() << std::endl; 		
+		std::cout << "walk time: " << T.get() << std::endl; 		
 
-		std::cout << "size: " << std::distance(nodeWalks.begin(), nodeWalks.end()) << std::endl;
 		//M step
-		//uint32_t size = std::distance(walks.begin(), walks.end());
 		std::vector<std::vector<uint32_t>> v;
 		computeVectors(v, walks, num_edge_types);
 
-		 std::vector<std::vector<uint32_t>> transformedV(num_edge_types+1);
+		std::vector<std::vector<uint32_t>> transformedV(num_edge_types+1);
 		transformVectors(v, transformedV, num_edge_types);
 
 		std::vector<double> means(num_edge_types+1);
