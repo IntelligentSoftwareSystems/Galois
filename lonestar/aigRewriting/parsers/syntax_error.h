@@ -33,7 +33,7 @@
 
 class syntax_error : public std::exception {
   unsigned l, c;
-  std::string msg;
+  std::string full_msg;
 
 public:
   syntax_error(unsigned l, unsigned c, std::string msg = "");

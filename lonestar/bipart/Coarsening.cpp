@@ -34,21 +34,6 @@ int LIMIT;
 bool FLAG = false;
 namespace {
 
-#ifndef NDEBUG
-__attribute__((unused)) void assertAllMatched(GNode node, GGraph* graph) {
-  for (auto jj : graph->edges(node))
-    assert(node == graph->getEdgeDst(jj) ||
-           graph->getData(graph->getEdgeDst(jj)).isMatched());
-}
-
-__attribute__((unused)) void assertNoMatched(GGraph* graph) {
-  for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn)
-    assert(!graph->getData(*nn).isMatched());
-}
-#endif
-
-
-typedef galois::GAccumulator<unsigned> Pcounter;
 
 
 int hash(unsigned val) {
@@ -411,6 +396,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, std::vector<bool> hed
   uint32_t num_nodes_next = nodes + hnum;
   uint64_t num_edges_next; 
   galois::gstl::Vector<galois::PODResizeableArray<uint32_t>> edges_id(num_nodes_next);
+  std::vector<std::vector<EdgeTy> > edges_data(num_nodes_next);
   std::vector<unsigned> old_id(hnum);
   unsigned h_id = 0;
   //galois::StatTimer sloop("for loop II");
@@ -457,7 +443,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag, std::vector<bool> hed
   }
   //galois::StatTimer TimerConstructFrom("Timer_Construct_From");
   //TimerConstructFrom.start();
-  coarseGGraph->constructFrom(num_nodes_next, num_edges_next, prefix_edges, edges_id);
+  coarseGGraph->constructFrom(num_nodes_next, num_edges_next, prefix_edges, edges_id,edges_data);
   //TimerConstructFrom.stop();
   //std::cout<<"graph cons time "<<TimerConstructFrom.get()<<"\n";
   coarseGGraph->hedges = hnum;

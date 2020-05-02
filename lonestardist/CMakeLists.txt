@@ -98,7 +98,6 @@ function(add_test_dist_and_verify app input type part N np)
   endif()
 
 
-  # Don't run dist tests in CI since they are broken in too many cases right now.
   if (NOT ${X_NOT_QUICK})
     set_tests_properties(run${suffix}
       PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
@@ -106,9 +105,14 @@ function(add_test_dist_and_verify app input type part N np)
 endfunction()
 
 function(add_test_dist_for_partitions app input type num_threads num_gpus part)
-  # spawn at most 5 processes/use at most 5 threads during testing
-  if (${num_threads} GREATER 5)
-    set(num_threads 5)
+  # cut threads in system in half first
+  if (${num_threads} GREATER 1)
+    math(EXPR num_threads "${num_threads} / 2")
+  endif()
+
+  # spawn at most 8 processes/use at most 8 threads during testing
+  if (${num_threads} GREATER 8)
+    set(num_threads 8)
   endif()
 
   set(partitions ${num_threads})
@@ -161,7 +165,7 @@ function(add_test_dist app input)
 
   set(num_threads ${NUM_TEST_THREADS})
 
-  foreach (part oec iec cvc cvc-iec)
+  foreach (part oec iec cvc cvc-iec hovc hivc)
     if (NOT ${X_NO_ASYNC})
       add_test_dist_for_partitions(${app} ${input} sync ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Sync)
       add_test_dist_for_partitions(${app} ${input} async ${num_threads} ${num_gpus} ${part} ${X_UNPARSED_ARGUMENTS} -exec=Async)

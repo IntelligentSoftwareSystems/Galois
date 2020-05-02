@@ -37,27 +37,15 @@ galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
   return b;
 }
 
-#ifdef MORE_MEM_HACK
-const size_t ptAllocSize =
-    16 * (2 << 20); // galois::runtime::MM::hugePageSize * 16;
-inline void* alloc() {
-  void* toReturn = malloc(ptAllocSize);
-  if (toReturn == nullptr) {
-    GALOIS_DIE("Out of memory in per thread storage allocation");
-  }
-  return toReturn;
-}
-#else
 const size_t ptAllocSize = galois::substrate::allocSize();
 inline void* alloc() {
   // alloc a single page, don't prefault
-  void* toReturn = galois::substrate::allocPages(1, false);
+  void* toReturn = galois::substrate::allocPages(1, true);
   if (toReturn == nullptr) {
     GALOIS_DIE("Out of memory in per thread storage allocation");
   }
   return toReturn;
 }
-#endif
 
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;

@@ -20,13 +20,13 @@
 #ifndef BIPART_H_
 #define BIPART_H_
 
-#include "galois/graphs/LC_CSR_Hypergraph.h"
+#include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/AtomicWrapper.h"
 
 class MetisNode;
 typedef uint32_t EdgeTy;
 using GGraph   = 
-    galois::graphs::LC_CSR_Hypergraph<MetisNode, EdgeTy>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
+    galois::graphs::LC_CSR_Graph<MetisNode, EdgeTy>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
 using GNode    = GGraph::GraphNode;
 using GNodeBag = galois::InsertBag<GNode>;
 
@@ -193,8 +193,8 @@ MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
                     scheduleMode sMode);
 
 // Partitioning
-void partition(MetisGraph* coarseMetisGraph);
+void partition(MetisGraph* coarseMetisGraph, unsigned K);
 // Refinement
- void refine(MetisGraph* coarseGraph, unsigned refineTo);
+ void refine(MetisGraph* coarseGraph, unsigned refineTo, unsigned K);
 
 #endif
