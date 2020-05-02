@@ -10,7 +10,7 @@ target_sources(galois_gluon PRIVATE
         src/GluonSubstrate.cpp
 )
 
-target_link_libraries(galois_gluon PUBLIC galois_dist_async LLVMSupport)
+target_link_libraries(galois_gluon PUBLIC galois_dist_async)
 
 target_include_directories(galois_gluon PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

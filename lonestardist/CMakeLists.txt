@@ -9,7 +9,7 @@ target_include_directories(distbench PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(distbench Galois::cusp Galois::gluon)
+target_link_libraries(distbench Galois::cusp Galois::gluon LLVMSupport)
 
 if(EXISTS /net/ohm/export/iss/dist-outputs)
   set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)

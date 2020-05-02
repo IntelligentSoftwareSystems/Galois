@@ -42,17 +42,14 @@
 #endif
 
 #include "galois/runtime/BareMPI.h"
-#include "llvm/Support/CommandLine.h"
 
-namespace cll = llvm::cl;
-
-//! Specifies if synchronization should be partition agnostic
-extern cll::opt<bool> partitionAgnostic;
+// TODO make not global
 //! Specifies what format to send metadata in
-extern cll::opt<DataCommMode> enforce_metadata;
+extern DataCommMode enforcedDataMode;
+
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-//! bare_mpi type to use
-extern cll::opt<BareMPI> bare_mpi;
+//! bare_mpi type to use; see options in runtime/BareMPI.h
+BareMPI bare_mpi = BareMPI::noBareMPI;
 #endif
 
 namespace galois {
@@ -81,6 +78,7 @@ private:
   //! The graph to handle communication for
   GraphTy& userGraph;
   const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
+  DataCommMode substrateDataMode; //!< datamode to enforce
   const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
   uint32_t num_run;   //!< Keep track of number of runs.
   uint32_t num_round; //!< Keep track of number of rounds.
@@ -352,16 +350,24 @@ public:
    * @param numHosts total number of hosts in the currently executing program
    */
   GluonEdgeSubstrate(GraphTy& _userGraph, unsigned host, unsigned numHosts,
-                     bool doNothing=false)
-      : galois::runtime::GlobalObject(this), userGraph(_userGraph), id(host),
-        numHosts(numHosts), num_run(0),
-        num_round(0), mirrorEdges(userGraph.getMirrorEdges()) {
+                     bool doNothing=false,
+                     DataCommMode _substrateDataMode=DataCommMode::noData)
+      : galois::runtime::GlobalObject(this),
+        userGraph(_userGraph),
+        id(host),
+        substrateDataMode(_substrateDataMode),
+        numHosts(numHosts),
+        num_run(0),
+        num_round(0),
+        mirrorEdges(userGraph.getMirrorEdges()) {
     if (!doNothing) {
       galois::StatTimer edgeSubstrateSetupTimer("GluonEdgeSubstrateConstructTime",
                                                 RNAME);
       edgeSubstrateSetupTimer.start();
 
-      enforce_data_mode = enforce_metadata;
+      // set global
+      enforcedDataMode = _substrateDataMode;
+
       initBareMPI();
       // master setup from mirrors done by setupCommunication call
       masterEdges.resize(numHosts);
@@ -507,7 +513,7 @@ private:
                            galois::PODResizeableArray<unsigned int>& offsets,
                            size_t& bit_set_count,
                            DataCommMode& data_mode) const {
-    if (enforce_data_mode != onlyData) {
+    if (substrateDataMode != onlyData) {
       bitset_comm.reset();
       std::string syncTypeStr =
           (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -1485,21 +1491,21 @@ private:
     //if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      if (enforce_data_mode == gidsData) {
+      if (substrateDataMode == gidsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (enforce_data_mode == offsetsData) {
+      } else if (substrateDataMode == offsetsData) {
         b.reserve(sizeof(DataCommMode)
             + sizeof(bit_set_count)
             + sizeof(size_t)
             + (num * sizeof(unsigned int))
             + sizeof(size_t)
             + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (enforce_data_mode == bitsetData) {
+      } else if (substrateDataMode == bitsetData) {
         size_t bitset_alloc_size =
             ((num + 63) / 64) * sizeof(uint64_t);
         b.reserve(sizeof(DataCommMode)

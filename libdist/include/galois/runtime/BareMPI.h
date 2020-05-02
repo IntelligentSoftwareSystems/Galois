@@ -29,7 +29,6 @@
 #pragma once
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 #include "mpi.h"
-#include "llvm/Support/CommandLine.h"
 
 //! Defines types of bare MPI to use
 enum BareMPI {
@@ -37,7 +36,4 @@ enum BareMPI {
   nonBlockingBareMPI, //!< non blocking bare MPI
   oneSidedBareMPI     //!< one sided bare MPI
 };
-
-//! Command line option for which kind of bare mpi to use
-extern llvm::cl::opt<BareMPI> bare_mpi;
 #endif
