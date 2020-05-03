@@ -47,7 +47,7 @@ public:
 
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
-  void norm_factor_computing(size_t g_size);
+  void norm_factor_computing(bool is_subgraph, int subg_id);
   void createSubgraphs(int num_subgraphs) {}
   void gen_subgraph_labels(size_t m, const mask_t *masks) {}
   void gen_subgraph_feats(size_t m, const mask_t *masks) {}

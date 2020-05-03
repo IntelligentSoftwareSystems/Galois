@@ -151,22 +151,22 @@ float_t* DistContext::get_in_ptr() {
   return &h_feats[0];
 }
 
-void DistContext::norm_factor_computing(size_t g_size) {
+void DistContext::norm_factor_computing(bool is_subgraph, int subg_id) {
   // TODO: this is a distributed operation
 
   // create for now, TODO need to actually fill it in
-  norm_factor = new float_t[localVertices];
+  norm_factors = new float_t[localVertices];
   galois::do_all(galois::iterate((size_t)0, localVertices),
     [&](auto v) {
-      norm_factor[v] = 1;
+      norm_factors[v] = 1;
     }, galois::loopname("NormCounting"));
 
   //galois::do_all(galois::iterate((size_t)0, localVertices),
   //  [&](auto v) {
   //    auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
   //    float_t temp = std::sqrt(float_t(degree));
-  //    if (temp == 0.0) norm_factor[v] = 0.0;
-  //    else norm_factor[v] = 1.0 / temp;
+  //    if (temp == 0.0) norm_factors[v] = 0.0;
+  //    else norm_factors[v] = 1.0 / temp;
   //  }, galois::loopname("NormCounting"));
 
   return;
