@@ -29,12 +29,12 @@ Context::Context() : n(0), num_classes(0),
   norm_factors(NULL), norm_factors_subg(NULL) {}
 
 Context::~Context() {
-  if (h_labels) delete h_labels;
-  if (h_labels_subg) delete h_labels_subg;
-  if (h_feats) delete h_feats;
-  if (h_feats_subg) delete h_feats_subg;
-  if (norm_factors) delete norm_factors;
-  if (norm_factors_subg) delete norm_factors_subg;
+  if (h_labels) delete[] h_labels;
+  if (h_labels_subg) delete[] h_labels_subg;
+  if (h_feats) delete[] h_feats;
+  if (h_feats_subg) delete[] h_feats_subg;
+  if (norm_factors) delete[] norm_factors;
+  if (norm_factors_subg) delete[] norm_factors_subg;
 }
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {

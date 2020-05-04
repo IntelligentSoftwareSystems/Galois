@@ -177,6 +177,7 @@ struct CSRGraph {
 
   size_t size() { return size_t(nnodes); }
   size_t sizeEdges() { return size_t(nedges); }
+  void degree_counting() {}
   index_type nnodes, nedges;
   index_type* row_start; // row_start[node] points into edge_dst, node starts at
                          // 0, row_start[nnodes] = nedges

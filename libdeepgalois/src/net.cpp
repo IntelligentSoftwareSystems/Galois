@@ -162,23 +162,22 @@ void Net::train(optimizer* opt, bool need_validate) {
   Timer t_epoch;
   // run epochs
   for (unsigned ep = 0; ep < num_epochs; ep++) {
-    galois::gPrint(header, "Epoch ", std::setw(3), ep, seperator);
     t_epoch.Start();
 
     if (subgraph_sample_size) {
       if (num_subg_remain == 0) {
-        //galois::gPrint("Generating ", num_subgraphs, " subgraphs (mini-batches) ... ");
+        galois::gPrint("Generating ", num_subgraphs, " subgraphs (mini-batches) ... ");
         Timer t_subgen;
         t_subgen.Start();
         // generate subgraphs
+#ifdef CPU_ONLY
         //for (int sid = 0; sid < num_subgraphs; sid++) {
         galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
           unsigned tid = 0;
           tid = galois::substrate::ThreadPool::getTID();
-#ifdef CPU_ONLY
           sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples], tid);
-#endif
         }, galois::loopname("subgraph_gen"));
+#endif
         num_subg_remain = num_subgraphs;
         t_subgen.Stop();
         //galois::gPrint("Done, time: ", t_subgen.Millisecs(), "\n");
@@ -210,6 +209,7 @@ void Net::train(optimizer* opt, bool need_validate) {
 	}
 
     // training steps
+    galois::gPrint(header, "Epoch ", std::setw(3), ep, seperator);
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
 
@@ -313,7 +313,7 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
   loss = fprop(begin, end, count, masks);
   float_t* predictions = layers[num_layers - 1]->next()->get_data();
   label_t* labels;
-  if (subgraph_sample_size) {
+  if (type == "train" && subgraph_sample_size) {
     labels = context->get_labels_subg_ptr();
   } else {
     labels = context->get_labels_ptr();

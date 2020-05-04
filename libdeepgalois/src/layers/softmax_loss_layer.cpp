@@ -13,7 +13,7 @@ softmax_loss_layer::softmax_loss_layer(unsigned level,
 }
 
 softmax_loss_layer::~softmax_loss_layer() {
-  delete loss;
+  delete[] loss;
 }
 
 void softmax_loss_layer::malloc_and_init() {

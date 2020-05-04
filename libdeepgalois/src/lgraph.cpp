@@ -38,11 +38,20 @@ void LearningGraph::progressPrint(unsigned maxii, unsigned ii) {
 }
 
 void LearningGraph::allocateFrom(index_t nv, index_t ne) {
-  num_vertices_ = nv;
-  num_edges_ = ne;
   //printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
-  rowptr_ = new index_t[num_vertices_+1];
-  colidx_ = new index_t[num_edges_];
+  if (num_vertices_ != nv) {
+    if (rowptr_ != NULL) delete [] rowptr_;
+    if (degrees_ != NULL) delete [] degrees_;
+    if (vertex_data_ != NULL) delete [] vertex_data_;
+    num_vertices_ = nv;
+  }
+  if (num_edges_ != ne) {
+    if (colidx_ != NULL) delete [] colidx_;
+    if (edge_data_ != NULL) delete [] edge_data_;
+    num_edges_ = ne;
+  } 
+  if (rowptr_ == NULL) rowptr_ = new index_t[num_vertices_+1];
+  if (colidx_ == NULL) colidx_ = new index_t[num_edges_];
   rowptr_[0] = 0;
 }
 
@@ -165,11 +174,11 @@ void LearningGraph::readGraphFromGRFile(const std::string& filename) {
 #ifdef CPU_ONLY
 void LearningGraph::dealloc() {
   assert (!is_device);
-  if (rowptr_ != NULL) delete rowptr_;
-  if (colidx_ != NULL) delete colidx_;
-  if (degrees_ != NULL) delete degrees_;
-  if (vertex_data_ != NULL) delete vertex_data_;
-  if (edge_data_ != NULL) delete edge_data_;
+  if (rowptr_ != NULL) delete [] rowptr_;
+  if (colidx_ != NULL) delete [] colidx_;
+  if (degrees_ != NULL) delete [] degrees_;
+  if (vertex_data_ != NULL) delete [] vertex_data_;
+  if (edge_data_ != NULL) delete [] edge_data_;
 }
 #endif
 

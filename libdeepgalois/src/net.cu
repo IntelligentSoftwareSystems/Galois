@@ -135,10 +135,10 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
   float_free_device(d_fp);
   float_free_device(d_fn);
   float_free_device(d_tn);
-  delete h_tp;
-  delete h_fp;
-  delete h_fn;
-  delete h_tn;
+  delete[] h_tp;
+  delete[] h_fp;
+  delete[] h_fn;
+  delete[] h_tn;
   return f1_micro;
 }
 

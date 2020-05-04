@@ -114,7 +114,8 @@ void print_vertex_set(VertexSet vertex_set) {
 
 void Sampler::select_vertices(size_t n, int m, VertexSet &st, unsigned tid) {
   //unsigned myseed = time(NULL);
-  unsigned myseed = tid;
+  unsigned myseed = tid + time(NULL);
+  //unsigned myseed = tid;
   //DBx: Dashboard line x, IAx: Index array line x
   std::vector<db_t> DB0, DB1, DB2, IA0, IA1, IA2, IA3, IA4, nDB0, nDB1, nDB2;
   DB0.reserve(subg_deg*m*ETA);

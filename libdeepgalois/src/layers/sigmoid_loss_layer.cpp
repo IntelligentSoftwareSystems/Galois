@@ -13,7 +13,7 @@ sigmoid_loss_layer::sigmoid_loss_layer(unsigned level,
 }
 
 sigmoid_loss_layer::~sigmoid_loss_layer() {
-  delete loss;
+  delete[] loss;
 }
 
 void sigmoid_loss_layer::malloc_and_init() {
@@ -37,7 +37,7 @@ void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* ou
       for (size_t j = 0; j < len; j++) ground_truth[j] = (float_t)get_label(i, j);
       // loss calculation
       loss[i] = math::cross_entropy(len, ground_truth, &out_data[idx]);
-	  delete ground_truth;
+	  delete[] ground_truth;
     }
   }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("sigmoid-loss-fw"));
 }
@@ -55,8 +55,8 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
       math::d_cross_entropy(len, ground_truth, &out_data[idx], norm_grad);
       // derviative sigmoid to gradient used in the next layer
       math::d_sigmoid(len, &in_data[idx], &out_data[idx], &in_grad[idx], norm_grad);
-	  delete norm_grad;
-	  delete ground_truth;
+	  delete[] norm_grad;
+	  delete[] ground_truth;
     }
   }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("sigmoid-loss-bw"));
 }
