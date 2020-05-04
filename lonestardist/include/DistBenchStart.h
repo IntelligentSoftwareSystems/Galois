@@ -42,6 +42,10 @@ extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
 extern cll::opt<std::string> statFile;
 extern cll::opt<bool> verify;
+//! If set, ignore partitioning comm optimizations
+extern cll::opt<bool> partitionAgnostic;
+//! Set method for metadata sends
+extern cll::opt<DataCommMode> commMetadata;
 
 #ifdef __GALOIS_HET_CUDA__
 enum Personality { CPU, GPU_CUDA };
@@ -232,7 +236,8 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
 #endif
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid());
+  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
+                    partitionAgnostic, commMetadata);
 
   // marshal graph to GPU as necessary
   #ifdef __GALOIS_HET_CUDA__
@@ -275,7 +280,8 @@ symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
 #endif
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid());
+  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
+                    partitionAgnostic, commMetadata);
 
   // marshal graph to GPU as necessary
   #ifdef __GALOIS_HET_CUDA__

@@ -40,8 +40,10 @@ enum DataCommMode {
   dataSplit // NOT USED
 };
 
-//! If this is set, then always used the data mode it is set to
-extern DataCommMode enforce_data_mode;
+//! If some mode is to be enforced, set this variable
+//! @todo using a global is not great, but current problem is that GPU code
+//! assumes variable and would take some reorg to fix
+extern DataCommMode enforcedDataMode;
 
 /**
  * Given a size of a subset of elements to send and the total number of
@@ -58,8 +60,8 @@ extern DataCommMode enforce_data_mode;
 template <typename DataType>
 DataCommMode get_data_mode(size_t num_selected, size_t num_total) {
   DataCommMode data_mode = noData;
-  if (enforce_data_mode != noData) {
-    data_mode = enforce_data_mode;
+  if (enforcedDataMode != noData) {
+    data_mode = enforcedDataMode;
   } else { // no enforced mode, so find an appropriate mode
     if (num_selected == 0) {
       data_mode = noData;

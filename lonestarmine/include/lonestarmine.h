@@ -8,8 +8,8 @@
 #endif
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype: txt,adj,mtx,gr>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"), cll::Required);
+static cll::opt<std::string> filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"), cll::init("gr"));
 static cll::opt<unsigned> num_trials("n", cll::desc("perform n trials (default value 1)"), cll::init(1));
 static cll::opt<unsigned> nblocks("b", cll::desc("edge blocking to b blocks (default value 1)"), cll::init(1));
 static cll::opt<std::string> pattern_filename("p", cll::desc("<pattern graph filename: unsymmetrized graph>"), cll::init(""));
@@ -18,7 +18,7 @@ static cll::opt<unsigned> fv("fv", cll::desc("first vertex is special"), cll::in
 static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 static cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
 static cll::opt<unsigned> debug("d", cll::desc("print out the frequent patterns for debugging"), cll::init(0));
-static cll::opt<unsigned> minsup("ms", cll::desc("minimum support (default value 0)"), cll::init(0));
+static cll::opt<unsigned> minsup("ms", cll::desc("minimum support (default value 300)"), cll::init(300));
 static cll::opt<int>numThreads("t", llvm::cl::desc("Number of threads (default value 1)"), llvm::cl::init(1));
 static cll::opt<std::string> preset_filename("pf", cll::desc("<filename: preset matching order>"), cll::init(""));
 static cll::opt<bool> verify("v", llvm::cl::desc("do verification step (default value false)"), llvm::cl::init(false));
