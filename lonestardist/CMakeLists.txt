@@ -32,11 +32,6 @@ if(ENABLE_HETERO_GALOIS)
   endif()
 endif()
 
-# CuSP uses DGAccumulator which uses LCI if enabled
-if (USE_LCI)
-  target_include_directories(distbench PUBLIC ${LWCI_INCLUDE})
-endif()
-
 function(app_dist name)
   set(options NO_GPU)
   set(one_value_args)

@@ -29,7 +29,7 @@ endif()
 
 if (USE_LCI)
   add_definitions(-DGALOIS_USE_LWCI)
-  set(LWCI_ROOT "${PROJECT_SOURCE_DIR}/liblci")
+  set(LWCI_ROOT "${PROJECT_SOURCE_DIR}/external/lci")
   set(LWCI_INCLUDE "${LWCI_ROOT}/include")
   set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
 
@@ -41,7 +41,10 @@ if (USE_LCI)
 
   add_dependencies(galois_dist_async lci)
   target_link_libraries(galois_dist_async PRIVATE ${LWCI_LIBRARY} -lpsm2)
-  target_include_directories(galois_dist_async PUBLIC ${LWCI_INCLUDE})
+  target_include_directories(galois_dist_async PUBLIC 
+    $<BUILD_INTERFACE:${LWCI_INCLUDE}>
+    $<INSTALL_INTERFACE:include>
+  )
 endif(USE_LCI)
 
 install(

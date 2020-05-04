@@ -25,12 +25,6 @@ if (USE_BARE_MPI)
   target_compile_definitions(galois_gluon PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
 endif()
 
-if (USE_LCI)
-  add_dependencies(galois_gluon lci)
-  target_link_libraries(galois_gluon ${LWCI_LIBRARY} -lpsm2)
-  target_include_directories(galois_gluon PUBLIC ${LWCI_INCLUDE})
-endif()
-
 install(
   DIRECTORY include/
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
