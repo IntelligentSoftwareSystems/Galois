@@ -33,7 +33,7 @@
 
 class semantic_error : public std::exception {
   unsigned l, c;
-  std::string msg;
+  std::string full_msg;
 
 public:
   semantic_error(unsigned l, unsigned c, std::string msg = "");

@@ -43,10 +43,13 @@ struct CUDA_Context;
 //! standard global options to the benchmarks
 namespace cll = llvm::cl;
 
+// note these come from distbenchstart rather than mining bench
 extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
 extern cll::opt<std::string> statFile;
 extern cll::opt<bool> verify;
+//! Set method for metadata sends
+extern cll::opt<DataCommMode> commMetadata;
 
 #ifdef __GALOIS_HET_CUDA__
 enum Personality { CPU, GPU_CUDA };
@@ -175,7 +178,7 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr, bool loadProxy
   const auto& net = galois::runtime::getSystemNetworkInterface();
   // if you want to load proxy edges (true), then do nothing should be false
   // hence the use of ! to negate
-  s = new Substrate(*g, net.ID, net.Num, !loadProxyEdges);
+  s = new Substrate(*g, net.ID, net.Num, !loadProxyEdges, commMetadata);
 
   // marshal graph to GPU as necessary
   #ifdef __GALOIS_HET_CUDA__

@@ -44,7 +44,9 @@ static const char* url = "SPRoute";
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-static cll::opt<std::string> outfile("o", cll::desc("output file"), cll::init(""));
+static cll::opt<std::string> outfile("o", cll::desc("output file (optional)"), cll::init(""));
+
+static cll::opt<std::string> fluteDir("flute", cll::desc("directory of POWV9.dat and POST9.dat (REQUIRED)"), cll::Required);
 
 int main(int argc, char** argv)
 {
@@ -114,13 +116,13 @@ int main(int argc, char** argv)
 
      //galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE> thread_local_storage;
      //galois::setActiveThreads(numThreads);
-    galois::on_each( 
+   /* galois::on_each( 
             [&] (const unsigned tid, const unsigned numT)
             {
                 printf("threadid: %d %d\n", tid, numT);
             }
             );
-
+*/
    cout << " nthreads: " << numThreads << endl;
 
     
@@ -137,7 +139,7 @@ int main(int argc, char** argv)
 		printf("\nReading %s ...\n", filename.c_str());
 		readFile(filename.c_str());
 		printf("\nReading Lookup Table ...\n");
-		readLUT();
+		readLUT(fluteDir.c_str());
 		printf("\nDone reading table\n\n");  
 
 		t2 = clock();

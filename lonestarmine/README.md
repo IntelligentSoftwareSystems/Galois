@@ -51,10 +51,10 @@ RUN
 
 The following are a few example command lines.
 
-- `$ ./tc_mine gr $SRC_DIR/lonestarmine/test_data/citeseer.csgr -t 28`
-- `$ ./kcl gr $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 28`
-- `$ ./motif gr $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 56`
-- `$ ./fsm adj $SRC_DIR/lonestarmine/test_data/citeseer.sadj -k=2 -ms=300 -t 28`
+- `$ ./tc_mine $SRC_DIR/lonestarmine/test_data/citeseer.csgr -t 28`
+- `$ ./kcl $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 28`
+- `$ ./motif $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 56`
+- `$ ./fsm $SRC_DIR/lonestarmine/test_data/citeseer.sadj -ft adj -k=2 -ms=300 -t 28`
 
 PERFORMANCE
 ===========

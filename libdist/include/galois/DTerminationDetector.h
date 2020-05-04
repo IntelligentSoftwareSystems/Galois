@@ -69,7 +69,7 @@ public:
 
   void reinitialize() {
     prev_snapshot = 0;
-    snapshot = 1; 
+    snapshot = 1;
     global_snapshot = 1;
     work_done = false;
   }
@@ -184,6 +184,11 @@ public:
           initiate_snapshot();
         } else {
           galois::gDebug("[", net.ID, "] terminating ", snapshot);
+          // an explicit barrier may be required here
+          // so that the next async phase begins on all hosts at the same time
+          // however, this may add overheads when it is not required
+          // (depending on when the next async phase actually begins), so
+          // ASSUME: caller will call getHostBarrier().wait() if required
           reinitialize(); // for next async phase
           return true;
         }

@@ -40,8 +40,8 @@
 /*************************************/
 /* Internal Parameters and Functions */
 /*************************************/
-#define POWVFILE "POWV9.dat"        // LUT for POWV (Wirelength Vector)
-#define POSTFILE "POST9.dat"        // LUT for POST (Steiner Tree)
+#define POWVFILE "/POWV9.dat"        // LUT for POWV (Wirelength Vector)
+#define POSTFILE "/POST9.dat"        // LUT for POST (Steiner Tree)
 #define D 9                         // LUT is used for d <= D, D <= 9
 #define TAU(A) (8+1.3*(A))
 #define D1(A) (25+120/((A)*(A)))     // flute_mr is used for D1 < d <= D2
@@ -148,6 +148,90 @@ int max_heap_size = MAX_HEAP_SIZE;
 void init_param()
 {
   heap = (node_pair*)malloc(sizeof(node_pair)*(max_heap_size+1));
+}
+
+void readLUT(const char* fluteDir)
+{
+    unsigned char charnum[256], line[32], *linep, c;
+    FILE *fpwv, *fprt;
+    struct csoln *p;
+    int d, i, j, k, kk, ns, nn;
+
+    init_param();
+    
+    for (i=0; i<=255; i++) {
+        if ('0'<=i && i<='9')
+            charnum[i] = i - '0';
+        else if (i>='A')
+            charnum[i] = i - 'A' + 10;
+        else // if (i=='$' || i=='\n' || ... )
+            charnum[i] = 0;
+    }
+    
+    char powvfile[100], postfile[100];
+    strcat(powvfile, fluteDir);
+    strcat(powvfile, POWVFILE);
+    strcat(postfile, fluteDir);
+    strcat(postfile, POSTFILE);
+
+    fpwv=fopen(powvfile, "r");
+    if (fpwv == NULL) {
+        printf("Error in opening %s\n", powvfile);
+        exit(1);
+    }
+
+#if ROUTING==1
+    fprt=fopen(postfile, "r");
+    if (fprt == NULL) {
+        printf("Error in opening %s\n", postfile);
+        exit(1);
+    }
+#endif
+
+    for (d=4; d<=D; d++) {
+        fscanf(fpwv, "d=%d\n", &d);
+#if ROUTING==1
+        fscanf(fprt, "d=%d\n", &d);
+#endif
+        for (k=0; k<numgrp[d]; k++) {
+            ns = (int) charnum[fgetc(fpwv)];
+
+            if (ns==0) {  // same as some previous group
+                fscanf(fpwv, "%d\n", &kk);
+                numsoln[d][k] = numsoln[d][kk];
+                LUT[d][k] = LUT[d][kk];
+            }
+            else {
+                fgetc(fpwv);  // '\n'
+                numsoln[d][k] = ns;
+                p = (struct csoln*) malloc(ns*sizeof(struct csoln));
+                LUT[d][k] = p;
+                for (i=1; i<=ns; i++) {
+                    linep = (unsigned char *) fgets((char *) line, 32, fpwv);
+                    p->parent = charnum[*(linep++)];
+                    j = 0;
+                    while ((p->seg[j++] = charnum[*(linep++)]) != 0) ;
+                    j = 10;
+                    while ((p->seg[j--] = charnum[*(linep++)]) != 0) ;
+#if ROUTING==1
+                    nn = 2*d-2;
+                    fread(line, 1, d-2, fprt); linep=line;
+                    for (j=d; j<nn; j++) {
+                        c = charnum[*(linep++)];
+                        p->rowcol[j-d] = c;
+                    }
+                    fread(line, 1, nn/2+1, fprt); linep=line;  // last char \n
+                    for (j=0; j<nn; ) {
+                        c = *(linep++);
+                        p->neighbor[j++] = c/16;
+                        p->neighbor[j++] = c%16;
+                    }
+#endif
+                    p++;
+                }
+            }
+        }
+    }
 }
 
 void readLUT()
