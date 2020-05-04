@@ -17,7 +17,7 @@ protected:
   galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
   Graph* graph_cpu;            // the input graph, |V| = N
-  Graph* subgraph_cpu;
+  std::vector<Graph*> subgraphs_cpu;
   label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
   label_t *h_labels_subg;      // labels for subgraph
   float_t* h_feats;            // input features: N x D
@@ -27,6 +27,7 @@ protected:
   float_t* d_feats;            // input features on device
   float_t* d_feats_subg;       // input features for subgraph on device
   float_t* norm_factors;       // normalization constant based on graph structure
+  float_t* norm_factors_subg;  // normalization constant for subgraph
 
 public:
   DistContext();
@@ -47,18 +48,19 @@ public:
 
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
-  void norm_factor_computing(bool is_subgraph, int subg_id);
+  void norm_factor_computing(bool is_subgraph, int subg_id = 0);
   void createSubgraphs(int num_subgraphs) {}
   void gen_subgraph_labels(size_t m, const mask_t *masks) {}
   void gen_subgraph_feats(size_t m, const mask_t *masks) {}
 
   float_t* get_norm_factors_ptr() { return norm_factors; }
   Graph* getGraphPointer() { return graph_cpu; }
-  Graph* getSubgraphPointer() { return subgraph_cpu; };
+  Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return h_feats_subg; }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return h_labels_subg; }
+  float_t* get_norm_factors_subg_ptr() { return norm_factors_subg; }
 
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();

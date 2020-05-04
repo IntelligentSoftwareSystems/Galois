@@ -194,7 +194,7 @@ void Net::train(optimizer* opt, bool need_validate) {
         sg_ptr->degree_counting();
         //galois::gPrint("\tsubgraph[", i, "]: num_v ", sg_ptr->size(), " num_e ", sg_ptr->sizeEdges(), "\n");
       }
-#endif GALOIS_USE_DIST
+#endif //GALOIS_USE_DIST
       num_subg_remain--;
       int sg_id = num_subg_remain;
       auto subgraph_ptr = context->getSubgraphPointer(sg_id);
@@ -530,9 +530,9 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks
       uint32_t localID = dGraph->getLID(i);
       if (masks[localID] == 1) {
         // get prediction
-        auto preds = math::argmax(num_classes, preds+localID*num_classes);
+        auto pred = math::argmax(num_classes, &preds[localID*num_classes]);
         // check prediction
-        if ((label_t)preds == ground_truth[localID])
+        if ((label_t)pred == ground_truth[localID])
           accuracy_all += 1.0;
       }
     }

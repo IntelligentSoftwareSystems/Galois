@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
   deepgalois::Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
-  network.dist_init(dGraph);
+  network.dist_init(dGraph, dataset);
 #endif
 
   // read network, features, ground truth, initialize metadata
