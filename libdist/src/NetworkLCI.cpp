@@ -146,7 +146,10 @@ public:
 
   NetworkInterfaceLCI() {
     lc_init(1, &lc_col_ep);
-    lc_opt opt = {.dev = 0, .desc = LC_DYN_CQ, .alloc = alloc_req};
+    lc_opt opt;
+    opt.dev = 0; 
+    opt.desc = LC_DYN_CQ;
+    opt.alloc = alloc_req;
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[0]);
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[1]);
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[2]);
