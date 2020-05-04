@@ -43,6 +43,10 @@ __device__ static float atomicMin(float* address, float val) {
   return old;
 }
 
+__device__ static int atomicTestAdd(int* address, int val) {
+  return (val == 0) ? *address : atomicAdd(address, val);
+}
+
 __device__ static float atomicTestAdd(float* address, float val) {
   return (val == 0.0) ? *address : atomicAdd(address, val);
 }
