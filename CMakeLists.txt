@@ -337,17 +337,21 @@ add_custom_target(apps)
 # Core libraries (lib)
 add_subdirectory(libgalois)
 
-if(USE_DEEPGALOIS)
-  add_subdirectory(libdeepgalois)
-  add_subdirectory(lonestargnn)
-endif(USE_DEEPGALOIS)
-
 if (ENABLE_DIST_GALOIS)
+  # currently making use of this in deepgalois to distinguish dist from no dist
+  # note this has to go before the libdeepgalois subdirectory is added below
+  add_definitions(-DGALOIS_USE_DIST)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
 endif()
+
+if(USE_DEEPGALOIS)
+  add_subdirectory(libdeepgalois)
+  add_subdirectory(lonestargnn)
+endif(USE_DEEPGALOIS)
+
 if (ENABLE_HETERO_GALOIS)
   enable_language(CUDA)
   string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
