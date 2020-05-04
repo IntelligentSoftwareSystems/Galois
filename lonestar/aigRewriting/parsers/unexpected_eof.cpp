@@ -29,24 +29,23 @@
 unexpected_eof::unexpected_eof(unsigned l, unsigned c) : std::exception() {
   this->l   = l;
   this->c   = c;
-  this->msg = "";
+  std::stringstream ret;
+  ret << "Unexpected eof in line-" << l << " char-" << c << std::endl;
+  this->full_msg = ret.str();
 }
 
 unexpected_eof::unexpected_eof(unsigned l, unsigned c, std::string msg)
     : std::exception() {
   this->l   = l;
   this->c   = c;
-  this->msg = msg;
+  std::stringstream ret;
+  ret << "Unexpected eof in line-" << l << " char-" << c
+      << ". Last token: " << msg << std::endl;
+  this->full_msg = ret.str();
 }
 
 const char* unexpected_eof::what() const throw() {
-  std::stringstream ret;
-  ret << "Unexpected eof in line-" << l << " char-" << c;
-  if (msg == "")
-    ret << std::endl;
-  else
-    ret << ". Last token: " << msg << std::endl;
-  return ret.str().c_str();
+  return this->full_msg.c_str();
 }
 
 unexpected_eof::~unexpected_eof() throw() {}

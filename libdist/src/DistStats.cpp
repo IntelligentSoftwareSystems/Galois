@@ -284,8 +284,9 @@ void DistStatManager::combineAtHost_0(void) {
       receiveAtHost_0_helper();
     }
   };
-
-  galois::DGTerminator<unsigned int> td2;
+  // explicit barrier after logical barrier is required
+  // as next async phase begins immediately
+  getHostBarrier().wait();
 
   // host 0 reads stats from Base class
   // other hosts send stats to host 0
@@ -293,12 +294,15 @@ void DistStatManager::combineAtHost_0(void) {
   getSystemNetworkInterface().flush();
 
   // barrier
-  while (td2.reduce()) {
+  while (td.reduce()) {
     if (getHostID() == 0) {
       // receive from other hosts
       receiveAtHost_0_helper2();
     }
   };
+  // explicit barrier after logical barrier is required
+  // as next async phase begins immediately
+  getHostBarrier().wait();
 }
 
 bool DistStatManager::printingHostVals(void) {

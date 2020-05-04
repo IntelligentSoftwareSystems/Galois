@@ -254,15 +254,6 @@ void parallel_refine_KF(GGraph& g, float tol, unsigned refineTo) {
  }
  unlock(g); 
 }
-// find the boundary in parallel 
-// sort the boundary in parallel
-// swap in parallel using for_each (find the smallest and go over that)
-__attribute__((unused)) unsigned hash(unsigned int val)
-{
-  val = ((val >> 16) ^ val) * 0x45d9f3b;
-  val = ((val >> 16) ^ val) * 0x45d9f3b;
-  return (val >> 16) ^ val;
-}
 
 
 void parallel_make_balance(GGraph& g, float tol, int p) {
@@ -520,112 +511,36 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
 	
   }//end while
 }
-__attribute__((unused)) void make_balance(GGraph& g, float tol, int p) {
-
- unsigned Size = g.hnodes;
-
-  galois::GAccumulator<unsigned int> accum;
-  galois::GAccumulator<unsigned int> nodeSize;
-  galois::do_all(galois::iterate(g),
-  [&](GNode n) {
-     if (n < g.hedges) return;
-     nodeSize += g.getData(n).getWeight();
-     if (g.getData(n).getPart() > 0)
-       accum += g.getData(n).getWeight();
-  },
-  galois::loopname("make balance"));
-  const int hi = (1 + tol) * nodeSize.reduce() / (2 + tol);
-  const int lo = nodeSize.reduce() - hi;
-  int bal = accum.reduce();
-
-  int pass = 0;
-  while(1) {
-    if(bal >= lo && bal <= hi)	break;
-    initGains(g, p);
-    std::vector<GNode> nodeListz;
-    std::vector<GNode> nodeListo;
-    std::set<GNode> nodelistz;
-    std::set<GNode> nodelisto;
-    if (bal < lo) {
-      for (size_t b = 0; b < g.hedges; b++) {
-        for (auto n : g.edges(b)) {
-          auto node = g.getEdgeDst(n);
-          unsigned pp = g.getData(node).getPart();
-          if (pp == 0) {
-            nodelistz.insert(node);
-          }
-      	}
-    }
-		
-    for (auto x : nodelistz)
-       nodeListz.push_back(x);
-    std::sort(nodeListz.begin(), nodeListz.end(), [&g] (GNode& lpw, GNode& rpw) {
-    if (fabs((float)((g.getData(lpw).getGain()) * (1.0f / g.getData(lpw).getWeight())) - (float)((g.getData(rpw).getGain()) * (1.0f / g.getData(rpw).getWeight()))) < 0.00001f) return (float)g.getData(lpw).nodeid < (float)g.getData(rpw).nodeid;
-      return (float) ((g.getData(lpw).getGain()) * (1.0f / g.getData(lpw).getWeight())) > (float)((g.getData(rpw).getGain()) * (1.0f / g.getData(rpw).getWeight()));
-    });
-    int i = 0;
-      for (auto zz : nodeListz) {
-       // if (g.getData(zz).counter > 2)continue;
-//        g.getData(zz).counter++;
-        g.getData(zz).setPart(1);
-	bal += g.getData(zz).getWeight();
-	if(bal >= lo) break;
-	i++;
-	if (i > sqrt(Size)) break;
-      }
-      if(bal >= lo) break;//continue;
-     
-    }
-	
-    else {
-      for (GNode b = 0; b < g.hedges; b++) {
-        for (auto n : g.edges(b)) {
-          auto node = g.getEdgeDst(n);
-          unsigned pp = g.getData(node).getPart();
-          if (pp == 1) {
-            nodelisto.insert(node);
-          }
-
-        }
-      }
-
-      for (auto x : nodelisto)
-        nodeListo.push_back(x);
-
-      std::sort(nodeListo.begin(), nodeListo.end(), [&g] (GNode& lpw, GNode& rpw) {
-    if (fabs((float)((g.getData(lpw).getGain()) * (1.0f / g.getData(lpw).getWeight())) - (float)((g.getData(rpw).getGain()) * (1.0f / g.getData(rpw).getWeight()))) < 0.00001f) return (float)g.getData(lpw).nodeid < (float)g.getData(rpw).nodeid;
-      return (float) ((g.getData(lpw).getGain()) * (1.0f / g.getData(lpw).getWeight())) > (float)((g.getData(rpw).getGain()) * (1.0f / g.getData(rpw).getWeight()));
-    });
-
-      int i = 0;
-      for (auto zz : nodeListo) {
-    //    if (g.getData(zz).counter > 20)continue;
-        g.getData(zz).setPart(0);
-      //  g.getData(zz).counter++;
-        bal -= g.getData(zz).getWeight();
-        if(bal <= hi) break;
-        i++;
-        if (i > sqrt(Size)) break;
-      }
-
-      if (bal <= hi) break;//continue;
-    }
-  pass++;
-  }
-}
 
 } // namespace
 
-void refine(MetisGraph* coarseGraph, unsigned refineTo) {
-  const float ratio = 55.0 / 45.0;  // change if needed
-  const float tol = std::max(ratio, 1 - ratio) - 1;
+bool isPT(int n) 
+{ 
+   if(n==0) 
+   return false; 
+  
+   return (ceil(log2(n)) == floor(log2(n))); 
+} 
+  
+
+void refine(MetisGraph* coarseGraph, unsigned refineTo, unsigned K) {
+  float ratio = 0.0f;
+  float tol = 0.0f;
+  bool flag = isPT(K);
+  if (flag) {
+    ratio = 55.0 / 45.0;  // change if needed
+    tol = std::max(ratio, 1 - ratio) - 1;
+  }
+  else {
+    ratio = ((float) ((K+1) / 2)) / ((float)(K/2));  // change if needed
+    tol = std::max(ratio, 1 - ratio) - 1;
+  }
   do {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     auto gg = coarseGraph->getGraph();
 
-    parallel_refine_KF(*gg, tol, refineTo);
+    parallel_refine_KF(*gg, tol, 2);
     parallel_make_balance(*gg, tol, 2);
-
     bool do_pro = true;
     if (fineGraph && do_pro) {
       projectPart(coarseGraph);

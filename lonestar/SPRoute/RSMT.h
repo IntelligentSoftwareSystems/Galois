@@ -23,7 +23,7 @@ struct pnt
 // ** V_table;
 //int ** H_table;
 
-static int ordery1(const void *a,  const void *b)
+/*static int ordery1(const void *a,  const void *b)
 {
     struct wire *pa, *pb;
     
@@ -77,7 +77,7 @@ static int orderx2(const void *a,  const void *b)
     return 0;
    // return ((struct Segment*)a->x1-(struct Segment*)b->x1);
 
-}
+}*/
 
 /*int orderx(const void *a, const void *b)
 {
@@ -127,6 +127,7 @@ int mapxy(int nx, int xs[], int nxs[], int d)
     }
     
     if (min>max) printf("mapping error\n");
+    return 0;
 }
 
 
@@ -418,9 +419,9 @@ void fluteNormal(int netID, int d, DTYPE x[], DTYPE y[], int acc, float coeffV, 
 
 void fluteCongest(int netID, int d, DTYPE x[], DTYPE y[], int acc, float coeffV, Tree *t)
 {
-    DTYPE *xs, *ys, *nxs, *nys, *x_seg, *y_seg, minval, x_max, x_min, x_mid, y_max, y_min, y_mid;
+    DTYPE *xs, *ys, *nxs, *nys, *x_seg, *y_seg, x_max, x_min, x_mid, y_max, y_min, y_mid;
     int *s;
-    int i, j, k, minidx, grid;
+    int i, j, k, grid;
 	DTYPE height, width;
 	int usageH, usageV;
 	float coeffH = 1;
@@ -602,15 +603,10 @@ void fluteCongest(int netID, int d, DTYPE x[], DTYPE y[], int acc, float coeffV,
 
 Bool netCongestion (int netID) 
 {
-    int i, j, edgeID, edgelength, *gridsX, *gridsY;
-    int n1, n2, x1, y1, x2, y2, distance, grid, ymin, ymax;
-    int cnt, Zpoint;
-    TreeEdge *treeedge;
-    TreeNode *treenodes;
+    int i, j;
+    int grid, ymin, ymax;
 //	Bool Congested;
 	Segment *seg;
-	
-	
 
     for(j=seglistIndex[netID]; j<seglistIndex[netID]+seglistCnt[netID]; j++)
     {
@@ -805,13 +801,12 @@ float coeffADJ (int netID)
 
 void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree, Bool newType, Bool noADJ)
 {
-    int i, j, k, d, n, seg, hedge, vedge, grid, netID, n1, n2;
+    int i, j, d, n, netID, n1, n2;
     int x1, y1, x2, y2;
     int x[MAXNETDEG], y[MAXNETDEG];
     int segPos, segcnt;
     Tree rsmt;
     int wl, wl1, numShift = 0, cnt1, cnt2, cnt3;
-    float costL1, costL2, tmp;
 	float coeffV, coefMax, coefMin;
 
 	coefMax = 0;

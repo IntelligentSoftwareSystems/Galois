@@ -6,6 +6,8 @@ constexpr galois::MethodFlag flag_read_lock = galois::MethodFlag::READ;
 constexpr galois::MethodFlag flag_write_lock = galois::MethodFlag::WRITE;
 
 typedef uint32_t NodeTy;
+//typedef uint32_t EdgeTy;
+
 
 struct EdgeTy{
 
@@ -21,3 +23,4 @@ using GNode = Graph::GraphNode;
 std::default_random_engine generator;
 std::uniform_real_distribution<double> distribution(0.0,1.0);
 
+#endif //EDGE2VEC_H

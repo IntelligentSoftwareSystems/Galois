@@ -54,6 +54,7 @@ add_subdirectory(sssp)
 add_subdirectory(triangles)
 add_subdirectory(tutorial_examples)
 add_subdirectory(ktruss)
-add_subdirectory(louvainClustering)
+add_subdirectory(clustering)
+
 add_subdirectory(analytics)
 add_subdirectory(scientific)
