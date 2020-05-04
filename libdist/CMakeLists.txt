@@ -29,7 +29,7 @@ endif()
 
 if (USE_LCI)
   add_definitions(-DGALOIS_USE_LWCI)
-  set(LCI_ROOT "${PROJECT_SOURCE_DIR}/external/src/lci")
+  set(LCI_ROOT "${CMAKE_BINARY_DIR}/libdist/external/src/lci")
   set(LCI_INCLUDE "${LCI_ROOT}/include")
   set(LCI_LIBRARY "${LCI_ROOT}/liblci.a")
 
