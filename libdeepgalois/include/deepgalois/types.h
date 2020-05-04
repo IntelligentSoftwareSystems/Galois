@@ -44,11 +44,14 @@ enum class net_phase { train, test };
 
 #ifdef GALOIS_USE_DIST
 namespace deepgalois {
+  // TODO only being used by graph conv layer at the moment so extern works,
+  // but this design is bad and needs to be revisited
+
   //! Set this to let sync struct know where to get data from
-  static float_t* _dataToSync = nullptr;
+  extern float_t* _dataToSync;
   //! Set this to let sync struct know the size of the vector to use during
   //! sync
-  static long unsigned _syncVectorSize = 0;
+  extern long unsigned _syncVectorSize;
 }
 #endif
 

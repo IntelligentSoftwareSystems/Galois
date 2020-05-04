@@ -4,6 +4,13 @@
 
 namespace deepgalois {
 
+//! Set this to let sync struct know where to get data from
+float_t* _dataToSync = nullptr;
+//! Set this to let sync struct know the size of the vector to use during
+//! sync
+long unsigned _syncVectorSize = 0;
+
+
 graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
                                    bool bias, bool dropout, float_t dropout_rate,
                                    std::vector<size_t> in_dims,
