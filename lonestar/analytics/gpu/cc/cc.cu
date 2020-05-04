@@ -263,7 +263,7 @@ __global__ void hook_init(CSRGraph graph, index_type * edge_src)
     graph.node_data[mx] = mn;
   }
 }
-__global__ void hook_high_to_low(CSRGraph graph, const __restrict__ index_type * edge_src, char * marks, Any ret_val)
+__global__ void hook_high_to_low(CSRGraph graph, const __restrict__ index_type * edge_src, char * marks, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -291,7 +291,7 @@ __global__ void hook_high_to_low(CSRGraph graph, const __restrict__ index_type *
       else
       {
         graph.node_data[mn] = mx;
-        ret_val.do_return(true);
+        ret_val.reduce(true);
         continue;
         continue;
       }
@@ -299,7 +299,7 @@ __global__ void hook_high_to_low(CSRGraph graph, const __restrict__ index_type *
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__global__ void hook_low_to_high(CSRGraph graph, index_type * edge_src, char * marks, Any ret_val)
+__global__ void hook_low_to_high(CSRGraph graph, index_type * edge_src, char * marks, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -327,7 +327,7 @@ __global__ void hook_low_to_high(CSRGraph graph, index_type * edge_src, char * m
       else
       {
         graph.node_data[mx] = mn;
-        ret_val.do_return(true);
+        ret_val.reduce(true);
         continue;
         continue;
       }
@@ -335,7 +335,7 @@ __global__ void hook_low_to_high(CSRGraph graph, index_type * edge_src, char * m
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__device__ void p_jump_dev(CSRGraph graph, Any ret_val)
+__device__ void p_jump_dev(CSRGraph graph, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -353,14 +353,14 @@ __device__ void p_jump_dev(CSRGraph graph, Any ret_val)
     if (p_u != p_v)
     {
       graph.node_data[node] = p_v;
-      ret_val.do_return(true);
+      ret_val.reduce(true);
       continue;
       continue;
     }
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__global__ void p_jump(CSRGraph graph, Any ret_val)
+__global__ void p_jump(CSRGraph graph, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -389,7 +389,7 @@ __global__ void identify_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl
     }
   }
 }
-__device__ void p_jump_roots_dev(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl, Any ret_val)
+__device__ void p_jump_roots_dev(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -410,14 +410,14 @@ __device__ void p_jump_roots_dev(CSRGraph graph, Worklist2 in_wl, Worklist2 out_
     if (p_u != p_v)
     {
       graph.node_data[node] = p_v;
-      ret_val.do_return(true);
+      ret_val.reduce(true);
       continue;
       continue;
     }
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__global__ void p_jump_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl, Any ret_val)
+__global__ void p_jump_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -468,7 +468,7 @@ void gg_main_pipe_4(CSRGraphTy& gg, PipeContextT<Worklist2>& pipe, dim3& blocks,
   do
   {
     Shared<int> retval = Shared<int>(1);
-    Any _rv;
+    HGAccumulator<int> _rv;
     *(retval.cpu_wr_ptr()) = 0;
     _rv.rv = retval.gpu_wr_ptr();
     pipe.out_wl().will_write();
@@ -487,7 +487,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_4_gpu_gb) gg_main_pipe_4_gpu
   bool loopc = false;
   do
   {
-    Any _rv;
+    HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
     gb.Sync();
@@ -515,7 +515,7 @@ __global__ void gg_main_pipe_4_gpu(CSRGraphTy gg, PipeContextT<Worklist2> pipe, 
   bool loopc = false;
   do
   {
-    Any _rv;
+    HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
     p_jump_roots <<<blocks, threads>>>(gg, pipe.in_wl(), pipe.out_wl(), _rv);
@@ -557,7 +557,7 @@ void gg_main_pipe_3(CSRGraphTy& gg, dim3& blocks, dim3& threads)
   do
   {
     Shared<int> retval = Shared<int>(1);
-    Any _rv;
+    HGAccumulator<int> _rv;
     *(retval.cpu_wr_ptr()) = 0;
     _rv.rv = retval.gpu_wr_ptr();
     p_jump <<<blocks, threads>>>(gg, _rv);
@@ -575,7 +575,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_3_gpu_gb) gg_main_pipe_3_gpu
   bool loopc = false;
   do
   {
-    Any _rv;
+    HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
     gb.Sync();
@@ -597,7 +597,7 @@ __global__ void gg_main_pipe_3_gpu(CSRGraphTy gg, dim3 blocks, dim3 threads, int
   bool loopc = false;
   do
   {
-    Any _rv;
+    HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
     p_jump <<<blocks, threads>>>(gg, _rv);
@@ -682,7 +682,7 @@ void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
         if (it_hk != 0)
         {
           Shared<int> retval = Shared<int>(1);
-          Any _rv;
+          HGAccumulator<int> _rv;
           *(retval.cpu_wr_ptr()) = 0;
           _rv.rv = retval.gpu_wr_ptr();
           hook_low_to_high <<<edge_blocks, threads>>>(gg, edge_src.gpu_rd_ptr(), edge_marks.gpu_wr_ptr(), _rv);
@@ -693,7 +693,7 @@ void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
         else
         {
           Shared<int> retval = Shared<int>(1);
-          Any _rv;
+          HGAccumulator<int> _rv;
           *(retval.cpu_wr_ptr()) = 0;
           _rv.rv = retval.gpu_wr_ptr();
           hook_high_to_low <<<edge_blocks, threads>>>(gg, edge_src.gpu_rd_ptr(), edge_marks.gpu_wr_ptr(), _rv);
