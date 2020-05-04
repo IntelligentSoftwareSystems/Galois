@@ -1,3 +1,5 @@
+#ifndef GALOIS_USE_DIST
+
 #pragma once
 #include "deepgalois/gtypes.h"
 
@@ -51,3 +53,5 @@ protected:
 };
 
 }
+
+#endif

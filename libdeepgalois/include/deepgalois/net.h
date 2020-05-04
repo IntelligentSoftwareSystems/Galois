@@ -43,7 +43,7 @@ public:
             bool selfloop, bool single, bool l2norm, bool dense, 
             unsigned neigh_sample_size = 0, unsigned subg_sample = 0);
 #ifdef GALOIS_USE_DIST
-  void dist_init(Graph* dGraph);
+  void dist_init(Graph* graph, std::string dataset_str);
 #endif
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
@@ -120,7 +120,9 @@ protected:
 #endif
 
 #ifdef CPU_ONLY
+#ifndef GALOIS_USE_DIST
   Sampler *sampler;
+#endif
 #endif
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth);

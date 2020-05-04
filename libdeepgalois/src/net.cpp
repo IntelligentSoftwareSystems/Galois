@@ -87,6 +87,7 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs
   feature_dims[num_layers] = num_classes;                // normalized output embedding: E
   layers.resize(num_layers);
 
+#ifndef GALOIS_USE_DIST
   context->set_use_subgraph(subgraph_sample_size > 0);
 #ifdef CPU_ONLY
   if (subgraph_sample_size) sampler = new deepgalois::Sampler();
@@ -95,10 +96,11 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs
   copy_masks_device(num_samples, val_masks, d_val_masks);
   context->copy_data_to_device(); // copy labels and input features to the device
 #endif
+#endif
 }
 
 #ifdef GALOIS_USE_DIST
-void Net::dist_init(Graph* graph) {
+void Net::dist_init(Graph* graph, std::string dataset_str) {
   dGraph = graph;
   context = new deepgalois::DistContext();
   num_samples = dGraph->size();
@@ -151,12 +153,14 @@ void Net::train(optimizer* opt, bool need_validate) {
 
   int num_subg_remain = 0;
 #ifdef CPU_ONLY
+#ifndef GALOIS_USE_DIST
   if (subgraph_sample_size) {
     context->createSubgraphs(num_subgraphs);
     subgraphs_masks = new mask_t[num_samples*num_subgraphs];
     galois::gPrint("\nConstruct training vertex set induced graph...\n");
     sampler->set_masked_graph(train_begin, train_end, train_count, train_masks, context->getGraphPointer());
   }
+#endif
 #endif
   galois::gPrint("\nStart training...\n");
   Timer t_epoch;
@@ -171,6 +175,7 @@ void Net::train(optimizer* opt, bool need_validate) {
         t_subgen.Start();
         // generate subgraphs
 #ifdef CPU_ONLY
+#ifndef GALOIS_USE_DIST
         //for (int sid = 0; sid < num_subgraphs; sid++) {
         galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
           unsigned tid = 0;
@@ -178,15 +183,18 @@ void Net::train(optimizer* opt, bool need_validate) {
           sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples], tid);
         }, galois::loopname("subgraph_gen"));
 #endif
+#endif
         num_subg_remain = num_subgraphs;
         t_subgen.Stop();
         //galois::gPrint("Done, time: ", t_subgen.Millisecs(), "\n");
       }
+#ifndef GALOIS_USE_DIST
       for (int i = 0; i < num_subgraphs; i++) {
         auto sg_ptr = context->getSubgraphPointer(i);
         sg_ptr->degree_counting();
         //galois::gPrint("\tsubgraph[", i, "]: num_v ", sg_ptr->size(), " num_e ", sg_ptr->sizeEdges(), "\n");
       }
+#endif GALOIS_USE_DIST
       num_subg_remain--;
       int sg_id = num_subg_remain;
       auto subgraph_ptr = context->getSubgraphPointer(sg_id);

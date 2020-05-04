@@ -4,9 +4,9 @@
 #ifdef CPU_ONLY
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
-  size_t n = g.size();
   //std::cout << "[update_all] graph size: " << n << "\n";
   #ifndef GALOIS_USE_DIST
+  size_t n = g.size();
   galois::do_all(galois::iterate(size_t(0), n),[&](const auto src) {
   #else
   auto& rangeObj = g.allNodesRange();
