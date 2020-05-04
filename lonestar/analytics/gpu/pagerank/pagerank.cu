@@ -19,7 +19,6 @@ extern const float ALPHA = 0.85;
 extern const float EPSILON = 0.000001;
 extern int MAX_ITERATIONS ;
 static const int __tb_gg_main_pipe_1_gpu_gb = 256;
-static const int __tb_one = 1;
 static const int __tb_pagerank_main = TB_SIZE;
 static const int __tb_remove_dups = TB_SIZE;
 __global__ void init_1(CSRGraph graph, float * p_curr, float * residual)
@@ -27,7 +26,6 @@ __global__ void init_1(CSRGraph graph, float * p_curr, float * residual)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -50,7 +48,6 @@ __device__ void init_2_dev(CSRGraph graph, float * residual, Worklist2 in_wl, Wo
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type _start_22;
   index_type node_end;
   _start_22 = (out_wl).push_range((tid < ((graph).nnodes)) ? ((((graph).nnodes) - 1 - tid)/nthreads + 1) : 0);;
@@ -64,9 +61,7 @@ __device__ void init_2_dev(CSRGraph graph, float * residual, Worklist2 in_wl, Wo
 __global__ void init_2(CSRGraph graph, float * residual, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -77,7 +72,6 @@ __global__ void remove_dups(int * marks, Worklist2 in_wl, Worklist2 out_wl, Glob
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -114,10 +108,8 @@ __device__ void pagerank_main_dev(CSRGraph graph, float * p_curr, float * residu
   const unsigned __kernel_tb_size = __tb_pagerank_main;
   index_type wlnode_end;
   const int _NP_CROSSOVER_WP = 32;
-  const int _NP_CROSSOVER_TB = __kernel_tb_size;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
-  unsigned d_limit = DEGREE_LIMIT;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
   typedef union np_shared<BlockScan::TempStorage, index_type, struct empty_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
@@ -159,7 +151,7 @@ __device__ void pagerank_main_dev(CSRGraph graph, float * p_curr, float * residu
     {
       const int warpid = threadIdx.x / 32;
       const int _np_laneid = cub::LaneId();
-      while (__any(_np.size >= _NP_CROSSOVER_WP))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP))
       {
         if (_np.size >= _NP_CROSSOVER_WP)
         {
@@ -236,9 +228,7 @@ __device__ void pagerank_main_dev(CSRGraph graph, float * p_curr, float * residu
 __global__ void __launch_bounds__(TB_SIZE, 3) pagerank_main(CSRGraph graph, float * p_curr, float * residual, float * p_diff, bool enable_lb, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_pagerank_main;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -270,9 +260,7 @@ void gg_main_pipe_1(gfloat_p p2, gfloat_p p0, gfloat_p rp, int& iter, CSRGraph& 
 __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu_gb(gfloat_p p2, gfloat_p p0, gfloat_p rp, int iter, CSRGraph gg, CSRGraph hg, int MAX_ITERATIONS, PipeContextT<Worklist2> pipe, int* cl_iter, bool enable_lb, GlobalBarrier gb)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_gg_main_pipe_1_gpu_gb;
   iter = *cl_iter;
   {
     if (tid == 0)
@@ -305,9 +293,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu
 __global__ void gg_main_pipe_1_gpu(gfloat_p p2, gfloat_p p0, gfloat_p rp, int iter, CSRGraph gg, CSRGraph hg, int MAX_ITERATIONS, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* cl_iter, bool enable_lb)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_one;
   iter = *cl_iter;
   {
     init_2 <<<blocks, threads>>>(gg, rp, pipe.in_wl(), pipe.out_wl());
@@ -372,9 +358,7 @@ void gg_main(CSRGraph& hg, CSRGraph& gg)
   static const size_t remove_dups_residency = maximum_residency(remove_dups, __tb_remove_dups, 0);
   static const size_t remove_dups_blocks = GG_MIN(blocks.x, ggc_get_nSM() * remove_dups_residency);
   if(!remove_dups_barrier_inited) { remove_dups_barrier.Setup(remove_dups_blocks); remove_dups_barrier_inited = true;};
-  int curr = 0;
   int iter = 0;
-  float l1 = 0;
   r.zero_gpu();
   init_1 <<<blocks, threads>>>(gg, p[0].gpu_wr_ptr(), r.gpu_wr_ptr());
   cudaDeviceSynchronize();

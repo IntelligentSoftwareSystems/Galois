@@ -11,7 +11,6 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=True $ backoff_b
 struct ThreadWork t_work;
 extern unsigned long DISCOUNT_TIME_NS;
 bool enable_lb = true;
-static const int __tb_one = 1;
 static const int __tb_prep_edge_src = TB_SIZE;
 static const int __tb_gg_main_pipe_4_gpu_gb = 256;
 static const int __tb_gg_main_pipe_3_gpu_gb = 256;
@@ -20,7 +19,6 @@ __global__ void init(CSRGraph graph)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -33,7 +31,6 @@ __global__ void prep_edge_src_TB_LB(CSRGraph graph, index_type * edge_src, int *
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   __shared__ unsigned int total_work;
   __shared__ unsigned block_start_src_index;
   __shared__ unsigned block_end_src_index;
@@ -90,7 +87,6 @@ __global__ void Inspect_prep_edge_src(CSRGraph graph, index_type * edge_src, Pip
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -118,7 +114,6 @@ __global__ void prep_edge_src(CSRGraph graph, index_type * edge_src, bool enable
   const int _NP_CROSSOVER_TB = __kernel_tb_size;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
-  unsigned d_limit = DEGREE_LIMIT;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
@@ -190,7 +185,7 @@ __global__ void prep_edge_src(CSRGraph graph, index_type * edge_src, bool enable
     {
       const int warpid = threadIdx.x / 32;
       const int _np_laneid = cub::LaneId();
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
+      while (__any_sync(0xffffffff, _np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
         {
@@ -251,7 +246,6 @@ __global__ void hook_init(CSRGraph graph, index_type * edge_src)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   int edge_end;
   edge_end = graph.nedges;
   for (int edge = 0 + tid; edge < edge_end; edge += nthreads)
@@ -268,7 +262,6 @@ __global__ void hook_high_to_low(CSRGraph graph, const __restrict__ index_type *
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -304,7 +297,6 @@ __global__ void hook_low_to_high(CSRGraph graph, index_type * edge_src, char * m
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -340,7 +332,6 @@ __device__ void p_jump_dev(CSRGraph graph, HGAccumulator<int> ret_val)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -362,10 +353,6 @@ __device__ void p_jump_dev(CSRGraph graph, HGAccumulator<int> ret_val)
 }
 __global__ void p_jump(CSRGraph graph, HGAccumulator<int> ret_val)
 {
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
   p_jump_dev(graph, ret_val);
 }
 __global__ void identify_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl)
@@ -373,7 +360,6 @@ __global__ void identify_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -394,7 +380,6 @@ __device__ void p_jump_roots_dev(CSRGraph graph, Worklist2 in_wl, Worklist2 out_
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -420,9 +405,7 @@ __device__ void p_jump_roots_dev(CSRGraph graph, Worklist2 in_wl, Worklist2 out_
 __global__ void p_jump_roots(CSRGraph graph, Worklist2 in_wl, Worklist2 out_wl, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -433,7 +416,6 @@ __global__ void p_jump_leaves(CSRGraph graph)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -451,7 +433,6 @@ __global__ void count_components(CSRGraph graph, int * count)
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -481,9 +462,7 @@ void gg_main_pipe_4(CSRGraphTy& gg, PipeContextT<Worklist2>& pipe, dim3& blocks,
 __global__ void __launch_bounds__(__tb_gg_main_pipe_4_gpu_gb) gg_main_pipe_4_gpu_gb(CSRGraphTy gg, PipeContextT<Worklist2> pipe, int* retval, bool enable_lb, GlobalBarrier gb)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   bool loopc = false;
   do
   {
@@ -509,9 +488,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_4_gpu_gb) gg_main_pipe_4_gpu
 __global__ void gg_main_pipe_4_gpu(CSRGraphTy gg, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* retval)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_one;
   bool loopc = false;
   do
   {
@@ -568,10 +545,6 @@ void gg_main_pipe_3(CSRGraphTy& gg, dim3& blocks, dim3& threads)
 }
 __global__ void __launch_bounds__(__tb_gg_main_pipe_3_gpu_gb) gg_main_pipe_3_gpu_gb(CSRGraphTy gg, int* retval, bool enable_lb, GlobalBarrier gb)
 {
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
   bool loopc = false;
   do
   {
@@ -590,10 +563,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_3_gpu_gb) gg_main_pipe_3_gpu
 }
 __global__ void gg_main_pipe_3_gpu(CSRGraphTy gg, dim3 blocks, dim3 threads, int* retval)
 {
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_one;
   bool loopc = false;
   do
   {

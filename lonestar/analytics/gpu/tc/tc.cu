@@ -14,9 +14,7 @@ __global__ void preprocess(CSRGraph graph, unsigned int * valid_edges)
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_preprocess;
-  index_type node_end;
   index_type node_rup;
-  const int _NP_CROSSOVER_WP = 32;
   const int _NP_CROSSOVER_TB = __kernel_tb_size;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
@@ -25,8 +23,6 @@ __global__ void preprocess(CSRGraph graph, unsigned int * valid_edges)
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct empty_np, struct fg_np<ITSIZE> > npsTy;
 
   __shared__ npsTy nps ;
-  const index_type last  = graph.nnodes;
-  node_end = (graph).nnodes;
   node_rup = ((0) + roundup((((graph).nnodes) - (0)), (blockDim.x)));
   for (index_type node = 0 + tid; node < node_rup; node += nthreads)
   {
@@ -146,10 +142,6 @@ __global__ void preprocess(CSRGraph graph, unsigned int * valid_edges)
 }
 __device__ unsigned int intersect(CSRGraph graph, index_type u, index_type v, unsigned int * valid_edges)
 {
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type u_start = graph.getFirstEdge(u);
   index_type u_end = u_start + valid_edges[u];
   index_type v_start = graph.getFirstEdge(v);
@@ -185,9 +177,7 @@ __global__ void count_triangles(CSRGraph graph, unsigned int * valid_edges, int 
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_count_triangles;
-  index_type v_end;
   index_type v_rup;
-  const int _NP_CROSSOVER_WP = 32;
   const int _NP_CROSSOVER_TB = __kernel_tb_size;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
@@ -196,13 +186,10 @@ __global__ void count_triangles(CSRGraph graph, unsigned int * valid_edges, int 
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct empty_np, struct fg_np<ITSIZE> > npsTy;
 
   __shared__ npsTy nps ;
-  int lcount =0;
-  v_end = (graph).nnodes;
   v_rup = ((0) + roundup((((graph).nnodes) - (0)), (blockDim.x)));
   for (index_type v = 0 + tid; v < v_rup; v += nthreads)
   {
     bool pop;
-    int d_v;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     pop = graph.valid_node(v);;
@@ -300,35 +287,6 @@ __global__ void count_triangles(CSRGraph graph, unsigned int * valid_edges, int 
     assert(threadIdx.x < __kernel_tb_size);
     v = _np_closure[threadIdx.x].v;
   }
-}
-__global__ void print_matrix_kernel(CSRGraph graph, unsigned int __begin, unsigned int __end, int hostid)
-{
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	unsigned long long count = 0;
-	if(tid == 0) {
-		for (index_type src = __begin + tid; src < __end; src++)
-		{
-				unsigned ne = (graph).getOutDegree(src);
-				//limit the edges to 20 only
-				if(ne > 10) ne = 10;
-				int ns = (graph).getFirstEdge(src);
-				for (int _np_j = 0; _np_j < ne; _np_j++)
-				{
-						index_type jj = ns +_np_j;
-						index_type dst;
-						dst = graph.getAbsDestination(jj);
-						edge_data_type wt;
-						wt = graph.getAbsWeight(jj);
-						printf("[%d] %d %d %d degree: %d \n", hostid, src, dst, wt, (graph).getOutDegree(src));
-						//printf("%d %d %d \n", src, dst, wt);
-						unsigned long long weight;
-						weight = wt;
-						count += weight;
-				}
-		}
-	}
-	
 }
 void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
 {
