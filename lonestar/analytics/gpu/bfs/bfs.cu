@@ -15,14 +15,12 @@ typedef int edge_data_type;
 typedef int node_data_type;
 extern const node_data_type INF = INT_MAX;
 static const int __tb_bfs_kernel = TB_SIZE;
-static const int __tb_one = 1;
 static const int __tb_gg_main_pipe_1_gpu_gb = 256;
 __global__ void bfs_init(CSRGraph graph, int src)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type node_end;
   node_end = (graph).nnodes;
   for (index_type node = 0 + tid; node < node_end; node += nthreads)
@@ -35,7 +33,6 @@ __global__ void bfs_kernel_dev_TB_LB(CSRGraph graph, int LEVEL, int * thread_pre
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   __shared__ unsigned int total_work;
   __shared__ unsigned block_start_src_index;
   __shared__ unsigned block_end_src_index;
@@ -100,7 +97,6 @@ __global__ void Inspect_bfs_kernel_dev(CSRGraph graph, int LEVEL, PipeContextT<W
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type wlnode_end;
   wlnode_end = *((volatile index_type *) (in_wl).dindex);
   for (index_type wlnode = 0 + tid; wlnode < wlnode_end; wlnode += nthreads)
@@ -129,7 +125,6 @@ __device__ void bfs_kernel_dev(CSRGraph graph, int LEVEL, bool enable_lb, Workli
   const int _NP_CROSSOVER_TB = __kernel_tb_size;
   const int BLKSIZE = __kernel_tb_size;
   const int ITSIZE = BLKSIZE * 8;
-  unsigned d_limit = DEGREE_LIMIT;
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
@@ -275,9 +270,7 @@ __device__ void bfs_kernel_dev(CSRGraph graph, int LEVEL, bool enable_lb, Workli
 __global__ void bfs_kernel(CSRGraph graph, int LEVEL, bool enable_lb, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_bfs_kernel;
   if (tid == 0)
     in_wl.reset_next_slot();
 
@@ -312,9 +305,7 @@ void gg_main_pipe_1(CSRGraph& gg, int& LEVEL, PipeContextT<Worklist2>& pipe, dim
 __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu_gb(CSRGraph gg, int LEVEL, PipeContextT<Worklist2> pipe, int* cl_LEVEL, bool enable_lb, GlobalBarrier gb)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   LEVEL = *cl_LEVEL;
   while (pipe.in_wl().nitems())
   {
@@ -335,9 +326,7 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu
 __global__ void gg_main_pipe_1_gpu(CSRGraph gg, int LEVEL, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* cl_LEVEL, bool enable_lb)
 {
   unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_one;
   LEVEL = *cl_LEVEL;
   while (pipe.in_wl().nitems())
   {
