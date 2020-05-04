@@ -29,20 +29,28 @@ endif()
 
 if (USE_LCI)
   add_definitions(-DGALOIS_USE_LWCI)
-  set(LWCI_ROOT "${PROJECT_SOURCE_DIR}/external/lci")
-  set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-  set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
+  set(LCI_ROOT "${PROJECT_SOURCE_DIR}/external/src/lci")
+  set(LCI_INCLUDE "${LCI_ROOT}/include")
+  set(LCI_LIBRARY "${LCI_ROOT}/liblci.a")
 
-  add_custom_command(
-    OUTPUT ${LWCI_LIBRARY}
-    COMMAND make -C ${LWCI_ROOT}
-  )
-  add_custom_target(lci DEPENDS ${LWCI_LIBRARY})
+  include(ExternalProject)
+  # do not clone submodules for external projects
+  cmake_policy(SET CMP0097 NEW)
+
+  ExternalProject_Add(lci
+    PREFIX external
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ""
+    INSTALL_COMMAND ""
+    LOG_OUTPUT_ON_FAILURE 1
+    GIT_REPOSITORY "https://github.com/uiuc-hpc/LC.git"
+    GIT_SUBMODULES ""
+    GIT_TAG "9bf912829339879e1132614c6d24cd032c32366b")
 
   add_dependencies(galois_dist_async lci)
-  target_link_libraries(galois_dist_async PRIVATE ${LWCI_LIBRARY} -lpsm2)
+  target_link_libraries(galois_dist_async PRIVATE ${LCI_LIBRARY} -lpsm2)
   target_include_directories(galois_dist_async PUBLIC 
-    $<BUILD_INTERFACE:${LWCI_INCLUDE}>
+    $<BUILD_INTERFACE:${LCI_INCLUDE}>
     $<INSTALL_INTERFACE:include>
   )
 endif(USE_LCI)
