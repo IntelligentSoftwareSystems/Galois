@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,8 +27,8 @@
 static const char* name = "Page Rank";
 static const char* url  = 0;
 
-// All PageRank algorithm variants use the same constants for ease of
-// comparison.
+//! All PageRank algorithm variants use the same constants for ease of
+//! comparison.
 constexpr static const float ALPHA         = 0.85;
 constexpr static const float INIT_RESIDUAL = 1 - ALPHA;
 
@@ -47,7 +47,7 @@ static cll::opt<unsigned int> maxIterations(
 static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 
-// Type definitions
+//! Type definitions.
 typedef float PRTy;
 
 template <typename GNode>
@@ -64,7 +64,7 @@ struct TopPair {
   }
 };
 
-// Helper functions
+//! Helper functions.
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   PRTy old;

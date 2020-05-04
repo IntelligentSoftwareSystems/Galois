@@ -749,7 +749,44 @@ public:
     // does nothing
   }
 
-  void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
+  template <typename E = EdgeTy,
+            std::enable_if_t<!std::is_same<E, void>::value, int>* = nullptr>
+  void constructFrom(FileGraph& graph, unsigned tid, unsigned total,
+                     const bool readUnweighted = false) {
+    // at this point memory should already be allocated
+    auto r =
+        graph
+            .divideByNode(
+                NodeData::size_of::value + EdgeIndData::size_of::value +
+                    LC_CSR_Graph::size_of_out_of_line::value,
+                EdgeDst::size_of::value + EdgeData::size_of::value, tid, total)
+            .first;
+
+    this->setLocalRange(*r.first, *r.second);
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      nodeData.constructAt(*ii);
+      edgeIndData[*ii] = *graph.edge_end(*ii);
+
+      this->outOfLineConstructAt(*ii);
+
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii),
+                                    en = graph.edge_end(*ii);
+           nn != en; ++nn) {
+        if (readUnweighted) {
+          edgeData.set(*nn, {});
+        } else {
+          constructEdgeValue(graph, nn);
+        }
+        edgeDst[*nn] = graph.getEdgeDst(nn);
+      }
+    }
+  }
+
+  template <typename E = EdgeTy,
+           std::enable_if_t<std::is_same<E, void>::value, int>* = nullptr>
+  void constructFrom(FileGraph& graph, unsigned tid, unsigned total,
+                     const bool readUnweighted = false) {
     // at this point memory should already be allocated
     auto r =
         graph

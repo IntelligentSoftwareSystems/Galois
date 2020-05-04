@@ -3,9 +3,12 @@ add_library(Galois::gpu ALIAS galois_gpu)
 set_target_properties(galois_gpu PROPERTIES EXPORT_NAME gpu)
 add_dependencies(lib galois_gpu)
 
+#target_link_libraries(galois_gpu ${CUDA_cudadevrt_LIBRARY})
+
 target_sources(galois_gpu PRIVATE
   src/csr_graph.cu
   src/ggc_rt.cu
+  src/skelapp/skel.cu
 )
 
 target_include_directories(galois_gpu PUBLIC
@@ -38,7 +41,6 @@ install(
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/cub"
   COMPONENT dev
 )
-
 target_compile_definitions(galois_gpu PRIVATE _FORCE_INLINES)
 target_compile_options(galois_gpu PUBLIC "$<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>")
 set_property(TARGET galois_gpu PROPERTY CUDA_STANDARD 14)

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -72,13 +72,14 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to removed
-  galois::do_all(galois::iterate(g),
-                 [&g](typename Graph::GraphNode N) {
-                   for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
-                     g.getEdgeData(e) = removed;
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(g),
+      [&g](typename Graph::GraphNode N) {
+        for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
+          g.getEdgeData(e) = removed;
+        }
+      },
+      galois::steal());
 }
 
 // TODO: can we read in edges in parallel?
@@ -145,20 +146,21 @@ void printGraph(Graph& g) {
 std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
   galois::GAccumulator<size_t> numNodes, numEdges;
 
-  galois::do_all(galois::iterate(g),
-                 [&g, &numNodes, &numEdges](GNode n) {
-                   size_t numN = 0;
-                   for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                     if (!(g.getEdgeData(e) & removed)) {
-                       if (g.getEdgeDst(e) > n) {
-                         numEdges += 1;
-                       }
-                       numN = 1;
-                     }
-                   }
-                   numNodes += numN;
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(g),
+      [&g, &numNodes, &numEdges](GNode n) {
+        size_t numN = 0;
+        for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+          if (!(g.getEdgeData(e) & removed)) {
+            if (g.getEdgeDst(e) > n) {
+              numEdges += 1;
+            }
+            numN = 1;
+          }
+        }
+        numNodes += numN;
+      },
+      galois::steal());
 
   return std::make_pair(numNodes.reduce(), numEdges.reduce());
 }
@@ -217,7 +219,7 @@ int main(int argc, char** argv) {
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  galois::graphs::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename, true);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);
@@ -234,34 +236,35 @@ int main(int argc, char** argv) {
 
   // symmetry breaking:
   // consider only edges (i, j) where i < j
-  galois::do_all(galois::iterate(g),
-                 [&g, &work](GNode n) {
-                   for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                     auto dst = g.getEdgeDst(e);
-                     if (dst > n) {
-                       work.push_back(std::make_pair(n, dst));
-                     }
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(g),
+      [&g, &work](GNode n) {
+        for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+          auto dst = g.getEdgeDst(e);
+          if (dst > n) {
+            work.push_back(std::make_pair(n, dst));
+          }
+        }
+      },
+      galois::steal());
 
   // pick out the following:
   // 1. valid edges whose support < trussNum-2
   // 2. removed edges whose support >= trussNum-2
-  galois::do_all(galois::iterate(work),
-                 [&g, &shouldBeInvalid, &shouldBeValid](Edge e) {
-                   bool isSupportEnough =
-                       isSupportNoLessThanJ(g, e.first, e.second, trussNum - 2);
-                   bool isRemoved =
-                       g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) &
-                       0x1;
-                   if (!isRemoved && !isSupportEnough) {
-                     shouldBeInvalid.push_back(e);
-                   } else if (isRemoved && isSupportEnough) {
-                     shouldBeValid.push_back(e);
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      galois::iterate(work),
+      [&g, &shouldBeInvalid, &shouldBeValid](Edge e) {
+        bool isSupportEnough =
+            isSupportNoLessThanJ(g, e.first, e.second, trussNum - 2);
+        bool isRemoved =
+            g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) & 0x1;
+        if (!isRemoved && !isSupportEnough) {
+          shouldBeInvalid.push_back(e);
+        } else if (isRemoved && isSupportEnough) {
+          shouldBeValid.push_back(e);
+        }
+      },
+      galois::steal());
 
   auto numShouldBeInvalid =
       std::distance(shouldBeInvalid.begin(), shouldBeInvalid.end());

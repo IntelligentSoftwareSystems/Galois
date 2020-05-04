@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause
+ * BSD License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -21,9 +21,9 @@
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/TypeTraits.h"
+#include "galois/runtime/Statistics.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -46,12 +46,16 @@ static const char* desc =
     "Computes the maximal k-trusses for a given undirected graph";
 static const char* url = "k_truss";
 
-static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input graph (symmetric)>"),
+                                      cll::Required);
+
 static cll::opt<unsigned int>
     trussNum("trussNum", cll::desc("report trussNum-trusses"), cll::Required);
+
 static cll::opt<std::string>
     outName("o", cll::desc("output file for the edgelist of resulting truss"));
+
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -59,78 +63,237 @@ static cll::opt<Algo> algo(
                    "Bulk-synchronous parallel with separated edge removal"),
         clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"),
         clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss",
-                   "Compute k-1 core and then k-truss")
-        ),
+                   "Compute k-1 core and then k-truss")),
     cll::init(Algo::bsp));
+
+//! Flag that forces user to be aware that they should be passing in a
+//! symmetric graph
+static cll::opt<bool> symmetricGraph(
+    "symmetricGraph",
+    cll::desc("Flag should be used to make user aware they should be passing a "
+              "symmetric graph to this program"),
+    cll::init(false));
+
+//! Set LSB of an edge weight to indicate the removal of the edge.
+using Graph =
+    galois::graphs::LC_CSR_Graph<void, uint32_t>::template with_numa_alloc<
+        true>::type::template with_no_lockable<true>::type;
+
+using GNode   = Graph::GraphNode;
+using Edge    = std::pair<GNode, GNode>;
+using EdgeVec = galois::InsertBag<Edge>;
+using NodeVec = galois::InsertBag<GNode>;
+
+template <typename T>
+using PerIterAlloc = typename galois::PerIterAllocTy::rebind<T>::other;
 
 static const uint32_t valid   = 0x0;
 static const uint32_t removed = 0x1;
 
+#if 0 ///< Deprecated codes.
+///< TODO We can restore the asynchronous ktruss.
+
+/**
+ * Get the common negihbors between the node src and the dst.
+ *
+ * @param g
+ * @param src the target src node.
+ * @param dst the target dst node.
+ * @param a
+ *
+ * @return dequeue containing the common neighbors between the src and the dst.
+ */
+std::deque<GNode, PerIterAlloc<GNode>>
+getValidCommonNeighbors(Graph& g, GNode src, GNode dst,
+                        galois::PerIterAllocTy& a,
+                        galois::MethodFlag flag = galois::MethodFlag::WRITE) {
+  auto srcI = g.edge_begin(src, flag), srcE = g.edge_end(src, flag),
+       dstI = g.edge_begin(dst, flag), dstE = g.edge_end(dst, flag);
+  std::deque<GNode, PerIterAlloc<GNode>> commonNeighbors(a);
+
+  while (true) {
+    //! Find the first valid edge.
+    while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
+      ++srcI;
+    }
+
+    while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
+      ++dstI;
+    }
+
+    //! Check for intersection.
+    auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
+
+    if (srcI == srcE || dstI == dstE) {
+      break;
+    }
+
+    if (sN < dN) {
+      ++srcI;
+    } else if (dN < sN) {
+      ++dstI;
+    } else {
+      commonNeighbors.push_back(sN);
+      ++srcI;
+      ++dstI;
+    }
+  }
+  return commonNeighbors;
+}
+
+/**
+ * AsyncTrussTxAlgo:
+ * 1. Compute support for all edges and pick out unsupported ones.
+ * 2. Remove unsupported edges, decrease the support for affected edges and pick
+ *    out those becomeing unsupported.
+ * 3. Repeat 2. until no more unsupported edges are found.
+ *
+ * edges update in default Galois sync model, i.e. transactional semantics.
+ */
+struct AsyncTrussTxAlgo {
+  std::string name() { return "asyncTx"; }
+
+  struct PickUnsupportedEdges {
+    Graph& g;
+    unsigned int j;
+    EdgeVec& r;
+
+    PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r)
+        : g(g), j(j), r(r) {}
+
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
+      auto src = e.first, dst = e.second;
+      std::deque<GNode, PerIterAlloc<GNode>> commonNeighbors =
+          getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(),
+                                  galois::MethodFlag::UNPROTECTED);
+      auto numValidCommonNeighbors = commonNeighbors.size();
+
+      g.getEdgeData(g.findEdgeSortedByDst(src, dst)) =
+                                          (numValidCommonNeighbors << 1);
+      g.getEdgeData(g.findEdgeSortedByDst(dst, src)) =
+                                          (numValidCommonNeighbors << 1);
+      if (numValidCommonNeighbors < j) {
+        r.push_back(e);
+      }
+    }
+  };
+
+  struct PropagateEdgeRemoval {
+    Graph& g;
+    unsigned int j;
+
+    PropagateEdgeRemoval(Graph& g, unsigned int j) : g(g), j(j) {}
+
+    void removeUnsupportedEdge(GNode src, GNode dst,
+                               galois::UserContext<Edge>& ctx) {
+      auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
+      auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
+
+      auto newSupport = (oeData >> 1) - 1;
+      oeData          = (newSupport << 1);
+      ieData          = (newSupport << 1);
+      if (newSupport < j) {
+        ctx.push(std::make_pair(src, dst));
+      }
+    }
+
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
+      auto src = e.first, dst = e.second;
+
+      //! Lock src's neighbors.
+      auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
+      //! Lock src's neighbors' neighbors for back edges from them to src's
+      //! neighbors.
+      for (auto ei : g.edges(src)) {
+        g.edges(g.getEdgeDst(ei));
+      }
+
+      //! Lock dst's neighbors.
+      auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
+      //! Lock dst's neighbors' neighbors for back edge from them to dst's
+      //! neighbors.
+      for (auto ei : g.edges(dst)) {
+        g.edges(g.getEdgeDst(ei));
+      }
+
+      //! Avoid repeated processing.
+      if (oeData & removed) {
+        return;
+      }
+
+      //! Mark as removed.
+      oeData = removed;
+      ieData = removed;
+
+      //! Propagate edge removal.
+      std::deque<GNode, PerIterAlloc<GNode>> commonNeighbors =
+          getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc());
+      for (auto n : commonNeighbors) {
+        removeUnsupportedEdge(((n < src) ? n : src), ((n < src) ? src : n),
+                              ctx);
+        removeUnsupportedEdge(((n < dst) ? n : dst), ((n < dst) ? dst : n),
+                              ctx);
+      }
+    }
+  };
+
+  void operator()(Graph& g, unsigned int k) {
+    if (k - 2 == 0) {
+      return;
+    }
+
+    EdgeVec work, unsupported;
+
+    //! Symmetry breaking:
+    //! Consider only edges (i, j) where i < j.
+    galois::do_all(galois::iterate(g),
+                   [&g, &work](GNode n) {
+                     for (auto e :
+                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+                       auto dst = g.getEdgeDst(e);
+                       if (dst > n) {
+                         work.push_back(std::make_pair(n, dst));
+                       }
+                     }
+                   },
+                   galois::steal());
+
+    galois::for_each(galois::iterate(work),
+                     PickUnsupportedEdges{g, k - 2, unsupported},
+                     galois::loopname("PickUnsupportedEdges"),
+                     galois::no_conflicts(), galois::no_pushes(),
+                     galois::per_iter_alloc());
+
+    galois::for_each(galois::iterate(unsupported),
+                     PropagateEdgeRemoval{g, k - 2},
+                     galois::loopname("PropagateEdgeRemoval"),
+                     galois::per_iter_alloc());
+  } ///< End operator().
+};  ///< End AsyncTrussTxAlgo.
+
+#endif
+
+/**
+ * Initialize edge data to valid.
+ */
 template <typename Graph>
 void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
-  // initializa all edges to valid
-  galois::do_all(galois::iterate(g),
-                 [&g](typename Graph::GraphNode N) {
-                   for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
-                     g.getEdgeData(e) = valid;
-                   }
-                 },
-                 galois::steal());
-}
-
-#if 0
-template<typename Graph>
-void printGraph(Graph& g) {
-  for (auto n: g) {
-    std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-      auto d = g.getEdgeDst(e);
-      if (d >= n) continue;
-      std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
-    }
-  }
-}
-
-template<typename G>
-size_t countValidNodes(G& g) {
-  galois::GAccumulator<size_t> numNodes;
-
-  galois::do_all(galois::iterate(g), 
-    [&g, &numNodes] (typename G::GraphNode n) {
-      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-        if (!(g.getEdgeData(e) & removed)) {
-          numNodes += 1;
-          break;
+  //! Initializa all edges to valid.
+  galois::do_all(
+      galois::iterate(g),
+      [&g](typename Graph::GraphNode N) {
+        for (auto e : g.edges(N, galois::MethodFlag::UNPROTECTED)) {
+          g.getEdgeData(e) = valid;
         }
-      }
-    },
-    galois::steal()
-  );
-
-  return numNodes.reduce();
+      },
+      galois::steal());
 }
 
-template<typename G>
-size_t countValidEdges(G& g) {
-  galois::GAccumulator<size_t> numEdges;
-
-  galois::do_all(galois::iterate(g), 
-    [&g, &numEdges] (typename G::GraphNode n) {
-      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-        if (n < g.getEdgeDst(e) && !(g.getEdgeData(e) & removed)) {
-          numEdges += 1;
-        }
-      }
-    },
-    galois::steal()
-  );
-
-  return numEdges.reduce();
-}
-#endif
-
+/**
+ * Dump ktruss for each node to a file.
+ */
 template <typename Graph>
 void reportKTruss(Graph& g) {
   if (outName.empty()) {
@@ -147,15 +310,50 @@ void reportKTruss(Graph& g) {
     for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
       if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
-        of << n << " " << dst << std::endl;
+        of << n << " " << dst << " " << g.getEdgeData(e) << std::endl;
       }
     }
   }
+
+  of.close();
 }
 
-template <typename G>
-bool isSupportNoLessThanJ(G& g, typename G::GraphNode src,
-                          typename G::GraphNode dst, unsigned int j) {
+/**
+ * Check if the number of valid edges is more than or equal to j.
+ * If it is, then the node n still could be processed.
+ * Otherwise, the node n will be ignored in the following steps.
+ *
+ * @param g
+ * @param n the target node n to be tested
+ * @param j the target number of triangels
+ *
+ * @return true if the target node n has the number of degrees
+ *         more than or equal to j
+ */
+bool isValidDegreeNoLessThanJ(Graph& g, GNode n, unsigned int j) {
+  size_t numValid = 0;
+  for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+    if (!(g.getEdgeData(e) & removed)) {
+      numValid += 1;
+      if (numValid >= j) {
+        return true;
+      }
+    }
+  }
+  return numValid >= j;
+}
+
+/**
+ * Measure the number of intersected edges between the src and the dst nodes.
+ *
+ * @param g
+ * @param src the source node
+ * @param dst the destination node
+ * @param j the number of the target triangles
+ *
+ * @return true if the src and the dst are included in more than j triangles
+ */
+bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
   size_t numValidEqual = 0;
   auto srcI            = g.edge_begin(src, galois::MethodFlag::UNPROTECTED),
        srcE            = g.edge_end(src, galois::MethodFlag::UNPROTECTED),
@@ -163,7 +361,7 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src,
        dstE            = g.edge_end(dst, galois::MethodFlag::UNPROTECTED);
 
   while (true) {
-    // find the first valid edge
+    //! Find the first valid edge.
     while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
       ++srcI;
     }
@@ -175,7 +373,7 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src,
       return numValidEqual >= j;
     }
 
-    // check for intersection
+    //! Check for intersection.
     auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
     if (sN < dN) {
       ++srcI;
@@ -190,31 +388,26 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src,
       ++dstI;
     }
   }
+
   return numValidEqual >= j;
 }
 
-// BSPTrussJacobiAlgo:
-// 1. Scan for unsupported edges.
-// 2. If no unsupported edges are found, done.
-// 3. Remove unsupported edges in a separated loop.
-// 4. Go back to 1.
+/**
+ * BSPTrussJacobiAlgo:
+ * 1. Scan for unsupported edges.
+ * 2. If no unsupported edges are found, done.
+ * 3. Remove unsupported edges in a separated loop.
+ *    TODO why would it be processed in a separted loop?
+ * 4. Go back to 1.
+ */
 struct BSPTrussJacobiAlgo {
-  // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>::
-      template with_numa_alloc<true>::type ::template with_no_lockable<
-          true>::type Graph;
-  typedef Graph::GraphNode GNode;
-
-  typedef std::pair<GNode, GNode> Edge;
-  typedef galois::InsertBag<Edge> EdgeVec;
-
   std::string name() { return "bsp"; }
 
   struct PickUnsupportedEdges {
     Graph& g;
     unsigned int j;
-    EdgeVec& r;
-    EdgeVec& s;
+    EdgeVec& r; ///< unsupported
+    EdgeVec& s; ///< next
 
     PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s)
         : g(g), j(j), r(r), s(s) {}
@@ -226,66 +419,59 @@ struct BSPTrussJacobiAlgo {
   };
 
   void operator()(Graph& g, unsigned int k) {
-    if (0 == k - 2) {
+    if (k - 2 == 0) {
       return;
     }
 
     EdgeVec unsupported, work[2];
     EdgeVec *cur = &work[0], *next = &work[1];
 
-    // symmetry breaking:
-    // consider only edges (i, j) where i < j
-    galois::do_all(galois::iterate(g),
-                   [&g, cur](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   },
-                   galois::steal());
+    //! Symmetry breaking:
+    //! Consider only edges (i, j) where i < j.
+    galois::do_all(
+        galois::iterate(g),
+        [&](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
 
     while (true) {
-      galois::do_all(galois::iterate(*cur), PickUnsupportedEdges{g, k - 2, unsupported, *next},
+      galois::do_all(galois::iterate(*cur),
+                     PickUnsupportedEdges{g, k - 2, unsupported, *next},
                      galois::steal());
 
-      if (0 == std::distance(unsupported.begin(), unsupported.end())) {
+      if (std::distance(unsupported.begin(), unsupported.end()) == 0) {
         break;
       }
 
-      // mark unsupported edges as removed
-      galois::do_all(galois::iterate(unsupported),
-                     [&g](Edge e) {
-                       g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) =
-                           removed;
-                       g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) =
-                           removed;
-                     },
-                     galois::steal());
+      //! Mark unsupported edges as removed.
+      galois::do_all(
+          galois::iterate(unsupported),
+          [&](Edge e) {
+            g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
+            g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
+          },
+          galois::steal());
 
       unsupported.clear();
       cur->clear();
       std::swap(cur, next);
     }
-  } // end operator()
-};  // end struct BSPTrussJacobiAlgo
+  } ///< End operator()
+};  ///< End struct BSPTrussJacobiAlgo
 
-// BSPTrussAlgo:
-// 1. Keep supported edges and remove unsupported edges.
-// 2. If all edges are kept, done.
-// 3. Go back to 3.
+/**
+ * BSPTrussAlgo:
+ * 1. Keep supported edges and remove unsupported edges.
+ * 2. If all edges are kept, done.
+ * 3. Go back to 3.
+ */
 struct BSPTrussAlgo {
-  // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>::
-      template with_numa_alloc<true>::type ::template with_no_lockable<
-          true>::type Graph;
-  typedef Graph::GraphNode GNode;
-
-  typedef std::pair<GNode, GNode> Edge;
-  typedef galois::InsertBag<Edge> EdgeVec;
-
   std::string name() { return "bsp"; }
 
   struct KeepSupportedEdges {
@@ -307,7 +493,7 @@ struct BSPTrussAlgo {
   };
 
   void operator()(Graph& g, unsigned int k) {
-    if (0 == k - 2) {
+    if (k - 2 == 0) {
       return;
     }
 
@@ -315,29 +501,29 @@ struct BSPTrussAlgo {
     EdgeVec *cur = &work[0], *next = &work[1];
     size_t curSize, nextSize;
 
-    // symmetry breaking:
-    // consider only edges (i, j) where i < j
-    galois::do_all(galois::iterate(g),
-                   [&g, cur](GNode n) {
-                     for (auto e :
-                          g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-                       auto dst = g.getEdgeDst(e);
-                       if (dst > n) {
-                         cur->push_back(std::make_pair(n, dst));
-                       }
-                     }
-                   },
-                   galois::steal());
+    //! Symmetry breaking:
+    //! Consider only edges (i, j) where i < j.
+    galois::do_all(
+        galois::iterate(g),
+        [&g, cur](GNode n) {
+          for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
+            auto dst = g.getEdgeDst(e);
+            if (dst > n) {
+              cur->push_back(std::make_pair(n, dst));
+            }
+          }
+        },
+        galois::steal());
     curSize = std::distance(cur->begin(), cur->end());
 
-    // remove unsupported edges until no more edges can be removed
+    //! Remove unsupported edges until no more edges can be removed.
     while (true) {
       galois::do_all(galois::iterate(*cur), KeepSupportedEdges{g, k - 2, *next},
                      galois::steal());
       nextSize = std::distance(next->begin(), next->end());
 
       if (curSize == nextSize) {
-        // every edge in *cur is kept, done
+        //! Every edge in *cur is kept, done
         break;
       }
 
@@ -345,36 +531,16 @@ struct BSPTrussAlgo {
       curSize = nextSize;
       std::swap(cur, next);
     }
-  } // end operator()
-};  // end struct BSPTrussAlgo
+  } ///< End operator()
+};  ///< End struct BSPTrussAlgo
 
-template <typename G>
-bool isValidDegreeNoLessThanJ(G& g, typename G::GraphNode n, unsigned int j) {
-  size_t numValid = 0;
-  for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-    if (!(g.getEdgeData(e) & removed)) {
-      numValid += 1;
-      if (numValid >= j) {
-        return true;
-      }
-    }
-  }
-  return numValid >= j;
-}
-
-// BSPCoreAlgo:
-// 1. Keep nodes w/ degree >= k and remove all edges for nodes whose degree < k.
-// 2. If all nodes are kept, done.
-// 3. Go back to 1.
+/**
+ * BSPCoreAlgo:
+ * 1. Keep nodes w/ degree >= k and remove all edges for nodes whose degree < k.
+ * 2. If all nodes are kept, done.
+ * 3. Go back to 1.
+ */
 struct BSPCoreAlgo {
-  // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>::
-      template with_numa_alloc<true>::type ::template with_no_lockable<
-          true>::type Graph;
-  typedef Graph::GraphNode GNode;
-
-  typedef galois::InsertBag<GNode> NodeVec;
-
   std::string name() { return "bspCore"; }
 
   struct KeepValidNodes {
@@ -402,7 +568,8 @@ struct BSPCoreAlgo {
     NodeVec *cur = &work[0], *next = &work[1];
     size_t curSize = g.size(), nextSize;
 
-    galois::do_all(galois::iterate(g), KeepValidNodes{g, k, *next}, galois::steal());
+    galois::do_all(galois::iterate(g), KeepValidNodes{g, k, *next},
+                   galois::steal());
     nextSize = std::distance(next->begin(), next->end());
 
     while (curSize != nextSize) {
@@ -410,26 +577,23 @@ struct BSPCoreAlgo {
       curSize = nextSize;
       std::swap(cur, next);
 
-      galois::do_all(galois::iterate(*cur), KeepValidNodes{g, k, *next}, galois::steal());
+      galois::do_all(galois::iterate(*cur), KeepValidNodes{g, k, *next},
+                     galois::steal());
       nextSize = std::distance(next->begin(), next->end());
     }
   }
-}; // end BSPCoreAlgo
+}; ///< End BSPCoreAlgo.
 
-// BSPCoreThenTrussAlgo:
-// 1. Reduce the graph to k-1 core
-// 2. Compute k-truss from k-1 core
+/**
+ * BSPCoreThenTrussAlgo:
+ * 1. Reduce the graph to k-1 core
+ * 2. Compute k-truss from k-1 core
+ */
 struct BSPCoreThenTrussAlgo {
-  // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>::
-      template with_numa_alloc<true>::type ::template with_no_lockable<
-          true>::type Graph;
-  typedef Graph::GraphNode GNode;
-
   std::string name() { return "bspCoreThenTruss"; }
 
   void operator()(Graph& g, unsigned int k) {
-    if (0 == k - 2) {
+    if (k - 2 == 0) {
       return;
     }
 
@@ -448,92 +612,60 @@ struct BSPCoreThenTrussAlgo {
     bspTrussIm(g, k);
 
     TTruss.stop();
-  } // end operator()
-};  // end struct BSPCoreThenTrussAlgo
-
-template <typename T>
-using PerIterAlloc = typename galois::PerIterAllocTy::rebind<T>::other;
-
-template <typename G>
-std::deque<typename G::GraphNode, PerIterAlloc<typename G::GraphNode>>
-getValidCommonNeighbors(G& g, typename G::GraphNode src,
-                        typename G::GraphNode dst, galois::PerIterAllocTy& a,
-                        galois::MethodFlag flag = galois::MethodFlag::WRITE) {
-  using GNode = typename G::GraphNode;
-
-  auto srcI = g.edge_begin(src, flag), srcE = g.edge_end(src, flag),
-       dstI = g.edge_begin(dst, flag), dstE = g.edge_end(dst, flag);
-  std::deque<GNode, PerIterAlloc<GNode>> commonNeighbors(a);
-
-  while (true) {
-    // find the first valid edge
-    while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
-      ++srcI;
-    }
-    while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
-      ++dstI;
-    }
-
-    if (srcI == srcE || dstI == dstE) {
-      break;
-    }
-
-    // check for intersection
-    auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
-    if (sN < dN) {
-      ++srcI;
-    } else if (dN < sN) {
-      ++dstI;
-    } else {
-      commonNeighbors.push_back(sN);
-      ++srcI;
-      ++dstI;
-    }
-  }
-  return commonNeighbors;
-}
+  } ///< End operator().
+};  ///< End struct BSPCoreThenTrussAlgo.
 
 template <typename Algo>
 void run() {
+  Graph graph;
   Algo algo;
-  typename Algo::Graph g;
 
-  galois::reportPageAlloc("MeminfoPre");
-
-  galois::graphs::readGraph(g, filename);
-  std::cout << "Read " << g.size() << " nodes" << std::endl;
-
-  initialize(g);
-  //  printGraph(g);
-
+  std::cout << "Reading from file: " << filename << std::endl;
+  galois::graphs::readGraph(graph, filename, true);
+  std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
+            << " edges" << std::endl;
   std::cout << "Running " << algo.name() << " algorithm for maximal "
             << trussNum << "-truss" << std::endl;
 
-  galois::StatTimer T;
-  T.start();
-  algo(g, trussNum);
-  T.stop();
+  size_t approxEdgeData = 4 * (graph.size() + graph.sizeEdges());
+  galois::preAlloc(numThreads +
+                   4 * (approxEdgeData) / galois::runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
+
+  initialize(graph);
+
+  galois::StatTimer Tmain;
+  Tmain.start();
+
+  algo(graph, trussNum);
+
+  Tmain.stop();
+
   galois::reportPageAlloc("MeminfoPost");
-  reportKTruss(g);
+  reportKTruss(graph);
 
   uint64_t numEdges = 0;
 
-  for (auto n : g) {
-    for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-      auto dst = g.getEdgeDst(e);
-      if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
+  for (auto n : graph) {
+    for (auto e : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
+      auto dst = graph.getEdgeDst(e);
+      if (n < dst && (graph.getEdgeData(e) & 0x1) != removed) {
         numEdges++;
       }
     }
   }
 
   galois::gInfo("Number of edges left in truss is ", numEdges);
-
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("User did not pass in symmetric graph flag signifying they are "
+               "aware this program needs to be passed a symmetric graph.");
+  }
 
   if (2 > trussNum) {
     std::cerr << "trussNum >= 2" << std::endl;
