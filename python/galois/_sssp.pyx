@@ -95,7 +95,7 @@ cdef void ssspDeltaStep(Graph_CSR *graph, GNodeCSR source, uint32_t shift):
                     bind_leading(&ssspOperator, graph),
                                 wl[OBIM](UpdateRequestIndexer(shift)), 
                                 #steal(), 
-                                no_conflicts(),
+                                disable_conflict_detection(),
                                 loopname("SSSP"))
     T.stop()
     gPrint(b"Elapsed time:", T.get(), b" milliseconds.\n")        

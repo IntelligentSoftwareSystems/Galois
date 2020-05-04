@@ -16,8 +16,13 @@ add_library(_pagerank MODULE ${PAGERANK_SOURCES})
 python_extension_module(_pagerank)
 target_link_libraries(_pagerank Galois::shmem)
 
+add_cython_target(_connectedComponents _connectedComponents.pyx shmem.pyx CXX OUTPUT_VAR CONNECTEDCOMPONENTS_SOURCES)
+add_library(_connectedComponents MODULE ${CONNECTEDCOMPONENTS_SOURCES})
+python_extension_module(_connectedComponents)
+target_link_libraries(_connectedComponents Galois::shmem)
+
 install(
-  TARGETS shmem _bfs _pagerank
+  TARGETS shmem _bfs _sssp _pagerank _connectedComponents
   LIBRARY DESTINATION python/galois
 )
 
