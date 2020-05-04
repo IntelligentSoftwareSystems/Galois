@@ -5,7 +5,6 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['tb', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=texture $ cuda.use_worklist_slots=True $ cuda.worklist_type=texture";
-#include "moderngpu/kernel_segsort.hxx"
 void debug_output(CSRGraphTy &g, unsigned int *valid_edges);;
 static const int __tb_preprocess = TB_SIZE;
 static const int __tb_count_triangles = TB_SIZE;
@@ -302,6 +301,35 @@ __global__ void count_triangles(CSRGraph graph, unsigned int * valid_edges, int 
     v = _np_closure[threadIdx.x].v;
   }
 }
+__global__ void print_matrix_kernel(CSRGraph graph, unsigned int __begin, unsigned int __end, int hostid)
+{
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	unsigned long long count = 0;
+	if(tid == 0) {
+		for (index_type src = __begin + tid; src < __end; src++)
+		{
+				unsigned ne = (graph).getOutDegree(src);
+				//limit the edges to 20 only
+				if(ne > 10) ne = 10;
+				int ns = (graph).getFirstEdge(src);
+				for (int _np_j = 0; _np_j < ne; _np_j++)
+				{
+						index_type jj = ns +_np_j;
+						index_type dst;
+						dst = graph.getAbsDestination(jj);
+						edge_data_type wt;
+						wt = graph.getAbsWeight(jj);
+						printf("[%d] %d %d %d degree: %d \n", hostid, src, dst, wt, (graph).getOutDegree(src));
+						//printf("%d %d %d \n", src, dst, wt);
+						unsigned long long weight;
+						weight = wt;
+						count += weight;
+				}
+		}
+	}
+	
+}
 void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
 {
   dim3 blocks, threads;
@@ -311,8 +339,15 @@ void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
   count.zero_gpu();
   valid_edges.zero_gpu();
   preprocess <<<blocks, __tb_preprocess>>>(gg, valid_edges.gpu_wr_ptr());
-  mgpu::standard_context_t context;
-  mgpu::segmented_sort_indices(gg.edge_data, (int *) gg.edge_dst, (int) gg.nedges, (const int *) gg.row_start + 1, gg.nnodes - 1, mgpu::less_t<int>(), context);
+  void     *d_temp_storage = NULL;
+  size_t   temp_storage_bytes = 0;
+  cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, gg.edge_data , gg.edge_data, gg.edge_dst, gg.edge_dst, 
+                                               gg.nedges, gg.nnodes - 1,  gg.row_start, gg.row_start + 1);
+  // Allocate temporary storage
+  cudaMalloc(&d_temp_storage, temp_storage_bytes);
+  // Run sorting operation
+  cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, gg.edge_data , gg.edge_data, gg.edge_dst, gg.edge_dst, 
+                                               gg.nedges, gg.nnodes - 1,  gg.row_start, gg.row_start + 1);
   count_triangles <<<blocks, __tb_count_triangles>>>(gg, valid_edges.gpu_rd_ptr(), count.gpu_wr_ptr());
   printf("triangles: %d\n", *count.cpu_rd_ptr());
 }
