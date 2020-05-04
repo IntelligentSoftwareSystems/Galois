@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,15 +25,21 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 
-// These implementations are based on the Push-based PageRank computation
-// (Algorithm 4) as described in the PageRank Europar 2015 paper.
+/**
+ * These implementations are based on the Push-based PageRank computation
+ * (Algorithm 4) as described in the PageRank Europar 2015 paper.
+ *
+ * WHANG, Joyce Jiyoung, et al. Scalable data-driven pagerank: Algorithms,
+ * system issues, and lessons learned. In: European Conference on Parallel
+ * Processing. Springer, Berlin, Heidelberg, 2015. p. 438-450.
+ */
 
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
 
 constexpr static const unsigned CHUNK_SIZE = 16;
 
-enum Algo { Async, Sync }; // Async has better asbolute performance.
+enum Algo { Async, Sync }; ///< Async has better asbolute performance.
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Async, "Async"),
@@ -75,7 +81,7 @@ void asyncPageRank(Graph& graph) {
                                        graph.edge_end(src, flag));
           if (src_nout > 0) {
             PRTy delta = oldResidual * ALPHA / src_nout;
-            // for each out-going neighbors
+            //! For each out-going neighbors.
             for (auto jj : graph.edges(src, flag)) {
               GNode dst    = graph.getEdgeDst(jj);
               LNode& ddata = graph.getData(dst, flag);
@@ -105,72 +111,72 @@ void syncPageRank(Graph& graph) {
   galois::InsertBag<Update> updates;
   galois::InsertBag<GNode> activeNodes;
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) { activeNodes.push(src); },
-                 galois::no_stats());
+  galois::do_all(
+      galois::iterate(graph), [&](const GNode& src) { activeNodes.push(src); },
+      galois::no_stats());
 
   size_t iter = 0;
   for (; !activeNodes.empty() && iter < maxIterations; ++iter) {
+    galois::do_all(
+        galois::iterate(activeNodes),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
+          LNode& sdata = graph.getData(src, flag);
 
-    galois::do_all(galois::iterate(activeNodes),
-                   [&](const GNode& src) {
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
-                     LNode& sdata = graph.getData(src, flag);
+          if (sdata.residual > tolerance) {
+            PRTy oldResidual = sdata.residual;
+            sdata.value += oldResidual;
+            sdata.residual = 0.0;
 
-                     if (sdata.residual > tolerance) {
-                       PRTy oldResidual = sdata.residual;
-                       sdata.value += oldResidual;
-                       sdata.residual = 0.0;
+            int src_nout = std::distance(graph.edge_begin(src, flag),
+                                         graph.edge_end(src, flag));
+            PRTy delta   = oldResidual * ALPHA / src_nout;
 
-                       int src_nout = std::distance(graph.edge_begin(src, flag),
-                                                    graph.edge_end(src, flag));
-                       PRTy delta   = oldResidual * ALPHA / src_nout;
+            auto beg       = graph.edge_begin(src, flag);
+            const auto end = graph.edge_end(src, flag);
 
-                       auto beg       = graph.edge_begin(src, flag);
-                       const auto end = graph.edge_end(src, flag);
+            assert(beg <= end);
 
-                       assert(beg <= end);
+            //! Edge tiling for large outdegree nodes.
+            if ((end - beg) > EDGE_TILE_SIZE) {
+              for (; beg + EDGE_TILE_SIZE < end;) {
+                auto ne = beg + EDGE_TILE_SIZE;
+                updates.push(Update{delta, beg, ne});
+                beg = ne;
+              }
+            }
 
-                       // Edge tiling for large outdegree nodes
-                       if ((end - beg) > EDGE_TILE_SIZE) {
-                         for (; beg + EDGE_TILE_SIZE < end;) {
-                           auto ne = beg + EDGE_TILE_SIZE;
-                           updates.push(Update{delta, beg, ne});
-                           beg = ne;
-                         }
-                       }
-
-                       if ((end - beg) > 0) {
-                         updates.push(Update{delta, beg, end});
-                       }
-                     }
-                   },
-                   galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("CreateEdgeTiles"), galois::no_stats());
+            if ((end - beg) > 0) {
+              updates.push(Update{delta, beg, end});
+            }
+          }
+        },
+        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("CreateEdgeTiles"), galois::no_stats());
 
     activeNodes.clear();
 
-    galois::do_all(galois::iterate(updates),
-                   [&](const Update& up) {
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
-                     // for each out-going neighbors
-                     for (auto jj = up.beg; jj != up.end; ++jj) {
-                       GNode dst    = graph.getEdgeDst(jj);
-                       LNode& ddata = graph.getData(dst, flag);
-                       auto old     = atomicAdd(ddata.residual, up.delta);
-                       // if fabs(old) is greater than tolerance, then it would
-                       // already have been processed in the previous do_all
-                       // loop
-                       if ((old <= tolerance) &&
-                           (old + up.delta >= tolerance)) {
-                         activeNodes.push(dst);
-                       }
-                     }
-                   },
-                   galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("PushResidualSync"), galois::no_stats());
+    galois::do_all(
+        galois::iterate(updates),
+        [&](const Update& up) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
+          //! For each out-going neighbors.
+          for (auto jj = up.beg; jj != up.end; ++jj) {
+            GNode dst    = graph.getEdgeDst(jj);
+            LNode& ddata = graph.getData(dst, flag);
+            auto old     = atomicAdd(ddata.residual, up.delta);
+            //! If fabs(old) is greater than tolerance, then it would
+            //! already have been processed in the previous do_all
+            //! loop.
+            if ((old <= tolerance) && (old + up.delta >= tolerance)) {
+              activeNodes.push(dst);
+            }
+          }
+        },
+        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("PushResidualSync"), galois::no_stats());
 
     updates.clear();
   }
@@ -201,9 +207,9 @@ int main(int argc, char** argv) {
   std::cout << "tolerance:" << tolerance << ", maxIterations:" << maxIterations
             << "\n";
 
-  galois::do_all(galois::iterate(graph),
-                 [&graph](GNode n) { graph.getData(n).init(); },
-                 galois::no_stats(), galois::loopname("Initialize"));
+  galois::do_all(
+      galois::iterate(graph), [&graph](GNode n) { graph.getData(n).init(); },
+      galois::no_stats(), galois::loopname("Initialize"));
 
   galois::StatTimer Tmain;
   Tmain.start();
