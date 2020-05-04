@@ -32,6 +32,7 @@
 
 #include "galois/graphs/CuSPPartitioner.h"
 #include "deepgalois/configs.h"
+#include "llvm/Support/CommandLine.h"
 
 /*******************************************************************************
  * Supported partitioning schemes

@@ -19,9 +19,7 @@ endif()
 
 if(ENABLE_DIST_GALOIS)
   add_library(distgraphloader STATIC src/DistributedGraphLoader.cpp)
-  target_include_directories(distgraphloader PUBLIC
-    include
-  )
+  target_include_directories(distgraphloader PUBLIC include)
   target_link_libraries(distgraphloader galois_cusp)
 endif()
 
