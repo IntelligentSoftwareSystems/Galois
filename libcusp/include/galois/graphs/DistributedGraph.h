@@ -67,13 +67,16 @@ enum MASTERS_DISTRIBUTION {
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
  */
-template <typename NodeTy, typename EdgeTy>
+template <typename NodeTy, typename EdgeTy,
+          typename NodeIndexTy=uint32_t,
+          typename EdgeIndexTy=uint64_t>
 class DistGraph {
 private:
   //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
-  using GraphTy = galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>;
+  using GraphTy = galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true, false,
+                  false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
 
 protected:
   //! The internal graph used by DistGraph to represent the graph
@@ -1029,11 +1032,20 @@ public:
     galois::gDebug("Deallocating CSR in DistGraph");
     graph.deallocate();
   }
+
+
+////////////////////////////////////////////////////////////////////////////////
+// what follows are GNN functions; some are not great (e.g. expose arrays)
+// TODO figure out better way to do this
+////////////////////////////////////////////////////////////////////////////////
+  EdgeIndexTy* row_start_ptr() { return graph.row_start_ptr(); }
+  NodeIndexTy* edge_dst_ptr() { return graph.edge_dst_ptr(); }
 };
 
-template <typename NodeTy, typename EdgeTy>
+template <typename NodeTy, typename EdgeTy, typename NodeIndexTy,
+          typename EdgeIndexTy>
 constexpr const char* const
-    galois::graphs::DistGraph<NodeTy, EdgeTy>::GRNAME;
+    galois::graphs::DistGraph<NodeTy, EdgeTy, NodeIndexTy, EdgeIndexTy>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 
