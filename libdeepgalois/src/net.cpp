@@ -167,30 +167,32 @@ void Net::train(optimizer* opt, bool need_validate) {
 
     if (subgraph_sample_size) {
       if (num_subg_remain == 0) {
-        galois::gPrint("Generating subgraphs (mini-batches) ... ");
+        //galois::gPrint("Generating ", num_subgraphs, " subgraphs (mini-batches) ... ");
         Timer t_subgen;
         t_subgen.Start();
         // generate subgraphs
-        for (int sid = 0; sid < num_subgraphs; sid++) {
-        //galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
+        //for (int sid = 0; sid < num_subgraphs; sid++) {
+        galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
+          unsigned tid = 0;
+          tid = galois::substrate::ThreadPool::getTID();
 #ifdef CPU_ONLY
-          sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples]);
+          sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples], tid);
 #endif
-        }//, galois::loopname("subgraph_gen"));
+        }, galois::loopname("subgraph_gen"));
         num_subg_remain = num_subgraphs;
         t_subgen.Stop();
-        galois::gPrint("Done, time: ", t_subgen.Millisecs(), "\n");
+        //galois::gPrint("Done, time: ", t_subgen.Millisecs(), "\n");
       }
       for (int i = 0; i < num_subgraphs; i++) {
-        //auto sg_ptr = context->getSubgraphPointer(i);
+        auto sg_ptr = context->getSubgraphPointer(i);
+        sg_ptr->degree_counting();
         //galois::gPrint("\tsubgraph[", i, "]: num_v ", sg_ptr->size(), " num_e ", sg_ptr->sizeEdges(), "\n");
       }
       num_subg_remain--;
       int sg_id = num_subg_remain;
       auto subgraph_ptr = context->getSubgraphPointer(sg_id);
       num_vertices_sg = subgraph_ptr->size();
-      galois::gPrint("Subgraph num_vertices: ", num_vertices_sg, 
-          ", num_edges: ", subgraph_ptr->sizeEdges(), "\n");
+      //galois::gPrint("Subgraph num_vertices: ", num_vertices_sg, ", num_edges: ", subgraph_ptr->sizeEdges(), "\n");
       for (size_t i = 0; i < num_layers; i++)
         layers[i]->update_dim_size(num_vertices_sg);
       context->norm_factor_computing(1, sg_id);
