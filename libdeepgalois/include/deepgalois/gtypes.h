@@ -29,6 +29,8 @@ typedef galois::graphs::LC_CSR_Graph<void, void, false, false, false, void, uint
 typedef LearningGraph Graph;
 typedef index_t edge_iterator;
 #else
+// TODO check if this needs changing
+typedef index_t edge_iterator;
 using Graph = galois::graphs::DistGraph<char, void>;
 #endif
 
