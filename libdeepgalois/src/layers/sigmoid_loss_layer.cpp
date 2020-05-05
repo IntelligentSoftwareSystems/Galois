@@ -28,7 +28,7 @@ inline label_t sigmoid_loss_layer::get_label(size_t i, size_t j) {
 void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
   size_t len = input_dims[1];
   galois::do_all(galois::iterate(begin_, end_), [&](const auto& i) {
-    if (masks_[i] == 1) { // masked
+    if (!use_mask || masks_[i] == 1) { // masked
       size_t idx = len * i;
       // output is normalized input for this layer
       math::sigmoid(len, &in_data[idx], &out_data[idx]); // normalize using sigmoid
@@ -46,7 +46,7 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
                                           float_t* out_grad, float_t* in_grad) {
   size_t len = layer::input_dims[1];
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
-    if (masks_[i] == 1) { // masked
+    if (!use_mask || masks_[i] == 1) { // masked
       size_t idx = len * i;
       float_t *norm_grad = new float_t[len];
       float_t *ground_truth = new float_t[len];
@@ -68,7 +68,7 @@ acc_t sigmoid_loss_layer::get_prediction_loss() {
   total_loss.reset();
   valid_sample_count.reset();
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
-    if (masks_[i]) {
+    if (!use_mask || masks_[i]) {
       total_loss += loss[i];
       valid_sample_count += 1;
     }

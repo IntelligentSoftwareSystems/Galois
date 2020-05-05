@@ -259,7 +259,7 @@ if(USE_VTUNE)
 endif()
 
 if(USE_MKL_BLAS)
-  SET(INTEL_ROOT /opt/apps/sysnet/intel/17.0)
+  SET(INTEL_ROOT /opt/apps/sysnet/intel/19.0)
   SET(MKL_ROOT ${INTEL_ROOT}/mkl)
   SET(INTEL_LIBS_DIR ${INTEL_ROOT}/lib/intel64_lin)
   find_package(MKL)

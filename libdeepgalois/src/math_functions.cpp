@@ -57,23 +57,42 @@ void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
   Tmatmul.start();
   int lda = (TransA == CblasNoTrans) ? K : M;
   int ldb = (TransB == CblasNoTrans) ? N : K;
-  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb,
-              beta, C, N);
+  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B, ldb, beta, C, N);
   Tmatmul.stop();
 }
 
 void csrmm_cpu(const int M, const int N, const int K, const int nnz, 
-               const float alpha, const float* A_nonzeros, 
-	           const int* A_idx_ptr, const int* A_nnz_idx,
+               const float alpha, float* A_nonzeros, int* A_idx_ptr, int* A_nnz_idx,
                const float* B, const float beta, float* C) {
 #ifdef USE_MKL
-  mkl_set_num_threads(56);
-  const char *matdescra = "GXXCX";//6 bytes
-  const char transa = 'N';
-  //printf("Calling Intel MKL\n"); exit(1);
-  mkl_scsrmm(&transa, &M , &N, &K, &alpha , matdescra,
-             A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1,
-             B, &N, &beta , C, &N);
+  //mkl_set_num_threads(56);
+  //const char *matdescra = "GXXCX";//6 bytes
+  //const char transa = 'N';
+  //mkl_scsrmm(&transa, &M , &N, &K, &alpha, matdescra, A_nonzeros, A_nnz_idx, A_idx_ptr, A_idx_ptr+1, B, &N, &beta, C, &N);
+  sparse_status_t status;
+  bool need_trans = false;
+  bool is_row_major = true;
+  sparse_matrix_t csrA = NULL;
+  sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+  sparse_layout_t layout = (is_row_major ? SPARSE_LAYOUT_ROW_MAJOR : SPARSE_LAYOUT_COLUMN_MAJOR);
+  status = mkl_sparse_s_create_csr(&csrA, indexing, M, K, A_idx_ptr, A_idx_ptr + 1, A_nnz_idx, A_nonzeros);
+  if (status != SPARSE_STATUS_SUCCESS) {
+    std::cout << "mkl_sparse_s_create_csr status :" << status << std::endl;
+    exit(1);
+  }
+  sparse_operation_t transa = (need_trans ? SPARSE_OPERATION_TRANSPOSE : SPARSE_OPERATION_NON_TRANSPOSE);
+  struct matrix_descr descrA;
+  descrA.type = SPARSE_MATRIX_TYPE_GENERAL;
+  //descrA.mode = SPARSE_FILL_MODE_UPPER;
+  //descrA.diag = SPARSE_DIAG_NON_UNIT;
+  //mkl_sparse_set_mm_hint(csrA, transa, descrA, layout, N, 1);
+  //mkl_sparse_optimize(csrA);
+  status = mkl_sparse_s_mm(transa, alpha, csrA, descrA, layout, B, N, N, beta, C, N);
+  if (status != SPARSE_STATUS_SUCCESS) {
+    std::cout << "mkl_sparse_s_create_csr status :" << status << std::endl;
+    exit(1);
+  }
+  mkl_sparse_destroy(csrA);
 #else
   NOT_IMPLEMENTED;
 #endif

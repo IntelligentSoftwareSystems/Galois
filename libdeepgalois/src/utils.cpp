@@ -59,7 +59,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks,
     int tp_cls(0), fp_cls(0), fn_cls(0), tn_cls(0);
     for (size_t row = begin; row < end; row ++) {
     //galois::do_all(galois::iterate(begin, end), [&](const auto& row) {
-      if (masks[row] == 1) {
+      if (masks == NULL || masks[row] == 1) {
         auto idx = row * num_classes + col;
         if (ground_truth[idx] == 1 && pred[idx] > 0.5) {
           //__sync_fetch_and_add(&tp_cls, 1);

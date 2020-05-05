@@ -29,8 +29,7 @@ void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
 
 // single-precision sparse matrix dense matrix multiply, C = A * B, A is sparse
 void csrmm_cpu(const int M, const int N, const int K, const int nnz, 
-               const float alpha, const float* A_nonzeros, 
-	           const int* A_idx_ptr, const int* A_nonzero_idx,
+               const float alpha, float* A_nonzeros, int* A_idx_ptr, int* A_nonzero_idx,
                const float* B, const float beta, float* C);
 
 // matrix-vector multiply

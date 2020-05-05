@@ -64,10 +64,9 @@ curandGenerator_t Context::curand_generator_   = 0;
 
 Context::Context() : n(0), num_classes(0), feat_len(0), 
                      is_single_class(true), is_selfloop_added(false), 
-                     h_labels(NULL), h_labels_subg(NULL), 
-                     h_feats(NULL), h_feats_subg(NULL),
-                     d_labels(NULL), d_labels_subg(NULL),
-                     d_feats(NULL), d_feats_subg(NULL),
+                     h_labels(NULL), h_feats(NULL), 
+                     d_labels(NULL), d_feats(NULL),
+                     d_labels_subg(NULL), d_feats_subg(NULL),
                      norm_factors(NULL) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
