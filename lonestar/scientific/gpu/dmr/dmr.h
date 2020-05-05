@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,13 +20,13 @@
 #pragma once
 #include "sharedptr.h"
 
-#define MINANGLE	30
-#define PI		3.14159265358979323846	// from C99 standard.
-#define FORD		double
-#define DIMSTYPE	unsigned
+#define MINANGLE 30
+#define PI 3.14159265358979323846 // from C99 standard.
+#define FORD double
+#define DIMSTYPE unsigned
 
-#define INVALIDID	1234567890
-#define MAXID		INVALIDID
+#define INVALIDID 1234567890
+#define MAXID INVALIDID
 
 // "usual" ratio of final nodes to final elements, determined empirically
 // used to adjust maxfactor for nodes
@@ -58,49 +58,48 @@ struct Mesh {
   uint nsegments;
   uint nelements;
 
-  FORD *nodex; // could be combined
-  FORD *nodey;
-  uint3 *elements;
-  volatile bool *isdel;  
-  bool *isbad;
-  uint3 *neighbours;
-  int *owners;
+  FORD* nodex; // could be combined
+  FORD* nodey;
+  uint3* elements;
+  volatile bool* isdel;
+  bool* isbad;
+  uint3* neighbours;
+  int* owners;
 
   Mesh() {}
 
-  Mesh(ShMesh &mesh)
-  {
+  Mesh(ShMesh& mesh) {
     maxnelements = mesh.maxnelements;
-    maxnnodes = mesh.maxnnodes;
-    ntriangles = mesh.ntriangles;
-    nnodes = mesh.nnodes;
-    nsegments = mesh.nsegments;
-    nelements = mesh.nelements;
+    maxnnodes    = mesh.maxnnodes;
+    ntriangles   = mesh.ntriangles;
+    nnodes       = mesh.nnodes;
+    nsegments    = mesh.nsegments;
+    nelements    = mesh.nelements;
 
-    nodex = mesh.nodex.gpu_wr_ptr();
-    nodey = mesh.nodey.gpu_wr_ptr();
-    elements = mesh.elements.gpu_wr_ptr();
+    nodex      = mesh.nodex.gpu_wr_ptr();
+    nodey      = mesh.nodey.gpu_wr_ptr();
+    elements   = mesh.elements.gpu_wr_ptr();
     neighbours = mesh.neighbours.gpu_wr_ptr();
-    isdel = mesh.isdel.gpu_wr_ptr();
-    isbad = mesh.isbad.gpu_wr_ptr();
-    owners = mesh.owners.gpu_wr_ptr(true);
+    isdel      = mesh.isdel.gpu_wr_ptr();
+    isbad      = mesh.isbad.gpu_wr_ptr();
+    owners     = mesh.owners.gpu_wr_ptr(true);
   }
 
-  void refresh(ShMesh &mesh) {
+  void refresh(ShMesh& mesh) {
     maxnelements = mesh.maxnelements;
-    maxnnodes = mesh.maxnnodes;
-    ntriangles = mesh.ntriangles;
-    nnodes = mesh.nnodes;
-    nsegments = mesh.nsegments;
-    nelements = mesh.nelements;
+    maxnnodes    = mesh.maxnnodes;
+    ntriangles   = mesh.ntriangles;
+    nnodes       = mesh.nnodes;
+    nsegments    = mesh.nsegments;
+    nelements    = mesh.nelements;
 
-    nodex = mesh.nodex.gpu_wr_ptr();
-    nodey = mesh.nodey.gpu_wr_ptr();
-    elements = mesh.elements.gpu_wr_ptr();
+    nodex      = mesh.nodex.gpu_wr_ptr();
+    nodey      = mesh.nodey.gpu_wr_ptr();
+    elements   = mesh.elements.gpu_wr_ptr();
     neighbours = mesh.neighbours.gpu_wr_ptr();
-    isdel = mesh.isdel.gpu_wr_ptr();
-    isbad = mesh.isbad.gpu_wr_ptr();
-    owners = mesh.owners.gpu_wr_ptr(true);
+    isdel      = mesh.isdel.gpu_wr_ptr();
+    isbad      = mesh.isbad.gpu_wr_ptr();
+    owners     = mesh.owners.gpu_wr_ptr(true);
   }
 };
 

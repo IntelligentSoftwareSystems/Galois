@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -41,7 +41,7 @@ static cll::opt<int> rounds("rounds", cll::desc("number of rounds"),
 static cll::opt<int> trials("trials", cll::desc("number of trials"),
                             cll::init(1));
 static cll::opt<unsigned> threads("threads", cll::desc("number of threads"),
-                            cll::init(2));
+                                  cll::init(2));
 
 void runDoAllBurn(int num) {
   galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
@@ -112,8 +112,8 @@ int main(int argc, char* argv[]) {
   }
   EXIT = 1;
 
-  std::cout << "threads: " << galois::getActiveThreads()
-            << " usable threads: " << galois::substrate::getThreadPool().getMaxUsableThreads()
+  std::cout << "threads: " << galois::getActiveThreads() << " usable threads: "
+            << galois::substrate::getThreadPool().getMaxUsableThreads()
             << " rounds: " << rounds << " size: " << size << "\n";
 
   return 0;

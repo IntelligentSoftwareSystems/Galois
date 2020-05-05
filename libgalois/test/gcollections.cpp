@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -123,7 +123,8 @@ void testNormal(std::string prefix, C&& collection, int N) {
 
   GALOIS_ASSERT(static_cast<int>(c.size()) == N, prefix);
 
-  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()), prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()),
+                prefix);
 
   i = N - 1;
   for (; !c.empty(); --i, removeFromCollection(c)) {
@@ -131,7 +132,8 @@ void testNormal(std::string prefix, C&& collection, int N) {
   }
 
   GALOIS_ASSERT(static_cast<int>(c.size()) == 0, prefix);
-  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()), prefix);
+  GALOIS_ASSERT(static_cast<int>(c.size()) == std::distance(c.begin(), c.end()),
+                prefix);
 }
 
 template <typename C>

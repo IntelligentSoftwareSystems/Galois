@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,4 +30,7 @@
 #define FACTOR4 4
 #define FACTOR5 7
 #define FACTOR6 6
-static const char *TUNING_PARAMETERS = "THREADS1 32\nTHREADS2 192\nTHREADS3 64\nTHREADS4 352\nTHREADS5 192\nTHREADS6 96\nFACTOR1 6\nFACTOR2 7\nFACTOR3 8\nFACTOR4 4\nFACTOR5 7\nFACTOR6 6\n";
+static const char* TUNING_PARAMETERS =
+    "THREADS1 32\nTHREADS2 192\nTHREADS3 64\nTHREADS4 352\nTHREADS5 "
+    "192\nTHREADS6 96\nFACTOR1 6\nFACTOR2 7\nFACTOR3 8\nFACTOR4 4\nFACTOR5 "
+    "7\nFACTOR6 6\n";

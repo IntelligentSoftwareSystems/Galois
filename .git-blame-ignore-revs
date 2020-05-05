@@ -16,3 +16,8 @@
 # Re-run clang-format.
 47ddbe14de2e61b87749cd20bd368f07ef3c322f
 
+# Reorganize the lonestar directories.
+6ade1c5ac3cf0c261aff7bee863e46b2c124d174
+
+# Run clang-format.
+517fca343c75f842096b661e3ff883bb93f5c09e

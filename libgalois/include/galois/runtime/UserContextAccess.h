@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -40,7 +40,9 @@ public:
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void* p) { SuperTy::__setLocalState(p); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
-  void setBreakFlag(bool* b) { SuperTy::didBreak = b; }  // NOLINT(readability-non-const-parameter)
+  void setBreakFlag(bool* b) {
+    SuperTy::didBreak = b;
+  } // NOLINT(readability-non-const-parameter)
 
   void setFirstPass(void) { SuperTy::__setFirstPass(); }
   void resetFirstPass(void) { SuperTy::__resetFirstPass(); }

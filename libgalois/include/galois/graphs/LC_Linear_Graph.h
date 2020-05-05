@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -193,8 +193,8 @@ protected:
 
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph&,
-                          typename FileGraph::edge_iterator, EdgeInfo* edge,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
+                          EdgeInfo* edge,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edge->construct();
   }
@@ -236,7 +236,7 @@ public:
 
   edge_data_reference
   getEdgeData(edge_iterator ni,
-    MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) const {
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) const {
     // galois::runtime::checkWrite(mflag, false);
     return ni->get();
   }

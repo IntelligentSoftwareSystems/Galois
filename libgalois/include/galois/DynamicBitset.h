@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -60,9 +60,7 @@ public:
    * @returns constant reference vector of copyable atomics that represents
    * the bitset
    */
-  const auto& get_vec() const {
-    return bitvec;
-  }
+  const auto& get_vec() const { return bitvec; }
 
   /**
    * Returns the underlying bitset representation to the user
@@ -87,7 +85,7 @@ public:
   /**
    * Reserves capacity for the bitset.
    *
-   * @param n Size to reserve the capacity of the bitset to 
+   * @param n Size to reserve the capacity of the bitset to
    */
   void reserve(uint64_t n) {
     assert(bits_uint64 == 64); // compatibility with other devices
@@ -104,7 +102,7 @@ public:
    * Gets the space taken by the bitset
    * @returns the space in bytes taken by this bitset
    */
-  //size_t alloc_size() const { return bitvec.size() * sizeof(uint64_t); }
+  // size_t alloc_size() const { return bitvec.size() * sizeof(uint64_t); }
 
   /**
    * Unset every bit in the bitset.
@@ -118,7 +116,8 @@ public:
    * @param end last bit in range to reset
    */
   void reset(size_t begin, size_t end) {
-    if (num_bits == 0) return;
+    if (num_bits == 0)
+      return;
 
     assert(begin <= (num_bits - 1));
     assert(end <= (num_bits - 1));
@@ -184,24 +183,25 @@ public:
 
   /**
    * Check a bit to see if it is currently set.
-   * Using this is recommeneded only if set() and reset() 
+   * Using this is recommeneded only if set() and reset()
    * are not being used in that parallel section/phase
    *
    * @param index Bit to check to see if set
    * @returns true if index is set
    */
-  bool test(size_t index)  const {
+  bool test(size_t index) const {
     size_t bit_index    = index / bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index % bits_uint64);
-    return ((bitvec[bit_index].load(std::memory_order_relaxed) & bit_offset) != 0);
+    return ((bitvec[bit_index].load(std::memory_order_relaxed) & bit_offset) !=
+            0);
   }
 
   /**
    * Set a bit in the bitset.
    *
    * @param index Bit to set
-   * @returns the old value 
+   * @returns the old value
    */
   bool set(size_t index) {
     size_t bit_index    = index / bits_uint64;
@@ -211,8 +211,8 @@ public:
     // test and set
     // if old_bit is 0, then atomically set it
     while (((old_val & bit_offset) == 0) &&
-            !bitvec[bit_index].compare_exchange_weak(
-              old_val, old_val | bit_offset, std::memory_order_relaxed))
+           !bitvec[bit_index].compare_exchange_weak(
+               old_val, old_val | bit_offset, std::memory_order_relaxed))
       ;
     return (old_val & bit_offset);
   }
@@ -221,18 +221,18 @@ public:
    * Reset a bit in the bitset.
    *
    * @param index Bit to reset
-   * @returns the old value 
+   * @returns the old value
    */
   bool reset(size_t index) {
-    size_t bit_index = index/bits_uint64;
+    size_t bit_index    = index / bits_uint64;
     uint64_t bit_offset = 1;
-    bit_offset <<= (index%bits_uint64);
+    bit_offset <<= (index % bits_uint64);
     uint64_t old_val = bitvec[bit_index];
     // test and reset
     // if old_bit is 1, then atomically reset it
     while (((old_val & bit_offset) != 0) &&
-            !bitvec[bit_index].compare_exchange_weak(
-              old_val, old_val & ~bit_offset, std::memory_order_relaxed))
+           !bitvec[bit_index].compare_exchange_weak(
+               old_val, old_val & ~bit_offset, std::memory_order_relaxed))
       ;
     return (old_val & bit_offset);
   }
@@ -241,9 +241,9 @@ public:
   void bitwise_or(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
-                   [&](size_t i) { bitvec[i] |= other_bitvec[i]; },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(size_t{0}, bitvec.size()),
+        [&](size_t i) { bitvec[i] |= other_bitvec[i]; }, galois::no_stats());
   }
 
   // assumes bit_vector is not updated (set) in parallel
@@ -256,9 +256,9 @@ public:
   void bitwise_and(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
-                   [&](size_t i) { bitvec[i] &= other_bitvec[i]; },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(size_t{0}, bitvec.size()),
+        [&](size_t i) { bitvec[i] &= other_bitvec[i]; }, galois::no_stats());
   }
 
   /**
@@ -274,11 +274,10 @@ public:
     auto& other_bitvec1 = other1.get_vec();
     auto& other_bitvec2 = other2.get_vec();
 
-    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
-                   [&](size_t i) {
-                     bitvec[i] = other_bitvec1[i] & other_bitvec2[i];
-                   },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(size_t{0}, bitvec.size()),
+        [&](size_t i) { bitvec[i] = other_bitvec1[i] & other_bitvec2[i]; },
+        galois::no_stats());
   }
 
   /**
@@ -289,9 +288,9 @@ public:
   void bitwise_xor(const DynamicBitSet& other) {
     assert(size() == other.size());
     auto& other_bitvec = other.get_vec();
-    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
-                   [&](size_t i) { bitvec[i] ^= other_bitvec[i]; },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(size_t{0}, bitvec.size()),
+        [&](size_t i) { bitvec[i] ^= other_bitvec[i]; }, galois::no_stats());
   }
 
   /**
@@ -307,13 +306,11 @@ public:
     auto& other_bitvec1 = other1.get_vec();
     auto& other_bitvec2 = other2.get_vec();
 
-    galois::do_all(galois::iterate(size_t{0}, bitvec.size()),
-                   [&](size_t i) {
-                     bitvec[i] = other_bitvec1[i] ^ other_bitvec2[i];
-                   },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(size_t{0}, bitvec.size()),
+        [&](size_t i) { bitvec[i] = other_bitvec1[i] ^ other_bitvec2[i]; },
+        galois::no_stats());
   }
-
 
   /**
    * Count how many bits are set in the bitset
@@ -322,20 +319,20 @@ public:
    */
   uint64_t count() const {
     galois::GAccumulator<uint64_t> ret;
-    galois::do_all(galois::iterate(bitvec.begin(), bitvec.end()),
-                   [&](uint64_t n) {
-  #ifdef __GNUC__
-                     ret += __builtin_popcountll(n);
-  #else
-                     n = n - ((n >> 1) & 0x5555555555555555UL);
-                     n = (n & 0x3333333333333333UL) +
-                         ((n >> 2) & 0x3333333333333333UL);
-                     ret += (((n + (n >> 4)) & 0xF0F0F0F0F0F0F0FUL) *
-                             0x101010101010101UL) >>
-                            56;
-  #endif
-                   },
-                   galois::no_stats());
+    galois::do_all(
+        galois::iterate(bitvec.begin(), bitvec.end()),
+        [&](uint64_t n) {
+#ifdef __GNUC__
+          ret += __builtin_popcountll(n);
+#else
+          n = n - ((n >> 1) & 0x5555555555555555UL);
+          n = (n & 0x3333333333333333UL) + ((n >> 2) & 0x3333333333333333UL);
+          ret +=
+              (((n + (n >> 4)) & 0xF0F0F0F0F0F0F0FUL) * 0x101010101010101UL) >>
+              56;
+#endif
+        },
+        galois::no_stats());
     return ret.reduce();
   }
 
@@ -352,19 +349,19 @@ public:
     std::vector<unsigned int> tPrefixBitCounts(activeThreads);
 
     // count how many bits are set on each thread
-    galois::on_each(
-      [&] (unsigned tid, unsigned nthreads) {
-        size_t start;
-        size_t end;
-        std::tie(start, end) = galois::block_range((size_t)0, this->size(), tid,
-                                                   nthreads);
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      size_t start;
+      size_t end;
+      std::tie(start, end) =
+          galois::block_range((size_t)0, this->size(), tid, nthreads);
 
-        unsigned int count = 0;
-        for (unsigned int i = start; i < end; ++i) {
-          if (this->test(i)) ++count;
-        }
+      unsigned int count = 0;
+      for (unsigned int i = start; i < end; ++i) {
+        if (this->test(i))
+          ++count;
+      }
 
-        tPrefixBitCounts[tid] = count;
+      tPrefixBitCounts[tid] = count;
     });
 
     // calculate prefix sum of bits per thread
@@ -380,28 +377,26 @@ public:
     // vector
     if (bitsetCount > 0) {
       offsets.resize(bitsetCount);
-      galois::on_each(
-        [&] (unsigned tid, unsigned nthreads) {
-          size_t start;
-          size_t end;
-          std::tie(start, end) = galois::block_range((size_t)0, this->size(), tid,
-                                                     nthreads);
-          unsigned int count = 0;
-          unsigned int tPrefixBitCount;
-          if (tid == 0) {
-            tPrefixBitCount = 0;
-          } else {
-            tPrefixBitCount = tPrefixBitCounts[tid - 1];
-          }
+      galois::on_each([&](unsigned tid, unsigned nthreads) {
+        size_t start;
+        size_t end;
+        std::tie(start, end) =
+            galois::block_range((size_t)0, this->size(), tid, nthreads);
+        unsigned int count = 0;
+        unsigned int tPrefixBitCount;
+        if (tid == 0) {
+          tPrefixBitCount = 0;
+        } else {
+          tPrefixBitCount = tPrefixBitCounts[tid - 1];
+        }
 
-          for (unsigned int i = start; i < end; ++i) {
-            if (this->test(i)) {
-              offsets[tPrefixBitCount + count] = i;
-              ++count;
-            }
+        for (unsigned int i = start; i < end; ++i) {
+          if (this->test(i)) {
+            offsets[tPrefixBitCount + count] = i;
+            ++count;
           }
         }
-      );
+      });
     }
 
     return offsets;

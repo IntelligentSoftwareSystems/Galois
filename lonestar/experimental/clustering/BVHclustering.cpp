@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -161,11 +161,12 @@ BVHnode* clusterParallel(const V& bodies, A& bvhAlloc) {
 
         T.rebuild();
 
-        galois::do_all(galois::iterate(T),
-                       [&](auto* nA) {
-                         BVHnode* b = static_cast<BVHnode*>(*nA);
+        galois::do_all(
+            galois::iterate(T),
+            [&](auto* nA) {
+              BVHnode* b = static_cast<BVHnode*>(*nA);
 
-                         auto* nB = T.nearsetNeighbor(nA);
+              auto* nB = T.nearsetNeighbor(nA);
 !activeSet.empty());
 if (nB != nullptr) {
   auto* nC = T.nearsetNeighbor(nB);
@@ -185,9 +186,9 @@ if (nB != nullptr) {
 } else {!activeSet.empty());
   T.pushNext(static_cast<BVHnode*>(*nA));
 }
-                       },
-                       galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                       galois::loopname("findMatch"));
+            },
+            galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+            galois::loopname("findMatch"));
       }
 }
 

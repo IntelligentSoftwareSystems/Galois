@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -144,14 +144,12 @@ public:
 
   using with_name = AggregStat<T, NamedStat<T>, Bases...>;
 
-  void add(const T& val) {
-    (..., Bases::add(val));
-  }
+  void add(const T& val) { (..., Bases::add(val)); }
 };
 
 namespace {
-  static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
-                                                   "TSUM", "TAVG"};
+static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
+                                                 "TSUM", "TAVG"};
 }
 
 struct StatTotal {
@@ -324,7 +322,7 @@ struct ScalarStat {
 
   void add(const T& v) { m_val += v; }
 
-  operator const T&(void)const { return m_val; }
+  operator const T&(void) const { return m_val; }
 
   const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 };
@@ -333,7 +331,6 @@ template <typename T>
 using ScalarStatManager = BasicStatMap<ScalarStat<T>>;
 
 } // end namespace internal
-
 
 class StatManager {
 
@@ -530,7 +527,6 @@ public:
   void print(void);
 };
 
-
 namespace internal {
 
 void setSysStatManager(StatManager* sm);
@@ -622,7 +618,6 @@ void reportParam(const S1& region, const S2& category, const V& value) {
 }
 
 void setStatFile(const std::string& f);
-
 
 //! Reports maximum resident set size and page faults stats using
 //! rusage

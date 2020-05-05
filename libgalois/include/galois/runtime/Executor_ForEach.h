@@ -376,8 +376,8 @@ protected:
       : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template <typename WArgsTy>
-  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args,
-                  const WArgsTy&, std::index_sequence<>)
+  ForEachExecutor(T1, FunctionTy f, const ArgsTy& args, const WArgsTy&,
+                  std::index_sequence<>)
       : ForEachExecutor(T2{}, f, args) {}
 
 public:

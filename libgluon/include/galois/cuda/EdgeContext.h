@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -57,10 +57,11 @@ template <typename Type>
 struct CUDA_Context_Field_Edges {
   Shared<Type> data;
   Shared<DynamicBitset> is_updated; // size of edges
-  DeviceOnly<Type> shared_data; // union across master/mirror of all hosts
+  DeviceOnly<Type> shared_data;     // union across master/mirror of all hosts
 };
 
-bool init_CUDA_context_common_edges(struct CUDA_Context_Common_Edges* ctx, int device) {
+bool init_CUDA_context_common_edges(struct CUDA_Context_Common_Edges* ctx,
+                                    int device) {
   struct cudaDeviceProp dev;
   if (device == -1) {
     check_cuda(cudaGetDevice(&device));
@@ -80,8 +81,9 @@ bool init_CUDA_context_common_edges(struct CUDA_Context_Common_Edges* ctx, int d
   return true;
 }
 
-void load_graph_CUDA_common_edges(struct CUDA_Context_Common_Edges* ctx, EdgeMarshalGraph& g,
-                            unsigned num_hosts, bool LoadProxyEdges = true) {
+void load_graph_CUDA_common_edges(struct CUDA_Context_Common_Edges* ctx,
+                                  EdgeMarshalGraph& g, unsigned num_hosts,
+                                  bool LoadProxyEdges = true) {
   CSRGraphTy graph;
   ctx->numOwned          = g.numOwned;
   ctx->beginMaster       = g.beginMaster;
@@ -103,39 +105,39 @@ void load_graph_CUDA_common_edges(struct CUDA_Context_Common_Edges* ctx, EdgeMar
   graph.edge_data = g.edge_data;
   graph.copy_to_gpu(ctx->gg);
 
-  if(LoadProxyEdges) {
-     size_t max_shared_size = 0; // for union across master/mirror of all hosts
-     ctx->master.num_edges =
-      (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
-     memcpy(ctx->master.num_edges, g.num_master_edges,
-       sizeof(unsigned int) * num_hosts);
-      ctx->master.edges = (DeviceOnly<unsigned int>*)calloc(
-      num_hosts, sizeof(Shared<unsigned int>));
+  if (LoadProxyEdges) {
+    size_t max_shared_size = 0; // for union across master/mirror of all hosts
+    ctx->master.num_edges =
+        (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
+    memcpy(ctx->master.num_edges, g.num_master_edges,
+           sizeof(unsigned int) * num_hosts);
+    ctx->master.edges = (DeviceOnly<unsigned int>*)calloc(
+        num_hosts, sizeof(Shared<unsigned int>));
     for (uint32_t h = 0; h < num_hosts; ++h) {
-    if (ctx->master.num_edges[h] > 0) {
-      ctx->master.edges[h].alloc(ctx->master.num_edges[h]);
-      ctx->master.edges[h].copy_to_gpu(g.master_edges[h],
-                       ctx->master.num_edges[h]);
-    }
-    if (ctx->master.num_edges[h] > max_shared_size) {
-      max_shared_size = ctx->master.num_edges[h];
-    }
+      if (ctx->master.num_edges[h] > 0) {
+        ctx->master.edges[h].alloc(ctx->master.num_edges[h]);
+        ctx->master.edges[h].copy_to_gpu(g.master_edges[h],
+                                         ctx->master.num_edges[h]);
+      }
+      if (ctx->master.num_edges[h] > max_shared_size) {
+        max_shared_size = ctx->master.num_edges[h];
+      }
     }
     ctx->mirror.num_edges =
-      (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
+        (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
     memcpy(ctx->mirror.num_edges, g.num_mirror_edges,
-       sizeof(unsigned int) * num_hosts);
+           sizeof(unsigned int) * num_hosts);
     ctx->mirror.edges = (DeviceOnly<unsigned int>*)calloc(
-      num_hosts, sizeof(Shared<unsigned int>));
+        num_hosts, sizeof(Shared<unsigned int>));
     for (uint32_t h = 0; h < num_hosts; ++h) {
-    if (ctx->mirror.num_edges[h] > 0) {
-      ctx->mirror.edges[h].alloc(ctx->mirror.num_edges[h]);
-      ctx->mirror.edges[h].copy_to_gpu(g.mirror_edges[h],
-                       ctx->mirror.num_edges[h]);
-    }
-    if (ctx->mirror.num_edges[h] > max_shared_size) {
-      max_shared_size = ctx->mirror.num_edges[h];
-    }
+      if (ctx->mirror.num_edges[h] > 0) {
+        ctx->mirror.edges[h].alloc(ctx->mirror.num_edges[h]);
+        ctx->mirror.edges[h].copy_to_gpu(g.mirror_edges[h],
+                                         ctx->mirror.num_edges[h]);
+      }
+      if (ctx->mirror.num_edges[h] > max_shared_size) {
+        max_shared_size = ctx->mirror.num_edges[h];
+      }
     }
     ctx->offsets.alloc(max_shared_size);
     ctx->is_updated.alloc(1);
@@ -143,7 +145,6 @@ void load_graph_CUDA_common_edges(struct CUDA_Context_Common_Edges* ctx, EdgeMar
   }
   // printf("[%u] load_graph_GPU: %u owned nodes of total %u resident, %lu
   // edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
-
 }
 
 size_t mem_usage_CUDA_common_edges(EdgeMarshalGraph& g, unsigned num_hosts) {
@@ -174,11 +175,10 @@ size_t mem_usage_CUDA_common_edges(EdgeMarshalGraph& g, unsigned num_hosts) {
   return mem_usage;
 }
 
-
 template <typename Type>
 void load_graph_CUDA_field_edges(struct CUDA_Context_Common_Edges* ctx,
-                           struct CUDA_Context_Field_Edges<Type>* field,
-                           unsigned num_hosts) {
+                                 struct CUDA_Context_Field_Edges<Type>* field,
+                                 unsigned num_hosts) {
   field->data.alloc(ctx->gg.nedges);
   size_t max_shared_size = 0; // for union across master/mirror of all hosts
   for (uint32_t h = 0; h < num_hosts; ++h) {
@@ -196,10 +196,9 @@ void load_graph_CUDA_field_edges(struct CUDA_Context_Common_Edges* ctx,
   field->is_updated.cpu_wr_ptr()->alloc(ctx->gg.nedges);
 }
 
-
 template <typename Type>
 size_t mem_usage_CUDA_field_edges(struct CUDA_Context_Field_Edges<Type>* field,
-                            EdgeMarshalGraph& g, unsigned num_hosts) {
+                                  EdgeMarshalGraph& g, unsigned num_hosts) {
   size_t mem_usage = 0;
   mem_usage += g.nedges * sizeof(Type);
   size_t max_shared_size = 0; // for union across master/mirror of all hosts

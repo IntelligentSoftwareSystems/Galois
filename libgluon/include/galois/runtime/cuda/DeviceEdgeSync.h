@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -16,7 +16,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
 
 #ifndef __DEV_EDGE_SYNC__
 #define __DEV_EDGE_SYNC__
@@ -319,7 +318,6 @@ __global__ void bitset_reset_range(DynamicBitset* __restrict__ bitset,
   }
 }
 
-
 template <typename DataType>
 void reset_bitset_field(struct CUDA_Context_Field_Edges<DataType>* field,
                         size_t begin, size_t end) {
@@ -395,8 +393,8 @@ void reset_bitset_field(struct CUDA_Context_Field_Edges<DataType>* field,
 }
 
 template <typename DataType>
-void reset_data_field(struct CUDA_Context_Field_Edges<DataType>* field, size_t begin,
-                      size_t end, DataType val) {
+void reset_data_field(struct CUDA_Context_Field_Edges<DataType>* field,
+                      size_t begin, size_t end, DataType val) {
   dim3 blocks;
   dim3 threads;
   kernel_sizing(blocks, threads);
@@ -409,7 +407,8 @@ void get_offsets_from_bitset(index_type bitset_size,
                              unsigned int* __restrict__ offsets,
                              DynamicBitset* __restrict__ bitset,
                              size_t* __restrict__ num_set_bits) {
-  cub::CachingDeviceAllocator  g_allocator(true);  // Caching allocator for device memory
+  cub::CachingDeviceAllocator g_allocator(
+      true); // Caching allocator for device memory
   DynamicBitsetIterator flag_iterator(bitset);
   IdentityIterator offset_iterator;
   Shared<size_t> num_set_bits_ptr;
@@ -421,13 +420,14 @@ void get_offsets_from_bitset(index_type bitset_size,
                              num_set_bits_ptr.gpu_wr_ptr(true), bitset_size);
   check_cuda_kernel;
   CubDebugExit(g_allocator.DeviceAllocate(&d_temp_storage, temp_storage_bytes));
-  //CUDA_SAFE_CALL(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+  // CUDA_SAFE_CALL(cudaMalloc(&d_temp_storage, temp_storage_bytes));
   cub::DeviceSelect::Flagged(d_temp_storage, temp_storage_bytes,
                              offset_iterator, flag_iterator, offsets,
                              num_set_bits_ptr.gpu_wr_ptr(true), bitset_size);
   check_cuda_kernel;
-  //CUDA_SAFE_CALL(cudaFree(d_temp_storage));
-  if (d_temp_storage) CubDebugExit(g_allocator.DeviceFree(d_temp_storage));
+  // CUDA_SAFE_CALL(cudaFree(d_temp_storage));
+  if (d_temp_storage)
+    CubDebugExit(g_allocator.DeviceFree(d_temp_storage));
   *num_set_bits = *num_set_bits_ptr.cpu_rd_ptr();
 }
 
@@ -466,7 +466,8 @@ void batch_get_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   DataCommMode data_mode = onlyData;
   memcpy(send_buffer, &data_mode, sizeof(data_mode));
   memcpy(send_buffer + sizeof(data_mode), &v_size, sizeof(v_size));
-  shared_data->copy_to_cpu((DataType*)(send_buffer + sizeof(data_mode) + sizeof(v_size)), v_size);
+  shared_data->copy_to_cpu(
+      (DataType*)(send_buffer + sizeof(data_mode) + sizeof(v_size)), v_size);
   // timer2.stop();
   // timer.stop();
   // fprintf(stderr, "Get %u->%u: Time (ms): %llu + %llu = %llu\n",
@@ -475,11 +476,11 @@ void batch_get_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   //  timer.duration_ms());
 }
 
-
 template <typename DataType>
-void serializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data_mode,
-                      size_t bit_set_count, size_t num_shared,
-                      DeviceOnly<DataType>* shared_data, uint8_t* send_buffer) {
+void serializeMessage(struct CUDA_Context_Common_Edges* ctx,
+                      DataCommMode data_mode, size_t bit_set_count,
+                      size_t num_shared, DeviceOnly<DataType>* shared_data,
+                      uint8_t* send_buffer) {
   if (data_mode == noData) {
     // do nothing
     return;
@@ -501,7 +502,8 @@ void serializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data_m
     // serialize offsets vector
     memcpy(send_buffer + offset, &bit_set_count, sizeof(bit_set_count));
     offset += sizeof(bit_set_count);
-    ctx->offsets.copy_to_cpu((unsigned int*)(send_buffer + offset), bit_set_count);
+    ctx->offsets.copy_to_cpu((unsigned int*)(send_buffer + offset),
+                             bit_set_count);
     offset += bit_set_count * sizeof(unsigned int);
   } else if ((data_mode == bitsetData)) {
     // serialize bitset
@@ -510,7 +512,8 @@ void serializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data_m
     size_t vec_size = ctx->is_updated.cpu_rd_ptr()->vec_size();
     memcpy(send_buffer + offset, &vec_size, sizeof(vec_size));
     offset += sizeof(vec_size);
-    ctx->is_updated.cpu_rd_ptr()->copy_to_cpu((uint64_t*)(send_buffer + offset));
+    ctx->is_updated.cpu_rd_ptr()->copy_to_cpu(
+        (uint64_t*)(send_buffer + offset));
     offset += vec_size * sizeof(uint64_t);
   }
 
@@ -518,11 +521,8 @@ void serializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data_m
   memcpy(send_buffer + offset, &bit_set_count, sizeof(bit_set_count));
   offset += sizeof(bit_set_count);
   shared_data->copy_to_cpu((DataType*)(send_buffer + offset), bit_set_count);
-  //offset += bit_set_count * sizeof(DataType);
+  // offset += bit_set_count * sizeof(DataType);
 }
-
-
-
 
 template <typename DataType, SharedType sharedType, bool reset>
 void batch_get_shared_edge(struct CUDA_Context_Common_Edges* ctx,
@@ -587,7 +587,8 @@ void batch_get_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   check_cuda_kernel;
   // timer3.stop();
   // timer4.start();
-  serializeMessage(ctx, *data_mode, *v_size, shared->num_edges[from_id], shared_data, send_buffer);
+  serializeMessage(ctx, *data_mode, *v_size, shared->num_edges[from_id],
+                   shared_data, send_buffer);
   // timer4.stop();
   // timer.stop();
   // fprintf(stderr, "Get %u->%u: %d mode %u bitset %u indices. Time (ms): %llu
@@ -598,11 +599,11 @@ void batch_get_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   //  timer3.duration_ms(), timer4.duration_ms(), timer.duration_ms());
 }
 
-
 template <typename DataType>
-void deserializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data_mode,
-                      size_t& bit_set_count, size_t num_shared,
-                      DeviceOnly<DataType>* shared_data, uint8_t* recv_buffer) {
+void deserializeMessage(struct CUDA_Context_Common_Edges* ctx,
+                        DataCommMode data_mode, size_t& bit_set_count,
+                        size_t num_shared, DeviceOnly<DataType>* shared_data,
+                        uint8_t* recv_buffer) {
   size_t offset = 0; // data_mode is already deserialized
 
   if (data_mode != onlyData) {
@@ -617,7 +618,8 @@ void deserializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data
   if (data_mode == offsetsData) {
     // deserialize offsets vector
     offset += sizeof(bit_set_count);
-    ctx->offsets.copy_to_gpu((unsigned int*)(recv_buffer + offset), bit_set_count);
+    ctx->offsets.copy_to_gpu((unsigned int*)(recv_buffer + offset),
+                             bit_set_count);
     offset += bit_set_count * sizeof(unsigned int);
   } else if ((data_mode == bitsetData)) {
     // deserialize bitset
@@ -625,12 +627,12 @@ void deserializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data
     offset += sizeof(num_shared);
     size_t vec_size = ctx->is_updated.cpu_rd_ptr()->vec_size();
     offset += sizeof(vec_size);
-    ctx->is_updated.cpu_rd_ptr()->copy_to_gpu((uint64_t*)(recv_buffer + offset));
+    ctx->is_updated.cpu_rd_ptr()->copy_to_gpu(
+        (uint64_t*)(recv_buffer + offset));
     offset += vec_size * sizeof(uint64_t);
     // get offsets
     size_t v_size;
-    get_offsets_from_bitset(num_shared,
-                            ctx->offsets.device_ptr(),
+    get_offsets_from_bitset(num_shared, ctx->offsets.device_ptr(),
                             ctx->is_updated.gpu_rd_ptr(), &v_size);
 
     assert(bit_set_count == v_size);
@@ -639,7 +641,7 @@ void deserializeMessage(struct CUDA_Context_Common_Edges* ctx, DataCommMode data
   // deserialize data vector
   offset += sizeof(bit_set_count);
   shared_data->copy_to_gpu((DataType*)(recv_buffer + offset), bit_set_count);
-  //offset += bit_set_count * sizeof(DataType);
+  // offset += bit_set_count * sizeof(DataType);
 }
 
 template <typename DataType, SharedType sharedType, UpdateOp op>
@@ -663,7 +665,8 @@ void batch_set_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   // ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2");
   // timer.start();
   // timer1.start();
-  deserializeMessage(ctx, data_mode, v_size, shared->num_edges[from_id], shared_data, recv_buffer);
+  deserializeMessage(ctx, data_mode, v_size, shared->num_edges[from_id],
+                     shared_data, recv_buffer);
   // timer1.stop();
   // timer2.start();
   if (data_mode == onlyData) {

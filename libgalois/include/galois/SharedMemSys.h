@@ -23,6 +23,6 @@ public:
   SharedMemSys& operator=(SharedMemSys&&) = delete;
 };
 
-}  // namespace galois
+} // namespace galois
 
 #endif
