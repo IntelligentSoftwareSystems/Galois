@@ -381,7 +381,8 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
 
                 // if(PRINT) printf("curX curY %d %d, (%d, %d), (%d, %d),
                 // pq1.size: %d\n", curX, curY, regionX1, regionX2, regionY1,
-                // regionY2, pq1.size()); if(curX == 102 && curY == 221) exit(1);
+                // regionY2, pq1.size()); if(curX == 102 && curY == 221)
+                // exit(1);
                 curr_d1 = d1[curY][curX];
                 if (curr_d1 != 0) {
                   if (HV[curY][curX]) {
@@ -1265,7 +1266,8 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
 
                 // if(PRINT) printf("curX curY %d %d, (%d, %d), (%d, %d),
                 // pq1.size: %d\n", curX, curY, regionX1, regionX2, regionY1,
-                // regionY2, pq1.size()); if(curX == 102 && curY == 221) exit(1);
+                // regionY2, pq1.size()); if(curX == 102 && curY == 221)
+                // exit(1);
                 curr_d1 = d1[curY][curX];
                 if (curr_d1 != 0) {
                   if (HV[curY][curX]) {

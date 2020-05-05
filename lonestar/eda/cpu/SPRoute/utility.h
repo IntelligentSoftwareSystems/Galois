@@ -166,7 +166,7 @@ void ConvertToFull3DType2() {
         newCNT   = 0;
         routeLen = treeedge->route.routelen;
         //				printf("netID %d, edgeID %d, len %d\n",netID, edgeID,
-        //routeLen);
+        // routeLen);
         gridsX = treeedge->route.gridsX;
         gridsY = treeedge->route.gridsY;
         gridsL = treeedge->route.gridsL;
@@ -330,7 +330,7 @@ void fillVIA() {
         newCNT   = 0;
         routeLen = treeedge->route.routelen;
         //				printf("netID %d, edgeID %d, len %d\n",netID, edgeID,
-        //routeLen);
+        // routeLen);
         n1     = treeedge->n1;
         n2     = treeedge->n2;
         gridsX = treeedge->route.gridsX;
@@ -1451,7 +1451,7 @@ Bool checkRoute2DTree(int netID) {
       // if(netID == 252163 && edgeID == 10)
       //	printf("checking src: %d %d gridstart: %d %d dst: %d %d gridend: %d
       //%d\n", y1, x1, gridsY[0],gridsX[0], y2, x2,
-      //gridsY[edgelength],gridsX[edgelength]);
+      // gridsY[edgelength],gridsX[edgelength]);
       if (gridsX[0] != x1 || gridsY[0] != y1) {
         printf("%d %d initial grid wrong y1 x1 [%d %d] , net start [%d %d] "
                "routelen %d\n ",
