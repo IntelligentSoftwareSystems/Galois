@@ -12,9 +12,9 @@
 
 namespace deepgalois {
 
-bool LearningGraph::isLocal(index_t vid) { UNUSED(vid); return true; }
+bool LearningGraph::isLocal(index_t) { return true; }
 
-index_t LearningGraph::getLID(index_t vid) { UNUSED(vid); return 0; }
+index_t LearningGraph::getLID(index_t) { return 0; }
 
 bool LearningGraph::is_vertex_cut() {return true; }
 

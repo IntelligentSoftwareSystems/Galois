@@ -61,10 +61,9 @@ void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
   Tmatmul.stop();
 }
 
-void csrmm_cpu(const int M, const int N, const int K, const int nnz, 
+void csrmm_cpu(const int M, const int N, const int K, const int, 
                const float alpha, float* A_nonzeros, int* A_idx_ptr, int* A_nnz_idx,
                const float* B, const float beta, float* C) {
-  UNUSED(nnz);
 #ifdef USE_MKL
   //mkl_set_num_threads(56);
   //const char *matdescra = "GXXCX";//6 bytes
@@ -330,9 +329,8 @@ void softmax(size_t n, const float_t* input, float_t* output) {
     output[i] /= denominator;
 }
 
-void d_softmax(size_t n, const float_t* y, const float_t* p, float_t* dy,
+void d_softmax(size_t n, const float_t*, const float_t* p, float_t* dy,
                const float_t* dp) {
-  UNUSED(y);
   vec_t df(n, 0);
   for (size_t i = 0; i < n; i++) {
     for (size_t j = 0; j < n; j++) {
@@ -375,8 +373,7 @@ void sigmoid(size_t n, const float_t* in, float_t* out) {
   }
 }
 
-void d_sigmoid(size_t n, const float_t* y, const float_t* p, float_t* dy, const float_t* dp) {
-  UNUSED(y);
+void d_sigmoid(size_t n, const float_t*, const float_t* p, float_t* dy, const float_t* dp) {
   for (size_t i = 0; i < n; i++) {
     dy[i] = dp[i] * p[i] * (float_t(1) - p[i]);
   }

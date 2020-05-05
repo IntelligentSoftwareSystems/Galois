@@ -51,9 +51,8 @@ template uint32_t* parallel_prefix_sum<uint32_t, uint32_t>(const std::vector<uin
 // Please refer to https://sebastianraschka.com/faq/docs/multiclass-metric.html,
 // http://pageperso.lif.univ-mrs.fr/~francois.denis/IAAM1/scikit-learn-docs.pdf (p.1672)
 // and https://github.com/ashokpant/accuracy-evaluation-cpp/blob/master/src/evaluation.hpp
-acc_t masked_f1_score(size_t begin, size_t end, size_t count, mask_t *masks, 
+acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t *masks, 
                       size_t num_classes, label_t *ground_truth, float_t *pred) {
-  UNUSED(count);
   double precision_cls(0.), recall_cls(0.), f1_accum(0.);
   int tp_accum(0), fn_accum(0), fp_accum(0), tn_accum(0);
   for (size_t col = 0; col < num_classes; col++) {
