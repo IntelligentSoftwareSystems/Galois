@@ -375,9 +375,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curX > regionX1) {
                     grid = curY * (xGrid - 1) + curX - 1;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, h_edges[grid].usage.load(), h_edges[grid].red,
-                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load() +
-                    // h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                    // %d\n",grid, h_edges[grid].usage.load(),
+                    // h_edges[grid].red, h_edges[grid].last_usage, L ,
+                    // h_edges[grid].usage.load() + h_edges[grid].red +
+                    // (int)(L*h_edges[grid].last_usage));
                     if ((preY == curY) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -437,9 +438,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curX < regionX2) {
                     grid = curY * (xGrid - 1) + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, h_edges[grid].usage.load(), h_edges[grid].red,
-                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load() +
-                    // h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                    // %d\n",grid, h_edges[grid].usage.load(),
+                    // h_edges[grid].red, h_edges[grid].last_usage, L ,
+                    // h_edges[grid].usage.load() + h_edges[grid].red +
+                    // (int)(L*h_edges[grid].last_usage));
                     if ((preY == curY) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -502,9 +504,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curY > regionY1) {
                     grid = (curY - 1) * xGrid + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, v_edges[grid].usage.load(), v_edges[grid].red,
-                    // v_edges[grid].last_usage, L , v_edges[grid].usage.load() +
-                    // v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                    // %d\n",grid, v_edges[grid].usage.load(),
+                    // v_edges[grid].red, v_edges[grid].last_usage, L ,
+                    // v_edges[grid].usage.load() + v_edges[grid].red +
+                    // (int)(L*v_edges[grid].last_usage));
                     if ((preX == curX) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -565,9 +568,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curY < regionY2) {
                     grid = curY * xGrid + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, v_edges[grid].usage.load(), v_edges[grid].red,
-                    // v_edges[grid].last_usage, L , v_edges[grid].usage.load() +
-                    // v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                    // %d\n",grid, v_edges[grid].usage.load(),
+                    // v_edges[grid].red, v_edges[grid].last_usage, L ,
+                    // v_edges[grid].usage.load() + v_edges[grid].red +
+                    // (int)(L*v_edges[grid].last_usage));
                     if ((preX == curX) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -2445,7 +2449,8 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
                       // printf("grid: %d %d usage: %d red:%d last:%d L:%f
                       // sum:%d\n",grid%xGrid, grid/xGrid,
                       // h_edges[grid].usage.load(), h_edges[grid].red,
-                      // h_edges[grid].last_usage, L , h_edges[grid].usage.load()
+                      // h_edges[grid].last_usage, L ,
+                      // h_edges[grid].usage.load()
                       // + h_edges[grid].red +
                       // (int)(L*h_edges[grid].last_usage));
                       if ((preY == curY) || (curr_d1 == 0)) {
