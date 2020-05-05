@@ -44,7 +44,7 @@ void sigmoid_loss_layer::forward_propagation(const float_t* in_data, float_t* ou
 
 void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t* out_data,
                                           float_t* out_grad, float_t* in_grad) {
-  if (out_grad) delete[] out_grad;
+  UNUSED(out_grad);
   size_t len = layer::input_dims[1];
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {
     if (!use_mask || masks_[i] == 1) { // masked

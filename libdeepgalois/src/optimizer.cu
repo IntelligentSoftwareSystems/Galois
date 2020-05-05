@@ -39,4 +39,40 @@ void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
   b2_t *= b2;
 }
 
+void adagrad::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
+void RMSprop::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
+void adamax::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
+void gradient_descent::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
+void momentum::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
+void nesterov_momentum::update_gpu(const size_t n, const float_t* dW, float_t* W) {
+  UNUSED(n);
+  UNUSED(dW);
+  UNUSED(W);
+}
+
 }
