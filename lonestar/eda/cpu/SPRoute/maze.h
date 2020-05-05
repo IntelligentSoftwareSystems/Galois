@@ -264,8 +264,8 @@ struct THREAD_LOCAL_STORAGE {
     }
   }
   void reset_heap() { memset(pop_heap2, 0, yGrid * xGrid * sizeof(bool)); }
-  void clear() {
-    if (!NET_PARALLEL) {
+
+  ~THREAD_LOCAL_STORAGE() {
       free(pop_heap2);
 
       free(d1_p);
@@ -295,68 +295,7 @@ struct THREAD_LOCAL_STORAGE {
       free(inRegion_p);
 
       free(netEO_p);
-    } else {
-      /*delete [] pop_heap2;
-      delete [] heap1;
-      delete [] heap2;
-
-      delete [] d1_p;
-      delete [] d1_alloc;
-
-      delete [] HV_p;
-      delete [] hyperV_p;
-      delete [] hyperH_p;
-      delete [] HV_alloc;
-      delete [] hyperV_alloc;
-      delete [] hyperH_alloc;
-
-      delete [] parentX1_p;
-      delete [] parentY1_p;
-      delete [] parentX3_p;
-      delete [] parentY3_p;
-
-      delete [] parentX1_alloc;
-      delete [] parentY1_alloc;
-      delete [] parentX3_alloc;
-      delete [] parentY3_alloc;
-
-      delete [] corrEdge_alloc;
-      delete [] corrEdge_p;
-
-      delete [] netEO_p;*/
-    }
   }
-  /*~THREAD_LOCAL_STORAGE() {
-      free(pop_heap2);
-
-      free(d1_p);
-      free(d1_alloc);
-
-      free(HV_p);
-      free(hyperV_p);
-      free(hyperH_p);
-      free(HV_alloc);
-      free(hyperV_alloc);
-      free(hyperH_alloc);
-
-      free(parentX1_p);
-      free(parentY1_p);
-      free(parentX3_p);
-      free(parentY3_p);
-
-      free(parentX1_alloc);
-      free(parentY1_alloc);
-      free(parentX3_alloc);
-      free(parentY3_alloc);
-
-      free(corrEdge_alloc);
-      free(corrEdge_p);
-
-      free(inRegion_alloc);
-      free(inRegion_p);
-
-      free(netEO_p);
-  }*/
 };
 
 void convertToMazerouteNet(int netID) {
@@ -1352,8 +1291,6 @@ void reInitTree(int netID) {
 void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
                    int mazeedge_Threshold, Bool Ordering, int cost_type,
                    galois::InsertBag<int>* net_shuffle)
-// galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>*
-// thread_local_storage)
 {
   // LOCK = 0;
   float forange;
@@ -1420,9 +1357,8 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
     // printf("order?\n");
   }
 
-  galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>*
-      thread_local_storage =
-          new galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>;
+  galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>
+      thread_local_storage{};
   // for(nidRPC=0; nidRPC<numValidNets; nidRPC++)//parallelize
   PerThread_PQ perthread_pq;
   PerThread_Vec perthread_vec;
@@ -1465,23 +1401,23 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
         TreeEdge *treeedges, *treeedge;
         TreeNode* treenodes;
 
-        bool* pop_heap2 = thread_local_storage->getLocal()->pop_heap2;
+        bool* pop_heap2 = thread_local_storage.getLocal()->pop_heap2;
 
-        float** d1    = thread_local_storage->getLocal()->d1_p;
-        bool** HV     = thread_local_storage->getLocal()->HV_p;
-        bool** hyperV = thread_local_storage->getLocal()->hyperV_p;
-        bool** hyperH = thread_local_storage->getLocal()->hyperH_p;
+        float** d1    = thread_local_storage.getLocal()->d1_p;
+        bool** HV     = thread_local_storage.getLocal()->HV_p;
+        bool** hyperV = thread_local_storage.getLocal()->hyperV_p;
+        bool** hyperH = thread_local_storage.getLocal()->hyperH_p;
 
-        short** parentX1 = thread_local_storage->getLocal()->parentX1_p;
-        short** parentX3 = thread_local_storage->getLocal()->parentX3_p;
-        short** parentY1 = thread_local_storage->getLocal()->parentY1_p;
-        short** parentY3 = thread_local_storage->getLocal()->parentY3_p;
+        short** parentX1 = thread_local_storage.getLocal()->parentX1_p;
+        short** parentX3 = thread_local_storage.getLocal()->parentX3_p;
+        short** parentY1 = thread_local_storage.getLocal()->parentY1_p;
+        short** parentY3 = thread_local_storage.getLocal()->parentY3_p;
 
-        int** corrEdge = thread_local_storage->getLocal()->corrEdge_p;
+        int** corrEdge = thread_local_storage.getLocal()->corrEdge_p;
 
-        OrderNetEdge* netEO = thread_local_storage->getLocal()->netEO_p;
+        OrderNetEdge* netEO = thread_local_storage.getLocal()->netEO_p;
 
-        bool** inRegion = thread_local_storage->getLocal()->inRegion_p;
+        bool** inRegion = thread_local_storage.getLocal()->inRegion_p;
 
         local_pq pq1 = perthread_pq.get();
         local_vec v2 = perthread_vec.get();
@@ -2237,22 +2173,12 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
-  galois::on_each([&](const unsigned tid, const unsigned numT) {
-    thread_local_storage->getLocal()->clear();
-  });
-
-  // delete[] thread_local_storage;
-
-  // free memory
 }
 
 void mazeRouteMSMD_block(int iter, int expand, float costHeight,
                          int ripup_threshold, int mazeedge_Threshold,
                          Bool Ordering, int cost_type,
                          galois::InsertBag<int>* net_shuffle)
-// galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>*
-// thread_local_storage)
 {
   // LOCK = 0;
   float forange;
@@ -2317,9 +2243,8 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
     // printf("order?\n");
   }
 
-  galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>*
-      thread_local_storage =
-          new galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>;
+  galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>
+      thread_local_storage{};
   // for(nidRPC=0; nidRPC<numValidNets; nidRPC++)//parallelize
   PerThread_PQ perthread_pq;
   PerThread_Vec perthread_vec;
@@ -2359,23 +2284,23 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
           TreeEdge *treeedges, *treeedge;
           TreeNode* treenodes;
 
-          bool* pop_heap2 = thread_local_storage->getLocal()->pop_heap2;
+          bool* pop_heap2 = thread_local_storage.getLocal()->pop_heap2;
 
-          float** d1    = thread_local_storage->getLocal()->d1_p;
-          bool** HV     = thread_local_storage->getLocal()->HV_p;
-          bool** hyperV = thread_local_storage->getLocal()->hyperV_p;
-          bool** hyperH = thread_local_storage->getLocal()->hyperH_p;
+          float** d1    = thread_local_storage.getLocal()->d1_p;
+          bool** HV     = thread_local_storage.getLocal()->HV_p;
+          bool** hyperV = thread_local_storage.getLocal()->hyperV_p;
+          bool** hyperH = thread_local_storage.getLocal()->hyperH_p;
 
-          short** parentX1 = thread_local_storage->getLocal()->parentX1_p;
-          short** parentX3 = thread_local_storage->getLocal()->parentX3_p;
-          short** parentY1 = thread_local_storage->getLocal()->parentY1_p;
-          short** parentY3 = thread_local_storage->getLocal()->parentY3_p;
+          short** parentX1 = thread_local_storage.getLocal()->parentX1_p;
+          short** parentX3 = thread_local_storage.getLocal()->parentX3_p;
+          short** parentY1 = thread_local_storage.getLocal()->parentY1_p;
+          short** parentY3 = thread_local_storage.getLocal()->parentY3_p;
 
-          int** corrEdge = thread_local_storage->getLocal()->corrEdge_p;
+          int** corrEdge = thread_local_storage.getLocal()->corrEdge_p;
 
-          OrderNetEdge* netEO = thread_local_storage->getLocal()->netEO_p;
+          OrderNetEdge* netEO = thread_local_storage.getLocal()->netEO_p;
 
-          bool** inRegion = thread_local_storage->getLocal()->inRegion_p;
+          bool** inRegion = thread_local_storage.getLocal()->inRegion_p;
 
           local_pq pq1 = perthread_pq.get();
           local_vec v2 = perthread_vec.get();
@@ -3111,11 +3036,6 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
   free(h_costTable);
   free(v_costTable);
 
-  galois::on_each([&](const unsigned tid, const unsigned numT) {
-    thread_local_storage->getLocal()->clear();
-  });
-
-  // free memory
 }
 
 int getOverflow2Dmaze(int* maxOverflow, int* tUsage) {
