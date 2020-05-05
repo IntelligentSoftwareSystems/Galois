@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -64,7 +64,7 @@ RewriteManager::~RewriteManager() {
 
 aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
                                        aig::GNode node,
-                                       GNodeVector& fanoutNodes)  {
+                                       GNodeVector& fanoutNodes) {
 
   aig::Graph& aigGraph    = this->aig.getGraph();
   aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::WRITE);
@@ -189,7 +189,7 @@ aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
 
   assert(bestGraph != nullptr);
 
-  // Preparing structure/AIG tracking for updating the AIG 
+  // Preparing structure/AIG tracking for updating the AIG
   for (int j = 0; j < 20; j++) {
     if (j < 4) {
       threadCtx->decNodeFunc[j] =
@@ -207,8 +207,8 @@ aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
 
   // std::cout << threadCtx->threadId << " - Updating AIG with gain " <<
   // bestGain << std::endl;
-  aig::GNode newRoot = updateAig(threadCtx, node, bestGraph, fanoutNodes,
-                                 isOutputCompl);
+  aig::GNode newRoot =
+      updateAig(threadCtx, node, bestGraph, fanoutNodes, isOutputCompl);
   // std::cout << threadCtx->threadId << " - Update done " << std::endl;
 
   return newRoot;
@@ -227,18 +227,19 @@ void RewriteManager::lockFaninCone(aig::Graph& aigGraph, aig::GNode node,
   }
 
   // If node is a PI
-  if ( (nodeData.type == aig::NodeType::PI) || (nodeData.type == aig::NodeType::LATCH) ) {
+  if ((nodeData.type == aig::NodeType::PI) ||
+      (nodeData.type == aig::NodeType::LATCH)) {
     return;
   }
 
   auto inEdgeIt      = aigGraph.in_edge_begin(node);
   aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
-//  aig::NodeData& lhsData =
-      aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
+  //  aig::NodeData& lhsData =
+  aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
   inEdgeIt++;
   aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
-//  aig::NodeData& rhsData =
-      aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
+  //  aig::NodeData& rhsData =
+  aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
 
   lockFaninCone(aigGraph, lhsNode, cut);
   lockFaninCone(aigGraph, rhsNode, cut);
@@ -252,7 +253,8 @@ int RewriteManager::labelMFFC(ThreadContextData* threadCtx, aig::GNode node,
   threadCtx->currentCutMFFCIds.clear();
 
   aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::READ);
-  if ( (nodeData.type == aig::NodeType::PI) || (nodeData.type == aig::NodeType::LATCH) ) {
+  if ((nodeData.type == aig::NodeType::PI) ||
+      (nodeData.type == aig::NodeType::LATCH)) {
     return 0;
   }
 
@@ -286,7 +288,8 @@ int RewriteManager::refDerefMFFCNodes(ThreadContextData* threadCtx,
     this->aig.registerTravId(nodeData.id, threadId, travId);
   }
   // skip the CI
-  if ( (nodeData.type == aig::NodeType::PI) || (nodeData.type == aig::NodeType::LATCH) ) { 
+  if ((nodeData.type == aig::NodeType::PI) ||
+      (nodeData.type == aig::NodeType::LATCH)) {
     return 0;
   }
 
@@ -352,13 +355,13 @@ DecGraph* RewriteManager::evaluateCut(ThreadContextData* threadCtx,
   // copy the leaves
   for (int i = 0; i < 4; i++) { // each deGraph has eactly 4 inputs (vars).
     aig::GNode fanin = threadCtx->currentFanins[i];
-//    aig::NodeData& faninData =
-        aigGraph.getData(fanin, galois::MethodFlag::READ);
+    //    aig::NodeData& faninData =
+    aigGraph.getData(fanin, galois::MethodFlag::READ);
     threadCtx->decNodeFunc[i] = fanin;
     // threadCtx->decNodeLevel[i] = faninData.level;
   }
 
-	// Pruning
+  // Pruning
   int nSubgraphs = subgraphs.size();
   if (nSubgraphs > this->triesNGraphs) {
     nSubgraphs = this->triesNGraphs;
@@ -432,7 +435,9 @@ int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
   }
 
   // compute the AIG size after adding the internal nodes
-  for (int i = decGraph->getLeaveNum(); (i < decGraph->getNodeNum()) && ((node = decGraph->getNode(i)), 1); i++) {
+  for (int i = decGraph->getLeaveNum();
+       (i < decGraph->getNodeNum()) && ((node = decGraph->getNode(i)), 1);
+       i++) {
 
     // get the children of this node
     lhsNode = decGraph->getNode(node->eEdge0.Node);
@@ -540,13 +545,13 @@ aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
     auto inEdge         = aigGraph.in_edge_begin(mffcNode);
 
     aig::GNode lhsNode = aigGraph.getEdgeDst(inEdge);
-//    aig::NodeData& lhsNodeData =
-        aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
+    //    aig::NodeData& lhsNodeData =
+    aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
     bool lhsNodePol = aigGraph.getEdgeData(inEdge);
     inEdge++;
     aig::GNode rhsNode = aigGraph.getEdgeDst(inEdge);
-//    aig::NodeData& rhsNodeData =
-        aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
+    //    aig::NodeData& rhsNodeData =
+    aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
     bool rhsNodePol = aigGraph.getEdgeData(inEdge);
 
     this->aig.removeNodeInFanoutMap(mffcNode, lhsNode, rhsNode, lhsNodePol,
@@ -729,7 +734,8 @@ void RewriteManager::addNewSubgraph(aig::GNode oldNode, aig::GNode newNode,
     auto fanoutNodeInEdge = aigGraph.findInEdge(oldNode, fanoutNode);
 
     if (fanoutNodeInEdge == aigGraph.in_edge_end(fanoutNode)) {
-      std::cout << "Adding new subgraph, fanoutNode inEdge not found!" << std::endl;
+      std::cout << "Adding new subgraph, fanoutNode inEdge not found!"
+                << std::endl;
     }
 
     oldNodePol = aigGraph.getEdgeData(fanoutNodeInEdge);
@@ -737,7 +743,8 @@ void RewriteManager::addNewSubgraph(aig::GNode oldNode, aig::GNode newNode,
     // oldNodePol);
     newNodePol = isNewRootComplement ? !(oldNodePol) : oldNodePol;
 
-    if ( (fanoutNodeData.type == aig::NodeType::PO) || (fanoutNodeData.type == aig::NodeType::LATCH) ) {
+    if ((fanoutNodeData.type == aig::NodeType::PO) ||
+        (fanoutNodeData.type == aig::NodeType::LATCH)) {
       // remove the oldNode from the fanoutNode's fanin
       // aigGraph.removeEdge( oldNode, fanoutEdge );
       aigGraph.removeInEdge(fanoutNode, fanoutNodeInEdge);
@@ -800,7 +807,8 @@ void RewriteManager::deleteOldMFFC(aig::Graph& aigGraph, aig::GNode oldNode) {
   }
 }
 
-void RewriteManager::deleteOldMFFCRec(aig::Graph& aigGraph, aig::GNode oldNode) {
+void RewriteManager::deleteOldMFFCRec(aig::Graph& aigGraph,
+                                      aig::GNode oldNode) {
 
   auto inEdge        = aigGraph.in_edge_begin(oldNode);
   aig::GNode lhsNode = aigGraph.getEdgeDst(inEdge);
@@ -912,10 +920,11 @@ struct RewriteOperator {
           for (aig::GNode nextNode : fanoutNodes) {
             aig::NodeData& nextNodeData =
                 aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
-						
-						if ( ( nextNodeData.type == aig::NodeType::PO ) || ( nextNodeData.type == aig::NodeType::LATCH ) ) {
-							continue;
-						}
+
+            if ((nextNodeData.type == aig::NodeType::PO) ||
+                (nextNodeData.type == aig::NodeType::LATCH)) {
+              continue;
+            }
 
             nextNodeData.counter += 1;
             if (nextNodeData.counter == 2) {
@@ -945,9 +954,10 @@ struct RewriteOperator {
             aig::NodeData& nextNodeData =
                 aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
 
-						if ( ( nextNodeData.type == aig::NodeType::PO ) || ( nextNodeData.type == aig::NodeType::LATCH ) ) {
-							continue;
-						}
+            if ((nextNodeData.type == aig::NodeType::PO) ||
+                (nextNodeData.type == aig::NodeType::LATCH)) {
+              continue;
+            }
 
             nextNodeData.counter += 1;
             if (nextNodeData.counter == 2) {
@@ -961,7 +971,8 @@ struct RewriteOperator {
         }
       }
     } else {
-      if ( (nodeData.type == aig::NodeType::PI) || (nodeData.type == aig::NodeType::LATCH) ) { 
+      if ((nodeData.type == aig::NodeType::PI) ||
+          (nodeData.type == aig::NodeType::LATCH)) {
 
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
@@ -986,11 +997,12 @@ struct RewriteOperator {
         for (auto edge : aigGraph.out_edges(node)) {
           aig::GNode nextNode = aigGraph.getEdgeDst(edge);
           aig::NodeData& nextNodeData =
-              aigGraph.getData(nextNode, galois::MethodFlag::WRITE);						
+              aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
 
-					if ( ( nextNodeData.type == aig::NodeType::PO ) || ( nextNodeData.type == aig::NodeType::LATCH ) ) {
-						continue;
-					}
+          if ((nextNodeData.type == aig::NodeType::PO) ||
+              (nextNodeData.type == aig::NodeType::LATCH)) {
+            continue;
+          }
 
           nextNodeData.counter += 1;
           if (nextNodeData.counter == 2) {
@@ -1023,16 +1035,14 @@ void runRewriteOperator(RewriteManager& rwtMan) {
 
   // Galois Parallel Foreach
   galois::for_each(galois::iterate(workList.begin(), workList.end()),
-                   RewriteOperator(rwtMan), 
-									 galois::wl<DC_BAG>(),
+                   RewriteOperator(rwtMan), galois::wl<DC_BAG>(),
                    galois::loopname("RewriteOperator"),
                    galois::per_iter_alloc());
 
-	//galois::wl<galois::worklists::Deterministic<>>(),
-	//galois::wl<DC_BAG>(),
+  // galois::wl<galois::worklists::Deterministic<>>(),
+  // galois::wl<DC_BAG>(),
 
   //,"REWRITING" );
-
 }
 
 } /* namespace algorithm */

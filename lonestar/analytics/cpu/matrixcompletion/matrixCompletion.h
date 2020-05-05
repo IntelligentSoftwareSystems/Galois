@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -94,11 +94,11 @@ static cll::opt<std::string>
     outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
 static cll::opt<std::string>
     transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
-static cll::opt<OutputType> outputType(
-    "output", cll::desc("Output type:"),
-    cll::values(clEnumValN(OutputType::binary, "binary", "Binary"),
-                clEnumValN(OutputType::ascii, "ascii", "ASCII")),
-    cll::init(OutputType::binary));
+static cll::opt<OutputType>
+    outputType("output", cll::desc("Output type:"),
+               cll::values(clEnumValN(OutputType::binary, "binary", "Binary"),
+                           clEnumValN(OutputType::ascii, "ascii", "ASCII")),
+               cll::init(OutputType::binary));
 
 static cll::opt<unsigned int>
     updatesPerEdge("updatesPerEdge", cll::desc("number of updates per edge"),
@@ -191,7 +191,7 @@ struct StepFunction {
   virtual LatentValue stepSize(int round) const = 0;
   virtual std::string name() const              = 0;
   virtual bool isBold() const { return false; }
-  virtual ~StepFunction() { }
+  virtual ~StepFunction() {}
 };
 
 /*

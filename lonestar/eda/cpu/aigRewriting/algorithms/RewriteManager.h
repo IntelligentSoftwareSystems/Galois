@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -68,10 +68,15 @@ typedef struct ThreadContextData_ {
 
 typedef galois::PerIterAllocTy Alloc;
 typedef std::vector<int, galois::PerIterAllocTy::rebind<int>::other> IntVector;
-typedef std::vector<aig::GNode, galois::PerIterAllocTy::rebind<aig::GNode>::other> GNodeVector;
-typedef std::unordered_set<int, std::hash<int>, std::equal_to<int>, galois::PerIterAllocTy::rebind<int>::other> IntSet;
+typedef std::vector<aig::GNode,
+                    galois::PerIterAllocTy::rebind<aig::GNode>::other>
+    GNodeVector;
+typedef std::unordered_set<int, std::hash<int>, std::equal_to<int>,
+                           galois::PerIterAllocTy::rebind<int>::other>
+    IntSet;
 
-typedef galois::substrate::PerThreadStorage<ThreadContextData> PerThreadContextData;
+typedef galois::substrate::PerThreadStorage<ThreadContextData>
+    PerThreadContextData;
 
 class RewriteManager {
 
@@ -107,8 +112,7 @@ private:
   aig::GNode createAndNode(ThreadContextData* threadCtx, aig::GNode lhsAnd,
                            aig::GNode rhsAnd, bool lhsAndPol, bool rhsAndPol);
   void addNewSubgraph(aig::GNode oldNode, aig::GNode newNode,
-                      GNodeVector& fanoutNodes,
-                      bool isNewRootComplement);
+                      GNodeVector& fanoutNodes, bool isNewRootComplement);
   void deleteOldMFFC(aig::Graph& aigGraph, aig::GNode oldNode);
   void deleteOldMFFCRec(aig::Graph& aigGraph, aig::GNode oldNode);
 

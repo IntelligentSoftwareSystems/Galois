@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -58,7 +58,7 @@ class SerializeBuffer {
   friend DeSerializeBuffer;
 
   //! type of data buffer
-  //using vTy = std::vector<uint8_t>;
+  // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
   //! the actual data stored in this buffer
   vTy bufdata;
@@ -100,9 +100,7 @@ public:
     return retval;
   }
 
-  void resize(size_t bytes) {
-    bufdata.resize(bytes);
-  }
+  void resize(size_t bytes) { bufdata.resize(bytes); }
 
   /**
    * Reserve more space in the serialize buffer.
@@ -150,7 +148,7 @@ class DeSerializeBuffer {
   //! Access to serialize buffer
   friend SerializeBuffer;
   //! type of data buffer
-  //using vTy = std::vector<uint8_t>;
+  // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
   //! the actual data stored in this buffer
   vTy bufdata;
@@ -344,8 +342,8 @@ inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
 }
 
 /**
- * Returns the size needed to store the elements a PODResizeableArray in a serialize
- * buffer.
+ * Returns the size needed to store the elements a PODResizeableArray in a
+ * serialize buffer.
  *
  * @returns size needed to store a PODResizeableArray into a serialize buffer
  */
@@ -820,7 +818,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
  */
 template <typename T1, typename T2>
 inline void gDeserializeObj(DeSerializeBuffer& buf,
-                          galois::Pair<T1, T2>& data) {
+                            galois::Pair<T1, T2>& data) {
   if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value) {
     // do memcpy
     buf.extract((uint8_t*)&data, sizeof(data));
@@ -995,7 +993,8 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
  * @param data [in,out] PODResizeableArray to deserialize into
  */
 template <typename T>
-void gDeserializeObj(DeSerializeBuffer& buf, galois::PODResizeableArray<T>& data) {
+void gDeserializeObj(DeSerializeBuffer& buf,
+                     galois::PODResizeableArray<T>& data) {
   gDeserializeLinearSeq(buf, data);
 }
 

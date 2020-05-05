@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,47 +38,44 @@ using namespace std::chrono;
 
 namespace algorithm {
 
-PriCutManager::PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool compTruth, bool deterministic, bool verbose) 
-			:
-      aig(aig), aigGraph(aig.getGraph()), K(K), C(C),
+PriCutManager::PriCutManager(aig::Aig& aig, int K, int C, int nThreads,
+                             bool compTruth, bool deterministic, bool verbose)
+    : aig(aig), aigGraph(aig.getGraph()), K(K), C(C),
       nWords(Functional32::wordNum(K)),
-      nNodes(std::distance(aig.getGraph().begin(), aig.getGraph().end()) - aig.getNumOutputs()),
-      nThreads(nThreads),
-      cutPoolSize(nNodes / nThreads),
-      compTruth(compTruth), deterministic(deterministic), verbose(verbose),
+      nNodes(std::distance(aig.getGraph().begin(), aig.getGraph().end()) -
+             aig.getNumOutputs()),
+      nThreads(nThreads), cutPoolSize(nNodes / nThreads), compTruth(compTruth),
+      deterministic(deterministic), verbose(verbose),
       perThreadData(cutPoolSize, K, compTruth, C, nWords) {
 
-	nLUTs = 0;
-	nLevels = 0;
-	passId = 0;
+  nLUTs   = 0;
+  nLevels = 0;
+  passId  = 0;
 
-	sortMode = SortMode::DELAY;
-	costMode = CostMode::AREA_FLOW;
-	
-	if ( deterministic ) {	
-		refMode  = RefMode::MAP;
-	}
-	else {
-		refMode  = RefMode::STANDARD;
-	}
+  sortMode = SortMode::DELAY;
+  costMode = CostMode::AREA_FLOW;
 
-	fPower = false;
-	fEpsilon = (float) 0.005;
+  if (deterministic) {
+    refMode = RefMode::MAP;
+  } else {
+    refMode = RefMode::STANDARD;
+  }
+
+  fPower   = false;
+  fEpsilon = (float)0.005;
   kcutTime = 0;
 
   nodePriCuts = new PriCut*[nNodes + 1];
   for (int i = 0; i < nNodes + 1; i++) {
     nodePriCuts[i] = nullptr;
   }
-  
-	// iterating from 0 to N is reverse topological order
-	// iterating from N to 0 is topological order
-	aig.computeGenericTopologicalSortForAnds( this->sortedNodes );
+
+  // iterating from 0 to N is reverse topological order
+  // iterating from N to 0 is topological order
+  aig.computeGenericTopologicalSortForAnds(this->sortedNodes);
 }
 
-PriCutManager::~PriCutManager() { 
-	delete[] nodePriCuts; 
-}
+PriCutManager::~PriCutManager() { delete[] nodePriCuts; }
 
 void PriCutManager::computePriCutsRecursively(aig::GNode node, RefMap& refMap) {
 
@@ -86,128 +83,138 @@ void PriCutManager::computePriCutsRecursively(aig::GNode node, RefMap& refMap) {
 
   if (this->nodePriCuts[nodeData.id] == nullptr) {
 
-    auto inEdgeIt          = aigGraph.in_edge_begin(node);
-    aig::GNode lhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-    aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::READ);
-    bool lhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+    auto inEdgeIt      = aigGraph.in_edge_begin(node);
+    aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& lhsData =
+        aigGraph.getData(lhsNode, galois::MethodFlag::READ);
+    bool lhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
     inEdgeIt++;
-    aig::GNode rhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-    aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::READ);
-    bool rhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+    aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& rhsData =
+        aigGraph.getData(rhsNode, galois::MethodFlag::READ);
+    bool rhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
-		ThreadLocalData* thData = this->perThreadData.getLocal();
+    ThreadLocalData* thData = this->perThreadData.getLocal();
 
-		computePriCutsRec(lhsNode, thData, refMap);
+    computePriCutsRec(lhsNode, thData, refMap);
     computePriCutsRec(rhsNode, thData, refMap);
 
-    computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id, lhsPolarity, rhsPolarity);
-
-	}
+    computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id,
+                   lhsPolarity, rhsPolarity);
+  }
 }
 
-void PriCutManager::computePriCutsRec(aig::GNode node, ThreadLocalData * thData, RefMap& refMap) {
+void PriCutManager::computePriCutsRec(aig::GNode node, ThreadLocalData* thData,
+                                      RefMap& refMap) {
 
   aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::READ);
 
   if (this->nodePriCuts[nodeData.id] == nullptr) {
 
-    auto inEdgeIt          = aigGraph.in_edge_begin(node);
-    aig::GNode lhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-    aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::READ);
-    bool lhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+    auto inEdgeIt      = aigGraph.in_edge_begin(node);
+    aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& lhsData =
+        aigGraph.getData(lhsNode, galois::MethodFlag::READ);
+    bool lhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
     inEdgeIt++;
-    aig::GNode rhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-    aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::READ);
-    bool rhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+    aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& rhsData =
+        aigGraph.getData(rhsNode, galois::MethodFlag::READ);
+    bool rhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
     computePriCutsRec(lhsNode, thData, refMap);
     computePriCutsRec(rhsNode, thData, refMap);
 
-    computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id, lhsPolarity, rhsPolarity);
+    computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id,
+                   lhsPolarity, rhsPolarity);
   }
 }
 
-void PriCutManager::computePriCuts(ThreadLocalData* thData, RefMap& refMap, aig::NodeData & nodeData, int lhsId, int rhsId, bool lhsPolarity, bool rhsPolarity) {
+void PriCutManager::computePriCuts(ThreadLocalData* thData, RefMap& refMap,
+                                   aig::NodeData& nodeData, int lhsId,
+                                   int rhsId, bool lhsPolarity,
+                                   bool rhsPolarity) {
 
-	PriCut * trivialCut, * resCut, * oldBestCut = nullptr; 
-	
-	cleanupCutList(thData->cutPool, thData->cutList); // Ensure that the cutList is empty
+  PriCut *trivialCut, *resCut, *oldBestCut = nullptr;
 
-	if ( (this->passId > 1) && (this->nodePriCuts[nodeData.id] != nullptr) ) {
-		// Save a copy of the previous bestCut and recompute the cut's costs
-		oldBestCut = thData->cutPool.getMemory();
-		copyCut(oldBestCut, this->nodePriCuts[nodeData.id]);
+  cleanupCutList(thData->cutPool,
+                 thData->cutList); // Ensure that the cutList is empty
 
-		if ( this->costMode == CostMode::AREA_FLOW ) {
-			cutFlowCosts( oldBestCut );
-		}
-		else {
-			if ( this->refMode == RefMode::MAP ) {
-				cutDerefedCosts( oldBestCut, refMap );
-			}
-			else {
-				cutDerefedCosts( oldBestCut );
-			}
-		}
+  if ((this->passId > 1) && (this->nodePriCuts[nodeData.id] != nullptr)) {
+    // Save a copy of the previous bestCut and recompute the cut's costs
+    oldBestCut = thData->cutPool.getMemory();
+    copyCut(oldBestCut, this->nodePriCuts[nodeData.id]);
 
-		if ( this->deterministic == false ) {
-			decreaseCutReferences( oldBestCut );
-		}
-	}
+    if (this->costMode == CostMode::AREA_FLOW) {
+      cutFlowCosts(oldBestCut);
+    } else {
+      if (this->refMode == RefMode::MAP) {
+        cutDerefedCosts(oldBestCut, refMap);
+      } else {
+        cutDerefedCosts(oldBestCut);
+      }
+    }
 
-  for (PriCut* lhsCut = this->nodePriCuts[lhsId]; lhsCut != nullptr; lhsCut = lhsCut->nextCut) {
-    for (PriCut* rhsCut = this->nodePriCuts[rhsId]; rhsCut != nullptr; rhsCut = rhsCut->nextCut) {
-	
-			if (Functional32::countOnes( lhsCut->sig | rhsCut->sig ) > this->K) {
-				continue;
-			}
-
-  		// merge the cuts
-  		if (lhsCut->nLeaves >= rhsCut->nLeaves) {
-   			resCut = mergeCuts(thData->cutPool, lhsCut, rhsCut);
-  		} else {
-    		resCut = mergeCuts(thData->cutPool, rhsCut, lhsCut);
-  		}
-
-  		if (resCut == nullptr) {
-				continue;
-  		}
-
-		  // check containment
-  		if (cutFilter(thData->cutPool, thData->cutList, resCut)) {
-  			continue;
-			}
-
-  		if (this->compTruth) {
-    		computeTruth(thData->auxTruth, resCut, lhsCut, rhsCut, lhsPolarity, rhsPolarity);
-				//std::cout << Functional32::toHex( readTruth( resCut ), getNWords() ) << std::endl;
-  		}
-
-			if ( this->costMode == CostMode::AREA_FLOW ) {
-				cutFlowCosts( resCut );
-			}
-			else {
-				if ( this->refMode == RefMode::MAP ) {
-					cutDerefedCosts( resCut, refMap );
-				}
-				else {
-					cutDerefedCosts( resCut );
-				}
-			}				
-
-  		// add to the sorted list
-  		cutSort(thData->cutPool, thData->cutList, resCut);
-  	}
+    if (this->deterministic == false) {
+      decreaseCutReferences(oldBestCut);
+    }
   }
 
-	if ((nodeData.nFanout > 0) && (nodeData.choiceList != nullptr)) {
-		mapChoices( thData, refMap, nodeData );
-	}
+  for (PriCut* lhsCut = this->nodePriCuts[lhsId]; lhsCut != nullptr;
+       lhsCut         = lhsCut->nextCut) {
+    for (PriCut* rhsCut = this->nodePriCuts[rhsId]; rhsCut != nullptr;
+         rhsCut         = rhsCut->nextCut) {
 
- 	// start with the elementary cut
-  trivialCut = thData->cutPool.getMemory();
+      if (Functional32::countOnes(lhsCut->sig | rhsCut->sig) > this->K) {
+        continue;
+      }
+
+      // merge the cuts
+      if (lhsCut->nLeaves >= rhsCut->nLeaves) {
+        resCut = mergeCuts(thData->cutPool, lhsCut, rhsCut);
+      } else {
+        resCut = mergeCuts(thData->cutPool, rhsCut, lhsCut);
+      }
+
+      if (resCut == nullptr) {
+        continue;
+      }
+
+      // check containment
+      if (cutFilter(thData->cutPool, thData->cutList, resCut)) {
+        continue;
+      }
+
+      if (this->compTruth) {
+        computeTruth(thData->auxTruth, resCut, lhsCut, rhsCut, lhsPolarity,
+                     rhsPolarity);
+        // std::cout << Functional32::toHex( readTruth( resCut ), getNWords() )
+        // << std::endl;
+      }
+
+      if (this->costMode == CostMode::AREA_FLOW) {
+        cutFlowCosts(resCut);
+      } else {
+        if (this->refMode == RefMode::MAP) {
+          cutDerefedCosts(resCut, refMap);
+        } else {
+          cutDerefedCosts(resCut);
+        }
+      }
+
+      // add to the sorted list
+      cutSort(thData->cutPool, thData->cutList, resCut);
+    }
+  }
+
+  if ((nodeData.nFanout > 0) && (nodeData.choiceList != nullptr)) {
+    mapChoices(thData, refMap, nodeData);
+  }
+
+  // start with the elementary cut
+  trivialCut            = thData->cutPool.getMemory();
   trivialCut->leaves[0] = nodeData.id;
   trivialCut->nLeaves++;
   trivialCut->sig = (1U << (nodeData.id % 31));
@@ -224,75 +231,80 @@ void PriCutManager::computePriCuts(ThreadLocalData* thData, RefMap& refMap, aig:
   // Copy from currentCutList to the nodeCuts
   commitCuts(thData->cutPool, thData->cutList, nodeData.id);
 
-	if ( oldBestCut != nullptr ) {
-		if ( this->nodePriCuts[nodeData.id]->delay > nodeData.reqTime ) {
-			oldBestCut->nextCut = this->nodePriCuts[nodeData.id]; // Keep the oldBestCut as the best one
-			this->nodePriCuts[nodeData.id] = oldBestCut;
-		}
-		else {
-			thData->cutPool.giveBackMemory( oldBestCut );
-		}
-	}
-	
-	if ( this->deterministic == false ) {
-		increaseCutReferences(this->nodePriCuts[nodeData.id]);
-	}
+  if (oldBestCut != nullptr) {
+    if (this->nodePriCuts[nodeData.id]->delay > nodeData.reqTime) {
+      oldBestCut->nextCut =
+          this->nodePriCuts[nodeData.id]; // Keep the oldBestCut as the best one
+      this->nodePriCuts[nodeData.id] = oldBestCut;
+    } else {
+      thData->cutPool.giveBackMemory(oldBestCut);
+    }
+  }
+
+  if (this->deterministic == false) {
+    increaseCutReferences(this->nodePriCuts[nodeData.id]);
+  }
 }
 
-void PriCutManager::mapChoices(ThreadLocalData* thData, RefMap& refMap, aig::NodeData & nodeData) {
+void PriCutManager::mapChoices(ThreadLocalData* thData, RefMap& refMap,
+                               aig::NodeData& nodeData) {
 
-	aig::GNode nextChoice = nullptr;
+  aig::GNode nextChoice = nullptr;
 
-	for (aig::GNode currChoice = nodeData.choiceList; currChoice != nullptr ; currChoice = nextChoice) {
-	
-		aig::NodeData& currChoiceData = aigGraph.getData( currChoice, galois::MethodFlag::READ );
-		nextChoice = currChoiceData.choiceList;
+  for (aig::GNode currChoice = nodeData.choiceList; currChoice != nullptr;
+       currChoice            = nextChoice) {
 
-		//std::cout << "Node " << currChoiceData.id << " has fanout " << currChoiceData.nFanout << std::endl;
+    aig::NodeData& currChoiceData =
+        aigGraph.getData(currChoice, galois::MethodFlag::READ);
+    nextChoice = currChoiceData.choiceList;
 
-		for (PriCut* chCut = this->nodePriCuts[ currChoiceData.id ];  chCut != nullptr; chCut = chCut->nextCut) {
+    // std::cout << "Node " << currChoiceData.id << " has fanout " <<
+    // currChoiceData.nFanout << std::endl;
 
-			// Discard trivial cuts
-			if (chCut->nLeaves == 1) {
-				continue;
-			}
+    for (PriCut* chCut = this->nodePriCuts[currChoiceData.id]; chCut != nullptr;
+         chCut         = chCut->nextCut) {
 
-			PriCut* chCutCopy = thData->cutPool.getMemory();	
-			copyCut(chCutCopy, chCut);
+      // Discard trivial cuts
+      if (chCut->nLeaves == 1) {
+        continue;
+      }
 
-			/*	
-			if (this->compTruth) { // FIXME treat complemented choices
-				if(currChoiceData.isCompl) {
-					Functional32::NOT(readTruth(chCutCopy), readTruth(chCutCopy), this->nWords);
-				}
-			}
-			*/			
+      PriCut* chCutCopy = thData->cutPool.getMemory();
+      copyCut(chCutCopy, chCut);
 
-			// check containment
-  		if (cutFilter(thData->cutPool, thData->cutList, chCutCopy)) {
-  			continue;
-			}
-			
-			if (this->costMode == CostMode::AREA_FLOW) {
-				cutFlowCosts(chCutCopy);
-			}
-			else {
-				if (this->refMode == RefMode::MAP) {
-					cutDerefedCosts(chCutCopy, refMap);
-					//cutDerefedCosts(chCutCopy, thData->refMap);
-				}
-				else {
-					cutDerefedCosts(chCutCopy);
-				}
-			}
+      /*
+      if (this->compTruth) { // FIXME treat complemented choices
+          if(currChoiceData.isCompl) {
+              Functional32::NOT(readTruth(chCutCopy), readTruth(chCutCopy),
+      this->nWords);
+          }
+      }
+      */
 
-			// add to the sorted list
-  		cutSort(thData->cutPool, thData->cutList, chCutCopy);
-		}
-	}	
+      // check containment
+      if (cutFilter(thData->cutPool, thData->cutList, chCutCopy)) {
+        continue;
+      }
+
+      if (this->costMode == CostMode::AREA_FLOW) {
+        cutFlowCosts(chCutCopy);
+      } else {
+        if (this->refMode == RefMode::MAP) {
+          cutDerefedCosts(chCutCopy, refMap);
+          // cutDerefedCosts(chCutCopy, thData->refMap);
+        } else {
+          cutDerefedCosts(chCutCopy);
+        }
+      }
+
+      // add to the sorted list
+      cutSort(thData->cutPool, thData->cutList, chCutCopy);
+    }
+  }
 }
 
-PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rhsCut) {
+PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut,
+                                 PriCut* rhsCut) {
 
   // assert( lhsCut->nLeaves >= rhsCut->nLeaves );
   int i, j, l;
@@ -310,7 +322,7 @@ PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rh
       resCut->leaves[i] = lhsCut->leaves[i];
     }
     resCut->nLeaves = lhsCut->nLeaves;
-  	resCut->sig = lhsCut->sig | rhsCut->sig; // set the signature
+    resCut->sig     = lhsCut->sig | rhsCut->sig; // set the signature
     return resCut;
   }
 
@@ -331,19 +343,19 @@ PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rh
       resCut->leaves[i] = lhsCut->leaves[i];
     }
     resCut->nLeaves = lhsCut->nLeaves;
-  	resCut->sig = lhsCut->sig | rhsCut->sig; // set the signature
+    resCut->sig     = lhsCut->sig | rhsCut->sig; // set the signature
     return resCut;
   }
 
   // compare two cuts with different numbers
   resCut = cutPool.getMemory();
-  i = 0;
-  j = 0;
+  i      = 0;
+  j      = 0;
   for (l = 0; l < this->K; l++) {
     if (j == rhsCut->nLeaves) {
       if (i == lhsCut->nLeaves) {
         resCut->nLeaves = l;
-  			resCut->sig = lhsCut->sig | rhsCut->sig; // set the signature
+        resCut->sig     = lhsCut->sig | rhsCut->sig; // set the signature
         return resCut;
       }
       resCut->leaves[l] = lhsCut->leaves[i++];
@@ -353,7 +365,7 @@ PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rh
     if (i == lhsCut->nLeaves) {
       if (j == rhsCut->nLeaves) {
         resCut->nLeaves = l;
-  			resCut->sig = lhsCut->sig | rhsCut->sig; // set the signature
+        resCut->sig     = lhsCut->sig | rhsCut->sig; // set the signature
         return resCut;
       }
       resCut->leaves[l] = rhsCut->leaves[j++];
@@ -380,59 +392,63 @@ PriCut* PriCutManager::mergeCuts(PriCutPool& cutPool, PriCut* lhsCut, PriCut* rh
   }
 
   resCut->nLeaves = l;
-  resCut->sig = lhsCut->sig | rhsCut->sig; // set the signature
+  resCut->sig     = lhsCut->sig | rhsCut->sig; // set the signature
   return resCut;
 }
 
-inline bool PriCutManager::cutFilter(PriCutPool& cutPool, PriCutList& cutList, PriCut* resCut) {
+inline bool PriCutManager::cutFilter(PriCutPool& cutPool, PriCutList& cutList,
+                                     PriCut* resCut) {
 
-	PriCut * cut;
+  PriCut* cut;
 
-	for (int i = 0; i < cutList.nCuts; i++ ) {
+  for (int i = 0; i < cutList.nCuts; i++) {
 
-		cut = cutList.array[i];
+    cut = cutList.array[i];
 
-		if (cut->nLeaves <= resCut->nLeaves) {
-	    // skip the non-contained cuts
-   		if ((cut->sig & resCut->sig) != cut->sig) {	
-    		continue;
-    	}
-    	// check containment seriously
-    	if (checkCutDominance(cut, resCut)) {
-      	cutPool.giveBackMemory(resCut); // Recycle Cut
-      	nFilt += 1;
-    		return true; // resCut is dominated
-  		}
-		} else {
-			 // sKip the non-contained cuts
+    if (cut->nLeaves <= resCut->nLeaves) {
+      // skip the non-contained cuts
+      if ((cut->sig & resCut->sig) != cut->sig) {
+        continue;
+      }
+      // check containment seriously
+      if (checkCutDominance(cut, resCut)) {
+        cutPool.giveBackMemory(resCut); // Recycle Cut
+        nFilt += 1;
+        return true; // resCut is dominated
+      }
+    } else {
+      // sKip the non-contained cuts
       if ((cut->sig & resCut->sig) != resCut->sig) {
-      	continue;
+        continue;
       }
       // check containment seriously
       if (checkCutDominance(resCut, cut)) {
         nCuts -= 1;
-        nFilt += 1; 
-				cutList.nCuts--;
-				cutPool.giveBackMemory(cut); // Recycle Cut
-				for (int j = i; j < cutList.nCuts; j++) {
-					cutList.array[j] = cutList.array[j+1]; 
-				}
+        nFilt += 1;
+        cutList.nCuts--;
+        cutPool.giveBackMemory(cut); // Recycle Cut
+        for (int j = i; j < cutList.nCuts; j++) {
+          cutList.array[j] = cutList.array[j + 1];
+        }
       }
-		}	
+    }
   }
   return false;
 }
 
-inline bool PriCutManager::checkCutDominance(PriCut* smallerCut, PriCut* largerCut) {
-	
-	int i, j;
+inline bool PriCutManager::checkCutDominance(PriCut* smallerCut,
+                                             PriCut* largerCut) {
+
+  int i, j;
   for (i = 0; i < smallerCut->nLeaves; i++) {
     for (j = 0; j < largerCut->nLeaves; j++) {
       if (smallerCut->leaves[i] == largerCut->leaves[j]) {
         break;
       }
     }
-    if (j == largerCut->nLeaves) { // node i in smallerCut is not contained in largerCut
+    if (j ==
+        largerCut
+            ->nLeaves) { // node i in smallerCut is not contained in largerCut
       return false;
     }
   }
@@ -440,197 +456,197 @@ inline bool PriCutManager::checkCutDominance(PriCut* smallerCut, PriCut* largerC
   return true;
 }
 
-inline void PriCutManager::cutSort(PriCutPool& cutPool, PriCutList& cutList, PriCut* resCut) {
- 
-	// cut structure is empty
-	if (cutList.nCuts == 0) {
-		cutList.array[cutList.nCuts++] = resCut;
-  	nCuts += 1;
-		return;
-	}
+inline void PriCutManager::cutSort(PriCutPool& cutPool, PriCutList& cutList,
+                                   PriCut* resCut) {
 
-	// the cut will be added - find its place
-	cutList.array[cutList.nCuts++] = resCut;
+  // cut structure is empty
+  if (cutList.nCuts == 0) {
+    cutList.array[cutList.nCuts++] = resCut;
+    nCuts += 1;
+    return;
+  }
 
-	for (int i = cutList.nCuts-2; i >= 0 ; i--) {
-		if (sortCompare( cutList.array[i], resCut ) <= 0) {
-			break;
-		}
-		cutList.array[i+1] = cutList.array[i];
-		cutList.array[i] = resCut;
-	}
-	
-	if (cutList.nCuts > this->C) {
-		cutPool.giveBackMemory(cutList.array[--cutList.nCuts]);
-	}
-	else {
-  	nCuts += 1;
-	}
+  // the cut will be added - find its place
+  cutList.array[cutList.nCuts++] = resCut;
+
+  for (int i = cutList.nCuts - 2; i >= 0; i--) {
+    if (sortCompare(cutList.array[i], resCut) <= 0) {
+      break;
+    }
+    cutList.array[i + 1] = cutList.array[i];
+    cutList.array[i]     = resCut;
+  }
+
+  if (cutList.nCuts > this->C) {
+    cutPool.giveBackMemory(cutList.array[--cutList.nCuts]);
+  } else {
+    nCuts += 1;
+  }
 }
 
-int PriCutManager::sortCompare(PriCut * lhsCut, PriCut * rhsCut) {
+int PriCutManager::sortCompare(PriCut* lhsCut, PriCut* rhsCut) {
 
-	if ( this->fPower ) {
-		if ( this->sortMode == SortMode::AREA ) { // area flow       
-			if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-					return -1;
-			if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-					return 1;
-			if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-					return -1;
-			if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-					return 1;
-			if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-					return -1;
-			if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-					return 1;
-			if ( lhsCut->nLeaves < rhsCut->nLeaves )
-					return -1;
-			if ( lhsCut->nLeaves > rhsCut->nLeaves )
-					return 1;
-			if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-					return -1;
-			if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-					return 1;
-			return 0;
-		}
-		if ( this->sortMode == SortMode::DELAY ) { // delay
-			if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-					return -1;
-			if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-					return 1;
-			if ( lhsCut->nLeaves < rhsCut->nLeaves )
-					return -1;
-			if ( lhsCut->nLeaves > rhsCut->nLeaves )
-					return 1;
-			if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-					return -1;
-			if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-					return 1;
-			if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-					return -1;
-			if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-					return 1;
-			if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-					return -1;
-			if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-					return 1;
-			return 0;
-		}
-		assert( this->sortMode == SortMode::DELAY_OLD ); // delay old, exact area
-		if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-				return -1;
-		if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-				return 1;
-		if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-				return -1;
-		if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-				return 1;
-		if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-				return -1;
-		if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-				return 1;
-		if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-				return -1;
-		if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-				return 1;
-		if ( lhsCut->nLeaves < rhsCut->nLeaves )
-				return -1;
-		if ( lhsCut->nLeaves > rhsCut->nLeaves )
-				return 1;
-		return 0;
-	} 
-  else  { // regular
-		if ( this->sortMode == SortMode::AREA ) { // area
-			if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-					return -1;
-			if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-					return 1;
-			if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-					return -1;
-			if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-					return 1;
-			if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-					return -1;
-			if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-					return 1;
-			if ( lhsCut->nLeaves < rhsCut->nLeaves )
-					return -1;
-			if ( lhsCut->nLeaves > rhsCut->nLeaves )
-					return 1;
-			if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-					return -1;
-			if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-					return 1;
-			return 0;
-		}
-		if ( this->sortMode == SortMode::DELAY ) { // delay
-			if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-					return -1;
-			if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-					return 1;
-			if ( lhsCut->nLeaves < rhsCut->nLeaves )
-					return -1;
-			if ( lhsCut->nLeaves > rhsCut->nLeaves )
-					return 1;
-			if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-					return -1;
-			if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-					return 1;
-			if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-					return -1;
-			if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-					return 1;
-			if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-					return -1;
-			if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-					return 1;
-			return 0;
-		}
-                assert(this->sortMode == SortMode::DELAY_OLD);
-		if ( lhsCut->delay < rhsCut->delay - this->fEpsilon )
-				return -1;
-		if ( lhsCut->delay > rhsCut->delay + this->fEpsilon )
-				return 1;
-		if ( lhsCut->area < rhsCut->area - this->fEpsilon )
-				return -1;
-		if ( lhsCut->area > rhsCut->area + this->fEpsilon )
-				return 1;
-		if ( lhsCut->edge < rhsCut->edge - this->fEpsilon )
-				return -1;
-		if ( lhsCut->edge > rhsCut->edge + this->fEpsilon )
-				return 1;
-		if ( lhsCut->power < rhsCut->power - this->fEpsilon )
-				return -1;
-		if ( lhsCut->power > rhsCut->power + this->fEpsilon )
-				return 1;
-		if ( lhsCut->nLeaves < rhsCut->nLeaves )
-				return -1;
-		if ( lhsCut->nLeaves > rhsCut->nLeaves )
-				return 1;
-		return 0;
-	}
+  if (this->fPower) {
+    if (this->sortMode == SortMode::AREA) { // area flow
+      if (lhsCut->area < rhsCut->area - this->fEpsilon)
+        return -1;
+      if (lhsCut->area > rhsCut->area + this->fEpsilon)
+        return 1;
+      if (lhsCut->power < rhsCut->power - this->fEpsilon)
+        return -1;
+      if (lhsCut->power > rhsCut->power + this->fEpsilon)
+        return 1;
+      if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+        return -1;
+      if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+        return 1;
+      if (lhsCut->nLeaves < rhsCut->nLeaves)
+        return -1;
+      if (lhsCut->nLeaves > rhsCut->nLeaves)
+        return 1;
+      if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+        return -1;
+      if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+        return 1;
+      return 0;
+    }
+    if (this->sortMode == SortMode::DELAY) { // delay
+      if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+        return -1;
+      if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+        return 1;
+      if (lhsCut->nLeaves < rhsCut->nLeaves)
+        return -1;
+      if (lhsCut->nLeaves > rhsCut->nLeaves)
+        return 1;
+      if (lhsCut->area < rhsCut->area - this->fEpsilon)
+        return -1;
+      if (lhsCut->area > rhsCut->area + this->fEpsilon)
+        return 1;
+      if (lhsCut->power < rhsCut->power - this->fEpsilon)
+        return -1;
+      if (lhsCut->power > rhsCut->power + this->fEpsilon)
+        return 1;
+      if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+        return -1;
+      if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+        return 1;
+      return 0;
+    }
+    assert(this->sortMode == SortMode::DELAY_OLD); // delay old, exact area
+    if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+      return -1;
+    if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+      return 1;
+    if (lhsCut->power < rhsCut->power - this->fEpsilon)
+      return -1;
+    if (lhsCut->power > rhsCut->power + this->fEpsilon)
+      return 1;
+    if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+      return -1;
+    if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+      return 1;
+    if (lhsCut->area < rhsCut->area - this->fEpsilon)
+      return -1;
+    if (lhsCut->area > rhsCut->area + this->fEpsilon)
+      return 1;
+    if (lhsCut->nLeaves < rhsCut->nLeaves)
+      return -1;
+    if (lhsCut->nLeaves > rhsCut->nLeaves)
+      return 1;
+    return 0;
+  } else {                                  // regular
+    if (this->sortMode == SortMode::AREA) { // area
+      if (lhsCut->area < rhsCut->area - this->fEpsilon)
+        return -1;
+      if (lhsCut->area > rhsCut->area + this->fEpsilon)
+        return 1;
+      if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+        return -1;
+      if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+        return 1;
+      if (lhsCut->power < rhsCut->power - this->fEpsilon)
+        return -1;
+      if (lhsCut->power > rhsCut->power + this->fEpsilon)
+        return 1;
+      if (lhsCut->nLeaves < rhsCut->nLeaves)
+        return -1;
+      if (lhsCut->nLeaves > rhsCut->nLeaves)
+        return 1;
+      if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+        return -1;
+      if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+        return 1;
+      return 0;
+    }
+    if (this->sortMode == SortMode::DELAY) { // delay
+      if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+        return -1;
+      if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+        return 1;
+      if (lhsCut->nLeaves < rhsCut->nLeaves)
+        return -1;
+      if (lhsCut->nLeaves > rhsCut->nLeaves)
+        return 1;
+      if (lhsCut->area < rhsCut->area - this->fEpsilon)
+        return -1;
+      if (lhsCut->area > rhsCut->area + this->fEpsilon)
+        return 1;
+      if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+        return -1;
+      if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+        return 1;
+      if (lhsCut->power < rhsCut->power - this->fEpsilon)
+        return -1;
+      if (lhsCut->power > rhsCut->power + this->fEpsilon)
+        return 1;
+      return 0;
+    }
+    assert(this->sortMode == SortMode::DELAY_OLD);
+    if (lhsCut->delay < rhsCut->delay - this->fEpsilon)
+      return -1;
+    if (lhsCut->delay > rhsCut->delay + this->fEpsilon)
+      return 1;
+    if (lhsCut->area < rhsCut->area - this->fEpsilon)
+      return -1;
+    if (lhsCut->area > rhsCut->area + this->fEpsilon)
+      return 1;
+    if (lhsCut->edge < rhsCut->edge - this->fEpsilon)
+      return -1;
+    if (lhsCut->edge > rhsCut->edge + this->fEpsilon)
+      return 1;
+    if (lhsCut->power < rhsCut->power - this->fEpsilon)
+      return -1;
+    if (lhsCut->power > rhsCut->power + this->fEpsilon)
+      return 1;
+    if (lhsCut->nLeaves < rhsCut->nLeaves)
+      return -1;
+    if (lhsCut->nLeaves > rhsCut->nLeaves)
+      return 1;
+    return 0;
+  }
 }
 
-inline void PriCutManager::commitCuts(PriCutPool& cutPool, PriCutList& cutList, int nodeId) {
+inline void PriCutManager::commitCuts(PriCutPool& cutPool, PriCutList& cutList,
+                                      int nodeId) {
 
-	assert(cutList.nCuts != 0);
+  assert(cutList.nCuts != 0);
 
-	recycleNodeCuts( cutPool, nodeId );
+  recycleNodeCuts(cutPool, nodeId);
 
   // Copy from currenti CutList to the nodePriCuts and clean up the cutList
   this->nodePriCuts[nodeId] = cutList.array[0];
 
   int i;
-	for ( i = 0; i < cutList.nCuts-1; i++) {
-		cutList.array[i]->nextCut = cutList.array[i+1];
-		cutList.array[i] = nullptr;
-	}
-	cutList.array[i]->nextCut = nullptr;
-	cutList.array[i] = nullptr;
-	cutList.nCuts = 0;
+  for (i = 0; i < cutList.nCuts - 1; i++) {
+    cutList.array[i]->nextCut = cutList.array[i + 1];
+    cutList.array[i]          = nullptr;
+  }
+  cutList.array[i]->nextCut = nullptr;
+  cutList.array[i]          = nullptr;
+  cutList.nCuts             = 0;
 
-	assert( this->nodePriCuts[nodeId] != nullptr );
+  assert(this->nodePriCuts[nodeId] != nullptr);
 }
 
 /*
@@ -641,48 +657,50 @@ inline void PriCutManager::commitCuts(PriCutPool& cutPool, PriCutList& cutList, 
  */
 inline void PriCutManager::recycleNodeCuts(PriCutPool& cutPool, int nodeId) {
 
-  PriCut* cut = this->nodePriCuts[nodeId]; 
+  PriCut* cut = this->nodePriCuts[nodeId];
 
-	while ( cut != nullptr ) {
-		PriCut* nextCut = cut->nextCut;
+  while (cut != nullptr) {
+    PriCut* nextCut = cut->nextCut;
     cutPool.giveBackMemory(cut);
-		cut = nextCut;
+    cut = nextCut;
   }
 
   this->nodePriCuts[nodeId] = nullptr;
 }
 
-inline void PriCutManager::cleanupCutList(PriCutPool& cutPool, PriCutList& cutList) {
+inline void PriCutManager::cleanupCutList(PriCutPool& cutPool,
+                                          PriCutList& cutList) {
 
-	for ( int i = 0; i < cutList.nCuts; i++ ) {
-    cutPool.giveBackMemory( cutList.array[i] );
-		cutList.array[i] = nullptr;
-	}
+  for (int i = 0; i < cutList.nCuts; i++) {
+    cutPool.giveBackMemory(cutList.array[i]);
+    cutList.array[i] = nullptr;
+  }
 
-	cutList.nCuts = 0;
+  cutList.nCuts = 0;
 }
 
 inline void PriCutManager::copyCut(PriCut* dest, PriCut* source) {
 
-	dest->area 		= source->area;
-	dest->edge 		= source->edge;
-	dest->power 	= source->power;
-	dest->delay 	= source->delay;
-	dest->sig 		= source->sig;
-	dest->nLeaves = source->nLeaves;
-	dest->nextCut = nullptr;
-	for ( int i = 0; i < source->nLeaves ; i++ ) {
-		dest->leaves[i] = source->leaves[i];
-	}
-	if ( this->compTruth ) {
-		unsigned int * destTruth = readTruth( dest );
-		unsigned int * sourceTruth = readTruth( source );
-		Functional32::copy( destTruth, sourceTruth, this->nWords );
-	}
+  dest->area    = source->area;
+  dest->edge    = source->edge;
+  dest->power   = source->power;
+  dest->delay   = source->delay;
+  dest->sig     = source->sig;
+  dest->nLeaves = source->nLeaves;
+  dest->nextCut = nullptr;
+  for (int i = 0; i < source->nLeaves; i++) {
+    dest->leaves[i] = source->leaves[i];
+  }
+  if (this->compTruth) {
+    unsigned int* destTruth   = readTruth(dest);
+    unsigned int* sourceTruth = readTruth(source);
+    Functional32::copy(destTruth, sourceTruth, this->nWords);
+  }
 }
 
-void PriCutManager::computeTruth(AuxTruth& auxTruth, PriCut* resCut, PriCut* lhsCut,
-                              PriCut* rhsCut, bool lhsPolarity, bool rhsPolarity) {
+void PriCutManager::computeTruth(AuxTruth& auxTruth, PriCut* resCut,
+                                 PriCut* lhsCut, PriCut* rhsCut,
+                                 bool lhsPolarity, bool rhsPolarity) {
 
   // permute the first table
   if (lhsPolarity) {
@@ -738,449 +756,465 @@ unsigned int* PriCutManager::readTruth(PriCut* cut) {
   return (unsigned*)(cut->leaves + this->K);
 }
 
-void PriCutManager::increaseCutReferences(PriCut * cut ) {
+void PriCutManager::increaseCutReferences(PriCut* cut) {
 
-	int leafId;
+  int leafId;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::WRITE );
-		assert( leafData.nRefs >= 0 );
-		leafData.nRefs++;
-	}
+  for (int i = 0; i < cut->nLeaves; i++) {
+    leafId                  = cut->leaves[i];
+    aig::GNode leaf         = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData = aigGraph.getData(leaf, galois::MethodFlag::WRITE);
+    assert(leafData.nRefs >= 0);
+    leafData.nRefs++;
+  }
 }
 
-void PriCutManager::decreaseCutReferences(PriCut * cut) {
+void PriCutManager::decreaseCutReferences(PriCut* cut) {
 
-	int leafId;
+  int leafId;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::WRITE );
-		assert( leafData.nRefs > 0 ); 
-		--leafData.nRefs;
-	}
+  for (int i = 0; i < cut->nLeaves; i++) {
+    leafId                  = cut->leaves[i];
+    aig::GNode leaf         = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData = aigGraph.getData(leaf, galois::MethodFlag::WRITE);
+    assert(leafData.nRefs > 0);
+    --leafData.nRefs;
+  }
 }
 
-// ################### Start of the New Cut's Cost Functions ###################### //
+// ################### Start of the New Cut's Cost Functions
+// ###################### //
 inline float PriCutManager::cutDelay(PriCut* cut) {
 
-	int leafId;
-	float currDelay, delay = std::numeric_limits<float>::min();
+  int leafId;
+  float currDelay, delay = std::numeric_limits<float>::min();
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
-		leafId = cut->leaves[i];
-		currDelay = getBestCut( leafId )->delay + 1.0;
-		delay = std::max( delay, currDelay );
-	}
-	return delay;
+  for (int i = 0; i < cut->nLeaves; i++) {
+    leafId    = cut->leaves[i];
+    currDelay = getBestCut(leafId)->delay + 1.0;
+    delay     = std::max(delay, currDelay);
+  }
+  return delay;
 }
 
-void PriCutManager::cutFlowCosts(PriCut * cut) {
+void PriCutManager::cutFlowCosts(PriCut* cut) {
 
-	int leafId;
-	float areaFlow = 1.0;
-	float edgeFlow = cut->nLeaves;
-	float currDelay, delay = std::numeric_limits<float>::min();
-	PriCut * bestCut = nullptr;
+  int leafId;
+  float areaFlow = 1.0;
+  float edgeFlow = cut->nLeaves;
+  float currDelay, delay = std::numeric_limits<float>::min();
+  PriCut* bestCut = nullptr;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
+  for (int i = 0; i < cut->nLeaves; i++) {
 
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED ); 
-		bestCut = getBestCut( leafId );	
+    leafId          = cut->leaves[i];
+    aig::GNode leaf = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData =
+        aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
+    bestCut = getBestCut(leafId);
 
-		if ( ( leafData.nRefs == 0 ) || ( leafData.type == aig::NodeType::CONSTZERO ) ) {
-			areaFlow += bestCut->area; 
-			edgeFlow += bestCut->edge;
-		}
-		else 
-		{
-			assert( leafData.nRefs > this->fEpsilon );
-			areaFlow += bestCut->area / leafData.nRefs;
-			edgeFlow += bestCut->edge / leafData.nRefs;
-		}
-	
-		currDelay = bestCut->delay + 1.0;
-		delay = std::max( delay, currDelay );
-	}
-	
-	cut->area = areaFlow;
-	cut->edge = edgeFlow;
-	cut->delay = delay;
+    if ((leafData.nRefs == 0) || (leafData.type == aig::NodeType::CONSTZERO)) {
+      areaFlow += bestCut->area;
+      edgeFlow += bestCut->edge;
+    } else {
+      assert(leafData.nRefs > this->fEpsilon);
+      areaFlow += bestCut->area / leafData.nRefs;
+      edgeFlow += bestCut->edge / leafData.nRefs;
+    }
+
+    currDelay = bestCut->delay + 1.0;
+    delay     = std::max(delay, currDelay);
+  }
+
+  cut->area  = areaFlow;
+  cut->edge  = edgeFlow;
+  cut->delay = delay;
 }
 
 // STANDARD VERSION
-void PriCutManager::cutDerefedCosts(PriCut * cut) {
+void PriCutManager::cutDerefedCosts(PriCut* cut) {
 
-	float area1 = 0, area2 = 0, edge1 = 0, edge2 = 0;
+  float area1 = 0, area2 = 0, edge1 = 0, edge2 = 0;
 
-	if ( cut->nLeaves < 2 ) {
-		cut->area = 0;
-		cut->edge = cut->nLeaves;
-		return;
-	}
+  if (cut->nLeaves < 2) {
+    cut->area = 0;
+    cut->edge = cut->nLeaves;
+    return;
+  }
 
-	cutRefCosts( cut, area1, edge1 );
-	cutDerefCosts( cut, area2, edge2 );
+  cutRefCosts(cut, area1, edge1);
+  cutDerefCosts(cut, area2, edge2);
 
-	assert( area2 > area1 - this->fEpsilon );
-	assert( area2 < area1 + this->fEpsilon );
-	assert( edge2 > edge1 - this->fEpsilon );
-	assert( edge2 < edge1 + this->fEpsilon );
+  assert(area2 > area1 - this->fEpsilon);
+  assert(area2 < area1 + this->fEpsilon);
+  assert(edge2 > edge1 - this->fEpsilon);
+  assert(edge2 < edge1 + this->fEpsilon);
 
-	cut->area = area2;
-	cut->edge = edge2;
-	cut->delay = cutDelay( cut );
+  cut->area  = area2;
+  cut->edge  = edge2;
+  cut->delay = cutDelay(cut);
 }
 
-void PriCutManager::cutRefCosts(PriCut * cut, float & area, float & edge) {
+void PriCutManager::cutRefCosts(PriCut* cut, float& area, float& edge) {
 
-	int leafId;
-	area += 1.0;	
-	edge += cut->nLeaves;	
+  int leafId;
+  area += 1.0;
+  edge += cut->nLeaves;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
+  for (int i = 0; i < cut->nLeaves; i++) {
 
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::WRITE );
+    leafId                  = cut->leaves[i];
+    aig::GNode leaf         = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData = aigGraph.getData(leaf, galois::MethodFlag::WRITE);
 
-		assert( leafData.nRefs >= 0 );
-		if ( ( leafData.nRefs++ > 0 ) || ( leafData.type != aig::NodeType::AND ) )
-			continue;
-		
-		cutRefCosts( getBestCut( leafId ), area, edge );
-	}
+    assert(leafData.nRefs >= 0);
+    if ((leafData.nRefs++ > 0) || (leafData.type != aig::NodeType::AND))
+      continue;
+
+    cutRefCosts(getBestCut(leafId), area, edge);
+  }
 }
 
-void PriCutManager::cutDerefCosts(PriCut * cut, float & area, float & edge) {
+void PriCutManager::cutDerefCosts(PriCut* cut, float& area, float& edge) {
 
-	int leafId;
-	area += 1.0;	
-	edge += cut->nLeaves;	
+  int leafId;
+  area += 1.0;
+  edge += cut->nLeaves;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
+  for (int i = 0; i < cut->nLeaves; i++) {
 
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::WRITE );
+    leafId                  = cut->leaves[i];
+    aig::GNode leaf         = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData = aigGraph.getData(leaf, galois::MethodFlag::WRITE);
 
-		assert( leafData.nRefs > 0 );
-		if ( --leafData.nRefs > 0 || ( leafData.type != aig::NodeType::AND ) )
-			continue;
-		
-		cutDerefCosts( getBestCut( leafId ), area, edge );
-	}
+    assert(leafData.nRefs > 0);
+    if (--leafData.nRefs > 0 || (leafData.type != aig::NodeType::AND))
+      continue;
+
+    cutDerefCosts(getBestCut(leafId), area, edge);
+  }
 }
 
 // REFMAP VERSION
 
-void PriCutManager::cutDerefedCosts(PriCut * cut, RefMap& refMap) {
+void PriCutManager::cutDerefedCosts(PriCut* cut, RefMap& refMap) {
 
-	float area1 = 0, area2 = 0, edge1 = 0, edge2 = 0;
+  float area1 = 0, area2 = 0, edge1 = 0, edge2 = 0;
 
-	if ( cut->nLeaves < 2 ) {
-		cut->area = 0;
-		cut->edge = cut->nLeaves;
-		return;
-	}
+  if (cut->nLeaves < 2) {
+    cut->area = 0;
+    cut->edge = cut->nLeaves;
+    return;
+  }
 
-	cutRefCosts( cut, area1, edge1, refMap );
-	cutDerefCosts( cut, area2, edge2, refMap );
+  cutRefCosts(cut, area1, edge1, refMap);
+  cutDerefCosts(cut, area2, edge2, refMap);
 
-	assert( area2 > area1 - this->fEpsilon );
-	assert( area2 < area1 + this->fEpsilon );
-	assert( edge2 > edge1 - this->fEpsilon );
-	assert( edge2 < edge1 + this->fEpsilon );
+  assert(area2 > area1 - this->fEpsilon);
+  assert(area2 < area1 + this->fEpsilon);
+  assert(edge2 > edge1 - this->fEpsilon);
+  assert(edge2 < edge1 + this->fEpsilon);
 
-	cut->area = area2;
-	cut->edge = edge2;
-	cut->delay = cutDelay( cut );
+  cut->area  = area2;
+  cut->edge  = edge2;
+  cut->delay = cutDelay(cut);
 }
 
-void PriCutManager::cutRefCosts(PriCut * cut, float & area, float & edge, RefMap& refMap) {
+void PriCutManager::cutRefCosts(PriCut* cut, float& area, float& edge,
+                                RefMap& refMap) {
 
-	int leafId;
-	area += 1.0;	
-	edge += cut->nLeaves;	
+  int leafId;
+  area += 1.0;
+  edge += cut->nLeaves;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
+  for (int i = 0; i < cut->nLeaves; i++) {
 
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
+    leafId          = cut->leaves[i];
+    aig::GNode leaf = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData =
+        aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
 
-		// Experimental
-		auto it = refMap.find( leafId );
-		if ( it != refMap.end() ) {
-			assert( it->second >= 0 );
-			if ( ( it->second++ > 0 ) || ( leafData.type != aig::NodeType::AND ) )
-				continue;
-		}
-		else {
-			assert( leafData.nRefs >= 0 );
-			refMap.insert( {leafId, leafData.nRefs+1} );
-			if ( ( leafData.nRefs > 0 ) || ( leafData.type != aig::NodeType::AND ) )
-				continue;
-		}
+    // Experimental
+    auto it = refMap.find(leafId);
+    if (it != refMap.end()) {
+      assert(it->second >= 0);
+      if ((it->second++ > 0) || (leafData.type != aig::NodeType::AND))
+        continue;
+    } else {
+      assert(leafData.nRefs >= 0);
+      refMap.insert({leafId, leafData.nRefs + 1});
+      if ((leafData.nRefs > 0) || (leafData.type != aig::NodeType::AND))
+        continue;
+    }
 
-		cutRefCosts( getBestCut( leafId ), area, edge, refMap );
-	}
+    cutRefCosts(getBestCut(leafId), area, edge, refMap);
+  }
 }
 
-void PriCutManager::cutDerefCosts(PriCut * cut, float & area, float & edge, RefMap& refMap) {
+void PriCutManager::cutDerefCosts(PriCut* cut, float& area, float& edge,
+                                  RefMap& refMap) {
 
-	int leafId;
-	area += 1.0;	
-	edge += cut->nLeaves;	
+  int leafId;
+  area += 1.0;
+  edge += cut->nLeaves;
 
-	for ( int i = 0 ; i < cut->nLeaves ; i++ ) {
+  for (int i = 0; i < cut->nLeaves; i++) {
 
-		leafId = cut->leaves[i];
-		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
+    leafId          = cut->leaves[i];
+    aig::GNode leaf = this->aig.getNodes()[leafId];
+    aig::NodeData& leafData =
+        aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
 
-		// Experimental
-		auto it = refMap.find( leafId );
-		if ( it != refMap.end() ) {
-			assert( it->second > 0 );
-			if ( --it->second > 0 || ( leafData.type != aig::NodeType::AND ) )
-				continue;
-		}
-		else {
-			assert( leafData.nRefs > 0 );
-			refMap.insert( {leafId, leafData.nRefs-1} );
-			if ( (leafData.nRefs-1) > 0 || ( leafData.type != aig::NodeType::AND ) )
-				continue;
-		}
+    // Experimental
+    auto it = refMap.find(leafId);
+    if (it != refMap.end()) {
+      assert(it->second > 0);
+      if (--it->second > 0 || (leafData.type != aig::NodeType::AND))
+        continue;
+    } else {
+      assert(leafData.nRefs > 0);
+      refMap.insert({leafId, leafData.nRefs - 1});
+      if ((leafData.nRefs - 1) > 0 || (leafData.type != aig::NodeType::AND))
+        continue;
+    }
 
-		cutDerefCosts( getBestCut( leafId ), area, edge, refMap );
-	}
+    cutDerefCosts(getBestCut(leafId), area, edge, refMap);
+  }
 }
-// ################### End of the NewCuts Cost Functions ###################### //
-
+// ################### End of the NewCuts Cost Functions ######################
+// //
 
 void PriCutManager::resetNodeCountersFanout() {
 
-	const float FLOAT_MAX = std::numeric_limits<float>::max();
+  const float FLOAT_MAX = std::numeric_limits<float>::max();
 
-	for ( aig::GNode node : aigGraph ) {
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
-		nodeData.counter = 0;
-		nodeData.nRefs = nodeData.nFanout;
-		nodeData.reqTime = FLOAT_MAX;
-	}
+  for (aig::GNode node : aigGraph) {
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
+    nodeData.counter = 0;
+    nodeData.nRefs   = nodeData.nFanout;
+    nodeData.reqTime = FLOAT_MAX;
+  }
 
-	//galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersFanout{ aigGraph }, galois::loopname("ResetOperatorFanout"), galois::steal() );
+  // galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersFanout{
+  // aigGraph }, galois::loopname("ResetOperatorFanout"), galois::steal() );
 }
 
 void PriCutManager::resetNodeCountersZero() {
-		
-	const float FLOAT_MAX = std::numeric_limits<float>::max();
 
-	for ( aig::GNode node : aigGraph ) {
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
-		nodeData.counter = 0;
-		nodeData.nRefs = 0;
-		nodeData.reqTime = FLOAT_MAX;
-	}
+  const float FLOAT_MAX = std::numeric_limits<float>::max();
 
-	//galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersZero{ aigGraph }, galois::loopname("ResetOperatorZero"), galois::steal() );
+  for (aig::GNode node : aigGraph) {
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
+    nodeData.counter = 0;
+    nodeData.nRefs   = 0;
+    nodeData.reqTime = FLOAT_MAX;
+  }
+
+  // galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersZero{
+  // aigGraph }, galois::loopname("ResetOperatorZero"), galois::steal() );
 }
 
 void PriCutManager::resetNodeCountersOnly() {
 
-	const float FLOAT_MAX = std::numeric_limits<float>::max();
+  const float FLOAT_MAX = std::numeric_limits<float>::max();
 
-	for ( aig::GNode node : aigGraph ) {
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
-		nodeData.counter = 0;
-		nodeData.reqTime = FLOAT_MAX;
-	}
+  for (aig::GNode node : aigGraph) {
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
+    nodeData.counter = 0;
+    nodeData.reqTime = FLOAT_MAX;
+  }
 
-	//galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersOnly{ aigGraph }, galois::loopname("ResetOperatorOnly"), galois::steal() );
+  // galois::do_all( galois::iterate( aigGraph ), ResetNodeCountersOnly{
+  // aigGraph }, galois::loopname("ResetOperatorOnly"), galois::steal() );
 }
 
 void PriCutManager::computeReferenceCounters() {
 
-	PriCut* bestCut;
-	int size = this->nNodes+1;
+  PriCut* bestCut;
+  int size = this->nNodes + 1;
 
-	for ( int i = 0; i < size ; i++ ) {
-		bestCut = this->nodePriCuts[i];
-		if ( bestCut == nullptr ) {
-			continue;
-		}
-		if ( bestCut->nLeaves == 1 ) {
-			continue; // skip trivial cuts
-		}
-		for ( int j = 0 ; j < bestCut->nLeaves ; j++ ) {	
-			aig::GNode leaf = this->aig.getNodes()[ bestCut->leaves[j] ];
-			aig::NodeData& leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
-			leafData.nRefs++;
-		}
-	}
+  for (int i = 0; i < size; i++) {
+    bestCut = this->nodePriCuts[i];
+    if (bestCut == nullptr) {
+      continue;
+    }
+    if (bestCut->nLeaves == 1) {
+      continue; // skip trivial cuts
+    }
+    for (int j = 0; j < bestCut->nLeaves; j++) {
+      aig::GNode leaf = this->aig.getNodes()[bestCut->leaves[j]];
+      aig::NodeData& leafData =
+          aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
+      leafData.nRefs++;
+    }
+  }
 }
 
 void PriCutManager::computeCoveringReferenceCounters() {
 
-	computeCovering();
+  computeCovering();
 
-	PriCut* bestCut;
+  PriCut* bestCut;
 
-	for ( auto entry : this->covering ) {
-		bestCut = entry.second;
-		if ( bestCut == nullptr ) {
-			continue;
-		}
-		if ( bestCut->nLeaves == 1 ) {
-			continue; // skip trivial cuts
-		}
-		for ( int j = 0 ; j < bestCut->nLeaves ; j++ ) {	
-			aig::GNode leaf = this->aig.getNodes()[ bestCut->leaves[j] ];
-			aig::NodeData& leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
-			leafData.nRefs++;
-		}
-	}
+  for (auto entry : this->covering) {
+    bestCut = entry.second;
+    if (bestCut == nullptr) {
+      continue;
+    }
+    if (bestCut->nLeaves == 1) {
+      continue; // skip trivial cuts
+    }
+    for (int j = 0; j < bestCut->nLeaves; j++) {
+      aig::GNode leaf = this->aig.getNodes()[bestCut->leaves[j]];
+      aig::NodeData& leafData =
+          aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
+      leafData.nRefs++;
+    }
+  }
 }
 
 void PriCutManager::computeRequiredTimes() {
 
-	float maxDelay = 0;
-	PriCut * bestCut;
+  float maxDelay = 0;
+  PriCut* bestCut;
 
-	for (auto po : this->aig.getOutputNodes()) {	
-   	auto inEdgeIt = aigGraph.in_edge_begin( po );
-		aig::GNode inNode = aigGraph.getEdgeDst( inEdgeIt );
-		aig::NodeData& inNodeData = aigGraph.getData( inNode, galois::MethodFlag::UNPROTECTED );
-		if ( inNodeData.type == aig::NodeType::CONSTZERO ) {
-			continue;
-		}
-		bestCut = getBestCut( inNodeData.id );
-		if ( maxDelay < bestCut->delay - this->fEpsilon ) {
-			maxDelay = bestCut->delay;
-		}
-	}
- 
-	for (auto po : this->aig.getOutputNodes()) {	
-   	auto inEdgeIt = aigGraph.in_edge_begin( po );
-		aig::GNode inNode = aigGraph.getEdgeDst( inEdgeIt );
-		aig::NodeData& inNodeData = aigGraph.getData( inNode, galois::MethodFlag::UNPROTECTED );
-		inNodeData.reqTime = maxDelay;
-	}
+  for (auto po : this->aig.getOutputNodes()) {
+    auto inEdgeIt     = aigGraph.in_edge_begin(po);
+    aig::GNode inNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& inNodeData =
+        aigGraph.getData(inNode, galois::MethodFlag::UNPROTECTED);
+    if (inNodeData.type == aig::NodeType::CONSTZERO) {
+      continue;
+    }
+    bestCut = getBestCut(inNodeData.id);
+    if (maxDelay < bestCut->delay - this->fEpsilon) {
+      maxDelay = bestCut->delay;
+    }
+  }
 
-	// iterating from 0 to N is reverse topological order
-	// iterating from N to 0 is topological order
-  for (auto node : this->sortedNodes ) {	
-		aig::NodeData& nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
+  for (auto po : this->aig.getOutputNodes()) {
+    auto inEdgeIt     = aigGraph.in_edge_begin(po);
+    aig::GNode inNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& inNodeData =
+        aigGraph.getData(inNode, galois::MethodFlag::UNPROTECTED);
+    inNodeData.reqTime = maxDelay;
+  }
 
-		// Reset node data to prepare for the next mapping pass
-		nodeData.counter = 0;
-		if ( this->deterministic ) {
-			nodeData.nRefs = 0;
-		}
-		
-		bestCut = getBestCut( nodeData.id );
-		for ( int i = 0; i < bestCut->nLeaves; i++ ) {
-			aig::GNode leaf = this->aig.getNodes()[ bestCut->leaves[i] ];
-			aig::NodeData& leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
-			leafData.reqTime = std::min( (nodeData.reqTime-1), leafData.reqTime );
-		}
-	}
+  // iterating from 0 to N is reverse topological order
+  // iterating from N to 0 is topological order
+  for (auto node : this->sortedNodes) {
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
+
+    // Reset node data to prepare for the next mapping pass
+    nodeData.counter = 0;
+    if (this->deterministic) {
+      nodeData.nRefs = 0;
+    }
+
+    bestCut = getBestCut(nodeData.id);
+    for (int i = 0; i < bestCut->nLeaves; i++) {
+      aig::GNode leaf = this->aig.getNodes()[bestCut->leaves[i]];
+      aig::NodeData& leafData =
+          aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
+      leafData.reqTime = std::min((nodeData.reqTime - 1), leafData.reqTime);
+    }
+  }
 }
 
 void PriCutManager::computeCovering() {
 
-	PriCut * bestCut;
-	aig::GNode leaf;
-	int leafId, nodeId;
-	std::vector< int > S;
+  PriCut* bestCut;
+  aig::GNode leaf;
+  int leafId, nodeId;
+  std::vector<int> S;
 
-	this->covering.clear();
+  this->covering.clear();
 
-	this->nLevels = -1;
-	for (auto po : this->aig.getOutputNodes()) {	
-    auto inEdgeIt = aigGraph.in_edge_begin( po );
-		aig::GNode inNode = aigGraph.getEdgeDst( inEdgeIt );
-		aig::NodeData& inNodeData = aigGraph.getData( inNode, galois::MethodFlag::UNPROTECTED );
+  this->nLevels = -1;
+  for (auto po : this->aig.getOutputNodes()) {
+    auto inEdgeIt     = aigGraph.in_edge_begin(po);
+    aig::GNode inNode = aigGraph.getEdgeDst(inEdgeIt);
+    aig::NodeData& inNodeData =
+        aigGraph.getData(inNode, galois::MethodFlag::UNPROTECTED);
 
-		if (  ( inNodeData.type != aig::NodeType::PI ) &&
-					( inNodeData.type != aig::NodeType::LATCH ) &&
-					( inNodeData.type != aig::NodeType::CONSTZERO ) ) {
-			S.push_back( inNodeData.id );
-			bestCut = getBestCut( inNodeData.id );
-			if ( this->nLevels < bestCut->delay ) {
-				this->nLevels = bestCut->delay;
-			}
-		}
-	}
+    if ((inNodeData.type != aig::NodeType::PI) &&
+        (inNodeData.type != aig::NodeType::LATCH) &&
+        (inNodeData.type != aig::NodeType::CONSTZERO)) {
+      S.push_back(inNodeData.id);
+      bestCut = getBestCut(inNodeData.id);
+      if (this->nLevels < bestCut->delay) {
+        this->nLevels = bestCut->delay;
+      }
+    }
+  }
 
-	while ( !S.empty() ) {
-		nodeId = S.back();
-		S.pop_back();
-		
-		auto it = this->covering.find( nodeId );
-		if ( it != this->covering.end() ) {
-			continue;
-		}
+  while (!S.empty()) {
+    nodeId = S.back();
+    S.pop_back();
 
-		bestCut = getBestCut( nodeId );
-		this->covering.insert( {nodeId, bestCut} );
+    auto it = this->covering.find(nodeId);
+    if (it != this->covering.end()) {
+      continue;
+    }
 
-		for ( int i = 0; i < bestCut->nLeaves; i++ ) {
-			leafId = bestCut->leaves[i]; 
-			leaf = this->aig.getNodes()[leafId];
-			aig::NodeData& leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED );
-			leafData.nRefs++; // Update reference counters
-			auto it = this->covering.find( leafId );
-			if ( it == this->covering.end() ) {
-					if (  ( leafData.type != aig::NodeType::PI ) &&
-							( leafData.type != aig::NodeType::LATCH ) &&
-				 	 		( leafData.type != aig::NodeType::CONSTZERO ) ) {
-						S.push_back( leafId );
-				}
-			}
-		}
-	}
+    bestCut = getBestCut(nodeId);
+    this->covering.insert({nodeId, bestCut});
+
+    for (int i = 0; i < bestCut->nLeaves; i++) {
+      leafId = bestCut->leaves[i];
+      leaf   = this->aig.getNodes()[leafId];
+      aig::NodeData& leafData =
+          aigGraph.getData(leaf, galois::MethodFlag::UNPROTECTED);
+      leafData.nRefs++; // Update reference counters
+      auto it = this->covering.find(leafId);
+      if (it == this->covering.end()) {
+        if ((leafData.type != aig::NodeType::PI) &&
+            (leafData.type != aig::NodeType::LATCH) &&
+            (leafData.type != aig::NodeType::CONSTZERO)) {
+          S.push_back(leafId);
+        }
+      }
+    }
+  }
 }
 
 inline void PriCutManager::switchToFirstDelayMode() {
-	this->passId++;
-	this->sortMode = SortMode::DELAY;
-	this->costMode = CostMode::AREA_FLOW;
+  this->passId++;
+  this->sortMode = SortMode::DELAY;
+  this->costMode = CostMode::AREA_FLOW;
 }
 
 inline void PriCutManager::switchToSecondDelayMode() {
-	this->passId++;
-	this->sortMode = SortMode::DELAY_OLD;
-	this->costMode = CostMode::AREA_FLOW;
+  this->passId++;
+  this->sortMode = SortMode::DELAY_OLD;
+  this->costMode = CostMode::AREA_FLOW;
 }
 
 inline void PriCutManager::switchToAreaFlowMode() {
-	this->passId++;
-	this->sortMode = SortMode::AREA;
-	this->costMode = CostMode::AREA_FLOW;
+  this->passId++;
+  this->sortMode = SortMode::AREA;
+  this->costMode = CostMode::AREA_FLOW;
 }
 
 inline void PriCutManager::switchToLocalAreaMode() {
-	this->passId++;
-	this->sortMode = SortMode::AREA;
-	this->costMode = CostMode::LOCAL_AREA;
+  this->passId++;
+  this->sortMode = SortMode::AREA;
+  this->costMode = CostMode::LOCAL_AREA;
 }
 
 inline aig::Aig& PriCutManager::getAig() { return this->aig; }
 
-inline PriCut * PriCutManager::getBestCut( int nodeId ) {
-	return this->nodePriCuts[ nodeId ]; // the first cut is the best cut
+inline PriCut* PriCutManager::getBestCut(int nodeId) {
+  return this->nodePriCuts[nodeId]; // the first cut is the best cut
 }
 
 int PriCutManager::getNumLUTs() {
-	this->nLUTs = this->covering.size();
-	return this->nLUTs;
+  this->nLUTs = this->covering.size();
+  return this->nLUTs;
 }
 
 int PriCutManager::getNumLevels() { return this->nLevels; }
@@ -1203,44 +1237,46 @@ long double PriCutManager::getKcutTime() { return this->kcutTime; }
 
 void PriCutManager::setKcutTime(long double time) { this->kcutTime = time; }
 
-PerThreadData& PriCutManager::getPerThreadData() {
-  return this->perThreadData;
-}
+PerThreadData& PriCutManager::getPerThreadData() { return this->perThreadData; }
 
 PriCut** PriCutManager::getNodePriCuts() { return this->nodePriCuts; }
 
-Covering & PriCutManager::getCovering() { return this->covering; }
+Covering& PriCutManager::getCovering() { return this->covering; }
 
 void PriCutManager::printCovering() {
 
-  std::cout << std::endl << "########## Mapping Covering ###############" << std::endl;
-	PriCut * bestCut;
-	for ( auto entry : this->covering ) {
-		std::cout << "Node " << entry.first << ": { ";
-		bestCut = entry.second;		
-	  for (int i = 0; i < bestCut->nLeaves; i++) {
-  	  std::cout << bestCut->leaves[i] << " ";
-	  }
-  	std::cout << "}" << std::endl;
-	  //std::cout << "}[" << Functional32::toHex( readTruth( bestCut ), this->nWords )  << "] " << std::endl;
-	}
-  std::cout << std::endl << "###########################################" << std::endl;
+  std::cout << std::endl
+            << "########## Mapping Covering ###############" << std::endl;
+  PriCut* bestCut;
+  for (auto entry : this->covering) {
+    std::cout << "Node " << entry.first << ": { ";
+    bestCut = entry.second;
+    for (int i = 0; i < bestCut->nLeaves; i++) {
+      std::cout << bestCut->leaves[i] << " ";
+    }
+    std::cout << "}" << std::endl;
+    // std::cout << "}[" << Functional32::toHex( readTruth( bestCut ),
+    // this->nWords )  << "] " << std::endl;
+  }
+  std::cout << std::endl
+            << "###########################################" << std::endl;
 }
 
 void PriCutManager::printNodeCuts(int nodeId, long int& counter) {
 
   std::cout << "Node " << nodeId << ": { ";
   for (PriCut* currentCut = this->nodePriCuts[nodeId]; currentCut != nullptr;
-       currentCut      = currentCut->nextCut) {
+       currentCut         = currentCut->nextCut) {
     counter++;
     std::cout << "{ ";
     for (int i = 0; i < currentCut->nLeaves; i++) {
       std::cout << currentCut->leaves[i] << " ";
     }
-		//std::cout << "} ";
+    // std::cout << "} ";
     std::cout << "}(a" << currentCut->area << ") ";
-    //std::cout << "}(a" << currentCut->area << ", e" << currentCut->edge << ") ";
-    //std::cout << "}[" << Functional32::toHex( readTruth( currentCut ), this->nWords )  << "] ";
+    // std::cout << "}(a" << currentCut->area << ", e" << currentCut->edge << ")
+    // "; std::cout << "}[" << Functional32::toHex( readTruth( currentCut ),
+    // this->nWords )  << "] ";
   }
   std::cout << "}" << std::endl;
 }
@@ -1263,14 +1299,15 @@ void PriCutManager::printAllCuts() {
 
 void PriCutManager::printNodeBestCut(int nodeId) {
 
-	PriCut * bestCut = getBestCut( nodeId );
+  PriCut* bestCut = getBestCut(nodeId);
   std::cout << "Node " << nodeId << ": { ";
   for (int i = 0; i < bestCut->nLeaves; i++) {
     std::cout << bestCut->leaves[i] << " ";
   }
   std::cout << "}(a" << bestCut->area << ")" << std::endl;
-  //std::cout << "}(a" << bestCut->area << ", e" << bestCut->edge << ")" << std::endl;
-  //std::cout << "}[" << Functional32::toHex( readTruth( bestCut ), this->nWords )  << "] " << std::endl;
+  // std::cout << "}(a" << bestCut->area << ", e" << bestCut->edge << ")" <<
+  // std::endl; std::cout << "}[" << Functional32::toHex( readTruth( bestCut ),
+  // this->nWords )  << "] " << std::endl;
 }
 
 void PriCutManager::printBestCuts() {
@@ -1281,7 +1318,7 @@ void PriCutManager::printBestCuts() {
         aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
     if ((nodeData.type == aig::NodeType::AND) ||
         (nodeData.type == aig::NodeType::PI)) {
-				printNodeBestCut( nodeData.id );
+      printNodeBestCut(nodeData.id);
     }
   }
   std::cout << "#################################" << std::endl;
@@ -1299,13 +1336,14 @@ void PriCutManager::printCutStatistics() {
 
   long int nSatuRed = nSatu.reduce();
 
-
-  std::cout << std::endl << "############## Cut Statistics #############" << std::endl;
+  std::cout << std::endl
+            << "############## Cut Statistics #############" << std::endl;
   std::cout << "nCuts: " << nCutsRed << std::endl;
   std::cout << "nTriv: " << nTrivRed << std::endl;
   std::cout << "nFilt: " << nFiltRed << std::endl;
   std::cout << "nSatu: " << nSatuRed << std::endl;
-  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes) << std::endl;
+  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes)
+            << std::endl;
   std::cout << "###########################################" << std::endl;
 }
 
@@ -1324,7 +1362,7 @@ void PriCutManager::printRuntimes() {
 // ######################## BEGIN OPERATOR ######################## //
 struct KPriCutOperator {
 
-	const float FLOAT_MAX = std::numeric_limits<float>::max();
+  const float FLOAT_MAX = std::numeric_limits<float>::max();
   PriCutManager& cutMan;
 
   KPriCutOperator(PriCutManager& cutMan) : cutMan(cutMan) {}
@@ -1342,89 +1380,98 @@ struct KPriCutOperator {
       aigGraph.out_edges(node);
 
       // Combine Cuts
-      auto inEdgeIt          = aigGraph.in_edge_begin(node);
-      aig::GNode lhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-      aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::READ);
-      bool lhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+      auto inEdgeIt      = aigGraph.in_edge_begin(node);
+      aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
+      aig::NodeData& lhsData =
+          aigGraph.getData(lhsNode, galois::MethodFlag::READ);
+      bool lhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
       inEdgeIt++;
-      aig::GNode rhsNode     = aigGraph.getEdgeDst(inEdgeIt);
-      aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::READ);
-      bool rhsPolarity       = aigGraph.getEdgeData(inEdgeIt);
+      aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
+      aig::NodeData& rhsData =
+          aigGraph.getData(rhsNode, galois::MethodFlag::READ);
+      bool rhsPolarity = aigGraph.getEdgeData(inEdgeIt);
 
-			ThreadLocalData* thData = cutMan.getPerThreadData().getLocal();
+      ThreadLocalData* thData = cutMan.getPerThreadData().getLocal();
 
-      RefMap refMap( ctx.getPerIterAlloc() );
+      RefMap refMap(ctx.getPerIterAlloc());
 
-      cutMan.computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id, lhsPolarity, rhsPolarity);
+      cutMan.computePriCuts(thData, refMap, nodeData, lhsData.id, rhsData.id,
+                            lhsPolarity, rhsPolarity);
 
-			// Mark node as processed
-			nodeData.counter = nodeData.nFanout;
-			nodeData.reqTime = FLOAT_MAX; 
+      // Mark node as processed
+      nodeData.counter = nodeData.nFanout;
+      nodeData.reqTime = FLOAT_MAX;
 
       // Schedule next nodes
       for (auto edge : aigGraph.out_edges(node)) {
         aig::GNode nextNode = aigGraph.getEdgeDst(edge);
-        aig::NodeData& nextNodeData = aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
+        aig::NodeData& nextNodeData =
+            aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
         nextNodeData.counter += 1;
         if (nextNodeData.counter == 2) {
           ctx.push(nextNode);
         }
       }
 
-			// Delete cuts of previous nodes if possibles
-			if ( lhsData.type == aig::NodeType::AND ) {
-				if ( --lhsData.counter == 0 ) {
-					PriCut* cut = cutMan.getNodePriCuts()[lhsData.id]->nextCut; // skipe the first cut which is the best cut
-					cutMan.getNodePriCuts()[lhsData.id]->nextCut = nullptr;
-					while ( cut != nullptr ) {
-						PriCut* nextCut = cut->nextCut;
-						thData->cutPool.giveBackMemory(cut);
-						cut = nextCut;
-					}
-				}
-			}
-			if ( rhsData.type == aig::NodeType::AND ) {
-				if ( --rhsData.counter == 0 ) {
-					PriCut* cut = cutMan.getNodePriCuts()[rhsData.id]->nextCut; // skipe the first cut which is the best cut
-					cutMan.getNodePriCuts()[rhsData.id]->nextCut = nullptr;
-					while ( cut != nullptr ) {
-						PriCut* nextCut = cut->nextCut;
-						thData->cutPool.giveBackMemory(cut);
-						cut = nextCut;
-					}
-				}
-			}
+      // Delete cuts of previous nodes if possibles
+      if (lhsData.type == aig::NodeType::AND) {
+        if (--lhsData.counter == 0) {
+          PriCut* cut =
+              cutMan.getNodePriCuts()[lhsData.id]
+                  ->nextCut; // skipe the first cut which is the best cut
+          cutMan.getNodePriCuts()[lhsData.id]->nextCut = nullptr;
+          while (cut != nullptr) {
+            PriCut* nextCut = cut->nextCut;
+            thData->cutPool.giveBackMemory(cut);
+            cut = nextCut;
+          }
+        }
+      }
+      if (rhsData.type == aig::NodeType::AND) {
+        if (--rhsData.counter == 0) {
+          PriCut* cut =
+              cutMan.getNodePriCuts()[rhsData.id]
+                  ->nextCut; // skipe the first cut which is the best cut
+          cutMan.getNodePriCuts()[rhsData.id]->nextCut = nullptr;
+          while (cut != nullptr) {
+            PriCut* nextCut = cut->nextCut;
+            thData->cutPool.giveBackMemory(cut);
+            cut = nextCut;
+          }
+        }
+      }
     } else {
       if (nodeData.type == aig::NodeType::PI) {
         // Touching outgoing neighobors to acquire their locks and their fanin
         // node's locks.
         aigGraph.out_edges(node);
 
-        if ( cutMan.getNodePriCuts()[nodeData.id] == nullptr ) {
-					// Set the trivial cut
-					nodeData.counter = 3;
-					ThreadLocalData* thData = cutMan.getPerThreadData().getLocal();
-					PriCut* trivialCut = thData->cutPool.getMemory();
-					trivialCut->leaves[0] = nodeData.id;
-					trivialCut->nLeaves++;
-					trivialCut->sig = (1U << (nodeData.id % 31));
-					if (cutMan.getCompTruthFlag()) {
-						unsigned* cutTruth = cutMan.readTruth(trivialCut);
-						for (int i = 0; i < cutMan.getNWords(); i++) {
-							cutTruth[i] = 0xAAAAAAAA;
-						}
-					}
-					cutMan.getNodePriCuts()[nodeData.id] = trivialCut;
-				}
-				
-				nodeData.counter = 0;
-				nodeData.reqTime = FLOAT_MAX; 
+        if (cutMan.getNodePriCuts()[nodeData.id] == nullptr) {
+          // Set the trivial cut
+          nodeData.counter        = 3;
+          ThreadLocalData* thData = cutMan.getPerThreadData().getLocal();
+          PriCut* trivialCut      = thData->cutPool.getMemory();
+          trivialCut->leaves[0]   = nodeData.id;
+          trivialCut->nLeaves++;
+          trivialCut->sig = (1U << (nodeData.id % 31));
+          if (cutMan.getCompTruthFlag()) {
+            unsigned* cutTruth = cutMan.readTruth(trivialCut);
+            for (int i = 0; i < cutMan.getNWords(); i++) {
+              cutTruth[i] = 0xAAAAAAAA;
+            }
+          }
+          cutMan.getNodePriCuts()[nodeData.id] = trivialCut;
+        }
+
+        nodeData.counter = 0;
+        nodeData.reqTime = FLOAT_MAX;
 
         // Schedule next nodes
         for (auto edge : aigGraph.out_edges(node)) {
           aig::GNode nextNode = aigGraph.getEdgeDst(edge);
-          aig::NodeData& nextNodeData = aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
+          aig::NodeData& nextNodeData =
+              aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
           nextNodeData.counter += 1;
           if (nextNodeData.counter == 2) {
             ctx.push(nextNode);
@@ -1438,90 +1485,77 @@ struct KPriCutOperator {
 
 void runKPriCutOperator(PriCutManager& cutMan) {
 
-	typedef galois::worklists::PerSocketChunkBag<1000> DC_BAG;
-	bool verbose = cutMan.getVerboseFlag();
-	int nAreaRecovery =2, nAreaFlow = 1, nLocalArea = 1;
-	aig::Aig & aig = cutMan.getAig();
-//	aig::Graph & aigGraph = aig.getGraph();
+  typedef galois::worklists::PerSocketChunkBag<1000> DC_BAG;
+  bool verbose      = cutMan.getVerboseFlag();
+  int nAreaRecovery = 2, nAreaFlow = 1, nLocalArea = 1;
+  aig::Aig& aig = cutMan.getAig();
+  //	aig::Graph & aigGraph = aig.getGraph();
 
-
-	if ( verbose ) { 
-	  std::cout << std::endl << "########## LUT Mapping ###########" << std::endl;
-		std::cout << "Mapping in First Delay Mode" << std::endl;
-	}
-	cutMan.switchToFirstDelayMode();
-	cutMan.resetNodeCountersFanout();
+  if (verbose) {
+    std::cout << std::endl << "########## LUT Mapping ###########" << std::endl;
+    std::cout << "Mapping in First Delay Mode" << std::endl;
+  }
+  cutMan.switchToFirstDelayMode();
+  cutMan.resetNodeCountersFanout();
   // Galois Parallel Foreach
   galois::for_each(galois::iterate(aig.getInputNodes()),
-                   KPriCutOperator(cutMan),
-									 galois::wl<DC_BAG>(),
+                   KPriCutOperator(cutMan), galois::wl<DC_BAG>(),
                    galois::loopname("KPriCutOperator"),
-									 galois::per_iter_alloc());
+                   galois::per_iter_alloc());
 
-	
-	
-	if ( verbose ) { 
-		std::cout << "Mapping in Second Delay Mode" << std::endl;
-	}
-	cutMan.switchToSecondDelayMode();
-	cutMan.computeRequiredTimes();
-	if ( cutMan.isDeterministic() ) {
-		cutMan.computeCovering();
-	}
-	// Galois Parallel Foreach
+  if (verbose) {
+    std::cout << "Mapping in Second Delay Mode" << std::endl;
+  }
+  cutMan.switchToSecondDelayMode();
+  cutMan.computeRequiredTimes();
+  if (cutMan.isDeterministic()) {
+    cutMan.computeCovering();
+  }
+  // Galois Parallel Foreach
   galois::for_each(galois::iterate(aig.getInputNodes()),
-                   KPriCutOperator(cutMan),
-									 galois::wl<DC_BAG>(),
+                   KPriCutOperator(cutMan), galois::wl<DC_BAG>(),
                    galois::loopname("KPriCutOperator"),
-									 galois::per_iter_alloc());
-	
+                   galois::per_iter_alloc());
 
+  for (int i = 1; i <= nAreaRecovery; i++) {
 
-	for ( int i = 1 ; i <= nAreaRecovery; i++ ) {
+    for (int j = 1; j <= nLocalArea; j++) {
+      if (verbose) {
+        std::cout << "Mapping in Local Area Mode" << std::endl;
+      }
+      cutMan.switchToLocalAreaMode();
+      cutMan.computeRequiredTimes();
+      if (cutMan.isDeterministic()) {
+        cutMan.computeCovering();
+      }
+      // Galois Parallel Foreach
+      galois::for_each(galois::iterate(aig.getInputNodes()),
+                       KPriCutOperator(cutMan), galois::wl<DC_BAG>(),
+                       galois::loopname("KPriCutOperator"),
+                       galois::per_iter_alloc());
+    }
 
-		for ( int j = 1 ; j <= nLocalArea; j++ ) {
-			if ( verbose ) { 
-				std::cout << "Mapping in Local Area Mode" << std::endl;
-			}
-			cutMan.switchToLocalAreaMode();
-			cutMan.computeRequiredTimes();
-			if ( cutMan.isDeterministic() ) {
-				cutMan.computeCovering();
-			}
-			// Galois Parallel Foreach
-			galois::for_each(galois::iterate(aig.getInputNodes()),
-											 KPriCutOperator(cutMan),
-											 galois::wl<DC_BAG>(),
-											 galois::loopname("KPriCutOperator"),
-									 		 galois::per_iter_alloc());
-		}
-		
-		for ( int j = 1 ; j <= nAreaFlow; j++ ) {
-			if ( verbose ) { 
-				std::cout << "Mapping in Area Flow Mode" << std::endl;
-			}
-			cutMan.switchToAreaFlowMode();
-			cutMan.computeRequiredTimes();
-			if ( cutMan.isDeterministic() ) {
-				cutMan.computeCovering();
-			}
-			// Galois Parallel Foreach
-			galois::for_each(galois::iterate(aig.getInputNodes()),
-											 KPriCutOperator(cutMan),
-											 galois::wl<DC_BAG>(),
-											 galois::loopname("KPriCutOperator"),
-									 		 galois::per_iter_alloc());
-		}
+    for (int j = 1; j <= nAreaFlow; j++) {
+      if (verbose) {
+        std::cout << "Mapping in Area Flow Mode" << std::endl;
+      }
+      cutMan.switchToAreaFlowMode();
+      cutMan.computeRequiredTimes();
+      if (cutMan.isDeterministic()) {
+        cutMan.computeCovering();
+      }
+      // Galois Parallel Foreach
+      galois::for_each(galois::iterate(aig.getInputNodes()),
+                       KPriCutOperator(cutMan), galois::wl<DC_BAG>(),
+                       galois::loopname("KPriCutOperator"),
+                       galois::per_iter_alloc());
+    }
+  }
 
-	}
-
-
-	if ( verbose ) { 
-		std::cout << "Covering ..." << std::endl;
-	}
-	cutMan.computeCovering();
-
+  if (verbose) {
+    std::cout << "Covering ..." << std::endl;
+  }
+  cutMan.computeCovering();
 }
 
 } /* namespace algorithm */
-

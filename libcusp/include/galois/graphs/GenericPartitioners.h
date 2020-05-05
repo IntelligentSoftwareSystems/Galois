@@ -8,9 +8,9 @@
 #include <limits>
 
 class NoCommunication : public galois::graphs::ReadMasterAssignment {
- public:
-  NoCommunication(uint32_t, uint32_t numHosts, uint64_t, uint64_t) :
-    galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) { }
+public:
+  NoCommunication(uint32_t, uint32_t numHosts, uint64_t, uint64_t)
+      : galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) {}
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t, uint64_t) const {
     return retrieveMaster(src);
@@ -28,34 +28,30 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
 /**
  */
 class MiningPolicyNaive : public galois::graphs::ReadMasterAssignment {
- public:
+public:
   MiningPolicyNaive(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
-                    std::vector<uint64_t>&) :
-    galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) { }
+                    std::vector<uint64_t>&)
+      : galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) {}
 
-  static bool needNodeDegrees() {
-    return false;
-  }
+  static bool needNodeDegrees() { return false; }
 
-  bool keepEdge(uint32_t src, uint32_t dst) const {
-    return src < dst;
-  }
+  bool keepEdge(uint32_t src, uint32_t dst) const { return src < dst; }
 };
 
 class MiningPolicyDegrees : public galois::graphs::ReadMasterAssignment {
   std::vector<uint64_t>& ndegrees;
- public:
-  MiningPolicyDegrees(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
-                std::vector<uint64_t>& _ndeg) :
-    galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0), ndegrees(_ndeg) { }
 
-  static bool needNodeDegrees() {
-    return true;
-  }
+public:
+  MiningPolicyDegrees(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
+                      std::vector<uint64_t>& _ndeg)
+      : galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0),
+        ndegrees(_ndeg) {}
+
+  static bool needNodeDegrees() { return true; }
 
   bool keepEdge(uint32_t src, uint32_t dst) const {
     uint64_t sourceDegree = ndegrees[src];
-    uint64_t destDegree = ndegrees[dst];
+    uint64_t destDegree   = ndegrees[dst];
     if ((destDegree > sourceDegree) ||
         ((destDegree == sourceDegree) && (src < dst))) {
       return true;
@@ -73,7 +69,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
   unsigned _h_offset;
 
   void factorizeHosts() {
-    numColumnHosts  = sqrt(_numHosts);
+    numColumnHosts = sqrt(_numHosts);
 
     while ((_numHosts % numColumnHosts) != 0)
       numColumnHosts--;
@@ -81,7 +77,7 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     numRowHosts = _numHosts / numColumnHosts;
     assert(numRowHosts >= numColumnHosts);
 
-    //if (moreColumnHosts) {
+    // if (moreColumnHosts) {
     //  std::swap(numRowHosts, numColumnHosts);
     //}
 
@@ -96,25 +92,21 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
   //! Returns the grid row ID of the specified host
   unsigned gridRowID(unsigned id) const { return (id / numColumnHosts); }
   //! Returns the grid column ID of this host
-  unsigned gridColumnID() const {
-    return (_hostID % numColumnHosts);
-  }
+  unsigned gridColumnID() const { return (_hostID % numColumnHosts); }
   //! Returns the grid column ID of the specified host
-  unsigned gridColumnID(unsigned id) const {
-    return (id % numColumnHosts);
-  }
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
     return gridColumnID(retrieveMaster(gid));
   }
 
- public:
+public:
   GenericCVC(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-             uint64_t numEdges) :
-        galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
+             uint64_t numEdges)
+      : galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
                                              numEdges) {
-     factorizeHosts();
+    factorizeHosts();
     _h_offset = gridRowID() * numColumnHosts;
   }
 
@@ -125,7 +117,8 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
 
   bool noCommunication() { return false; }
   bool isVertexCut() const {
-    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
+    if ((numRowHosts == 1) || (numColumnHosts == 1))
+      return false;
     return true;
   }
   void serializePartition(boost::archive::binary_oarchive& ar) {
@@ -152,7 +145,7 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
   unsigned _h_offset;
 
   void factorizeHosts() {
-    numColumnHosts  = sqrt(_numHosts);
+    numColumnHosts = sqrt(_numHosts);
 
     while ((_numHosts % numColumnHosts) != 0)
       numColumnHosts--;
@@ -174,23 +167,19 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
   //! Returns the grid row ID of the specified host
   unsigned gridRowID(unsigned id) const { return (id / numColumnHosts); }
   //! Returns the grid column ID of this host
-  unsigned gridColumnID() const {
-    return (_hostID % numColumnHosts);
-  }
+  unsigned gridColumnID() const { return (_hostID % numColumnHosts); }
   //! Returns the grid column ID of the specified host
-  unsigned gridColumnID(unsigned id) const {
-    return (id % numColumnHosts);
-  }
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
     return gridColumnID(retrieveMaster(gid));
   }
 
- public:
+public:
   GenericCVCColumnFlip(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-                       uint64_t numEdges) :
-        galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
+                       uint64_t numEdges)
+      : galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
                                              numEdges) {
     factorizeHosts();
     _h_offset = gridRowID() * numColumnHosts;
@@ -203,7 +192,8 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
 
   bool noCommunication() { return false; }
   bool isVertexCut() const {
-    if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
+    if ((numRowHosts == 1) && (numColumnHosts == 1))
+      return false;
     return true;
   }
 
@@ -224,10 +214,11 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
 ////////////////////////////////////////////////////////////////////////////////
 class GenericHVC : public galois::graphs::ReadMasterAssignment {
   uint32_t _vCutThreshold;
- public:
+
+public:
   GenericHVC(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-             uint64_t numEdges) :
-        galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
+             uint64_t numEdges)
+      : galois::graphs::ReadMasterAssignment(hostID, numHosts, numNodes,
                                              numEdges) {
     _vCutThreshold = 1000; // can be changed, but default seems to be 1000
   }
@@ -264,11 +255,11 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
   /**
    * Returns Ginger's composite balance parameter for a given host
    */
-  double getCompositeBalanceParam(unsigned host,
-          const std::vector<uint64_t>& nodeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-          const std::vector<uint64_t>& edgeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+  double getCompositeBalanceParam(
+      unsigned host, const std::vector<uint64_t>& nodeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+      const std::vector<uint64_t>& edgeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     // get node/edge loads
     uint64_t hostNodeLoad = nodeLoads[host] + nodeAccum[host].load();
     uint64_t hostEdgeLoad = edgeLoads[host] + edgeAccum[host].load();
@@ -284,26 +275,26 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
     return _alpha * _gamma * pow(param, _gamma - 1);
   }
 
- public:
+public:
   GingerP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-          uint64_t numEdges) :
-      galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
-                                             numEdges) {
+          uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges) {
     _vCutThreshold = 1000;
-    _gamma = 1.5;
-    _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
+    _gamma         = 1.5;
+    _alpha   = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     _neRatio = (double)numNodes / (double)numEdges;
   }
 
-  template<typename EdgeTy>
+  template <typename EdgeTy>
   uint32_t getMaster(uint32_t src,
-      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
-      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-      const std::vector<uint64_t>& nodeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      const std::vector<uint64_t>& edgeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+                     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                     const std::vector<uint32_t>& localNodeToMaster,
+                     std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+                     const std::vector<uint64_t>& nodeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+                     const std::vector<uint64_t>& edgeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -313,7 +304,7 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
     if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // low in degree masters move based on augmented FENNEL scoring metric
+      // low in degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
@@ -322,7 +313,7 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
       }
 
       for (; ii < ee; ++ii) {
-        uint64_t dst = bufGraph.edgeDestination(*ii);
+        uint64_t dst         = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
         auto it = gid2offsets.find(dst);
@@ -349,19 +340,17 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
       // subtraction of the composite balance term
       for (unsigned i = 0; i < _numHosts; i++) {
         scores[i] -= getFennelBalanceScore(getCompositeBalanceParam(
-                                             i, nodeLoads, nodeAccum,
-                                             edgeLoads, edgeAccum
-                                           ));
+            i, nodeLoads, nodeAccum, edgeLoads, edgeAccum));
       }
 
       unsigned bestHost = -1;
-      double bestScore = std::numeric_limits<double>::lowest();
+      double bestScore  = std::numeric_limits<double>::lowest();
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          //galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          // galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
-          bestHost = i;
+          bestHost  = i;
         }
       }
 
@@ -410,11 +399,11 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
   /**
    * Returns Ginger's composite balance parameter for a given host
    */
-  double getCompositeBalanceParam(unsigned host,
-          const std::vector<uint64_t>& nodeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-          const std::vector<uint64_t>& edgeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+  double getCompositeBalanceParam(
+      unsigned host, const std::vector<uint64_t>& nodeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+      const std::vector<uint64_t>& edgeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     // get node/edge loads
     uint64_t hostNodeLoad = nodeLoads[host] + nodeAccum[host].load();
     uint64_t hostEdgeLoad = edgeLoads[host] + edgeAccum[host].load();
@@ -430,27 +419,26 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
     return _alpha * _gamma * pow(param, _gamma - 1);
   }
 
- public:
+public:
   FennelP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-          uint64_t numEdges) :
-      galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
-                                             numEdges) {
+          uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges) {
     _vCutThreshold = 1000;
-    _gamma = 1.5;
-    _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
+    _gamma         = 1.5;
+    _alpha   = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     _neRatio = (double)numNodes / (double)numEdges;
   }
 
-
-  template<typename EdgeTy>
+  template <typename EdgeTy>
   uint32_t getMaster(uint32_t src,
-      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
-      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-      const std::vector<uint64_t>& nodeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      const std::vector<uint64_t>& edgeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+                     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                     const std::vector<uint32_t>& localNodeToMaster,
+                     std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+                     const std::vector<uint64_t>& nodeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+                     const std::vector<uint64_t>& edgeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -460,7 +448,7 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
     if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // low degree masters move based on augmented FENNEL scoring metric
+      // low degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
@@ -469,7 +457,7 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
       }
 
       for (; ii < ee; ++ii) {
-        uint64_t dst = bufGraph.edgeDestination(*ii);
+        uint64_t dst         = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
         auto it = gid2offsets.find(dst);
@@ -496,19 +484,17 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
       // subtraction of the composite balance term
       for (unsigned i = 0; i < _numHosts; i++) {
         scores[i] -= getFennelBalanceScore(getCompositeBalanceParam(
-                                             i, nodeLoads, nodeAccum,
-                                             edgeLoads, edgeAccum
-                                           ));
+            i, nodeLoads, nodeAccum, edgeLoads, edgeAccum));
       }
 
       unsigned bestHost = -1;
-      double bestScore = std::numeric_limits<double>::lowest();
+      double bestScore  = std::numeric_limits<double>::lowest();
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          //galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          // galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
-          bestHost = i;
+          bestHost  = i;
         }
       }
 
@@ -551,7 +537,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
   unsigned numColumnHosts;
 
   void factorizeHosts() {
-    numColumnHosts  = sqrt(_numHosts);
+    numColumnHosts = sqrt(_numHosts);
 
     while ((_numHosts % numColumnHosts) != 0)
       numColumnHosts--;
@@ -572,9 +558,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
   //! Returns the grid column ID of this host
   unsigned gridColumnID() const { return (_hostID % numColumnHosts); }
   //! Returns the grid column ID of the specified host
-  unsigned gridColumnID(unsigned id) const {
-    return (id % numColumnHosts);
-  }
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
   //! Find the row of a particular node
   unsigned getRowOfNode(uint64_t gid) const {
@@ -589,11 +573,11 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
   /**
    * Returns Ginger's composite balance parameter for a given host
    */
-  double getCompositeBalanceParam(unsigned host,
-          const std::vector<uint64_t>& nodeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-          const std::vector<uint64_t>& edgeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+  double getCompositeBalanceParam(
+      unsigned host, const std::vector<uint64_t>& nodeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+      const std::vector<uint64_t>& edgeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     // get node/edge loads
     uint64_t hostNodeLoad = nodeLoads[host] + nodeAccum[host].load();
     uint64_t hostEdgeLoad = edgeLoads[host] + edgeAccum[host].load();
@@ -609,28 +593,28 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     return _alpha * _gamma * pow(param, _gamma - 1);
   }
 
- public:
+public:
   SugarP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-         uint64_t numEdges) :
-      galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
-                                             numEdges) {
+         uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges) {
     _vCutThreshold = 1000;
-    _gamma = 1.5;
-    _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
+    _gamma         = 1.5;
+    _alpha   = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     _neRatio = (double)numNodes / (double)numEdges;
     // CVC things
     factorizeHosts();
   }
 
-  template<typename EdgeTy>
+  template <typename EdgeTy>
   uint32_t getMaster(uint32_t src,
-      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
-      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-      const std::vector<uint64_t>& nodeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      const std::vector<uint64_t>& edgeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+                     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                     const std::vector<uint32_t>& localNodeToMaster,
+                     std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+                     const std::vector<uint64_t>& nodeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+                     const std::vector<uint64_t>& edgeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -640,7 +624,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // low degree masters move based on augmented FENNEL scoring metric
+      // low degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
@@ -649,7 +633,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
       }
 
       for (; ii < ee; ++ii) {
-        uint64_t dst = bufGraph.edgeDestination(*ii);
+        uint64_t dst         = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
         auto it = gid2offsets.find(dst);
@@ -669,26 +653,24 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
         if (currentAssignment != (unsigned)-1) {
           scores[currentAssignment] += 1.0;
         } else {
-          //galois::gDebug("[", _hostID, "] ", dst, " unassigned");
+          // galois::gDebug("[", _hostID, "] ", dst, " unassigned");
         }
       }
 
       // subtraction of the composite balance term
       for (unsigned i = 0; i < _numHosts; i++) {
         scores[i] -= getFennelBalanceScore(getCompositeBalanceParam(
-                                             i, nodeLoads, nodeAccum,
-                                             edgeLoads, edgeAccum
-                                           ));
+            i, nodeLoads, nodeAccum, edgeLoads, edgeAccum));
       }
 
       unsigned bestHost = -1;
-      double bestScore = std::numeric_limits<double>::lowest();
+      double bestScore  = std::numeric_limits<double>::lowest();
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          //galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          // galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
-          bestHost = i;
+          bestHost  = i;
         }
       }
 
@@ -703,7 +685,6 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
     }
   }
 
-
   /**
    * return owner of edge using cartesian edge owner determination
    */
@@ -715,7 +696,8 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
 
   bool noCommunication() { return false; }
   bool isVertexCut() const {
-    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false;
+    if ((numRowHosts == 1) || (numColumnHosts == 1))
+      return false;
     return true;
   }
 
@@ -747,7 +729,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
   unsigned numColumnHosts;
 
   void factorizeHosts() {
-    numColumnHosts  = sqrt(_numHosts);
+    numColumnHosts = sqrt(_numHosts);
 
     while ((_numHosts % numColumnHosts) != 0)
       numColumnHosts--;
@@ -771,9 +753,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
   //! Returns the grid column ID of this host
   unsigned gridColumnID() const { return (_hostID % numColumnHosts); }
   //! Returns the grid column ID of the specified host
-  unsigned gridColumnID(unsigned id) const {
-    return (id % numColumnHosts);
-  }
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
   //! Find the row of a particular node
   unsigned getRowOfNode(uint64_t gid) const {
@@ -788,11 +768,11 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
   /**
    * Returns Ginger's composite balance parameter for a given host
    */
-  double getCompositeBalanceParam(unsigned host,
-          const std::vector<uint64_t>& nodeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-          const std::vector<uint64_t>& edgeLoads,
-          const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+  double getCompositeBalanceParam(
+      unsigned host, const std::vector<uint64_t>& nodeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+      const std::vector<uint64_t>& edgeLoads,
+      const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     // get node/edge loads
     uint64_t hostNodeLoad = nodeLoads[host] + nodeAccum[host].load();
     uint64_t hostEdgeLoad = edgeLoads[host] + edgeAccum[host].load();
@@ -808,28 +788,28 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     return _alpha * _gamma * pow(param, _gamma - 1);
   }
 
- public:
+public:
   SugarColumnFlipP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-                   uint64_t numEdges) :
-      galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
-                                             numEdges) {
+                   uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges) {
     _vCutThreshold = 1000;
-    _gamma = 1.5;
-    _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
+    _gamma         = 1.5;
+    _alpha   = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     _neRatio = (double)numNodes / (double)numEdges;
     // CVC things
     factorizeHosts();
   }
 
-  template<typename EdgeTy>
+  template <typename EdgeTy>
   uint32_t getMaster(uint32_t src,
-      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
-      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-      const std::vector<uint64_t>& nodeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      const std::vector<uint64_t>& edgeLoads,
-      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+                     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                     const std::vector<uint32_t>& localNodeToMaster,
+                     std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+                     const std::vector<uint64_t>& nodeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+                     const std::vector<uint64_t>& edgeLoads,
+                     std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
     // number of edges
@@ -839,7 +819,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
     if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // low degree masters move based on augmented FENNEL scoring metric
+      // low degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
@@ -848,7 +828,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
       }
 
       for (; ii < ee; ++ii) {
-        uint64_t dst = bufGraph.edgeDestination(*ii);
+        uint64_t dst         = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
         auto it = gid2offsets.find(dst);
@@ -875,19 +855,17 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
       // subtraction of the composite balance term
       for (unsigned i = 0; i < _numHosts; i++) {
         scores[i] -= getFennelBalanceScore(getCompositeBalanceParam(
-                                             i, nodeLoads, nodeAccum,
-                                             edgeLoads, edgeAccum
-                                           ));
+            i, nodeLoads, nodeAccum, edgeLoads, edgeAccum));
       }
 
       unsigned bestHost = -1;
-      double bestScore = std::numeric_limits<double>::lowest();
+      double bestScore  = std::numeric_limits<double>::lowest();
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          //galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          // galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
-          bestHost = i;
+          bestHost  = i;
         }
       }
 
@@ -913,7 +891,8 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
 
   bool noCommunication() { return false; }
   bool isVertexCut() const {
-    if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
+    if ((numRowHosts == 1) && (numColumnHosts == 1))
+      return false;
     return true;
   }
   void serializePartition(boost::archive::binary_oarchive& ar) {

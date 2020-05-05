@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -206,11 +206,11 @@ class ParaMeterExecutor {
   using WorkListTy = typename GenericWL::template retype<T>;
   using dbg        = galois::debug<1>;
 
-  constexpr static bool needsStats = !has_trait<no_stats_tag, ArgsTy>();
-  constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsStats  = !has_trait<no_stats_tag, ArgsTy>();
+  constexpr static bool needsPush   = !has_trait<no_pushes_tag, ArgsTy>();
   constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
-  constexpr static bool needsPia = has_trait<per_iter_alloc_tag, ArgsTy>();
-  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
+  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
 
   struct IterationContext {
     T item;

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,35 +37,37 @@ bool isBoundary(GGraph& g, GNode n) {
 // This is only used on the terminal graph (find graph)
 void findBoundary(GNodeBag& bag, GGraph& cg) {
 
-  galois::do_all(galois::iterate(cg),
-                 [&](GNode n) {
-                   auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
-                   if (cn.getmaybeBoundary())
-                     cn.setmaybeBoundary(isBoundary(cg, n));
-                   if (cn.getmaybeBoundary())
-                     bag.push(n);
-                 },
-                 galois::loopname("findBoundary"));
+  galois::do_all(
+      galois::iterate(cg),
+      [&](GNode n) {
+        auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
+        if (cn.getmaybeBoundary())
+          cn.setmaybeBoundary(isBoundary(cg, n));
+        if (cn.getmaybeBoundary())
+          bag.push(n);
+      },
+      galois::loopname("findBoundary"));
 }
 
 // this is used on the coarse graph to project to the fine graph
 void findBoundaryAndProject(GNodeBag& bag, GGraph& cg, GGraph& fg) {
-  galois::do_all(galois::iterate(cg),
-                 [&](GNode n) {
-                   auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
-                   if (cn.getmaybeBoundary())
-                     cn.setmaybeBoundary(isBoundary(cg, n));
+  galois::do_all(
+      galois::iterate(cg),
+      [&](GNode n) {
+        auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
+        if (cn.getmaybeBoundary())
+          cn.setmaybeBoundary(isBoundary(cg, n));
 
-                   // project part and maybe boundary
-                   // unsigned part = cn.getPart();
-                   for (unsigned x = 0; x < cn.numChildren(); ++x) {
-                     fg.getData(cn.getChild(x), galois::MethodFlag::UNPROTECTED)
-                         .initRefine(cn.getPart(), cn.getmaybeBoundary());
-                   }
-                   if (cn.getmaybeBoundary())
-                     bag.push(n);
-                 },
-                 galois::loopname("findBoundaryAndProject"));
+        // project part and maybe boundary
+        // unsigned part = cn.getPart();
+        for (unsigned x = 0; x < cn.numChildren(); ++x) {
+          fg.getData(cn.getChild(x), galois::MethodFlag::UNPROTECTED)
+              .initRefine(cn.getPart(), cn.getmaybeBoundary());
+        }
+        if (cn.getmaybeBoundary())
+          bag.push(n);
+      },
+      galois::loopname("findBoundaryAndProject"));
 }
 
 template <bool balance>
@@ -181,15 +183,16 @@ void projectPart(MetisGraph* Graph, std::vector<partInfo>&) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
 
-  galois::do_all(galois::iterate(*coarseGraph),
-                 [&](GNode n) {
-                   auto& cn      = coarseGraph->getData(n);
-                   unsigned part = cn.getPart();
-                   for (unsigned x = 0; x < cn.numChildren(); ++x) {
-                     fineGraph->getData(cn.getChild(x)).setPart(part);
-                   }
-                 },
-                 galois::loopname("project"));
+  galois::do_all(
+      galois::iterate(*coarseGraph),
+      [&](GNode n) {
+        auto& cn      = coarseGraph->getData(n);
+        unsigned part = cn.getPart();
+        for (unsigned x = 0; x < cn.numChildren(); ++x) {
+          fineGraph->getData(cn.getChild(x)).setPart(part);
+        }
+      },
+      galois::loopname("project"));
 }
 
 int gain(GGraph& g, GNode n) {
@@ -206,12 +209,13 @@ int gain(GGraph& g, GNode n) {
 }
 
 void parallelBoundary(GNodeBag& bag, GGraph& graph) {
-  galois::do_all(galois::iterate(graph),
-                 [&](GNode n) {
-                   if (gain(graph, n) > 0)
-                     bag.push(n);
-                 },
-                 galois::loopname("Get-Boundary"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](GNode n) {
+        if (gain(graph, n) > 0)
+          bag.push(n);
+      },
+      galois::loopname("Get-Boundary"));
 }
 
 void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {

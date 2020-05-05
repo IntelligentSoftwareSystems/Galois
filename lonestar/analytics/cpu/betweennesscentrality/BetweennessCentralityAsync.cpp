@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -49,9 +49,9 @@ static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                           cll::init(""));
 
 // @todo fix how this works
-//static cll::opt<unsigned int> startNode("startNode",
-//                                        cll::desc("Node to start search from"),
-//                                        cll::init(0));
+// static cll::opt<unsigned int> startNode("startNode",
+//                                        cll::desc("Node to start search
+//                                        from"), cll::init(0));
 
 static cll::opt<unsigned int>
     numOfSources("numOfSources",
@@ -98,10 +98,10 @@ using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
 using OBIM    = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, PSchunk>;
 
 template <typename T, bool enable>
-struct Counter: public T {
+struct Counter : public T {
   std::string name;
 
-  Counter(std::string s): name(std::move(s)) { }
+  Counter(std::string s) : name(std::move(s)) {}
 
   ~Counter() {
     galois::runtime::reportStat_Single("(NULL)", name, this->reduce());
@@ -110,10 +110,10 @@ struct Counter: public T {
 
 template <typename T>
 struct Counter<T, false> {
-  Counter(std::string) { }
+  Counter(std::string) {}
 
   template <typename... Args>
-  void update(Args...) { }
+  void update(Args...) {}
 };
 
 struct BetweenessCentralityAsync {
@@ -121,7 +121,8 @@ struct BetweenessCentralityAsync {
 
   BetweenessCentralityAsync(Graph& _graph) : graph(_graph) {}
 
-  using SumCounter = Counter<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
+  using SumCounter =
+      Counter<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
   SumCounter spfuCount{"SP&FU"};
   SumCounter updateSigmaP1Count{"UpdateSigmaBefore"};
   SumCounter updateSigmaP2Count{"RealUS"};
@@ -130,11 +131,12 @@ struct BetweenessCentralityAsync {
   SumCounter correctNodeP2Count{"Real CN"};
   SumCounter noActionCount{"NoAction"};
 
-  using MaxCounter = Counter<galois::GReduceMax<unsigned long>,
-                                            BC_COUNT_ACTIONS>;
+  using MaxCounter =
+      Counter<galois::GReduceMax<unsigned long>, BC_COUNT_ACTIONS>;
   MaxCounter largestNodeDist{"Largest node distance"};
 
-  using LeafCounter = Counter<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
+  using LeafCounter =
+      Counter<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
 
   void correctNode(uint32_t dstID, BCEdge&) {
     NodeType& dstData = graph.getData(dstID);
@@ -281,120 +283,123 @@ struct BetweenessCentralityAsync {
   }
 
   void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
-    galois::for_each(galois::iterate(wl),
-                     [&](ForwardPhaseWorkItem& wi, auto& ctx) {
-                       uint32_t srcID    = wi.nodeID;
-                       NodeType& srcData = graph.getData(srcID);
-                       srcData.markOut();
+    galois::for_each(
+        galois::iterate(wl),
+        [&](ForwardPhaseWorkItem& wi, auto& ctx) {
+          uint32_t srcID    = wi.nodeID;
+          NodeType& srcData = graph.getData(srcID);
+          srcData.markOut();
 
-                       // loop through all edges
-                       for (auto e : graph.edges(srcID)) {
-                         BCEdge& edgeData  = graph.getEdgeData(e);
-                         uint32_t dstID    = graph.getEdgeDst(e);
-                         NodeType& dstData = graph.getData(dstID);
+          // loop through all edges
+          for (auto e : graph.edges(srcID)) {
+            BCEdge& edgeData  = graph.getEdgeData(e);
+            uint32_t dstID    = graph.getEdgeDst(e);
+            NodeType& dstData = graph.getData(dstID);
 
-                         if (srcID == dstID)
-                           continue; // ignore self loops
+            if (srcID == dstID)
+              continue; // ignore self loops
 
-                         // lock in set order to prevent deadlock (lower id
-                         // first)
-                         // TODO run even in serial version; find way to not
-                         // need to run
-                         if (srcID < dstID) {
-                           srcData.lock();
-                           dstData.lock();
-                         } else {
-                           dstData.lock();
-                           srcData.lock();
-                         }
+            // lock in set order to prevent deadlock (lower id
+            // first)
+            // TODO run even in serial version; find way to not
+            // need to run
+            if (srcID < dstID) {
+              srcData.lock();
+              dstData.lock();
+            } else {
+              dstData.lock();
+              srcData.lock();
+            }
 
-                         const int elevel = edgeData.level;
-                         const int ADist  = srcData.distance;
-                         const int BDist  = dstData.distance;
+            const int elevel = edgeData.level;
+            const int ADist  = srcData.distance;
+            const int BDist  = dstData.distance;
 
-                         if (BDist - ADist > 1) {
-                           // Shortest Path + First Update (and Correct Node)
-                           this->spAndFU(srcID, dstID, edgeData, ctx);
-                         } else if (elevel == ADist && BDist == ADist + 1) {
-                           // Update Sigma
-                           this->updateSigma(srcID, dstID, edgeData, ctx);
-                         } else if (BDist == ADist + 1 && elevel != ADist) {
-                           // First Update not combined with Shortest Path
-                           this->firstUpdate(srcID, dstID, edgeData, ctx);
-                         } else { // No Action
-                           noActionCount.update(1);
-                           srcData.unlock();
-                           dstData.unlock();
-                         }
-                       }
-                     },
-                     galois::wl<OBIM>(FPWorkItemIndexer()),
-                     galois::no_conflicts(), galois::loopname("ForwardPhase"));
+            if (BDist - ADist > 1) {
+              // Shortest Path + First Update (and Correct Node)
+              this->spAndFU(srcID, dstID, edgeData, ctx);
+            } else if (elevel == ADist && BDist == ADist + 1) {
+              // Update Sigma
+              this->updateSigma(srcID, dstID, edgeData, ctx);
+            } else if (BDist == ADist + 1 && elevel != ADist) {
+              // First Update not combined with Shortest Path
+              this->firstUpdate(srcID, dstID, edgeData, ctx);
+            } else { // No Action
+              noActionCount.update(1);
+              srcData.unlock();
+              dstData.unlock();
+            }
+          }
+        },
+        galois::wl<OBIM>(FPWorkItemIndexer()), galois::no_conflicts(),
+        galois::loopname("ForwardPhase"));
   }
 
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
-    galois::for_each(galois::iterate(wl),
-                     [&](uint32_t srcID, auto& ctx) {
-                       NodeType& srcData = graph.getData(srcID);
-                       srcData.lock();
+    galois::for_each(
+        galois::iterate(wl),
+        [&](uint32_t srcID, auto& ctx) {
+          NodeType& srcData = graph.getData(srcID);
+          srcData.lock();
 
-                       if (srcData.nsuccs == 0) {
-                         const double srcDelta = srcData.delta;
-                         srcData.bc += srcDelta;
+          if (srcData.nsuccs == 0) {
+            const double srcDelta = srcData.delta;
+            srcData.bc += srcDelta;
 
-                         srcData.unlock();
+            srcData.unlock();
 
-                         NodeType::predTY& srcPreds = srcData.preds;
+            NodeType::predTY& srcPreds = srcData.preds;
 
-                         // loop through src's predecessors
-                         for (unsigned i = 0; i < srcPreds.size(); i++) {
-                           uint32_t predID    = srcPreds[i];
-                           NodeType& predData = graph.getData(predID);
+            // loop through src's predecessors
+            for (unsigned i = 0; i < srcPreds.size(); i++) {
+              uint32_t predID    = srcPreds[i];
+              NodeType& predData = graph.getData(predID);
 
-                           assert(srcData.sigma >= 1);
-                           const double term = (double)predData.sigma *
-                                               (1.0 + srcDelta) / srcData.sigma;
-                           // if (std::isnan(term)) {
-                           //  galois::gPrint(predData.sigma, " ", srcDelta, "
-                           //  ", srcData.sigma, "\n");
-                           //}
-                           predData.lock();
-                           predData.delta += term;
-                           const unsigned prevPdNsuccs = predData.nsuccs;
-                           predData.nsuccs--;
+              assert(srcData.sigma >= 1);
+              const double term =
+                  (double)predData.sigma * (1.0 + srcDelta) / srcData.sigma;
+              // if (std::isnan(term)) {
+              //  galois::gPrint(predData.sigma, " ", srcDelta, "
+              //  ", srcData.sigma, "\n");
+              //}
+              predData.lock();
+              predData.delta += term;
+              const unsigned prevPdNsuccs = predData.nsuccs;
+              predData.nsuccs--;
 
-                           if (prevPdNsuccs == 1) {
-                             predData.unlock();
-                             ctx.push(predID);
-                           } else {
-                             predData.unlock();
-                           }
-                         }
+              if (prevPdNsuccs == 1) {
+                predData.unlock();
+                ctx.push(predID);
+              } else {
+                predData.unlock();
+              }
+            }
 
-                         // reset data in preparation for next source
-                         srcData.reset();
-                         for (auto e : graph.edges(srcID)) {
-                           graph.getEdgeData(e).reset();
-                         }
-                       } else {
-                         srcData.unlock();
-                       }
-                     },
-                     galois::no_conflicts(), galois::loopname("BackwardPhase"));
+            // reset data in preparation for next source
+            srcData.reset();
+            for (auto e : graph.edges(srcID)) {
+              graph.getEdgeData(e).reset();
+            }
+          } else {
+            srcData.unlock();
+          }
+        },
+        galois::no_conflicts(), galois::loopname("BackwardPhase"));
   }
 
   void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {
     LeafCounter leafCount{"leaf nodes in DAG"};
-    galois::do_all(galois::iterate(0u, nnodes),
-                   [&](auto i) {
-                     NodeType& n = graph.getData(i);
+    galois::do_all(
+        galois::iterate(0u, nnodes),
+        [&](auto i) {
+          NodeType& n = graph.getData(i);
 
-                     if (n.nsuccs == 0 && n.distance < infinity) {
-                       leafCount.update(1);
-                       fringeWL.push(i);
-                     }
-                   },
-                   galois::loopname("LeafFind"));
+          if (n.nsuccs == 0 && n.distance < infinity) {
+            leafCount.update(1);
+            fringeWL.push(i);
+          }
+        },
+        galois::loopname("LeafFind"));
   }
 };
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -67,32 +67,34 @@ static cll::opt<unsigned int>
                cll::desc("Node to report distance to (default value 1)"),
                cll::init(1));
 static cll::opt<unsigned int>
-    numRuns("numRuns",
-              cll::desc("Number of runs (default value 1)"),
-              cll::init(1));
+    numRuns("numRuns", cll::desc("Number of runs (default value 1)"),
+            cll::init(1));
 
 static cll::opt<int>
     alpha("alpha",
-              cll::desc("alpha value to change direction in direction-optimization (default value 15)"),
-              cll::init(15));
+          cll::desc("alpha value to change direction in direction-optimization "
+                    "(default value 15)"),
+          cll::init(15));
 static cll::opt<int>
     beta("beta",
-              cll::desc("beta value to change direction in direction-optimization (default value 18)"),
-              cll::init(18));
+         cll::desc("beta value to change direction in direction-optimization "
+                   "(default value 18)"),
+         cll::init(18));
 
 static cll::opt<unsigned int>
     preAlloc("preAlloc",
-              cll::desc("Number of pages to preAlloc (default value 400)"),
-              cll::init(400));
+             cll::desc("Number of pages to preAlloc (default value 400)"),
+             cll::init(400));
 
 static cll::opt<unsigned int>
     numPrint("numPrint",
-              cll::desc("Print parents for the numPrint number of nodes for verification if verification is on (default value 10)"),
-              cll::init(10));
+             cll::desc("Print parents for the numPrint number of nodes for "
+                       "verification if verification is on (default value 10)"),
+             cll::init(10));
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { SyncDO = 0, Async};
+enum Algo { SyncDO = 0, Async };
 
 const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
 
@@ -102,25 +104,25 @@ static cll::opt<Exec> execution(
     cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL")),
     cll::init(PARALLEL));
 
-static cll::opt<Algo> algo(
-    "algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-    cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
-    cll::init(SyncDO));
+static cll::opt<Algo>
+    algo("algo", cll::desc("Choose an algorithm (default value SyncDO):"),
+         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
+         cll::init(SyncDO));
 
 using Graph =
-    //galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
+    // galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
     galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-    //galois::graphs::B_LC_CSR_Graph<unsigned, void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
+// galois::graphs::B_LC_CSR_Graph<unsigned,
+// void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
-
 
 constexpr static const unsigned CHUNK_SIZE      = 256u;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
 
-using BFS = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
-using UpdateRequest       = BFS::UpdateRequest;
-using Dist                = BFS::Dist;
-using OutEdgeRangeFn      = BFS::OutEdgeRangeFn;
+using BFS            = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
+using UpdateRequest  = BFS::UpdateRequest;
+using Dist           = BFS::Dist;
+using OutEdgeRangeFn = BFS::OutEdgeRangeFn;
 
 struct EdgeTile {
   Graph::edge_iterator beg;
@@ -180,25 +182,25 @@ struct OneTilePushWrap {
 
 template <typename WL>
 void WlToBitset(WL& wl, galois::DynamicBitSet& bitset) {
-  galois::do_all(galois::iterate(wl),
-           [&](const GNode& src) {
-              bitset.set(src);
-           },
-           galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-           galois::loopname("WlToBitset"));
+  galois::do_all(
+      galois::iterate(wl), [&](const GNode& src) { bitset.set(src); },
+      galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+      galois::loopname("WlToBitset"));
 }
 
 template <typename WL>
-void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset, WL& wl) {
+void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset,
+                WL& wl) {
   wl.clear();
-  galois::do_all(galois::iterate(graph),
-           [&](const GNode& src) {
-              if(bitset.test(src))
-                //pushWrap(wl, src);
-		wl.push(src);
-           },
-           galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-           galois::loopname("BitsetToWl"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        if (bitset.test(src))
+          // pushWrap(wl, src);
+          wl.push(src);
+      },
+      galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+      galois::loopname("BitsetToWl"));
 }
 
 template <bool CONCURRENT, typename T, typename P, typename R>
@@ -215,7 +217,7 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   Loop loop;
 
-  galois::DynamicBitSet front_bitset,next_bitset;
+  galois::DynamicBitSet front_bitset, next_bitset;
   front_bitset.resize(graph.size());
   next_bitset.resize(graph.size());
 
@@ -233,23 +235,24 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
   } else {
     pushWrap(*next, source);
   }
-  //adding source to the worklist
+  // adding source to the worklist
   work_items += 1;
-  //next_bitset.set(source);
+  // next_bitset.set(source);
 
   int64_t edges_to_check = graph.sizeEdges();
-  int64_t scout_count = std::distance(graph.edge_begin(source), graph.edge_end(source));
+  int64_t scout_count =
+      std::distance(graph.edge_begin(source), graph.edge_end(source));
   galois::gPrint("source: ", source, " has OutDegree:", scout_count, "\n");
   assert(!next->empty());
 
   uint64_t old_workItemNum = 0;
-  uint64_t numNodes = graph.size();
-  //uint32_t c_pull = 0, c_push = 0;
+  uint64_t numNodes        = graph.size();
+  // uint32_t c_pull = 0, c_push = 0;
   galois::GAccumulator<uint64_t> writes_pull, writes_push;
   writes_push.reset();
   writes_pull.reset();
-  //std::vector<uint32_t> pull_levels;
-  //pull_levels.reserve(10);
+  // std::vector<uint32_t> pull_levels;
+  // pull_levels.reserve(10);
 
   while (!next->empty()) {
 
@@ -259,75 +262,80 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
       WlToBitset(*curr, front_bitset);
       do {
-        //c_pull++;
-        //pull_levels.push_back(nextLevel);
+        // c_pull++;
+        // pull_levels.push_back(nextLevel);
 
         ++nextLevel;
         old_workItemNum = work_items.reduce();
         work_items.reset();
 
-        //PULL from in-edges
-        loop(galois::iterate(graph),
-             [&](const T& dst) {
-             auto& ddata = graph.getData(dst, flag);
-             if(ddata == BFS::DIST_INFINITY) {
-                 for (auto e : graph.in_edges(dst)) {
-                   auto src = graph.getInEdgeDst(e);
+        // PULL from in-edges
+        loop(
+            galois::iterate(graph),
+            [&](const T& dst) {
+              auto& ddata = graph.getData(dst, flag);
+              if (ddata == BFS::DIST_INFINITY) {
+                for (auto e : graph.in_edges(dst)) {
+                  auto src = graph.getInEdgeDst(e);
 
-                   if (front_bitset.test(src)) {
-                     /*
-                      * Currently assigning parents on the bfs path.
-                      * Assign nextLevel (uncomment below) 
-                      */
-                     //ddata = nextLevel;
-                     ddata = src;
-                     next_bitset.set(dst);
-                     work_items += 1;
-                     break;
-                   }
-                 }
-               }
-             },
-             galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-             galois::loopname((std::string("Sync-pull_") + std::to_string(runID)).c_str()));
+                  if (front_bitset.test(src)) {
+                    /*
+                     * Currently assigning parents on the bfs path.
+                     * Assign nextLevel (uncomment below)
+                     */
+                    // ddata = nextLevel;
+                    ddata = src;
+                    next_bitset.set(dst);
+                    work_items += 1;
+                    break;
+                  }
+                }
+              }
+            },
+            galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+            galois::loopname(
+                (std::string("Sync-pull_") + std::to_string(runID)).c_str()));
 
-            std::swap(front_bitset, next_bitset);
-            next_bitset.reset();
-      } while(work_items.reduce() >= old_workItemNum || (work_items.reduce() > numNodes / beta));
+        std::swap(front_bitset, next_bitset);
+        next_bitset.reset();
+      } while (work_items.reduce() >= old_workItemNum ||
+               (work_items.reduce() > numNodes / beta));
 
       BitsetToWl(graph, front_bitset, *next);
       scout_count = 1;
-    }
-    else {
-      //c_push++;
+    } else {
+      // c_push++;
       ++nextLevel;
       edges_to_check -= scout_count;
       work_items.reset();
-      //PUSH to out-edges
-      loop(galois::iterate(*curr),
-           [&](const T& src) {
-             for (auto e : graph.edges(src)) {
-               auto dst = graph.getEdgeDst(e);
-               auto& ddata = graph.getData(dst, flag);
+      // PUSH to out-edges
+      loop(
+          galois::iterate(*curr),
+          [&](const T& src) {
+            for (auto e : graph.edges(src)) {
+              auto dst    = graph.getEdgeDst(e);
+              auto& ddata = graph.getData(dst, flag);
 
-               if (ddata == BFS::DIST_INFINITY) {
-                 Dist oldDist = ddata;
-                    /* 
-                     * Currently assigning parents on the bfs path.
-                     * Assign nextLevel (uncomment below) 
-                     */
-                   //if(__sync_bool_compare_and_swap(&ddata, oldDist, nextLevel)) {
-                   if(__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
-                     next->push(dst);
-                     work_items += (graph.edge_end(dst) - graph.edge_begin(dst));
-                   }
-               }
-             }
-           },
-           galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-           galois::loopname((std::string("Sync-push_") + std::to_string(runID)).c_str()));
+              if (ddata == BFS::DIST_INFINITY) {
+                Dist oldDist = ddata;
+                /*
+                 * Currently assigning parents on the bfs path.
+                 * Assign nextLevel (uncomment below)
+                 */
+                // if(__sync_bool_compare_and_swap(&ddata, oldDist, nextLevel))
+                // {
+                if (__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
+                  next->push(dst);
+                  work_items += (graph.edge_end(dst) - graph.edge_begin(dst));
+                }
+              }
+            }
+          },
+          galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+          galois::loopname(
+              (std::string("Sync-push_") + std::to_string(runID)).c_str()));
 
-        scout_count = work_items.reduce();
+      scout_count = work_items.reduce();
     }
   }
 
@@ -362,26 +370,25 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
     pushWrap(initBag, source);
   }
 
-  loop(galois::iterate(initBag),
-       [&](const GNode& src, auto& ctx) {
-         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  loop(
+      galois::iterate(initBag),
+      [&](const GNode& src, auto& ctx) {
+        constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
-         for (auto ii : graph.edges(src)) {
-           GNode dst   = graph.getEdgeDst(ii);
-           auto& ddata = graph.getData(dst, flag);
+        for (auto ii : graph.edges(src)) {
+          GNode dst   = graph.getEdgeDst(ii);
+          auto& ddata = graph.getData(dst, flag);
 
-
-	if (ddata == BFS::DIST_INFINITY) {
+          if (ddata == BFS::DIST_INFINITY) {
             Dist oldDist = ddata;
-            if(__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
-                ctx.push(dst);
-             }
-           }
-         }
-       },
-       galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+            if (__sync_bool_compare_and_swap(&ddata, oldDist, src)) {
+              ctx.push(dst);
+            }
+          }
+        }
+      },
+      galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
 }
-
 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
@@ -389,18 +396,17 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
   switch (algo) {
   case SyncDO:
     syncDOAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
-                                   OutEdgeRangeFn{graph}, runID);
+                                  OutEdgeRangeFn{graph}, runID);
     break;
   case Async:
     asyncAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
-                                         OutEdgeRangeFn{graph});
+                                 OutEdgeRangeFn{graph});
     break;
 
   default:
     std::cerr << "ERROR: unkown algo type" << std::endl;
   }
 }
-
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -431,7 +437,7 @@ int main(int argc, char** argv) {
   report = *it;
 
   galois::preAlloc(preAlloc);
-  galois::gPrint("Fixed preAlloc done : ", preAlloc,"\n");
+  galois::gPrint("Fixed preAlloc done : ", preAlloc, "\n");
   galois::reportPageAlloc("MeminfoPre");
 
   galois::do_all(galois::iterate(graph),
@@ -443,14 +449,16 @@ int main(int argc, char** argv) {
             << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
             << std::endl;
 
-  std::cout << "WARNING: This bfs version uses bi-directional CSR graph "
-            << "and assigns parent instead of the shortest distance from source\n";          
-  if(algo == Async) {
-    std::cout << "WARNING: Async bfs does not use direction optimization. " 
-              << "It uses Galois for_each for asynchronous execution which is advantageous " 
+  std::cout
+      << "WARNING: This bfs version uses bi-directional CSR graph "
+      << "and assigns parent instead of the shortest distance from source\n";
+  if (algo == Async) {
+    std::cout << "WARNING: Async bfs does not use direction optimization. "
+              << "It uses Galois for_each for asynchronous execution which is "
+                 "advantageous "
               << "for large diameter graphs such as road networks\n";
   }
-  
+
   std::cout << " Execution started\n";
   galois::StatTimer Tmain;
   Tmain.start();
@@ -465,33 +473,32 @@ int main(int argc, char** argv) {
       runAlgo<false>(graph, source, run);
     } else if (execution == PARALLEL) {
       galois::runtime::profileVtune(
-      [&]() {
-      runAlgo<true>(graph, source, run);
-      },"runAlgo");
+          [&]() { runAlgo<true>(graph, source, run); }, "runAlgo");
     } else {
       std::cerr << "ERROR: unknown type of execution passed to -exec"
-        << std::endl;
+                << std::endl;
       std::abort();
     }
 
     StatTimer_main.stop();
 
     if ((run + 1) != numRuns) {
-      for(unsigned int i = 0; i < 1; ++i) {
-        galois::do_all(galois::iterate(graph),
-            [&graph](GNode n) { graph.getData(n) = BFS::DIST_INFINITY; });
+      for (unsigned int i = 0; i < 1; ++i) {
+        galois::do_all(galois::iterate(graph), [&graph](GNode n) {
+          graph.getData(n) = BFS::DIST_INFINITY;
+        });
       }
     }
   }
   Tmain.stop();
   galois::reportPageAlloc("MeminfoPost");
 
-  std::cout << "Node " << reportNode << " has parent "
-            << graph.getData(report) << "\n";
+  std::cout << "Node " << reportNode << " has parent " << graph.getData(report)
+            << "\n";
 
   if (!skipVerify) {
-    for(GNode n = 0; n < numPrint; n++){
-    galois::gPrint("parent[", n, "] : ", graph.getData(n), "\n"); 
+    for (GNode n = 0; n < numPrint; n++) {
+      galois::gPrint("parent[", n, "] : ", graph.getData(n), "\n");
     }
   }
 

@@ -49,14 +49,15 @@ typedef std::vector<bool> BoolVec;
 
 // We provide two types of 'support': frequency and domain support.
 // Frequency is used for counting, e.g. motif counting.
-// Domain support, a.k.a, the minimum image-based support, is used for FSM. It has the anti-monotonic property.
+// Domain support, a.k.a, the minimum image-based support, is used for FSM. It
+// has the anti-monotonic property.
 typedef float MatType;
 typedef unsigned Frequency;
-typedef std::vector<std::vector<MatType> > Matrix;
+typedef std::vector<std::vector<MatType>> Matrix;
 typedef std::unordered_map<unsigned, unsigned> UintMap;
 typedef std::pair<unsigned, unsigned> InitPattern;
 typedef std::unordered_map<unsigned, unsigned> FreqMap;
 typedef std::unordered_map<unsigned, bool> DomainMap;
-typedef std::map<unsigned, std::map<unsigned, unsigned> > Map2D;
+typedef std::map<unsigned, std::map<unsigned, unsigned>> Map2D;
 
 #endif

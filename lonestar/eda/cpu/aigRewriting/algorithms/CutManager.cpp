@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,13 +42,10 @@ CutManager::CutManager(aig::Aig& aig, int K, int C, int nThreads,
                        bool compTruth)
     :
 
-      aig(aig), K(K), C(C),
-      nWords(Functional32::wordNum(K)),
+      aig(aig), K(K), C(C), nWords(Functional32::wordNum(K)),
       nNodes(std::distance(aig.getGraph().begin(), aig.getGraph().end()) -
              aig.getNumOutputs()),
-      nThreads(nThreads),
-      cutPoolSize(nNodes / nThreads),
-      compTruth(compTruth),
+      nThreads(nThreads), cutPoolSize(nNodes / nThreads), compTruth(compTruth),
       perThreadCutPool(cutPoolSize, K, compTruth), perThreadCutList(K),
       perThreadAuxTruth(nWords) {
 
@@ -239,8 +236,7 @@ void CutManager::computeCutsRec(aig::GNode node, CutPool* cutPool,
 inline bool CutManager::processTwoCuts(CutPool* cutPool, CutList* cutList,
                                        AuxTruth* auxTruth, Cut* lhsCut,
                                        Cut* rhsCut, bool lhsPolarity,
-                                       bool rhsPolarity,
-                                       int& currentNumCuts) {
+                                       bool rhsPolarity, int& currentNumCuts) {
 
   // std::chrono::high_resolution_clock::time_point t0 =
   // std::chrono::high_resolution_clock::now();
@@ -483,7 +479,9 @@ inline bool CutManager::checkCutDominance(Cut* smallerCut, Cut* largerCut) {
         break;
       }
     }
-    if (j == largerCut->nLeaves) { // node i in smallerCut is not contained in largerCut
+    if (j ==
+        largerCut
+            ->nLeaves) { // node i in smallerCut is not contained in largerCut
       return false;
     }
   }
@@ -576,12 +574,12 @@ unsigned int* CutManager::readTruth(Cut* cut) {
 void CutManager::recycleNodeCuts(int nodeId) {
 
   CutPool* cutPool = this->perThreadCutPool.getLocal();
-  Cut* cut = this->nodeCuts[nodeId];
+  Cut* cut         = this->nodeCuts[nodeId];
 
-	while ( cut != nullptr ) {
-		Cut* nextCut = cut->nextCut;
+  while (cut != nullptr) {
+    Cut* nextCut = cut->nextCut;
     cutPool->giveBackMemory(cut);
-		cut = nextCut;
+    cut = nextCut;
   }
 
   this->nodeCuts[nodeId] = nullptr;
@@ -631,13 +629,14 @@ void CutManager::printCutStatistics() {
 
   long int nSatuRed = nSatu.reduce();
 
-
-  std::cout << std::endl << "############## Cut Statistics #############" << std::endl;
+  std::cout << std::endl
+            << "############## Cut Statistics #############" << std::endl;
   std::cout << "nCuts: " << nCutsRed << std::endl;
   std::cout << "nTriv: " << nTrivRed << std::endl;
   std::cout << "nFilt: " << nFiltRed << std::endl;
   std::cout << "nSatu: " << nSatuRed << std::endl;
-  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes) << std::endl;
+  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes)
+            << std::endl;
   std::cout << "###########################################" << std::endl;
 }
 
@@ -717,7 +716,7 @@ struct KCutOperator {
       CutList* cutList   = cutMan.getPerThreadCutList().getLocal();
       AuxTruth* auxTruth = cutMan.getPerThreadAuxTruth().getLocal();
 
-			//ctx.cautiousPoint();
+      // ctx.cautiousPoint();
 
       cutMan.computeCuts(cutPool, cutList, auxTruth, nodeData.id, lhsData.id,
                          rhsData.id, lhsPolarity, rhsPolarity);
@@ -738,7 +737,7 @@ struct KCutOperator {
         // node's locks.
         aigGraph.out_edges(node);
 
-				//ctx.cautiousPoint();
+        // ctx.cautiousPoint();
 
         // Set the trivial cut
         nodeData.counter      = 3;
@@ -784,14 +783,11 @@ void runKCutOperator(CutManager& cutMan) {
 
   // Galois Parallel Foreach
   galois::for_each(galois::iterate(workList.begin(), workList.end()),
-                   KCutOperator(cutMan),
-									 galois::wl<DC_BAG>(),
+                   KCutOperator(cutMan), galois::wl<DC_BAG>(),
                    galois::loopname("KCutOperator"));
 
-
-	//galois::wl<galois::worklists::Deterministic<>>(),
-	//galois::wl<DC_BAG>(),
-	
+  // galois::wl<galois::worklists::Deterministic<>>(),
+  // galois::wl<DC_BAG>(),
 }
 // ######################## END OPERATOR ######################## //
 

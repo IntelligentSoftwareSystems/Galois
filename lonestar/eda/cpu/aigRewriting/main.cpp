@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,10 +35,13 @@
 
 using namespace std::chrono;
 
-void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose);
+void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
+                  bool verbose);
 void kcut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose);
-void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool deterministic, bool verbose);
-void addChoices(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose);
+void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads,
+                 bool deterministic, bool verbose);
+void addChoices(aig::Aig& aig, std::string& fileName, int nThreads,
+                bool verbose);
 void rdCut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose);
 std::string getFileName(std::string path);
 
@@ -50,7 +53,8 @@ int main(int argc, char* argv[]) {
   if (argc < 3) {
     std::cout << "Mandatory arguments: <nThreads> <AigInputFile>" << std::endl;
     std::cout << "Optional arguments: -v (verbose)" << std::endl;
-    //std::cout << "Optional arguments: -d (deterministic mapping)" << std::endl;
+    // std::cout << "Optional arguments: -d (deterministic mapping)" <<
+    // std::endl;
     exit(1);
   }
 
@@ -65,7 +69,7 @@ int main(int argc, char* argv[]) {
   // aigParser.parseAag();
 
   bool verbose = false;
-  for ( int i = 3; i < argc; i++ ) {
+  for (int i = 3; i < argc; i++) {
     std::string verbosity(argv[i]);
     if (verbosity.compare("-v") == 0) {
       verbose = true;
@@ -75,7 +79,7 @@ int main(int argc, char* argv[]) {
     // INVALID ARG
     std::cout << "Mandatory arguments: <nThreads> <AigInputFile>" << std::endl;
     std::cout << "Optional arguments: -v (verbose)" << std::endl;
-    exit(1);		
+    exit(1);
   }
 
   if (verbose) {
@@ -86,7 +90,8 @@ int main(int argc, char* argv[]) {
     std::cout << "|L|: " << aigParser.getL() << std::endl;
     std::cout << "|O|: " << aigParser.getO() << std::endl;
     std::cout << "|A|: " << aigParser.getA() << std::endl;
-    std::cout << "|E|: " << aigParser.getE() << " (outgoing edges)" << std::endl;
+    std::cout << "|E|: " << aigParser.getE() << " (outgoing edges)"
+              << std::endl;
   }
 
   aigRewriting(aig, fileName, nThreads, verbose);
@@ -94,7 +99,8 @@ int main(int argc, char* argv[]) {
   return 0;
 }
 
-void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose) {
+void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
+                  bool verbose) {
 
   int numThreads = galois::setActiveThreads(nThreads);
 
@@ -131,7 +137,7 @@ void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads, bool verbo
   // RWMan
   algorithm::RewriteManager rwtMan(aig, cutMan, npnMan, pcgMan, triesNGraphs,
                                    useZeros, updateLevel);
- 
+
   algorithm::runRewriteOperator(rwtMan);
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
@@ -142,9 +148,8 @@ void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads, bool verbo
     std::cout << "Size: " << aig.getNumAnds() << std::endl;
     std::cout << "Depth: " << aig.getDepth() << std::endl;
     std::cout << "Runtime (us): " << rewriteTime << std::endl;
-  }
-	else {
-		std::cout << fileName << ";" << C << ";" << triesNGraphs << ";" << useZeros
+  } else {
+    std::cout << fileName << ";" << C << ";" << triesNGraphs << ";" << useZeros
               << ";" << aig.getNumAnds() << ";" << aig.getDepth() << ";"
               << numThreads << ";" << rewriteTime << std::endl;
   }
@@ -157,7 +162,8 @@ void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads, bool verbo
   // aig.writeDot( fileName + "_rewritten.dot", aig.toDot() );
 }
 
-void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool deterministic, bool verbose) {
+void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads,
+                 bool deterministic, bool verbose) {
 
   int numThreads = galois::setActiveThreads(nThreads);
 
@@ -169,30 +175,32 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool determ
     std::cout << "K: " << K << std::endl;
     std::cout << "C: " << C << std::endl;
     std::cout << "CompTruth: " << (compTruth ? "yes" : "no") << std::endl;
-    std::cout << "Deterministic: " << (deterministic ? "yes" : "no") << std::endl;
+    std::cout << "Deterministic: " << (deterministic ? "yes" : "no")
+              << std::endl;
     std::cout << "nThreads: " << numThreads << std::endl;
   }
 
-  long double kcutTime = 0;
+  long double kcutTime                 = 0;
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-  algorithm::PriCutManager cutMan(aig, K, C, numThreads, compTruth, deterministic, verbose);
+  algorithm::PriCutManager cutMan(aig, K, C, numThreads, compTruth,
+                                  deterministic, verbose);
   algorithm::runKPriCutOperator(cutMan);
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   kcutTime = duration_cast<microseconds>(t2 - t1).count();
 
-  BlifWriter blifWriter( fileName + "_mapped.blif" );
-  blifWriter.writeNetlist( aig, cutMan );
+  BlifWriter blifWriter(fileName + "_mapped.blif");
+  blifWriter.writeNetlist(aig, cutMan);
 
   // WRITE DOT //
-  //aig.writeDot( fileName + ".dot", aig.toDot() );
+  // aig.writeDot( fileName + ".dot", aig.toDot() );
 
   if (verbose) {
     std::cout << "################ Results ################## " << std::endl;
-    //cutMan.printCovering();
-    //cutMan.printAllCuts();
-    //cutMan.printBestCuts();
+    // cutMan.printCovering();
+    // cutMan.printAllCuts();
+    // cutMan.printBestCuts();
     // cutMan.printRuntimes();
     cutMan.printCutStatistics();
     std::cout << "AIG Size: " << aig.getNumAnds() << std::endl;
@@ -202,7 +210,7 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool determ
     std::cout << "Runtime (us): " << kcutTime << std::endl;
   } else {
     std::cout << fileName << ";" << K << ";" << C << ";" << compTruth << ";"
-              << aig.getNumAnds() << ";" << aig.getDepth() << ";" 
+              << aig.getNumAnds() << ";" << aig.getDepth() << ";"
               << cutMan.getNumLUTs() << ";" << cutMan.getNumLevels() << ";"
               << numThreads << ";" << kcutTime << std::endl;
   }
@@ -211,15 +219,15 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool determ
 void addChoices(aig::Aig& aig, std::string& GALOIS_UNUSED(fileName),
                 int GALOIS_UNUSED(nThreads), bool verbose) {
 
-  // FIXME 
+  // FIXME
   // In the current implementation the creation of choices must be serial.
   // It is due to the management of AIGi node's IDs when creating new nodes.
-  int numThreads = galois::setActiveThreads( 1 );
-  //int numThreads = galois::setActiveThreads(nThreads);
+  int numThreads = galois::setActiveThreads(1);
+  // int numThreads = galois::setActiveThreads(nThreads);
 
   int K = 4, C = 500;
-  int nGraphs = 4;
-  int nChoices = 4;
+  int nGraphs      = 4;
+  int nChoices     = 4;
   bool compTruth   = true;
   bool useZeros    = false;
   bool updateLevel = false;
@@ -250,8 +258,9 @@ void addChoices(aig::Aig& aig, std::string& GALOIS_UNUSED(fileName),
   pcgMan.processDecompositionGraphs();
 
   // RWMan
-  algorithm::ChoiceManager chMan(aig, cutMan, npnMan, pcgMan, nGraphs, nChoices);
- 
+  algorithm::ChoiceManager chMan(aig, cutMan, npnMan, pcgMan, nGraphs,
+                                 nChoices);
+
   algorithm::runChoiceOperator(chMan);
   aig.resetAllIds();
 
@@ -259,7 +268,7 @@ void addChoices(aig::Aig& aig, std::string& GALOIS_UNUSED(fileName),
   long double runtime = duration_cast<microseconds>(t2 - t1).count();
 
   // WRITE DOT //
-  //aig.writeDot( fileName + "_choices.dot", aig.toDot() );
+  // aig.writeDot( fileName + "_choices.dot", aig.toDot() );
 
   if (verbose) {
     std::cout << "################ Results ################## " << std::endl;
@@ -267,11 +276,11 @@ void addChoices(aig::Aig& aig, std::string& GALOIS_UNUSED(fileName),
     std::cout << "Depth: " << aig.getDepth() << std::endl;
     std::cout << "Runtime (us): " << runtime << std::endl;
   } else {
-  /*
-   * std::cout << fileName << ";" << C << ";" << nGraphs << ";" << useZeros
-   * << ";" << aig.getNumAnds() << ";" << aig.getDepth() << ";"
-   * << numThreads << ";" << runtime << std::endl;
-   */
+    /*
+     * std::cout << fileName << ";" << C << ";" << nGraphs << ";" << useZeros
+     * << ";" << aig.getNumAnds() << ";" << aig.getDepth() << ";"
+     * << numThreads << ";" << runtime << std::endl;
+     */
   }
 }
 
@@ -290,7 +299,7 @@ void kcut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose) {
     std::cout << "nThreads: " << numThreads << std::endl;
   }
 
-  long double kcutTime = 0;
+  long double kcutTime                 = 0;
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
   algorithm::CutManager cutMan(aig, K, C, numThreads, compTruth);
@@ -301,7 +310,7 @@ void kcut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose) {
 
   if (verbose) {
     std::cout << "################ Results ################## " << std::endl;
-    //cutMan.printAllCuts();
+    // cutMan.printAllCuts();
     // cutMan.printRuntimes();
     cutMan.printCutStatistics();
     std::cout << "Size: " << aig.getNumAnds() << std::endl;

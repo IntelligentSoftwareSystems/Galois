@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -211,63 +211,63 @@ void KLMatch(GGraph& graph, std::vector<GNode>& boundary,
     return !node.isLocked() && isPartOk(node.getPart());
   };
 
-  galois::for_each(galois::iterate(boundary),
-                   [&](GNode node, auto&) {
-                     auto flag            = galois::MethodFlag::UNPROTECTED;
-                     PartMatch* localInfo = threadInfo.getLocal();
-                     int gain             = localInfo->first;
-                     auto& srcData        = graph.getData(node, flag);
-                     int srcGain          = 0;
-                     if (!isNodeOk(srcData)) {
-                       return;
-                     }
+  galois::for_each(
+      galois::iterate(boundary),
+      [&](GNode node, auto&) {
+        auto flag            = galois::MethodFlag::UNPROTECTED;
+        PartMatch* localInfo = threadInfo.getLocal();
+        int gain             = localInfo->first;
+        auto& srcData        = graph.getData(node, flag);
+        int srcGain          = 0;
+        if (!isNodeOk(srcData)) {
+          return;
+        }
 
-                     for (auto ei : graph.edges(node, flag)) {
-                       int ew      = graph.getEdgeData(ei, flag);
-                       GNode n     = graph.getEdgeDst(ei);
-                       auto& nData = graph.getData(n, flag);
-                       if (!isNodeOk(nData)) {
-                         continue;
-                       }
-                       if (nData.getPart() == srcData.getPart()) {
-                         srcGain -= ew;
-                       } else {
-                         srcGain += ew;
-                       }
-                     }
-                     for (auto ei : graph.edges(node, flag)) {
-                       GNode n       = graph.getEdgeDst(ei);
-                       auto nData    = graph.getData(n, flag);
-                       int nw        = graph.getEdgeData(ei, flag);
-                       int neighGain = 0;
-                       if (!isNodeOk(nData) ||
-                           nData.getPart() == srcData.getPart()) {
-                         continue;
-                       }
-                       for (auto nei : graph.edges(n, flag)) {
-                         int ew      = graph.getEdgeData(nei, flag);
-                         GNode nn    = graph.getEdgeDst(nei);
-                         auto nnData = graph.getData(nn, flag);
-                         if (!isNodeOk(nnData)) {
-                           continue;
-                         }
-                         if (nnData.getPart() == nData.getPart()) {
-                           neighGain -= ew;
-                         } else {
-                           neighGain += ew;
-                         }
-                       }
-                       int totalGain = srcGain + neighGain - 2 * nw;
-                       if (totalGain > gain) {
-                         gain                     = totalGain;
-                         localInfo->first         = gain;
-                         localInfo->second.first  = node;
-                         localInfo->second.second = n;
-                       }
-                     }
-                   },
-                   galois::loopname("KLMatch"),
-                   galois::wl<galois::worklists::ChunkLIFO<32>>());
+        for (auto ei : graph.edges(node, flag)) {
+          int ew      = graph.getEdgeData(ei, flag);
+          GNode n     = graph.getEdgeDst(ei);
+          auto& nData = graph.getData(n, flag);
+          if (!isNodeOk(nData)) {
+            continue;
+          }
+          if (nData.getPart() == srcData.getPart()) {
+            srcGain -= ew;
+          } else {
+            srcGain += ew;
+          }
+        }
+        for (auto ei : graph.edges(node, flag)) {
+          GNode n       = graph.getEdgeDst(ei);
+          auto nData    = graph.getData(n, flag);
+          int nw        = graph.getEdgeData(ei, flag);
+          int neighGain = 0;
+          if (!isNodeOk(nData) || nData.getPart() == srcData.getPart()) {
+            continue;
+          }
+          for (auto nei : graph.edges(n, flag)) {
+            int ew      = graph.getEdgeData(nei, flag);
+            GNode nn    = graph.getEdgeDst(nei);
+            auto nnData = graph.getData(nn, flag);
+            if (!isNodeOk(nnData)) {
+              continue;
+            }
+            if (nnData.getPart() == nData.getPart()) {
+              neighGain -= ew;
+            } else {
+              neighGain += ew;
+            }
+          }
+          int totalGain = srcGain + neighGain - 2 * nw;
+          if (totalGain > gain) {
+            gain                     = totalGain;
+            localInfo->first         = gain;
+            localInfo->second.first  = node;
+            localInfo->second.second = n;
+          }
+        }
+      },
+      galois::loopname("KLMatch"),
+      galois::wl<galois::worklists::ChunkLIFO<32>>());
 };
 
 void refine_kl(GGraph& graph, std::vector<GNode>& boundary, int oldPartNum,
@@ -381,24 +381,24 @@ template <BisectPolicy bisect>
 void parallelBisect(MetisGraph* mg, unsigned int, unsigned int nparts,
                     std::vector<partInfo>& parts) {
   GGraph* graph = mg->getGraph();
-  galois::for_each(galois::iterate({&parts[0]}),
-                   [&](partInfo* item, auto& cnx) {
-                     if (item->splitID() >= nparts) // when to stop
-                       return;
-                     std::pair<unsigned, unsigned> ratio =
-                         item->splitRatio(nparts);
-                     // std::cout << "Splitting " << item->partNum << ":" <<
-                     // item->partMask << " L " << ratio.first << " R " <<
-                     // ratio.second << "\n";
-                     partInfo newPart = bisect(*graph, *item, ratio, NULL, 0);
-                     // std::cout << "Result " << item->partNum << " " <<
-                     // newPart.partNum << "\n";
-                     parts[newPart.partNum] = newPart;
-                     cnx.push(&parts[newPart.partNum]);
-                     cnx.push(item);
-                   },
-                   galois::loopname("parallelBisect"),
-                   galois::wl<galois::worklists::ChunkLIFO<1>>());
+  galois::for_each(
+      galois::iterate({&parts[0]}),
+      [&](partInfo* item, auto& cnx) {
+        if (item->splitID() >= nparts) // when to stop
+          return;
+        std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
+        // std::cout << "Splitting " << item->partNum << ":" <<
+        // item->partMask << " L " << ratio.first << " R " <<
+        // ratio.second << "\n";
+        partInfo newPart = bisect(*graph, *item, ratio, NULL, 0);
+        // std::cout << "Result " << item->partNum << " " <<
+        // newPart.partNum << "\n";
+        parts[newPart.partNum] = newPart;
+        cnx.push(&parts[newPart.partNum]);
+        cnx.push(item);
+      },
+      galois::loopname("parallelBisect"),
+      galois::wl<galois::worklists::ChunkLIFO<1>>());
 }
 
 } // namespace

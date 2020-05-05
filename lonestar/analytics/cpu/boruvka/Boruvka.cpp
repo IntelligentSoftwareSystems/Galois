@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -50,8 +50,7 @@ static cll::opt<bool>
                    cll::init(false));
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value parallel):"),
-         cll::values(clEnumVal(parallel, "Parallel")),
-         cll::init(parallel));
+         cll::values(clEnumVal(parallel, "Parallel")), cll::init(parallel));
 
 typedef int EdgeData;
 
@@ -182,8 +181,7 @@ struct ParallelAlgo {
     }
 
     template <typename Context, typename Pending>
-    void operator()(const WorkItem& item, Context&,
-                    Pending&) const {
+    void operator()(const WorkItem& item, Context&, Pending&) const {
       GNode src   = item.edge.src;
       Node& sdata = self->graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Node* rep   = sdata.findAndCompress();

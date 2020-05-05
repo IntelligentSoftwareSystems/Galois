@@ -286,9 +286,8 @@ protected:
    */
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph&,
-                          typename FileGraph::edge_iterator, GraphNode src,
-                          GraphNode dst,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
+                          GraphNode src, GraphNode dst,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
@@ -579,9 +578,9 @@ public:
                  .first;
 
     // create nodes of portion we are responsible for only
-    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei;
-         ++ii) {
-      aux[*ii] = createNode(std::distance(graph.edge_begin(*ii), graph.edge_end(*ii)));
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      aux[*ii] =
+          createNode(std::distance(graph.edge_begin(*ii), graph.edge_end(*ii)));
     }
   }
 

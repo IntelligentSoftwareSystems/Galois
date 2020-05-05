@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -51,8 +51,7 @@ static cll::opt<InitialPartMode> partMode(
 static cll::opt<refinementMode> refineMode(
     cll::desc("Choose a refinement mode:"),
     cll::values(clEnumVal(BKL, "BKL"), clEnumVal(BKL2, "BKL2 (default)"),
-                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS")
-                ),
+                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS")),
     cll::init(BKL2));
 
 static cll::opt<bool>
@@ -91,13 +90,14 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   TM.start();
   unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
   unsigned meanWeight = ((double)fineMetisGraphWeight) / (double)nparts;
-  unsigned coarsenTo = 20 * nparts;
+  unsigned coarsenTo  = 20 * nparts;
 
   if (verbose)
     std::cout << "Starting coarsening: \n";
   galois::StatTimer T("Coarsen");
   T.start();
-  auto mcg = std::unique_ptr<MetisGraph>(coarsen(metisGraph, coarsenTo, verbose));
+  auto mcg =
+      std::unique_ptr<MetisGraph>(coarsen(metisGraph, coarsenTo, verbose));
   T.stop();
   if (verbose)
     std::cout << "Time coarsen: " << T.get() << "\n";
@@ -189,14 +189,15 @@ int main(int argc, char** argv) {
 
   galois::graphs::readGraph(graph, filename);
 
-  galois::do_all(galois::iterate(graph),
-                 [&](GNode node) {
-                   for (auto jj : graph.edges(node)) {
-                     graph.getEdgeData(jj) = 1;
-                     // weight+=1;
-                   }
-                 },
-                 galois::loopname("initMorphGraph"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](GNode node) {
+        for (auto jj : graph.edges(node)) {
+          graph.getEdgeData(jj) = 1;
+          // weight+=1;
+        }
+      },
+      galois::loopname("initMorphGraph"));
 
   graphStat(graph);
   std::cout << "\n";

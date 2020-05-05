@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -109,7 +109,7 @@ int PriCutPool::getNumBlocks() { return this->blocks.size(); }
 
 int PriCutPool::getBlockSize() { return this->blockSize; }
 
-//void PriCutPool::copyCut(PriCut* dest, PriCut* source) {
+// void PriCutPool::copyCut(PriCut* dest, PriCut* source) {
 //	memcpy(dest, source, this->entrySize);
 //}
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -171,17 +171,17 @@ void AigParser::resize() {
   latches.resize(l);
   outputs.resize(o);
   ands.resize(a);
- 	
-	// The symbols may be empty
- 	// inputNames.resize(i);
- 	// latchNames.resize(l);
+
+  // The symbols may be empty
+  // inputNames.resize(i);
+  // latchNames.resize(l);
   // outputNames.resize(o);
-  
+
   int nNodes = m + o + 1;
-	aig.resizeNodeVectors(nNodes);
-  //aig.getNodes().resize(nNodes);
-  //aig.getNodesTravId().resize(nNodes);
-  //aig.getNodesFanoutMap().resize(nNodes);
+  aig.resizeNodeVectors(nNodes);
+  // aig.getNodes().resize(nNodes);
+  // aig.getNodesTravId().resize(nNodes);
+  // aig.getNodesFanoutMap().resize(nNodes);
 }
 
 void AigParser::parseAagHeader() {
@@ -315,9 +315,9 @@ void AigParser::parseSymbolTable() {
       if (n >= i)
         throw semantic_error(currLine, currChar,
                              "Input number greater than number of inputs");
-			if (inputNames.empty()) {
-				inputNames.resize(i);
-			}
+      if (inputNames.empty()) {
+        inputNames.resize(i);
+      }
       inputNames[n] = parseString("\n");
       break;
     case 'l':
@@ -325,9 +325,9 @@ void AigParser::parseSymbolTable() {
       if (n >= l)
         throw semantic_error(currLine, currChar,
                              "Latch number greater than number of latches");
-			if (latchNames.empty()) {
-				latchNames.resize(l);
-			}
+      if (latchNames.empty()) {
+        latchNames.resize(l);
+      }
       latchNames[n] = parseString("\n");
       break;
     case 'o':
@@ -335,9 +335,9 @@ void AigParser::parseSymbolTable() {
       if (n >= o)
         throw semantic_error(currLine, currChar,
                              "Output number greater than number of outputs");
-			if (outputNames.empty()) {
-				outputNames.resize(o);
-			}
+      if (outputNames.empty()) {
+        outputNames.resize(o);
+      }
       outputNames[n] = parseString("\n");
       break;
     case 'c':
@@ -487,7 +487,7 @@ void AigParser::connectLatches() {
     int rhs                      = std::get<1>(latches[in]);
     aig::GNode inputNode         = aig.getNodes()[rhs / 2];
     aig::NodeData& inputNodeData = aigGraph.getData(inputNode);
-		inputNodeData.nFanout += 1;
+    inputNodeData.nFanout += 1;
 
     aigGraph.getEdgeData(aigGraph.addEdge(inputNode, latchNode)) = !(rhs % 2);
     latchNodeData.level = 1 + inputNodeData.level;
@@ -582,11 +582,11 @@ void AigParser::connectAndsWithFanoutMap() {
 
     aigGraph.getEdgeData(aigGraph.addMultiEdge(
         lhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = lhsPol;
-   
-		aigGraph.getEdgeData(aigGraph.addMultiEdge(
+
+    aigGraph.getEdgeData(aigGraph.addMultiEdge(
         rhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = rhsPol;
-   
-		aig.insertNodeInFanoutMap(andNode, lhsNode, rhsNode, lhsPol, rhsPol);
+
+    aig.insertNodeInFanoutMap(andNode, lhsNode, rhsNode, lhsPol, rhsPol);
 
     andData.level = 1 + std::max(lhsData.level, rhsData.level);
     this->levelHistogram[andData.level] += 1;

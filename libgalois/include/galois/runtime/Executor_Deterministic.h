@@ -916,9 +916,7 @@ private:
 public:
   ThreadLocalData& getLocalWindowManager() { return data; }
 
-  size_t nextWindow(size_t, size_t, size_t = 0) {
-    return data.nextWindow();
-  }
+  size_t nextWindow(size_t, size_t, size_t = 0) { return data.nextWindow(); }
 
   size_t initialWindow(size_t, size_t, size_t = 0) {
     return std::numeric_limits<size_t>::max();

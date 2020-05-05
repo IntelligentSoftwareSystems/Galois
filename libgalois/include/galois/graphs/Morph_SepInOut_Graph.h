@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -900,9 +900,9 @@ public:
   }
 
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this),
-                   [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(*this),
+        [=](GraphNode N) { this->sortEdgesByDst(N, mflag); }, galois::steal());
   }
 
   //// General Things ////
@@ -950,8 +950,9 @@ public:
   }
 
   //! Returns the end of the neighbor iterator
-  edge_iterator edge_end(GraphNode N,
-    galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE) {
+  edge_iterator
+  edge_end(GraphNode N,
+           galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -962,7 +963,7 @@ public:
   template <bool _Undirected = !Directional>
   in_edge_iterator
   in_edge_end(GraphNode N,
-              galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE,
+              galois::MethodFlag GALOIS_UNUSED(mflag)      = MethodFlag::WRITE,
               typename std::enable_if<!_Undirected>::type* = 0) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -181,11 +181,12 @@ struct PageRank {
     T_comm.stop();
 
     // std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID  <<
-    // "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get()
+    // "] T_compute : " << T_compute.get() << "(msec)  T_comm : " <<
+    // T_comm.get()
     // << "(msec)\n"; std::cout << "[" <<
-    // galois::runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " <<
-    // T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)
-    // T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
+    // galois::runtime::getSystemNetworkInterface().ID  << "] T_comm_total : "
+    // << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() <<
+    // "(msec) T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
   }
 
   void operator()(GNode src) const {

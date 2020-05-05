@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -60,8 +60,7 @@ static cll::opt<Algo> algo(
             "prio algo based on Martin's GPU ECL-MIS algorithm (default)"),
         clEnumVal(
             edgetiledprio,
-            "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")
-        ),
+            "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")),
     cll::init(prio));
 
 enum MatchFlag : char { UNMATCHED, OTHER_MATCHED, MATCHED };
@@ -252,14 +251,14 @@ struct PullAlgo {
   template <MatchFlag F>
   void take(Bag& bag, Graph& graph, Counter& numTaken) {
 
-    galois::do_all(galois::iterate(bag),
-                   [&](const GNode& src) {
-                     Node& n =
-                         graph.getData(src, galois::MethodFlag::UNPROTECTED);
-                     numTaken += 1;
-                     n.flag = F;
-                   },
-                   galois::loopname("take"));
+    galois::do_all(
+        galois::iterate(bag),
+        [&](const GNode& src) {
+          Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          numTaken += 1;
+          n.flag = F;
+        },
+        galois::loopname("take"));
   }
 
   void operator()(Graph& graph) {
@@ -332,33 +331,34 @@ struct PrioAlgo {
     galois::GReduceLogicalOr unmatched;
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     nedges += std::distance(
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
-                   },
-                   galois::loopname("cal_degree"), galois::steal());
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          nedges += std::distance(
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
+        },
+        galois::loopname("cal_degree"), galois::steal());
 
     float nedges_tmp = nedges.reduce();
     float avg_degree = nedges_tmp / (float)graph.size();
     unsigned char in = ~1;
     float scale_avg  = ((in / 2) - 1) * avg_degree;
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     prioNode& nodedata =
-                         graph.getData(src, galois::MethodFlag::UNPROTECTED);
-                     float degree = (float)std::distance(
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
-                     float x = degree -
-                               hash(src) * 0.00000000023283064365386962890625f;
-                     int res           = round(scale_avg / (avg_degree + x));
-                     unsigned char val = (res + res) | 1;
-                     nodedata.flag     = val;
-                   },
-                   galois::loopname("init-prio"), galois::steal());
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          prioNode& nodedata =
+              graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          float degree = (float)std::distance(
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
+          float x = degree - hash(src) * 0.00000000023283064365386962890625f;
+          int res = round(scale_avg / (avg_degree + x));
+          unsigned char val = (res + res) | 1;
+          nodedata.flag     = val;
+        },
+        galois::loopname("init-prio"), galois::steal());
 
     do {
       unmatched.reset();
@@ -438,13 +438,14 @@ struct EdgeTiledPrioAlgo {
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
     galois::InsertBag<EdgeTile> works;
     const int EDGE_TILE_SIZE = 64;
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     nedges += std::distance(
-                         graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-                         graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
-                   },
-                   galois::loopname("cal_degree"), galois::steal());
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          nedges += std::distance(
+              graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
+        },
+        galois::loopname("cal_degree"), galois::steal());
 
     float nedges_tmp = nedges.reduce();
     float avg_degree = nedges_tmp / (float)graph.size();
@@ -511,7 +512,7 @@ struct EdgeTiledPrioAlgo {
                     continue;
                   else if (src == dst) {
                     nodedata.flag = (unsigned char)0x00; // other_matched
-                    tile.flag = false;
+                    tile.flag     = false;
                     return;
                   } else {
                     tile.flag = false;
@@ -549,7 +550,7 @@ struct EdgeTiledPrioAlgo {
           [&](const GNode& src) {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
-            if ((nodedata.flag & (unsigned char)0x01) != 0) { // undecided
+            if ((nodedata.flag & (unsigned char)0x01) != 0) {   // undecided
               if ((nodedata.flag & (unsigned char)0x02) != 0) { // temporary yes
                 nodedata.flag =
                     (unsigned char)0xfe; // 0x1111 1110, permanent yes
@@ -680,7 +681,6 @@ void run() {
   algo(graph);
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
-
 
   if (!skipVerify && !verify(graph, algo)) {
     std::cerr << "verification failed\n";

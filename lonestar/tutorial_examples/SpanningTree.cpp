@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,12 +42,12 @@ enum Algo { demo, asynchronous, blockedasync };
 
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<Algo> algo(
-    "algo", cll::desc("Choose an algorithm:"),
-    cll::values(clEnumVal(demo, "Demonstration algorithm"),
-                clEnumVal(asynchronous, "Asynchronous"),
-                clEnumVal(blockedasync, "Blocked Asynchronous")),
-    cll::init(blockedasync));
+static cll::opt<Algo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(clEnumVal(demo, "Demonstration algorithm"),
+                     clEnumVal(asynchronous, "Asynchronous"),
+                     clEnumVal(blockedasync, "Blocked Asynchronous")),
+         cll::init(blockedasync));
 
 struct Node : public galois::UnionFindNode<Node> {
   Node() : galois::UnionFindNode<Node>(const_cast<Node*>(this)) {}

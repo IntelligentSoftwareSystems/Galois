@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -64,15 +64,16 @@ int main(int argc, char* argv[]) {
   // 2. do_all is named "sum_in_do_all_with_lambda" to show stat after this
   // program finishes
   //! [Graph traversal in pull using do_all]
-  galois::do_all(galois::iterate(g.begin(), g.end()), // range
-                 [&](GNode n) {                       // operator
-                   auto& sum = g.getData(n);
-                   sum       = 0;
-                   for (auto e : g.edges(n)) {
-                     sum += g.getEdgeData(e);
-                   }
-                 },
-                 galois::loopname("sum_in_do_all_with_lambda") // options
+  galois::do_all(
+      galois::iterate(g.begin(), g.end()), // range
+      [&](GNode n) {                       // operator
+        auto& sum = g.getData(n);
+        sum       = 0;
+        for (auto e : g.edges(n)) {
+          sum += g.getEdgeData(e);
+        }
+      },
+      galois::loopname("sum_in_do_all_with_lambda") // options
   );
   //! [Graph traversal in pull using do_all]
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -47,8 +47,7 @@ using namespace galois::substrate;
 
 /* CRC-32C (iSCSI) polynomial in reversed bit order. */
 #define POLY 0x82f63b78
-inline uint32_t crc32c(char *buf, size_t len)
-{
+inline uint32_t crc32c(char* buf, size_t len) {
   uint32_t crc = 0;
   int k;
 
@@ -71,22 +70,22 @@ struct pendingReq {
   vTy buf;
   lc_req req;
   std::atomic<size_t>& inflight;
-  pendingReq(uint32_t _d, uint32_t _t, int _p, vTy& _buf, std::atomic<size_t>& s)
-    : dest(_d), tag(_t), phase(_p), buf(std::move(_buf)), inflight(s) { s++; }
-  ~pendingReq() {
-    inflight--;
+  pendingReq(uint32_t _d, uint32_t _t, int _p, vTy& _buf,
+             std::atomic<size_t>& s)
+      : dest(_d), tag(_t), phase(_p), buf(std::move(_buf)), inflight(s) {
+    s++;
   }
+  ~pendingReq() { inflight--; }
 };
 
 static void* alloc_req(size_t size, void** ctx) {
-  vTy** vector = (vTy**) ctx;
-  *vector = new vTy(size);
+  vTy** vector = (vTy**)ctx;
+  *vector      = new vTy(size);
   return (*vector)->data();
 }
 
-static void free_req(void* ctx)
-{
-  pendingReq* req = (pendingReq*) ctx;
+static void free_req(void* ctx) {
+  pendingReq* req = (pendingReq*)ctx;
   delete req;
 }
 
@@ -108,11 +107,10 @@ class NetworkInterfaceLCI : public NetworkInterface {
   unsigned long statRecvDequeued;
   bool anyReceivedMessages;
 
-  //using vTy = std::vector<uint8_t>;
+  // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
 
-  public:
-
+public:
   void workerThread() {
     // Initialize LWCI
     // makeNetworkIOLWCI(memUsageTracker, inflightSends, inflightRecvs);
@@ -147,8 +145,8 @@ public:
   NetworkInterfaceLCI() {
     lc_init(1, &lc_col_ep);
     lc_opt opt;
-    opt.dev = 0; 
-    opt.desc = LC_DYN_CQ;
+    opt.dev   = 0;
+    opt.desc  = LC_DYN_CQ;
     opt.alloc = alloc_req;
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[0]);
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[1]);
@@ -157,11 +155,11 @@ public:
     lc_get_proc_num((int*)&ID);
     lc_get_num_proc((int*)&Num);
 
-    inflightSends = 0;
-    inflightRecvs = 0;
-    ready  = 0;
+    inflightSends       = 0;
+    inflightRecvs       = 0;
+    ready               = 0;
     anyReceivedMessages = false;
-    worker = std::thread(&NetworkInterfaceLCI::workerThread, this);
+    worker              = std::thread(&NetworkInterfaceLCI::workerThread, this);
     while (ready != 1) {
     };
     ready = 2;
@@ -172,24 +170,30 @@ public:
     worker.join();
   }
 
-  boost::lockfree::queue<pendingReq*> bufferedRecv[9]; // [0, 1, 2] [0, 1, 2] 0: normal, 1: reduce, 2: AM
+  boost::lockfree::queue<pendingReq*>
+      bufferedRecv[9]; // [0, 1, 2] [0, 1, 2] 0: normal, 1: reduce, 2: AM
 
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf, int phase) {
-    if (tag == 0) phase = 2;
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf,
+                          int phase) {
+    if (tag == 0)
+      phase = 2;
 
     statSendNum += 1;
     statSendBytes += buf.size();
     // int count = 0;
 #ifndef __GALOIS_HET_ASYNC__
     if (buf.getVec().size() < 8192) {
-      while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag, lc_p2p_ep[phase]) != LC_OK) {
+      while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag,
+                      lc_p2p_ep[phase]) != LC_OK) {
         sched_yield();
       }
     } else
 #endif
     {
-      pendingReq* msg = new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
-      while (lc_sendl(msg->buf.data(), msg->buf.size(), dest, tag, lc_p2p_ep[phase], free_req, msg) != LC_OK) {
+      pendingReq* msg =
+          new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
+      while (lc_sendl(msg->buf.data(), msg->buf.size(), dest, tag,
+                      lc_p2p_ep[phase], free_req, msg) != LC_OK) {
         sched_yield();
       }
     }
@@ -198,18 +202,20 @@ public:
   inline pendingReq* convertReq(lc_req* req_ptr, int phase) {
     // Need to drain LCI queue to allow more injection.
     // Convert internal LCI request to a Galois pending request.
-    vTy buf = std::move(*((vTy*) (req_ptr->ctx)));
+    vTy buf  = std::move(*((vTy*)(req_ptr->ctx)));
     int rank = req_ptr->rank;
     int meta = req_ptr->meta;
-    delete (vTy*) req_ptr->ctx;
+    delete (vTy*)req_ptr->ctx;
     lc_cq_reqfree(lc_p2p_ep[phase], req_ptr);
     return new pendingReq(rank, meta, phase, buf, inflightRecvs);
   }
 
   virtual optional_t<std::pair<uint32_t, RecvBuffer>>
   recieveTagged(uint32_t tag,
-                std::unique_lock<galois::substrate::SimpleLock>* rlg, int phase) {
-    if (tag == 0) phase = 2;
+                std::unique_lock<galois::substrate::SimpleLock>* rlg,
+                int phase) {
+    if (tag == 0)
+      phase = 2;
     // static int count = 0;
 
     pendingReq* req;
@@ -220,32 +226,34 @@ public:
       // }
       return optional_t<std::pair<uint32_t, RecvBuffer>>();
     }
-    
+
     if (req->tag == tag) {
-      vTy buf = std::move(req->buf);
+      vTy buf  = std::move(req->buf);
       int dest = req->dest;
       delete req;
-      return optional_t<std::pair<uint32_t, RecvBuffer>>(std::make_pair(dest, std::move(buf)));
+      return optional_t<std::pair<uint32_t, RecvBuffer>>(
+          std::make_pair(dest, std::move(buf)));
     } else {
-      printf("[%d] WARNING possible lock out, wrong tag %d/%d.\n", ID, req->tag, tag);
+      printf("[%d] WARNING possible lock out, wrong tag %d/%d.\n", ID, req->tag,
+             tag);
       return optional_t<std::pair<uint32_t, RecvBuffer>>();
     }
   }
 
-  virtual void flush() {
-  }
+  virtual void flush() {}
 
   virtual bool anyPendingSends() {
     // static int count = 0;
-    // if (count++ == 10000) 
-    // printf("[%d] WARNING possible lock out terminate %d %d\n", ID, inflightSends.load(), inflightRecvs.load());
+    // if (count++ == 10000)
+    // printf("[%d] WARNING possible lock out terminate %d %d\n", ID,
+    // inflightSends.load(), inflightRecvs.load());
     return (inflightSends > 0);
   }
 
   virtual bool anyPendingReceives() {
     if (anyReceivedMessages) { // might not be acted on by the computation yet
       anyReceivedMessages = false;
-      //galois::gDebug("[", ID, "] receive out of buffer \n");
+      // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
     galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
@@ -265,11 +273,11 @@ public:
   virtual std::vector<std::pair<std::string, unsigned long>>
   reportExtraNamed() const {
     std::vector<std::pair<std::string, unsigned long>> retval(5);
-    retval[0].first = "SendTimeout";
-    retval[1].first = "SendOverflow";
-    retval[2].first = "SendUrgent";
-    retval[3].first = "SendEnqueued";
-    retval[4].first = "RecvDequeued";
+    retval[0].first  = "SendTimeout";
+    retval[1].first  = "SendOverflow";
+    retval[2].first  = "SendUrgent";
+    retval[3].first  = "SendEnqueued";
+    retval[4].first  = "RecvDequeued";
     retval[3].second = statSendEnqueued;
     retval[4].second = statRecvDequeued;
     return retval;

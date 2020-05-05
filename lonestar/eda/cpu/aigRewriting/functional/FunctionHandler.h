@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -203,8 +203,8 @@ inline void createLiterals(
   literals.insert(std::make_pair("1", std::make_pair(constOne, 0)));
 
   //	std::cout << std::endl << "############################## Literals
-  //##############################" << std::endl; 	for ( auto lit : literals ) {
-  //		std::cout << lit.first << " = " << toHex( lit.second.first, nWords )
+  //##############################" << std::endl; 	for ( auto lit : literals )
+  //{ 		std::cout << lit.first << " = " << toHex( lit.second.first, nWords )
   //<< " | " << supportToBin( lit.second.second ) << std::endl;
   //	}
   //	std::cout << std::endl;
@@ -357,8 +357,8 @@ inline void cofactor1(word* result, word* original, int nWords, int iVar) {
 }
 
 inline void computeAllCubeCofactors(BitVectorPool& functionPool,
-                             FunctionSet& cubeCofactors, word* function,
-                             int nVars) {
+                                    FunctionSet& cubeCofactors, word* function,
+                                    int nVars) {
   bool isPrevVarCofactored = true;
   int nWords               = wordNum(nVars);
   int iVar                 = nVars - 1;
@@ -367,9 +367,9 @@ inline void computeAllCubeCofactors(BitVectorPool& functionPool,
 }
 
 inline void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
-                                FunctionSet& cubeCofactors, word* function,
-                                int nVars, int nWords, int iVar,
-                                bool isPrevVarCofactored) {
+                                       FunctionSet& cubeCofactors,
+                                       word* function, int nVars, int nWords,
+                                       int iVar, bool isPrevVarCofactored) {
 
   // ignoring constants
   if (isConstZero(function, nVars) || isConstOne(function, nVars)) {
@@ -413,19 +413,19 @@ inline void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
                              iVar - 1, true);
 }
 
-inline void computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
-                                        FunctionDataMap& cubeCofactorData,
-                                        word* function, int nVars) {
+inline void
+computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
+                                   FunctionDataMap& cubeCofactorData,
+                                   word* function, int nVars) {
   int nWords = wordNum(nVars);
   int iVar   = nVars - 1;
   computeAllCubeCofactorsWithSupportRec(functionPool, cubeCofactorData,
                                         function, nVars, nWords, iVar);
 }
 
-inline void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
-                                           FunctionDataMap& cubeCofactorData,
-                                           word* function, int nVars,
-                                           int nWords, int iVar) {
+inline void computeAllCubeCofactorsWithSupportRec(
+    BitVectorPool& functionPool, FunctionDataMap& cubeCofactorData,
+    word* function, int nVars, int nWords, int iVar) {
 
   // When the constants are found
   if (isConstZero(function, nVars) || isConstOne(function, nVars)) {
@@ -459,7 +459,7 @@ inline void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
 }
 
 inline void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
-                      int nVars, unsigned int occurencesInc) {
+                             int nVars, unsigned int occurencesInc) {
 
   auto it = cubeCofactorData.find(function);
   if (it == cubeCofactorData.end()) {

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,7 +42,8 @@ typedef struct ThreadLocalDataCH_ {
   std::vector<aig::GNode> currentFanins;
   std::vector<aig::GNode> decNodeFunc;
 
-  ThreadLocalDataCH_() : currentFaninsPol(4), currentFanins(4), decNodeFunc(20) { }
+  ThreadLocalDataCH_()
+      : currentFaninsPol(4), currentFanins(4), decNodeFunc(20) {}
 
 } ThreadLocalDataCH;
 
@@ -58,17 +59,19 @@ private:
   PerThreadDataCH perThreadDataCH;
   int nFuncs;
   int nGraphs;
-	int nChoices;
+  int nChoices;
 
-  bool updateAig(ThreadLocalDataCH* thData, aig::GNode rootNode, aig::NodeData& rootData, DecGraph* decGraph, bool isOutputCompl);
+  bool updateAig(ThreadLocalDataCH* thData, aig::GNode rootNode,
+                 aig::NodeData& rootData, DecGraph* decGraph,
+                 bool isOutputCompl);
   bool decGraphToAigTry(ThreadLocalDataCH* thData, DecGraph* decGraph);
   aig::GNode decGraphToAigCreate(ThreadLocalDataCH* thData, DecGraph* decGraph);
 
   void lockFaninCone(aig::Graph& aigGraph, aig::GNode node, Cut* cut);
 
 public:
-
-  ChoiceManager(aig::Aig& aig, CutManager& cutMan, NPNManager& npnMan, PreCompGraphManager& pcgMan, int nGraphs, int nChoinces);
+  ChoiceManager(aig::Aig& aig, CutManager& cutMan, NPNManager& npnMan,
+                PreCompGraphManager& pcgMan, int nGraphs, int nChoinces);
 
   ~ChoiceManager();
 
@@ -86,4 +89,3 @@ void runChoiceOperator(ChoiceManager& chMan);
 } /* namespace algorithm */
 
 #endif /* CHOICEMANAGER_H_ */
-

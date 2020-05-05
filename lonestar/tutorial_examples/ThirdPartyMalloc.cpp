@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,7 +31,7 @@ int main() {
   // Our 3rd-party heap
   using RealHeap = galois::runtime::MallocHeap;
 
-  // Wrap RealHeap to conform to STL allocators 
+  // Wrap RealHeap to conform to STL allocators
   using WrappedHeap = galois::runtime::ExternalHeapAllocator<int, RealHeap>;
 
   // Instantiate heaps
@@ -44,8 +44,9 @@ int main() {
     v.push_back(i);
   }
 
-  std::cout << "Use of a std::vector with a third-party allocator wrapped by galois::runtime::ExternalHeapAllocator.\n";
-  for (auto& j: v) {
+  std::cout << "Use of a std::vector with a third-party allocator wrapped by "
+               "galois::runtime::ExternalHeapAllocator.\n";
+  for (auto& j : v) {
     std::cout << j << std::endl;
   }
   //! [heap wrapping example]

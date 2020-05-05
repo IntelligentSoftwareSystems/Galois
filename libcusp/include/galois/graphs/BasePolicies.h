@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,14 +35,15 @@ namespace graphs {
  * inherit from.
  */
 class PartitioningScaffold {
- protected:
-  uint32_t _hostID; //!< host ID of owner of this object
+protected:
+  uint32_t _hostID;   //!< host ID of owner of this object
   uint32_t _numHosts; //!< total number of hosts
   uint64_t _numNodes; //!< number of nodes in graph
   uint64_t _numEdges; //!< number of edges in graph
   //! maps from host id to nodes that host as read from disk
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
- public:
+
+public:
   /**
    * Constructor for Scaffold.
    *
@@ -52,9 +53,9 @@ class PartitioningScaffold {
    * @param numEdges Total number of edges in graph
    */
   PartitioningScaffold(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-                       uint64_t numEdges) :
-    _hostID(hostID), _numHosts(numHosts), _numNodes(numNodes),
-    _numEdges(numEdges) { }
+                       uint64_t numEdges)
+      : _hostID(hostID), _numHosts(numHosts), _numNodes(numNodes),
+        _numEdges(numEdges) {}
 
   /**
    * Save a provided map from host to nodes a host has read into this object
@@ -71,13 +72,13 @@ class PartitioningScaffold {
  * need to go through a master assignment phase, saving overhead.
  */
 class ReadMasterAssignment : public PartitioningScaffold {
- public:
+public:
   /**
    * Constructor simply calls parent constructor.
    */
   ReadMasterAssignment(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-                       uint64_t numEdges) :
-    PartitioningScaffold(hostID, numHosts, numNodes, numEdges) {}
+                       uint64_t numEdges)
+      : PartitioningScaffold(hostID, numHosts, numNodes, numEdges) {}
 
   /**
    * Returns the host ID of the host that read a particular node and its edges
@@ -115,14 +116,14 @@ class ReadMasterAssignment : public PartitioningScaffold {
    * Does nothing because this policy doesn't have a master assignment phase.
    * (uses read assignment)
    */
-  template<typename EdgeTy> uint32_t getMaster(uint32_t,
-      galois::graphs::BufferedGraph<EdgeTy>&,
-      const std::vector<uint32_t>&,
-      std::unordered_map<uint64_t, uint32_t>&,
-      const std::vector<uint64_t>&,
-      std::vector<galois::CopyableAtomic<uint64_t>>&,
-      const std::vector<uint64_t>&,
-      std::vector<galois::CopyableAtomic<uint64_t>>&) {
+  template <typename EdgeTy>
+  uint32_t getMaster(uint32_t, galois::graphs::BufferedGraph<EdgeTy>&,
+                     const std::vector<uint32_t>&,
+                     std::unordered_map<uint64_t, uint32_t>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&) {
     return 0;
   }
 
@@ -130,7 +131,7 @@ class ReadMasterAssignment : public PartitioningScaffold {
    * No-op because no master assignment phase.
    */
   void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>&,
-                        std::vector<uint32_t>&, uint64_t) { }
+                        std::vector<uint32_t>&, uint64_t) {}
   /**
    * Technically doesn't nothing and should never be called because no master
    * assignment phase.
@@ -144,7 +145,7 @@ class ReadMasterAssignment : public PartitioningScaffold {
  * to partitioning, but may get better quality partitions.
  */
 class CustomMasterAssignment : public PartitioningScaffold {
- protected:
+protected:
   char _status; //!< Specifies what phase of master assignment partitioner is on
   //! Metadata for determining where a node's master is
   std::vector<uint32_t> _localNodeToMaster;
@@ -170,11 +171,12 @@ class CustomMasterAssignment : public PartitioningScaffold {
     return -1;
   }
 
- public:
+public:
   //! Calls parent constructor to initialize common data
   CustomMasterAssignment(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
-                         uint64_t numEdges) :
-    PartitioningScaffold(hostID, numHosts, numNodes, numEdges), _status(0) {}
+                         uint64_t numEdges)
+      : PartitioningScaffold(hostID, numHosts, numNodes, numEdges), _status(0) {
+  }
 
   /**
    * Retrieves a saved master mapping: does not fail if a GID
@@ -192,7 +194,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
         // found in map
         if (gidMasterIter != _gid2masters.end()) {
           uint32_t mappedMaster = gidMasterIter->second;
-          //galois::gDebug("[", _hostID, "] ", gid, " found with master ",
+          // galois::gDebug("[", _hostID, "] ", gid, " found with master ",
           //               mappedMaster, "!");
           // make sure host is in bounds
           assert(mappedMaster < _numHosts);
@@ -234,9 +236,9 @@ class CustomMasterAssignment : public PartitioningScaffold {
   void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
-    #ifndef NDEBUG
+#ifndef NDEBUG
     size_t originalSize = _gid2masters.size();
-    #endif
+#endif
 
     for (auto i = gid2offsets.begin(); i != gid2offsets.end(); i++) {
       assert(i->second < localNodeToMaster.size());
@@ -261,7 +263,6 @@ class CustomMasterAssignment : public PartitioningScaffold {
     // stage 1 setup complete
     _status = 1;
   }
-
 
   //! Returns true as policies that inherit from this should define master
   //! assignment function
@@ -288,7 +289,8 @@ class CustomMasterAssignment : public PartitioningScaffold {
    *
    * @returns Host id in which to assing a node
    */
-  template<typename EdgeTy> uint32_t getMaster(
+  template <typename EdgeTy>
+  uint32_t getMaster(
       uint32_t GALOIS_UNUSED(src),
       galois::graphs::BufferedGraph<EdgeTy>& GALOIS_UNUSED(bufGraph),
       const std::vector<uint32_t>& GALOIS_UNUSED(localNodeToMaster),
@@ -296,8 +298,7 @@ class CustomMasterAssignment : public PartitioningScaffold {
       const std::vector<uint64_t>& GALOIS_UNUSED(nodeLoads),
       std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(nodeAccum),
       const std::vector<uint64_t>& GALOIS_UNUSED(edgeLoads),
-      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(edgeAccum))
-  {
+      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(edgeAccum)) {
     return (uint32_t)-1;
   }
 

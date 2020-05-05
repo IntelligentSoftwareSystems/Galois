@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,7 +36,6 @@
 #include "../algorithms/PriorityCutManager.h"
 #include "galois/Galois.h"
 
-
 class BlifWriter {
 
 private:
@@ -44,17 +43,16 @@ private:
   std::string path;
 
 public:
-	BlifWriter();
-	BlifWriter(std::string path);
-	~BlifWriter();
+  BlifWriter();
+  BlifWriter(std::string path);
+  ~BlifWriter();
 
-	void setFile(std::string path);
-	bool isOpen();
-	void close();
-	int countDigits( int n );
+  void setFile(std::string path);
+  bool isOpen();
+  void close();
+  int countDigits(int n);
 
-	void writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan );
-
+  void writeNetlist(aig::Aig& aig, algorithm::PriCutManager& cutMan);
 };
 
 #endif /* BLIFWRITER_H_ */

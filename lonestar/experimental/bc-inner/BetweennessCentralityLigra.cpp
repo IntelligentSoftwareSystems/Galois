@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -230,14 +230,14 @@ struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
                        false);
       // galois::do_all(*output, [&](GNode n) {
       // galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      galois::for_each(*output,
-                       [&](size_t id, galois::UserContext<size_t>&) {
-                         SNode& d =
-                             graph.getData(graph.nodeFromId(id),
-                                           galois::MethodFlag::UNPROTECTED);
-                         d.visited = true;
-                       },
-                       galois::wl<WL>());
+      galois::for_each(
+          *output,
+          [&](size_t id, galois::UserContext<size_t>&) {
+            SNode& d  = graph.getData(graph.nodeFromId(id),
+                                     galois::MethodFlag::UNPROTECTED);
+            d.visited = true;
+          },
+          galois::wl<WL>());
       levels.push_back(output);
       frontier = output;
     }

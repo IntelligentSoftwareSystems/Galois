@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -18,8 +18,8 @@
  */
 
 /* This is an implementation of Distributed multi-GPU triangle counting code.
- * The single GPU code which is executed on GPU is generated using the IrGL compiler.
- * Currently, it does not support distributed multi-CPU code.
+ * The single GPU code which is executed on GPU is generated using the IrGL
+ * compiler. Currently, it does not support distributed multi-CPU code.
  *
  * TODO implement CPU kernel
  */
@@ -52,7 +52,6 @@ struct NodeData {
   char dummy;
 };
 
-
 typedef galois::graphs::MiningGraph<NodeData, void, MiningPolicyDegrees> Graph;
 typedef typename Graph::GraphNode GNode;
 
@@ -73,21 +72,21 @@ struct TC {
     syncSubstrate->set_num_round(_num_iterations);
     num_triangles.reset();
 
-    #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       uint64_t num_local_triangles = 0;
-      TC_masterNodes_cuda( num_local_triangles, cuda_ctx);
+      TC_masterNodes_cuda(num_local_triangles, cuda_ctx);
       num_triangles += num_local_triangles;
       StatTimer_cuda.stop();
     }
-    #endif
+#endif
 
     uint64_t total_triangles = num_triangles.reduce();
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-       galois::gPrint("Total number of triangles ", total_triangles, "\n");
+      galois::gPrint("Total number of triangles ", total_triangles, "\n");
     }
   }
 };
@@ -112,7 +111,8 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(&cuda_ctx, false);
+  std::tie(hg, syncSubstrate) =
+      distGraphInitialization<NodeData, void>(&cuda_ctx, false);
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>();
 #endif

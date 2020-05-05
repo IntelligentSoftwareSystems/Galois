@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -60,7 +60,7 @@ inline int wordNum(int nVars);
 inline void truthStretch(word* result, word* input, int inVars, int nVars,
                          unsigned phase);
 inline void swapAdjacentVars(word* result, word* input, int nVars, int iVar);
-inline std::string toCubeString( word* function, int nWords, int nVars);
+inline std::string toCubeString(word* function, int nWords, int nVars);
 inline std::string toHex(word* function, int nWords);
 inline std::string toBin(word* function, int nWords);
 
@@ -137,17 +137,17 @@ inline bool isConstOne(word* function, int nVars) {
 
 inline int countOnes(unsigned uWord) {
 
-    uWord = (uWord & 0x55555555) + ((uWord>>1) & 0x55555555);
-    uWord = (uWord & 0x33333333) + ((uWord>>2) & 0x33333333);
-    uWord = (uWord & 0x0F0F0F0F) + ((uWord>>4) & 0x0F0F0F0F);
-    uWord = (uWord & 0x00FF00FF) + ((uWord>>8) & 0x00FF00FF);
-    return  (uWord & 0x0000FFFF) + (uWord>>16);
+  uWord = (uWord & 0x55555555) + ((uWord >> 1) & 0x55555555);
+  uWord = (uWord & 0x33333333) + ((uWord >> 2) & 0x33333333);
+  uWord = (uWord & 0x0F0F0F0F) + ((uWord >> 4) & 0x0F0F0F0F);
+  uWord = (uWord & 0x00FF00FF) + ((uWord >> 8) & 0x00FF00FF);
+  return (uWord & 0x0000FFFF) + (uWord >> 16);
 }
 
 inline int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
 
 inline void truthStretch(word* result, word* input, int inVars, int nVars,
-                  unsigned phase) {
+                         unsigned phase) {
 
   unsigned* pTemp;
   int var = inVars - 1, counter = 0;
@@ -267,52 +267,49 @@ inline std::string toHex(word* function, int nWords) {
   return result.str();
 }
 
-inline std::string toCubeString( word* function, int nWords, int nVars) {
+inline std::string toCubeString(word* function, int nWords, int nVars) {
 
-	std::stringstream cubes;
-	word mask, cube;
-	int nRows;
+  std::stringstream cubes;
+  word mask, cube;
+  int nRows;
 
-	if ( nWords == 1 ) {
-		nRows = 2 << (nVars-1);
-		mask = 1;
-		for (int j = 0; j < nRows; j++) {
-			if ( function[0] & mask ) {
-				cube = j;
-				for (int k = 0; k < nVars; k++) {
-					if ((cube >> k) & 1) {
-						cubes << ("1");
-					}
-					else {
-						cubes << ("0");
-					}
-				}
-				cubes << " 1" << std::endl;
-			}
-			mask = mask << 1;
-		}
-	}
-	else {
-		for (int i = 0; i < nWords; i++) {
-			mask = 1;
-			for (int j = 0; j < 32; j++) {
-				if ( function[i] & mask ) {
-					cube = (i*32)+j;
-					for (int k = 0; k < nVars; k++) {
-						if ((cube >> k) & 1) {
-							cubes << ("1");
-						} 
-						else {
-							cubes << ("0");
-						}
-					}
-					cubes << " 1" << std::endl;
-				}
-				mask = mask << 1;
-			}
-		}
-	}
-	return cubes.str();
+  if (nWords == 1) {
+    nRows = 2 << (nVars - 1);
+    mask  = 1;
+    for (int j = 0; j < nRows; j++) {
+      if (function[0] & mask) {
+        cube = j;
+        for (int k = 0; k < nVars; k++) {
+          if ((cube >> k) & 1) {
+            cubes << ("1");
+          } else {
+            cubes << ("0");
+          }
+        }
+        cubes << " 1" << std::endl;
+      }
+      mask = mask << 1;
+    }
+  } else {
+    for (int i = 0; i < nWords; i++) {
+      mask = 1;
+      for (int j = 0; j < 32; j++) {
+        if (function[i] & mask) {
+          cube = (i * 32) + j;
+          for (int k = 0; k < nVars; k++) {
+            if ((cube >> k) & 1) {
+              cubes << ("1");
+            } else {
+              cubes << ("0");
+            }
+          }
+          cubes << " 1" << std::endl;
+        }
+        mask = mask << 1;
+      }
+    }
+  }
+  return cubes.str();
 }
 
 } /* namespace Functional32 */

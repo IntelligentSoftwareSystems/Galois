@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -69,8 +69,7 @@ const char* const ALGO_NAMES[] = {"AsyncTile", "Async",      "SyncTile",
 static cll::opt<Exec> execution(
     "exec",
     cll::desc("Choose SERIAL or PARALLEL execution (default value PARALLEL):"),
-    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL")
-                ),
+    cll::values(clEnumVal(SERIAL, "SERIAL"), clEnumVal(PARALLEL, "PARALLEL")),
     cll::init(PARALLEL));
 
 static cll::opt<Algo> algo(
@@ -172,9 +171,9 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
       typename std::conditional<CONCURRENT, galois::ForEach,
                                 galois::WhileQ<galois::SerFIFO<T>>>::type;
 
-GALOIS_GCC7_IGNORE_UNUSED_BUT_SET
+  GALOIS_GCC7_IGNORE_UNUSED_BUT_SET
   constexpr bool useCAS = CONCURRENT && !std::is_same<WL, BSWL>::value;
-GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
+  GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
 
   Loop loop;
 
@@ -190,53 +189,54 @@ GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
     pushWrap(initBag, source, 1);
   }
 
-  loop(galois::iterate(initBag),
-       [&](const T& item, auto& ctx) {
-         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  loop(
+      galois::iterate(initBag),
+      [&](const T& item, auto& ctx) {
+        constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
-         const auto& sdist = graph.getData(item.src, flag);
+        const auto& sdist = graph.getData(item.src, flag);
 
-         if (TRACK_WORK) {
-           if (item.dist != sdist) {
-             WLEmptyWork += 1;
-             return;
-           }
-         }
+        if (TRACK_WORK) {
+          if (item.dist != sdist) {
+            WLEmptyWork += 1;
+            return;
+          }
+        }
 
-         const auto newDist = item.dist;
+        const auto newDist = item.dist;
 
-         for (auto ii : edgeRange(item)) {
-           GNode dst   = graph.getEdgeDst(ii);
-           auto& ddata = graph.getData(dst, flag);
+        for (auto ii : edgeRange(item)) {
+          GNode dst   = graph.getEdgeDst(ii);
+          auto& ddata = graph.getData(dst, flag);
 
-           while (true) {
+          while (true) {
 
-             Dist oldDist = ddata;
+            Dist oldDist = ddata;
 
-             if (oldDist <= newDist) {
-               break;
-             }
+            if (oldDist <= newDist) {
+              break;
+            }
 
-             if (!useCAS ||
-                 __sync_bool_compare_and_swap(&ddata, oldDist, newDist)) {
+            if (!useCAS ||
+                __sync_bool_compare_and_swap(&ddata, oldDist, newDist)) {
 
-               if (!useCAS) {
-                 ddata = newDist;
-               }
+              if (!useCAS) {
+                ddata = newDist;
+              }
 
-               if (TRACK_WORK) {
-                 if (oldDist != BFS::DIST_INFINITY) {
-                   BadWork += 1;
-                 }
-               }
+              if (TRACK_WORK) {
+                if (oldDist != BFS::DIST_INFINITY) {
+                  BadWork += 1;
+                }
+              }
 
-               pushWrap(ctx, dst, newDist + 1);
-               break;
-             }
-           }
-         }
-       },
-       galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+              pushWrap(ctx, dst, newDist + 1);
+              break;
+            }
+          }
+        }
+      },
+      galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
 
   if (TRACK_WORK) {
     galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());
@@ -278,22 +278,23 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
     next->clear();
     ++nextLevel;
 
-    loop(galois::iterate(*curr),
-         [&](const T& item) {
-           for (auto e : edgeRange(item)) {
-             auto dst = graph.getEdgeDst(e);
-             // if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " <<
-             // dst << " visited"<<std::endl;
-             auto& dstData = graph.getData(dst, flag);
+    loop(
+        galois::iterate(*curr),
+        [&](const T& item) {
+          for (auto e : edgeRange(item)) {
+            auto dst = graph.getEdgeDst(e);
+            // if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " <<
+            // dst << " visited"<<std::endl;
+            auto& dstData = graph.getData(dst, flag);
 
-             if (dstData == BFS::DIST_INFINITY) {
-               dstData = nextLevel;
-               pushWrap(*next, dst);
-             }
-           }
-         },
-         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-         galois::loopname("Sync"));
+            if (dstData == BFS::DIST_INFINITY) {
+              dstData = nextLevel;
+              pushWrap(*next, dst);
+            }
+          }
+        },
+        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("Sync"));
   }
 
   delete curr;
@@ -328,30 +329,29 @@ void sync2phaseAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   while (!activeNodes.empty()) {
 
-    loop(galois::iterate(activeNodes),
-         [&](const GNode& src) {
-           pushWrap(edgeTiles, src);
-         },
-         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-         galois::loopname("activeNodes"));
+    loop(
+        galois::iterate(activeNodes),
+        [&](const GNode& src) { pushWrap(edgeTiles, src); }, galois::steal(),
+        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("activeNodes"));
 
     ++nextLevel;
     activeNodes.clear();
 
-    loop(galois::iterate(edgeTiles),
-         [&](const EdgeTile& item) {
-           for (auto e : edgeRange(item)) {
-             auto dst      = graph.getEdgeDst(e);
-             auto& dstData = graph.getData(dst, flag);
+    loop(
+        galois::iterate(edgeTiles),
+        [&](const EdgeTile& item) {
+          for (auto e : edgeRange(item)) {
+            auto dst      = graph.getEdgeDst(e);
+            auto& dstData = graph.getData(dst, flag);
 
-             if (dstData == BFS::DIST_INFINITY) {
-               dstData = nextLevel;
-               activeNodes.push(dst);
-             }
-           }
-         },
-         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-         galois::loopname("edgeTiles"));
+            if (dstData == BFS::DIST_INFINITY) {
+              dstData = nextLevel;
+              activeNodes.push(dst);
+            }
+          }
+        },
+        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("edgeTiles"));
 
     edgeTiles.clear();
   }
@@ -461,19 +461,17 @@ int main(int argc, char** argv) {
   visitedNode.reset();
 
   galois::do_all(
-    galois::iterate(graph),
-    [&] (uint64_t i) {
-      uint32_t myDistance = graph.getData(i);
+      galois::iterate(graph),
+      [&](uint64_t i) {
+        uint32_t myDistance = graph.getData(i);
 
-      if (myDistance != BFS::DIST_INFINITY) {
-        maxDistance.update(myDistance);
-        distanceSum += myDistance;
-        visitedNode += 1;
-      }
-    },
-    galois::loopname("Sanity check"),
-    galois::no_stats()
-  );
+        if (myDistance != BFS::DIST_INFINITY) {
+          maxDistance.update(myDistance);
+          distanceSum += myDistance;
+          visitedNode += 1;
+        }
+      },
+      galois::loopname("Sanity check"), galois::no_stats());
 
   // report sanity stats
   uint64_t rMaxDistance = maxDistance.reduce();

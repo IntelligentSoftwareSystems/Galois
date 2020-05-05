@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,12 +30,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 cll::opt<int> numThreads("t", cll::desc("Number of threads (default 1)"),
-                              cll::init(1));
+                         cll::init(1));
 cll::opt<int> numRuns("runs", cll::desc("Number of runs (default 3)"),
-                                        cll::init(3));
-cll::opt<std::string> statFile("statFile",
-                               cll::desc("optional output file to print stats to"),
-                               cll::init(""));
+                      cll::init(3));
+cll::opt<std::string>
+    statFile("statFile", cll::desc("optional output file to print stats to"),
+             cll::init(""));
 cll::opt<bool> verify("verify",
                       cll::desc("Verify results by outputting results "
                                 "to file (default false)"),
@@ -49,18 +49,15 @@ cll::opt<bool>
 // TODO: use enums
 cll::opt<DataCommMode> commMetadata(
     "metadata", cll::desc("Communication metadata"),
-    cll::values(clEnumValN(noData, "auto",
-                           "Dynamically choose the metadata"),
+    cll::values(clEnumValN(noData, "auto", "Dynamically choose the metadata"),
                 clEnumValN(bitsetData, "bitset", "Use bitset metadata always"),
                 clEnumValN(offsetsData, "offsets",
                            "Use offsets metadata always"),
                 clEnumValN(gidsData, "gids", "Use global IDs metadata always"),
                 clEnumValN(onlyData, "none",
                            "Do not use any metadata (sends "
-                           "non-updated values)")
-                ),
+                           "non-updated values)")),
     cll::init(noData), cll::Hidden);
-
 
 #ifdef __GALOIS_HET_CUDA__
 std::string personality_str(Personality p) {
@@ -102,7 +99,7 @@ cll::opt<std::string> personality_set(
 
 static void PrintVersion(llvm::raw_ostream& out) {
   out << "D-Galois Benchmark Suite v" << galois::getVersion() << " ("
-            << galois::getRevision() << ")\n";
+      << galois::getRevision() << ")\n";
   out.flush();
 }
 
@@ -122,7 +119,7 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
   if (net.ID == 0) {
     PrintVersion(llvm::outs());
     llvm::outs() << "Copyright (C) " << galois::getCopyrightYear()
-              << " The University of Texas at Austin\n";
+                 << " The University of Texas at Austin\n";
     llvm::outs() << "http://iss.ices.utexas.edu/galois/\n\n";
     llvm::outs() << "application: " << (app ? app : "unspecified") << "\n";
 
@@ -130,8 +127,9 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
       llvm::outs() << desc << "\n";
     }
     if (url) {
-      llvm::outs() << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
-                << url << "\n";
+      llvm::outs()
+          << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" << url
+          << "\n";
     }
     llvm::outs() << "\n";
     llvm::outs().flush();
@@ -211,7 +209,9 @@ void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
       }
     }
   } else {
-    galois::gWarn("Command line option -pset ignored because its string length is not equal to the number of processes/hosts on each physical node");
-  } 
+    galois::gWarn(
+        "Command line option -pset ignored because its string length is not "
+        "equal to the number of processes/hosts on each physical node");
+  }
 }
 #endif

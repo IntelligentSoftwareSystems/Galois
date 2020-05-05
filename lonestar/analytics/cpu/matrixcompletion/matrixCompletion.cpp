@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -67,8 +67,7 @@ static cll::opt<Algo>
              clEnumValN(Algo::sgdBlockJump, "sgdBlockJump",
                         "SGD using Block jumping "),
              clEnumValN(Algo::sgdByItems, "sgdByItems", "Simple SGD on Items"),
-             clEnumValN(Algo::sgdByEdges, "sgdByEdges", "Simple SGD on edges")
-             ),
+             clEnumValN(Algo::sgdByEdges, "sgdByEdges", "Simple SGD on edges")),
          cll::init(Algo::sgdBlockEdge));
 /*
  * Commandline options for different learning functions
@@ -148,12 +147,11 @@ size_t countEdges(Graph& g) {
   galois::GAccumulator<size_t> edges;
   galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   std::cout << "NUM_ITEM_NODES : " << NUM_ITEM_NODES << "\n";
-  executor.execute(g.begin(), g.begin() + NUM_ITEM_NODES,
-                   g.begin() + NUM_ITEM_NODES, g.end(), itemsPerBlock,
-                   usersPerBlock,
-                   [&](GNode, GNode,
-                       typename Graph::edge_iterator) { edges += 1; },
-                   false); // false = no locks
+  executor.execute(
+      g.begin(), g.begin() + NUM_ITEM_NODES, g.begin() + NUM_ITEM_NODES,
+      g.end(), itemsPerBlock, usersPerBlock,
+      [&](GNode, GNode, typename Graph::edge_iterator) { edges += 1; },
+      false); // false = no locks
   return edges.reduce();
 }
 
@@ -913,8 +911,8 @@ struct SimpleALSalgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, EdgeType>::with_no_lockable<
-      true>::type Graph;
+  typedef typename galois::graphs::LC_CSR_Graph<
+      Node, EdgeType>::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
   // Column-major access
   typedef Eigen::SparseMatrix<LatentValue> Sp;
@@ -1341,35 +1339,34 @@ size_t initializeGraphData(Graph& g) {
     });
   }
 
+  auto activeThreads = galois::getActiveThreads();
+  std::vector<uint32_t> largestNodeID_perThread(activeThreads);
 
-   auto activeThreads = galois::getActiveThreads();
-   std::vector<uint32_t> largestNodeID_perThread(activeThreads);
+  galois::on_each([&](unsigned tid, unsigned nthreads) {
+    unsigned int block_size = g.size() / nthreads;
+    if ((g.size() % nthreads) > 0)
+      ++block_size;
 
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      unsigned int block_size = g.size() / nthreads;
-      if ((g.size() % nthreads) > 0)
-        ++block_size;
+    uint32_t start = tid * block_size;
+    uint32_t end   = (tid + 1) * block_size;
+    if (end > g.size())
+      end = g.size();
 
-      uint32_t start = tid * block_size;
-      uint32_t end   = (tid + 1) * block_size;
-      if (end > g.size())
-        end = g.size();
-
-      largestNodeID_perThread[tid] = 0;
-      for (uint32_t i = start; i < end; ++i) {
-        if(std::distance(g.edge_begin(i), g.edge_end(i))) {
-          if(largestNodeID_perThread[tid] < i)
-            largestNodeID_perThread[tid] = i;
-          }
+    largestNodeID_perThread[tid] = 0;
+    for (uint32_t i = start; i < end; ++i) {
+      if (std::distance(g.edge_begin(i), g.edge_end(i))) {
+        if (largestNodeID_perThread[tid] < i)
+          largestNodeID_perThread[tid] = i;
       }
-    });
-
-    uint32_t largestNodeID = 0;
-    for(uint32_t t = 0; t < activeThreads; ++t){
-      if(largestNodeID < largestNodeID_perThread[t])
-        largestNodeID = largestNodeID_perThread[t];
     }
-    size_t numItemNodes = largestNodeID + 1;
+  });
+
+  uint32_t largestNodeID = 0;
+  for (uint32_t t = 0; t < activeThreads; ++t) {
+    if (largestNodeID < largestNodeID_perThread[t])
+      largestNodeID = largestNodeID_perThread[t];
+  }
+  size_t numItemNodes = largestNodeID + 1;
 
   initTimer.stop();
   return numItemNodes;

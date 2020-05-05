@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -22,9 +22,7 @@
 
 AigWriter::AigWriter() {}
 
-AigWriter::AigWriter(std::string path) {
-  setFile(path);
-}
+AigWriter::AigWriter(std::string path) { setFile(path); }
 
 AigWriter::~AigWriter() { aigerFile.close(); }
 
@@ -114,8 +112,8 @@ void AigWriter::writeAndsAag(Aig& aig) {
 
   aig.computeTopologicalSortForAnds(stack);
 
-	//std::cout << "size: " << aig.getNumAnds() << std::endl;
-	//std::cout << "stack size: " << stack.size() << std::endl;
+  // std::cout << "size: " << aig.getNumAnds() << std::endl;
+  // std::cout << "stack size: " << stack.size() << std::endl;
 
   aig::Graph& graph = aig.getGraph();
 

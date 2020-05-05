@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -48,7 +48,7 @@ namespace galois {
  * Both MergeFunc and IdFunc should be copy constructable.
  *
  * The MergeFunc and IdFunc should be related as follows:
- * 
+ *
  *   MergeFunc(x, IdFunc()) == x    for all x in X
  *
  * An example of using a move merge function:
@@ -62,7 +62,7 @@ namespace galois {
  *   T& result = r.reduce();
  */
 template <typename T, typename MergeFunc, typename IdFunc>
-class Reducible: public MergeFunc, public IdFunc {
+class Reducible : public MergeFunc, public IdFunc {
 
   galois::substrate::PerThreadStorage<T> data_;
 
@@ -71,16 +71,13 @@ class Reducible: public MergeFunc, public IdFunc {
     lhs = std::move(v);
   }
 
-  void merge(T& lhs, const T& rhs) {
-    lhs = MergeFunc::operator()(lhs, rhs);
-  }
+  void merge(T& lhs, const T& rhs) { lhs = MergeFunc::operator()(lhs, rhs); }
 
 public:
   using value_type = T;
 
-  Reducible(MergeFunc merge_func, IdFunc id_func):
-    MergeFunc(merge_func), IdFunc(id_func)
-  {
+  Reducible(MergeFunc merge_func, IdFunc id_func)
+      : MergeFunc(merge_func), IdFunc(id_func) {
     for (unsigned i = 0; i < data_.size(); ++i) {
       *(data_.getRemote(i)) = IdFunc::operator()();
     }
@@ -90,20 +87,14 @@ public:
    * Updates the thread local value by applying the reduction operator to
    * current and newly provided value
    */
-  void update(T&& rhs) {
-    merge(*data_.getLocal(), std::move(rhs));
-  }
+  void update(T&& rhs) { merge(*data_.getLocal(), std::move(rhs)); }
 
-  void update(const T& rhs) {
-    merge(*data_.getLocal(), rhs);
-  }
+  void update(const T& rhs) { merge(*data_.getLocal(), rhs); }
 
   /**
    * Returns a reference to the local value of T.
    */
-  T& getLocal() {
-    return *data_.getLocal();
-  }
+  T& getLocal() { return *data_.getLocal(); }
 
   /**
    * Returns the final reduction value. Only valid outside the parallel region.
@@ -153,9 +144,7 @@ struct gmin {
 
 template <typename T, T value>
 struct identity_value {
-  constexpr T operator()() const {
-    return T{value};
-  }
+  constexpr T operator()() const { return T{value}; }
 };
 
 // The following identity_value specializations exist because floating point
@@ -163,23 +152,17 @@ struct identity_value {
 
 template <typename T>
 struct identity_value_zero {
-  constexpr T operator()() const {
-    return T{0};
-  }
+  constexpr T operator()() const { return T{0}; }
 };
 
 template <typename T>
 struct identity_value_min {
-  constexpr T operator()() const {
-    return std::numeric_limits<T>::min();
-  }
+  constexpr T operator()() const { return std::numeric_limits<T>::min(); }
 };
 
 template <typename T>
 struct identity_value_max {
-  constexpr T operator()() const {
-    return std::numeric_limits<T>::max();
-  }
+  constexpr T operator()() const { return std::numeric_limits<T>::max(); }
 };
 
 //! Accumulator for T where accumulation is plus
@@ -188,7 +171,7 @@ class GAccumulator : public Reducible<T, std::plus<T>, identity_value_zero<T>> {
   using base_type = Reducible<T, std::plus<T>, identity_value_zero<T>>;
 
 public:
-  GAccumulator(): base_type(std::plus<T>(), identity_value_zero<T>()) { }
+  GAccumulator() : base_type(std::plus<T>(), identity_value_zero<T>()) {}
 
   GAccumulator& operator+=(const T& rhs) {
     base_type::update(rhs);
@@ -207,7 +190,7 @@ class GReduceMax : public Reducible<T, gmax<T>, identity_value_min<T>> {
   using base_type = Reducible<T, gmax<T>, identity_value_min<T>>;
 
 public:
-  GReduceMax(): base_type(gmax<T>(), identity_value_min<T>()) { }
+  GReduceMax() : base_type(gmax<T>(), identity_value_min<T>()) {}
 };
 
 //! Accumulator for T where accumulation is min
@@ -216,23 +199,29 @@ class GReduceMin : public Reducible<T, gmin<T>, identity_value_max<T>> {
   using base_type = Reducible<T, gmin<T>, identity_value_max<T>>;
 
 public:
-  GReduceMin(): base_type(gmin<T>(), identity_value_max<T>()) { }
+  GReduceMin() : base_type(gmin<T>(), identity_value_max<T>()) {}
 };
 
 //! logical AND reduction
-class GReduceLogicalAnd : public Reducible<bool, std::logical_and<bool>, identity_value<bool, true>> {
-  using base_type = Reducible<bool, std::logical_and<bool>, identity_value<bool, true>>;
+class GReduceLogicalAnd : public Reducible<bool, std::logical_and<bool>,
+                                           identity_value<bool, true>> {
+  using base_type =
+      Reducible<bool, std::logical_and<bool>, identity_value<bool, true>>;
 
 public:
-  GReduceLogicalAnd(): base_type(std::logical_and<bool>(), identity_value<bool, true>()) { }
+  GReduceLogicalAnd()
+      : base_type(std::logical_and<bool>(), identity_value<bool, true>()) {}
 };
 
 //! logical OR reduction
-class GReduceLogicalOr : public Reducible<bool, std::logical_or<bool>, identity_value<bool, false>> {
-  using base_type = Reducible<bool, std::logical_or<bool>, identity_value<bool, false>>;
+class GReduceLogicalOr : public Reducible<bool, std::logical_or<bool>,
+                                          identity_value<bool, false>> {
+  using base_type =
+      Reducible<bool, std::logical_or<bool>, identity_value<bool, false>>;
 
 public:
-  GReduceLogicalOr(): base_type(std::logical_or<bool>(), identity_value<bool, false>()) { }
+  GReduceLogicalOr()
+      : base_type(std::logical_or<bool>(), identity_value<bool, false>()) {}
 };
 
 } // namespace galois

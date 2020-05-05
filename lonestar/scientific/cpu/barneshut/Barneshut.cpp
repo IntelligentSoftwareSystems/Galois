@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -426,11 +426,12 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   // sort and copy out
   divide(tmp.begin(), tmp.end(), gen);
 
-  galois::do_all(galois::iterate(tmp),
-                 [&pBodies, &bodies](const Body& b) {
-                   pBodies.push_back(&(bodies.push_back(b)));
-                 },
-                 galois::loopname("InsertBody"));
+  galois::do_all(
+      galois::iterate(tmp),
+      [&pBodies, &bodies](const Body& b) {
+        pBodies.push_back(&(bodies.push_back(b)));
+      },
+      galois::loopname("InsertBody"));
 }
 
 struct CheckAllPairs {
@@ -482,16 +483,15 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
       return lhs.merge(rhs);
     };
 
-    auto identity = []() {
-      return BoundingBox();
-    };
+    auto identity = []() { return BoundingBox(); };
 
     // Do tree building sequentially
     auto boxes = galois::make_reducible(mergeBoxes, identity);
 
-    galois::do_all(galois::iterate(pBodies),
-                   [&boxes](const Body* b) { boxes.update(BoundingBox(b->pos)); },
-                   galois::loopname("reduceBoxes"));
+    galois::do_all(
+        galois::iterate(pBodies),
+        [&boxes](const Body* b) { boxes.update(BoundingBox(b->pos)); },
+        galois::loopname("reduceBoxes"));
 
     BoundingBox box = boxes.reduce();
 
@@ -520,11 +520,11 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
-    galois::for_each(galois::iterate(pBodies),
-                     [&](Body* b, auto& cnx) { cf.computeForce(b, cnx); },
-                     galois::loopname("compute"), galois::wl<WLL>(),
-                     galois::no_conflicts(), galois::no_pushes(),
-                     galois::per_iter_alloc());
+    galois::for_each(
+        galois::iterate(pBodies),
+        [&](Body* b, auto& cnx) { cf.computeForce(b, cnx); },
+        galois::loopname("compute"), galois::wl<WLL>(), galois::no_conflicts(),
+        galois::no_pushes(), galois::per_iter_alloc());
     T_compute.stop();
 
     if (!skipVerify) {
@@ -537,16 +537,17 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
           "checkAllPairs");
     }
     // Done in compute forces
-    galois::do_all(galois::iterate(pBodies),
-                   [](Body* b) {
-                     Point dvel(b->acc);
-                     dvel *= config.dthf;
-                     Point velh(b->vel);
-                     velh += dvel;
-                     b->pos += velh * config.dtime;
-                     b->vel = velh + dvel;
-                   },
-                   galois::loopname("advance"));
+    galois::do_all(
+        galois::iterate(pBodies),
+        [](Body* b) {
+          Point dvel(b->acc);
+          dvel *= config.dthf;
+          Point velh(b->vel);
+          velh += dvel;
+          b->pos += velh * config.dtime;
+          b->vel = velh + dvel;
+        },
+        galois::loopname("advance"));
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags =

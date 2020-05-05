@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -127,7 +127,8 @@ struct InitializeGraph {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str(syncSubstrate->get_run_identifier("InitializeGraph"));
+      std::string impl_str(
+          syncSubstrate->get_run_identifier("InitializeGraph"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
       InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
@@ -139,7 +140,8 @@ struct InitializeGraph {
 
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
-    syncSubstrate->sync<writeSource, readAny, Reduce_set_latent_vector>("InitializeGraph");
+    syncSubstrate->sync<writeSource, readAny, Reduce_set_latent_vector>(
+        "InitializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -185,7 +187,8 @@ struct SGD_mergeResidual {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           SGD_mergeResidual{&_graph},
-          galois::loopname(syncSubstrate->get_run_identifier("SGD_merge").c_str()),
+          galois::loopname(
+              syncSubstrate->get_run_identifier("SGD_merge").c_str()),
           galois::steal(), galois::no_stats());
   }
 
@@ -228,14 +231,15 @@ struct SGD {
       auto step_size = getstep_size(_num_iterations);
       syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
-      galois::do_all(galois::iterate(nodesWithEdges),
-                     SGD(&_graph, step_size, dga),
-                     galois::loopname(syncSubstrate->get_run_identifier("SGD").c_str()),
-                     galois::steal(), galois::no_stats());
+      galois::do_all(
+          galois::iterate(nodesWithEdges), SGD(&_graph, step_size, dga),
+          galois::loopname(syncSubstrate->get_run_identifier("SGD").c_str()),
+          galois::steal(), galois::no_stats());
 
       // sync all residual latent vectors
       syncSubstrate->sync<writeAny, readAny,
-                  Reduce_pair_wise_add_array_residual_latent_vector>("SGD");
+                          Reduce_pair_wise_add_array_residual_latent_vector>(
+          "SGD");
 
       SGD_mergeResidual::go(_graph);
 
@@ -246,13 +250,14 @@ struct SGD {
       galois::gDebug("RMS Normalized : ", rms_normalized);
       galois::gPrint("RMS Normalized: ", rms_normalized, "\n");
       // galois::runtime::reportStat_Single(regionname,
-      //syncSubstrate->get_run_identifier("RMS_NORMALIZED"),
+      // syncSubstrate->get_run_identifier("RMS_NORMALIZED"),
       //(double)rms_normalized);
     } while ((_num_iterations < maxIterations) && (rms_normalized > 1));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          regionname, "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
+          regionname,
+          "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
           (unsigned long)_num_iterations);
     }
   }
@@ -323,7 +328,8 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
   Graph* hg;
 #ifdef __GALOIS_HET_CUDA__
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, double>(&cuda_ctx);
+  std::tie(hg, syncSubstrate) =
+      distGraphInitialization<NodeData, double>(&cuda_ctx);
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, double>();
 #endif

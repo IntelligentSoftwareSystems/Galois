@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -78,21 +78,21 @@ public:
   template <typename _node_data>
   struct with_node_data {
     typedef LC_CSR_Hypergraph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,
-                         HasOutOfLineLockable, FileEdgeTy>
+                              HasOutOfLineLockable, FileEdgeTy>
         type;
   };
 
   template <typename _edge_data>
   struct with_edge_data {
     typedef LC_CSR_Hypergraph<NodeTy, _edge_data, HasNoLockable, UseNumaAlloc,
-                         HasOutOfLineLockable, FileEdgeTy>
+                              HasOutOfLineLockable, FileEdgeTy>
         type;
   };
 
   template <typename _file_edge_data>
   struct with_file_edge_data {
     typedef LC_CSR_Hypergraph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
-                         HasOutOfLineLockable, _file_edge_data>
+                              HasOutOfLineLockable, _file_edge_data>
         type;
   };
 
@@ -100,31 +100,31 @@ public:
   template <bool _has_no_lockable>
   struct with_no_lockable {
     typedef LC_CSR_Hypergraph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
-                         HasOutOfLineLockable, FileEdgeTy>
+                              HasOutOfLineLockable, FileEdgeTy>
         type;
   };
   template <bool _has_no_lockable>
   using _with_no_lockable =
       LC_CSR_Hypergraph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
-                   HasOutOfLineLockable, FileEdgeTy>;
+                        HasOutOfLineLockable, FileEdgeTy>;
 
   //! If true, use NUMA-aware graph allocation
   template <bool _use_numa_alloc>
   struct with_numa_alloc {
     typedef LC_CSR_Hypergraph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
-                         HasOutOfLineLockable, FileEdgeTy>
+                              HasOutOfLineLockable, FileEdgeTy>
         type;
   };
   template <bool _use_numa_alloc>
   using _with_numa_alloc =
       LC_CSR_Hypergraph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
-                   HasOutOfLineLockable, FileEdgeTy>;
+                        HasOutOfLineLockable, FileEdgeTy>;
 
   //! If true, store abstract locks separate from nodes
   template <bool _has_out_of_line_lockable>
   struct with_out_of_line_lockable {
     typedef LC_CSR_Hypergraph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
-                         _has_out_of_line_lockable, FileEdgeTy>
+                              _has_out_of_line_lockable, FileEdgeTy>
         type;
   };
 
@@ -164,7 +164,7 @@ protected:
   EdgeIndData edgeIndData;
   EdgeDst edgeDst;
   EdgeData edgeData;
- 
+
   uint64_t numNodes;
   uint64_t numEdges;
 
@@ -216,8 +216,7 @@ protected:
 
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph&,
-                          typename FileGraph::edge_iterator nn,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator nn,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
@@ -271,7 +270,7 @@ private:
 
 public:
   LC_CSR_Hypergraph(LC_CSR_Hypergraph&& rhs) = default;
-  LC_CSR_Hypergraph()                   = default;
+  LC_CSR_Hypergraph()                        = default;
   LC_CSR_Hypergraph& operator=(LC_CSR_Hypergraph&&) = default;
 
   /**
@@ -340,7 +339,7 @@ public:
 
   template <typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
   LC_CSR_Hypergraph(uint32_t _numNodes, uint64_t _numEdges, EdgeNumFnTy edgeNum,
-               EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
+                    EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
       : numNodes(_numNodes), numEdges(_numEdges) {
     // std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
@@ -401,8 +400,9 @@ public:
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni,
-    MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
+  edge_data_reference
+  getEdgeData(edge_iterator ni,
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
@@ -511,9 +511,10 @@ public:
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(size_t{0}, this->size()),
-                   [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
-                   galois::no_stats(), galois::steal());
+    galois::do_all(
+        galois::iterate(size_t{0}, this->size()),
+        [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
+        galois::no_stats(), galois::steal());
   }
 
   template <typename F>
@@ -568,12 +569,13 @@ public:
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t x) {
-                     nodeData.constructAt(x);
-                     this->outOfLineConstructAt(x);
-                   },
-                   galois::no_stats(), galois::loopname("CONSTRUCT_NODES"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t x) {
+          nodeData.constructAt(x);
+          this->outOfLineConstructAt(x);
+        },
+        galois::no_stats(), galois::loopname("CONSTRUCT_NODES"));
 #endif
   }
 
@@ -627,25 +629,25 @@ public:
     }
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t n) {
-                     edgeIndData_old[n]  = edgeIndData[n];
-                     edgeIndData_temp[n] = 0;
-                   },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t n) {
+          edgeIndData_old[n]  = edgeIndData[n];
+          edgeIndData_temp[n] = 0;
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
 
     // get destination of edge, copy to array, and
-    galois::do_all(galois::iterate(UINT64_C(0), numEdges),
-                   [&](uint64_t e) {
-                     auto dst       = edgeDst[e];
-                     edgeDst_old[e] = dst;
-                     // counting outgoing edges in the tranpose graph by
-                     // counting incoming edges in the original graph
-                     __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
-                   },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numEdges),
+        [&](uint64_t e) {
+          auto dst       = edgeDst[e];
+          edgeDst_old[e] = dst;
+          // counting outgoing edges in the tranpose graph by
+          // counting incoming edges in the original graph
+          __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
 
     // TODO is it worth doing parallel prefix sum?
     // prefix sum calculation of the edge index array
@@ -654,10 +656,10 @@ public:
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
     // before the ith node have
@@ -669,27 +671,27 @@ public:
           galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
     }
 
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t src) {
-                     // e = start index into edge array for a particular node
-                     uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t src) {
+          // e = start index into edge array for a particular node
+          uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
 
-                     // get all outgoing edges of a particular node in the
-                     // non-transpose and convert to incoming
-                     while (e < edgeIndData_old[src]) {
-                       // destination nodde
-                       auto dst = edgeDst_old[e];
-                       // location to save edge
-                       auto e_new =
-                           __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
-                       // save src as destination
-                       edgeDst[e_new] = src;
-                       // copy edge data to "new" array
-                       edgeDataCopy(edgeData_new, edgeData, e_new, e);
-                       e++;
-                     }
-                   },
-                   galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDST"));
+          // get all outgoing edges of a particular node in the
+          // non-transpose and convert to incoming
+          while (e < edgeIndData_old[src]) {
+            // destination nodde
+            auto dst = edgeDst_old[e];
+            // location to save edge
+            auto e_new = __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
+            // save src as destination
+            edgeDst[e_new] = src;
+            // copy edge data to "new" array
+            edgeDataCopy(edgeData_new, edgeData, e_new, e);
+            e++;
+          }
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDST"));
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
@@ -750,9 +752,9 @@ public:
    */
   const EdgeIndData& getEdgePrefixSum() const { return edgeIndData; }
 
-
   auto divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total) {
-    return galois::graphs::divideNodesBinarySearch(numNodes, numEdges, nodeSize, edgeSize, id, total, edgeIndData);
+    return galois::graphs::divideNodesBinarySearch(
+        numNodes, numEdges, nodeSize, edgeSize, id, total, edgeIndData);
   }
   /**
    *
@@ -760,82 +762,84 @@ public:
    * Adding for Louvain clustering
    * TODO: Find better way to do this
    */
-  void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, std::vector<std::vector<uint32_t>>& edges_id){//, std::vector<std::vector<EdgeTy>>& edges_data) {
+  void constructFrom(
+      uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum,
+      std::vector<std::vector<uint32_t>>&
+          edges_id) { //, std::vector<std::vector<EdgeTy>>& edges_data) {
     allocateFrom(numNodes, numEdges);
     constructNodes();
 
     galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    edgeIndData[n] = prefix_sum[n];
-                    });
+                   [&](uint32_t n) { edgeIndData[n] = prefix_sum[n]; });
 
-    galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    if( n == 0){
-                      if(edgeIndData[n] > 0){
-                        std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
-                        //std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin());
-                      }
-                    }
-                    else{
-                        if(edgeIndData[n] - edgeIndData[n-1] > 0){
-                          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin() + edgeIndData[n-1]);
-                       //   std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin() + edgeIndData[n-1]);
-                      }
-                      }
-                  });
-
-
- galois::on_each(
-        [&](unsigned tid, unsigned total) {
-        std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-
-          auto r = divideByNode(0, 1, tid, total).first;
-
-        //galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second, "\n");
-        this->setLocalRange(*r.first, *r.second);
+    galois::do_all(galois::iterate((uint32_t)0, numNodes), [&](uint32_t n) {
+      if (n == 0) {
+        if (edgeIndData[n] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
+          // std::copy(edges_data[n].begin(), edges_data[n].end(),
+          // edgeData.begin());
         }
-        );
+      } else {
+        if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(),
+                    edgeDst.begin() + edgeIndData[n - 1]);
+          //   std::copy(edges_data[n].begin(), edges_data[n].end(),
+          //   edgeData.begin() + edgeIndData[n-1]);
+        }
+      }
+    });
+
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+
+      auto r = divideByNode(0, 1, tid, total).first;
+
+      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
+      // "\n");
+      this->setLocalRange(*r.first, *r.second);
+    });
   }
-  void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, galois::gstl::Vector<galois::PODResizeableArray<uint32_t>>& edges_id){//, std::vector<std::vector<EdgeTy>>& edges_data) {
+  void constructFrom(
+      uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum,
+      galois::gstl::Vector<galois::PODResizeableArray<uint32_t>>&
+          edges_id) { //, std::vector<std::vector<EdgeTy>>& edges_data) {
     allocateFrom(numNodes, numEdges);
     constructNodes();
 
     galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    edgeIndData[n] = prefix_sum[n];
-                    });
+                   [&](uint32_t n) { edgeIndData[n] = prefix_sum[n]; });
 
-    galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    if( n == 0){
-                      if(edgeIndData[n] > 0){
-                        std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
-                        //std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin());
-                      }
-                    }
-                    else{
-                        if(edgeIndData[n] - edgeIndData[n-1] > 0){
-                          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin() + edgeIndData[n-1]);
-                       //   std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin() + edgeIndData[n-1]);
-                      }
-                      }
-                  });
-
-
- galois::on_each(
-        [&](unsigned tid, unsigned total) {
-        std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-
-          auto r = divideByNode(0, 1, tid, total).first;
-
-        //galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second, "\n");
-        this->setLocalRange(*r.first, *r.second);
+    galois::do_all(galois::iterate((uint32_t)0, numNodes), [&](uint32_t n) {
+      if (n == 0) {
+        if (edgeIndData[n] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
+          // std::copy(edges_data[n].begin(), edges_data[n].end(),
+          // edgeData.begin());
         }
-        );
+      } else {
+        if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(),
+                    edgeDst.begin() + edgeIndData[n - 1]);
+          //   std::copy(edges_data[n].begin(), edges_data[n].end(),
+          //   edgeData.begin() + edgeIndData[n-1]);
+        }
+      }
+    });
+
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+
+      auto r = divideByNode(0, 1, tid, total).first;
+
+      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
+      // "\n");
+      this->setLocalRange(*r.first, *r.second);
+    });
   }
-  //uint32_t edgeSize(uint32_t n) {
-   //   return edgeDst[n].size();
+  // uint32_t edgeSize(uint32_t n) {
+  //   return edgeDst[n].size();
   //}
 };
 } // namespace graphs
