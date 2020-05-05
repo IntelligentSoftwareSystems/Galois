@@ -32,6 +32,8 @@ If you need to become root in the container:
 
   gosu root whoami
 
+Because your user ID does not exist in this container, you may see errors
+related to missing group or user IDs. You can ignore them.
 ###############################################
 
 EOF

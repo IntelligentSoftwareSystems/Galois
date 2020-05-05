@@ -25,7 +25,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -44,7 +44,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -63,7 +63,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -83,7 +83,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -102,9 +102,9 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main'
+            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-7 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -122,9 +122,9 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main'
+            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-8 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -142,9 +142,9 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
+            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -162,9 +162,9 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
+            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
@@ -183,9 +183,9 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
+            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-            - sourceline: 'deb https://apt.kitware.com/ubuntu/ xenial main'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:

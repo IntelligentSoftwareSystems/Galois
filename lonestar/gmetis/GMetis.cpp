@@ -91,15 +91,13 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   TM.start();
   unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
   unsigned meanWeight = ((double)fineMetisGraphWeight) / (double)nparts;
-  // unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 *
-  // intlog2(nparts)), 20 * (nparts));
   unsigned coarsenTo = 20 * nparts;
 
   if (verbose)
     std::cout << "Starting coarsening: \n";
   galois::StatTimer T("Coarsen");
   T.start();
-  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, verbose);
+  auto mcg = std::unique_ptr<MetisGraph>(coarsen(metisGraph, coarsenTo, verbose));
   T.stop();
   if (verbose)
     std::cout << "Time coarsen: " << T.get() << "\n";
@@ -107,7 +105,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer T2("Partition");
   T2.start();
   std::vector<partInfo> parts;
-  parts = partition(mcg, fineMetisGraphWeight, nparts, partMode);
+  parts = partition(mcg.get(), fineMetisGraphWeight, nparts, partMode);
   T2.stop();
 
   if (verbose)
@@ -138,7 +136,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
   galois::StatTimer T3("Refine");
   T3.start();
-  refine(mcg, parts, meanWeight - (unsigned)(meanWeight * imbalance),
+  refine(mcg.get(), parts, meanWeight - (unsigned)(meanWeight * imbalance),
          meanWeight + (unsigned)(meanWeight * imbalance), refineMode, verbose);
   T3.stop();
   if (verbose)
@@ -155,7 +153,6 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   std::cout << "\n";
 
   std::cout << "Time:  " << TM.get() << '\n';
-  return;
 }
 
 // printGraphBeg(*graph)

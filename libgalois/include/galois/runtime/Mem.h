@@ -618,7 +618,7 @@ private:
 
   SizedHeapFactory();
 
-  SizedHeap* getHeap(const size_t);
+  SizedHeap* getHeap(size_t);
 
 public:
   ~SizedHeapFactory();
@@ -726,9 +726,10 @@ public:
     typedef FixedSizeAllocator<Other> other;
   };
 
-  FixedSizeAllocator() throw() : heap(sizeof(Ty)) {}
+  FixedSizeAllocator() noexcept : heap(sizeof(Ty)) {}
+
   template <class U>
-  FixedSizeAllocator(const FixedSizeAllocator<U>&) throw() : heap(sizeof(Ty)) {}
+  FixedSizeAllocator(const FixedSizeAllocator<U>&) noexcept : heap(sizeof(Ty)) {}
 
   inline pointer address(reference val) const { return &val; }
   inline const_pointer address(const_reference val) const { return &val; }
@@ -751,7 +752,7 @@ public:
 
   inline void destroy(pointer ptr) const { destruct(ptr); }
 
-  size_type max_size() const throw() { return 1; }
+  size_type max_size() const noexcept { return 1; }
 
   template <typename T1>
   inline bool operator!=(const FixedSizeAllocator<T1>& rhs) const {
@@ -868,13 +869,13 @@ public:
 
   Pow_2_BlockHeap* heap;
 
-  Pow_2_BlockAllocator() throw() : heap(Pow_2_BlockHeap::getInstance()) {}
+  Pow_2_BlockAllocator() noexcept : heap(Pow_2_BlockHeap::getInstance()) {}
 
   // template <typename U>
   // friend class Pow_2_BlockAllocator<U>;
 
   template <typename U>
-  Pow_2_BlockAllocator(const Pow_2_BlockAllocator<U>& that) throw()
+  Pow_2_BlockAllocator(const Pow_2_BlockAllocator<U>& that) noexcept
       : heap(that.heap) {}
 
   inline pointer address(reference val) const { return &val; }
@@ -896,7 +897,7 @@ public:
 
   inline void destroy(pointer ptr) const { destruct(ptr); }
 
-  size_type max_size() const throw() { return size_type(-1); }
+  size_type max_size() const noexcept { return size_type(-1); }
 
   template <typename T1>
   bool operator!=(const Pow_2_BlockAllocator<T1>& rhs) const {
@@ -968,10 +969,10 @@ public:
     typedef ExternalHeapAllocator<Other, HeapTy> other;
   };
 
-  explicit ExternalHeapAllocator(HeapTy* a) throw() : heap(a) {}
+  explicit ExternalHeapAllocator(HeapTy* a) noexcept : heap(a) {}
 
   template <class T1>
-  ExternalHeapAllocator(const ExternalHeapAllocator<T1, HeapTy>& rhs) throw() {
+  ExternalHeapAllocator(const ExternalHeapAllocator<T1, HeapTy>& rhs) noexcept {
     heap = rhs.heap;
   }
 
@@ -998,7 +999,7 @@ public:
 
   void destroy(pointer ptr) const { destruct(ptr); }
 
-  size_type max_size() const throw() {
+  size_type max_size() const noexcept {
     return (HeapTy::AllocSize == 0) ? size_t(-1) / sizeof(Ty)
                                     : HeapTy::AllocSize / sizeof(Ty);
   }
