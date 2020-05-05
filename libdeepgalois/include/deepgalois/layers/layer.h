@@ -48,7 +48,7 @@ public:
 
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
-      : node(in_dims.size(), out_dims.size()), level_(level), begin_(0),
+      : level_(level), begin_(0),
         end_(0), num_dims(in_dims.size()), input_dims(in_dims),
         output_dims(out_dims), labels(NULL) { }
   virtual ~layer()                       = default;
@@ -68,7 +68,7 @@ public:
   float_t* get_grads_device_ptr() { return d_weight_grad; }
 
   // set methods
-  virtual void set_netphase(net_phase phase) {}
+  void set_netphase(net_phase ctx) { phase_ = ctx; }
   void set_context(ContextType* ctx) { context = ctx; }
   void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
   void set_labels_ptr(label_t *ptr) { labels = ptr; }
@@ -137,8 +137,8 @@ public:
 #ifdef CPU_ONLY
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
-    bool parallel = (W.size() >= 512);
-    opt->update(layer::weight_grad, layer::W, parallel); // W += grad
+    //bool parallel = (W.size() >= 512);
+    opt->update(layer::weight_grad, layer::W); // W += grad
 #else
     opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
 #endif
@@ -152,6 +152,7 @@ protected:
   size_t end_;                     // sample end index
   size_t count_;                   // number of samples
   size_t num_dims;                 // number of dimensions
+  net_phase phase_;                // in which phase: train, val or test
   std::vector<size_t> input_dims;  // input dimensions
   std::vector<size_t> output_dims; // output dimentions
   std::string name_;               // name of this layer

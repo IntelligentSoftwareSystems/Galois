@@ -91,6 +91,14 @@ set(sources
   src/net.cpp
 )
 else()
+if(ENABLE_DIST_GALOIS)
+set(sources
+  src/context.cpp
+  src/lgraph.cpp
+  src/node.cpp
+  src/net.cpp
+)
+else()
 set(sources
   src/layers/softmax_loss_layer.cpp
   src/layers/sigmoid_loss_layer.cpp
@@ -109,6 +117,7 @@ set(sources
   src/node.cpp
   src/net.cpp
 )
+endif()
 endif()
 
 #set(BOOST_LIBRARIES "-lboost_system -lboost_thread")

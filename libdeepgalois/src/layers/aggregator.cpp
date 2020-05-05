@@ -43,6 +43,7 @@ void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* ou
 
 void deepgalois::update_all_csrmm(size_t len, Graph& g, const float_t* in, float_t* out,
                                   bool norm, float_t* norm_factor) {
+  UNUSED(norm);
   galois::StatTimer Tcsrmm("CSRMM-MKL");
   Tcsrmm.start();
   unsigned n = g.size();

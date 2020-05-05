@@ -28,14 +28,21 @@ class graph_conv_layer : public layer {
 public:
   graph_conv_layer(unsigned level, bool act, bool norm, bool bias,
                    bool dropout, float_t dropout_rate,
-                   std::vector<size_t> in_dims, std::vector<size_t> out_dims);
+                   std::vector<size_t> in_dims, std::vector<size_t> out_dims)
+    : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),
+      dropout_(dropout), dropout_rate_(dropout_rate) {
+    assert(input_dims[0] == output_dims[0]); // num_vertices
+    trainable_ = true;
+    name_      = layer_type() + "_" + std::to_string(level);
+    assert(dropout_rate_ >= 0. && dropout_rate_ < 1.);
+    scale_ = 1. / (1. - dropout_rate_);
+  }
   graph_conv_layer(unsigned level, std::vector<size_t> in_dims,
                    std::vector<size_t> out_dims)
       : graph_conv_layer(level, false, true, false, true, 0.5, in_dims, out_dims) {}
   ~graph_conv_layer() {}
   void malloc_and_init();
   std::string layer_type() const override { return std::string("graph_conv"); }
-  void set_netphase(net_phase ctx) override { phase_ = ctx; }
   virtual acc_t get_weight_decay_loss();
   //! Uses weights contained in this layer to update in_data (results from previous)
   //! and save result to out_data
@@ -62,7 +69,6 @@ private:
   bool dropout_; // whether to use dropout at first
   const float_t dropout_rate_;
   float_t scale_;
-  net_phase phase_;
   float_t* out_temp; //!< intermediate data temporary
   float_t* in_temp;
   float_t* in_temp1;

@@ -22,6 +22,7 @@ void leaky_relu_layer::forward_propagation(const float_t* in_data, float_t* out_
 //              = 𝜕𝐿 / 𝜕𝑦𝑙,       𝑖𝑓 (𝑦[𝑙] > 0)
 void leaky_relu_layer::back_propagation(const float_t* in_data, const float_t* out_data,
                                   float_t* out_grad, float_t* in_grad) {
+  UNUSED(in_data);
   math::d_leaky_relu_cpu(n, epsilon_, out_grad, out_data, in_grad);
 }
 #endif

@@ -41,6 +41,7 @@ enum class net_phase { train, test };
 #define MAX_NUM_CLASSES 128
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
 #define USE_CUSPARSE
+#define UNUSED(expr) do { (void)(expr); } while (0)
 
 #ifdef GALOIS_USE_DIST
 namespace deepgalois {

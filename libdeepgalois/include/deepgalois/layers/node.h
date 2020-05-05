@@ -26,14 +26,15 @@ typedef std::shared_ptr<edge> edgeptr_t;
 // edge
 class node : public std::enable_shared_from_this<node> {
 public:
-  node(size_t in_size, size_t out_size) {
-  } //: prev_(in_size), next_(out_size) {}
+  node() { prev_= NULL; next_ = NULL; }
+  //node(size_t in_size, size_t out_size) {
+  //} //: prev_(in_size), next_(out_size) {}
   virtual ~node() {}
   const edgeptr_t prev() const { return prev_; }
   const edgeptr_t next() const { return next_; }
 
 protected:
-  node() = delete;
+  //node() = delete;
   friend void connect(layer* head, layer* tail);
   mutable edgeptr_t prev_;
   mutable edgeptr_t next_;

@@ -29,7 +29,7 @@ struct optimizer {
   optimizer& operator=(const optimizer&) = default;
   optimizer& operator=(optimizer&&)                                = default;
   virtual ~optimizer()                                             = default;
-  virtual void update(const vec_t& dW, vec_t& W, bool parallelize) = 0;
+  virtual void update(const vec_t& dW, vec_t& W) = 0;
   virtual void update_gpu(const size_t n, const float_t* dW, float_t* W) = 0;
   virtual void reset() {} // override to implement pre-learning action
 };
@@ -65,8 +65,8 @@ protected:
  **/
 struct adagrad : public stateful_optimizer<1> {
   adagrad() : alpha(0.01), eps(float_t(1e-8)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
   float_t alpha; // learning rate
 private:
   float_t eps;
@@ -80,8 +80,8 @@ private:
  **/
 struct RMSprop : public stateful_optimizer<1> {
   RMSprop() : alpha(float_t(0.0001)), mu(float_t(0.99)), eps(float_t(1e-8)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
   float_t alpha; // learning rate
   float_t mu;    // decay term
 private:
@@ -94,9 +94,9 @@ struct adam : public stateful_optimizer<2> {
   adam()
       : alpha(float_t(0.01)), b1(float_t(0.9)), b2(float_t(0.999)),
         b1_t(float_t(0.9)), b2_t(float_t(0.999)), eps(float_t(1e-8)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
+  void update(const vec_t& dW, vec_t& W);
 #ifdef CPU_ONLY
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
 #else
   void update_gpu(const size_t n, const float_t* dW, float_t* W);
 #endif
@@ -121,8 +121,8 @@ struct adamax : public stateful_optimizer<2> {
   adamax()
       : alpha(float_t(0.002)), b1(float_t(0.9)), b2(float_t(0.999)), b1_t(b1),
         eps(float_t(1e-8)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
 
   float_t alpha; // learning rate
   float_t b1;    // decay term
@@ -137,8 +137,8 @@ private:
 // slightly faster than tiny_dnn::momentum
 struct gradient_descent : public optimizer {
   gradient_descent() : alpha(float_t(0.01)), lambda(float_t(0)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
   float_t alpha;  // learning rate
   float_t lambda; // weight decay
 };
@@ -153,8 +153,8 @@ struct gradient_descent : public optimizer {
 struct momentum : public stateful_optimizer<1> {
 public:
   momentum() : alpha(float_t(0.01)), lambda(float_t(0)), mu(float_t(0.9)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
 
   float_t alpha;  // learning rate
   float_t lambda; // weight decay
@@ -172,8 +172,8 @@ struct nesterov_momentum : public stateful_optimizer<1> {
 public:
   nesterov_momentum()
       : alpha(float_t(0.01)), lambda(float_t(0)), mu(float_t(0.9)) {}
-  void update(const vec_t& dW, vec_t& W, bool parallelize);
-  void update_gpu(const size_t n, const float_t* dW, float_t* W) {}
+  void update(const vec_t& dW, vec_t& W);
+  void update_gpu(const size_t n, const float_t* dW, float_t* W);
 
   float_t alpha;  // learning rate
   float_t lambda; // weight decay

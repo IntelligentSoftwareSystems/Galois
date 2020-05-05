@@ -32,6 +32,7 @@ void l2_norm_layer::forward_propagation(const float_t* in_data, float_t* out_dat
 
 void l2_norm_layer::back_propagation(const float_t* in_data, const float_t* out_data,
                                   float_t* out_grad, float_t* in_grad) {
+  UNUSED(out_data);
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   galois::do_all(galois::iterate((size_t)0, x), [&](const auto i) {

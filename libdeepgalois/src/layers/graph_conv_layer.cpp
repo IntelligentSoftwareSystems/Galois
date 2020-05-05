@@ -10,20 +10,7 @@ float_t* _dataToSync = nullptr;
 //! sync
 long unsigned _syncVectorSize = 0;
 
-
-graph_conv_layer::graph_conv_layer(unsigned level, bool act, bool norm,
-                                   bool bias, bool dropout, float_t dropout_rate,
-                                   std::vector<size_t> in_dims,
-                                   std::vector<size_t> out_dims)
-    : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),
-      dropout_(dropout), dropout_rate_(dropout_rate) {
-  assert(input_dims[0] == output_dims[0]); // num_vertices
-  trainable_ = true;
-  name_      = layer_type() + "_" + std::to_string(level);
-  assert(dropout_rate_ >= 0. && dropout_rate_ < 1.);
-  scale_ = 1. / (1. - dropout_rate_);
-}
-
+#ifdef CPU_ONLY
 inline void graph_conv_layer::rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed) {
   auto init_range = sqrt(6.0 / (dim_x + dim_y));
   std::default_random_engine rng(seed);
@@ -43,7 +30,6 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y, vec_t
   }
 }
 
-#ifdef CPU_ONLY
 // aggregate based on graph topology
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in, float_t* out) {
   // normalization constant based on graph structure
