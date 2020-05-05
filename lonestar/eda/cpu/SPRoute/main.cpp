@@ -332,22 +332,18 @@ int main(int argc, char** argv) {
              max(OBIM_delta, (int)(costheight / (2 * slope))));
       // L = 2;
       roundtimer.start();
-      galois::runtime::profileVtune(
-          [&](void) {
-            round_num = i;
-            if (finegrain) {
-              printf("finegrain\n");
+      round_num = i;
+      if (finegrain) {
+        printf("finegrain\n");
 
-              mazeRouteMSMD_finegrain_spinlock(
-                  i, enlarge, costheight, ripup_threshold, mazeedge_Threshold,
-                  !(i % 3), cost_type, net_shuffle);
-            } else {
-              mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                            mazeedge_Threshold, !(i % 3), cost_type,
-                            net_shuffle);
-            }
-          },
-          "mazeroute");
+        mazeRouteMSMD_finegrain_spinlock(
+            i, enlarge, costheight, ripup_threshold, mazeedge_Threshold,
+            !(i % 3), cost_type, net_shuffle);
+      } else {
+        mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
+                      mazeedge_Threshold, !(i % 3), cost_type,
+                      net_shuffle);
+      }
       roundtimer.stop();
       cout << "round : " << i << " time(ms): " << roundtimer.get() - oldtime
            << " acc time(ms): " << roundtimer.get() << endl;
