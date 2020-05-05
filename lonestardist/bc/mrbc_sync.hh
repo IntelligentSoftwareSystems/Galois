@@ -24,7 +24,7 @@
 struct APSPReduce {
   using ValTy = galois::TupleOfThree<uint32_t, uint32_t, ShortPathType>;
 
-  static ValTy extract(uint32_t node_id, struct NodeData& node) {
+  static ValTy extract(uint32_t, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
 
     uint32_t a;
@@ -55,7 +55,7 @@ struct APSPReduce {
 
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
+  static bool reduce(uint32_t, struct NodeData& node, ValTy y) {
     uint32_t rIndex = y.first;
 
     if (rIndex != infinity) {
@@ -102,13 +102,13 @@ struct APSPReduce {
   static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) {
+  static void reset(uint32_t, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
       node.sourceData[node.roundIndexToSend].shortPathCount = 0;
     }
   }
 
-  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
+  static void setVal(uint32_t, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;
     if (rIndex != infinity) {
       uint32_t rDistance = y.second;
@@ -131,7 +131,7 @@ struct APSPReduce {
 struct DependencyReduce {
   using ValTy = galois::Pair<uint32_t, float>;
 
-  static ValTy extract(uint32_t node_id, struct NodeData& node) {
+  static ValTy extract(uint32_t, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
     float thing;
     if (indexToGet != infinity) {
@@ -153,7 +153,7 @@ struct DependencyReduce {
 
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
+  static bool reduce(uint32_t, struct NodeData& node, ValTy y) {
     uint32_t rIndex = y.first;
 
     if (rIndex != infinity) {
@@ -175,13 +175,13 @@ struct DependencyReduce {
   static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) {
+  static void reset(uint32_t, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
       node.sourceData[node.roundIndexToSend].dependencyValue = 0;
     }
   }
 
-  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
+  static void setVal(uint32_t, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;
     if (rIndex != infinity) {
       float rDep = y.second;

@@ -20,17 +20,20 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
-#include "galois/MethodFlags.h"
-#include "galois/substrate/PtrLock.h"
-#include "galois/gIO.h"
-#include "galois/runtime/config.h"
-
-#include <boost/utility.hpp>
-
 #include <cassert>
 #include <cstdlib>
 
+#include <boost/utility.hpp>
+
+#include "galois/config.h"
+
+#ifdef GALOIS_USE_LONGJMP_ABORT
 #include <csetjmp>
+#endif
+
+#include "galois/gIO.h"
+#include "galois/MethodFlags.h"
+#include "galois/substrate/PtrLock.h"
 
 namespace galois {
 namespace runtime {

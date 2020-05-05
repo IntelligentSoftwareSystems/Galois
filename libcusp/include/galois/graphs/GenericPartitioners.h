@@ -18,8 +18,8 @@ class NoCommunication : public galois::graphs::ReadMasterAssignment {
 
   bool noCommunication() { return true; }
   bool isVertexCut() const { return false; }
-  void serializePartition(boost::archive::binary_oarchive&) { return; }
-  void deserializePartition(boost::archive::binary_iarchive&) { return; }
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
   std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(0u, 0u);
   }
@@ -118,8 +118,8 @@ class GenericCVC : public galois::graphs::ReadMasterAssignment {
     _h_offset = gridRowID() * numColumnHosts;
   }
 
-  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
-    int i         = getColumnOfNode(dst);
+  uint32_t getEdgeOwner(uint32_t, uint32_t dst, uint64_t) const {
+    int i = getColumnOfNode(dst);
     return _h_offset + i;
   }
 
@@ -196,8 +196,8 @@ class GenericCVCColumnFlip : public galois::graphs::ReadMasterAssignment {
     _h_offset = gridRowID() * numColumnHosts;
   }
 
-  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
-    int i         = getColumnOfNode(dst);
+  uint32_t getEdgeOwner(uint32_t, uint32_t dst, uint64_t) const {
+    int i = getColumnOfNode(dst);
     return _h_offset + i;
   }
 
@@ -243,12 +243,8 @@ class GenericHVC : public galois::graphs::ReadMasterAssignment {
   bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
-  void serializePartition(boost::archive::binary_oarchive& ar) {
-    return;
-  }
-  void deserializePartition(boost::archive::binary_iarchive& ar) {
-    return;
-  }
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
   std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(0u, 0u);
   }
@@ -395,8 +391,8 @@ class GingerP : public galois::graphs::CustomMasterAssignment {
   bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return true; }
-  void serializePartition(boost::archive::binary_oarchive& ar) { return; }
-  void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
   std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(0u, 0u);
   }
@@ -528,15 +524,15 @@ class FennelP : public galois::graphs::CustomMasterAssignment {
   }
 
   // Fennel is an edge cut: all edges on source
-  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+  uint32_t getEdgeOwner(uint32_t src, uint32_t, uint64_t) const {
     return retrieveMaster(src);
   }
 
   bool noCommunication() { return false; }
   // TODO I should be able to make this runtime detectable
   bool isVertexCut() const { return false; }
-  void serializePartition(boost::archive::binary_oarchive& ar) { return; }
-  void deserializePartition(boost::archive::binary_iarchive& ar) { return; }
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
   std::pair<unsigned, unsigned> cartesianGrid() {
     return std::make_pair(0u, 0u);
   }
@@ -711,7 +707,7 @@ class SugarP : public galois::graphs::CustomMasterAssignment {
   /**
    * return owner of edge using cartesian edge owner determination
    */
-  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t) const {
     unsigned blockedRowOffset   = getRowOfNode(src) * numColumnHosts;
     unsigned cyclicColumnOffset = getColumnOfNode(dst);
     return blockedRowOffset + cyclicColumnOffset;
@@ -909,7 +905,7 @@ class SugarColumnFlipP : public galois::graphs::CustomMasterAssignment {
   /**
    * return owner of edge using cartesian edge owner determination
    */
-  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t) const {
     unsigned blockedRowOffset   = getRowOfNode(src) * numColumnHosts;
     unsigned cyclicColumnOffset = getColumnOfNode(dst);
     return blockedRowOffset + cyclicColumnOffset;

@@ -137,7 +137,7 @@ namespace graphs {
  */
 template <typename NodeData, typename EdgeData>
 DistGraph<NodeData, EdgeData>*
-constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
+constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
   if (!inputFileSymmetric) {
     GALOIS_DIE("Calling constructSymmetricGraph without inputFileSymmetric "
                "flag");
@@ -204,7 +204,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
 template <typename NodeData, typename EdgeData, bool iterateOut = true,
           typename std::enable_if<iterateOut>::type* = nullptr>
 DistGraph<NodeData, EdgeData>*
-constructGraph(std::vector<unsigned>& scaleFactor) {
+constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
   // 1 host = no concept of cut; just load from edgeCut, no transpose
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.Num == 1) {
@@ -322,7 +322,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 template <typename NodeData, typename EdgeData, bool iterateOut = true,
           typename std::enable_if<!iterateOut>::type* = nullptr>
 DistGraph<NodeData, EdgeData>*
-constructGraph(std::vector<unsigned>& scaleFactor) {
+constructGraph(std::vector<unsigned>&) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // 1 host = no concept of cut; just load from edgeCut

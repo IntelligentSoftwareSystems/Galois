@@ -40,12 +40,12 @@ struct emp {
   }
 
   template <typename T>
-  void operator()(const T& t) {
+  void operator()(const T&) {
     go();
   }
 
   template <typename T, typename C>
-  void operator()(const T& t, const C& c) {
+  void operator()(const T&, const C&) {
     go();
   }
 };

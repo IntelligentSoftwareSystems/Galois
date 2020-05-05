@@ -566,7 +566,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
 
   // receive edges
   galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
+      [&](unsigned, unsigned) {
         std::vector<uint32_t> recvVector;
         std::vector<uint32_t> recvDataVector;
 

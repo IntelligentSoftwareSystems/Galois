@@ -20,6 +20,7 @@
 #ifndef GALOIS_PERTHREADCONTAINER_H
 #define GALOIS_PERTHREADCONTAINER_H
 
+#include <cstdio>
 #include <vector>
 #include <deque>
 #include <list>
@@ -28,23 +29,22 @@
 #include <limits>
 #include <iterator>
 
-#include <cstdio>
-
 #include <boost/iterator/counting_iterator.hpp>
-#include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 
+#include "galois/config.h"
 #include "galois/gdeque.h"
+#include "galois/gIO.h"
 #include "galois/gstl.h"
-#include "galois/Threads.h"
 #include "galois/PriorityQueue.h"
-#include "galois/TwoLevelIterator.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_OnEach.h"
+#include "galois/runtime/Mem.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/ThreadPool.h"
-#include "galois/runtime/Mem.h"
-#include "galois/gIO.h"
+#include "galois/Threads.h"
+#include "galois/TwoLevelIterator.h"
 
 namespace galois {
 
@@ -422,7 +422,7 @@ public:
 
   void clear_all_parallel(void) {
     galois::runtime::on_each_gen(
-        [this](const unsigned tid, const unsigned numT) { get().clear(); },
+        [this](const unsigned, const unsigned) { get().clear(); },
         std::make_tuple());
   }
 

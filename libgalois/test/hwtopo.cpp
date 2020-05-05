@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main() {
   auto t = galois::substrate::getHWTopo();
   std::cout << "T,C,P,N: " << t.first.maxThreads << " " << t.first.maxCores
             << " " << t.first.maxSockets << " " << t.first.maxNumaNodes << "\n";

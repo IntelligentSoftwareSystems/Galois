@@ -20,24 +20,26 @@
 #ifndef GALOIS_STAT_MANAGER_H
 #define GALOIS_STAT_MANAGER_H
 
-#include "galois/gstl.h"
-#include "galois/gIO.h"
-#include "galois/Threads.h"
-#include "galois/substrate/PerThreadStorage.h"
-#include "galois/substrate/ThreadRWlock.h"
-#include "galois/substrate/EnvCheck.h"
+#include <limits>
+#include <map>
+#include <string>
+#include <type_traits>
+
+#include <sys/resource.h>
+#include <sys/time.h>
 
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
-#include <limits>
-#include <string>
-#include <map>
-#include <type_traits>
-
-#include <sys/resource.h>
-#include <sys/time.h>
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/gstl.h"
+#include "galois/Threads.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadRWlock.h"
+#include "galois/Threads.h"
 
 /**
  * TODO:
@@ -125,7 +127,7 @@ public:
 
   const Str& name(void) const { return m_name; }
 
-  void add(const T& val) const {}
+  void add(const T&) const {}
 };
 
 template <typename T, typename... Bases>

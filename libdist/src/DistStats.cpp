@@ -53,12 +53,11 @@ DistStatManager::~DistStatManager() {
 class galois::runtime::StatRecvHelper {
 
 public:
-  static void recvAtHost_0_hostTotalTy(uint32_t hostID,
-                                       galois::gstl::Str region,
+  static void recvAtHost_0_hostTotalTy(galois::gstl::Str region,
                                        galois::gstl::Str category,
                                        StatTotal::Type totalTy) {
 
-    dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
+    dsm()->addRecvdHostTotalTy(region, category, totalTy);
   }
 
   static void recvAtHost_0_int(uint32_t hostID, galois::gstl::Str region,
@@ -187,7 +186,6 @@ void DistStatManager::receiveAtHost_0_helper(void) {
       p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
 
       if (p) {
-        uint32_t hostID = p->first;
         RecvBuffer& b = p->second;
 
         galois::gstl::Str region;
@@ -195,7 +193,7 @@ void DistStatManager::receiveAtHost_0_helper(void) {
         StatTotal::Type totalTy;
         gDeserialize(b, region, category, totalTy);
 
-        StatRecvHelper::recvAtHost_0_hostTotalTy(hostID, region, category, totalTy);
+        StatRecvHelper::recvAtHost_0_hostTotalTy(region, category, totalTy);
       }
     } while (p);
   }
@@ -325,7 +323,7 @@ DistStatManager::findHostTotalTy(const Str& region, const Str& category,
   return hostTotalTy;
 }
 
-void DistStatManager::addRecvdHostTotalTy(unsigned hostID, const Str& region,
+void DistStatManager::addRecvdHostTotalTy(const Str& region,
                                           const Str& category,
                                           const StatTotal::Type& totalTy) {
   hostTotalTypes.addToStat(region, category, totalTy);

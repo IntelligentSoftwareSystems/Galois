@@ -20,9 +20,10 @@
 #ifndef GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 #define GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 
-#include "CompilerSpecific.h"
-
 #include <utility>
+
+#include "galois/config.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 namespace substrate {

@@ -20,12 +20,14 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
-#include "galois/gstl.h"
-#include "galois/substrate/ThreadPool.h"
+#include <iterator>
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include <iterator>
+#include "galois/config.h"
+#include "galois/gstl.h"
+#include "galois/substrate/ThreadPool.h"
+
 
 namespace galois {
 namespace runtime {
@@ -238,7 +240,7 @@ public:
   IteratorRangeMaker(const I& beg, const I& end) : m_beg(beg), m_end(end) {}
 
   template <typename Arg>
-  auto operator()(const Arg& argTuple) const {
+  auto operator()(const Arg&) const {
     return runtime::makeStandardRange(m_beg, m_end);
   }
 };
@@ -252,7 +254,7 @@ public:
   IteratorRangeMaker(const I& beg, const I& end) : m_beg(beg), m_end(end) {}
 
   template <typename Arg>
-  auto operator()(const Arg& argTuple) const {
+  auto operator()(const Arg&) const {
     return runtime::makeStandardRange(boost::counting_iterator<I>(m_beg),
                                       boost::counting_iterator<I>(m_end));
   }
@@ -266,7 +268,7 @@ public:
   explicit InitListRangeMaker(const std::initializer_list<T>& l) : m_list(l) {}
 
   template <typename Arg>
-  auto operator()(const Arg& argTuple) const {
+  auto operator()(const Arg&) const {
     return runtime::makeStandardRange(m_list.begin(), m_list.end());
   }
 };
@@ -279,7 +281,7 @@ public:
   explicit ContainerRangeMaker(C& cont) : m_cont(cont) {}
 
   template <typename Arg>
-  auto operator()(const Arg& argTuple) const {
+  auto operator()(const Arg&) const {
     return runtime::makeLocalRange(m_cont);
   }
 };
@@ -293,7 +295,7 @@ public:
   explicit ContainerRangeMaker(C& cont) : m_cont(cont) {}
 
   template <typename Arg>
-  auto operator()(const Arg& argTuple) const {
+  auto operator()(const Arg&) const {
     return runtime::makeStandardRange(m_cont.begin(), m_cont.end());
   }
 };

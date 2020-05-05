@@ -49,7 +49,7 @@ public:
 			//set_input_pattern(pid);
 		}
 	}
-	void set_input_pattern(unsigned pid) {
+	void set_input_pattern(unsigned GALOIS_UNUSED(pid)) {
 		//input_pid = pid;
 	} 
 	virtual void print_output() {}

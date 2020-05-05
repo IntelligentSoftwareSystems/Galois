@@ -20,12 +20,13 @@
 #ifndef GALOIS_GRAPHS_LCGRAPH_H
 #define GALOIS_GRAPHS_LCGRAPH_H
 
-#include "LC_CSR_Graph.h"
-#include "LC_InlineEdge_Graph.h"
-#include "LC_Linear_Graph.h"
-#include "LC_Morph_Graph.h"
-#include "LC_InOut_Graph.h"
-#include "LC_Adaptor_Graph.h"
-#include "ReadGraph.h"
+#include "galois/config.h"
+#include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/LC_InlineEdge_Graph.h"
+#include "galois/graphs/LC_Linear_Graph.h"
+#include "galois/graphs/LC_Morph_Graph.h"
+#include "galois/graphs/LC_InOut_Graph.h"
+#include "galois/graphs/LC_Adaptor_Graph.h"
+#include "galois/graphs/ReadGraph.h"
 
 #endif

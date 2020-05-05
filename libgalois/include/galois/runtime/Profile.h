@@ -20,9 +20,7 @@
 #ifndef GALOIS_RUNTIME_SAMPLING_H
 #define GALOIS_RUNTIME_SAMPLING_H
 
-#include "galois/Galois.h"
-#include "galois/Timer.h"
-#include "galois/gIO.h"
+#include <cstdlib>
 
 #ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
@@ -39,7 +37,10 @@ extern "C" {
 #include <hpctoolkit.h>
 #endif
 
-#include <cstdlib>
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/gIO.h"
+#include "galois/Timer.h"
 
 namespace galois {
 namespace runtime {

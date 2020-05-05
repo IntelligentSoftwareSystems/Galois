@@ -231,8 +231,6 @@ private:
    *
    * @param g The offline graph which has loaded the graph you want
    * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
    * @param DecomposeFactor Specifies how decomposed the blocking
@@ -240,9 +238,9 @@ private:
    * out of 1 block had the decompose factor been set to 1.
    */
   void computeMastersBlockedNodes(galois::graphs::OfflineGraph& g,
-                                  uint64_t numNodes_to_divide,
                                   const std::vector<unsigned>& scalefactor,
                                   unsigned DecomposeFactor = 1) {
+    uint64_t numNodes_to_divide = g.size();
     if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
       for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
         gid2host.push_back(galois::block_range(0U, (unsigned)numNodes_to_divide,
@@ -287,8 +285,6 @@ private:
    *
    * @param g The offline graph which has loaded the graph you want
    * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
    * @param DecomposeFactor Specifies how decomposed the blocking
@@ -296,7 +292,6 @@ private:
    * out of 1 block had the decompose factor been set to 1.
    */
   void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
-                                   uint64_t numNodes_to_divide,
                                    const std::vector<unsigned>& scalefactor,
                                    uint32_t edgeWeight,
                                    unsigned DecomposeFactor = 1) {
@@ -362,8 +357,6 @@ private:
    *
    * @param g The offline graph which has loaded the graph you want
    * to get the masters for
-   * @param numNodes_to_divide The total number of nodes you are
-   * assigning to different hosts
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
    * @param DecomposeFactor Specifies how decomposed the blocking
@@ -374,9 +367,9 @@ private:
    * @todo make this function work with decompose factor
    */
   void computeMastersBalancedNodesAndEdges(
-      galois::graphs::OfflineGraph& g, uint64_t numNodes_to_divide,
+      galois::graphs::OfflineGraph& g,
       const std::vector<unsigned>& scalefactor, uint32_t nodeWeight,
-      uint32_t edgeWeight, unsigned DecomposeFactor = 1) {
+      uint32_t edgeWeight, unsigned GALOIS_UNUSED(DecomposeFactor) = 1) {
     if (nodeWeight == 0) {
       nodeWeight = g.sizeEdges() / g.size(); // average degree
     }
@@ -434,24 +427,22 @@ protected:
     timer.start();
     g.reset_seek_counters();
 
-    uint64_t numNodes_to_divide = 0;
-
-    numNodes_to_divide = g.size();
+    uint64_t numNodes_to_divide = g.size();
 
     // compute masters for all nodes
     switch (masters_distribution) {
     case BALANCED_MASTERS:
-      computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor,
+      computeMastersBlockedNodes(g, scalefactor,
                                  DecomposeFactor);
       break;
     case BALANCED_MASTERS_AND_EDGES:
-      computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor,
+      computeMastersBalancedNodesAndEdges(g, scalefactor,
                                           nodeWeight, edgeWeight,
                                           DecomposeFactor);
       break;
     case BALANCED_EDGES_OF_MASTERS:
     default:
-      computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor,
+      computeMastersBalancedEdges(g, scalefactor,
                                   edgeWeight, DecomposeFactor);
       break;
     }
@@ -909,7 +900,8 @@ public:
    * @param localGraphFileName file name to write local graph to.
    * @todo revive this
    */
-  void save_local_graph_to_file(std::string localGraphFileName = "local_graph") {
+  void save_local_graph_to_file(
+      std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
     galois::gWarn("Currently not implemented. TODO");
     //using namespace boost::archive;
     //galois::StatTimer dGraphTimerSaveLocalGraph("TimerSaveLocalGraph", GRNAME);
@@ -962,7 +954,8 @@ public:
    * @todo revive this
    */
   void
-  read_local_graph_from_file(std::string localGraphFileName = "local_graph") {
+  read_local_graph_from_file(
+    std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
     galois::gWarn("Currently not implemented. TODO");
     //using namespace boost::archive;
     //galois::StatTimer dGraphTimerReadLocalGraph("TimerReadLocalGraph", GRNAME);

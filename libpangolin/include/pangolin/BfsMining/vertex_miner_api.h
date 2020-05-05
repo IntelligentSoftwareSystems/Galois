@@ -7,18 +7,18 @@ public:
 	VertexMinerAPI() {}
 	~VertexMinerAPI() {}
 	// toExtend
-	static inline bool toExtend(unsigned n, const EmbeddingTy &emb, unsigned pos) {
+	static inline bool toExtend(unsigned, const EmbeddingTy &, unsigned) {
 		return true;
 	}
 	// toAdd (only add non-automorphisms)
 	static inline bool toAdd(unsigned n, Graph &g, const EmbeddingTy &emb, unsigned pos, VertexId dst) {
 		return !is_vertex_automorphism(n, g, emb, pos, dst);
 	}
-	static inline bool toAddOrdered(unsigned n, Graph &g, const EmbeddingTy &emb, unsigned pos, VertexId dst, Graph &p) {
+	static inline bool toAddOrdered(unsigned, Graph &, const EmbeddingTy &, unsigned, VertexId, Graph &) {
 		return true;
 	}
 	// given an embedding, return its pattern id (hash value)
-	static inline unsigned getPattern(unsigned n, Graph &g, unsigned i, VertexId dst, const EmbeddingTy &emb, unsigned pos) {
+	static inline unsigned getPattern(unsigned, Graph &, unsigned, VertexId, const EmbeddingTy &, unsigned) {
 		return 0;
 	}
 

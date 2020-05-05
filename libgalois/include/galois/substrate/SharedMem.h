@@ -20,11 +20,12 @@
 #ifndef GALOIS_SUBSTRATE_SHAREDMEM_H
 #define GALOIS_SUBSTRATE_SHAREDMEM_H
 
+#include <memory>
+
+#include "galois/config.h"
 #include "galois/substrate/ThreadPool.h"
 #include "galois/substrate/Barrier.h"
 #include "galois/substrate/Termination.h"
-
-#include <memory>
 
 namespace galois::substrate {
 

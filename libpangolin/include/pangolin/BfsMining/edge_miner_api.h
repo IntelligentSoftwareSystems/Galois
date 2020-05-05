@@ -8,7 +8,7 @@ public:
 	~EdgeMinerAPI() {}
 
 	// toExtend
-	static inline bool toExtend(unsigned n, const EmbeddingTy &emb, unsigned pos) {
+	static inline bool toExtend(unsigned, const EmbeddingTy &, unsigned) {
 		return true;
 	}
 	// toAdd (only add non-automorphisms)
@@ -16,13 +16,13 @@ public:
 		return !is_edge_automorphism(n, emb, pos, src, dst, existed, vertex_set);
 	}
 	// customized pattern classification method
-	static inline unsigned getPattern(unsigned n, const EmbeddingTy &emb, unsigned pos, VertexId src, VertexId dst) { 
+	static inline unsigned getPattern(unsigned GALOIS_USED_ONLY_IN_DEBUG(n), const EmbeddingTy &, unsigned, VertexId, VertexId) { 
 		assert(n < 4);
 		return 0;
 	}
 
 protected:
-	static inline bool is_quick_automorphism(unsigned size, const EmbeddingTy& emb, unsigned history, VertexId src, VertexId dst, BYTE& existed) {
+	static inline bool is_quick_automorphism(unsigned size, const EmbeddingTy& emb, unsigned history, VertexId dst, BYTE& existed) {
 		if (dst <= emb.get_vertex(0)) return true;
 		if (dst == emb.get_vertex(1)) return true;
 		if (history == 0 && dst < emb.get_vertex(1)) return true;
@@ -39,7 +39,7 @@ protected:
 	}
 
 	static inline bool is_edge_automorphism(unsigned size, const EmbeddingTy& emb, unsigned history, VertexId src, VertexId dst, BYTE& existed, const VertexSet& vertex_set) {
-		if (size < 3) return is_quick_automorphism(size, emb, history, src, dst, existed);
+		if (size < 3) return is_quick_automorphism(size, emb, history, dst, existed);
 		// check with the first element
 		if (dst <= emb.get_vertex(0)) return true;
 		if (history == 0 && dst <= emb.get_vertex(1)) return true;

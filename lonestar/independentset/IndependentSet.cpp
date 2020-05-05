@@ -627,7 +627,7 @@ struct is_matched {
 };
 
 template <typename Graph, typename Algo>
-bool verify(Graph& graph, Algo& algo) {
+bool verify(Graph& graph, Algo&) {
   using GNode    = typename Graph::GraphNode;
   using prioNode = typename Graph::node_data_type;
 

@@ -21,7 +21,7 @@ public:
 		return *this;
 	}
 	inline unsigned get_pid() const { return 0; } // not used
-	inline void set_pid(unsigned i) { } // not used
+	inline void set_pid(unsigned) { } // not used
 	friend bool operator==(const BaseEmbedding &e1, const BaseEmbedding &e2) {
 		return e1.elements == e2.elements;
 	}

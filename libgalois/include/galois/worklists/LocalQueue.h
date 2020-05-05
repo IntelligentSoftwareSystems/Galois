@@ -20,10 +20,12 @@
 #ifndef GALOIS_WORKLIST_LOCALQUEUE_H
 #define GALOIS_WORKLIST_LOCALQUEUE_H
 
-#include <boost/mpl/if.hpp>
-#include "galois/worklists/Simple.h"
-
 #include <type_traits>
+
+#include <boost/mpl/if.hpp>
+
+#include "galois/config.h"
+#include "galois/worklists/Simple.h"
 
 namespace galois {
 namespace worklists {

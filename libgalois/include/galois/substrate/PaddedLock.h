@@ -20,8 +20,8 @@
 #ifndef GALOIS_SUBSTRATE_PADDEDLOCK_H
 #define GALOIS_SUBSTRATE_PADDEDLOCK_H
 
-#include "SimpleLock.h"
-#include "CacheLineStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 namespace galois {
 namespace substrate {

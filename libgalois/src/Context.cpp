@@ -20,7 +20,6 @@
 #include "galois/runtime/Context.h"
 #include "galois/substrate/SimpleLock.h"
 #include "galois/substrate/CacheLineStorage.h"
-#include "galois/runtime/config.h"
 
 #include <stdio.h>
 
@@ -95,6 +94,6 @@ unsigned galois::runtime::SimpleRuntimeContext::cancelIteration() {
 }
 
 void galois::runtime::SimpleRuntimeContext::subAcquire(
-    galois::runtime::Lockable* lockable, galois::MethodFlag) {
+    galois::runtime::Lockable*, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }

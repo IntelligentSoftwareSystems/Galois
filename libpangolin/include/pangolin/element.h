@@ -82,14 +82,14 @@ public:
 	StructuralElement() { }
 	StructuralElement(VertexId _vertex_id) : vertex_id(_vertex_id), history_info(0) { }
 	StructuralElement(VertexId _vertex_id, BYTE _history) : vertex_id(_vertex_id), history_info(_history) { }
-	StructuralElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+	StructuralElement(VertexId _vertex_id, BYTE, BYTE, BYTE _history) :
 		vertex_id(_vertex_id), history_info(_history) { }
-	StructuralElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+	StructuralElement(VertexId _vertex_id, BYTE, BYTE, BYTE, BYTE _history) :
 		vertex_id(_vertex_id), history_info(_history) { }
 	~StructuralElement() = default;
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
 	inline void set_history_info(BYTE his) { history_info = his; }
-	inline void set_vertex_label(BYTE lab) { }
+	inline void set_vertex_label(BYTE) { }
 	inline int cmp(const StructuralElement& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id) return -1;
@@ -117,12 +117,12 @@ protected:
 public:
 	SimpleElement() : vertex_id(0) { }
 	SimpleElement(VertexId _vertex_id) : vertex_id(_vertex_id) { }
-	SimpleElement(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
-	SimpleElement(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) : vertex_id(_vertex_id) { }
+	SimpleElement(VertexId _vertex_id, BYTE, BYTE, BYTE) : vertex_id(_vertex_id) { }
+	SimpleElement(VertexId _vertex_id, BYTE, BYTE, BYTE, BYTE) : vertex_id(_vertex_id) { }
 	~SimpleElement() = default;
 	inline void set_vertex_id(VertexId new_id) { vertex_id = new_id; }
-	inline void set_history_info(BYTE his) { }
-	inline void set_vertex_label(BYTE lab) { }
+	inline void set_history_info(BYTE) { }
+	inline void set_vertex_label(BYTE) { }
 	VertexId get_vid() const { return vertex_id; }
 	BYTE get_his() const { return 0; }
 	BYTE get_key() const { return 0; }

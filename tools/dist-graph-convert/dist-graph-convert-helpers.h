@@ -885,7 +885,7 @@ template <
 void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
                        const std::vector<uint32_t>& localEdges,
                        std::vector<std::vector<uint32_t>>& localSrcToDest,
-                       std::vector<std::vector<uint32_t>>& localSrcToData,
+                       std::vector<std::vector<uint32_t>>&,
                        std::vector<std::mutex>& nodeLocks) {
   auto& net              = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID        = net.ID;
@@ -903,7 +903,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
       lastSourceSentStorage(totalNumHosts);
 
   // initialize last source sent
-  galois::on_each([&](unsigned tid, unsigned nthreads) {
+  galois::on_each([&](unsigned, unsigned) {
     for (unsigned h = 0; h < totalNumHosts; h++) {
       (*(lastSourceSentStorage.getLocal()))[h] = 0;
     }
@@ -962,7 +962,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
+      [&](unsigned, unsigned) {
         for (unsigned h = 0; h < totalNumHosts; h++) {
           if (h == hostID)
             continue;
@@ -1019,7 +1019,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
       lastSourceSentStorage(totalNumHosts);
 
   // initialize last source sent
-  galois::on_each([&](unsigned tid, unsigned nthreads) {
+  galois::on_each([&](unsigned, unsigned) {
     for (unsigned h = 0; h < totalNumHosts; h++) {
       (*(lastSourceSentStorage.getLocal()))[h] = 0;
     }
@@ -1084,7 +1084,7 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
+      [&](unsigned, unsigned) {
         for (unsigned h = 0; h < totalNumHosts; h++) {
           if (h == hostID)
             continue;

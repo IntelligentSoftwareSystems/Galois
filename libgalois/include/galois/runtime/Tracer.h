@@ -25,11 +25,12 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
+#include <functional>
+#include <sstream>
+
+#include "galois/config.h"
 #include "galois/substrate/EnvCheck.h"
 #include "galois/PODResizeableArray.h"
-
-#include <sstream>
-#include <functional>
 
 namespace galois {
 namespace runtime {
@@ -45,7 +46,7 @@ static inline void traceImpl(std::ostringstream& os) { os << "\n"; }
  * Prints out a value to the output stream.
  */
 template <typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, T&& value,
+static inline void traceImpl(std::ostringstream& os, T&&,
                              Args&&... args) {
   // os << value << " ";
   traceImpl(os, std::forward<Args>(args)...);

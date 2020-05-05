@@ -301,7 +301,7 @@ void receiveAtHost_0_helper2(void);
 void combineAtHost_0(void);
 StatTotal::Type findHostTotalTy(const Str& region, const Str& category,
                                 const StatTotal::Type& thrdTotalTy) const;
-void addRecvdHostTotalTy(unsigned hostID, const Str& region,
+void addRecvdHostTotalTy(const Str& region,
                          const Str& category, const StatTotal::Type& totalTy);
 void addRecvdStat(unsigned hostID, const Str& region, const Str& category,
                   int64_t thrdTotal, const StatTotal::Type& thrdTotalTy,

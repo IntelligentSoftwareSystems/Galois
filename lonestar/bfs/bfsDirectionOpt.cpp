@@ -137,7 +137,7 @@ struct EdgeTileMaker {
 struct NodePushWrap {
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     (*this)(cont, n);
   }
 
@@ -151,7 +151,7 @@ struct EdgeTilePushWrap {
   Graph& graph;
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     BFS::pushEdgeTilesParallel(cont, graph, n, EdgeTileMaker{});
   }
 
@@ -165,7 +165,7 @@ struct OneTilePushWrap {
   Graph& graph;
 
   template <typename C>
-  void operator()(C& cont, const GNode& n, const char* const _parallel) const {
+  void operator()(C& cont, const GNode& n, const char* const) const {
     (*this)(cont, n);
   }
 
@@ -188,8 +188,8 @@ void WlToBitset(WL& wl, galois::DynamicBitSet& bitset) {
            galois::loopname("WlToBitset"));
 }
 
-template <typename WL, typename P>
-void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset, WL& wl, const P& pushWrap) {
+template <typename WL>
+void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset, WL& wl) {
   wl.clear();
   galois::do_all(galois::iterate(graph),
            [&](const GNode& src) {
@@ -203,7 +203,7 @@ void BitsetToWl(const Graph& graph, const galois::DynamicBitSet& bitset, WL& wl,
 
 template <bool CONCURRENT, typename T, typename P, typename R>
 void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
-              const R& edgeRange, const uint32_t runID) {
+                const R& GALOIS_UNUSED(edgeRange), const uint32_t runID) {
 
   using Cont = typename std::conditional<CONCURRENT, galois::InsertBag<T>,
                                          galois::SerStack<T>>::type;
@@ -295,7 +295,7 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
             next_bitset.reset();
       } while(work_items.reduce() >= old_workItemNum || (work_items.reduce() > numNodes / beta));
 
-      BitsetToWl(graph, front_bitset, *next, NodePushWrap());
+      BitsetToWl(graph, front_bitset, *next);
       scout_count = 1;
     }
     else {
@@ -337,7 +337,7 @@ void syncDOAlgo(Graph& graph, GNode source, const P& pushWrap,
 
 template <bool CONCURRENT, typename T, typename P, typename R>
 void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
-               const R& edgeRange) {
+               const R& GALOIS_UNUSED(edgeRange)) {
 
   namespace gwl = galois::worklists;
   // typedef PerSocketChunkFIFO<CHUNK_SIZE> dFIFO;

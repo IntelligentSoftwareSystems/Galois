@@ -82,7 +82,7 @@ using BisectPolicy = partInfo(GGraph& g, partInfo& oldPart,
 
 partInfo bisect_GGP(GGraph& g, partInfo& oldPart,
                     std::pair<unsigned, unsigned> ratio,
-                    std::vector<GNode>* b = NULL, int oldWeight = 0) {
+                    std::vector<GNode>* b = NULL, int = 0) {
   partInfo newPart = oldPart.split();
   std::deque<GNode> boundary;
   unsigned& newWeight = newPart.partWeight = 0;
@@ -212,7 +212,7 @@ void KLMatch(GGraph& graph, std::vector<GNode>& boundary,
   };
 
   galois::for_each(galois::iterate(boundary),
-                   [&](GNode node, auto& lwl) {
+                   [&](GNode node, auto&) {
                      auto flag            = galois::MethodFlag::UNPROTECTED;
                      PartMatch* localInfo = threadInfo.getLocal();
                      int gain             = localInfo->first;
@@ -349,7 +349,7 @@ void refine_kl(GGraph& graph, std::vector<GNode>& boundary, int oldPartNum,
 }
 
 template <BisectPolicy bisect>
-void serialBisect(MetisGraph* mg, unsigned totalWeight, unsigned nparts,
+void serialBisect(MetisGraph* mg, unsigned int, unsigned int nparts,
                   std::vector<partInfo>& parts) {
   GGraph* graph = mg->getGraph();
   std::stack<partInfo*> workList;
@@ -378,7 +378,7 @@ void serialBisect(MetisGraph* mg, unsigned totalWeight, unsigned nparts,
 }
 
 template <BisectPolicy bisect>
-void parallelBisect(MetisGraph* mg, unsigned totalWeight, unsigned nparts,
+void parallelBisect(MetisGraph* mg, unsigned int, unsigned int nparts,
                     std::vector<partInfo>& parts) {
   GGraph* graph = mg->getGraph();
   galois::for_each(galois::iterate({&parts[0]}),
@@ -471,7 +471,7 @@ int edgeCount(GGraph& g) {
 } // namespace
 
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions,
-                                unsigned maxSize) {
+                                unsigned int) {
   std::cout << "\nSorting initial partitioning using MGGGP:\n";
   auto flag = galois::MethodFlag::UNPROTECTED;
   GGraph& g = *mcg->getGraph();

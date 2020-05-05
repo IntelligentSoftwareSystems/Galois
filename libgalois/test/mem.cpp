@@ -30,7 +30,7 @@ struct element {
   element(int i) : val(i), next(0) {}
 };
 
-int main(int argc, char** argv) {
+int main() {
   galois::SharedMemSys Galois_runtime;
   unsigned baseAllocSize = SystemHeap::AllocSize;
 

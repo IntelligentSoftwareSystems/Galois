@@ -20,6 +20,7 @@
 #ifndef GALOIS_WORKLIST_STABLEITERATOR_H
 #define GALOIS_WORKLIST_STABLEITERATOR_H
 
+#include "galois/config.h"
 #include "galois/gstl.h"
 #include "galois/worklists/Chunk.h"
 

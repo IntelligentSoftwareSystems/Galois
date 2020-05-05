@@ -17,6 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "galois/config.h"
+
 namespace galois {
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>

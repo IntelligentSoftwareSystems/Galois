@@ -145,7 +145,7 @@ struct Node : public galois::UnionFindNode<Node> {
   }
 
   component_type component() { return this->get(); }
-  bool isRepComp(unsigned int x) { return false; }
+  bool isRepComp(unsigned int) { return false; }
 };
 
 const unsigned int LABEL_INF = std::numeric_limits<unsigned int>::max();
@@ -662,7 +662,7 @@ struct AfforestAlgo {
     NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
 
     component_type component() { return this->get(); }
-    bool isRepComp(unsigned int x) { return false; } // verify
+    bool isRepComp(unsigned int) { return false; } // verify
 
   public:
     void link(NodeData* b) {
@@ -772,7 +772,7 @@ struct EdgeAfforestAlgo {
     NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
 
     component_type component() { return this->get(); }
-    bool isRepComp(unsigned int x) { return false; } // verify
+    bool isRepComp(unsigned int) { return false; } // verify
 
   public:
     NodeData* hook_min(NodeData* b, NodeData* c=0) {
@@ -911,7 +911,7 @@ struct EdgeTiledAfforestAlgo {
     NodeData(const NodeData& o) : galois::UnionFindNode<NodeData>(o.m_component) {}
 
     component_type component() { return this->get(); }
-    bool isRepComp(unsigned int x) { return false; } // verify
+    bool isRepComp(unsigned int) { return false; } // verify
 
   public:
     void link(NodeData* b) {
@@ -1039,7 +1039,7 @@ struct EdgeTiledAfforestAlgo {
 
 template <typename Graph>
 bool verify(
-    Graph& graph,
+    Graph&,
     typename std::enable_if<galois::graphs::is_segmented<Graph>::value>::type* =
         0) {
   return true;
@@ -1162,7 +1162,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
 }
 
 template <typename Graph>
-void initialize(Graph& graph) {}
+void initialize(Graph&) {}
 
 template <>
 void initialize<LabelPropAlgo::Graph>(typename LabelPropAlgo::Graph& graph) {

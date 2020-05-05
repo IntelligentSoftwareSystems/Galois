@@ -20,6 +20,8 @@
 #ifndef GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 #define GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace substrate {
 

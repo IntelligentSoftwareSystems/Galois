@@ -20,13 +20,15 @@
 #ifndef GALOIS_TWOLEVELITERATORA_H
 #define GALOIS_TWOLEVELITERATORA_H
 
-#include "galois/gIO.h"
-
-#include <boost/iterator/iterator_adaptor.hpp>
 #include <cassert>
 #include <iterator>
 #include <type_traits>
 #include <utility>
+
+#include <boost/iterator/iterator_adaptor.hpp>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 
@@ -96,7 +98,7 @@ private:
 
   template <class Iter>
   void safe_decrement_dispatch(std::bidirectional_iterator_tag, Iter& it,
-                               const Iter& begin) {
+                               const Iter&) {
     --it;
   }
 
@@ -139,7 +141,7 @@ private:
 
   template <class Iter>
   typename std::iterator_traits<Iter>::difference_type
-  safe_difference_dispatch(Iter it1, Iter it2, Iter end,
+  safe_difference_dispatch(Iter it1, Iter it2, Iter,
                            std::random_access_iterator_tag) const {
     return std::distance(it1, it2);
   }

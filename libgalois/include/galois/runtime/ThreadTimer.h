@@ -1,9 +1,10 @@
 #ifndef GALOIS_RUNTIME_THREADTIMER_H
 #define GALOIS_RUNTIME_THREADTIMER_H
 
-#include "galois/substrate/PerThreadStorage.h"
-
 #include <ctime>
+
+#include "galois/config.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 namespace galois::runtime {
 
@@ -67,8 +68,8 @@ template <>
 class PerThreadTimer<false> {
 
 public:
-  PerThreadTimer(const char* const _region,
-                 const char* const _category) {}
+  PerThreadTimer(const char* const,
+                 const char* const) {}
 
   PerThreadTimer(const PerThreadTimer&) = delete;
   PerThreadTimer(PerThreadTimer&&) = delete;

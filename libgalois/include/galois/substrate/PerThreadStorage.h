@@ -20,15 +20,15 @@
 #ifndef GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 #define GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 
-#include "galois/substrate/ThreadPool.h"
+#include <cassert>
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include "galois/config.h"
 #include "galois/substrate/HWTopo.h"
 #include "galois/substrate/PaddedLock.h"
-
-#include <cstddef>
-
-#include <cassert>
-#include <vector>
-#include <utility>
+#include "galois/substrate/ThreadPool.h"
 
 namespace galois {
 namespace substrate {

@@ -182,8 +182,8 @@ struct ParallelAlgo {
     }
 
     template <typename Context, typename Pending>
-    void operator()(const WorkItem& item, Context& ctx,
-                    Pending& pending) const {
+    void operator()(const WorkItem& item, Context&,
+                    Pending&) const {
       GNode src   = item.edge.src;
       Node& sdata = self->graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Node* rep   = sdata.findAndCompress();

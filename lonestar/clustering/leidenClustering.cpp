@@ -144,7 +144,7 @@ double algoLeidenWithLocking(Graph &graph, double lower, double threshold, uint3
                     });
 
     galois::for_each(galois::iterate(graph),
-                  [&](GNode n, auto& ctx) {
+                  [&](GNode n, auto&) {
                   auto& n_data = graph.getData(n, flag_write_lock);
                   uint64_t degree = std::distance(graph.edge_begin(n, flag_write_lock),
                                                   graph.edge_end(n,  flag_write_lock));
@@ -157,7 +157,7 @@ double algoLeidenWithLocking(Graph &graph, double lower, double threshold, uint3
                   if(degree > 0){
                       findNeighboringClusters(graph, n, cluster_local_map, counter, self_loop_wt);
                       local_target = maxModularity(cluster_local_map, counter, self_loop_wt, c_info, n_data.degree_wt, n_data.curr_comm_ass, constant_for_second_term);
-                      //local_target = maxCPMQuality<Graph, CommArray>(cluster_local_map, counter, self_loop_wt, c_info, n_data.node_wt, n_data.curr_comm_ass, constant_for_second_term);
+                      //local_target = maxCPMQuality<Graph, CommArray>(cluster_local_map, counter, self_loop_wt, c_info, n_data.node_wt, n_data.curr_comm_ass);
 									} else {
                     local_target = UNASSIGNED;
                   }
@@ -210,7 +210,7 @@ double algoLeidenWithLocking(Graph &graph, double lower, double threshold, uint3
   return prev_mod;
 }
 
-void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double c_threshold, largeArray& clusters_orig, largeArray& clusters_sub_orig) {
+void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size, double c_threshold, largeArray& clusters_orig) {
 
   galois::gPrint("Inside runMultiPhaseLouvainAlgorithm\n");
   double prev_mod = -1; //Previous modularity
@@ -319,9 +319,8 @@ int main(int argc, char** argv) {
    * To keep track of communities for nodes in the original graph.
    * Community will be set to -1 for isolated nodes
    */
-  largeArray clusters_orig, clusters_sub_orig;
+  largeArray clusters_orig;
   clusters_orig.allocateBlocked(graph_curr->size());
-  clusters_sub_orig.allocateBlocked(graph_curr->size());
 
   /*
    * Vertex following optimization
@@ -338,7 +337,6 @@ int main(int argc, char** argv) {
     galois::do_all(galois::iterate(*graph_curr),
                   [&](GNode n){
                     clusters_orig[n] = graph.getData(n, flag_no_lock).curr_comm_ass;
-                    clusters_sub_orig[n] = graph.getData(n, flag_no_lock).curr_comm_ass;
                   });
 
     /*
@@ -355,7 +353,6 @@ int main(int argc, char** argv) {
     galois::do_all(galois::iterate(*graph_curr),
                   [&](GNode n){
                     clusters_orig[n] = UNASSIGNED;
-                    clusters_sub_orig[n] = UNASSIGNED;
                   });
 
     printGraphCharateristics(*graph_curr);
@@ -364,7 +361,7 @@ int main(int argc, char** argv) {
   uint64_t min_graph_size = 10;
   galois::StatTimer Tmain("Timer_LC");
   Tmain.start();
-  runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold, clusters_orig, clusters_sub_orig);
+  runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold, clusters_orig);
   Tmain.stop();
 
   TEnd2End.stop();

@@ -20,6 +20,8 @@
 #ifndef GALOIS_WORKLIST_EXTERNALREFERENCE_H
 #define GALOIS_WORKLIST_EXTERNALREFERENCE_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace worklists {
 

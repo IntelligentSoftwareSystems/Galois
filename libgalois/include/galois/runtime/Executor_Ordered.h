@@ -20,24 +20,32 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 #define GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 
+#include "galois/config.h"
+
 namespace galois {
 namespace runtime {
 
 // TODO(ddn): Pull in and integrate in executors from exp
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp,
-                           const NhFunc& nhFunc, const OpFunc& opFunc,
-                           const char* loopname) {
+void for_each_ordered_impl(Iter GALOIS_UNUSED(beg),
+                           Iter GALOIS_UNUSED(end),
+                           const Cmp& GALOIS_UNUSED(cmp),
+                           const NhFunc& GALOIS_UNUSED(nhFunc),
+                           const OpFunc& GALOIS_UNUSED(opFunc),
+                           const char* GALOIS_UNUSED(loopname)) {
   GALOIS_DIE("not yet implemented");
 }
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc,
           typename StableTest>
-void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp,
-                           const NhFunc& nhFunc, const OpFunc& opFunc,
-                           const StableTest& stabilityTest,
-                           const char* loopname) {
+void for_each_ordered_impl(Iter GALOIS_UNUSED(beg),
+                           Iter GALOIS_UNUSED(end),
+                           const Cmp& GALOIS_UNUSED(cmp),
+                           const NhFunc& GALOIS_UNUSED(nhFunc),
+                           const OpFunc& GALOIS_UNUSED(opFunc),
+                           const StableTest& GALOIS_UNUSED(stabilityTest),
+                           const char* GALOIS_UNUSED(loopname)) {
   GALOIS_DIE("not yet implemented");
 }
 

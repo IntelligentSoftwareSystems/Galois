@@ -196,7 +196,7 @@ int main(int argc, char* argv[]) {
   galois::for_each(
       galois::iterate(
           torus), // range as a container. assuming begin() and end()
-      [&](TorusNode n, auto& ctx) { // operator
+      [&](TorusNode n, auto&) { // operator
         // cautious point
         torus.acquireAllNeighbors(n);
 

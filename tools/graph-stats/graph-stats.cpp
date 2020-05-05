@@ -181,7 +181,7 @@ int getLogIndex(ptrdiff_t x) {
   return sign * logvalue;
 }
 
-void doSortedLogOffsetHistogram(Graph& graph) {
+void doSortedLogOffsetHistogram(Graph& GALOIS_UNUSED(graph)) {
   // Graph copy;
   // {
   //   // Original FileGraph is immutable because it is backed by a file
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
         break;
       case sparsityPattern: {
         unsigned lastrow = ~0;
-        doSparsityPattern(graph, [&lastrow](unsigned x, unsigned y, bool val) {
+        doSparsityPattern(graph, [&lastrow](unsigned, unsigned y, bool val) {
           if (y != lastrow) {
             lastrow = y;
             std::cout << '\n';

@@ -133,7 +133,7 @@ struct BFS_SSSP {
   struct ReqPushWrap {
     template <typename C>
     void operator()(C& cont, const GNode& n, const Dist& dist,
-                    const char* const _parallel) const {
+                    const char* const) const {
       (*this)(cont, n, dist);
     }
 
@@ -149,7 +149,7 @@ struct BFS_SSSP {
 
     template <typename C>
     void operator()(C& cont, const GNode& n, const Dist& dist,
-                    const char* const _parallel) const {
+                    const char* const) const {
       pushEdgeTilesParallel(cont, graph, n, SrcEdgeTileMaker{n, dist});
     }
 
@@ -183,7 +183,7 @@ struct BFS_SSSP {
     not_consistent(Graph& g, std::atomic<bool>& refb) : g(g), refb(refb) {}
 
     template <bool useWt, typename iiTy>
-    Dist getEdgeWeight(iiTy ii,
+    Dist getEdgeWeight(iiTy,
                        typename std::enable_if<!useWt>::type* = nullptr) const {
       return 1;
     }

@@ -33,7 +33,7 @@ struct testL {
   PerThreadStorage<T>& b;
 
   testL(PerThreadStorage<T>& B) : b(B) {}
-  void operator()(unsigned t, unsigned n) {
+  void operator()(unsigned, unsigned) {
     for (int x = 0; x < num; ++x) {
       *b.getLocal() += x;
     }

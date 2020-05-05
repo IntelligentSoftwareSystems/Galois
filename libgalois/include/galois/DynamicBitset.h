@@ -26,16 +26,19 @@
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
 
+#include <climits>
+#include <vector>
+#include <cassert>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/mpl/has_xxx.hpp>
+
+#include "galois/config.h"
 #include "galois/AtomicWrapper.h"
 #include "galois/PODResizeableArray.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/Traits.h"
 #include "galois/Galois.h"
-#include <boost/iterator/counting_iterator.hpp>
-#include <boost/mpl/has_xxx.hpp>
-#include <climits> // CHAR_BIT
-#include <vector>
-#include <assert.h>
 
 namespace galois {
 /**
@@ -423,7 +426,7 @@ struct InvalidBitsetFnTy {
   static galois::DynamicBitSet& get() { return EmptyBitset; }
 
   //! No-op since it's an empty bitset
-  static void reset_range(size_t begin, size_t end) {}
+  static void reset_range(size_t, size_t) {}
 };
 } // namespace galois
 #endif

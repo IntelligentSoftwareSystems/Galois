@@ -20,8 +20,9 @@
 #ifndef GALOIS_GRAPHS_LC_ADAPTOR_GRAPH_H
 #define GALOIS_GRAPHS_LC_ADAPTOR_GRAPH_H
 
-#include "galois/LargeArray.h"
+#include "galois/config.h"
 #include "galois/graphs/Details.h"
+#include "galois/LargeArray.h"
 
 namespace galois {
 namespace graphs {
@@ -61,7 +62,7 @@ protected:
   }
 
   template <bool _A1 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A1>::type* = 0) {}
 
   const DerivedTy& derived() const {
@@ -81,7 +82,7 @@ public:
   }
 
   edge_data_reference getEdgeData(edge_iterator ni,
-                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return derived().get_edge_data(ni);
   }

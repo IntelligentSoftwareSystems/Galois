@@ -22,6 +22,8 @@
 
 #include <string>
 
+#include "galois/config.h"
+
 namespace galois {
 
 std::string getVersion();

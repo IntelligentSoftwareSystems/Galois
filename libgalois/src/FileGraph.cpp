@@ -487,7 +487,7 @@ auto FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id,
       dummy_scale_factor, edgeOffset);
 }
 
-auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
+auto FileGraph::divideByEdge(size_t, size_t, size_t id,
                              size_t total) -> std::pair<NodeRange, EdgeRange> {
   size_t size  = numEdges;
   size_t block = (size + total - 1) / total;

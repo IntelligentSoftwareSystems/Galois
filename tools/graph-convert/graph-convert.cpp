@@ -218,7 +218,7 @@ void convert(
 
 template <typename EdgeTy, typename C>
 void convert(
-    C& c, HasOnlyVoidSpecialization,
+    C&, HasOnlyVoidSpecialization,
     typename std::enable_if<!std::is_same<EdgeTy, void>::value>::type* = 0) {
   GALOIS_DIE("conversion undefined for non-void graphs");
 }
@@ -232,7 +232,7 @@ void convert(
 
 template <typename EdgeTy, typename C>
 void convert(
-    C& c, HasNoVoidSpecialization,
+    C&, HasNoVoidSpecialization,
     typename std::enable_if<std::is_same<EdgeTy, void>::value>::type* = 0) {
   GALOIS_DIE("conversion undefined for void graphs");
 }
@@ -306,7 +306,7 @@ void setEdgeValue(EdgeValues& edgeValues, int value,
 }
 
 template <typename EdgeValues, bool Enable>
-void setEdgeValue(EdgeValues& edgeValues, int value,
+void setEdgeValue(EdgeValues&, int,
                   typename std::enable_if<!Enable>::type* = 0) {}
 
 template <typename EdgeTy, bool Enable>
@@ -317,8 +317,8 @@ EdgeTy getEdgeValue(galois::graphs::FileGraph& g,
 }
 
 template <typename EdgeTy, bool Enable>
-int getEdgeValue(galois::graphs::FileGraph& g,
-                 galois::graphs::FileGraph::edge_iterator ii,
+int getEdgeValue(galois::graphs::FileGraph&,
+                 galois::graphs::FileGraph::edge_iterator,
                  typename std::enable_if<!Enable>::type* = 0) {
   return 1;
 }

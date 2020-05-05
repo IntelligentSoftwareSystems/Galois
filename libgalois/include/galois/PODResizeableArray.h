@@ -27,9 +27,7 @@
 #include <utility>
 #include <type_traits>
 
-// Statistics & Debug
-// #include "galois/Timer.h"
-// #include "galois/gIO.h"
+#include "galois/config.h"
 
 namespace galois {
 
@@ -183,7 +181,8 @@ public:
   }
 
   template <class InputIterator>
-  void insert(iterator position, InputIterator first, InputIterator last) {
+  void insert(iterator GALOIS_USED_ONLY_IN_DEBUG(position),
+              InputIterator first, InputIterator last) {
     assert(position == end());
     size_t old_size = size_;
     size_t to_add = last - first;

@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+#include "galois/config.h"
+
 namespace galois {
 
 static inline uint32_t bswap32(uint32_t x) {

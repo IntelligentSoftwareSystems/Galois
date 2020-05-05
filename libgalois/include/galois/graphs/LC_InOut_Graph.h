@@ -20,12 +20,13 @@
 #ifndef GALOIS_GRAPHS_LC_INOUT_GRAPH_H
 #define GALOIS_GRAPHS_LC_INOUT_GRAPH_H
 
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at_c.hpp>
+
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/Galois.h"
 
 namespace galois {
 namespace graphs {
@@ -147,7 +148,7 @@ public:
 
   edge_data_reference
   getInEdgeData(in_edge_iterator ni,
-                MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));

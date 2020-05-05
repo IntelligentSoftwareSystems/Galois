@@ -40,7 +40,7 @@ public:
 
   node_data_reference get_data(GraphNode n) { return m_instance.nodeData[n]; }
 
-  edge_data_reference get_edge_data(edge_iterator n) { return {}; }
+  edge_data_reference get_edge_data(edge_iterator) { return {}; }
 
   GraphNode get_edge_dst(edge_iterator n) { return *n; }
 

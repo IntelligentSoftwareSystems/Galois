@@ -208,7 +208,8 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, bool determ
   }
 }
 
-void addChoices(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose) {
+void addChoices(aig::Aig& aig, std::string& GALOIS_UNUSED(fileName),
+                int GALOIS_UNUSED(nThreads), bool verbose) {
 
   // FIXME 
   // In the current implementation the creation of choices must be serial.

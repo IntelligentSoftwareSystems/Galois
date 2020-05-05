@@ -20,10 +20,11 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
-#include "galois/gIO.h"
-
 #include <type_traits>
 #include <utility>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 
@@ -124,10 +125,10 @@ struct LazyObject<void> {
   };
 
   void destroy() {}
-  void construct(const_reference x) {}
+  void construct(const_reference) {}
 
   template <typename... Args>
-  void construct(Args&&... args) {}
+  void construct(Args&&...) {}
 
   const_reference get() const { return 0; }
 };

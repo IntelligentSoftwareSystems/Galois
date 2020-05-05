@@ -11,9 +11,13 @@
  */
 
 #define USE_DOMAIN // use domain support
+
+GALOIS_IGNORE_EXTERNAL_UNUSED_PARAMETERS
+#include "bliss/graph.hh"
+GALOIS_END_IGNORE_EXTERNAL_UNUSED_PARAMETERS
+
 #include "pangolin/embedding.h"
 #include "pangolin/edge_type.h"
-#include "bliss/graph.hh"
 
 typedef std::unordered_map<VertexId, BYTE> VertexMap;
 typedef std::vector<bliss::Graph::Vertex> BlissVertexList;
@@ -26,11 +30,13 @@ class CanonicalGraph {
 	friend std::ostream & operator<< <>(std::ostream & strm, const CanonicalGraph<EmbeddingTy,ElementTy>& cg);
 public:
 	CanonicalGraph() : number_of_vertices(0), hash_value(0) {}
-	CanonicalGraph(bliss::AbstractGraph* ag, bool is_directed = false) {
+	CanonicalGraph(bliss::AbstractGraph* ag,
+                       bool GALOIS_USED_ONLY_IN_DEBUG(is_directed) = false) {
 		assert(!is_directed);
 		construct_cg(ag);
 	}
-	CanonicalGraph(const QuickPattern<EmbeddingTy,ElementTy>& qp, bool is_directed = false) {
+	CanonicalGraph(const QuickPattern<EmbeddingTy,ElementTy>& qp,
+                       bool GALOIS_USED_ONLY_IN_DEBUG(is_directed) = false) {
 		assert(!is_directed);
 		bliss::AbstractGraph* ag = turn_abstract(qp);
 		construct_cg(ag);
@@ -172,7 +178,9 @@ private:
 			set.insert(srcId);
 		}
 	}
-	static void report_aut(void* param, const unsigned n, const unsigned* aut) {
+	static void report_aut(void* GALOIS_USED_ONLY_IN_DEBUG(param),
+                               const unsigned GALOIS_UNUSED(n),
+                               const unsigned* GALOIS_UNUSED(aut)) {
 		assert(param);
 		//fprintf((FILE*) param, "Generator: ");
 		//bliss::print_permutation((FILE*) param, n, aut, 1);

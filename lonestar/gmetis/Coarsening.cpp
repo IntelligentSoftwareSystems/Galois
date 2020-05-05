@@ -30,7 +30,7 @@ namespace {
 using MatchingPolicy    = GNode(GNode, GGraph*);
 using MatchingSubPolicy = std::pair<GNode, int>(GNode, GGraph*, bool tag);
 
-std::pair<GNode, int> HEMmatch(GNode node, GGraph* graph, bool tag) {
+std::pair<GNode, int> HEMmatch(GNode node, GGraph* graph, bool) {
   GNode retval = node; // match self if nothing else
   int maxwgt   = std::numeric_limits<int>::min();
   //    nume += std::distance(graph->edge_begin(node), graph->edge_end(node));
@@ -101,7 +101,7 @@ void parallelMatchAndCreateNodes(MetisGraph* graph, Pcounter& pc,
 
   galois::for_each(
       galois::iterate(*fineGGraph),
-      [&](GNode item, galois::UserContext<GNode>& lwl) {
+      [&](GNode item, galois::UserContext<GNode>&) {
         if (fineGGraph->getData(item).isMatched())
           return;
 

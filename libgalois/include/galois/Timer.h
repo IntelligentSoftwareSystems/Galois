@@ -20,9 +20,10 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "galois/gstl.h"
-
 #include <chrono>
+
+#include "galois/config.h"
+#include "galois/gstl.h"
 
 namespace galois {
 
@@ -95,8 +96,8 @@ public:
 template <>
 class CondStatTimer<false> {
 public:
-  CondStatTimer(const char* name) {}
-  CondStatTimer(const char* const n, const char* region) {}
+  CondStatTimer(const char* ) {}
+  CondStatTimer(const char* const , const char* ) {}
 
   void start() const {}
   void stop() const {}

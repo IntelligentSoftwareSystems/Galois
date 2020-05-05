@@ -20,16 +20,16 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
+#include <deque>
+#include <limits>
+#include <type_traits>
+
 #include "galois/FlatMap.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
 #include "galois/worklists/Chunk.h"
 #include "galois/worklists/WorkListHelpers.h"
-
-#include <deque>
-#include <limits>
-#include <type_traits>
 
 namespace galois {
 namespace worklists {

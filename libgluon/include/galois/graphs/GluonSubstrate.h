@@ -334,7 +334,7 @@ private:
    * @param global_total_owned_nodes number of "owned" nodes on all hosts
    */
   void reportProxyStats(uint64_t global_total_mirror_nodes,
-                        uint64_t global_total_owned_nodes) {
+                        uint64_t GALOIS_UNUSED(global_total_owned_nodes)) {
     float replication_factor =
         (float)(global_total_mirror_nodes + userGraph.globalSize()) /
         (float)userGraph.globalSize();
@@ -1932,7 +1932,7 @@ private:
       SyncType syncType, typename SyncFnTy, typename BitsetFnTy, 
       typename VecTy, bool async,
       typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = nullptr>
-  void syncExtract(std::string loopName, unsigned from_id,
+  void syncExtract(std::string loopName, unsigned,
                    std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
@@ -3107,7 +3107,7 @@ private:
     static inline void call(GluonSubstrate* substrate,
                             galois::runtime::FieldFlags& fieldFlags,
                             std::string loopName,
-                            const BITVECTOR_STATUS& bvFlag) {
+                            const BITVECTOR_STATUS&) {
       if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
         substrate->sync_any_to_src<SyncFnTy, BitsetFnTy>(loopName);
       } else if (fieldFlags.src_to_src()) {
@@ -3142,7 +3142,7 @@ private:
     static inline void call(GluonSubstrate* substrate,
                             galois::runtime::FieldFlags& fieldFlags,
                             std::string loopName,
-                            const BITVECTOR_STATUS& bvFlag) {
+                            const BITVECTOR_STATUS&) {
       if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
         substrate->sync_any_to_dst<SyncFnTy, BitsetFnTy>(loopName);
       } else if (fieldFlags.src_to_dst()) {

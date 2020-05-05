@@ -35,6 +35,12 @@
 struct CUDA_Context;
 #endif
 
+#if defined(__GNUC__) && !defined(__GALOIS_HET_CUDA__)
+#define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME __attribute__((unused))
+#else
+#define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME
+#endif
+
 //! standard global options to the benchmarks
 namespace cll = llvm::cl;
 
@@ -137,7 +143,7 @@ marshalGPUGraph(galois::graphs::GluonSubstrate<
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
 loadDGraph(std::vector<unsigned>& scaleFactor,
-           struct CUDA_Context** cuda_ctx = nullptr) {
+  struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) = nullptr) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -175,7 +181,7 @@ loadDGraph(std::vector<unsigned>& scaleFactor,
 template <typename NodeData, typename EdgeData>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
 loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
-                    struct CUDA_Context** cuda_ctx = nullptr) {
+  struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) = nullptr) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -221,7 +227,8 @@ std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
           galois::graphs::GluonSubstrate<
             galois::graphs::DistGraph<NodeData, EdgeData>
           >*>
-distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
+distGraphInitialization(
+  struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) = nullptr) {
   using Graph = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
@@ -265,7 +272,8 @@ std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
           galois::graphs::GluonSubstrate<
             galois::graphs::DistGraph<NodeData, EdgeData>
           >*>
-symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
+symmetricDistGraphInitialization(
+  struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) = nullptr) {
   using Graph = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;

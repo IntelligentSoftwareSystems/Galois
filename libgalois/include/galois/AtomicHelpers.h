@@ -22,6 +22,9 @@
 #include <atomic>
 #include <algorithm>
 #include <vector>
+
+#include "galois/config.h"
+
 namespace galois {
 /** galois::atomicMax + non-atomic max calls **/
 template <typename Ty>

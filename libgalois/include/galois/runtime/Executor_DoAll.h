@@ -20,18 +20,18 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
 #define GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
 
+#include "galois/config.h"
 #include "galois/gIO.h"
-#include "galois/Timer.h"
-
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Barrier.h"
+#include "galois/substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
-#include "galois/substrate/PaddedLock.h"
-#include "galois/substrate/CompilerSpecific.h"
+#include "galois/Timer.h"
 
 namespace galois {
 namespace runtime {
@@ -551,7 +551,7 @@ struct ChooseDoAllImpl<false> {
   static void call(const R& range, F func, const ArgsT& argsTuple) {
 
     runtime::on_each_gen(
-        [&](const unsigned tid, const unsigned numT) {
+        [&](const unsigned int, const unsigned int) {
           static constexpr bool NEED_STATS =
               galois::internal::NeedStats<ArgsT>::value;
           static constexpr bool MORE_STATS =

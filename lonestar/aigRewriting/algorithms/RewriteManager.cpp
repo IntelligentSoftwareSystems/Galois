@@ -208,7 +208,7 @@ aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
   // std::cout << threadCtx->threadId << " - Updating AIG with gain " <<
   // bestGain << std::endl;
   aig::GNode newRoot = updateAig(threadCtx, node, bestGraph, fanoutNodes,
-                                 isOutputCompl, updateLevel, bestGain);
+                                 isOutputCompl);
   // std::cout << threadCtx->threadId << " - Update done " << std::endl;
 
   return newRoot;
@@ -409,7 +409,8 @@ DecGraph* RewriteManager::evaluateCut(ThreadContextData* threadCtx,
  */
 int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
                                        aig::GNode root, DecGraph* decGraph,
-                                       int maxNode, int maxLevel) {
+                                       int maxNode,
+                                       int GALOIS_UNUSED(maxLevel)) {
 
   DecNode* node;
   DecNode* lhsNode;
@@ -529,8 +530,7 @@ int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
 aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
                                      aig::GNode oldRoot, DecGraph* decGraph,
                                      GNodeVector& fanoutNodes,
-                                     bool isOutputCompl, bool updateLevel,
-                                     int gain) {
+                                     bool isOutputCompl) {
 
   aig::Graph& aigGraph = this->aig.getGraph();
 
@@ -577,8 +577,7 @@ aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
     }
   }
 
-  addNewSubgraph(threadCtx, oldRoot, newRoot, fanoutNodes, isDecGraphComplement,
-                 updateLevel);
+  addNewSubgraph(oldRoot, newRoot, fanoutNodes, isDecGraphComplement);
 
   deleteOldMFFC(aigGraph, oldRoot);
 
@@ -700,11 +699,9 @@ aig::GNode RewriteManager::createAndNode(ThreadContextData* threadCtx,
   return newAnd;
 }
 
-void RewriteManager::addNewSubgraph(ThreadContextData* threadCtx,
-                                    aig::GNode oldNode, aig::GNode newNode,
+void RewriteManager::addNewSubgraph(aig::GNode oldNode, aig::GNode newNode,
                                     GNodeVector& fanoutNodes,
-                                    bool isNewRootComplement,
-                                    bool updateLevel) {
+                                    bool isNewRootComplement) {
 
   int fanoutNodesSize = fanoutNodes.size();
 
