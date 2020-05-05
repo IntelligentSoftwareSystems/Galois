@@ -2,6 +2,7 @@
 #include "deepgalois/sampler.h"
 #include <time.h> 
 #include <vector>
+#define PARALLEL_GEN
 
 namespace deepgalois {
 inline unsigned getDegree(Graph *g, index_t v) {
@@ -54,15 +55,21 @@ void Sampler::set_masked_graph(size_t begin, size_t end, size_t count, mask_t *m
 
 void Sampler::get_masked_degrees(size_t n, mask_t *masks, Graph *g, std::vector<uint32_t> &degrees) {
   assert(degrees.size() == n);
+#ifdef PARALLEL_GEN
+  galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
+#else
   for (size_t src = 0; src < n; src++) {
-  //galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
+#endif
     if (masks[src] == 1) {
       for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
         const auto dst = g->getEdgeDst(e);
         if (masks[dst] == 1) degrees[src] ++;
       }
     }
-  }//, galois::loopname("update_degrees"));
+  }
+#ifdef PARALLEL_GEN
+  , galois::loopname("update_degrees"));
+#endif
 }
 
 void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& sub) {
@@ -75,8 +82,11 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
 #ifndef GALOIS_USE_DIST
   sub.allocateFrom(n, ne);
   sub.constructNodes();
+#ifdef PARALLEL_GEN
+  galois::do_all(galois::iterate((size_t)0, n), [&](const auto src) {
+#else
   for (size_t src = 0; src < n; src++) {
-  //galois::do_all(galois::iterate((size_t)0, n), [&](const auto src) {
+#endif
     sub.fixEndEdge(src, offsets[src+1]);
     if (masks[src] == 1) {
       auto idx = offsets[src];
@@ -85,7 +95,10 @@ void Sampler::generate_masked_graph(size_t n, mask_t* masks, Graph* g, Graph& su
         if (masks[dst] == 1) sub.constructEdge(idx++, dst, 0);
       }
     }
-  }//, galois::loopname("gen_subgraph"));
+  }
+#ifdef PARALLEL_GEN
+  , galois::loopname("gen_subgraph"));
+#endif
 #endif
 }
 
@@ -319,8 +332,11 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
   sub.allocateFrom(nv, ne);
   sub.constructNodes();
   VertexList old_ids(vertex_set.begin(), vertex_set.end()); // vertex ID mapping
+#ifdef PARALLEL_GEN
+  galois::do_all(galois::iterate((size_t)0, nv), [&](const auto i) {
+#else
   for (size_t i = 0; i < nv; i++) {
-  //galois::do_all(galois::iterate((size_t)0, nv), [&](const auto i) {
+#endif
     sub.fixEndEdge(i, offsets[i+1]);
     unsigned j = 0;
     auto old_id = old_ids[i];
@@ -330,7 +346,10 @@ void Sampler::generate_subgraph(VertexSet &vertex_set, Graph &g, Graph &sub) {
       sub.constructEdge(offsets[i]+j, dst, 0);
       j ++;
     }
-  }//, galois::loopname("construct_graph"));
+  }
+#ifdef PARALLEL_GEN
+  , galois::loopname("construct_graph"));
+#endif
 #endif
 }
 

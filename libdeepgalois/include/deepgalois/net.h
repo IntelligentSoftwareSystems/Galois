@@ -37,11 +37,13 @@ public:
           train_begin(0), train_end(0), train_count(0),
           val_begin(0), val_end(0), val_count(0),
           test_begin(0), test_end(0), test_count(0),
-          train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
-  void init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs,
+          val_interval(1), num_subgraphs(1), num_vertices_sg(9000),
+          train_masks(NULL), val_masks(NULL), 
+          test_masks(NULL), context(NULL) {}
+  void init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
             unsigned hidden1, float lr, float dropout, float wd,
             bool selfloop, bool single, bool l2norm, bool dense, 
-            unsigned neigh_sample_size = 0, unsigned subg_sample = 0);
+            unsigned neigh_sample_sz, unsigned subg_sample_sz, int val_itv);
 #ifdef GALOIS_USE_DIST
   void dist_init(Graph* graph, std::string dataset_str);
 #endif
@@ -92,7 +94,7 @@ protected:
   size_t num_classes;                // number of vertex classes: E
   size_t num_conv_layers;            // number of convolutional layers
   size_t num_layers;                 // total number of layers (conv + output)
-  unsigned num_epochs;               // number of epochs
+  int num_epochs;                    // number of epochs
   float learning_rate;               // learning rate
   float dropout_rate;                // dropout rate
   float weight_decay;                // weighti decay for over-fitting

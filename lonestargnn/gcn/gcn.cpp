@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
   network.init(dataset, numThreads, num_conv_layers, epochs, hidden1,
                learning_rate, dropout_rate, weight_decay,
                add_selfloop, is_single_class, add_l2norm, add_dense, 
-               neighbor_sample_sz, subgraph_sample_sz);
+               neighbor_sample_sz, subgraph_sample_sz, val_interval);
   // default setting for now; can be customized by the user
   network.construct_layers();
   network.print_layers_info();

@@ -9,10 +9,10 @@
 
 namespace deepgalois {
 
-void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs,
+void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
                unsigned hidden1, float lr, float dropout, float wd,
                bool selfloop, bool single, bool l2norm, bool dense, 
-               unsigned neigh_sz, unsigned subg_sz) {
+               unsigned neigh_sz, unsigned subg_sz, int val_itv) {
   assert(n_conv > 0);
   num_threads = nt;
   num_conv_layers = n_conv;
@@ -25,8 +25,8 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, unsigned epochs
   has_dense = dense;
   neighbor_sample_size = neigh_sz;
   subgraph_sample_size = subg_sz;
-  val_interval = 1;
-  num_subgraphs = num_threads;
+  val_interval = val_itv;
+  //num_subgraphs = 1;//num_threads;
   galois::gPrint("Configuration: num_threads ", num_threads, 
                  ", num_conv_layers ", num_conv_layers,
                  ", num_epochs ", num_epochs,
@@ -165,7 +165,7 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::gPrint("\nStart training...\n");
   Timer t_epoch;
   // run epochs
-  for (unsigned ep = 0; ep < num_epochs; ep++) {
+  for (int ep = 0; ep < num_epochs; ep++) {
     t_epoch.Start();
 
     if (subgraph_sample_size) {
@@ -176,12 +176,12 @@ void Net::train(optimizer* opt, bool need_validate) {
         // generate subgraphs
 #ifdef CPU_ONLY
 #ifndef GALOIS_USE_DIST
-        //for (int sid = 0; sid < num_subgraphs; sid++) {
-        galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
+        for (int sid = 0; sid < num_subgraphs; sid++) {
+        //galois::do_all(galois::iterate(size_t(0), size_t(num_subgraphs)),[&](const auto sid) {
           unsigned tid = 0;
-          tid = galois::substrate::ThreadPool::getTID();
+          //tid = galois::substrate::ThreadPool::getTID();
           sampler->subgraph_sample(subgraph_sample_size, *(context->getSubgraphPointer(sid)), &subgraphs_masks[sid*num_samples], tid);
-        }, galois::loopname("subgraph_gen"));
+        }//, galois::loopname("subgraph_gen"));
 #endif
 #endif
         num_subg_remain = num_subgraphs;
@@ -247,17 +247,6 @@ void Net::train(optimizer* opt, bool need_validate) {
     double epoch_time = t_epoch.Millisecs();
     total_train_time += epoch_time;
     if (need_validate && ep % val_interval == 0) {
-      if (subgraph_sample_size) { // switch to the original graph
-        for (size_t i = 0; i < num_layers; i++) layers[i]->update_dim_size(num_samples);
-#ifdef CPU_ONLY
-        for (size_t i = 0; i < num_conv_layers; i++) {
-          layers[i]->set_graph_ptr(context->getGraphPointer());
-          layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
-	    }
-        layers[num_layers-1]->set_labels_ptr(context->get_labels_ptr());
-        layers[0]->set_feats_ptr(context->get_feats_ptr()); // feed input data
-#endif
-      }
       // Validation
       acc_t val_loss = 0.0, val_acc = 0.0;
       Tval.start();
@@ -308,7 +297,17 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
     count = test_count;
     masks = test_masks;
   }
-#ifndef CPU_ONLY
+#ifdef CPU_ONLY
+  if (subgraph_sample_size && type != "train") { // switch to the original graph
+    for (size_t i = 0; i < num_layers; i++) layers[i]->update_dim_size(num_samples);
+    for (size_t i = 0; i < num_conv_layers; i++) {
+      layers[i]->set_graph_ptr(context->getGraphPointer());
+      layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
+    }
+    layers[num_layers-1]->set_labels_ptr(context->get_labels_ptr());
+    layers[0]->set_feats_ptr(context->get_feats_ptr()); // feed input data
+  }
+#else
   if (type == "train") {
     masks = d_train_masks;
   } else if (type == "val") {

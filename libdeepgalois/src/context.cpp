@@ -52,7 +52,11 @@ void Context::createSubgraphs(int num_subgraphs) {
 // generate labels for the subgraph, m is subgraph size
 void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
   //if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
-  h_labels_subg.resize(m);
+  if (is_single_class) {
+    h_labels_subg.resize(m);
+  } else {
+    h_labels_subg.resize(m*num_classes);
+  }
   size_t count = 0;
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
