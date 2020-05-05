@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -160,27 +160,28 @@ struct PageRank {
 void initResidual(Graph& graph) {
 
   // use residual for the partial, scaled initial residual
-  galois::do_all(graph,
-                 [&graph](const typename Graph::GraphNode& src) {
-                   // contribute residual
-                   auto nout = std::distance(graph.edge_begin(src),
-                                             graph.edge_end(src));
-                   for (auto ii : graph.edges(src)) {
-                     auto dst        = graph.getEdgeDst(ii);
-                     auto& ddata     = graph.getData(dst);
-                     auto& dResidual = ddata.DAd.vAtomicDouble;
-                     atomicAdd(dResidual, 1.0 / nout);
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      graph,
+      [&graph](const typename Graph::GraphNode& src) {
+        // contribute residual
+        auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
+        for (auto ii : graph.edges(src)) {
+          auto dst        = graph.getEdgeDst(ii);
+          auto& ddata     = graph.getData(dst);
+          auto& dResidual = ddata.DAd.vAtomicDouble;
+          atomicAdd(dResidual, 1.0 / nout);
+        }
+      },
+      galois::steal());
   // scale residual
-  galois::do_all(graph,
-                 [&graph](const typename Graph::GraphNode& src) {
-                   auto& data      = graph.getData(src);
-                   auto& dResidual = data.DAd.vAtomicDouble;
-                   dResidual       = dResidual * alpha * (1.0 - alpha);
-                 },
-                 galois::steal());
+  galois::do_all(
+      graph,
+      [&graph](const typename Graph::GraphNode& src) {
+        auto& data      = graph.getData(src);
+        auto& dResidual = data.DAd.vAtomicDouble;
+        dResidual       = dResidual * alpha * (1.0 - alpha);
+      },
+      galois::steal());
 }
 
 NodeDouble* analyzePagerank(Graph* g, int topK, double tolerance,

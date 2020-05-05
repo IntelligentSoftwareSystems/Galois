@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -431,7 +431,7 @@ public:
   const std::map<Var, size_t>& get() const { return states; }
 
   /// Cast into std::map<Var, size_t>
-  operator const std::map<Var, size_t>&() const { return states; }
+  operator const std::map<Var, size_t> &() const { return states; }
 
   /// Return current state of variable \a v, or 0 if \a v is not in \c *this
   size_t operator()(const Var& v) const {

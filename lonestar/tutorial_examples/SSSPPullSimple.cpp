@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -70,30 +70,30 @@ int main(int argc, char** argv) {
   for (auto ii : graph.edges(*graph.begin()))
     init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
 
-  galois::for_each(galois::iterate(init.begin(), init.end()),
-                   [&](const UpdateRequest& req, auto& ctx) {
-                     GNode active_node = req.second;
-                     unsigned& data    = graph.getData(active_node);
-                     unsigned newValue = data;
+  galois::for_each(
+      galois::iterate(init.begin(), init.end()),
+      [&](const UpdateRequest& req, auto& ctx) {
+        GNode active_node = req.second;
+        unsigned& data    = graph.getData(active_node);
+        unsigned newValue = data;
 
-                     //![loop over neighbors to compute new value]
-                     for (auto ii : graph.edges(active_node)) {
-                       GNode dst = graph.getEdgeDst(ii);
-                       newValue  = std::min(newValue, graph.getData(dst) +
-                                                         graph.getEdgeData(ii));
-                     }
-                     //![set new value and add neighbors to wotklist
-                     if (newValue < data) {
-                       data = newValue;
-                       for (auto ii : graph.edges(active_node)) {
-                         GNode dst = graph.getEdgeDst(ii);
-                         if (graph.getData(dst) > newValue)
-                           ctx.push(std::make_pair(newValue, dst));
-                       }
-                     }
-                   },
-                   galois::wl<OBIM>(reqIndexer),
-                   galois::loopname("sssp_run_loop"));
+        //![loop over neighbors to compute new value]
+        for (auto ii : graph.edges(active_node)) {
+          GNode dst = graph.getEdgeDst(ii);
+          newValue =
+              std::min(newValue, graph.getData(dst) + graph.getEdgeData(ii));
+        }
+        //![set new value and add neighbors to wotklist
+        if (newValue < data) {
+          data = newValue;
+          for (auto ii : graph.edges(active_node)) {
+            GNode dst = graph.getEdgeDst(ii);
+            if (graph.getData(dst) > newValue)
+              ctx.push(std::make_pair(newValue, dst));
+          }
+        }
+      },
+      galois::wl<OBIM>(reqIndexer), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;

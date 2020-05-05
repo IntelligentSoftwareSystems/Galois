@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,12 +20,13 @@
 #ifndef GALOIS_GRAPHS_LC_INOUT_GRAPH_H
 #define GALOIS_GRAPHS_LC_INOUT_GRAPH_H
 
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at_c.hpp>
+
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/Galois.h"
 
 namespace galois {
 namespace graphs {
@@ -147,7 +148,7 @@ public:
 
   edge_data_reference
   getInEdgeData(in_edge_iterator ni,
-                MethodFlag mflag = MethodFlag::UNPROTECTED) {
+                MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
@@ -282,9 +283,10 @@ public:
    * Sorts incoming edges of all nodes. Comparison is by getInEdgeDst(e).
    */
   void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this),
-                   [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(*this),
+        [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
+        galois::steal());
   }
 
   size_t idFromNode(GraphNode N) { return this->getId(N); }

@@ -1,6 +1,7 @@
 #ifndef GALOIS_SHAREDMEMSYS_H
 #define GALOIS_SHAREDMEMSYS_H
 
+#include "galois/config.h"
 #include "galois/runtime/SharedMem.h"
 
 namespace galois {
@@ -22,6 +23,6 @@ public:
   SharedMemSys& operator=(SharedMemSys&&) = delete;
 };
 
-}  // namespace galois
+} // namespace galois
 
 #endif

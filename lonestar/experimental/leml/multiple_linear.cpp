@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -16,7 +16,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
 
 #include <cstdio>
 #include <cstdlib>
@@ -464,7 +463,7 @@ int multiple_l2r_ls_chol(multiple_linear_problem* prob,
 #endif
                      double* Wj      = &W[j * k];
                      double* Hessian = Hessian_set[tid];
-                     double* y = Wj; // MALLOC(double,k);
+                     double* y       = Wj; // MALLOC(double,k);
                      memset(Hessian, 0, sizeof(double) * k * k);
                      memset(y, 0, sizeof(double) * k);
 

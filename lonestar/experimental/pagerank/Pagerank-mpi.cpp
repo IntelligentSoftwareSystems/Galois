@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -310,8 +310,8 @@ int main(int argc, char** argv) {
     // cout << "\n\n " << time_compute[0] << "   " << time_mpi[0] << "  "<<
     // time_apply[0] << "\n"; cout << "\n Accumulative time for " << iterations
     // << " iterations\n"; cout << "\n\n " <<
-    // std::accumulate(time_compute.begin(), time_compute.end(), 0.0) << "   " <<
-    // std::accumulate(time_mpi.begin(), time_mpi.end(), 0.0) << "  "<<
+    // std::accumulate(time_compute.begin(), time_compute.end(), 0.0) << "   "
+    // << std::accumulate(time_mpi.begin(), time_mpi.end(), 0.0) << "  "<<
     // std::accumulate(time_apply.begin(), time_apply.end(), 0.0) << "\n";
     cout << "\n\n RUNTIME : " << end_time - start_time << " Seconds \n";
   }

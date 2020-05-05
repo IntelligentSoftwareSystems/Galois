@@ -1,9 +1,10 @@
 #ifndef GALOIS_RUNTIME_THREADTIMER_H
 #define GALOIS_RUNTIME_THREADTIMER_H
 
-#include "galois/substrate/PerThreadStorage.h"
-
 #include <ctime>
+
+#include "galois/config.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 namespace galois::runtime {
 
@@ -38,21 +39,18 @@ protected:
 };
 
 template <bool enabled>
-class PerThreadTimer: private ThreadTimers {
+class PerThreadTimer : private ThreadTimers {
   const char* const region_;
   const char* const category_;
 
-  void reportTimes() {
-    reportTimes(category_, region_);
-  }
+  void reportTimes() { reportTimes(category_, region_); }
 
 public:
-  PerThreadTimer(const char* const region,
-                 const char* const category)
+  PerThreadTimer(const char* const region, const char* const category)
       : region_(region), category_(category) {}
 
   PerThreadTimer(const PerThreadTimer&) = delete;
-  PerThreadTimer(PerThreadTimer&&) = delete;
+  PerThreadTimer(PerThreadTimer&&)      = delete;
   PerThreadTimer& operator=(const PerThreadTimer&) = delete;
   PerThreadTimer& operator=(PerThreadTimer&&) = delete;
 
@@ -67,11 +65,10 @@ template <>
 class PerThreadTimer<false> {
 
 public:
-  PerThreadTimer(const char* const _region,
-                 const char* const _category) {}
+  PerThreadTimer(const char* const, const char* const) {}
 
   PerThreadTimer(const PerThreadTimer&) = delete;
-  PerThreadTimer(PerThreadTimer&&) = delete;
+  PerThreadTimer(PerThreadTimer&&)      = delete;
   PerThreadTimer& operator=(const PerThreadTimer&) = delete;
   PerThreadTimer& operator=(PerThreadTimer&&) = delete;
 
@@ -82,6 +79,6 @@ public:
   void stop() const {}
 };
 
-}  // end namespace galois::runtime
+} // end namespace galois::runtime
 
 #endif

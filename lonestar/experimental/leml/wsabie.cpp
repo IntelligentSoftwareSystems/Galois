@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -16,7 +16,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
 
 #include "wsabie.h"
 
@@ -502,7 +501,7 @@ void wsabie_updates_new2(multilabel_problem* prob, multilabel_parameter* param,
       int ybar          = -1;
       int bucket_id     = -1;
       double ybar_score = -10e6; //(*std::min_element(sorted_y_score.begin(),
-                                 //sorted_y_score.begin()+nr_pos))-2.0;
+                                 // sorted_y_score.begin()+nr_pos))-2.0;
 
       for (long j = 0; j < N; j++) {
         int ytmp          = y_neg[rand() % nr_neg];

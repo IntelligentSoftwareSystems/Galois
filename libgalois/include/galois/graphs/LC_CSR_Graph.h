@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,23 +20,21 @@
 #ifndef GALOIS_GRAPHS_LC_CSR_GRAPH_H
 #define GALOIS_GRAPHS_LC_CSR_GRAPH_H
 
-#include "galois/Galois.h"
-#include "galois/graphs/Details.h"
-#include "galois/graphs/FileGraph.h"
-#include "galois/graphs/GraphHelpers.h"
-#include "galois/PODResizeableArray.h"
-
+#include <fstream>
 #include <type_traits>
-#include<fstream>
 
-/*
- * Headers for boost serialization
- */
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/serialization.hpp>
+
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/GraphHelpers.h"
+#include "galois/PODResizeableArray.h"
 
 namespace galois {
 namespace graphs {
@@ -161,12 +159,15 @@ public:
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
-  uint32_t *degrees;
+  uint32_t* degrees;
   void degree_counting() {
     degrees = new uint32_t[numNodes];
-    galois::do_all(galois::iterate(begin(), end()), [&] (auto v) {
-      degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
-    }, galois::loopname("DegreeCounting"));
+    galois::do_all(
+        galois::iterate(begin(), end()),
+        [&](auto v) {
+          degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
+        },
+        galois::loopname("DegreeCounting"));
   }
   uint32_t get_degree(uint32_t n) { return degrees[n]; }
 
@@ -212,7 +213,7 @@ protected:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   template <bool _A1 = EdgeData::has_value,
@@ -227,8 +228,7 @@ protected:
 
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
-                          typename FileGraph::edge_iterator nn,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator nn,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
@@ -240,7 +240,7 @@ protected:
 private:
   friend class boost::serialization::access;
   template <typename Archive>
-  void save(Archive& ar, const unsigned int version) const {
+  void save(Archive& ar, const unsigned int) const {
     ar << numNodes;
     ar << numEdges;
 
@@ -251,7 +251,7 @@ private:
   }
 
   template <typename Archive>
-  void load(Archive& ar, const unsigned int version) {
+  void load(Archive& ar, const unsigned int) {
     ar >> numNodes;
     ar >> numEdges;
 
@@ -412,8 +412,9 @@ public:
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni,
-                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference
+  getEdgeData(edge_iterator ni,
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
@@ -522,9 +523,10 @@ public:
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(size_t{0}, this->size()),
-                   [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
-                   galois::no_stats(), galois::steal());
+    galois::do_all(
+        galois::iterate(size_t{0}, this->size()),
+        [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
+        galois::no_stats(), galois::steal());
   }
 
   template <typename F>
@@ -592,8 +594,6 @@ public:
     }
   }
 
-
-
   void constructNodes() {
 #ifndef GALOIS_GRAPH_CONSTRUCT_SERIAL
     for (uint32_t x = 0; x < numNodes; ++x) {
@@ -601,12 +601,13 @@ public:
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t x) {
-                     nodeData.constructAt(x);
-                     this->outOfLineConstructAt(x);
-                   },
-                   galois::no_stats(), galois::loopname("CONSTRUCT_NODES"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t x) {
+          nodeData.constructAt(x);
+          this->outOfLineConstructAt(x);
+        },
+        galois::no_stats(), galois::loopname("CONSTRUCT_NODES"));
 #endif
   }
 
@@ -660,25 +661,25 @@ public:
     }
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t n) {
-                     edgeIndData_old[n]  = edgeIndData[n];
-                     edgeIndData_temp[n] = 0;
-                   },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t n) {
+          edgeIndData_old[n]  = edgeIndData[n];
+          edgeIndData_temp[n] = 0;
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
 
     // get destination of edge, copy to array, and
-    galois::do_all(galois::iterate(UINT64_C(0), numEdges),
-                   [&](uint64_t e) {
-                     auto dst       = edgeDst[e];
-                     edgeDst_old[e] = dst;
-                     // counting outgoing edges in the tranpose graph by
-                     // counting incoming edges in the original graph
-                     __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
-                   },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numEdges),
+        [&](uint64_t e) {
+          auto dst       = edgeDst[e];
+          edgeDst_old[e] = dst;
+          // counting outgoing edges in the tranpose graph by
+          // counting incoming edges in the original graph
+          __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
 
     // TODO is it worth doing parallel prefix sum?
     // prefix sum calculation of the edge index array
@@ -687,10 +688,10 @@ public:
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
     // before the ith node have
@@ -702,27 +703,27 @@ public:
           galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
     }
 
-    galois::do_all(galois::iterate(UINT64_C(0), numNodes),
-                   [&](uint64_t src) {
-                     // e = start index into edge array for a particular node
-                     uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
+    galois::do_all(
+        galois::iterate(UINT64_C(0), numNodes),
+        [&](uint64_t src) {
+          // e = start index into edge array for a particular node
+          uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
 
-                     // get all outgoing edges of a particular node in the
-                     // non-transpose and convert to incoming
-                     while (e < edgeIndData_old[src]) {
-                       // destination nodde
-                       auto dst = edgeDst_old[e];
-                       // location to save edge
-                       auto e_new =
-                           __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
-                       // save src as destination
-                       edgeDst[e_new] = src;
-                       // copy edge data to "new" array
-                       edgeDataCopy(edgeData_new, edgeData, e_new, e);
-                       e++;
-                     }
-                   },
-                   galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDST"));
+          // get all outgoing edges of a particular node in the
+          // non-transpose and convert to incoming
+          while (e < edgeIndData_old[src]) {
+            // destination nodde
+            auto dst = edgeDst_old[e];
+            // location to save edge
+            auto e_new = __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
+            // save src as destination
+            edgeDst[e_new] = src;
+            // copy edge data to "new" array
+            edgeDataCopy(edgeData_new, edgeData, e_new, e);
+            e++;
+          }
+        },
+        galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDST"));
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
@@ -743,13 +744,12 @@ public:
   }
 
   template <bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, uint64_t e_new,
-                    uint64_t e,
+  void edgeDataCopy(EdgeData&, EdgeData&, uint64_t, uint64_t,
                     typename std::enable_if<!is_non_void>::type* = 0) {
     // does nothing
   }
 
-  template <typename E = EdgeTy,
+  template <typename E                                            = EdgeTy,
             std::enable_if_t<!std::is_same<E, void>::value, int>* = nullptr>
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total,
                      const bool readUnweighted = false) {
@@ -783,10 +783,10 @@ public:
     }
   }
 
-  template <typename E = EdgeTy,
-           std::enable_if_t<std::is_same<E, void>::value, int>* = nullptr>
+  template <typename E                                           = EdgeTy,
+            std::enable_if_t<std::is_same<E, void>::value, int>* = nullptr>
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total,
-                     const bool readUnweighted = false) {
+                     const bool GALOIS_UNUSED(readUnweighted) = false) {
     // at this point memory should already be allocated
     auto r =
         graph
@@ -821,9 +821,9 @@ public:
    */
   const EdgeIndData& getEdgePrefixSum() const { return edgeIndData; }
 
-
   auto divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total) {
-    return galois::graphs::divideNodesBinarySearch(numNodes, numEdges, nodeSize, edgeSize, id, total, edgeIndData);
+    return galois::graphs::divideNodesBinarySearch(
+        numNodes, numEdges, nodeSize, edgeSize, id, total, edgeIndData);
   }
   /**
    *
@@ -831,8 +831,11 @@ public:
    * Adding for Louvain clustering
    * TODO: Find better way to do this
    */
-  void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, std::vector<std::vector<uint32_t>>& edges_id, std::vector<std::vector<EdgeTy>>& edges_data) {
-    //allocateFrom(numNodes, numEdges);
+  void constructFrom(uint32_t numNodes, uint64_t numEdges,
+                     std::vector<uint64_t>& prefix_sum,
+                     std::vector<std::vector<uint32_t>>& edges_id,
+                     std::vector<std::vector<EdgeTy>>& edges_data) {
+    // allocateFrom(numNodes, numEdges);
     /*
      * Deallocate if reusing the graph
      */
@@ -840,212 +843,224 @@ public:
     constructNodes();
 
     galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    edgeIndData[n] = prefix_sum[n];
-                    });
+                   [&](uint32_t n) { edgeIndData[n] = prefix_sum[n]; });
 
-    galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    if( n == 0){
-                      if(edgeIndData[n] > 0){
-                        std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
-                        std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin());
-                      }
-                    }
-                    else{
-                        if(edgeIndData[n] - edgeIndData[n-1] > 0){
-                          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin() + edgeIndData[n-1]);
-                          std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin() + edgeIndData[n-1]);
-                      }
-                      }
-                  });
-
-
- galois::on_each(
-        [&](unsigned tid, unsigned total) {
-        std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-
-          auto r = divideByNode(0, 1, tid, total).first;
-
-        //galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second, "\n");
-        this->setLocalRange(*r.first, *r.second);
+    galois::do_all(galois::iterate((uint32_t)0, numNodes), [&](uint32_t n) {
+      if (n == 0) {
+        if (edgeIndData[n] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
+          std::copy(edges_data[n].begin(), edges_data[n].end(),
+                    edgeData.begin());
         }
-        );
+      } else {
+        if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(),
+                    edgeDst.begin() + edgeIndData[n - 1]);
+          std::copy(edges_data[n].begin(), edges_data[n].end(),
+                    edgeData.begin() + edgeIndData[n - 1]);
+        }
+      }
+    });
+
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+
+      auto r = divideByNode(0, 1, tid, total).first;
+
+      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
+      // "\n");
+      this->setLocalRange(*r.first, *r.second);
+    });
   }
-  void constructFrom(uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum, galois::gstl::Vector<galois::PODResizeableArray<uint32_t>>& edges_id, std::vector<std::vector<EdgeTy>>& edges_data) {
+  void constructFrom(
+      uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum,
+      galois::gstl::Vector<galois::PODResizeableArray<uint32_t>>& edges_id,
+      std::vector<std::vector<EdgeTy>>& edges_data) {
     allocateFrom(numNodes, numEdges);
     constructNodes();
 
     galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    edgeIndData[n] = prefix_sum[n];
-                    });
+                   [&](uint32_t n) { edgeIndData[n] = prefix_sum[n]; });
 
-    galois::do_all(galois::iterate((uint32_t)0, numNodes),
-                  [&](uint32_t n) {
-                    if( n == 0){
-                      if(edgeIndData[n] > 0){
-                        std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
-                        std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin());
-                      }
-                    }
-                    else{
-                        if(edgeIndData[n] - edgeIndData[n-1] > 0){
-                          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin() + edgeIndData[n-1]);
-                          std::copy(edges_data[n].begin(), edges_data[n].end(), edgeData.begin() + edgeIndData[n-1]);
-                      }
-                      }
-                  });
-
-
- galois::on_each(
-        [&](unsigned tid, unsigned total) {
-        std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-
-          auto r = divideByNode(0, 1, tid, total).first;
-
-        //galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second, "\n");
-        this->setLocalRange(*r.first, *r.second);
+    galois::do_all(galois::iterate((uint32_t)0, numNodes), [&](uint32_t n) {
+      if (n == 0) {
+        if (edgeIndData[n] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
+          std::copy(edges_data[n].begin(), edges_data[n].end(),
+                    edgeData.begin());
         }
-        );
+      } else {
+        if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
+          std::copy(edges_id[n].begin(), edges_id[n].end(),
+                    edgeDst.begin() + edgeIndData[n - 1]);
+          std::copy(edges_data[n].begin(), edges_data[n].end(),
+                    edgeData.begin() + edgeIndData[n - 1]);
+        }
+      }
+    });
+
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+
+      auto r = divideByNode(0, 1, tid, total).first;
+
+      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
+      // "\n");
+      this->setLocalRange(*r.first, *r.second);
+    });
   }
-  
- /**
-  * Reads the GR files directly into in-memory
-  * data-structures of LC_CSR graphs using freads.
-  * 
-  * Edge is not void.
-  * 
-  */
-  template <typename U = void, typename std::enable_if<!std::is_void<EdgeTy>::value, U>::type* = nullptr>
+
+  /**
+   * Reads the GR files directly into in-memory
+   * data-structures of LC_CSR graphs using freads.
+   *
+   * Edge is not void.
+   *
+   */
+  template <
+      typename U                                                      = void,
+      typename std::enable_if<!std::is_void<EdgeTy>::value, U>::type* = nullptr>
   void readGraphFromGRFile(const std::string& filename) {
     std::ifstream graphFile(filename.c_str());
-    if(!graphFile.is_open()){
+    if (!graphFile.is_open()) {
       GALOIS_DIE("ERROR: Failed to open file.");
     }
-  uint64_t header[4];
-  graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
-  uint64_t version = header[0];
-  numNodes = header[2];
-  numEdges = header[3];
-  galois::gPrint("Number of Nodes: ", numNodes, ", Number of Edges: ", numEdges, "\n");
-  allocateFrom(numNodes, numEdges);
-  constructNodes();
-  /**
-   * Load outIndex array
-   **/
-  assert(edgeIndData.data());
-  if(!edgeIndData.data()){
-    GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
-  }
-
-  // start position to read index data
-  uint64_t readPosition = (4 * sizeof(uint64_t));
-  graphFile.seekg(readPosition);
-  graphFile.read(reinterpret_cast<char*>(edgeIndData.data()), sizeof(uint64_t)*numNodes);
-  /**
-   * Load edgeDst array
-   **/
-  assert(edgeDst.data());
-  if(!edgeDst.data()){
-    GALOIS_DIE("Failed: memory not allocated for edgeDst.");
-  }
-
-  readPosition = ((4 + numNodes) * sizeof(uint64_t));
-  graphFile.seekg(readPosition);
-  if(version == 1) {
-    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint32_t)*numEdges);
-    readPosition = ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint32_t));
-    // version 1 padding TODO make version agnostic
-    if (numEdges% 2) {
-      readPosition += sizeof(uint32_t);
+    uint64_t header[4];
+    graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
+    uint64_t version = header[0];
+    numNodes         = header[2];
+    numEdges         = header[3];
+    galois::gPrint("Number of Nodes: ", numNodes,
+                   ", Number of Edges: ", numEdges, "\n");
+    allocateFrom(numNodes, numEdges);
+    constructNodes();
+    /**
+     * Load outIndex array
+     **/
+    assert(edgeIndData.data());
+    if (!edgeIndData.data()) {
+      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
     }
-  } else if(version == 2) {
-    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint64_t)*numEdges);
-    readPosition = ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint64_t));
-    if (numEdges % 2) {
-      readPosition += sizeof(uint64_t);
-    }
-  } else {
-    GALOIS_DIE("ERROR: Unknown graph file version.");
-  }
-  /**
-   * Load edge data array
-   **/
-  assert(edgeData.data());
-  if(!edgeData.data()){
-    GALOIS_DIE("Failed: memory not allocated for edgeData.");
-  }
-  graphFile.seekg(readPosition);
-  graphFile.read(reinterpret_cast<char*>(edgeData.data()), sizeof(EdgeTy)*numEdges);
-  galois::on_each(
-    [&](unsigned tid, unsigned total) {
-      std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-      auto r = divideByNode(0, 1, tid, total).first;
-      this->setLocalRange(*r.first, *r.second);
-    }
-    );
-  graphFile.close();
-}
 
- /**
-  * Reads the GR files directly into in-memory
-  * data-structures of LC_CSR graphs using freads.
-  * 
-  * Edge is void.
-  * 
-  */
-template <typename U = void, typename std::enable_if<std::is_void<EdgeTy>::value, U>::type* = nullptr>
-void readGraphFromGRFile(const std::string& filename) {
-  std::ifstream graphFile(filename.c_str());
-  if(!graphFile.is_open()){
-    GALOIS_DIE("ERROR: Failed to open file.");
-  }
-  uint64_t header[4];
-  graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
-  uint64_t version = header[0];
-  numNodes = header[2];
-  numEdges = header[3];
-  galois::gPrint("Number of Nodes: ", numNodes, ", Number of Edges: ", numEdges, "\n");
-  allocateFrom(numNodes, numEdges);
-  constructNodes();
-  /**
-   * Load outIndex array
-   **/
-  assert(edgeIndData.data());
-  if(!edgeIndData.data()){
-    GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
-  }
-  // start position to read index data
-  uint64_t readPosition = (4 * sizeof(uint64_t));
-  graphFile.seekg(readPosition);
-  graphFile.read(reinterpret_cast<char*>(edgeIndData.data()), sizeof(uint64_t)*numNodes);
-  /**
-   * Load edgeDst array
-   **/
-  assert(edgeDst.data());
-  if(!edgeDst.data()){
-    GALOIS_DIE("Failed: memory not allocated for edgeDst.");
-  }
-  readPosition = ((4 + numNodes) * sizeof(uint64_t));
-  graphFile.seekg(readPosition);
-  if(version == 1) {
-    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint32_t)*numEdges);
-  } else if(version == 2) {
-    graphFile.read(reinterpret_cast<char*>(edgeDst.data()), sizeof(uint64_t)*numEdges);
-  } else {
-    GALOIS_DIE("ERROR: Unknown graph file version.");
-  }
-  galois::on_each(
-      [&](unsigned tid, unsigned total) {
-      std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
-      auto r = divideByNode(0, 1, tid, total).first;
-      this->setLocalRange(*r.first, *r.second);
+    // start position to read index data
+    uint64_t readPosition = (4 * sizeof(uint64_t));
+    graphFile.seekg(readPosition);
+    graphFile.read(reinterpret_cast<char*>(edgeIndData.data()),
+                   sizeof(uint64_t) * numNodes);
+    /**
+     * Load edgeDst array
+     **/
+    assert(edgeDst.data());
+    if (!edgeDst.data()) {
+      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+    }
+
+    readPosition = ((4 + numNodes) * sizeof(uint64_t));
+    graphFile.seekg(readPosition);
+    if (version == 1) {
+      graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
+                     sizeof(uint32_t) * numEdges);
+      readPosition =
+          ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint32_t));
+      // version 1 padding TODO make version agnostic
+      if (numEdges % 2) {
+        readPosition += sizeof(uint32_t);
       }
-      );
+    } else if (version == 2) {
+      graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
+                     sizeof(uint64_t) * numEdges);
+      readPosition =
+          ((4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint64_t));
+      if (numEdges % 2) {
+        readPosition += sizeof(uint64_t);
+      }
+    } else {
+      GALOIS_DIE("ERROR: Unknown graph file version.");
+    }
+    /**
+     * Load edge data array
+     **/
+    assert(edgeData.data());
+    if (!edgeData.data()) {
+      GALOIS_DIE("Failed: memory not allocated for edgeData.");
+    }
+    graphFile.seekg(readPosition);
+    graphFile.read(reinterpret_cast<char*>(edgeData.data()),
+                   sizeof(EdgeTy) * numEdges);
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+      auto r = divideByNode(0, 1, tid, total).first;
+      this->setLocalRange(*r.first, *r.second);
+    });
+    graphFile.close();
+  }
 
-  graphFile.close();
-}
+  /**
+   * Reads the GR files directly into in-memory
+   * data-structures of LC_CSR graphs using freads.
+   *
+   * Edge is void.
+   *
+   */
+  template <
+      typename U                                                     = void,
+      typename std::enable_if<std::is_void<EdgeTy>::value, U>::type* = nullptr>
+  void readGraphFromGRFile(const std::string& filename) {
+    std::ifstream graphFile(filename.c_str());
+    if (!graphFile.is_open()) {
+      GALOIS_DIE("ERROR: Failed to open file.");
+    }
+    uint64_t header[4];
+    graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
+    uint64_t version = header[0];
+    numNodes         = header[2];
+    numEdges         = header[3];
+    galois::gPrint("Number of Nodes: ", numNodes,
+                   ", Number of Edges: ", numEdges, "\n");
+    allocateFrom(numNodes, numEdges);
+    constructNodes();
+    /**
+     * Load outIndex array
+     **/
+    assert(edgeIndData.data());
+    if (!edgeIndData.data()) {
+      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+    }
+    // start position to read index data
+    uint64_t readPosition = (4 * sizeof(uint64_t));
+    graphFile.seekg(readPosition);
+    graphFile.read(reinterpret_cast<char*>(edgeIndData.data()),
+                   sizeof(uint64_t) * numNodes);
+    /**
+     * Load edgeDst array
+     **/
+    assert(edgeDst.data());
+    if (!edgeDst.data()) {
+      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+    }
+    readPosition = ((4 + numNodes) * sizeof(uint64_t));
+    graphFile.seekg(readPosition);
+    if (version == 1) {
+      graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
+                     sizeof(uint32_t) * numEdges);
+    } else if (version == 2) {
+      graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
+                     sizeof(uint64_t) * numEdges);
+    } else {
+      GALOIS_DIE("ERROR: Unknown graph file version.");
+    }
+    galois::on_each([&](unsigned tid, unsigned total) {
+      std::vector<unsigned>
+          dummy_scale_factor; // dummy passed in to function call
+      auto r = divideByNode(0, 1, tid, total).first;
+      this->setLocalRange(*r.first, *r.second);
+    });
+
+    graphFile.close();
+  }
 };
 } // namespace graphs
 } // namespace galois

@@ -17,4 +17,8 @@ add_subdirectory(sssp)
 add_subdirectory(cc)
 add_subdirectory(pagerank)
 add_subdirectory(tc)
+add_subdirectory(mst)
+add_subdirectory(mis)
+add_subdirectory(pta)
+add_subdirectory(sgd)
 

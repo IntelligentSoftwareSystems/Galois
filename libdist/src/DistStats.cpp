@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -53,12 +53,11 @@ DistStatManager::~DistStatManager() {
 class galois::runtime::StatRecvHelper {
 
 public:
-  static void recvAtHost_0_hostTotalTy(uint32_t hostID,
-                                       galois::gstl::Str region,
+  static void recvAtHost_0_hostTotalTy(galois::gstl::Str region,
                                        galois::gstl::Str category,
                                        StatTotal::Type totalTy) {
 
-    dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
+    dsm()->addRecvdHostTotalTy(region, category, totalTy);
   }
 
   static void recvAtHost_0_int(uint32_t hostID, galois::gstl::Str region,
@@ -104,10 +103,10 @@ void DistStatManager::combineAtHost_0_helper(void) {
     for (auto i = hTotalMap.cbegin(), end_i = hTotalMap.cend(); i != end_i;
          ++i) {
       SendBuffer b;
-      gSerialize(b, hTotalMap.region(i),
-          hTotalMap.category(i), hTotalMap.stat(i).totalTy());
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
-          b, syncTypePhase);
+      gSerialize(b, hTotalMap.region(i), hTotalMap.category(i),
+                 hTotalMap.stat(i).totalTy());
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
+                                             syncTypePhase);
     }
   }
 
@@ -127,8 +126,8 @@ void DistStatManager::combineAtHost_0_helper(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
-          b, syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
+                                             syncTypePhase);
     }
   }
 }
@@ -152,8 +151,8 @@ void DistStatManager::combineAtHost_0_helper2(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
-          b, syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
+                                             syncTypePhase);
     }
   }
 
@@ -173,8 +172,8 @@ void DistStatManager::combineAtHost_0_helper2(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
-          b, syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
+                                             syncTypePhase);
     }
   }
 }
@@ -182,12 +181,13 @@ void DistStatManager::combineAtHost_0_helper2(void) {
 void DistStatManager::receiveAtHost_0_helper(void) {
   size_t syncTypePhase = 0;
   {
-    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    decltype(getSystemNetworkInterface().recieveTagged(
+        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
     do {
-      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
+                                                    nullptr, syncTypePhase);
 
       if (p) {
-        uint32_t hostID = p->first;
         RecvBuffer& b = p->second;
 
         galois::gstl::Str region;
@@ -195,20 +195,22 @@ void DistStatManager::receiveAtHost_0_helper(void) {
         StatTotal::Type totalTy;
         gDeserialize(b, region, category, totalTy);
 
-        StatRecvHelper::recvAtHost_0_hostTotalTy(hostID, region, category, totalTy);
+        StatRecvHelper::recvAtHost_0_hostTotalTy(region, category, totalTy);
       }
     } while (p);
   }
 
   ++syncTypePhase;
   {
-    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    decltype(getSystemNetworkInterface().recieveTagged(
+        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
     do {
-      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
+                                                    nullptr, syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
-        RecvBuffer& b = p->second;
+        RecvBuffer& b   = p->second;
 
         Str ln;
         Str cat;
@@ -217,7 +219,8 @@ void DistStatManager::receiveAtHost_0_helper(void) {
         galois::gstl::Vector<int64_t> thrdVals;
         gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
 
-        StatRecvHelper::recvAtHost_0_int(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+        StatRecvHelper::recvAtHost_0_int(hostID, ln, cat, thrdTotal, totalTy,
+                                         thrdVals);
       }
     } while (p);
   }
@@ -226,13 +229,15 @@ void DistStatManager::receiveAtHost_0_helper(void) {
 void DistStatManager::receiveAtHost_0_helper2(void) {
   size_t syncTypePhase = 0;
   {
-    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    decltype(getSystemNetworkInterface().recieveTagged(
+        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
     do {
-      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
+                                                    nullptr, syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
-        RecvBuffer& b = p->second;
+        RecvBuffer& b   = p->second;
 
         Str ln;
         Str cat;
@@ -241,20 +246,23 @@ void DistStatManager::receiveAtHost_0_helper2(void) {
         galois::gstl::Vector<double> thrdVals;
         gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
 
-        StatRecvHelper::recvAtHost_0_fp(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+        StatRecvHelper::recvAtHost_0_fp(hostID, ln, cat, thrdTotal, totalTy,
+                                        thrdVals);
       }
     } while (p);
   }
 
   ++syncTypePhase;
   {
-    decltype(getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+    decltype(getSystemNetworkInterface().recieveTagged(
+        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
     do {
-      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
+      p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
+                                                    nullptr, syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
-        RecvBuffer& b = p->second;
+        RecvBuffer& b   = p->second;
 
         Str ln;
         Str cat;
@@ -263,7 +271,8 @@ void DistStatManager::receiveAtHost_0_helper2(void) {
         galois::gstl::Vector<Str> thrdVals;
         gDeserialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
 
-        StatRecvHelper::recvAtHost_0_str(hostID, ln, cat, thrdTotal, totalTy, thrdVals);
+        StatRecvHelper::recvAtHost_0_str(hostID, ln, cat, thrdTotal, totalTy,
+                                         thrdVals);
       }
     } while (p);
   }
@@ -325,7 +334,7 @@ DistStatManager::findHostTotalTy(const Str& region, const Str& category,
   return hostTotalTy;
 }
 
-void DistStatManager::addRecvdHostTotalTy(unsigned hostID, const Str& region,
+void DistStatManager::addRecvdHostTotalTy(const Str& region,
                                           const Str& category,
                                           const StatTotal::Type& totalTy) {
   hostTotalTypes.addToStat(region, category, totalTy);
@@ -385,5 +394,6 @@ void DistStatManager::printStats(std::ostream& out) {
     strDistStats.print(out);
   }
   // all hosts must wait for host 0 to finish printing stats
-  while (td.reduce()) {};
+  while (td.reduce()) {
+  };
 }

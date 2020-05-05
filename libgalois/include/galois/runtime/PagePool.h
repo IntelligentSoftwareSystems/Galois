@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,20 +20,20 @@
 #ifndef GALOIS_RUNTIME_PAGEPOOL_H
 #define GALOIS_RUNTIME_PAGEPOOL_H
 
-#include "galois/gIO.h"
-#include "galois/substrate/SimpleLock.h"
-#include "galois/substrate/PtrLock.h"
-#include "galois/substrate/CacheLineStorage.h"
-#include "galois/substrate/PageAlloc.h"
-#include "galois/substrate/ThreadPool.h"
-
-#include <unordered_map>
-#include <vector>
+#include <cstddef>
+#include <deque>
 #include <mutex>
 #include <numeric>
-#include <deque>
+#include <unordered_map>
+#include <vector>
 
-#include <cstddef>
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PageAlloc.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/ThreadPool.h"
 
 namespace galois {
 namespace runtime {

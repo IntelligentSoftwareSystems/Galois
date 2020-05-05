@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,9 +20,10 @@
 #ifndef GALOIS_GRAPHS_READGRAPH_H
 #define GALOIS_GRAPHS_READGRAPH_H
 
+#include "galois/config.h"
 #include "galois/Galois.h"
-#include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/Timer.h"
 
 namespace galois {
@@ -62,15 +63,15 @@ struct ReadGraphConstructFrom {
   bool readUnweighted = false;
   ReadGraphConstructFrom(GraphTy& g, FileGraph& _f) : graph(g), f(_f) {}
   ReadGraphConstructFrom(GraphTy& g, FileGraph& _f, bool _readUnweighted)
-                         : graph(g), f(_f), readUnweighted(_readUnweighted) {}
+      : graph(g), f(_f), readUnweighted(_readUnweighted) {}
   void operator()(unsigned tid, unsigned total) {
     graph.constructFrom(f, tid, total, readUnweighted);
   }
 };
 
 template <typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_default_graph_tag,
-                       FileGraph& f, const bool readUnweighted = false) {
+void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f,
+                       const bool readUnweighted = false) {
   graph.allocateFrom(f);
 
   ReadGraphConstructFrom<GraphTy> reader(graph, f, readUnweighted);

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -400,7 +400,8 @@ struct DistrPrefix {
         // std::cerr << "On_each thread: " << me << " step: " << ceil(len / tot)
         // << " start: " << start << " end " << end+1 << "\n"; std::cerr <<
         // "On_each thread tot: " << tot << " len: " << len << " ceil: " <<
-        // ceil((double) len / tot) << " floor: " << floor((double) len / tot) <<
+        // ceil((double) len / tot) << " floor: " << floor((double) len / tot)
+        // <<
         // "\n";
 
         // std::cerr << graph.getData(*(initial[round].begin()+start),
@@ -419,7 +420,8 @@ struct DistrPrefix {
         // std::cerr << "On_each thread: " << me << " size: " << len << " start:
         // " << start << " end " << initial[round].size() << "\n"; std::cerr <<
         // "On_each thread tot: " << tot << " len: " << len << " ceil: " <<
-        // ceil((double) len / tot) << " floor: " << floor((double) len / tot) <<
+        // ceil((double) len / tot) << " floor: " << floor((double) len / tot)
+        // <<
         // "\n"; std::cerr << graph.getData(*(initial[round].begin()+start),
         // galois::MethodFlag::UNPROTECTED).id << " to " <<
         // graph.getData(*(initial[round].end()-1),

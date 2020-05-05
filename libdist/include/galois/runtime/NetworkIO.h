@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -70,7 +70,7 @@ protected:
   std::atomic<size_t>& inflightSends;
   std::atomic<size_t>& inflightRecvs;
 
-  //using vTy = std::vector<uint8_t>;
+  // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
 
 public:
@@ -80,7 +80,7 @@ public:
   struct message {
     uint32_t host; //!< destination of this message
     uint32_t tag;  //!< tag on message indicating distinct communication phases
-    vTy data; //!< data portion of message
+    vTy data;      //!< data portion of message
 
     //! Default constructor initializes host and tag to large numbers.
     message() : host(~0), tag(~0) {}
@@ -97,8 +97,9 @@ public:
 
   //! The default constructor takes a memory usage tracker and saves it
   //! @param tracker reference to a memory usage tracker used by the system
-  NetworkIO(MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs)
-    : memUsageTracker(tracker), inflightSends(sends), inflightRecvs(recvs) {}
+  NetworkIO(MemUsageTracker& tracker, std::atomic<size_t>& sends,
+            std::atomic<size_t>& recvs)
+      : memUsageTracker(tracker), inflightSends(sends), inflightRecvs(recvs) {}
 
   //! Default destructor does nothing.
   virtual ~NetworkIO();
@@ -119,7 +120,8 @@ public:
  * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
-makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
+makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker,
+                 std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
 #ifdef GALOIS_USE_LWCI
 /**
  * Creates/returns a network IO layer that uses LWCI to do communication.
@@ -128,7 +130,8 @@ makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>&
  * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
-makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
+makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker,
+                  std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
 #endif
 
 } // namespace runtime

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,13 +20,14 @@
 #ifndef GALOIS_GSLIST_H
 #define GALOIS_GSLIST_H
 
-#include "galois/FixedSizeRing.h"
-#include "galois/TwoLevelIteratorA.h"
+#include <type_traits>
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/mpl/if.hpp>
 
-#include <type_traits>
+#include "galois/config.h"
+#include "galois/FixedSizeRing.h"
+#include "galois/TwoLevelIteratorA.h"
 
 namespace galois {
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,9 +20,10 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "galois/gstl.h"
-
 #include <chrono>
+
+#include "galois/config.h"
+#include "galois/gstl.h"
 
 namespace galois {
 
@@ -67,12 +68,12 @@ class StatTimer : public TimeAccumulator {
 public:
   StatTimer(const char* name, const char* region);
 
-  StatTimer(const char* const n): StatTimer(n, nullptr) { }
+  StatTimer(const char* const n) : StatTimer(n, nullptr) {}
 
-  StatTimer(): StatTimer(nullptr, nullptr) { }
+  StatTimer() : StatTimer(nullptr, nullptr) {}
 
   StatTimer(const StatTimer&) = delete;
-  StatTimer(StatTimer&&) = delete;
+  StatTimer(StatTimer&&)      = delete;
   StatTimer& operator=(const StatTimer&) = delete;
   StatTimer& operator=(StatTimer&&) = delete;
 
@@ -95,8 +96,8 @@ public:
 template <>
 class CondStatTimer<false> {
 public:
-  CondStatTimer(const char* name) {}
-  CondStatTimer(const char* const n, const char* region) {}
+  CondStatTimer(const char*) {}
+  CondStatTimer(const char* const, const char*) {}
 
   void start() const {}
   void stop() const {}

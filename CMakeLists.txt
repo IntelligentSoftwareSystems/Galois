@@ -40,7 +40,7 @@ set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/sto
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
-
+set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (Memory, MemoryWithOrigins, Address, Undefined, Thread)")
 # This option is automatically handled by CMake.
 # It makes add_library build a shared lib unless STATIC is explicitly specified.
 # Putting this here is mostly just a placeholder so people know it's an option.
@@ -95,18 +95,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
-    # GCC-{6,7} is a too imprecise
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-but-set-variable>")
-  elseif(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
     # Avoid warnings from openmpi
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
   endif()
-
-  # Removing unused parameters conflicts with readability rules
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -120,8 +114,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
   endif()
-
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
@@ -170,52 +162,6 @@ if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
 
-if(USE_EXP)
-  set(USE_VTUNE ON)
-  set(USE_PAPI ON)
-  include_directories("libgalois/experimental/include")
-  include_directories("lonestar/include/pangolin")
-  if(ENABLE_DIST_GALOIS)
-    include_directories("libgluon/experimental/include")
-  endif()
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>")
-    add_compile_options("$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
-  endif()
-
-  find_package(TBB)
-  if(TBB_FOUND)
-    include_directories(${TBB_INCLUDE_DIRS})
-  endif()
-
-  find_package(CBLAS)
-  if(CBLAS_FOUND)
-    include_directories(${BLAS_INCLUDE_DIRS})
-  endif()
-
-  if(USE_PROF)
-    add_definitions(-DGALOIS_USE_PROF)
-  endif()
-
-  if(USE_EMBEDDED_REVISION)
-    include(GetGitVersion)
-    set(GALOIS_USE_EMBEDDED_REVISION on)
-  endif()
-
-  if(USE_HTM)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
-      set(GALOIS_USE_HTM on)
-      set(GALOIS_USE_SEQ_ONLY on)
-    else()
-      message(FATAL_ERROR "Hardware transactional memory not supported")
-    endif()
-  endif()
-
-endif()
-
 if(USE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
   find_package(VTune REQUIRED)
@@ -254,6 +200,8 @@ if(NOT ${LLVM_ENABLE_RTTI})
   message(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
 endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
+
+include(HandleSanitizer)
 
 include(CheckEndian)
 
@@ -297,20 +245,10 @@ add_subdirectory(libpangolin)
 
 # Applications (apps)
 add_subdirectory(lonestar)
-if (ENABLE_DIST_GALOIS)
-  add_subdirectory(lonestardist)
-endif()
-add_subdirectory(lonestarmine)
 
 add_subdirectory(scripts)
 add_subdirectory(inputs)
 add_subdirectory(tools)
-
-if(USE_DIST_EXP)
-  add_subdirectory(lonestardist/experimental)
-  add_subdirectory(lonestardist/experimental/resilience)
-  add_subdirectory(lonestardist/experimental/on_demand)
-endif()
 
 if(USE_EXP)
   add_subdirectory(lonestar/experimental)

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,11 +20,13 @@
 #ifndef __GALOIS_GRAPH_HELPERS__
 #define __GALOIS_GRAPH_HELPERS__
 
-#include <galois/gIO.h>
-
-#include <boost/iterator/counting_iterator.hpp>
 #include <cassert>
 #include <vector>
+
+#include <boost/iterator/counting_iterator.hpp>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 namespace graphs {
@@ -166,7 +168,7 @@ auto divideNodesBinarySearch(
   // weight of a block (one block for each division by default; if scale
   // factor specifies something different, then use that instead)
   uint64_t blockWeight = (weight + numBlocks - 1) / numBlocks;
-  //galois::gDebug("weight ", weight, " numblock ", numBlocks, " blockwegith ",
+  // galois::gDebug("weight ", weight, " numblock ", numBlocks, " blockwegith ",
   //               blockWeight);
 
   // lower and upper blocks that this division should use determined
@@ -181,7 +183,7 @@ auto divideNodesBinarySearch(
   uint32_t blockUpper = scaleFactor[id];
 
   assert(blockLower <= blockUpper);
-  //galois::gDebug("Unit ", id, " block ", blockLower, " to ",
+  // galois::gDebug("Unit ", id, " block ", blockLower, " to ",
   //               blockUpper, "; ", blockLower * blockWeight, " ",
   //               blockUpper * blockWeight);
 
@@ -214,7 +216,7 @@ auto divideNodesBinarySearch(
     edgesUpper = edgePrefixSum[nodesUpper - 1 + nodeOffset] - edgeOffset;
   }
 
-  //galois::gDebug("Unit ", id, " nodes ", nodesLower, " to ",
+  // galois::gDebug("Unit ", id, " nodes ", nodesLower, " to ",
   //               nodesUpper, " edges ", edgesLower, " ",
   //               edgesUpper);
 
@@ -294,8 +296,8 @@ void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
       returnRanges[i + 1] = returnRanges[i];
     }
 
-    galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i], " to ",
-                   returnRanges[i + 1], ", num edges is ",
+    galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
+                   " to ", returnRanges[i + 1], ", num edges is ",
                    graph.edge_end(returnRanges[i + 1] - 1) -
                        graph.edge_begin(returnRanges[i]));
   }
