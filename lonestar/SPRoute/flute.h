@@ -167,23 +167,23 @@ void readLUT(const char* fluteDir)
         else // if (i=='$' || i=='\n' || ... )
             charnum[i] = 0;
     }
-    
-    char powvfile[100], postfile[100];
-    strcat(powvfile, fluteDir);
-    strcat(powvfile, POWVFILE);
-    strcat(postfile, fluteDir);
-    strcat(postfile, POSTFILE);
+   
+    string powvfile, postfile;
+    powvfile = fluteDir;
+    powvfile += POWVFILE;
+    postfile = fluteDir;
+    postfile += POSTFILE;
 
-    fpwv=fopen(powvfile, "r");
+    fpwv=fopen(powvfile.c_str(), "r");
     if (fpwv == NULL) {
-        printf("Error in opening %s\n", powvfile);
+        printf("Error in opening POWV: %s\n", powvfile.c_str());
         exit(1);
     }
 
 #if ROUTING==1
-    fprt=fopen(postfile, "r");
+    fprt=fopen(postfile.c_str(), "r");
     if (fprt == NULL) {
-        printf("Error in opening %s\n", postfile);
+        printf("Error in opening POST: %s\n", postfile.c_str());
         exit(1);
     }
 #endif

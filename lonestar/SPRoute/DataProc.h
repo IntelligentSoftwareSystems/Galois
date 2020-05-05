@@ -147,7 +147,7 @@ void readFile(const char* benchFile)
     int TC;
 
     net=0;
-    
+
     fp=fopen(benchFile, "r");
     if (fp == NULL) {
         printf("Error in opening %s\n", benchFile);
