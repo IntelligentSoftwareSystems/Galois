@@ -1207,7 +1207,7 @@ void StNetOrder() {
 
       gridsX = treeedge->route.gridsX;
       gridsY = treeedge->route.gridsY;
-      for (i = 0; i <= treeedge->route.routelen; i++) {
+      for (i = 0; i < treeedge->route.routelen; i++) {
         if (gridsX[i] == gridsX[i + 1]) // a vertical edge
         {
           min_y = min(gridsY[i], gridsY[i + 1]);
