@@ -1,4 +1,4 @@
-include_directories(${CMAKE_SOURCE_DIR}/lonestargnn/include)
+include_directories(${CMAKE_SOURCE_DIR}/lonestar/gnn/include)
 include_directories(${CMAKE_SOURCE_DIR}/libdeepgalois/include)
 include_directories(${CUDA_HOME}/include)
 link_directories(${CUDA_HOME}/lib64)

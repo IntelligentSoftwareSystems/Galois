@@ -297,7 +297,6 @@ endif()
 
 if(USE_DEEPGALOIS)
   add_subdirectory(libdeepgalois)
-  add_subdirectory(lonestargnn)
 endif(USE_DEEPGALOIS)
 
 if (ENABLE_HETERO_GALOIS)
