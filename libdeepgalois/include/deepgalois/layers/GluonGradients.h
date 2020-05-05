@@ -164,22 +164,22 @@ public:
   }
 
   //! no edges, return 0
-  unsigned edge_begin(uint32_t dummy) {
+  unsigned edge_begin(uint32_t) {
     return 0;
   }
 
   //! no edges, return 0
-  unsigned edge_end(uint32_t dummy) {
+  unsigned edge_end(uint32_t) {
     return 0;
   }
 
   //! no edges, return 0
-  unsigned getEdgeDst(uint32_t dummy) {
+  unsigned getEdgeDst(uint32_t) {
     return 0;
   }
 
   //! no edges, return 0
-  unsigned getEdgeData(uint32_t dummy) {
+  unsigned getEdgeData(uint32_t) {
     return 0;
   }
 };

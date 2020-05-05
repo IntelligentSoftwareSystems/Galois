@@ -38,6 +38,9 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
   context = new deepgalois::Context();
   num_samples = context->read_graph(dataset_str, selfloop);
   context->set_label_class(is_single_class);
+#else
+  // only done here to avoid unused var complain TODO find better way
+  (void)selfloop;
 #endif
 
   // read graph, get num nodes

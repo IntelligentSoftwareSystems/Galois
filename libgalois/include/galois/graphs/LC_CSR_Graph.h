@@ -748,8 +748,7 @@ public:
   }
 
   template <bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, EdgeIndexTy e_new,
-                    EdgeIndexTy e,
+  void edgeDataCopy(EdgeData&, EdgeData&, EdgeIndexTy, EdgeIndexTy,
                     typename std::enable_if<!is_non_void>::type* = 0) {
     // does nothing
   }

@@ -5,7 +5,7 @@ struct GraphConvSync {
   using ValTy = std::vector<float>;
 
   //! return a vector of floats to sync
-  static ValTy extract(uint32_t node_id, char& filler) {
+  static ValTy extract(uint32_t node_id, char&) {
     // TODO figure out how to avoid copy from C array to vector; best
     // way is if original data is in a vector probably, but that has the
     // issue of not being able to directly call BLAS
@@ -23,7 +23,7 @@ struct GraphConvSync {
 
   //! reduction is addition in this case; add received vector to
   //! own vector
-  static bool reduce(uint32_t node_id, char& filler, ValTy y) {
+  static bool reduce(uint32_t node_id, char&, ValTy y) {
     assert(y.size() == deepgalois::_syncVectorSize);
     // loop and do addition
     for (unsigned i = 0; i < deepgalois::_syncVectorSize; i++) {
@@ -33,11 +33,11 @@ struct GraphConvSync {
   }
 
   //! do nothing (waste of a write)
-  static void reset(uint32_t node_id, char& filler) {
+  static void reset(uint32_t, char&) {
   }
 
   //! element wise set
-  static void setVal(uint32_t node_id, char& filler, ValTy y) {
+  static void setVal(uint32_t node_id, char&, ValTy y) {
     assert(y.size() == deepgalois::_syncVectorSize);
     // loop and do addition
     for (unsigned i = 0; i < deepgalois::_syncVectorSize; i++) {

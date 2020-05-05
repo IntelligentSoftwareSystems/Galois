@@ -49,9 +49,13 @@ public:
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
   void norm_factor_computing(bool is_subgraph, int subg_id = 0);
-  void createSubgraphs(int num_subgraphs) {}
-  void gen_subgraph_labels(size_t m, const mask_t *masks) {}
-  void gen_subgraph_feats(size_t m, const mask_t *masks) {}
+  //void createSubgraphs(int num_subgraphs) {}
+  //void gen_subgraph_labels(size_t m, const mask_t *masks) {}
+  //void gen_subgraph_feats(size_t m, const mask_t *masks) {}
+  // TODO define these
+  void createSubgraphs(int) {}
+  void gen_subgraph_labels(size_t, const mask_t *) {}
+  void gen_subgraph_feats(size_t, const mask_t *) {}
 
   float_t* get_norm_factors_ptr() { return norm_factors; }
   Graph* getGraphPointer() { return graph_cpu; }

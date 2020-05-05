@@ -151,7 +151,8 @@ float_t* DistContext::get_in_ptr() {
   return &h_feats[0];
 }
 
-void DistContext::norm_factor_computing(bool is_subgraph, int subg_id) {
+//void DistContext::norm_factor_computing(bool is_subgraph, int subg_id) {
+void DistContext::norm_factor_computing(bool, int) {
   // TODO: this is a distributed operation
 
   // create for now, TODO need to actually fill it in

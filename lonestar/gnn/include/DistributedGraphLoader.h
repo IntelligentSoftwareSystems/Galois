@@ -117,13 +117,12 @@ namespace graphs {
  *
  * @tparam NodeData node data to store in graph
  * @tparam EdgeData edge data to store in graph
- * @param scaleFactor How to split nodes among hosts
  * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
 template <typename NodeData, typename EdgeData>
 DistGraph<NodeData, EdgeData>*
-constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
+constructSymmetricGraph(std::vector<unsigned>&) {
   std::string inputFile = deepgalois::path + dataset + ".csgr";
   galois::gInfo("File to read is ", inputFile);
 
