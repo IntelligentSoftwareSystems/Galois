@@ -309,6 +309,7 @@ if (ENABLE_HETERO_GALOIS)
 
   add_subdirectory(libgpu)
 endif()
+add_subdirectory(libpangolin)
 
 # Applications (apps)
 add_subdirectory(lonestar)
