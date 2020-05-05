@@ -223,7 +223,7 @@ void readFile(const char* benchFile) {
     nets[i]         = (Net*)malloc(sizeof(Net));
     invalid_nets[i] = (Net*)malloc(sizeof(Net));
   }
-  seglistIndex = (int*)malloc(numNets * sizeof(int));
+  seglistIndex = (int*)malloc((numNets + 1) * sizeof(int));
 
   // read nets information from the input file
   segcount      = 0;
