@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,48 +35,52 @@ const bool multiSeed = true;
 namespace {
 // final
 void initGain(GGraph& g) {
-  galois::do_all(galois::iterate(g.cellList()),
-        [&](GNode n) {
-            g.getData(n).FS.store(0);
-            g.getData(n).TE.store(0);
-        },
-        galois::loopname("firstinit"));
+  galois::do_all(
+      galois::iterate(g.cellList()),
+      [&](GNode n) {
+        g.getData(n).FS.store(0);
+        g.getData(n).TE.store(0);
+      },
+      galois::loopname("firstinit"));
 
   typedef std::map<GNode, int> mapTy;
   typedef galois::substrate::PerThreadStorage<mapTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
-  galois::do_all(galois::iterate(g.getNets()),
-        [&](GNode n) {
+  galois::do_all(
+      galois::iterate(g.getNets()),
+      [&](GNode n) {
         auto& edges = *edgesThreadLocal.getLocal();
-           int p1=0;
-						int p2 = 0;
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int part = g.getData(cc).getPart();
-              if (part == 0) p1++;
-              else p2++;
-            if (p1 > 1 && p2 > 1) break;
+        int p1      = 0;
+        int p2      = 0;
+        for (auto x : g.edges(n)) {
+          auto cc  = g.getEdgeDst(x);
+          int part = g.getData(cc).getPart();
+          if (part == 0)
+            p1++;
+          else
+            p2++;
+          if (p1 > 1 && p2 > 1)
+            break;
+        }
+        if (!(p1 > 1 && p2 > 1) && (p1 + p2 > 1)) {
+          for (auto x : g.edges(n)) {
+            auto cc  = g.getEdgeDst(x);
+            int part = g.getData(cc).getPart();
+            int nodep;
+            if (part == 0)
+              nodep = p1;
+            else
+              nodep = p2;
+            if (nodep == 1) {
+              galois::atomicAdd(g.getData(cc).FS, 1);
             }
-            if (!(p1 > 1 && p2 > 1) && (p1 + p2 > 1) ) {
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int part = g.getData(cc).getPart();
-              int nodep;
-              if (part == 0) 
-                nodep = p1;
-              else 
-                nodep = p2;
-              if (nodep == 1) {
-                  galois::atomicAdd(g.getData(cc).FS, 1);
-              }
-              if (nodep == (p1 + p2)) {
-                  galois::atomicAdd(g.getData(cc).TE, 1);
-		}
+            if (nodep == (p1 + p2)) {
+              galois::atomicAdd(g.getData(cc).TE, 1);
             }
-	}
-        },
-	galois::steal(),
-        galois::loopname("initGainsPart"));    
+          }
+        }
+      },
+      galois::steal(), galois::loopname("initGainsPart"));
 }
 
 } // namespace
@@ -105,107 +109,128 @@ void partition(MetisGraph* mcg) {
           g->getData(n).setPart(0);
         }
       },
-      galois::loopname("initones")); 
+      galois::loopname("initones"));
   GNodeBag nodelistoz;
   galois::do_all(
       galois::iterate(g->cellList()),
       [&](GNode item) {
-        if (g->getData(item).getPart() == 0) { 
-           accumZ += g->getData(item).getWeight();
-           nodelist.push(item);
-        }
-        else nodelistoz.push(item);
-        
+        if (g->getData(item).getPart() == 0) {
+          accumZ += g->getData(item).getWeight();
+          nodelist.push(item);
+        } else
+          nodelistoz.push(item);
       },
-      galois::loopname("initones")); 
-  unsigned newSize = accum.reduce();
-  waccum = accum.reduce() - accumZ.reduce();
+      galois::loopname("initones"));
+  unsigned newSize      = accum.reduce();
+  waccum                = accum.reduce() - accumZ.reduce();
   unsigned targetWeight = accum.reduce() / 2;
 
   if (accumZ.reduce() > waccum) {
-  int gain = waccum;
-  //initGain(*g);
-  while(1) {
-  initGain(*g);
-    std::vector<GNode> nodeListz;
-    GNodeBag nodelistz;
-    galois::do_all(
-      galois::iterate(nodelist),
-      [&](GNode node) {
-    //for (auto node : nodelist) {
-      unsigned pp = g->getData(node).getPart();
-      if (pp == 0) {
-        nodelistz.push(node);
-      }        
-    },	
-      galois::loopname("while")); 
+    int gain = waccum;
+    // initGain(*g);
+    while (1) {
+      initGain(*g);
+      std::vector<GNode> nodeListz;
+      GNodeBag nodelistz;
+      galois::do_all(
+          galois::iterate(nodelist),
+          [&](GNode node) {
+            // for (auto node : nodelist) {
+            unsigned pp = g->getData(node).getPart();
+            if (pp == 0) {
+              nodelistz.push(node);
+            }
+          },
+          galois::loopname("while"));
 
-    for (auto c :nodelistz) nodeListz.push_back(c);
-    std::sort(nodeListz.begin(), nodeListz.end(), [&g] (GNode& lpw, GNode& rpw) {
-    if (fabs((float)((g->getData(lpw).getGain()) * (1.0f / g->getData(lpw).getWeight())) - (float)((g->getData(rpw).getGain()) * (1.0f / g->getData(rpw).getWeight()))) < 0.00001f) return (float)g->getData(lpw).nodeid < (float)g->getData(rpw).nodeid;
-      return (float) ((g->getData(lpw).getGain()) * (1.0f / g->getData(lpw).getWeight())) > (float)((g->getData(rpw).getGain()) * (1.0f / g->getData(rpw).getWeight()));
-    });
-    int i = 0;
-    for (auto zz : nodeListz) {
-    //auto zz = *nodeListz.begin();
-    g->getData(zz).setPart(1);
-    gain += g->getData(zz).getWeight();
-    //std::cout<<" weight "<<g->getData(zz).getWeight()<<"\n";
-    
-    i++;
-    if (gain >= targetWeight) break;
-   if(i > sqrt(newSize)) break;
+      for (auto c : nodelistz)
+        nodeListz.push_back(c);
+      std::sort(
+          nodeListz.begin(), nodeListz.end(), [&g](GNode& lpw, GNode& rpw) {
+            if (fabs((float)((g->getData(lpw).getGain()) *
+                             (1.0f / g->getData(lpw).getWeight())) -
+                     (float)((g->getData(rpw).getGain()) *
+                             (1.0f / g->getData(rpw).getWeight()))) < 0.00001f)
+              return (float)g->getData(lpw).nodeid <
+                     (float)g->getData(rpw).nodeid;
+            return (float)((g->getData(lpw).getGain()) *
+                           (1.0f / g->getData(lpw).getWeight())) >
+                   (float)((g->getData(rpw).getGain()) *
+                           (1.0f / g->getData(rpw).getWeight()));
+          });
+      int i = 0;
+      for (auto zz : nodeListz) {
+        // auto zz = *nodeListz.begin();
+        g->getData(zz).setPart(1);
+        gain += g->getData(zz).getWeight();
+        // std::cout<<" weight "<<g->getData(zz).getWeight()<<"\n";
+
+        i++;
+        if (gain >= targetWeight)
+          break;
+        if (i > sqrt(newSize))
+          break;
+      }
+
+      if (gain >= targetWeight)
+        break;
+      // updateGain(*g,zz);
+    }
+
+  } else {
+
+    int gain = accumZ.reduce();
+    // std::cout<<"gain is "<<gain<<"\n";
+    // initGain(*g);
+    while (1) {
+      initGain(*g);
+      std::vector<GNode> nodeListz;
+      GNodeBag nodelistz;
+      galois::do_all(
+          galois::iterate(nodelistoz),
+          [&](GNode node) {
+            // for (auto node : nodelist) {
+            unsigned pp = g->getData(node).getPart();
+            if (pp == 1) {
+              nodelistz.push(node);
+            }
+          },
+          galois::loopname("while"));
+      for (auto c : nodelistz)
+        nodeListz.push_back(c);
+
+      std::sort(
+          nodeListz.begin(), nodeListz.end(), [&g](GNode& lpw, GNode& rpw) {
+            if (fabs((float)((g->getData(lpw).getGain()) *
+                             (1.0f / g->getData(lpw).getWeight())) -
+                     (float)((g->getData(rpw).getGain()) *
+                             (1.0f / g->getData(rpw).getWeight()))) < 0.00001f)
+              return (float)g->getData(lpw).nodeid <
+                     (float)g->getData(rpw).nodeid;
+            return (float)((g->getData(lpw).getGain()) *
+                           (1.0f / g->getData(lpw).getWeight())) >
+                   (float)((g->getData(rpw).getGain()) *
+                           (1.0f / g->getData(rpw).getWeight()));
+          });
+
+      int i = 0;
+      for (auto zz : nodeListz) {
+        // auto zz = *nodeListz.begin();
+        g->getData(zz).setPart(0);
+        gain += g->getData(zz).getWeight();
+
+        i++;
+        if (gain >= targetWeight)
+          break;
+        if (i > sqrt(newSize))
+          break;
+      }
+
+      if (gain >= targetWeight)
+        break;
+
+      // updateGain(*g,zz);
+    }
   }
-	
-    if (gain >= targetWeight) break;
-    //updateGain(*g,zz);
-
-  }
-
+  // std::cout<<cutsize(*g)<<"\n";
 }
-else {
-  
-  int gain = accumZ.reduce();
- // std::cout<<"gain is "<<gain<<"\n";
-  //initGain(*g);
-  while(1) {
-  initGain(*g);
-    std::vector<GNode> nodeListz;
-    GNodeBag nodelistz;
-    galois::do_all(
-      galois::iterate(nodelistoz),
-      [&](GNode node) {
-    //for (auto node : nodelist) {
-      unsigned pp = g->getData(node).getPart();
-      if (pp == 1) {
-        nodelistz.push(node);
-      }        
-    },	
-      galois::loopname("while")); 
-    for (auto c :nodelistz) nodeListz.push_back(c);
-	
-    std::sort(nodeListz.begin(), nodeListz.end(), [&g] (GNode& lpw, GNode& rpw) {
-    if (fabs((float)((g->getData(lpw).getGain()) * (1.0f / g->getData(lpw).getWeight())) - (float)((g->getData(rpw).getGain()) * (1.0f / g->getData(rpw).getWeight()))) < 0.00001f) return (float)g->getData(lpw).nodeid < (float)g->getData(rpw).nodeid;
-      return (float) ((g->getData(lpw).getGain()) * (1.0f / g->getData(lpw).getWeight())) > (float)((g->getData(rpw).getGain()) * (1.0f / g->getData(rpw).getWeight()));
-    });
-
-  int i = 0;
-  for (auto zz : nodeListz) {
-  //auto zz = *nodeListz.begin();
-  g->getData(zz).setPart(0);
-  gain += g->getData(zz).getWeight();
-    
-    i++;
-    if (gain >= targetWeight) break;
-    if(i > sqrt(newSize)) break;
-  }
-	
-   if (gain >= targetWeight) break;
-
-   //updateGain(*g,zz);
-  }
-}
-  //std::cout<<cutsize(*g)<<"\n";
-  
-}
-

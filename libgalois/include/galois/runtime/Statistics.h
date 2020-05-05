@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,24 +20,26 @@
 #ifndef GALOIS_STAT_MANAGER_H
 #define GALOIS_STAT_MANAGER_H
 
-#include "galois/gstl.h"
-#include "galois/gIO.h"
-#include "galois/Threads.h"
-#include "galois/substrate/PerThreadStorage.h"
-#include "galois/substrate/ThreadRWlock.h"
-#include "galois/substrate/EnvCheck.h"
+#include <limits>
+#include <map>
+#include <string>
+#include <type_traits>
+
+#include <sys/resource.h>
+#include <sys/time.h>
 
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
-#include <limits>
-#include <string>
-#include <map>
-#include <type_traits>
-
-#include <sys/resource.h>
-#include <sys/time.h>
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/gstl.h"
+#include "galois/Threads.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadRWlock.h"
+#include "galois/Threads.h"
 
 /**
  * TODO:
@@ -125,7 +127,7 @@ public:
 
   const Str& name(void) const { return m_name; }
 
-  void add(const T& val) const {}
+  void add(const T&) const {}
 };
 
 template <typename T, typename... Bases>
@@ -142,14 +144,12 @@ public:
 
   using with_name = AggregStat<T, NamedStat<T>, Bases...>;
 
-  void add(const T& val) {
-    (..., Bases::add(val));
-  }
+  void add(const T& val) { (..., Bases::add(val)); }
 };
 
 namespace {
-  static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
-                                                   "TSUM", "TAVG"};
+static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
+                                                 "TSUM", "TAVG"};
 }
 
 struct StatTotal {
@@ -322,7 +322,7 @@ struct ScalarStat {
 
   void add(const T& v) { m_val += v; }
 
-  operator const T&(void)const { return m_val; }
+  operator const T&(void) const { return m_val; }
 
   const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 };
@@ -331,7 +331,6 @@ template <typename T>
 using ScalarStatManager = BasicStatMap<ScalarStat<T>>;
 
 } // end namespace internal
-
 
 class StatManager {
 
@@ -528,7 +527,6 @@ public:
   void print(void);
 };
 
-
 namespace internal {
 
 void setSysStatManager(StatManager* sm);
@@ -620,7 +618,6 @@ void reportParam(const S1& region, const S2& category, const V& value) {
 }
 
 void setStatFile(const std::string& f);
-
 
 //! Reports maximum resident set size and page faults stats using
 //! rusage

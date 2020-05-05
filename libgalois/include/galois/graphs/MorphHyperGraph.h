@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,30 +26,30 @@
 #ifndef GALOIS_GRAPHS_MORPHHYPERGRAPH_H
 #define GALOIS_GRAPHS_MORPHHYPERGRAPH_H
 
-//#define AUX_MAP
+#include <algorithm>
+#include <map>
+#include <set>
+#include <type_traits>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/functional.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/filter_iterator.hpp>
 
 #include "galois/Bag.h"
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 #include "galois/gstl.h"
+
 #ifdef AUX_MAP
 #include "galois/PerThreadContainer.h"
 #else
 #include "galois/substrate/CacheLineStorage.h"
 #include "galois/substrate/SimpleLock.h"
 #endif
-#include "galois/graphs/FileGraph.h"
-#include "galois/graphs/Details.h"
-#include "galois/Galois.h"
-
-#include <boost/functional.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/container/small_vector.hpp>
-
-#include <algorithm>
-#include <map>
-#include <set>
-#include <type_traits>
-#include <vector>
 
 namespace galois {
 namespace graphs {
@@ -80,11 +80,11 @@ struct UEdgeInfoBase<NTy, ETy, true> {
   inline const ETy* second() const { return &Ea; }
 
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, ETy*, bool, Args&&... args)
       : N(n), Ea(std::forward<Args>(args)...) {}
 
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy& v, bool f, Args&&... args) : N(n) {
+  UEdgeInfoBase(NTy* n, ETy& v, bool, Args&&...) : N(n) {
     Ea = v;
   }
 
@@ -110,7 +110,7 @@ struct UEdgeInfoBase<NTy, ETy, false> {
   inline ETy* second() { return Ea; }
   inline const ETy* second() const { return Ea; }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&...)
       : N((NTy*)((uintptr_t)n | f)), Ea(v) {}
   static size_t sizeOfSecond() { return sizeof(ETy); }
   bool isInEdge() const { return (uintptr_t)N & 1; }
@@ -126,7 +126,7 @@ struct UEdgeInfoBase<NTy, void, true> {
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args) : N(n) {}
+  UEdgeInfoBase(NTy* n, void*, bool, Args&&...) : N(n) {}
   static size_t sizeOfSecond() { return 0; }
   bool isInEdge() const { return false; }
 };
@@ -141,7 +141,7 @@ struct UEdgeInfoBase<NTy, void, false> {
   inline char* second() const { return static_cast<char*>(NULL); }
   inline char* addr() const { return second(); }
   template <typename... Args>
-  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args)
+  UEdgeInfoBase(NTy* n, void*, bool f, Args&&...)
       : N((NTy*)((uintptr_t)n | f)) {}
   static size_t sizeOfSecond() { return 0; }
   bool isInEdge() const { return (uintptr_t)N & 1; }
@@ -166,7 +166,7 @@ struct EdgeFactory {
 template <typename ETy>
 struct EdgeFactory<ETy, true> {
   template <typename... Args>
-  ETy* mkEdge(Args&&... args) {
+  ETy* mkEdge(Args&&...) {
     return nullptr;
   }
   void delEdge(ETy*) {}
@@ -176,7 +176,7 @@ struct EdgeFactory<ETy, true> {
 template <>
 struct EdgeFactory<void, false> {
   template <typename... Args>
-  void* mkEdge(Args&&... args) {
+  void* mkEdge(Args&&...) {
     return static_cast<void*>(NULL);
   }
   void delEdge(void*) {}
@@ -253,8 +253,8 @@ public:
   template <bool _has_no_lockable>
   struct with_no_lockable {
     //! Type with Lockable parameter set according to struct template arg
-    using type = MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut, _has_no_lockable,
-                            SortedNeighbors, FileEdgeTy>;
+    using type = MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut,
+                                 _has_no_lockable, SortedNeighbors, FileEdgeTy>;
   };
 
   /**
@@ -263,8 +263,8 @@ public:
   template <typename _node_data>
   struct with_node_data {
     //! Type with node data parameter set according to struct template arg
-    using type = MorphHyperGraph<_node_data, EdgeTy, Directional, InOut, HasNoLockable,
-                            SortedNeighbors, FileEdgeTy>;
+    using type = MorphHyperGraph<_node_data, EdgeTy, Directional, InOut,
+                                 HasNoLockable, SortedNeighbors, FileEdgeTy>;
   };
 
   /**
@@ -273,8 +273,8 @@ public:
   template <typename _edge_data>
   struct with_edge_data {
     //! Type with edge data parameter set according to struct template arg
-    using type = MorphHyperGraph<NodeTy, _edge_data, Directional, InOut, HasNoLockable,
-                            SortedNeighbors, FileEdgeTy>;
+    using type = MorphHyperGraph<NodeTy, _edge_data, Directional, InOut,
+                                 HasNoLockable, SortedNeighbors, FileEdgeTy>;
   };
 
   /**
@@ -283,8 +283,9 @@ public:
   template <typename _file_edge_data>
   struct with_file_edge_data {
     //! Type with file edge data parameter set according to struct template arg
-    using type = MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
-                            SortedNeighbors, _file_edge_data>;
+    using type =
+        MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
+                        SortedNeighbors, _file_edge_data>;
   };
 
   /**
@@ -293,8 +294,8 @@ public:
   template <bool _directional>
   struct with_directional {
     //! Type with directional parameter set according to struct template arg
-    using type = MorphHyperGraph<NodeTy, EdgeTy, _directional, InOut, HasNoLockable,
-                            SortedNeighbors, FileEdgeTy>;
+    using type = MorphHyperGraph<NodeTy, EdgeTy, _directional, InOut,
+                                 HasNoLockable, SortedNeighbors, FileEdgeTy>;
   };
 
   /**
@@ -303,14 +304,14 @@ public:
   template <bool _sorted_neighbors>
   struct with_sorted_neighbors {
     //! Type with sort neighbor parameter set according to struct template arg
-    using type = MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
-                           _sorted_neighbors, FileEdgeTy>;
+    using type = MorphHyperGraph<NodeTy, EdgeTy, Directional, InOut,
+                                 HasNoLockable, _sorted_neighbors, FileEdgeTy>;
   };
 
   //! Tag that defines to graph reader how to read a graph into this class
   using read_tag = read_with_aux_first_graph_tag;
 
-private:///////////////////////////////////////////////////////////////////////
+private: ///////////////////////////////////////////////////////////////////////
   template <typename T>
   struct first_eq_and_valid {
     T N2;
@@ -348,15 +349,12 @@ private:///////////////////////////////////////////////////////////////////////
       : public internal::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
     using EdgeInfo =
-      internal::UEdgeInfoBase<gNode, EdgeTy, Directional & !InOut>;
+        internal::UEdgeInfoBase<gNode, EdgeTy, Directional & !InOut>;
 
     //! The storage type for edges
     // typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
-    using EdgesTy =
-      boost::container::small_vector<
-        EdgeInfo, 3,
-        galois::runtime::Pow_2_BlockAllocator<EdgeInfo>
-      >;
+    using EdgesTy = boost::container::small_vector<
+        EdgeInfo, 3, galois::runtime::Pow_2_BlockAllocator<EdgeInfo>>;
 
     using iterator = typename EdgesTy::iterator;
   };
@@ -403,7 +401,8 @@ private:///////////////////////////////////////////////////////////////////////
      */
     void erase(gNode* N, bool inEdge = false) {
       iterator ii = find(N, inEdge);
-      if (ii != end()) edges.erase(ii);
+      if (ii != end())
+        edges.erase(ii);
     }
 
     /**
@@ -418,7 +417,7 @@ private:///////////////////////////////////////////////////////////////////////
                                 return e1.first() < e2.first();
                               }));
         ii =
-          std::lower_bound(edges.begin(), edges.end(), N, first_lt<gNode*>());
+            std::lower_bound(edges.begin(), edges.end(), N, first_lt<gNode*>());
       } else {
         ii = edges.begin();
       }
@@ -493,19 +492,19 @@ private:///////////////////////////////////////////////////////////////////////
     }
 
     template <bool _A1 = HasNoLockable>
-    void acquire(MethodFlag mflag, typename std::enable_if<_A1>::type* = 0) {}
+    void acquire(MethodFlag, typename std::enable_if<_A1>::type* = 0) {}
 
   public:
     int gain;
     template <typename... Args>
     gNode(Args&&... args)
-      : NodeInfo(std::forward<Args>(args)...), active(false) {}
+        : NodeInfo(std::forward<Args>(args)...), active(false) {}
   };
 
   // The graph manages the lifetimes of the data in the nodes and edges
   //! Container for nodes
   using NodeListTy = galois::InsertBag<gNode>;
-  using Bnodes = galois::InsertBag<gNode*>;
+  using Bnodes     = galois::InsertBag<gNode*>;
   //! nodes in this graph
   NodeListTy nodes;
   Bnodes cells;
@@ -539,7 +538,7 @@ private:///////////////////////////////////////////////////////////////////////
     gNode* operator()(gNode& data) const { return &data; }
   };
 
-public:////////////////////////////////////////////////////////////////////////
+public: ////////////////////////////////////////////////////////////////////////
   //! Graph node handle
   using GraphNode = gNode*;
   //! Edge data type
@@ -550,21 +549,21 @@ public:////////////////////////////////////////////////////////////////////////
   using node_data_type = NodeTy;
   //! (Out or Undirected) Edge iterator
   using edge_iterator =
-    typename boost::filter_iterator<is_out_edge, typename gNodeTypes::iterator>;
+      typename boost::filter_iterator<is_out_edge,
+                                      typename gNodeTypes::iterator>;
   //! In Edge iterator
   using in_edge_iterator =
-   typename boost::filter_iterator<is_in_edge, typename gNodeTypes::iterator>;
+      typename boost::filter_iterator<is_in_edge,
+                                      typename gNodeTypes::iterator>;
 
   //! Reference to edge data
   using edge_data_reference = typename gNodeTypes::EdgeInfo::reference;
   //! Reference to node data
   using node_data_reference = typename gNodeTypes::reference;
   //! Node iterator
-  using iterator =
-    boost::transform_iterator<
+  using iterator = boost::transform_iterator<
       makeGraphNode,
-      boost::filter_iterator<is_node, typename NodeListTy::iterator>
-    >;
+      boost::filter_iterator<is_node, typename NodeListTy::iterator>>;
 
   gstl::Vector<GraphNode> locked_cells;
   int max_cell_area;
@@ -606,7 +605,7 @@ public:////////////////////////////////////////////////////////////////////////
                                 LargeArray<AuxNodePadded>>::type;
 #endif
 
-private:///////////////////////////////////////////////////////////////////////
+private: ///////////////////////////////////////////////////////////////////////
   template <typename... Args>
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst,
                                     galois::MethodFlag mflag, Args&&... args) {
@@ -715,19 +714,20 @@ private:///////////////////////////////////////////////////////////////////////
   template <bool _A1 = LargeArray<EdgeTy>::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
   EdgeTy*
-  constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  constructOutEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
                         GraphNode src, GraphNode dst,
                         typename std::enable_if<_A1 && !_A2>::type* = 0) {
     return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
   // will reuse edge data from outgoing edges
-  void constructInEdgeValue(FileGraph& graph, EdgeTy* e, GraphNode src,
+  void constructInEdgeValue(FileGraph&, EdgeTy* e, GraphNode src,
                             GraphNode dst) {
     createInEdge(src, dst, e, galois::MethodFlag::UNPROTECTED);
   }
 
-public://///////////////////////////////////////////////////////////////////////
+public
+    : /////////////////////////////////////////////////////////////////////////
   /**
    * Creates a new node holding the indicated data. Usually you should call
    * {@link addNode()} afterwards.
@@ -753,8 +753,9 @@ public://///////////////////////////////////////////////////////////////////////
   }
 
   //! Gets the node data for a node.
-  node_data_reference getData(const GraphNode& n,
-      galois::MethodFlag mflag = MethodFlag::WRITE) const {
+  node_data_reference
+  getData(const GraphNode& n,
+          galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     // galois::runtime::checkWrite(mflag, false);
     n->acquire(mflag);
@@ -858,8 +859,9 @@ public://///////////////////////////////////////////////////////////////////////
 
   //! Find/return edge between src/dst if it exists; assumes that edges
   //! are sorted by destination
-  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst,
-      galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator
+  findEdgeSortedByDst(GraphNode src, GraphNode dst,
+                      galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -981,9 +983,9 @@ public://///////////////////////////////////////////////////////////////////////
 
   //! Sort all edges by destination
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this),
-                   [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
-                   galois::steal());
+    galois::do_all(
+        galois::iterate(*this),
+        [=](GraphNode N) { this->sortEdgesByDst(N, mflag); }, galois::steal());
   }
 
   // General Things
@@ -993,15 +995,15 @@ public://///////////////////////////////////////////////////////////////////////
     typedef typename gNode::EdgeInfo EdgeInfo;
     std::sort(N->begin(), N->end(),
               [=](const EdgeInfo& e1, const EdgeInfo& e2) {
-                return getallneighbor(e1.first()).size() < getallneighbor(e2.first()).size();
+                return getallneighbor(e1.first()).size() <
+                       getallneighbor(e2.first()).size();
               });
   }
 
   // Sort cells in a net by their degree
   void sortCellDegree(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(this->getNets()), 
-                [=](GraphNode N) {this->sortEdgesByDeg(N, mflag); 
-            });
+    galois::do_all(galois::iterate(this->getNets()),
+                   [=](GraphNode N) { this->sortEdgesByDeg(N, mflag); });
   }
 
   //! Returns an iterator to the neighbors of a node
@@ -1048,8 +1050,9 @@ public://///////////////////////////////////////////////////////////////////////
   }
 
   //! Returns the end of the neighbor edge iterator
-  edge_iterator edge_end(GraphNode N,
-                         galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator
+  edge_end(GraphNode N,
+           galois::MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -1060,7 +1063,8 @@ public://///////////////////////////////////////////////////////////////////////
   //! Returns the end of an in-neighbor edge iterator
   template <bool _Undirected = !Directional>
   in_edge_iterator
-  in_edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+  in_edge_end(GraphNode N,
+              galois::MethodFlag GALOIS_UNUSED(mflag)      = MethodFlag::WRITE,
               typename std::enable_if<!_Undirected>::type* = 0) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
@@ -1221,9 +1225,8 @@ public://///////////////////////////////////////////////////////////////////////
   }
 
   /**
-   * Constructs the MorphGraph in-edges given a FileGraph to construct it from and
-   * already created nodes.
-   * Meant to be called by multiple threads.
+   * Constructs the MorphGraph in-edges given a FileGraph to construct it from
+   * and already created nodes. Meant to be called by multiple threads.
    * DirectedNotInOut = false version
    *
    * @param[in] graph FileGraph to construct a morph graph from
@@ -1384,9 +1387,8 @@ public://///////////////////////////////////////////////////////////////////////
   }
 
   /**
-   * Constructs the MorphGraph in-edges given a FileGraph to construct it from and
-   * already created nodes.
-   * Meant to be called by multiple threads.
+   * Constructs the MorphGraph in-edges given a FileGraph to construct it from
+   * and already created nodes. Meant to be called by multiple threads.
    * DirectedNotInOut = false version
    *
    * @param[in] graph FileGraph to construct a morph graph from
@@ -1420,13 +1422,13 @@ public://///////////////////////////////////////////////////////////////////////
   gstl::Vector<GraphNode> getneighbor(GraphNode N, GraphNode H) {
 
     gstl::Vector<GraphNode> neighbors;
-//    if (findEdge(N, H)) {
-        for (auto it : edges(H)) {
-          auto n = getEdgeDst(it);
-          if (n != N)
-            neighbors.push_back(n);
-        }
-  //  }
+    //    if (findEdge(N, H)) {
+    for (auto it : edges(H)) {
+      auto n = getEdgeDst(it);
+      if (n != N)
+        neighbors.push_back(n);
+    }
+    //  }
     return neighbors;
   }
   // get all the neighbors
@@ -1438,10 +1440,10 @@ public://///////////////////////////////////////////////////////////////////////
       for (auto h : edges(hedge)) {
         auto hneighbor = getEdgeDst(h);
         if (hneighbor != N)
-        neighbors.push_back(hneighbor);
+          neighbors.push_back(hneighbor);
       }
     }
-    
+
     return neighbors;
   }
   // get all the nets on a cell
@@ -1464,20 +1466,11 @@ public://///////////////////////////////////////////////////////////////////////
     return cells;
   }
 
-  void addHyperedge(GraphNode n) {
-    nets.push_back(n);
-  }
-  void addCell(GraphNode n) {
-    cells.push_back(n);
-  }
-  Bnodes& cellList() {
-    return cells;
-  }
+  void addHyperedge(GraphNode n) { nets.push_back(n); }
+  void addCell(GraphNode n) { cells.push_back(n); }
+  Bnodes& cellList() { return cells; }
 
-
-  Bnodes& getNets() {
-    return nets;
-  }
+  Bnodes& getNets() { return nets; }
 
   GraphNode getneighbornet(GraphNode N, GraphNode C) {
     for (auto n : edges(N)) {
@@ -1498,7 +1491,6 @@ public://///////////////////////////////////////////////////////////////////////
     }
     return nets;
   }
-
 };
 
 } // namespace graphs

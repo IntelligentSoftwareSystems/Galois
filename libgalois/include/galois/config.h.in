@@ -1,0 +1,41 @@
+#ifndef GALOIS_CONFIG_H
+#define GALOIS_CONFIG_H
+
+#if !(defined(GALOIS_USE_LONGJMP_ABORT) || defined(GALOIS_USE_EXCEPTION_ABORT))
+#define GALOIS_USE_LONGJMP_ABORT
+#endif
+#if !(defined(GALOIS_USE_LONGJMP_ABORT) ^ defined(GALOIS_USE_EXCEPTION_ABORT))
+#error Exactly one of GALOIS_USE_LONGJMP_ABORT or GALOIS_USE_EXCEPTION_ABORT must be defined.
+#endif
+
+// Macro to suppress compiler warnings that a variable is set but unused.
+// This warning is buggy in gcc 7.
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 8
+#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET                           \
+_Pragma("GCC diagnostic push")                                 \
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
+#define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET
+#define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET
+#endif
+
+#if defined(NDEBUG)
+#define GALOIS_USED_ONLY_IN_DEBUG(NAME) NAME [[maybe_unused]]
+#else
+#define GALOIS_USED_ONLY_IN_DEBUG(NAME) NAME
+#endif
+
+#define GALOIS_UNUSED(NAME) NAME [[maybe_unused]]
+
+#if defined(__GNUC__)
+#define GALOIS_IGNORE_EXTERNAL_UNUSED_PARAMETERS         \
+_Pragma("GCC diagnostic push")                           \
+_Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")
+#define GALOIS_END_IGNORE_EXTERNAL_UNUSED_PARAMETERS _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_IGNORE_EXTERNAL_UNUSED_PARAMETERS
+#define GALOIS_END_IGNORE_EXTERNAL_UNUSED_PARAMETERS
+#endif
+
+#endif

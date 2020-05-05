@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -58,10 +58,9 @@ TimeAccumulator& TimeAccumulator::operator+=(const Timer& rhs) {
   return *this;
 }
 
-
 StatTimer::StatTimer(const char* const name, const char* const region) {
-  const char *n = name ? name : "Time";
-  const char *r = region ? region : "(NULL)";
+  const char* n = name ? name : "Time";
+  const char* r = region ? region : "(NULL)";
 
   name_   = gstl::makeStr(n);
   region_ = gstl::makeStr(r);
@@ -90,6 +89,4 @@ void StatTimer::stop() {
   TimeAccumulator::stop();
 }
 
-uint64_t StatTimer::get_usec() const {
-  return TimeAccumulator::get_usec();
-}
+uint64_t StatTimer::get_usec() const { return TimeAccumulator::get_usec(); }

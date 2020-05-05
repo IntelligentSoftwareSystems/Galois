@@ -10,6 +10,67 @@ version: 2
 # during the actual CI testing is no longer necessary.
 
 jobs:
+  "CheckFormat":
+    docker:
+      - image: ubuntu:bionic
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
+          apt-add-repository -y 'deb https://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
+          apt-get -q update -y
+          apt-get -q install -y \
+            clang-format-10
+
+          update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 50
+
+          scripts/check_format.sh . || exit 0
+  "Sanitize":
+    docker:
+      - image: ubuntu:bionic
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
+          apt-add-repository -y 'ppa:ubuntu-toolchain-r/test'
+          apt-add-repository -y 'deb https://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
+          apt-add-repository -y 'deb https://apt.kitware.com/ubuntu/ bionic main'
+          apt-add-repository -y 'ppa:mhier/libboost-latest'
+          apt-get -q update -y
+          apt-get -q install -y \
+            clang-10 \
+            cmake \
+            libboost1.70-dev \
+            libeigen3-dev \
+            openmpi-bin \
+            libopenmpi-dev \
+            llvm-7-dev \
+            libz-dev
+
+          update-alternatives --install /usr/bin/clang clang /usr/bin/clang-10 50
+          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 50
+
+          chmod 755 /root
+          useradd runner
+          mkdir -p /tmp/build
+
+          cmake \
+            -S . \
+            -B /tmp/build \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DGALOIS_USE_SANITIZER="Address;Undefined"
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+          # Run tests as non-root otherwise MPI will complain
+          (cd /tmp/build \
+            && chown -R runner . \
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Debian":
     docker:
       - image: debian:10
@@ -279,6 +340,8 @@ workflows:
   version: 2
   build:
     jobs:
+      - "CheckFormat"
+      - "Sanitize"
       - "Debian"
       - "Ubuntu-18.04"
       - "CentOS-8-gcc"

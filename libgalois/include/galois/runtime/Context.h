@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,17 +20,20 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
-#include "galois/MethodFlags.h"
-#include "galois/substrate/PtrLock.h"
-#include "galois/gIO.h"
-#include "galois/runtime/config.h"
-
-#include <boost/utility.hpp>
-
 #include <cassert>
 #include <cstdlib>
 
+#include <boost/utility.hpp>
+
+#include "galois/config.h"
+
+#ifdef GALOIS_USE_LONGJMP_ABORT
 #include <csetjmp>
+#endif
+
+#include "galois/gIO.h"
+#include "galois/MethodFlags.h"
+#include "galois/substrate/PtrLock.h"
 
 namespace galois {
 namespace runtime {

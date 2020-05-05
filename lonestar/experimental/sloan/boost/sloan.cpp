@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -231,8 +231,8 @@ static void printSloan() {
        nit++) {
     SNode& data = graph.getData(*nit);
     // std::cerr << "[" << data.id << "] level: " << data.dist << " degree: " <<
-    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree << ")
-    // level: " << data.dist << "\n";
+    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree <<
+    // ") level: " << data.dist << "\n";
     std::cerr << data.id + 1 << "\n";
   }
   std::cerr << "\n";
@@ -289,7 +289,8 @@ static void printAccess(std::string msg) {
 
     std::cerr << "\n";
     // std::cerr << data.id << " (" << degree(*src) << ") level: " << data.dist
-    // << " reads: " << data.read << " writes: " << data.write << "\n"; std::cerr
+    // << " reads: " << data.read << " writes: " << data.write << "\n";
+    // std::cerr
     // << data.id << " (" << degree(*src) << ") level: " << data.dist << "\n";
 
     temp.push_back(sdata.id);
@@ -435,7 +436,8 @@ static void printDegreeDistribution() {
 
   for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
     distr[degree(*n)]++;
-    // std::cerr << graph.getData(*n, galois::MethodFlag::UNPROTECTED).id << "	"
+    // std::cerr << graph.getData(*n, galois::MethodFlag::UNPROTECTED).id << "
+    // "
     // << graph.getData(*n, galois::MethodFlag::UNPROTECTED).dist << "\n";
   }
 

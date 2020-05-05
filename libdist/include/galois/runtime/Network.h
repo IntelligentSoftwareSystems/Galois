@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -142,7 +142,8 @@ public:
   //! tag (tag) and some data (buf)
   //! on the receiver, buf will be returned on a receiveTagged(tag)
   //! buf is invalidated by this operation
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf, int type = 0) = 0;
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf,
+                          int type = 0) = 0;
 
   //! Send a message to all hosts.  A message is simply a
   //! landing pad (recv) and some data (buf)
@@ -166,7 +167,8 @@ public:
 
   //! Receive a tagged message
   virtual optional_t<std::pair<uint32_t, RecvBuffer>>
-  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg, int type = 0) = 0;
+  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg,
+                int type = 0) = 0;
 
   //! move send buffers out to network
   virtual void flush() = 0;
@@ -208,9 +210,9 @@ extern uint32_t evilPhase;
 NetworkInterface& getSystemNetworkInterface();
 
 namespace internal {
-  //! Deletes the system network interface (if it exists).
-  void destroySystemNetworkInterface();
-}
+//! Deletes the system network interface (if it exists).
+void destroySystemNetworkInterface();
+} // namespace internal
 
 //! Gets this host's ID
 //! @returns ID of this host

@@ -20,10 +20,11 @@
 #ifndef GALOIS_TRAITS_H
 #define GALOIS_TRAITS_H
 
-#include "galois/worklists/WorkList.h"
-
-#include <type_traits>
 #include <tuple>
+#include <type_traits>
+
+#include "galois/config.h"
+#include "galois/worklists/WorkList.h"
 
 namespace galois {
 
@@ -133,9 +134,9 @@ constexpr auto get_default_trait_value(
 
 template <typename S, typename T, typename D>
 constexpr auto get_default_trait_value(
-    S source, T tag, D def,
+    S GALOIS_UNUSED(source), T GALOIS_UNUSED(tags), D defaults,
     typename std::enable_if<!has_trait<T, S>()>::type* = nullptr) {
-  return std::make_tuple(def);
+  return std::make_tuple(defaults);
 }
 
 /**
@@ -143,14 +144,17 @@ constexpr auto get_default_trait_value(
  * from tags[i] missing in source.
  */
 template <typename S, typename T, typename D>
-constexpr auto get_default_trait_values(std::index_sequence<> seq, S /*source*/,
-                                        T /*tags*/, D /*defaults*/) {
+constexpr auto
+get_default_trait_values(std::index_sequence<> GALOIS_UNUSED(seq),
+                         S GALOIS_UNUSED(source), T GALOIS_UNUSED(tags),
+                         D GALOIS_UNUSED(defaults)) {
   return std::make_tuple();
 }
 
 template <size_t... Ints, typename S, typename T, typename D>
-constexpr auto get_default_trait_values(std::index_sequence<Ints...> seq,
-                                        S source, T tags, D defaults) {
+constexpr auto
+get_default_trait_values(std::index_sequence<Ints...> GALOIS_UNUSED(seq),
+                         S source, T tags, D defaults) {
   return std::tuple_cat(get_default_trait_value(source, std::get<Ints>(tags),
                                                 std::get<Ints>(defaults))...);
 }
@@ -387,7 +391,7 @@ getLoopName(const Tup& t) {
 
 template <typename Tup>
 std::enable_if_t<!has_trait<loopname_tag, Tup>(), const char*>
-getLoopName(const Tup& t) {
+getLoopName(const Tup&) {
   return "ANON_LOOP";
 }
 } // namespace internal

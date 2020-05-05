@@ -101,18 +101,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
-    # GCC-{6,7} is a too imprecise
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-but-set-variable>")
-  elseif(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
     # Avoid warnings from openmpi
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
   endif()
-
-  # Removing unused parameters conflicts with readability rules
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -126,8 +120,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
   endif()
-
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics;-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
@@ -205,52 +197,6 @@ if(ENABLE_HETERO_GALOIS)
   endif()
 endif()
 
-if(USE_EXP)
-  set(USE_VTUNE ON)
-  set(USE_PAPI ON)
-  include_directories("libgalois/experimental/include")
-  include_directories("lonestar/include/pangolin")
-  if(ENABLE_DIST_GALOIS)
-    include_directories("libgluon/experimental/include")
-  endif()
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>")
-    add_compile_options("$<$<COMPILE_LANGUAGE:C>:${OpenMP_CXX_FLAGS}>")
-  endif()
-
-  find_package(TBB)
-  if(TBB_FOUND)
-    include_directories(${TBB_INCLUDE_DIRS})
-  endif()
-
-  find_package(CBLAS)
-  if(CBLAS_FOUND)
-    include_directories(${BLAS_INCLUDE_DIRS})
-  endif()
-
-  if(USE_PROF)
-    add_definitions(-DGALOIS_USE_PROF)
-  endif()
-
-  if(USE_EMBEDDED_REVISION)
-    include(GetGitVersion)
-    set(GALOIS_USE_EMBEDDED_REVISION on)
-  endif()
-
-  if(USE_HTM)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
-      set(GALOIS_USE_HTM on)
-      set(GALOIS_USE_SEQ_ONLY on)
-    else()
-      message(FATAL_ERROR "Hardware transactional memory not supported")
-    endif()
-  endif()
-
-endif()
-
 if(USE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
   find_package(VTune REQUIRED)
@@ -314,6 +260,8 @@ if(NOT ${LLVM_ENABLE_RTTI})
 endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
+include(HandleSanitizer)
+
 include(CheckEndian)
 
 ###### Test Inputs ######
@@ -365,19 +313,10 @@ endif()
 
 # Applications (apps)
 add_subdirectory(lonestar)
-if (ENABLE_DIST_GALOIS)
-  add_subdirectory(lonestardist)
-endif()
 
 add_subdirectory(scripts)
 add_subdirectory(inputs)
 add_subdirectory(tools)
-
-if(USE_DIST_EXP)
-  add_subdirectory(lonestardist/experimental)
-  add_subdirectory(lonestardist/experimental/resilience)
-  add_subdirectory(lonestardist/experimental/on_demand)
-endif()
 
 if(USE_EXP)
   add_subdirectory(lonestar/experimental)

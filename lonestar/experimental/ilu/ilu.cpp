@@ -36,14 +36,15 @@
 #include "Lonestar/BoilerPlate.h"
 
 static char const* name = "ILU(0) Preconditioner";
-static char const* desc =
-    "Incomplete LU factorization";
-static char const* url = "ilu";
+static char const* desc = "Incomplete LU factorization";
+static char const* url  = "ilu";
 
 static llvm::cl::opt<unsigned long long> n{
     "n", llvm::cl::desc("number of rows of the generated square matrix.")};
 
-using graph_t = typename galois::graphs::LC_CSR_Graph<std::atomic<std::size_t>, double>::with_no_lockable<true>::type;
+using graph_t =
+    typename galois::graphs::LC_CSR_Graph<std::atomic<std::size_t>,
+                                          double>::with_no_lockable<true>::type;
 
 // Autogenerate a very simple sparse matrix.
 auto generate_matrix(graph_t& built_graph, std::size_t n) noexcept {
@@ -112,8 +113,9 @@ void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
   std::size_t num_edges = n;
   num_edges += 2 * (n - 1 - (n - 1) / inner_offset);
   std::size_t num_whole_diagonal_blocks = n / outer_offset;
-  std::size_t last_block_partial = n % outer_offset;
-  num_edges += 2 * (num_whole_diagonal_blocks * (inner_offset - 1) * inner_offset);
+  std::size_t last_block_partial        = n % outer_offset;
+  num_edges +=
+      2 * (num_whole_diagonal_blocks * (inner_offset - 1) * inner_offset);
   if (last_block_partial > inner_offset) {
     num_edges += 2 * (last_block_partial - inner_offset);
   }
@@ -137,7 +139,8 @@ void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
     if (i + 1 < n && (i + 1) % inner_offset) {
       temp_graph.incrementDegree(i);
     }
-    if (i < n - inner_offset && ((i + inner_offset) / inner_offset) % inner_offset) {
+    if (i < n - inner_offset &&
+        ((i + inner_offset) / inner_offset) % inner_offset) {
       temp_graph.incrementDegree(i);
     }
     if (i < n - outer_offset) {
@@ -159,7 +162,8 @@ void generate_matrix_3d(graph_t& built_graph, std::size_t n) noexcept {
     if (i + 1 < n && (i + 1) % inner_offset) {
       edge_data.set(temp_graph.addNeighbor(i, i + 1), 1.);
     }
-    if (i < n - inner_offset && ((i + inner_offset) / inner_offset) % inner_offset) {
+    if (i < n - inner_offset &&
+        ((i + inner_offset) / inner_offset) % inner_offset) {
       edge_data.set(temp_graph.addNeighbor(i, i + inner_offset), 1.);
     }
     if (i < n - outer_offset) {
@@ -178,88 +182,101 @@ int main(int argc, char** argv) noexcept {
   galois::SharedMemSys galois_system;
   LonestarStart(argc, argv, name, desc, url);
 
-  typename galois::graphs::LC_CSR_Graph<std::atomic<std::size_t>, double>::with_no_lockable<true>::type graph;
+  typename galois::graphs::LC_CSR_Graph<
+      std::atomic<std::size_t>, double>::with_no_lockable<true>::type graph;
 
   generate_matrix(graph, n);
 
   // Sort edges and zero counters.
-  // In the symmetric case it is sufficient to make j depend on k if A[k,j] != 0.
+  // In the symmetric case it is sufficient to make j depend on k if A[k,j] !=
+  // 0.
   galois::do_all(
-    galois::iterate(graph.begin(), graph.end()),
-    [&](auto node) noexcept {
-      graph.sortEdgesByDst(node, galois::MethodFlag::UNPROTECTED);
-      graph.getData(node, galois::MethodFlag::UNPROTECTED).store(0, std::memory_order_relaxed);
-    },
-    galois::loopname("sort_edges_and_zero_counters"));
+      galois::iterate(graph.begin(), graph.end()),
+      [&](auto node) noexcept {
+        graph.sortEdgesByDst(node, galois::MethodFlag::UNPROTECTED);
+        graph.getData(node, galois::MethodFlag::UNPROTECTED)
+            .store(0, std::memory_order_relaxed);
+      },
+      galois::loopname("sort_edges_and_zero_counters"));
 
   // Initialize the atomic counters.
   galois::do_all(
-    galois::iterate(graph.begin(), graph.end()),
-    [&](auto node) {
-      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        auto neighbor = graph.getEdgeDst(edge);
-        // TODO: binary search for starting point here.
-        // Doing this directly is probably faster for nodes with
-        // extremely small degree though.
-        if (neighbor <= node) continue;
-        graph.getData(neighbor, galois::MethodFlag::UNPROTECTED).fetch_add(1, std::memory_order_relaxed);
-      }
-    },
-    galois::loopname("initialize_counters"));
+      galois::iterate(graph.begin(), graph.end()),
+      [&](auto node) {
+        for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+          auto neighbor = graph.getEdgeDst(edge);
+          // TODO: binary search for starting point here.
+          // Doing this directly is probably faster for nodes with
+          // extremely small degree though.
+          if (neighbor <= node)
+            continue;
+          graph.getData(neighbor, galois::MethodFlag::UNPROTECTED)
+              .fetch_add(1, std::memory_order_relaxed);
+        }
+      },
+      galois::loopname("initialize_counters"));
 
   // Now find the ones that start as ready.
-  // This could potentially be done as a part of the iterator for the starting set instead.
+  // This could potentially be done as a part of the iterator for the starting
+  // set instead.
   galois::InsertBag<graph_t::GraphNode> starting_nodes;
 
   galois::do_all(
-    galois::iterate(graph.begin(), graph.end()),
-    [&](auto node) {
-      if (!graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed)) {
-        starting_nodes.emplace(node);
-      }
-    },
-    galois::loopname("find_starts"));
+      galois::iterate(graph.begin(), graph.end()),
+      [&](auto node) {
+        if (!graph.getData(node, galois::MethodFlag::UNPROTECTED)
+                 .load(std::memory_order_relaxed)) {
+          starting_nodes.emplace(node);
+        }
+      },
+      galois::loopname("find_starts"));
 
   // Now actually compute the ilu factorization.
   galois::for_each(
-    galois::iterate(starting_nodes.begin(), starting_nodes.end()),
-    [&](auto node, auto &context) noexcept {
-      // Can use memory order relaxed all through here because the work list
-      // does the atomic acquire/release when a work item (or chunk of work items)
-      // is stolen from the thread that created it.
-      assert(graph.getData(node, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed));
-      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        auto neighbor = graph.getEdgeDst(edge);
-        // Initialize to NaN in case it's ever used before being initialized.
-        double diag_val = std::numeric_limits<double>::quiet_NaN();
-        if (neighbor < node) {
-          for (auto neighbor_edge : graph.edges(neighbor, galois::MethodFlag::UNPROTECTED)) {
-            auto neighbor_of_neighbor = graph.getEdgeDst(neighbor_edge);
-            // TODO: binary search to find starting position here?
-            // Again, direct iteration will probably be faster for
-            // really low degree nodes.
-            if (neighbor_of_neighbor <= neighbor) {
-              continue;
-            }
-            // TODO: Again, do binary search for this?
-            for (auto potential_back_edge : graph.edges(neighbor_of_neighbor, galois::MethodFlag::UNPROTECTED)) {
-              auto third_neighbor = graph.getEdgeDst(potential_back_edge);
-              if (third_neighbor == node) {
-                graph.getEdgeData(potential_back_edge) -= graph.getEdgeData(neighbor_edge) * graph.getEdgeData(edge);
+      galois::iterate(starting_nodes.begin(), starting_nodes.end()),
+      [&](auto node, auto& context) noexcept {
+        // Can use memory order relaxed all through here because the work list
+        // does the atomic acquire/release when a work item (or chunk of work
+        // items) is stolen from the thread that created it.
+        assert(graph.getData(node, galois::MethodFlag::UNPROTECTED)
+                   .load(std::memory_order_relaxed));
+        for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+          auto neighbor = graph.getEdgeDst(edge);
+          // Initialize to NaN in case it's ever used before being initialized.
+          double diag_val = std::numeric_limits<double>::quiet_NaN();
+          if (neighbor < node) {
+            for (auto neighbor_edge :
+                 graph.edges(neighbor, galois::MethodFlag::UNPROTECTED)) {
+              auto neighbor_of_neighbor = graph.getEdgeDst(neighbor_edge);
+              // TODO: binary search to find starting position here?
+              // Again, direct iteration will probably be faster for
+              // really low degree nodes.
+              if (neighbor_of_neighbor <= neighbor) {
+                continue;
+              }
+              // TODO: Again, do binary search for this?
+              for (auto potential_back_edge : graph.edges(
+                       neighbor_of_neighbor, galois::MethodFlag::UNPROTECTED)) {
+                auto third_neighbor = graph.getEdgeDst(potential_back_edge);
+                if (third_neighbor == node) {
+                  graph.getEdgeData(potential_back_edge) -=
+                      graph.getEdgeData(neighbor_edge) *
+                      graph.getEdgeData(edge);
+                }
               }
             }
-          }
-        } else if (neighbor == node) {
-          diag_val = graph.getEdgeData(edge);
-        } else {
-          graph.getEdgeData(edge) /= diag_val;
-          if (!(graph.getData(neighbor, galois::MethodFlag::UNPROTECTED).fetch_sub(1, std::memory_order_relaxed) - 1)) {
-            context.push(neighbor);
+          } else if (neighbor == node) {
+            diag_val = graph.getEdgeData(edge);
+          } else {
+            graph.getEdgeData(edge) /= diag_val;
+            if (!(graph.getData(neighbor, galois::MethodFlag::UNPROTECTED)
+                      .fetch_sub(1, std::memory_order_relaxed) -
+                  1)) {
+              context.push(neighbor);
+            }
           }
         }
-      }
-    },
-    galois::loopname("ilu"),
-    galois::no_conflicts(),
-    galois::wl<galois::worklists::PerSocketChunkFIFO<64>>());
+      },
+      galois::loopname("ilu"), galois::no_conflicts(),
+      galois::wl<galois::worklists::PerSocketChunkFIFO<64>>());
 }

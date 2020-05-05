@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   Heaps heaps;
   Collection c;
 
-  galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned int, unsigned int) {
     HeapPtr& hp = *heaps.getLocal();
     hp          = HeapPtr(new Heap(sizeof(Collection::block_type)));
     for (unsigned i = 0; i < size; ++i)
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   }
   GALOIS_ASSERT(counter.size() == size);
 
-  galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned int, unsigned int) {
     while (c.pop_front(Collection::promise_to_dealloc()))
       ;
   });

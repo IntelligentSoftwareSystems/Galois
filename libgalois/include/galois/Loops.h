@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,6 +20,7 @@
 #ifndef GALOIS_LOOPS_H
 #define GALOIS_LOOPS_H
 
+#include "galois/config.h"
 #include "galois/runtime/Executor_Deterministic.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_ForEach.h"
@@ -48,7 +49,7 @@ namespace galois {
  */
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, FunctionTy &&fn,
+void for_each(const RangeFunc& rangeMaker, FunctionTy&& fn,
               const Args&... args) {
   auto tpl = std::make_tuple(args...);
   runtime::for_each_gen(rangeMaker(tpl), std::forward<FunctionTy>(fn), tpl);
@@ -67,8 +68,7 @@ void for_each(const RangeFunc& rangeMaker, FunctionTy &&fn,
  * @param args optional arguments to loop
  */
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn,
-            const Args&... args) {
+void do_all(const RangeFunc& rangeMaker, FunctionTy&& fn, const Args&... args) {
   auto tpl = std::make_tuple(args...);
   runtime::do_all_gen(rangeMaker(tpl), std::forward<FunctionTy>(fn), tpl);
 }

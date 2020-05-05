@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -21,12 +21,12 @@
 #define GALOIS_WORKLIST_PERTHREADCHUNK_H
 
 #include "galois/FixedSizeRing.h"
-#include "galois/Threads.h"
+#include "galois/runtime/Mem.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/substrate/PtrLock.h"
-#include "galois/runtime/Mem.h"
-#include "WLCompileCheck.h"
+#include "galois/Threads.h"
+#include "galois/worklists/WLCompileCheck.h"
 
 namespace galois {
 namespace worklists {
@@ -346,7 +346,7 @@ private:
       return c->extract_back();
   }
 
-  void push_internal(std::pair<Chunk*, Chunk*>& tld, Chunk*& n, const T& val) {
+  void push_internal(std::pair<Chunk*, Chunk*>&, Chunk*& n, const T& val) {
     // Simple case, space in current chunk
     if (n && doPush(n, val))
       return;

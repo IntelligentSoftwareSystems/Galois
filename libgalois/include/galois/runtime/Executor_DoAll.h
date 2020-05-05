@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,18 +20,18 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
 #define GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
 
+#include "galois/config.h"
 #include "galois/gIO.h"
-#include "galois/Timer.h"
-
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Barrier.h"
+#include "galois/substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
-#include "galois/substrate/PaddedLock.h"
-#include "galois/substrate/CompilerSpecific.h"
+#include "galois/Timer.h"
 
 namespace galois {
 namespace runtime {
@@ -532,15 +532,17 @@ template <bool _STEAL>
 struct ChooseDoAllImpl {
 
   template <typename R, typename F, typename ArgsT>
-  static void call(const R& range, F &&func, const ArgsT& argsTuple) {
+  static void call(const R& range, F&& func, const ArgsT& argsTuple) {
 
-    internal::DoAllStealingExec<R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT> exec(range, std::forward<F>(func), argsTuple);
+    internal::DoAllStealingExec<
+        R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT>
+        exec(range, std::forward<F>(func), argsTuple);
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
-    substrate::getThreadPool().run(activeThreads,
-                                   [&exec](void) { exec.initThread(); },
-                                   std::ref(barrier), std::ref(exec));
+    substrate::getThreadPool().run(
+        activeThreads, [&exec](void) { exec.initThread(); }, std::ref(barrier),
+        std::ref(exec));
   }
 };
 
@@ -551,7 +553,7 @@ struct ChooseDoAllImpl<false> {
   static void call(const R& range, F func, const ArgsT& argsTuple) {
 
     runtime::on_each_gen(
-        [&](const unsigned tid, const unsigned numT) {
+        [&](const unsigned int, const unsigned int) {
           static constexpr bool NEED_STATS =
               galois::internal::NeedStats<ArgsT>::value;
           static constexpr bool MORE_STATS =

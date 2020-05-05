@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,11 +20,12 @@
 #ifndef GALOIS_WORKLIST_CHUNK_H
 #define GALOIS_WORKLIST_CHUNK_H
 
+#include "galois/config.h"
 #include "galois/FixedSizeRing.h"
-#include "galois/substrate/PaddedLock.h"
 #include "galois/runtime/Mem.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/worklists/WLCompileCheck.h"
 #include "galois/worklists/WorkListHelpers.h"
-#include "WLCompileCheck.h"
 
 namespace galois {
 namespace runtime {
@@ -47,7 +48,7 @@ struct squeue {
 template <template <typename> class PS, typename TQ>
 struct squeue<false, PS, TQ> {
   TQ queue;
-  TQ& get(int i) { return queue; }
+  TQ& get(int) { return queue; }
   TQ& get() { return queue; }
   int myEffectiveID() { return 0; }
   int size() { return 0; }
@@ -144,7 +145,7 @@ private:
 public:
   typedef T value_type;
 
-  ChunkMaster() = default;
+  ChunkMaster()                   = default;
   ChunkMaster(const ChunkMaster&) = delete;
   ChunkMaster& operator=(const ChunkMaster&) = delete;
 

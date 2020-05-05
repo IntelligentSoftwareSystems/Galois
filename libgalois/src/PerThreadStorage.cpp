@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -21,6 +21,7 @@
 #include "galois/substrate/PageAlloc.h"
 
 #include "galois/gIO.h"
+#include <atomic>
 #include <mutex>
 
 thread_local char* galois::substrate::ptsBase;
@@ -47,6 +48,15 @@ inline void* alloc() {
   return toReturn;
 }
 
+constexpr unsigned MAX_SIZE = 30;
+// PerBackend storage is typically cache-aligned. Simplify bookkeeping at the
+// expense of fragmentation by restricting all allocations to be cache-aligned.
+constexpr unsigned MIN_SIZE = 7;
+
+static_assert((1 << MIN_SIZE) == GALOIS_CACHE_LINE_SIZE);
+
+galois::substrate::PerBackend::PerBackend() { freeOffsets.resize(MAX_SIZE); }
+
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
   while ((1U << i) < size) {
@@ -59,67 +69,84 @@ unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
 }
 
 unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
-  unsigned retval = ptAllocSize;
-  unsigned ll     = nextLog2(sz);
-  unsigned size   = (1 << ll);
+  unsigned ll   = nextLog2(sz);
+  unsigned size = (1 << ll);
 
-  if ((nextLoc + size) <= ptAllocSize) {
+  if (nextLoc.load(std::memory_order_relaxed) + size <= ptAllocSize) {
     // simple path, where we allocate bump ptr style
-    retval = __sync_fetch_and_add(&nextLoc, size);
-  } else if (!invalid) {
-    // find a free offset
-    std::lock_guard<Lock> llock(freeOffsetsLock);
-
-    unsigned index = ll;
-    if (!freeOffsets[index].empty()) {
-      retval = freeOffsets[index].back();
-      freeOffsets[index].pop_back();
-    } else {
-      // find a bigger size
-      for (; (index < MAX_SIZE) && (freeOffsets[index].empty()); ++index)
-        ;
-
-      if (index == MAX_SIZE) {
-        GALOIS_DIE("PTS out of memory error");
-      } else {
-        // Found a bigger free offset. Use the first piece equal to required
-        // size and produce vending machine change for the rest.
-        assert(!freeOffsets[index].empty());
-        retval = freeOffsets[index].back();
-        freeOffsets[index].pop_back();
-
-        // remaining chunk
-        unsigned end   = retval + (1 << index);
-        unsigned start = retval + size;
-        for (unsigned i = index - 1; start < end; --i) {
-          freeOffsets[i].push_back(start);
-          start += (1 << i);
-        }
-      }
+    unsigned offset = nextLoc.fetch_add(size);
+    if (offset + size <= ptAllocSize) {
+      return offset;
     }
   }
 
-  assert(retval != ptAllocSize);
+  if (invalid) {
+    GALOIS_DIE("allocating after delete");
+    return ptAllocSize;
+  }
 
-  return retval;
+  // find a free offset
+  std::lock_guard<Lock> llock(freeOffsetsLock);
+
+  unsigned index = ll;
+  if (!freeOffsets[index].empty()) {
+    unsigned offset = freeOffsets[index].back();
+    freeOffsets[index].pop_back();
+    return offset;
+  }
+
+  // find a bigger size
+  for (; (index < MAX_SIZE) && (freeOffsets[index].empty()); ++index)
+    ;
+
+  if (index == MAX_SIZE) {
+    GALOIS_DIE("PTS out of memory");
+    return ptAllocSize;
+  }
+
+  // Found a bigger free offset. Use the first piece equal to required
+  // size and produce vending machine change for the rest.
+  assert(!freeOffsets[index].empty());
+  unsigned offset = freeOffsets[index].back();
+  freeOffsets[index].pop_back();
+
+  // remaining chunk
+  unsigned end   = offset + (1 << index);
+  unsigned start = offset + size;
+  for (unsigned i = index - 1; start < end; --i) {
+    freeOffsets[i].push_back(start);
+    start += (1 << i);
+  }
+
+  assert(offset != ptAllocSize);
+
+  return offset;
 }
 
 void galois::substrate::PerBackend::deallocOffset(const unsigned offset,
                                                   const unsigned sz) {
-  unsigned ll   = nextLog2(sz);
-  unsigned size = (1 << ll);
-  if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
-    ; // allocation was at the end, so recovered some memory
-  } else if (!invalid) {
-    // allocation not at the end
-    std::lock_guard<Lock> llock(freeOffsetsLock);
-    freeOffsets[ll].push_back(offset);
+  unsigned ll       = nextLog2(sz);
+  unsigned size     = (1 << ll);
+  unsigned expected = offset + size;
+
+  if (nextLoc.compare_exchange_strong(expected, offset)) {
+    // allocation was at the end, so recovered some memory
+    return;
   }
+
+  if (invalid) {
+    GALOIS_DIE("deallocing after delete");
+    return;
+  }
+
+  // allocation not at the end
+  std::lock_guard<Lock> llock(freeOffsetsLock);
+  freeOffsets[ll].push_back(offset);
 }
 
 void* galois::substrate::PerBackend::getRemote(unsigned thread,
                                                unsigned offset) {
-  char* rbase = heads[thread];
+  char* rbase = heads[thread].load(std::memory_order_relaxed);
   assert(rbase);
   return &rbase[offset];
 }
@@ -127,8 +154,7 @@ void* galois::substrate::PerBackend::getRemote(unsigned thread,
 void galois::substrate::PerBackend::initCommon(unsigned maxT) {
   if (!heads) {
     assert(ThreadPool::getTID() == 0);
-    heads = new char*[maxT];
-    memset(heads, 0, sizeof(*heads) * maxT);
+    heads = new std::atomic<char*>[maxT] {};
   }
 }
 
@@ -147,14 +173,14 @@ char* galois::substrate::PerBackend::initPerSocket(unsigned maxT) {
     char* b = heads[id] = (char*)alloc();
     memset(b, 0, ptAllocSize);
     return b;
-  } else {
-    // wait for leader to fix up socket
-    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) {
-      substrate::asmPause();
-    }
-    heads[id] = heads[leader];
-    return heads[id];
   }
+  char* expected = nullptr;
+  // wait for leader to fix up socket
+  while (heads[leader].compare_exchange_weak(expected, nullptr)) {
+    substrate::asmPause();
+  }
+  heads[id] = heads[leader].load();
+  return heads[id];
 }
 
 void galois::substrate::initPTS(unsigned maxT) {
