@@ -266,35 +266,35 @@ struct THREAD_LOCAL_STORAGE {
   void reset_heap() { memset(pop_heap2, 0, yGrid * xGrid * sizeof(bool)); }
 
   ~THREAD_LOCAL_STORAGE() {
-      free(pop_heap2);
+    free(pop_heap2);
 
-      free(d1_p);
-      free(d1_alloc);
+    free(d1_p);
+    free(d1_alloc);
 
-      free(HV_p);
-      free(hyperV_p);
-      free(hyperH_p);
-      free(HV_alloc);
-      free(hyperV_alloc);
-      free(hyperH_alloc);
+    free(HV_p);
+    free(hyperV_p);
+    free(hyperH_p);
+    free(HV_alloc);
+    free(hyperV_alloc);
+    free(hyperH_alloc);
 
-      free(parentX1_p);
-      free(parentY1_p);
-      free(parentX3_p);
-      free(parentY3_p);
+    free(parentX1_p);
+    free(parentY1_p);
+    free(parentX3_p);
+    free(parentY3_p);
 
-      free(parentX1_alloc);
-      free(parentY1_alloc);
-      free(parentX3_alloc);
-      free(parentY3_alloc);
+    free(parentX1_alloc);
+    free(parentY1_alloc);
+    free(parentX3_alloc);
+    free(parentY3_alloc);
 
-      free(corrEdge_alloc);
-      free(corrEdge_p);
+    free(corrEdge_alloc);
+    free(corrEdge_p);
 
-      free(inRegion_alloc);
-      free(inRegion_p);
+    free(inRegion_alloc);
+    free(inRegion_p);
 
-      free(netEO_p);
+    free(netEO_p);
   }
 };
 
@@ -1290,8 +1290,7 @@ void reInitTree(int netID) {
 
 void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
                    int mazeedge_Threshold, Bool Ordering, int cost_type,
-                   galois::InsertBag<int>* net_shuffle)
-{
+                   galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   float forange;
 
@@ -2179,8 +2178,7 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
 void mazeRouteMSMD_block(int iter, int expand, float costHeight,
                          int ripup_threshold, int mazeedge_Threshold,
                          Bool Ordering, int cost_type,
-                         galois::InsertBag<int>* net_shuffle)
-{
+                         galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   float forange;
 
@@ -3036,7 +3034,6 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
 }
 
 int getOverflow2Dmaze(int* maxOverflow, int* tUsage) {

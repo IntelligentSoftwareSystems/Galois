@@ -116,8 +116,7 @@ Bool newRipupCheck_lock(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
 void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
                         Bool Ordering, int cost_type,
-                        galois::InsertBag<int>* net_shuffle)
-{
+                        galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   float forange;
 
@@ -994,14 +993,12 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
 }
 
 void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
                         Bool Ordering, int cost_type,
-                        galois::InsertBag<int>* net_shuffle)
-{
+                        galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   float forange;
 

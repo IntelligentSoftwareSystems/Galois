@@ -11,8 +11,7 @@ int round_num = 0;
 void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                              int ripup_threshold, int mazeedge_Threshold,
                              Bool Ordering, int cost_type,
-                             galois::InsertBag<int>* net_shuffle)
-{
+                             galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 
