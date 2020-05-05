@@ -291,20 +291,10 @@ add_subdirectory(libpangolin)
 
 # Applications (apps)
 add_subdirectory(lonestar)
-if (ENABLE_DIST_GALOIS)
-  add_subdirectory(lonestardist)
-endif()
-add_subdirectory(lonestarmine)
 
 add_subdirectory(scripts)
 add_subdirectory(inputs)
 add_subdirectory(tools)
-
-if(USE_DIST_EXP)
-  add_subdirectory(lonestardist/experimental)
-  add_subdirectory(lonestardist/experimental/resilience)
-  add_subdirectory(lonestardist/experimental/on_demand)
-endif()
 
 if(USE_EXP)
   add_subdirectory(lonestar/experimental)
