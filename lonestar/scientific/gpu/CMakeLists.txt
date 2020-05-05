@@ -18,4 +18,5 @@ function(app_gpu name)
 endfunction()
 
 add_subdirectory(bh)
+add_subdirectory(dmr)
 
