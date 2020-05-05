@@ -61,9 +61,15 @@ void sgemm_cpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
   Tmatmul.stop();
 }
 
-void csrmm_cpu(const int M, const int N, const int K, const int, 
+#ifdef USE_MKL
+void csrmm_cpu(const int M, const int N, const int K, const int,
                const float alpha, float* A_nonzeros, int* A_idx_ptr, int* A_nnz_idx,
                const float* B, const float beta, float* C) {
+#else
+void csrmm_cpu(const int, const int, const int, const int,
+               const float, float*, int*, int*,
+               const float*, const float, float*) {
+#endif
 #ifdef USE_MKL
   //mkl_set_num_threads(56);
   //const char *matdescra = "GXXCX";//6 bytes
@@ -99,14 +105,14 @@ void csrmm_cpu(const int M, const int N, const int K, const int,
 }
 
 // matrix-vector multiply
-void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float alpha, 
+void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N, const float alpha,
            const float* A, const float* x, const float beta, float* y) {
   cblas_sgemv(CblasRowMajor, TransA, M, N, alpha, A, N, x, 1, beta, y, 1);
 }
 
 inline void rng_uniform_cpu(size_t n, float_t* r) {
 #ifdef USE_MKL
-  VSLStreamStatePtr stream;	 
+  VSLStreamStatePtr stream;
   // Initializing the streams
   vslNewStream(&stream, VSL_BRNG_SOBOL, 1);
   // Generating
@@ -238,7 +244,7 @@ void clear_cpu(size_t n, float_t* in) {
   // memset(in, 0, n*sizeof(float_t));
 }
 
-void dropout(size_t m, float scale, float dropout_rate, 
+void dropout(size_t m, float scale, float dropout_rate,
              const float_t* in, mask_t* masks, float_t* out) {
   for (size_t i = 0; i < m; ++i)
     masks[i] = bernoulli(dropout_rate);
@@ -310,7 +316,7 @@ void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out) 
   }, galois::chunk_size<64>(), galois::loopname("leaky_relu"));
 }
 
-void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, 
+void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in,
                       const float_t* data, float_t* out) {
   // TODO: vectorize
   galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
