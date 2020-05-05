@@ -32,7 +32,7 @@ public:
   label_t get_label(size_t i) { return h_labels[i]; } // single-class (one-hot) label
   //label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
   float_t* get_norm_factors_ptr() { return norm_factors; }
-  float_t* get_norm_factors_subg_ptr() { return norm_factors_subg; }
+  float_t* get_norm_factors_subg_ptr() { return &norm_factors_subg[0]; }
 
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
   void set_use_subgraph(bool use_subg) { use_subgraph = use_subg; }
@@ -50,9 +50,9 @@ public:
   Graph* getGraphPointer() { return graph_cpu; }
   Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
   float_t* get_feats_ptr() { return h_feats; }
-  float_t* get_feats_subg_ptr() { return h_feats_subg; }
+  float_t* get_feats_subg_ptr() { return &h_feats_subg[0]; }
   label_t* get_labels_ptr() { return h_labels; }
-  label_t* get_labels_subg_ptr() { return h_labels_subg; }
+  label_t* get_labels_subg_ptr() { return &h_labels_subg[0]; }
 #else
   CSRGraph graph_gpu; // the input graph, |V| = N
   std::vector<CSRGraph*> subgraphs_gpu;
@@ -76,15 +76,18 @@ protected:
   bool is_selfloop_added;      // whether selfloop is added to the input graph
   bool use_subgraph;           // whether to use subgraph
   label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
-  label_t *h_labels_subg;      // labels for subgraph
   float_t* h_feats;            // input features: N x D
-  float_t* h_feats_subg;       // input features for subgraph
+  //label_t *h_labels_subg;      // labels for subgraph
+  //float_t* h_feats_subg;       // input features for subgraph
   label_t* d_labels;           // labels on device
   label_t *d_labels_subg;      // labels for subgraph on device
   float_t* d_feats;            // input features on device
   float_t* d_feats_subg;       // input features for subgraph on device
   float_t* norm_factors;       // normalization constant based on graph structure
-  float_t* norm_factors_subg;  // normalization constant for subgraph
+  std::vector<label_t> h_labels_subg;      // labels for subgraph
+  std::vector<float_t> h_feats_subg;       // input features for subgraph
+  std::vector<float_t> norm_factors_subg;  // normalization constant for subgraph
+  //float_t* norm_factors_subg;  // normalization constant for subgraph
   void alloc_norm_factor();
   void alloc_subgraph_norm_factor(int subg_id);
 

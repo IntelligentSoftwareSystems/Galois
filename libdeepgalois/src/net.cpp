@@ -170,7 +170,7 @@ void Net::train(optimizer* opt, bool need_validate) {
 
     if (subgraph_sample_size) {
       if (num_subg_remain == 0) {
-        galois::gPrint("Generating ", num_subgraphs, " subgraphs (mini-batches) ... ");
+        galois::gPrint("Generating ", num_subgraphs, " subgraphs ");
         Timer t_subgen;
         t_subgen.Start();
         // generate subgraphs

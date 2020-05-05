@@ -22,19 +22,20 @@ Context& Context::Get() {
 Context::Context() : n(0), num_classes(0), 
   feat_len(0), is_single_class(true), 
   is_selfloop_added(false), use_subgraph(false),
-  h_labels(NULL), h_labels_subg(NULL), 
-  h_feats(NULL), h_feats_subg(NULL),
+  h_labels(NULL), h_feats(NULL),
+  //h_labels_subg(NULL), h_feats_subg(NULL),
   d_labels(NULL), d_labels_subg(NULL),
   d_feats(NULL), d_feats_subg(NULL),
-  norm_factors(NULL), norm_factors_subg(NULL) {}
+  norm_factors(NULL) {}
+  //norm_factors_subg(NULL) {}
 
 Context::~Context() {
   if (h_labels) delete[] h_labels;
-  if (h_labels_subg) delete[] h_labels_subg;
+  //if (h_labels_subg) delete[] h_labels_subg;
   if (h_feats) delete[] h_feats;
-  if (h_feats_subg) delete[] h_feats_subg;
+  //if (h_feats_subg) delete[] h_feats_subg;
   if (norm_factors) delete[] norm_factors;
-  if (norm_factors_subg) delete[] norm_factors_subg;
+  //if (norm_factors_subg) delete[] norm_factors_subg;
 }
 
 size_t Context::read_graph(std::string dataset_str, bool selfloop) {
@@ -50,14 +51,15 @@ void Context::createSubgraphs(int num_subgraphs) {
 
 // generate labels for the subgraph, m is subgraph size
 void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
-  if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
+  //if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
+  h_labels_subg.resize(m);
   size_t count = 0;
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
       if (is_single_class) {
         h_labels_subg[count] = h_labels[i];
       } else {
-        std::copy(h_labels+i*num_classes, h_labels+(i+1)*num_classes, h_labels_subg+count*num_classes);
+        std::copy(h_labels+i*num_classes, h_labels+(i+1)*num_classes, &h_labels_subg[count*num_classes]);
 	  }
       count ++;
 	}
@@ -67,10 +69,11 @@ void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
 // generate input features for the subgraph, m is subgraph size
 void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
   size_t count = 0;
-  if (h_feats_subg == NULL) h_feats_subg = new float_t[m*feat_len];
+  //if (h_feats_subg == NULL) h_feats_subg = new float_t[m*feat_len];
+  h_feats_subg.resize(m*feat_len);
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
-      std::copy(h_feats+i*feat_len, h_feats+(i+1)*feat_len, h_feats_subg+count*feat_len);
+      std::copy(h_feats+i*feat_len, h_feats+(i+1)*feat_len, &h_feats_subg[count*feat_len]);
       count ++;
 	}
   }
@@ -154,11 +157,13 @@ void Context::alloc_norm_factor() {
 
 void Context::alloc_subgraph_norm_factor(int subg_id) {
   Graph* g = getSubgraphPointer(subg_id);
-  if (norm_factors_subg == NULL)
+  //if (norm_factors_subg == NULL)
 #ifdef USE_MKL
-    norm_factors_subg = new float_t[g->sizeEdges()];
+    //norm_factors_subg = new float_t[g->sizeEdges()];
+    norm_factors_subg.resize(g->sizeEdges());
 #else
-    norm_factors_subg = new float_t[g->size()];
+    norm_factors_subg.resize(g->size());
+    //norm_factors_subg = new float_t[g->size()];
 #endif
 }
 
@@ -172,7 +177,7 @@ void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
   } else {
     g = getSubgraphPointer(subg_id);
     alloc_subgraph_norm_factor(subg_id);
-    constants = norm_factors_subg;
+    constants = get_norm_factors_subg_ptr();
   }
   auto g_size = g->size();
   g->degree_counting();
