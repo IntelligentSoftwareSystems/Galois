@@ -1,6 +1,7 @@
 #pragma once
 #include "deepgalois/types.h"
 #include <string>
+#include <cassert>
 
 #ifdef __CUDACC__
 #define CUDA_HOSTDEV __host__ __device__
@@ -50,11 +51,12 @@ public:
   void copy_to_gpu();
   void dealloc();
   void degree_counting();
-  void constructNodes();
-  void fixEndEdge(index_t vid, index_t row_end);
-  void constructEdge(index_t eid, index_t dst, edata_t edata);
-  void add_selfloop();
+  void constructNodes() {}
+
   void readGraph(std::string dataset);
+  void fixEndEdge(index_t vid, index_t row_end) {
+    rowptr_[vid+1] = row_end;
+  }
   void allocateFrom(index_t nv, index_t ne) {
     //printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
     num_vertices_ = nv;
@@ -64,6 +66,46 @@ public:
     degrees_.resize(num_vertices_);
     rowptr_[0] = 0;
   }
+  void constructEdge(index_t eid, index_t dst, edata_t edata = 0) {
+    assert(dst < num_vertices_);
+    assert(eid < num_edges_);
+    colidx_[eid] = dst;
+    if (edge_data_) edge_data_[eid] = edata;
+  }
+  void add_selfloop() {
+    //print_neighbors(nnodes-1);
+    //print_neighbors(0);
+    auto old_colidx_ = colidx_;
+    colidx_.resize(num_vertices_ + num_edges_);
+    for (index_t i = 0; i < num_vertices_; i++) {
+      auto start = rowptr_[i];
+      auto end = rowptr_[i+1];
+      bool selfloop_inserted = false;
+      if (start == end) {
+        colidx_[start+i] = i;
+        continue;
+      }
+      for (auto e = start; e != end; e++) {
+        auto dst = old_colidx_[e];
+        if (!selfloop_inserted) {
+          if (i < dst) {
+            selfloop_inserted = true;
+            colidx_[e+i] = i;
+            colidx_[e+i+1] = dst;
+          } else if (e+1 == end) {
+            selfloop_inserted = true;
+            colidx_[e+i+1] = i;
+            colidx_[e+i] = dst;
+          } else colidx_[e+i] = dst;
+        } else colidx_[e+i+1] = dst;
+      }
+    }
+    for (index_t i = 0; i <= num_vertices_; i++) rowptr_[i] += i;
+    num_edges_ += num_vertices_;
+    //print_neighbors(nnodes-1);
+    //print_neighbors(0);
+  }
+
   bool isLocal(index_t vid);
   index_t getLID(index_t vid);
   bool is_vertex_cut();
@@ -71,6 +113,7 @@ public:
   uint64_t numMasters();
   uint64_t globalSize();
 
+  index_t* row_start_host_ptr() { return &rowptr_[0]; }
 #ifdef CPU_ONLY
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }

@@ -148,12 +148,12 @@ size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin, size_t
   return sample_count;
 }
 
-void Reader::progressPrint(unsigned maxii, unsigned ii) {
+void Reader::progressPrint(unsigned max, unsigned i) {
   const unsigned nsteps = 10;
-  unsigned ineachstep = (maxii / nsteps);
+  unsigned ineachstep = (max / nsteps);
   if(ineachstep == 0) ineachstep = 1;
-  if (ii % ineachstep == 0) {
-    int progress = ((size_t) ii * 100) / maxii + 1;
+  if (i % ineachstep == 0) {
+    int progress = ((size_t) i * 100) / max + 1;
     printf("\t%3d%%\r", progress);
     fflush(stdout);
   }
@@ -203,22 +203,20 @@ void Reader::readGraphFromGRFile(Graph *g) {
   }
   printf("num_vertices %lu, num_edges %lu.\n", nv, ne);
   g->allocateFrom(nv, ne);
-  auto rowptr = g->row_start_ptr();
-  auto colidx = g->edge_dst_ptr();
-  auto degrees = g->degrees_ptr();
-  for (unsigned ii = 0; ii < nv; ++ii) {
-    rowptr[ii+1] = le64toh(outIdx[ii]);
-    degrees[ii] = rowptr[ii+1] - rowptr[ii];
-    for (unsigned jj = 0; jj < degrees[ii]; ++jj) {
-      unsigned eid = rowptr[ii] + jj;
+  auto rowptr = g->row_start_host_ptr();
+  for (unsigned vid = 0; vid < nv; ++vid) {
+    g->fixEndEdge(vid, le64toh(outIdx[vid]));
+    auto degree = rowptr[vid+1] - rowptr[vid];
+    for (unsigned jj = 0; jj < degree; ++jj) {
+      unsigned eid = rowptr[vid] + jj;
       unsigned dst = le32toh(outs[eid]);
       if (dst >= nv) {
-        printf("\tinvalid edge from %d to %d at index %d(%d).\n", ii, dst, jj, eid);
+        printf("\tinvalid edge from %d to %d at index %d(%d).\n", vid, dst, jj, eid);
         exit(0);
       }
-      colidx[eid] = dst;
+      g->constructEdge(eid, dst);
     }
-    progressPrint(nv, ii);
+    progressPrint(nv, vid);
   }
   ifs.close();
 

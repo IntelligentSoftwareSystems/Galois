@@ -138,6 +138,10 @@ size_t Context::read_graph(bool selfloop) {
   g.copy_to_gpu(graph_gpu);
 #else
   graph_gpu.readGraph(dataset);
+  if (selfloop) {
+    graph_gpu.add_selfloop();
+    is_selfloop_added = selfloop;
+  }
   graph_gpu.copy_to_gpu();
 #endif
   n = graph_gpu.size();
