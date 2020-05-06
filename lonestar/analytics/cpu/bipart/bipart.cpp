@@ -75,14 +75,14 @@ static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> csize(cll::Positional,
                                 cll::desc("<size of coarsest graph>"),
-                                cll::Required);
+                                cll::init(25));
 
 static cll::opt<unsigned> refiter(cll::Positional,
                                   cll::desc("<number of iterations in ref>"),
-                                  cll::Required);
+                                  cll::init(2));
 static cll::opt<unsigned> numPartitions(cll::Positional,
                                         cll::desc("<number of partitions>"),
-                                        cll::Required);
+                                        cll::init(2));
 static cll::opt<double> imbalance(
     "balance",
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
