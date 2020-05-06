@@ -143,6 +143,25 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
 }
 
 namespace deepgalois {
+
+void Net::init() {
+  copy_masks_device(num_samples, train_masks, d_train_masks);
+  copy_masks_device(num_samples, val_masks, d_val_masks);
+  context->copy_data_to_device(); // copy labels and input features to the device
+}
+
+void Net::copy_test_masks_to_device() {
+  copy_masks_device(num_samples, test_masks, d_test_masks);
+}
+
+// add weight decay
+void Net::regularize() {
+  size_t layer_id = 0;
+  auto n = feature_dims[layer_id] * feature_dims[layer_id+1];
+  axpy_gpu(n, weight_decay, layers[layer_id]->get_weights_device_ptr(), 
+    layers[layer_id]->get_grads_device_ptr());
+}
+
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, 
                            mask_t* masks, float_t* preds, label_t* ground_truth) {
   return masked_accuracy_gpu(num_classes, begin, end, count, masks, preds, ground_truth);

@@ -16,7 +16,11 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
 #endif
   LonestarGnnStart(argc, argv, name, desc, url);
-  deepgalois::Net network; // the neural network to train
+  // the neural network to train
+  deepgalois::Net network(dataset, numThreads, num_conv_layers, epochs,
+                    hidden1, learning_rate, dropout_rate, weight_decay,
+                    add_selfloop, is_single_class, add_l2norm, add_dense, 
+                    neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
 #ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
@@ -25,10 +29,6 @@ int main(int argc, char** argv) {
 #endif
 
   // read network, features, ground truth, initialize metadata
-  network.init(dataset, numThreads, num_conv_layers, epochs, hidden1,
-               learning_rate, dropout_rate, weight_decay,
-               add_selfloop, is_single_class, add_l2norm, add_dense, 
-               neighbor_sample_sz, subgraph_sample_sz, val_interval);
   // default setting for now; can be customized by the user
   network.construct_layers();
   network.print_layers_info();

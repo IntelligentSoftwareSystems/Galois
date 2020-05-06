@@ -18,7 +18,10 @@
 //#include "graph_gpu.h"
 
 #include <fstream>
+#include "checker.h"
+#include "graph_gpu.h"
 
+/*
 // Adapted from LSG CSRGraph.h
 
 // TODO: make this template data
@@ -143,6 +146,7 @@ struct CSRGraph {
   bool device_graph;
 };
 >>>>>>> dist-dev
+//*/
 
 struct CSRGraphTex : CSRGraph {
   cudaTextureObject_t edge_dst_tx;

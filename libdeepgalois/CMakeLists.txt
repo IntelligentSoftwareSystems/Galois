@@ -70,9 +70,7 @@ else()
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-if(ENABLE_HETERO_GALOIS)
-set(sources src/net.cpp)
-else()
+if(NOT ENABLE_HETERO_GALOIS)
 if(ENABLE_DIST_GALOIS)
 # do not link regular context.cpp; TODO do this conditional in cleaner way
 # also don't link sampler
@@ -115,9 +113,7 @@ set(sources
   src/net.cpp
 )
 endif()
-endif()
 
-#set(BOOST_LIBRARIES "-lboost_system -lboost_thread")
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem)
 target_link_libraries(dg_cpu ${MPI_CXX_LIBRARIES})
@@ -150,3 +146,4 @@ set_target_properties(dg_cpu PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )
+endif()
