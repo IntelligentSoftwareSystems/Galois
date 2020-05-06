@@ -114,6 +114,12 @@ if(NOT ENABLE_HETERO_GALOIS)
       src/net.cpp
     )
   endif(ENABLE_DIST_GALOIS)
+else()
+  # dummy sources set for dg_cpu for HETERO build
+  # TODO fix this
+  set(sources
+    src/net.cpp
+  )
 endif(NOT ENABLE_HETERO_GALOIS)
 
 add_library(dg_cpu STATIC ${sources})
