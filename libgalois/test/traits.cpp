@@ -14,7 +14,7 @@ struct B : public A {
 struct Unrelated {};
 
 template <size_t... Ints, typename Tuple>
-void print(std::index_sequence<Ints...> seq, Tuple tup) {
+void print(std::index_sequence<Ints...>, Tuple tup) {
   (..., (std::cout << typeid(std::get<Ints>(tup)).name() << " ")) << "\n";
 }
 

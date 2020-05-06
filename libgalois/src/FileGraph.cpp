@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -318,8 +318,7 @@ void FileGraph::fromFile(const std::string& filename) {
 #ifdef MAP_POPULATE
   _MAP_BASE |= MAP_POPULATE;
 #endif
-  void* base = mmap_big(nullptr, buf.st_size, PROT_READ,
-                        _MAP_BASE, fd, 0);
+  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, _MAP_BASE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
@@ -492,8 +491,8 @@ auto FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id,
       dummy_scale_factor, edgeOffset);
 }
 
-auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
-                             size_t total) -> std::pair<NodeRange, EdgeRange> {
+auto FileGraph::divideByEdge(size_t, size_t, size_t id, size_t total)
+    -> std::pair<NodeRange, EdgeRange> {
   size_t size  = numEdges;
   size_t block = (size + total - 1) / total;
   size_t aa    = block * id;

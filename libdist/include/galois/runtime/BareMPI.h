@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,7 +29,6 @@
 #pragma once
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 #include "mpi.h"
-#include "llvm/Support/CommandLine.h"
 
 //! Defines types of bare MPI to use
 enum BareMPI {
@@ -37,7 +36,4 @@ enum BareMPI {
   nonBlockingBareMPI, //!< non blocking bare MPI
   oneSidedBareMPI     //!< one sided bare MPI
 };
-
-//! Command line option for which kind of bare mpi to use
-extern llvm::cl::opt<BareMPI> bare_mpi;
 #endif

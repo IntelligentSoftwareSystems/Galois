@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,16 +20,17 @@
 #ifndef GALOIS_GRAPHS_OCGRAPH_H
 #define GALOIS_GRAPHS_OCGRAPH_H
 
-#include "galois/optional.h"
-#include "galois/LazyObject.h"
-#include "galois/LargeArray.h"
-#include "galois/graphs/Details.h"
+#include <string>
+#include <type_traits>
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
 
-#include <type_traits>
-#include <string>
+#include "galois/config.h"
+#include "galois/graphs/Details.h"
+#include "galois/LazyObject.h"
+#include "galois/LargeArray.h"
+#include "galois/optional.h"
 
 namespace galois {
 namespace graphs {
@@ -228,7 +229,7 @@ public:
 
   template <typename EdgeTy>
   typename EdgeReference<EdgeTy>::type getEdgeData(
-      const segment_type& s, edge_iterator it,
+      const segment_type&, edge_iterator,
       typename std::enable_if<std::is_same<void, EdgeTy>::value>::type* = 0) {
     return 0;
   }
@@ -409,7 +410,7 @@ private:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
 public:
@@ -472,8 +473,9 @@ public:
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni,
-                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference
+  getEdgeData(const segment_type& segment, edge_iterator ni,
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return outGraph.getEdgeData<EdgeTy>(segment.out, ni);
   }
@@ -513,7 +515,7 @@ public:
     return outGraph.edge_begin(N);
   }
 
-  edge_iterator edge_end(const segment_type& segment, GraphNode N,
+  edge_iterator edge_end(const segment_type&, GraphNode N,
                          MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return outGraph.edge_end(N);
@@ -521,7 +523,7 @@ public:
 
   edge_data_reference
   getInEdgeData(const segment_type& segment, edge_iterator ni,
-                MethodFlag mflag = MethodFlag::UNPROTECTED) {
+                MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return inGraph->getEdgeData<EdgeTy>(segment.in, ni);
   }
@@ -543,7 +545,7 @@ public:
     return inGraph->edge_begin(N);
   }
 
-  in_edge_iterator in_edge_end(const segment_type& segment, GraphNode N,
+  in_edge_iterator in_edge_end(const segment_type&, GraphNode N,
                                MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return inGraph->edge_end(N);

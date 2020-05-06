@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -880,7 +880,8 @@ struct SerialBFS {
           if (reverse.getHeight() > forward.getHeight() &&
               reverse.getMaxWidth() < rwidth) {
             // std::cerr << "2nd case height: " << reverse.getHeight() << " >? "
-            // << forward.getHeight() << " width: " << reverse.getMaxWidth() << "
+            // << forward.getHeight() << " width: " << reverse.getMaxWidth() <<
+            // "
             // <? " << rwidth << "\n";
             snode = chosen[i];
             break;
@@ -1112,7 +1113,7 @@ void run(const AlgoTy& algo) {
       icomp++;
       // if(++icomp % 100 == 0)
       //	std::cout << "Connected components " << icomp << " with size " <<
-      //diff << " (max: " << maxcomp << ")\n";
+      // diff << " (max: " << maxcomp << ")\n";
 
       // if(diff > 10) {
       std::cout << "Connected components " << icomp << " with size "

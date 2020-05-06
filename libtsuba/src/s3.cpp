@@ -89,10 +89,11 @@ int S3DownloadRange(const std::string& bucket, const std::string& object,
 
   uint64_t finished = 0;
   auto callback =
-      [&](const Aws::S3::S3Client* clnt,
-          const Aws::S3::Model::GetObjectRequest& req,
+      [&](const Aws::S3::S3Client* /*clnt*/,
+          const Aws::S3::Model::GetObjectRequest& /*req*/,
           const Aws::S3::Model::GetObjectOutcome& get_object_outcome,
-          const std::shared_ptr<const Aws::Client::AsyncCallerContext>& _) {
+          const std::shared_ptr<
+              const Aws::Client::AsyncCallerContext>& /*ctx*/) {
         if (get_object_outcome.IsSuccess()) {
           /* result_buf should have our data here */
           std::unique_lock<std::mutex> lk(m);

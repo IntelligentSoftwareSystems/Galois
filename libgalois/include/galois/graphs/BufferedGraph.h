@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,12 +25,13 @@
 
 #ifndef GALOIS_GRAPHS_BUFGRAPH_H
 #define GALOIS_GRAPHS_BUFGRAPH_H
-#include <galois/gIO.h>
-#include <galois/Reduction.h>
-#include <galois/PartialGraphView.h>
-#include <boost/iterator/counting_iterator.hpp>
 
 #include <fstream>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/Reduction.h"
+#include "galois/PartialGraphView.h"
 
 namespace galois {
 namespace graphs {
@@ -276,7 +277,7 @@ private:
 
     assert(edgeDataBuffer == nullptr);
     sz_t buffer_size = sizeof(EdgeDataType) * numLocalEdges;
-    edgeDataBuffer = (EdgeDataType*)malloc(buffer_size);
+    edgeDataBuffer   = (EdgeDataType*)malloc(buffer_size);
 
     if (edgeDataBuffer == nullptr) {
       GALOIS_DIE("Failed to allocate memory for edge data buffer.");
@@ -297,9 +298,7 @@ private:
   template <
       typename EdgeType,
       typename std::enable_if<std::is_void<EdgeType>::value>::type* = nullptr>
-  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart,
-                    uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
-                    uint64_t numGlobalEdges) {
+  void loadEdgeData(std::ifstream&, uint64_t, uint64_t, uint64_t, uint64_t) {
     galois::gDebug("Not loading edge data");
     // do nothing (edge data is void, i.e. no edge data)
   }
@@ -307,8 +306,8 @@ private:
   template <
       typename EdgeType,
       typename std::enable_if<std::is_void<EdgeType>::value>::type* = nullptr>
-  void
-  loadEdgeData(const galois::PartialGraphView<EdgeDataType, uint32_t>& view) {
+  void loadEdgeData(const galois::PartialGraphView<EdgeDataType, uint32_t>&
+                        GALOIS_UNUSED(view)) {
     galois::gDebug("Not loading edge data");
     // do nothing (edge data is void, i.e. no edge data)
   }
@@ -580,7 +579,7 @@ public:
    */
   template <typename K = EdgeDataType,
             typename std::enable_if<std::is_void<K>::value>::type* = nullptr>
-  unsigned edgeData(uint64_t globalEdgeID) {
+  unsigned edgeData(uint64_t) {
     galois::gWarn("Getting edge data on graph when it doesn't exist\n");
     return 0;
   }

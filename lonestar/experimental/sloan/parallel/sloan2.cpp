@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -697,7 +697,8 @@ void printAccess(std::string msg) {
 
     std::cerr << "\n";
     // std::cerr << data.id << " (" << degree(*src) << ") level: " << data.dist
-    // << " reads: " << data.read << " writes: " << data.write << "\n"; std::cerr
+    // << " reads: " << data.read << " writes: " << data.write << "\n";
+    // std::cerr
     // << data.id << " (" << degree(*src) << ") level: " << data.dist << "\n";
 
     temp.push_back(sdata.id);
@@ -1183,8 +1184,8 @@ struct Sloan {
     std::cerr << "initFn: " << vTmain[1].get() << "\n";
     std::cerr << "sloanFn: " << vTmain[2].get() << "\n";
     // std::cout << "& " << vTmain[0].get() << " & \\multicolumn{2} {c|} {" <<
-    // vTmain[1].get() << "} & " << vTmain[2].get() << " & " << vTmain[0].get() +
-    // vTmain[1].get()  + vTmain[2].get() << "\n";
+    // vTmain[1].get() << "} & " << vTmain[2].get() << " & " << vTmain[0].get()
+    // + vTmain[1].get()  + vTmain[2].get() << "\n";
 #endif
     // printSloan();
   }

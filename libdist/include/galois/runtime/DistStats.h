@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -202,47 +202,47 @@ class DistStatManager : public galois::runtime::StatManager {
     using Base = internal::BasicStatMap<HostStat<T>>;
 
 #if __GNUC__ < 5
-    static const char* htotalName(const StatTotal::Type& type) {
+    static const char* htotalName(const StatTotal::Type& type){
 #else
     static constexpr const char* htotalName(const StatTotal::Type& type) {
 #endif
-      switch (type) {
-        case StatTotal::SINGLE : return "HOST_0";
-        case StatTotal::TSUM:
-          return "HSUM";
-        case StatTotal::TAVG:
-          return "HAVG";
-        case StatTotal::TMIN:
-          return "HMIN";
-        case StatTotal::TMAX:
-          return "HMAX";
-        default:
-          std::abort();
-          return nullptr;
-      }
-    }
+        switch (type) {
+          case StatTotal::SINGLE : return "HOST_0";
+  case StatTotal::TSUM:
+    return "HSUM";
+  case StatTotal::TAVG:
+    return "HAVG";
+  case StatTotal::TMIN:
+    return "HMIN";
+  case StatTotal::TMAX:
+    return "HMAX";
+  default:
+    std::abort();
+    return nullptr;
+  }
+}
 
     void print(std::ostream& out) const {
-      for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
-        out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID()
-            << SEP;
-        out << Base::region(i) << SEP << Base::category(i) << SEP;
+  for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
+    out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID()
+        << SEP;
+    out << Base::region(i) << SEP << Base::category(i) << SEP;
 
-        const HostStat<T>& hs = Base::stat(i);
+    const HostStat<T>& hs = Base::stat(i);
 
-        out << htotalName(hs.totalTy()) << SEP << hs.total();
-        out << std::endl;
+    out << htotalName(hs.totalTy()) << SEP << hs.total();
+    out << std::endl;
 
-        if (DistStatManager::printingHostVals()) {
-          hs.printHostVals(out, Base::region(i), Base::category(i));
-        }
-
-        if (StatManager::printingThreadVals()) {
-          hs.printThreadVals(out, Base::region(i), Base::category(i));
-        }
-      }
+    if (DistStatManager::printingHostVals()) {
+      hs.printHostVals(out, Base::region(i), Base::category(i));
     }
-  }; // struct dist stat combiner
+
+    if (StatManager::printingThreadVals()) {
+      hs.printThreadVals(out, Base::region(i), Base::category(i));
+    }
+  }
+}
+}; // namespace runtime
 
 DistStatCombiner<int64_t> intDistStats;
 DistStatCombiner<double> fpDistStats;
@@ -301,8 +301,8 @@ void receiveAtHost_0_helper2(void);
 void combineAtHost_0(void);
 StatTotal::Type findHostTotalTy(const Str& region, const Str& category,
                                 const StatTotal::Type& thrdTotalTy) const;
-void addRecvdHostTotalTy(unsigned hostID, const Str& region,
-                         const Str& category, const StatTotal::Type& totalTy);
+void addRecvdHostTotalTy(const Str& region, const Str& category,
+                         const StatTotal::Type& totalTy);
 void addRecvdStat(unsigned hostID, const Str& region, const Str& category,
                   int64_t thrdTotal, const StatTotal::Type& thrdTotalTy,
                   const ThrdVals<int64_t>& thrdVals);

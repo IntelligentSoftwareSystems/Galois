@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -46,7 +46,7 @@ void Node::execute() {
 
   // printf("Production: %d executed on [%d / %d] in: %f [s]\n",
   //		productionToExecute, tid,
-  //galois::runtime::LL::getSocketForSelf(tid),
+  // galois::runtime::LL::getSocketForSelf(tid),
   //		((t2.tv_sec-t1.tv_sec) * 1e6 + (t2.tv_usec-t1.tv_usec))/1e6
   //		);
 }

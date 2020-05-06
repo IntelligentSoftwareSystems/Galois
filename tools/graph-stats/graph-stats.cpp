@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -181,7 +181,7 @@ int getLogIndex(ptrdiff_t x) {
   return sign * logvalue;
 }
 
-void doSortedLogOffsetHistogram(Graph& graph) {
+void doSortedLogOffsetHistogram(Graph& GALOIS_UNUSED(graph)) {
   // Graph copy;
   // {
   //   // Original FileGraph is immutable because it is backed by a file
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
         break;
       case sparsityPattern: {
         unsigned lastrow = ~0;
-        doSparsityPattern(graph, [&lastrow](unsigned x, unsigned y, bool val) {
+        doSparsityPattern(graph, [&lastrow](unsigned, unsigned y, bool val) {
           if (y != lastrow) {
             lastrow = y;
             std::cout << '\n';

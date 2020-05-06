@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,7 +20,6 @@
 #include "galois/runtime/Context.h"
 #include "galois/substrate/SimpleLock.h"
 #include "galois/substrate/CacheLineStorage.h"
-#include "galois/runtime/config.h"
 
 #include <stdio.h>
 
@@ -95,6 +94,6 @@ unsigned galois::runtime::SimpleRuntimeContext::cancelIteration() {
 }
 
 void galois::runtime::SimpleRuntimeContext::subAcquire(
-    galois::runtime::Lockable* lockable, galois::MethodFlag) {
+    galois::runtime::Lockable*, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }

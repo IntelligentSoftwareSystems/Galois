@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -44,7 +44,6 @@ void galois::runtime::setStatFile(const std::string& f) {
   internal::sysStatManager()->setStatFile(f);
 }
 
-
 void galois::runtime::reportRUsage(const std::string& id) {
   // get rusage at this point in time
   struct rusage usage_stats;
@@ -54,12 +53,12 @@ void galois::runtime::reportRUsage(const std::string& id) {
   }
 
   // report stats using ID to identify them
-  reportStat("rusage", "MaxResidentSetSize_" + id,
-             usage_stats.ru_maxrss, StatTotal::SINGLE);
-  reportStat("rusage", "SoftPageFaults_" + id,
-             usage_stats.ru_minflt, StatTotal::SINGLE);
-  reportStat("rusage", "HardPageFaults_" + id,
-             usage_stats.ru_majflt, StatTotal::SINGLE);
+  reportStat("rusage", "MaxResidentSetSize_" + id, usage_stats.ru_maxrss,
+             StatTotal::SINGLE);
+  reportStat("rusage", "SoftPageFaults_" + id, usage_stats.ru_minflt,
+             StatTotal::SINGLE);
+  reportStat("rusage", "HardPageFaults_" + id, usage_stats.ru_majflt,
+             StatTotal::SINGLE);
 }
 
 bool StatManager::printingThreadVals(void) {
@@ -129,13 +128,13 @@ StatManager* galois::runtime::internal::sysStatManager(void) { return SM; }
 
 void galois::runtime::reportPageAlloc(const char* category) {
   galois::runtime::on_each_gen(
-      [category](const unsigned tid, const unsigned numT) {
+      [category](const unsigned int tid, const unsigned int) {
         reportStat_Tsum("PageAlloc", category, numPagePoolAllocForThread(tid));
       },
       std::make_tuple());
 }
 
-void galois::runtime::reportNumaAlloc(const char* category) {
+void galois::runtime::reportNumaAlloc(const char* GALOIS_UNUSED(category)) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
   int nodes = substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {

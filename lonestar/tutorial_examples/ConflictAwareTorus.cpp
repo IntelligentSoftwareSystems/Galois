@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -186,17 +186,18 @@ int main(int argc, char* argv[]) {
 
   Torus torus(std::atoi(argv[1]), std::atoi(argv[2]));
 
-  galois::do_all(galois::iterate(
-                     size_t{0}, torus.size()), // range as a pair of unsigned integers
-                 [&](TorusNode n) { torus.getData(n) = 0; } // operator
-                 ,
-                 galois::loopname("do_all_torus_reset_self") // options
+  galois::do_all(
+      galois::iterate(size_t{0},
+                      torus.size()), // range as a pair of unsigned integers
+      [&](TorusNode n) { torus.getData(n) = 0; } // operator
+      ,
+      galois::loopname("do_all_torus_reset_self") // options
   );
 
   galois::for_each(
       galois::iterate(
           torus), // range as a container. assuming begin() and end()
-      [&](TorusNode n, auto& ctx) { // operator
+      [&](TorusNode n, auto&) { // operator
         // cautious point
         torus.acquireAllNeighbors(n);
 

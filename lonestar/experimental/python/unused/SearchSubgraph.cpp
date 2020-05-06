@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -681,19 +681,20 @@ NodePair* reportMatchings(MatchingVector& report, size_t size) {
 
 void constructNodeVec(Graph& gQ) {
   using vector_type = std::vector<GNode>;
-  galois::do_all(gQ,
-                 [&gQ](const GNode n) {
-                   // placement new
-                   new (&(gQ.getData(n).vVec)) vector_type();
-                 },
-                 galois::steal());
+  galois::do_all(
+      gQ,
+      [&gQ](const GNode n) {
+        // placement new
+        new (&(gQ.getData(n).vVec)) vector_type();
+      },
+      galois::steal());
 }
 
 void destructNodeVec(Graph& gQ) {
   using vector_type = std::vector<GNode>;
-  galois::do_all(gQ,
-                 [&gQ](const GNode n) { gQ.getData(n).vVec.~vector_type(); },
-                 galois::steal());
+  galois::do_all(
+      gQ, [&gQ](const GNode n) { gQ.getData(n).vVec.~vector_type(); },
+      galois::steal());
 }
 
 template <typename Algo>

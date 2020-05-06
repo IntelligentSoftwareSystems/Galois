@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,11 +25,12 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
+#include <functional>
+#include <sstream>
+
+#include "galois/config.h"
 #include "galois/substrate/EnvCheck.h"
 #include "galois/PODResizeableArray.h"
-
-#include <sstream>
-#include <functional>
 
 namespace galois {
 namespace runtime {
@@ -45,8 +46,7 @@ static inline void traceImpl(std::ostringstream& os) { os << "\n"; }
  * Prints out a value to the output stream.
  */
 template <typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, T&& value,
-                             Args&&... args) {
+static inline void traceImpl(std::ostringstream& os, T&&, Args&&... args) {
   // os << value << " ";
   traceImpl(os, std::forward<Args>(args)...);
 }

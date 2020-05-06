@@ -10,7 +10,7 @@ target_sources(galois_gluon PRIVATE
         src/GluonSubstrate.cpp
 )
 
-target_link_libraries(galois_gluon PUBLIC galois_dist_async LLVMSupport)
+target_link_libraries(galois_gluon PUBLIC galois_dist_async)
 
 target_include_directories(galois_gluon PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -23,12 +23,6 @@ endif()
 
 if (USE_BARE_MPI)
   target_compile_definitions(galois_gluon PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
-endif()
-
-if (USE_LCI)
-  add_dependencies(galois_gluon lci)
-  target_link_libraries(galois_gluon ${LWCI_LIBRARY} -lpsm2)
-  target_include_directories(galois_gluon PUBLIC ${LWCI_INCLUDE})
 endif()
 
 install(
