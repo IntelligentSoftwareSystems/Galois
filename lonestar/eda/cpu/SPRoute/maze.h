@@ -211,7 +211,7 @@ struct THREAD_LOCAL_STORAGE {
       inRegion_p_LA     = largeMallocLocal(yGrid * sizeof(bool*));
       inRegion_p        = reinterpret_cast<bool**>(inRegion_p_LA.get());
 
-      netEO_p_LA = largeMallocLocal(2000 * sizeof(OrderNetEdge));
+      netEO_p_LA = largeMallocLocal(MAXNETDEG * 2 * sizeof(OrderNetEdge));
       netEO_p    = reinterpret_cast<OrderNetEdge*>(netEO_p_LA.get());
     } else {
       pop_heap2 = (bool*)calloc(yGrid * xGrid, sizeof(bool));
@@ -241,7 +241,7 @@ struct THREAD_LOCAL_STORAGE {
       inRegion_alloc = (bool*)calloc(yGrid * xGrid, sizeof(bool));
       inRegion_p     = (bool**)calloc(yGrid, sizeof(bool*));
 
-      netEO_p = (OrderNetEdge*)calloc(2000, sizeof(OrderNetEdge));
+      netEO_p = (OrderNetEdge*)calloc(MAXNETDEG * 2, sizeof(OrderNetEdge));
     }
     // printf("allocation success\n");
     for (int i = 0; i < yGrid; i++) {
@@ -505,7 +505,7 @@ void heapify(float** array, int heapSize, int i) {
         heapify(array, arrayLen, i);
 }*/
 
-void updateHeap(float** array, int arrayLen, int i) {
+void updateHeap(float** array, int i) {
   int parent;
   float* tmpi;
 
@@ -532,7 +532,7 @@ void extractMin(float** array, int arrayLen) {
  * round : the number of maze route stages runned
  */
 
-void updateCongestionHistory(int round, int upType) {
+void updateCongestionHistory(int upType) {
   int i, j, grid, maxlimit;
   float overflow;
 
@@ -941,7 +941,7 @@ void setupHeap(int netID, int edgeID, local_pq& pq1, local_vec& v2,
   }
 }
 
-int copyGrids(TreeNode* treenodes, int n1, int n2, TreeEdge* treeedges,
+int copyGrids(TreeNode* treenodes, int n1, TreeEdge* treeedges,
               int edge_n1n2, int* gridsX_n1n2, int* gridsY_n1n2) {
   int i, cnt;
   int n1x, n1y;
@@ -1020,11 +1020,11 @@ void updateRouteType1(TreeNode* treenodes, int n1, int A1, int A2, int E1x,
 
   // copy all the grids on (n1, A1) and (n2, A2) to tmp arrays, and keep the
   // grids order A1->n1->A2 copy (n1, A1)
-  cnt_n1A1 = copyGrids(treenodes, A1, n1, treeedges, edge_n1A1, gridsX_n1A1,
+  cnt_n1A1 = copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1,
                        gridsY_n1A1);
 
   // copy (n1, A2)
-  cnt_n1A2 = copyGrids(treenodes, n1, A2, treeedges, edge_n1A2, gridsX_n1A2,
+  cnt_n1A2 = copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2,
                        gridsY_n1A2);
 
   // update route for (n1, A1) and (n1, A2)
@@ -1147,15 +1147,15 @@ void updateRouteType2(TreeNode* treenodes, int n1, int A1, int A2, int C1,
 
   // combine (n1, A1) and (n1, A2) into (A1, A2), A1 is the first node and A2 is
   // the second grids order A1->n1->A2 copy (A1, n1)
-  cnt_n1A1 = copyGrids(treenodes, A1, n1, treeedges, edge_n1A1, gridsX_n1A1,
+  cnt_n1A1 = copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1,
                        gridsY_n1A1);
 
   // copy (n1, A2)
-  cnt_n1A2 = copyGrids(treenodes, n1, A2, treeedges, edge_n1A2, gridsX_n1A2,
+  cnt_n1A2 = copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2,
                        gridsY_n1A2);
 
   // copy all the grids on (C1, C2) to gridsX_C1C2[] and gridsY_C1C2[]
-  cnt_C1C2 = copyGrids(treenodes, C1, C2, treeedges, edge_C1C2, gridsX_C1C2,
+  cnt_C1C2 = copyGrids(treenodes, C1, treeedges, edge_C1C2, gridsX_C1C2,
                        gridsY_C1C2);
 
   // combine grids on original (A1, n1) and (n1, A2) to new (A1, A2)
@@ -1471,7 +1471,7 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
           {
             // enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_atomic(treeedge, n1x, n1y, n2x, n2y,
+            enter = newRipupCheck_atomic(treeedge, 
                                          ripup_threshold, netID, edgeID);
 
             // ripup the routing for the edge
@@ -2352,7 +2352,7 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
                 mazeedge_Threshold) // only route the non-degraded edges (len>0)
             {
 
-              enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y,
+              enter = newRipupCheck(treeedge, 
                                     ripup_threshold, netID, edgeID);
 
               // ripup the routing for the edge

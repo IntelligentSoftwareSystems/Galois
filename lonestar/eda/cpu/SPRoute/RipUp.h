@@ -92,8 +92,7 @@ void ripupSegZ(Segment* seg) {
   }
 }
 
-void newRipup(TreeEdge* treeedge, TreeNode* treenodes, int x1, int y1, int x2,
-              int y2) {
+void newRipup(TreeEdge* treeedge, int x1, int y1, int x2, int y2) {
   short *gridsX, *gridsY;
   int i, j, grid, Zpoint, ymin, ymax, xmin;
   RouteType ripuptype;
@@ -277,8 +276,7 @@ void printEdgeVEC(TreeEdge* treeedge) {
   printf("\n");
 }
 
-Bool newRipupCheckProb(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                       int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheckProb(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup = FALSE;
@@ -358,8 +356,7 @@ Bool newRipupCheckProb(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
   }
 }
 
-Bool newRipupCheck(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                   int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheck(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup = FALSE;
@@ -424,8 +421,7 @@ Bool newRipupCheck(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
   }
 }
 
-Bool newRipupCheck_M1M2(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                        int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheck_M1M2(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup = FALSE;
@@ -494,8 +490,7 @@ Bool newRipupCheck_M1M2(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
   }
 }
 
-Bool newRipupCheck_atomic(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                          int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheck_atomic(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup = FALSE;
@@ -579,8 +574,7 @@ Bool newRipupCheck_atomic(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
   }
 }
 
-Bool newRipupCheck_sort(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                        int ripup_threshold, int netID, int edgeID,
+Bool newRipupCheck_sort(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID,
                         bool& is_horizontal, int& grid_pos) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
@@ -656,8 +650,7 @@ Bool newRipupCheck_sort(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
   }
 }
 
-Bool newRipupCheck_nosub(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
-                         int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheck_nosub(TreeEdge* treeedge, int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup = FALSE;

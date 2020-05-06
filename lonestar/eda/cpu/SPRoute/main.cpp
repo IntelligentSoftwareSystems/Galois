@@ -250,18 +250,18 @@ int main(int argc, char** argv) {
       if (totalOverflow > 2000) {
         enlarge += ESTEP1; // ENLARGE+(i-1)*ESTEP;
         cost_step = CSTEP1;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
 
       } else if (totalOverflow < 500) {
 
         cost_step = CSTEP3;
         enlarge += ESTEP3;
         ripup_threshold = -1;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
       } else {
         cost_step = CSTEP2;
         enlarge += ESTEP2;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
       }
 
       if (totalOverflow > 15000 && maxOverflow > 400) {

@@ -597,7 +597,7 @@ void assignEdge(int netID, int edgeID, Bool processDIR) {
     for (k = routelen; k >= 0; k--) {
       gridsL[k] = last_layer;
       if (viaLink[last_layer][k] == BIG_INT) {
-        last_layer = last_layer;
+        //last_layer = last_layer;
       } else {
         last_layer = viaLink[last_layer][k];
       }
@@ -712,7 +712,7 @@ void assignEdge(int netID, int edgeID, Bool processDIR) {
 
     for (k = 0; k <= routelen; k++) {
       if (viaLink[last_layer][k] == BIG_INT) {
-        last_layer = last_layer;
+        //last_layer = last_layer;
       } else {
         last_layer = viaLink[last_layer][k];
       }

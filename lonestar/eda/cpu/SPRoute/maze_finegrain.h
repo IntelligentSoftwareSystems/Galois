@@ -209,8 +209,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -1208,8 +1207,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         // timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         // timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -2158,8 +2156,7 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         timer_newripupcheck.stop();
 
         // ripup the routing for the edge
