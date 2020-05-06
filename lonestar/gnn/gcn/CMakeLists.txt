@@ -1,6 +1,6 @@
-if(ENABLE_HETERO_GALOIS)
-  set_source_files_properties(gcn.cpp PROPERTIES LANGUAGE CUDA)
-endif()
+#if(ENABLE_HETERO_GALOIS)
+#  set_source_files_properties(gcn.cpp PROPERTIES LANGUAGE CUDA)
+#endif()
 add_executable(gcn gcn.cpp)
 target_link_libraries(gcn PRIVATE Galois::shmem lonestar)
 
