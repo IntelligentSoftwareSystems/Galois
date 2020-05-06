@@ -76,7 +76,7 @@ static cll::opt<unsigned>
  */
 class PtsToCons {
 public:
-  using ConstraintType = enum { AddressOf = 0, Copy, Load, Store };
+  using ConstraintType = enum { AddressOf = 0, Copy, Load, Store, GEP };
 
 private:
   unsigned src;
