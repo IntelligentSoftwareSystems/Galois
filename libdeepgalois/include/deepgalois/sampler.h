@@ -22,7 +22,7 @@ public:
   virtual void select_vertices(size_t nv, size_t n, int m, Graph* g, VertexList vertices, VertexSet &vertex_set);
   virtual void select_vertices(size_t n, int m, VertexSet &vertex_set, unsigned tid);
 
-  galois::runtime::iterable<galois::NoDerefIterator<edge_iterator> > neighbor_sampler(Graph &g, VertexID v);
+  //galois::runtime::iterable<galois::NoDerefIterator<edge_iterator> > neighbor_sampler(Graph &g, VertexID v);
 
   edge_iterator sampled_edge_begin(Graph &g, VertexID v) { return g.edge_begin(v); }
 

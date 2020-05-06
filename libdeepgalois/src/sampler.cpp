@@ -1,5 +1,6 @@
 #include "deepgalois/utils.h"
 #include "deepgalois/sampler.h"
+#include "galois/Galois.h"
 #include <time.h> 
 #include <vector>
 #define PARALLEL_GEN

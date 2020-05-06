@@ -4,11 +4,9 @@
 #include "deepgalois/context.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/configs.h"
-//#include <boost/thread.hpp>
+#include "galois/Galois.h"
 
 namespace deepgalois {
-
-#ifdef CPU_ONLY
 
 Context::Context() : Context(false) {}
 
@@ -247,10 +245,6 @@ void Context::read_edgelist(const char* filename, bool symmetrize, bool add_self
   }
 }
 
-#endif
-
-
-
 /*
 inline void init_features(size_t dim, vec_t &x) {
     std::default_random_engine rng;
@@ -259,4 +253,5 @@ inline void init_features(size_t dim, vec_t &x) {
         x[i] = dist(rng);
 }
 */
+
 } // end deepgalois namespace

@@ -1,7 +1,7 @@
 #include "deepgalois/layers/aggregator.h"
 #include "deepgalois/math_functions.hh"
+#include "galois/Galois.h"
 
-#ifdef CPU_ONLY
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, float_t* norm_factor) {
   //std::cout << "[update_all] graph size: " << n << "\n";
@@ -50,4 +50,4 @@ void deepgalois::update_all_csrmm(size_t len, Graph& g, const float_t* in, float
   math::csrmm_cpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, (int*)g.row_start_ptr(), (int*)g.edge_dst_ptr(), in, 0.0, out);
   Tcsrmm.stop();
 }
-#endif
+

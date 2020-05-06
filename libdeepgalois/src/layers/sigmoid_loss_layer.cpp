@@ -1,5 +1,6 @@
 #include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/math_functions.hh"
+#include "galois/Galois.h"
 
 namespace deepgalois {
 
@@ -63,8 +64,8 @@ void sigmoid_loss_layer::back_propagation(const float_t* in_data, const float_t*
 
 acc_t sigmoid_loss_layer::get_prediction_loss() {
   assert(count_ > 0);
-  AccumF total_loss;
-  AccumU valid_sample_count;
+  galois::GAccumulator<acc_t> total_loss;
+  galois::GAccumulator<size_t> valid_sample_count;
   total_loss.reset();
   valid_sample_count.reset();
   galois::do_all(galois::iterate(layer::begin_, layer::end_), [&](const auto& i) {

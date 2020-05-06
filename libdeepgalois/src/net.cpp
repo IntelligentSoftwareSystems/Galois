@@ -3,6 +3,7 @@
  */
 
 #include "galois/Timer.h"
+#include "galois/Galois.h"
 #include "deepgalois/net.h"
 #include "deepgalois/math_functions.hh"
 
@@ -83,9 +84,9 @@ void Net::normalize() {
  */
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks, float_t* preds, label_t* ground_truth) {
 #ifndef GALOIS_USE_DIST
-  AccumF accuracy_all;
+  galois::GAccumulator<acc_t> accuracy_all;
 #else
-  AccuracyAccum accuracy_all;
+  galois::DGAccumulator<acc_t> accuracy_all;
   galois::DGAccumulator<uint32_t> sampleCount;
   sampleCount.reset();
 #endif
