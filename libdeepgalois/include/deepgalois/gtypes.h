@@ -1,5 +1,5 @@
 #pragma once
-#define USE_CSRGRAPH
+//#define USE_CSRGRAPH
 
 #include "deepgalois/types.h"
 #ifdef GALOIS_USE_DIST
@@ -23,7 +23,6 @@
 
 namespace deepgalois {
 typedef index_t edge_iterator;
-#ifdef CPU_ONLY
 //#ifdef EDGE_LABEL
 //typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::
 //    with_numa_alloc<true>::type ::with_no_lockable<true>::type LCGraph;
@@ -34,12 +33,10 @@ typedef index_t edge_iterator;
 //typedef LCGraph Graph;
 //typedef Graph::edge_iterator edge_iterator;
 typedef LearningGraph Graph;
-#else
 #ifdef USE_CSRGRAPH
 typedef CSRGraph GraphGPU;
 #else
 typedef LearningGraph GraphGPU;
-#endif
 #endif
 }
 

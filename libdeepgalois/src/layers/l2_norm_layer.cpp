@@ -4,15 +4,6 @@
 
 namespace deepgalois {
 
-l2_norm_layer::l2_norm_layer(unsigned level, float_t eps, float_t scale,
-                             dims_t in_dims, dims_t out_dims)
-    : layer(level, in_dims, out_dims), epsilon_(eps), scale_(scale) {
-  assert(input_dims[0] == output_dims[0]); // num_vertices
-  trainable_ = false;
-  name_ = layer_type() + "_" + std::to_string(level);
-}
-
-#ifdef CPU_ONLY
 void l2_norm_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
   size_t x = input_dims[0];
   size_t y = input_dims[1];
@@ -51,6 +42,5 @@ void l2_norm_layer::back_propagation(const float_t* in_data, const float_t*,
     }
   }, galois::loopname("d_l2_norm"));
 }
-#endif
 
 } // namespace

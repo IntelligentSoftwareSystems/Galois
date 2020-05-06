@@ -1,8 +1,14 @@
 #include "deepgalois/lgraph.h"
 #include "deepgalois/cutils.h"
+#include "deepgalois/reader.h"
 #include <cassert>
 
 namespace deepgalois {
+
+void LearningGraph::readGraph(std::string dataset) {
+  deepgalois::Reader reader(dataset);
+  reader.readGraphFromGRFile(this);
+}
 
 void LearningGraph::dealloc() {
   assert(is_device);
@@ -39,5 +45,7 @@ void LearningGraph::copy_to_cpu() {
   //if (edge_data__ != NULL) CUDA_CHECK(cudaMemcpy(copygraph.edge_data__ptr(), edge_data__, num_edges_ * sizeof(edata_t), cudaMemcpyDeviceToHost));
   //CUDA_CHECK(cudaMemcpy(copygraph.vertex_data__ptr(), vertex_data__, num_vertices_ * sizeof(vdata_t), cudaMemcpyDeviceToHost));
 }
+
+void LearningGraph::degree_counting() {}
 
 }

@@ -2,6 +2,12 @@
 #include "deepgalois/types.h"
 #include <string>
 
+#ifdef __CUDACC__
+#define CUDA_HOSTDEV __host__ __device__
+#else
+#define CUDA_HOSTDEV
+#endif
+
 namespace deepgalois {
 
 class LearningGraph {
@@ -32,8 +38,6 @@ public:
   LearningGraph() : LearningGraph(false) {}
   ~LearningGraph() { dealloc(); }
   void init(index_t nv, index_t ne) { num_vertices_ = nv; num_edges_ = ne; }
-  void readGraph(std::string path, std::string dataset);
-  void readGraphFromGRFile(const std::string& filename);
   size_t size() { return (size_t)num_vertices_; }
   size_t sizeEdges() { return (size_t)num_edges_; }
   index_t get_degree(index_t vid) { return degrees_[vid]; }
@@ -46,12 +50,20 @@ public:
   void copy_to_gpu();
   void dealloc();
   void degree_counting();
-  void allocateFrom(index_t nv, index_t ne);
   void constructNodes();
   void fixEndEdge(index_t vid, index_t row_end);
   void constructEdge(index_t eid, index_t dst, edata_t edata);
   void add_selfloop();
-
+  void readGraph(std::string dataset);
+  void allocateFrom(index_t nv, index_t ne) {
+    //printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
+    num_vertices_ = nv;
+    num_edges_ = ne;
+    rowptr_.resize(num_vertices_+1);
+    colidx_.resize(num_edges_);
+    degrees_.resize(num_vertices_);
+    rowptr_[0] = 0;
+  }
   bool isLocal(index_t vid);
   index_t getLID(index_t vid);
   bool is_vertex_cut();
@@ -73,12 +85,12 @@ public:
   edata_t* edge_data_ptr() { return edge_data_; }
   vdata_t* vertex_data_ptr() { return vertex_data_; }
 #else
-	__device__ index_t getEdgeDst(index_t edge) { return d_colidx_[edge]; }
-	__device__ index_t edge_begin(index_t src) { return d_rowptr_[src]; }
-	__device__ index_t edge_end(index_t src) { return d_rowptr_[src+1]; }
-	__device__ vdata_t getData(index_t vid) { return d_vertex_data_[vid]; }
-	__device__ index_t getDegree(index_t vid) { return d_degrees_[vid]; }
-	__device__ index_t getOutDegree(index_t vid) { return d_degrees_[vid]; }
+	CUDA_HOSTDEV index_t getEdgeDst(index_t edge) { return d_colidx_[edge]; }
+	CUDA_HOSTDEV index_t edge_begin(index_t src) { return d_rowptr_[src]; }
+	CUDA_HOSTDEV index_t edge_end(index_t src) { return d_rowptr_[src+1]; }
+	CUDA_HOSTDEV vdata_t getData(index_t vid) { return d_vertex_data_[vid]; }
+	CUDA_HOSTDEV index_t getDegree(index_t vid) { return d_degrees_[vid]; }
+	CUDA_HOSTDEV index_t getOutDegree(index_t vid) { return d_degrees_[vid]; }
 	index_t *row_start_ptr() { return d_rowptr_; }
 	const index_t *row_start_ptr() const { return d_rowptr_; }
 	index_t *edge_dst_ptr() { return d_colidx_; }

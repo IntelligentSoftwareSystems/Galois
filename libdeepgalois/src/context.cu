@@ -127,8 +127,8 @@ void Context::SetDevice(const int device_id) {
 }
 */
 size_t Context::read_graph(bool selfloop) {
-  std::string filename = path + dataset + ".csgr";
 #ifdef USE_CSRGRAPH
+  std::string filename = path + dataset + ".csgr";
   GraphGPU g;
   g.read(filename.c_str(), false);
   if (selfloop) {
@@ -137,7 +137,7 @@ size_t Context::read_graph(bool selfloop) {
   }
   g.copy_to_gpu(graph_gpu);
 #else
-  graph_gpu.readGraphFromGRFile(filename);
+  graph_gpu.readGraph(dataset);
   graph_gpu.copy_to_gpu();
 #endif
   n = graph_gpu.size();

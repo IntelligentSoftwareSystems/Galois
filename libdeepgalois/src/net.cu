@@ -162,6 +162,8 @@ void Net::regularize() {
     layers[layer_id]->get_grads_device_ptr());
 }
 
+void Net::normalize() {}
+
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, 
                            mask_t* masks, float_t* preds, label_t* ground_truth) {
   return masked_accuracy_gpu(num_classes, begin, end, count, masks, preds, ground_truth);

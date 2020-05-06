@@ -8,7 +8,7 @@
  * All rights reserved.
  * Reused/revised under 3-BSD
  */
-
+#include <iostream>
 #include "deepgalois/gtypes.h"
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
@@ -53,9 +53,12 @@ public:
         output_dims(out_dims), labels(NULL) { }
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
-  void print_layer_info(); //! debug print function
   virtual void malloc_and_init() {}
-
+  void print_layer_info() { //! debug print function
+    std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
+              << input_dims[0] << "," << input_dims[1] << "] output["
+              <<  output_dims[0] << "," << output_dims[1] << "]\n";
+  }
   // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }
   virtual acc_t get_weight_decay_loss() { return acc_t(0); }

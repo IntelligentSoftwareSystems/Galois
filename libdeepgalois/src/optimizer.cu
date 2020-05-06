@@ -27,6 +27,7 @@ float_t* stateful_optimizer<N>::get_gpu(const size_t n, const float_t *key) {
   return dE_[Index][key];
 }
 
+void adam::update(const vec_t& dW, vec_t& W) {}
 void adam::update_gpu(const size_t n, const float_t* dW, float_t* W) {
   //std::cout << "updating weights on GPU, n = " << n << "\n";
   //print_device_vector(10, dW, "dW");

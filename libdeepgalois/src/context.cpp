@@ -69,7 +69,7 @@ size_t Context::read_graph(bool selfloop) {
     printf("Reading .el file: %s\n", filename.c_str());
     read_edgelist(filename.c_str(), true); // symmetrize
   } else if (filetype == "bin") {
-    graph_cpu->readGraphFromGRFile(filename);
+    graph_cpu->readGraph(dataset);
   } else if (filetype == "gr") {
     graph_cpu = new Graph(); 
     std::string filename = path + dataset + ".csgr";
@@ -77,11 +77,11 @@ size_t Context::read_graph(bool selfloop) {
     if (selfloop) {
       Graph graph_temp;
       //galois::graphs::readGraph(graph_temp, filename);
-      graph_temp.readGraphFromGRFile(filename);
+      graph_temp.readGraph(dataset);
       add_selfloop(graph_temp, *graph_cpu);
       is_selfloop_added = selfloop;
     //} else galois::graphs::readGraph(*graph_cpu, filename);
-    } else graph_cpu->readGraphFromGRFile(filename);
+    } else graph_cpu->readGraph(dataset);
 // TODO dist version of self loop
   } else {
     printf("Unkown file format\n");
