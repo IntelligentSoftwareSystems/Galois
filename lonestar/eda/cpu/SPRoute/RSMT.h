@@ -833,7 +833,7 @@ void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree,
       n  = rsmt.branch[j].n;
       x2 = rsmt.branch[n].x;
       y2 = rsmt.branch[n].y;
-        
+
       wl += ADIFF(x1, x2) + ADIFF(y1, y2);
 
       if (x1 != x2 || y1 != y2) // the branch is not degraded (a point)
@@ -858,7 +858,7 @@ void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree,
     } // loop j
 
     free(rsmt.branch);
-    
+
     seglistCnt[i] = segcnt; // the number of segments for net i
     totalNumSeg += segcnt;
 

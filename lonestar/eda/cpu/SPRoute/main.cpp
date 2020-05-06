@@ -335,9 +335,9 @@ int main(int argc, char** argv) {
       if (finegrain) {
         printf("finegrain\n");
 
-        mazeRouteMSMD_finegrain_spinlock(
-            i, enlarge, costheight, ripup_threshold, mazeedge_Threshold,
-            !(i % 3), cost_type);
+        mazeRouteMSMD_finegrain_spinlock(i, enlarge, costheight,
+                                         ripup_threshold, mazeedge_Threshold,
+                                         !(i % 3), cost_type);
       } else {
         mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
                       mazeedge_Threshold, !(i % 3), cost_type);

@@ -1,7 +1,7 @@
 
 
-Bool newRipupCheck_lock(TreeEdge* treeedge,
-                        int ripup_threshold, int netID, int edgeID) {
+Bool newRipupCheck_lock(TreeEdge* treeedge, int ripup_threshold, int netID,
+                        int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
   Bool needRipup  = FALSE;
@@ -115,8 +115,7 @@ Bool newRipupCheck_lock(TreeEdge* treeedge,
 
 void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
-                        Bool Ordering, int cost_type)
-{
+                        Bool Ordering, int cost_type) {
   // LOCK = 0;
   float forange;
 
@@ -298,8 +297,8 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
 
             // enter = newRipupCheck_nosub(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_lock(treeedge, 
-                                       ripup_threshold, netID, edgeID);
+            enter =
+                newRipupCheck_lock(treeedge, ripup_threshold, netID, edgeID);
 
             // ripup the routing for the edge
             if (enter) {
@@ -380,7 +379,8 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
 
                 // if(PRINT) printf("curX curY %d %d, (%d, %d), (%d, %d),
                 // pq1.size: %d\n", curX, curY, regionX1, regionX2, regionY1,
-                // regionY2, pq1.size()); if(curX == 102 && curY == 221) exit(1);
+                // regionY2, pq1.size()); if(curX == 102 && curY == 221)
+                // exit(1);
                 curr_d1 = d1[curY][curX];
                 if (curr_d1 != 0) {
                   if (HV[curY][curX]) {
@@ -992,13 +992,11 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
 }
 
 void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
-                        Bool Ordering, int cost_type)
-{
+                        Bool Ordering, int cost_type) {
   // LOCK = 0;
   float forange;
 
@@ -1179,8 +1177,8 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
 
             // enter = newRipupCheck_nosub(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_lock(treeedge,
-                                       ripup_threshold, netID, edgeID);
+            enter =
+                newRipupCheck_lock(treeedge, ripup_threshold, netID, edgeID);
             // enter = newRipupCheck_atomic(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
 
@@ -1263,7 +1261,8 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
 
                 // if(PRINT) printf("curX curY %d %d, (%d, %d), (%d, %d),
                 // pq1.size: %d\n", curX, curY, regionX1, regionX2, regionY1,
-                // regionY2, pq1.size()); if(curX == 102 && curY == 221) exit(1);
+                // regionY2, pq1.size()); if(curX == 102 && curY == 221)
+                // exit(1);
                 curr_d1 = d1[curY][curX];
                 if (curr_d1 != 0) {
                   if (HV[curY][curX]) {

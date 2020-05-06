@@ -462,7 +462,8 @@ struct SGDAsynEdgeCudaFunctor {
       max_rating = std::max(max_rating, graph.out_edge_data()[i]);
     }
     // fprintf(stderr, "] , max_Rating: %d, movies: %ld, Max degree:: %d for
-    // node: %d\n", 		max_rating, movies.size(), max_degree, max_degree_id);
+    // node: %d\n", 		max_rating, movies.size(), max_degree,
+    // max_degree_id);
     distribute_chunks(all_edges);
     cache_chunks(all_edges);
   }
@@ -623,8 +624,9 @@ struct SGDAsynEdgeCudaFunctor {
 
     metadata->copy_to_host();
     // fprintf(stderr, "blk_diag: round %d curr_step %d total_time %.3f
-    // per_diag_time %6.3g insp_time %.3f\t", round, 		curr_step, total_time,
-    //total_time / (double) count_of_diagonals, insp_time);
+    // per_diag_time %6.3g insp_time %.3f\t", round, 		curr_step,
+    // total_time,
+    // total_time / (double) count_of_diagonals, insp_time);
     printf("round %d: total_time %.3f\t", round, total_time);
     stats.push_stats(round, curr_step, total_time,
                      total_time / (double)count_of_diagonals, insp_time);

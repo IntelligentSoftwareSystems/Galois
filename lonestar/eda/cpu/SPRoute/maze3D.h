@@ -418,9 +418,8 @@ void newUpdateNodeLayers(TreeNode* treenodes, int edgeID, int n1, int lastL) {
   }
 }
 
-int copyGrids3D(TreeNode* treenodes, int n1, TreeEdge* treeedges,
-                int edge_n1n2, int gridsX_n1n2[], int gridsY_n1n2[],
-                int gridsL_n1n2[]) {
+int copyGrids3D(TreeNode* treenodes, int n1, TreeEdge* treeedges, int edge_n1n2,
+                int gridsX_n1n2[], int gridsY_n1n2[], int gridsL_n1n2[]) {
   int i, cnt;
   int n1x, n1y, n1l = 0;
 
@@ -471,8 +470,8 @@ int copyGrids3D(TreeNode* treenodes, int n1, TreeEdge* treeedges,
   return (cnt);
 }
 
-void updateRouteType13D(TreeNode* treenodes, int n1, int A1, int A2,
-                        int E1x, int E1y, TreeEdge* treeedges, int edge_n1A1,
+void updateRouteType13D(TreeNode* treenodes, int n1, int A1, int A2, int E1x,
+                        int E1y, TreeEdge* treeedges, int edge_n1A1,
                         int edge_n1A2) {
   int i, l, cnt, A1x, A1y, A2x, A2y;
   int cnt_n1A1, cnt_n1A2, E1_pos1 = 0, E1_pos2 = 0;
@@ -667,8 +666,8 @@ void updateRouteType13D(TreeNode* treenodes, int n1, int A1, int A2,
   treenodes[n1].y = E1y;
 }
 
-void updateRouteType23D(TreeNode* treenodes, int n1, int A1, int A2,
-                        int C1, int C2, int E1x, int E1y, TreeEdge* treeedges,
+void updateRouteType23D(TreeNode* treenodes, int n1, int A1, int A2, int C1,
+                        int C2, int E1x, int E1y, TreeEdge* treeedges,
                         int edge_n1A1, int edge_n1A2, int edge_C1C2) {
   int i, cnt, A1x, A1y, A2x, A2y, C1x, C1y, C2x, C2y, extraLen, startIND;
   int edge_n1C1, edge_n1C2, edge_A1A2;
@@ -1355,8 +1354,8 @@ void mazeRouteMSMDOrder3D(int expand, int ripupTHlb, int ripupTHub) {
               }
 
               // update route for edge (n1, A1), (n1, A2)
-              updateRouteType13D(treenodes, n1, A1, A2, E1x, E1y,
-                                 treeedges, edge_n1A1, edge_n1A2);
+              updateRouteType13D(treenodes, n1, A1, A2, E1x, E1y, treeedges,
+                                 edge_n1A1, edge_n1A2);
               // newUpdateNodeLayers(treenodes, edge_n1n2,n1, lastL);
 
               // update position for n1
@@ -1439,8 +1438,8 @@ void mazeRouteMSMDOrder3D(int expand, int ripupTHlb, int ripupTHub) {
 
           while (gridsX[tailRoom] == E2x && gridsY[tailRoom] == E2y) {
             tailRoom--;
-            if(tailRoom == -1)
-                break;
+            if (tailRoom == -1)
+              break;
           }
           if (tailRoom < cnt_n1n2 - 1) {
             tailRoom++;
@@ -1495,8 +1494,8 @@ void mazeRouteMSMDOrder3D(int expand, int ripupTHlb, int ripupTHub) {
               // printf(" type1\n");
 
               // update route for edge (n2, B1), (n2, B2)
-              updateRouteType13D(treenodes, n2, B1, B2, E2x, E2y,
-                                 treeedges, edge_n2B1, edge_n2B2);
+              updateRouteType13D(treenodes, n2, B1, B2, E2x, E2y, treeedges,
+                                 edge_n2B1, edge_n2B2);
               // newUpdateNodeLayers(treenodes, edge_n1n2,n2, lastL);
 
               // update position for n2

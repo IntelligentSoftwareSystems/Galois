@@ -266,35 +266,35 @@ struct THREAD_LOCAL_STORAGE {
   void reset_heap() { memset(pop_heap2, 0, yGrid * xGrid * sizeof(bool)); }
 
   ~THREAD_LOCAL_STORAGE() {
-      free(pop_heap2);
+    free(pop_heap2);
 
-      free(d1_p);
-      free(d1_alloc);
+    free(d1_p);
+    free(d1_alloc);
 
-      free(HV_p);
-      free(hyperV_p);
-      free(hyperH_p);
-      free(HV_alloc);
-      free(hyperV_alloc);
-      free(hyperH_alloc);
+    free(HV_p);
+    free(hyperV_p);
+    free(hyperH_p);
+    free(HV_alloc);
+    free(hyperV_alloc);
+    free(hyperH_alloc);
 
-      free(parentX1_p);
-      free(parentY1_p);
-      free(parentX3_p);
-      free(parentY3_p);
+    free(parentX1_p);
+    free(parentY1_p);
+    free(parentX3_p);
+    free(parentY3_p);
 
-      free(parentX1_alloc);
-      free(parentY1_alloc);
-      free(parentX3_alloc);
-      free(parentY3_alloc);
+    free(parentX1_alloc);
+    free(parentY1_alloc);
+    free(parentX3_alloc);
+    free(parentY3_alloc);
 
-      free(corrEdge_alloc);
-      free(corrEdge_p);
+    free(corrEdge_alloc);
+    free(corrEdge_p);
 
-      free(inRegion_alloc);
-      free(inRegion_p);
+    free(inRegion_alloc);
+    free(inRegion_p);
 
-      free(netEO_p);
+    free(netEO_p);
   }
 };
 
@@ -941,8 +941,8 @@ void setupHeap(int netID, int edgeID, local_pq& pq1, local_vec& v2,
   }
 }
 
-int copyGrids(TreeNode* treenodes, int n1, TreeEdge* treeedges,
-              int edge_n1n2, int* gridsX_n1n2, int* gridsY_n1n2) {
+int copyGrids(TreeNode* treenodes, int n1, TreeEdge* treeedges, int edge_n1n2,
+              int* gridsX_n1n2, int* gridsY_n1n2) {
   int i, cnt;
   int n1x, n1y;
 
@@ -1020,12 +1020,12 @@ void updateRouteType1(TreeNode* treenodes, int n1, int A1, int A2, int E1x,
 
   // copy all the grids on (n1, A1) and (n2, A2) to tmp arrays, and keep the
   // grids order A1->n1->A2 copy (n1, A1)
-  cnt_n1A1 = copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1,
-                       gridsY_n1A1);
+  cnt_n1A1 =
+      copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1, gridsY_n1A1);
 
   // copy (n1, A2)
-  cnt_n1A2 = copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2,
-                       gridsY_n1A2);
+  cnt_n1A2 =
+      copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2, gridsY_n1A2);
 
   // update route for (n1, A1) and (n1, A2)
   // find the index of E1 in (n1, A1)
@@ -1147,16 +1147,16 @@ void updateRouteType2(TreeNode* treenodes, int n1, int A1, int A2, int C1,
 
   // combine (n1, A1) and (n1, A2) into (A1, A2), A1 is the first node and A2 is
   // the second grids order A1->n1->A2 copy (A1, n1)
-  cnt_n1A1 = copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1,
-                       gridsY_n1A1);
+  cnt_n1A1 =
+      copyGrids(treenodes, A1, treeedges, edge_n1A1, gridsX_n1A1, gridsY_n1A1);
 
   // copy (n1, A2)
-  cnt_n1A2 = copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2,
-                       gridsY_n1A2);
+  cnt_n1A2 =
+      copyGrids(treenodes, n1, treeedges, edge_n1A2, gridsX_n1A2, gridsY_n1A2);
 
   // copy all the grids on (C1, C2) to gridsX_C1C2[] and gridsY_C1C2[]
-  cnt_C1C2 = copyGrids(treenodes, C1, treeedges, edge_C1C2, gridsX_C1C2,
-                       gridsY_C1C2);
+  cnt_C1C2 =
+      copyGrids(treenodes, C1, treeedges, edge_C1C2, gridsX_C1C2, gridsY_C1C2);
 
   // combine grids on original (A1, n1) and (n1, A2) to new (A1, A2)
   // allocate memory for gridsX[] and gridsY[] of edge_A1A2
@@ -1289,8 +1289,7 @@ void reInitTree(int netID) {
 }
 
 void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
-                   int mazeedge_Threshold, Bool Ordering, int cost_type)
-{
+                   int mazeedge_Threshold, Bool Ordering, int cost_type) {
   // LOCK = 0;
   float forange;
 
@@ -1470,8 +1469,8 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
           {
             // enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_atomic(treeedge, 
-                                         ripup_threshold, netID, edgeID);
+            enter =
+                newRipupCheck_atomic(treeedge, ripup_threshold, netID, edgeID);
 
             // ripup the routing for the edge
             if (enter) {
@@ -1558,7 +1557,8 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
 
                 // if(PRINT) printf("curX curY %d %d, (%d, %d), (%d, %d),
                 // pq1.size: %d\n", curX, curY, regionX1, regionX2, regionY1,
-                // regionY2, pq1.size()); if(curX == 102 && curY == 221) exit(1);
+                // regionY2, pq1.size()); if(curX == 102 && curY == 221)
+                // exit(1);
                 curr_d1 = d1[curY][curX];
                 if (curr_d1 != 0) {
                   if (HV[curY][curX]) {
@@ -2177,8 +2177,7 @@ void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
 void mazeRouteMSMD_block(int iter, int expand, float costHeight,
                          int ripup_threshold, int mazeedge_Threshold,
                          Bool Ordering, int cost_type,
-                         galois::InsertBag<int>* net_shuffle)
-{
+                         galois::InsertBag<int>* net_shuffle) {
   // LOCK = 0;
   float forange;
 
@@ -2260,8 +2259,8 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
       [&](const unsigned tid, const unsigned numT)
       // for(unsigned int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
       {
-        if(tid >= numT)
-            return;
+        if (tid >= numT)
+          return;
         for (const auto nidRPC : net_shuffle[tid]) {
           int grid, netID;
 
@@ -2353,8 +2352,7 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
                 mazeedge_Threshold) // only route the non-degraded edges (len>0)
             {
 
-              enter = newRipupCheck(treeedge, 
-                                    ripup_threshold, netID, edgeID);
+              enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
 
               // ripup the routing for the edge
               if (enter) {
@@ -3036,7 +3034,6 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
 }
 
 int getOverflow2Dmaze(int* maxOverflow, int* tUsage) {
