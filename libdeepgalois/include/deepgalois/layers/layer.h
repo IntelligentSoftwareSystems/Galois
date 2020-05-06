@@ -9,7 +9,7 @@
  * Reused/revised under 3-BSD
  */
 
-#include "deepgalois/types.h"
+#include "deepgalois/gtypes.h"
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
 #else
@@ -75,11 +75,11 @@ public:
   void set_norm_consts_ptr(float_t *ptr) { norm_consts = ptr; }
   void set_feats_ptr(float_t *ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
-//#ifdef CPU_ONLY
+#ifdef CPU_ONLY
   void set_graph_ptr(Graph *ptr) { graph_cpu = ptr; }
-//#else
-//  void set_graph_ptr(CSRGraph *ptr) { graph_gpu = ptr; }
-//#endif
+#else
+  void set_graph_ptr(GraphGPU *ptr) { graph_gpu = ptr; }
+#endif
   void update_dim_size(size_t g_size) { input_dims[0] = output_dims[0] = g_size; }
 
   //! set the data of the previous layer connected to this one
@@ -173,7 +173,7 @@ protected:
 #ifdef CPU_ONLY
   Graph *graph_cpu;
 #else
-  CSRGraph *graph_gpu;
+  GraphGPU *graph_gpu;
 #endif
 
 #ifdef GALOIS_USE_DIST

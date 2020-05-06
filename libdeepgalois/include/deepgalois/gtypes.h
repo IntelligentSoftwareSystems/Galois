@@ -10,13 +10,15 @@
 //#include "galois/graphs/LCGraph.h"
 #include "deepgalois/lgraph.h"
 #else
-#include "graph_gpu.h"
+//#include "graph_gpu.h"
+#include "deepgalois/lgraph.h"
 #endif
 #endif
 
 #ifndef GALOIS_USE_DIST
 
 namespace deepgalois {
+typedef index_t edge_iterator;
 #ifdef CPU_ONLY
 //#ifdef EDGE_LABEL
 //typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::
@@ -27,7 +29,6 @@ namespace deepgalois {
 //#endif
 //typedef LCGraph Graph;
 //typedef Graph::edge_iterator edge_iterator;
-typedef index_t edge_iterator;
 typedef LearningGraph Graph;
 #else
 //typedef CSRGraph GraphGPU;

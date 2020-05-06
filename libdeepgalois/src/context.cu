@@ -24,8 +24,10 @@ int64_t cluster_seedgen(void) {
   return seed;
 }
 
+namespace deepgalois {
+
 // computing normalization factor for each vertex
-__global__ void norm_factor_computing_node(int n, CSRGraph graph, float_t* norm_fac) {
+__global__ void norm_factor_computing_node(int n, GraphGPU graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(i, n) {
     float_t temp = sqrt(float_t(graph.getOutDegree(i)));
     if (temp == 0.0) norm_fac[i] = 0.0;
@@ -35,16 +37,16 @@ __global__ void norm_factor_computing_node(int n, CSRGraph graph, float_t* norm_
 
 // TODO: make sure self-loop added for each vertex
 // computing normalization factor for each edge
-__global__ void norm_factor_computing_edge(int n, CSRGraph graph, float_t* norm_fac) {
+__global__ void norm_factor_computing_edge(int n, GraphGPU graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(src, n) {
     assert(src < n);
     float_t d_src = float_t(graph.getOutDegree(src));
     assert(d_src != 0.0); // should never be zero since self-loop added for each vertex
     d_src = 1.0 / sqrt(d_src);
-    index_type start = graph.edge_begin(src);
-    index_type end = graph.edge_end(src);
-	for (index_type e = start; e != end; e++) {
-      index_type dst = graph.getEdgeDst(e);
+    auto start = graph.edge_begin(src);
+    index_t end = graph.edge_end(src);
+	for (index_t e = start; e != end; e++) {
+      index_t dst = graph.getEdgeDst(e);
       if (dst >= n) printf("src=%d, dst=%d, e=%d, start=%d, end=%d\n", src, dst, e, start, end);
       assert(dst < n);
       float_t d_dst = float_t(graph.getOutDegree(dst));
@@ -54,8 +56,6 @@ __global__ void norm_factor_computing_edge(int n, CSRGraph graph, float_t* norm_
     }
   }
 }
-
-namespace deepgalois {
 
 cublasHandle_t Context::cublas_handle_         = 0;
 cusparseHandle_t Context::cusparse_handle_     = 0;
@@ -102,7 +102,7 @@ void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
     exit(0);
   }
 #ifdef USE_CUSPARSE
-  int nnz = graph_gpu.nedges;
+  int nnz = graph_gpu.sizeEdges();
   CUDA_CHECK(cudaMalloc((void**)&norm_factors, nnz * sizeof(float_t)));
   init_const_gpu(nnz, 0.0, norm_factors);
   norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, graph_gpu, norm_factors);
@@ -128,14 +128,17 @@ void Context::SetDevice(const int device_id) {
 */
 size_t Context::read_graph(bool selfloop) {
   std::string filename = path + dataset + ".csgr";
-  CSRGraph g;
-  g.read(filename.c_str(), false);
+  /*GraphGPU g;
+  graph.read(filename.c_str(), false);
   if (selfloop) {
     g.add_selfloop();
     is_selfloop_added = selfloop;
   }
   g.copy_to_gpu(graph_gpu);
   n = graph_gpu.nnodes;
+  */
+  graph_gpu.readGraphFromGRFile(filename);
+  graph_gpu.copy_to_gpu();
   return n;
 }
 

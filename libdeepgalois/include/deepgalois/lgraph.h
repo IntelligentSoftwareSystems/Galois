@@ -1,7 +1,6 @@
 #pragma once
 #include "deepgalois/types.h"
 #include <string>
-//#include <boost/iterator/counting_iterator.hpp>
 
 namespace deepgalois {
 
@@ -27,7 +26,6 @@ protected:
 
 public:
   typedef size_t iterator;
-  //using iterator = boost::counting_iterator<index_t>;
   LearningGraph(bool use_gpu) : is_device(use_gpu), num_vertices_(0), num_edges_(0),
                                 //rowptr_(NULL), colidx_(NULL), degrees_(NULL),
                                 vertex_data_(NULL), edge_data_(NULL) {}
@@ -65,7 +63,7 @@ public:
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }
   index_t edge_end(index_t vid) { return rowptr_[vid+1]; }
-	vdata_t getData(unsigned vid) { return vertex_data_[vid]; }
+	vdata_t getData(index_t vid) { return vertex_data_[vid]; }
   index_t getDegree(index_t vid) { return degrees_[vid]; }
   index_t* row_start_ptr() { return &rowptr_[0]; }
   const index_t* row_start_ptr() const { return &rowptr_[0]; }
@@ -75,11 +73,12 @@ public:
   edata_t* edge_data_ptr() { return edge_data_; }
   vdata_t* vertex_data_ptr() { return vertex_data_; }
 #else
-	__device__ index_t getEdgeDst(unsigned edge) { return colidx_[edge]; }
-	__device__ index_t edge_begin(unsigned src) { return d_rowptr_[src]; }
-	__device__ index_t edge_end(unsigned src) { return d_rowptr_[src+1]; }
-	__device__ vdata_t getData(unsigned vid) { return d_vertex_data_[vid]; }
-	__device__ index_t getDegree(unsigned vid) { return d_degrees_[vid]; }
+	__device__ index_t getEdgeDst(index_t edge) { return d_colidx_[edge]; }
+	__device__ index_t edge_begin(index_t src) { return d_rowptr_[src]; }
+	__device__ index_t edge_end(index_t src) { return d_rowptr_[src+1]; }
+	__device__ vdata_t getData(index_t vid) { return d_vertex_data_[vid]; }
+	__device__ index_t getDegree(index_t vid) { return d_degrees_[vid]; }
+	__device__ index_t getOutDegree(index_t vid) { return d_degrees_[vid]; }
 	index_t *row_start_ptr() { return d_rowptr_; }
 	const index_t *row_start_ptr() const { return d_rowptr_; }
 	index_t *edge_dst_ptr() { return d_colidx_; }

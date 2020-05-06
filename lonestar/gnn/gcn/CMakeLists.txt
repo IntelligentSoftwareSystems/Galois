@@ -1,7 +1,12 @@
+if(ENABLE_HETERO_GALOIS)
+  set_source_files_properties(gcn.cpp PROPERTIES LANGUAGE CUDA)
+endif()
 add_executable(gcn gcn.cpp)
 target_link_libraries(gcn PRIVATE Galois::shmem lonestar)
 
 if(ENABLE_HETERO_GALOIS)
+  set_property(TARGET gcn PROPERTY CUDA_STANDARD 14)
+  set_property(TARGET gcn PROPERTY CUDA_SEPARABLE_COMPILATION ON)
   target_link_libraries(gcn PRIVATE dg_gpu)
   target_link_libraries(gcn PRIVATE -lcudart -lcublas -lcurand -lcudadevrt)
 else()

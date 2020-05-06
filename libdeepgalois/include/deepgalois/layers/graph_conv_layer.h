@@ -56,8 +56,8 @@ public:
   virtual void aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
   void d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
 #else
-  virtual void aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
-  void d_aggregate(size_t len, CSRGraph& g, const float_t* in, float_t* out);
+  virtual void aggregate(size_t len, GraphGPU& g, const float_t* in, float_t* out);
+  void d_aggregate(size_t len, GraphGPU& g, const float_t* in, float_t* out);
 #endif
   // user-defined combine function
   virtual void combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out);

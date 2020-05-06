@@ -7,10 +7,11 @@
 #include <cassert>
 #include "deepgalois/types.h"
 #include "deepgalois/reader.h"
-#ifdef CPU_ONLY
+//#ifdef CPU_ONLY
 #include "deepgalois/gtypes.h"
-#else
+//#else
 //#include "graph_gpu.h"
+#ifndef CPU_ONLY
 #include "deepgalois/cutils.h"
 #endif
 
@@ -46,22 +47,22 @@ public:
   void gen_subgraph_feats(size_t m, const mask_t *masks);
   void createSubgraphs(int num_subgraphs);
 
+#ifdef CPU_ONLY
   Graph* graph_cpu; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
   void add_selfloop(Graph &og, Graph &g);
   //! returns pointer to the graph
   Graph* getGraphPointer() { return graph_cpu; }
   Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
-#ifdef CPU_ONLY
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return &h_feats_subg[0]; }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return &h_labels_subg[0]; }
 #else
-  //CSRGraph graph_gpu; // the input graph, |V| = N
-  //std::vector<CSRGraph*> subgraphs_gpu;
-  //CSRGraph* getGraphPointer() { return &graph_gpu; }
-  //CSRGraph* getSubgraphPointer(int id) { return subgraphs_gpu[id]; };
+  GraphGPU graph_gpu; // the input graph, |V| = N
+  std::vector<GraphGPU*> subgraphs_gpu;
+  GraphGPU* getGraphPointer() { return &graph_gpu; }
+  GraphGPU* getSubgraphPointer(int id) { return subgraphs_gpu[id]; };
   float_t* get_feats_ptr() { return d_feats; }
   float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }

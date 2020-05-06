@@ -5,6 +5,8 @@
 #include "deepgalois/layers/aggregator.h"
 #include "deepgalois/math_functions.hh"
 
+namespace deepgalois {
+
 // TODO: use warp
 __device__ void scale_add(const int n, const float_t alpha, const float_t* a,
                           const float_t* b, float_t* y) {
@@ -12,7 +14,7 @@ __device__ void scale_add(const int n, const float_t alpha, const float_t* a,
     y[i] = alpha * a[i] + b[i];
 }
 
-__global__ void update_all_naive(size_t n, size_t len, CSRGraph g,
+__global__ void update_all_naive(size_t n, size_t len, GraphGPU g,
                                   const float_t* in, float_t* out,
                                   bool norm, const float_t* norm_factor) {
   CUDA_KERNEL_LOOP(src, n) {
@@ -29,7 +31,7 @@ __global__ void update_all_naive(size_t n, size_t len, CSRGraph g,
   }
 }
 
-__global__ void update_all_warp(size_t n, size_t len, CSRGraph g,
+__global__ void update_all_warp(size_t n, size_t len, GraphGPU g,
                                   const float_t* in, float_t* out,
                                   bool norm, const float_t* norm_factor) {
   __shared__ index_type ptrs[BLOCK_SIZE/WARP_SIZE][2];
@@ -59,23 +61,25 @@ __global__ void update_all_warp(size_t n, size_t len, CSRGraph g,
   }
 }
 
-void deepgalois::update_all(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+void update_all(size_t len, GraphGPU& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
-  unsigned n = g.nnodes;
+  unsigned n = g.size();
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   //update_all_naive<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, g, in, out, norm, norm_factor);
   update_all_warp<<<(n-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(n, len, g, in, out, norm, norm_factor);
   CudaTest("solving update_all kernel failed");
 }
 
-void deepgalois::update_all_csrmm(size_t len, CSRGraph& g, const float_t* in, float_t* out,
+void update_all_csrmm(size_t len, GraphGPU& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
-  unsigned n = g.nnodes;
+  unsigned n = g.size();
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
   //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
   //print_device_vector(10, norm_factor, "norm_factor");
   float *temp;
   float_malloc_device(n*len, temp); // TODO: avoid repetitive allocation
-  csrmm_gpu(n, len, n, g.nedges, 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, temp, out);
+  csrmm_gpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, temp, out);
   float_free_device(temp);
+}
+
 }
