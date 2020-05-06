@@ -47,12 +47,8 @@ public:
       : num_samples_(n), ft_dim_(len), data_(NULL), grad_(NULL), prev_(prev) {}
 
   void alloc();
-  void alloc_gpu();
-  void merge_grads(vec_t* dst);
-  void merge_grads_gpu(float_t* dst);
   void clear_grads();
-  void clear_grads_gpu();
-
+  void merge_grads(float_t* dst);
   void set_data(float_t* ptr) { data_ = ptr; }
   float_t* get_data() { return data_; }
   const float_t* get_data() const { return data_; }
