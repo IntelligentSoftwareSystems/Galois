@@ -34,7 +34,6 @@
 unsigned const debug = GGDEBUG;
 
 #include "Timer.h"
-#include "checker.h"
 
 template <typename T>
 static void check_retval(const T retval, const T expected, const char* file,

@@ -70,6 +70,12 @@ else()
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+if(ENABLE_HETERO_GALOIS)
+set(sources
+  src/node.cpp
+  src/net.cpp
+)
+else()
 if(ENABLE_DIST_GALOIS)
 # do not link regular context.cpp; TODO do this conditional in cleaner way
 # also don't link sampler
@@ -85,16 +91,9 @@ set(sources
   src/layers/layer.cpp
   src/DistContext.cpp
   src/optimizer.cpp
+  src/reader.cpp
   src/lgraph.cpp
   src/utils.cpp
-  src/node.cpp
-  src/net.cpp
-)
-else()
-if(ENABLE_DIST_GALOIS)
-set(sources
-  src/context.cpp
-  src/lgraph.cpp
   src/node.cpp
   src/net.cpp
 )
@@ -112,6 +111,7 @@ set(sources
   src/optimizer.cpp
   src/context.cpp
   src/sampler.cpp
+  src/reader.cpp
   src/lgraph.cpp
   src/utils.cpp
   src/node.cpp

@@ -6,7 +6,7 @@
 #include <string>
 #include <cassert>
 #include "deepgalois/types.h"
-//#include <boost/shared_ptr.hpp>
+#include "deepgalois/reader.h"
 #ifdef CPU_ONLY
 #include "deepgalois/gtypes.h"
 #else
@@ -19,21 +19,25 @@ namespace deepgalois {
 class Context {
 public:
   Context();
+  Context(bool use_gpu) : is_device(use_gpu), n(0), num_classes(0), feat_len(0), is_single_class(true), 
+  is_selfloop_added(false), use_subgraph(false), h_labels(NULL), h_feats(NULL),
+  d_labels(NULL), d_labels_subg(NULL), d_feats(NULL), d_feats_subg(NULL), norm_factors(NULL) {}
+
   ~Context();
 
-  size_t read_graph(std::string dataset_str, bool selfloop);
-  size_t read_graph_cpu(std::string dataset_str, std::string filetype, bool selfloop);
-  size_t read_graph_gpu(std::string dataset_str, bool selfloop);
-  size_t read_labels(std::string dataset_str);
-  size_t read_features(std::string dataset_str, std::string filetype = "bin");
-  size_t read_masks(std::string dataset_str, std::string mask_type,
-                    size_t n, size_t& begin, size_t& end, mask_t* masks);
+  size_t read_graph(bool selfloop);
+  size_t read_labels() { num_classes = reader.read_labels(is_single_class, h_labels); return num_classes; }
+  size_t read_features() { feat_len = reader.read_features(h_feats); return feat_len; }
+  size_t read_masks(std::string mask_type, size_t n, size_t& begin, size_t& end, mask_t* masks) {
+    return reader.read_masks(mask_type, n, begin, end, masks);
+  }
 
   label_t get_label(size_t i) { return h_labels[i]; } // single-class (one-hot) label
   //label_t get_label(size_t i, size_t j) { return labels[i*num_classes+j]; } // multi-class label
   float_t* get_norm_factors_ptr() { return norm_factors; }
   float_t* get_norm_factors_subg_ptr() { return &norm_factors_subg[0]; }
 
+  void set_dataset(std::string dataset_str) { dataset = dataset_str; reader.init(dataset); }
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
   void set_use_subgraph(bool use_subg) { use_subgraph = use_subg; }
   void copy_data_to_device(); // copy labels and input features
@@ -69,6 +73,8 @@ public:
 #endif
 
 protected:
+  std::string dataset; 
+  bool is_device;              // is this on device or host
   size_t n;                    // number of samples: N
   size_t num_classes;          // number of classes: E
   size_t feat_len;             // input feature length: D
@@ -88,6 +94,8 @@ protected:
   std::vector<float_t> h_feats_subg;       // input features for subgraph
   std::vector<float_t> norm_factors_subg;  // normalization constant for subgraph
   //float_t* norm_factors_subg;  // normalization constant for subgraph
+  Reader reader;
+
   void alloc_norm_factor();
   void alloc_subgraph_norm_factor(int subg_id);
 

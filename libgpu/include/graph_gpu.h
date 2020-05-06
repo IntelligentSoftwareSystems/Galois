@@ -16,7 +16,6 @@
 
 #include <cassert>
 #include <fstream>
-#include "checker.h"
 
 // Adapted from LSG CSRGraph.h
 
@@ -93,18 +92,6 @@ struct CSRGraph {
     return edge_data[abs_edge];
   };
 
-	void init_from_mgraph(int m, int nnz, index_type *h_row_offsets, index_type *h_column_indices, node_data_type *h_labels) {
-		nnodes = m;
-		nedges = nnz;
-		check_cuda(cudaMalloc((void **)&row_start, (m + 1) * sizeof(index_type)));
-		check_cuda(cudaMalloc((void **)&edge_dst, nnz * sizeof(index_type)));
-		check_cuda(cudaMemcpy(row_start, h_row_offsets, (m + 1) * sizeof(index_type), cudaMemcpyHostToDevice));
-		check_cuda(cudaMemcpy(edge_dst, h_column_indices, nnz * sizeof(index_type), cudaMemcpyHostToDevice));
-		#ifdef ENABLE_LABEL
-		check_cuda(cudaMalloc((void **)&node_data, m * sizeof(node_data_type)));
-		check_cuda(cudaMemcpy(node_data, h_labels, m * sizeof(node_data_type), cudaMemcpyHostToDevice));
-		#endif
-	}
 	void print_neighbors(index_type vid) {
 		printf("Vertex %d neighbors: [ ", vid);
 		index_type start = row_start[vid];

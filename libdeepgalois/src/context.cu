@@ -62,12 +62,7 @@ cusparseHandle_t Context::cusparse_handle_     = 0;
 cusparseMatDescr_t Context::cusparse_matdescr_ = 0;
 curandGenerator_t Context::curand_generator_   = 0;
 
-Context::Context() : n(0), num_classes(0), feat_len(0), 
-                     is_single_class(true), is_selfloop_added(false), 
-                     h_labels(NULL), h_feats(NULL), 
-                     d_labels(NULL), d_feats(NULL),
-                     d_labels_subg(NULL), d_feats_subg(NULL),
-                     norm_factors(NULL) {
+Context::Context() : Context(true) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -98,11 +93,6 @@ void Context::gen_subgraph_labels(size_t m, const mask_t *masks) {
 }
 
 void Context::gen_subgraph_feats(size_t m, const mask_t *masks) {
-}
-
-size_t Context::read_graph(std::string dataset_str, bool selfloop) {
-  n = read_graph_gpu(dataset_str, selfloop);
-  return n;
 }
 
 void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
@@ -136,8 +126,8 @@ void Context::SetDevice(const int device_id) {
   CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
 }
 */
-size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
-  std::string filename = path + dataset_str + ".csgr";
+size_t Context::read_graph(bool selfloop) {
+  std::string filename = path + dataset + ".csgr";
   CSRGraph g;
   g.read(filename.c_str(), false);
   if (selfloop) {
@@ -145,7 +135,8 @@ size_t Context::read_graph_gpu(std::string dataset_str, bool selfloop) {
     is_selfloop_added = selfloop;
   }
   g.copy_to_gpu(graph_gpu);
-  return graph_gpu.nnodes;
+  n = graph_gpu.nnodes;
+  return n;
 }
 
 void Context::copy_data_to_device() {

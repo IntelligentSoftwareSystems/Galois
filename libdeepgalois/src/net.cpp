@@ -36,7 +36,8 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
                  ", weight_decay ", weight_decay, "\n");
 #ifndef GALOIS_USE_DIST
   context = new deepgalois::Context();
-  num_samples = context->read_graph(dataset_str, selfloop);
+  context->set_dataset(dataset_str);
+  num_samples = context->read_graph(selfloop);
   context->set_label_class(is_single_class);
 #else
   // only done here to avoid unused var complain TODO find better way
@@ -44,7 +45,7 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
 #endif
 
   // read graph, get num nodes
-  num_classes = context->read_labels(dataset_str);
+  num_classes = context->read_labels();
 
 #ifndef GALOIS_USE_DIST
   //std::cout << "Reading label masks ... ";
@@ -62,8 +63,8 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
     for (size_t i = train_begin; i < train_end; i++) train_masks[i] = 1;
     for (size_t i = val_begin; i < val_end; i++) val_masks[i] = 1;
   } else {
-    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks);
-    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks);
+    train_count = context->read_masks("train", num_samples, train_begin, train_end, train_masks);
+    val_count = context->read_masks("val", num_samples, val_begin, val_end, val_masks);
   }
 #endif
 
@@ -79,7 +80,7 @@ void Net::init(std::string dataset_str, int nt, unsigned n_conv, int epochs,
   if (has_dense) num_layers ++;
   // initialize feature metadata
   feature_dims.resize(num_layers + 1);
-  feature_dims[0] = context->read_features(dataset_str); // input feature dimension: D
+  feature_dims[0] = context->read_features(); // input feature dimension: D
   for (size_t i = 1; i < num_conv_layers; i++)
     feature_dims[i] = hidden1;                           // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes;           // output embedding: E
@@ -133,8 +134,8 @@ void Net::dist_init(Graph* graph, std::string dataset_str) {
       }
     }
   } else {
-    train_count = context->read_masks(dataset_str, "train", num_samples, train_begin, train_end, train_masks, dGraph);
-    val_count = context->read_masks(dataset_str, "val", num_samples, val_begin, val_end, val_masks, dGraph);
+    train_count = context->read_masks("train", num_samples, train_begin, train_end, train_masks, dGraph);
+    val_count = context->read_masks("val", num_samples, val_begin, val_end, val_masks, dGraph);
   }
 }
 #endif
@@ -486,9 +487,9 @@ void Net::read_test_masks(std::string dataset) {
 #endif
   } else {
 #ifndef GALOIS_USE_DIST
-    test_count = context->read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks);
+    test_count = context->read_masks("test", num_samples, test_begin, test_end, test_masks);
 #else
-    test_count = context->read_masks(dataset, "test", num_samples, test_begin, test_end, test_masks, dGraph);
+    test_count = context->read_masks("test", num_samples, test_begin, test_end, test_masks, dGraph);
 #endif
   }
 #ifndef CPU_ONLY
