@@ -1,6 +1,6 @@
 
 
-Bool newRipupCheck_lock(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
+Bool newRipupCheck_lock(TreeEdge* treeedge,
                         int ripup_threshold, int netID, int edgeID) {
   short *gridsX, *gridsY;
   int i, grid, ymin, xmin;
@@ -115,8 +115,7 @@ Bool newRipupCheck_lock(TreeEdge* treeedge, int x1, int y1, int x2, int y2,
 
 void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
-                        Bool Ordering, int cost_type,
-                        galois::InsertBag<int>* net_shuffle)
+                        Bool Ordering, int cost_type)
 {
   // LOCK = 0;
   float forange;
@@ -198,9 +197,9 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
   std::shuffle(net_shuffle.begin(), net_shuffle.end(), g);
 
   galois::do_all(galois::iterate(net_shuffle), */
-  galois::for_each(
+  galois::do_all(
       galois::iterate(0, numValidNets),
-      [&](const auto nidRPC, auto& ctx)
+      [&](const auto nidRPC)
       // galois::do_all(galois::iterate(0, numValidNets),
       //        [&] (const auto nidRPC)
       {
@@ -299,7 +298,7 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
 
             // enter = newRipupCheck_nosub(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_lock(treeedge, n1x, n1y, n2x, n2y,
+            enter = newRipupCheck_lock(treeedge, 
                                        ripup_threshold, netID, edgeID);
 
             // ripup the routing for the edge
@@ -998,8 +997,7 @@ void mazeRouteMSMD_lock(int iter, int expand, float costHeight,
 
 void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
                         int ripup_threshold, int mazeedge_Threshold,
-                        Bool Ordering, int cost_type,
-                        galois::InsertBag<int>* net_shuffle)
+                        Bool Ordering, int cost_type)
 {
   // LOCK = 0;
   float forange;
@@ -1181,7 +1179,7 @@ void mazeRouteMSMD_M1M2(int iter, int expand, float costHeight,
 
             // enter = newRipupCheck_nosub(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);
-            enter = newRipupCheck_lock(treeedge, n1x, n1y, n2x, n2y,
+            enter = newRipupCheck_lock(treeedge,
                                        ripup_threshold, netID, edgeID);
             // enter = newRipupCheck_atomic(treeedge, n1x, n1y, n2x, n2y,
             // ripup_threshold, netID, edgeID);

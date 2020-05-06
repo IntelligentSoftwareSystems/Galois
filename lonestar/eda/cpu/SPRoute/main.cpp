@@ -224,7 +224,6 @@ int main(int argc, char** argv) {
 
     InitLastUsage(upType);
 
-    galois::InsertBag<int> net_shuffle[40]; // 6*6
     // OrderNetEdge* netEO = (OrderNetEdge*)calloc(2000, sizeof(OrderNetEdge));
 
     PRINT_HEAT = 0;
@@ -338,11 +337,10 @@ int main(int argc, char** argv) {
 
         mazeRouteMSMD_finegrain_spinlock(
             i, enlarge, costheight, ripup_threshold, mazeedge_Threshold,
-            !(i % 3), cost_type, net_shuffle);
+            !(i % 3), cost_type);
       } else {
         mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                      mazeedge_Threshold, !(i % 3), cost_type,
-                      net_shuffle);
+                      mazeedge_Threshold, !(i % 3), cost_type);
       }
       roundtimer.stop();
       cout << "round : " << i << " time(ms): " << roundtimer.get() - oldtime
@@ -403,11 +401,10 @@ int main(int argc, char** argv) {
 
                   mazeRouteMSMD_finegrain_spinlock(
                       i, enlarge, costheight, ripup_threshold,
-                      mazeedge_Threshold, !(i % 3), cost_type, net_shuffle);
+                      mazeedge_Threshold, !(i % 3), cost_type);
                 } else {
                   mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                                mazeedge_Threshold, !(i % 3), cost_type,
-                                net_shuffle);
+                                mazeedge_Threshold, !(i % 3), cost_type);
                 }
               },
               "mazeroute");
@@ -463,11 +460,10 @@ int main(int argc, char** argv) {
 
                   mazeRouteMSMD_finegrain_spinlock(
                       i, enlarge, costheight, ripup_threshold,
-                      mazeedge_Threshold, !(i % 3), cost_type, net_shuffle);
+                      mazeedge_Threshold, !(i % 3), cost_type);
                 } else {
                   mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                                mazeedge_Threshold, !(i % 3), cost_type,
-                                net_shuffle);
+                                mazeedge_Threshold, !(i % 3), cost_type);
                 }
               },
               "mazeroute");

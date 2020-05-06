@@ -440,8 +440,7 @@ void setupHeapLate(int netID, int edgeID, galois::InsertBag<lateUpdateReq>& pq1,
 void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
                                         int ripup_threshold,
                                         int mazeedge_Threshold, Bool Ordering,
-                                        int cost_type,
-                                        galois::InsertBag<int>* net_shuffle) {
+                                        int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 

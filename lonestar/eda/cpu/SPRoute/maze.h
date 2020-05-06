@@ -1267,7 +1267,7 @@ void reInitTree(int netID) {
   // printf("fluted worked\n");
   // fflush(stdout);
   if (d > 3) {
-    edgeShiftNew(&rsmt, netID);
+    edgeShiftNew(&rsmt);
     // printf("edge shifted\n");
   }
   // fflush(stdout);
@@ -1289,8 +1289,7 @@ void reInitTree(int netID) {
 }
 
 void mazeRouteMSMD(int iter, int expand, float costHeight, int ripup_threshold,
-                   int mazeedge_Threshold, Bool Ordering, int cost_type,
-                   galois::InsertBag<int>* net_shuffle)
+                   int mazeedge_Threshold, Bool Ordering, int cost_type)
 {
   // LOCK = 0;
   float forange;
@@ -2261,6 +2260,8 @@ void mazeRouteMSMD_block(int iter, int expand, float costHeight,
       [&](const unsigned tid, const unsigned numT)
       // for(unsigned int nidRPC = 0; nidRPC < numValidNets; nidRPC++)
       {
+        if(tid >= numT)
+            return;
         for (const auto nidRPC : net_shuffle[tid]) {
           int grid, netID;
 

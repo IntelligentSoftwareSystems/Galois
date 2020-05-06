@@ -10,8 +10,7 @@ int round_num = 0;
 
 void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                              int ripup_threshold, int mazeedge_Threshold,
-                             Bool Ordering, int cost_type,
-                             galois::InsertBag<int>* net_shuffle)
+                             Bool Ordering, int cost_type)
 {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
@@ -1011,8 +1010,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
 void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
                                       int ripup_threshold,
                                       int mazeedge_Threshold, Bool Ordering,
-                                      int cost_type,
-                                      galois::InsertBag<int>* net_shuffle) {
+                                      int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain maze", "fine grain maze");
 
@@ -1066,8 +1064,8 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
     }
   }
 
-  cout << " i = vCap:" << v_costTable[vCapacity - 1] << " "
-       << v_costTable[vCapacity] << " " << v_costTable[vCapacity + 1] << endl;
+  //cout << " i = vCap:" << v_costTable[vCapacity - 1] << " "
+  //     << v_costTable[vCapacity] << " " << v_costTable[vCapacity + 1] << endl;
 
   /*forange = yGrid*xGrid;
   for(i=0; i<forange; i++)
@@ -1978,8 +1976,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
 
 void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
                                    int ripup_threshold, int mazeedge_Threshold,
-                                   Bool Ordering, int cost_type,
-                                   galois::InsertBag<int>* net_shuffle) {
+                                   Bool Ordering, int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 
