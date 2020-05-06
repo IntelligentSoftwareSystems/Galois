@@ -113,8 +113,8 @@ if(NOT ENABLE_HETERO_GALOIS)
       src/node.cpp
       src/net.cpp
     )
-  endif()
-endif()
+  endif(ENABLE_DIST_GALOIS)
+endif(NOT ENABLE_HETERO_GALOIS)
 
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem)
@@ -148,4 +148,3 @@ set_target_properties(dg_cpu PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )
-endif()
