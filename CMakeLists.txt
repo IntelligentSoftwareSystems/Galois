@@ -124,11 +124,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd2196>")
 endif()
 
-if(CYGWIN)
-  message(STATUS "On Cygwin")
-  add_definitions(-U__STRICT_ANSI__)
-endif()
-
 # Enable architecture-specific optimizations
 include(CheckArchFlags)
 if(ARCH_FLAGS_FOUND)
