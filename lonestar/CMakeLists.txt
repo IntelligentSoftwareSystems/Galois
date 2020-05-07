@@ -34,7 +34,7 @@ if(GALOIS_ENABLE_DIST)
     set(BASEOUTPUT /workspace/dist-outputs)
   endif()
 
-  if(ENABLE_HETERO_GALOIS)
+  if(GALOIS_ENABLE_GPU)
     # turn on cuda for distbench as well
     target_compile_definitions(distbench PRIVATE __GALOIS_HET_CUDA__=1)
 
@@ -70,7 +70,7 @@ if(GALOIS_ENABLE_DIST)
       target_compile_definitions(${name} PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
     endif()
 
-    if(ENABLE_HETERO_GALOIS AND NOT ${X_NO_GPU})
+    if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
       target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
       target_link_libraries(${name} ${name}_cuda)
 
@@ -139,7 +139,7 @@ if(GALOIS_ENABLE_DIST)
       add_test_dist_and_verify(${app} ${input} ${type}-cpu ${part} ${num_threads} ${np} ${ARGN})
     endforeach()
 
-    if (NOT ENABLE_HETERO_GALOIS)
+    if (NOT GALOIS_ENABLE_GPU)
       return()
     endif()
 

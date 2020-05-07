@@ -5,7 +5,7 @@ install(TARGETS motif DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLU
 
 #add_test_mine(small1 motif "${BASEINPUT}/Mining/citeseer.csgr")
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_executable(motif_gpu motif_gpu.cpp motif.cu)
   add_dependencies(apps motif_gpu)
   target_link_libraries(motif_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)

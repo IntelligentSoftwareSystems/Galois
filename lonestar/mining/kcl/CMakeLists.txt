@@ -5,7 +5,7 @@ install(TARGETS kcl DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE
 
 #add_test_mine(small1 kcl "${BASEINPUT}/Mining/citeseer.csgr")
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_executable(kcl_gpu kcl_gpu.cpp kcl.cu)
   add_dependencies(apps kcl_gpu)
   target_link_libraries(kcl_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)

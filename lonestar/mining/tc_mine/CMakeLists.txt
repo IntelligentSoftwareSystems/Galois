@@ -5,7 +5,7 @@ install(TARGETS tc_mine DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXC
 
 #add_test_mine(small1 tc_mine "${BASEINPUT}/Mining/citeseer.csgr")
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_executable(tc_mine_gpu tc_mine_gpu.cpp tc_mine.cu)
   add_dependencies(apps tc_mine_gpu)
   target_link_libraries(tc_mine_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
