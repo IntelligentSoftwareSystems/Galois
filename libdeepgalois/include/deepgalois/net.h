@@ -38,6 +38,7 @@ public:
   learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
   val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     assert(n_conv > 0);
+    // TODO use galois print
     std::cout << "Configuration: num_threads " << num_threads
               << ", num_conv_layers " << num_conv_layers
               << ", num_epochs " << num_epochs
@@ -50,6 +51,9 @@ public:
     if (has_dense) num_layers ++;
     // initialize feature metadata
     feature_dims.resize(num_layers + 1);
+
+
+
 #ifndef GALOIS_USE_DIST
     context = new deepgalois::Context();
     context->set_dataset(dataset_str);

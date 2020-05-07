@@ -34,7 +34,7 @@ public:
   ~DistContext();
 
   //! save graph pointer to context object
-  void saveGraph(Graph* dGraph);
+  void saveDistGraph(Graph* dGraph);
 
   //! read labels of local nodes only
   size_t read_labels(std::string dataset_str);

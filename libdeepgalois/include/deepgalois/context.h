@@ -7,11 +7,9 @@
 #include <cassert>
 #include "deepgalois/types.h"
 #include "deepgalois/reader.h"
-//#ifdef CPU_ONLY
 #include "deepgalois/gtypes.h"
-//#else
-//#include "graph_gpu.h"
-#ifndef CPU_ONLY
+
+#ifdef __GALOIS_HET_CUDA__
 #include "deepgalois/cutils.h"
 #endif
 
@@ -20,10 +18,11 @@ namespace deepgalois {
 class Context {
 public:
   Context();
-  Context(bool use_gpu) : is_device(use_gpu), n(0), num_classes(0), feat_len(0), is_single_class(true), 
-  is_selfloop_added(false), use_subgraph(false), h_labels(NULL), h_feats(NULL),
-  d_labels(NULL), d_labels_subg(NULL), d_feats(NULL), d_feats_subg(NULL), norm_factors(NULL) {}
-
+  Context(bool use_gpu) :
+    is_device(use_gpu), n(0), num_classes(0), feat_len(0),
+    is_single_class(true), is_selfloop_added(false), use_subgraph(false),
+    h_labels(NULL), h_feats(NULL), d_labels(NULL), d_labels_subg(NULL),
+    d_feats(NULL), d_feats_subg(NULL), norm_factors(NULL) {}
   ~Context();
 
   size_t read_graph(bool selfloop);
@@ -47,7 +46,7 @@ public:
   void gen_subgraph_feats(size_t m, const mask_t *masks);
   void createSubgraphs(int num_subgraphs);
 
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   Graph* graph_cpu; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
   void add_selfloop(Graph &og, Graph &g);
@@ -100,7 +99,7 @@ protected:
   void alloc_norm_factor();
   void alloc_subgraph_norm_factor(int subg_id);
 
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   void read_edgelist(const char* filename, bool symmetrize = false, bool add_self_loop = false);
 #else
   static cublasHandle_t cublas_handle_; // used to call cuBLAS

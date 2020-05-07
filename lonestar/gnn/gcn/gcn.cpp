@@ -10,23 +10,19 @@ const char* desc = "Graph convolutional neural networks on an undirected graph";
 const char* url  = 0;
 
 int main(int argc, char** argv) {
-#ifndef GALOIS_USE_DIST
-  galois::SharedMemSys G;
-#else
   galois::DistMemSys G;
-#endif
   LonestarGnnStart(argc, argv, name, desc, url);
-  // the neural network to train
+
+  // the neural network to train: loads the entire graph on CPU
   deepgalois::Net network(dataset, numThreads, num_conv_layers, epochs,
                     hidden1, learning_rate, dropout_rate, weight_decay,
                     add_selfloop, is_single_class, add_l2norm, add_dense, 
                     neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
-#ifdef GALOIS_USE_DIST
   std::vector<unsigned> dummyVec;
-  deepgalois::Graph* dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  deepgalois::Graph* dGraph =
+    galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
   network.dist_init(dGraph, dataset);
-#endif
 
   // read network, features, ground truth, initialize metadata
   // default setting for now; can be customized by the user
