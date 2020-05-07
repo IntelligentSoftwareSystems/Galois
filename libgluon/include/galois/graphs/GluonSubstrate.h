@@ -3531,7 +3531,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 // @todo Checkpointing code needs updates to make it work.
-#ifdef __GALOIS_CHECKPOINT__
+#ifdef GALOIS_CHECKPOINT
 ///*
 // * Headers for boost serialization
 // */
