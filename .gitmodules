@@ -1,6 +1,3 @@
-[submodule "bliss"]
-	path = bliss
-	url = https://github.com/chenxuhao/bliss.git
 [submodule "moderngpu"]
 	path = external/moderngpu
 	url = https://github.com/moderngpu/moderngpu.git
