@@ -134,6 +134,58 @@ jobs:
           (cd /tmp/build \
             && chown -R runner . \
             && su runner -c "ctest -V --label-regex quick --parallel 2")
+  "Ubuntu-18.04-cuda10.1-build-only":
+    docker:
+      - image: nvidia/cuda:10.1-devel-ubuntu18.04
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
+          apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+          apt-get -q update -y
+
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-all-dev \
+            libeigen3-dev \
+            libopenmpi-dev \
+            llvm-7-dev \
+            openmpi-bin \
+            ssh
+
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
+  "Ubuntu-18.04-cuda10.2-build-only":
+    docker:
+      - image: nvidia/cuda:10.2-devel-ubuntu18.04
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
+          apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+          apt-get -q update -y
+
+          apt-get -q install -y \
+            cmake \
+            g++ \
+            gcc \
+            libboost-all-dev \
+            libeigen3-dev \
+            libopenmpi-dev \
+            llvm-7-dev \
+            openmpi-bin \
+            ssh
+
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake --build /tmp/build --target input
+          cmake --build /tmp/build --parallel 2
   "CentOS-8-gcc":
     docker:
       - image: centos:8
@@ -210,9 +262,9 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-          cd /tmp/build \
+          (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2"
+            && su runner -c "ctest -V --label-regex quick --parallel 2")
   "Arch":
     docker:
       - image: archlinux/base
@@ -340,13 +392,15 @@ workflows:
   version: 2
   build:
     jobs:
-      - "CheckFormat"
-      - "Sanitize"
-      - "Debian"
-      - "Ubuntu-18.04"
-      - "CentOS-8-gcc"
-      - "CentOS-8-clang"
-      - "Arch"
       - "Alpine"
-      - "Fedora-gcc"
+      - "Arch"
+      - "CentOS-8-clang"
+      - "CentOS-8-gcc"
+      - "CheckFormat"
+      - "Debian"
       - "Fedora-clang"
+      - "Fedora-gcc"
+      - "Sanitize"
+      - "Ubuntu-18.04"
+      - "Ubuntu-18.04-cuda10.2-build-only"
+      - "Ubuntu-18.04-cuda10.1-build-only"
