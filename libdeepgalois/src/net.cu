@@ -1,4 +1,4 @@
-#include "deepgalois/net.h"
+#include "deepgalois/Net.h"
 #include "deepgalois/cutils.h"
 #include "deepgalois/math_functions.hh"
 #include "gg.h"

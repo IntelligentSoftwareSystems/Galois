@@ -4,7 +4,7 @@
 
 #include "galois/Timer.h"
 #include "galois/Galois.h"
-#include "deepgalois/net.h"
+#include "deepgalois/Net.h"
 #include "deepgalois/math_functions.hh"
 
 namespace deepgalois {
