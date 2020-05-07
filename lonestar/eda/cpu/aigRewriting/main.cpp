@@ -29,9 +29,25 @@
 #include "algorithms/ChoiceManager.h"
 #include "algorithms/ReconvDrivenCut.h"
 #include "galois/Galois.h"
+#include "Lonestar/BoilerPlate.h"
 #include <chrono>
 #include <iostream>
 #include <sstream>
+
+static const char* name = "AIG Rewriting";
+
+static const char* desc =
+    "Optimization in logic synthesis through rewriting AND-Inverter Graphs";
+
+static const char* url = "aigRewriting";
+
+namespace cll = llvm::cl;
+static cll::opt<std::string>
+    inputFileName(cll::Positional, cll::desc("<input file>"), cll::Required);
+
+static cll::opt<bool>
+    outputVerbose("v", cll::desc("verbose output (default: false)"),
+                  cll::init(false));
 
 using namespace std::chrono;
 
@@ -49,18 +65,10 @@ int main(int argc, char* argv[]) {
 
   // shared-memory system object initializes global variables for galois
   galois::SharedMemSys G;
+  LonestarStart(argc, argv, name, desc, url);
 
-  if (argc < 3) {
-    std::cout << "Mandatory arguments: <nThreads> <AigInputFile>" << std::endl;
-    std::cout << "Optional arguments: -v (verbose)" << std::endl;
-    // std::cout << "Optional arguments: -d (deterministic mapping)" <<
-    // std::endl;
-    exit(1);
-  }
-
-  int nThreads = atoi(argv[1]);
-
-  std::string path(argv[2]);
+  int nThreads         = numThreads;
+  std::string path     = inputFileName;
   std::string fileName = getFileName(path);
 
   aig::Aig aig;
@@ -68,21 +76,7 @@ int main(int argc, char* argv[]) {
   aigParser.parseAig();
   // aigParser.parseAag();
 
-  bool verbose = false;
-  for (int i = 3; i < argc; i++) {
-    std::string verbosity(argv[i]);
-    if (verbosity.compare("-v") == 0) {
-      verbose = true;
-      continue;
-    }
-
-    // INVALID ARG
-    std::cout << "Mandatory arguments: <nThreads> <AigInputFile>" << std::endl;
-    std::cout << "Optional arguments: -v (verbose)" << std::endl;
-    exit(1);
-  }
-
-  if (verbose) {
+  if (outputVerbose) {
     std::cout << "############## AIG REWRITING ##############" << std::endl;
     std::cout << "Design Name: " << fileName << std::endl;
     std::cout << "|Nodes|: " << aig.getGraph().size() << std::endl;
@@ -94,7 +88,7 @@ int main(int argc, char* argv[]) {
               << std::endl;
   }
 
-  aigRewriting(aig, fileName, nThreads, verbose);
+  aigRewriting(aig, fileName, nThreads, outputVerbose);
 
   return 0;
 }
