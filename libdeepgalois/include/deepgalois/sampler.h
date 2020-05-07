@@ -1,7 +1,7 @@
 #ifndef GALOIS_USE_DIST
 
 #pragma once
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 
 namespace deepgalois {
 #define ETA 1.5          // length factor of DB in sampling

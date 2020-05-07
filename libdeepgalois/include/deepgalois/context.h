@@ -7,7 +7,7 @@
 #include <cassert>
 #include "deepgalois/types.h"
 #include "deepgalois/reader.h"
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "deepgalois/cutils.h"
@@ -18,6 +18,7 @@ namespace deepgalois {
 class Context {
 public:
   Context();
+  //! initializer for gpu; goes ahead and sets a few things
   Context(bool use_gpu)
       : is_device(use_gpu), n(0), num_classes(0), feat_len(0),
         is_single_class(true), is_selfloop_added(false), use_subgraph(false),

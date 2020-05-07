@@ -1,5 +1,5 @@
 #pragma once
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 
 namespace deepgalois {
 

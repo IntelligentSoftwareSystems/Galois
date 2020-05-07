@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #ifdef GALOIS_USE_DIST
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 #else
 #include "deepgalois/types.h"
 #endif

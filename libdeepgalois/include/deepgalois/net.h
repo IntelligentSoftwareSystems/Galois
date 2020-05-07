@@ -16,7 +16,7 @@
 #ifndef GALOIS_USE_DIST
 #include "deepgalois/context.h"
 #else
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 #include "deepgalois/DistContext.h"
 #endif
 
@@ -45,28 +45,32 @@ public:
               << learning_rate << ", dropout_rate " << dropout_rate
               << ", weight_decay " << weight_decay << "\n";
     num_layers = num_conv_layers + 1;
+
+    // additional layers to add
     if (has_l2norm)
       num_layers++;
     if (has_dense)
       num_layers++;
+
     // initialize feature metadata
     feature_dims.resize(num_layers + 1);
 
-#ifndef GALOIS_USE_DIST
+    // initialze context
     context = new deepgalois::Context();
     context->set_dataset(dataset_str);
+    // read graph, get num nodes
     num_samples = context->read_graph(selfloop);
     context->set_label_class(is_single_class);
-    // read graph, get num nodes
+    // read ground truth labels
     num_classes = context->read_labels();
 
-    // std::cout << "Reading label masks ... ";
+    // get training and validation sets
     train_masks = new mask_t[num_samples];
     val_masks   = new mask_t[num_samples];
     std::fill(train_masks, train_masks + num_samples, 0);
     std::fill(val_masks, val_masks + num_samples, 0);
 
-    // get training and validation sets
+    // reddit is hard coded
     if (dataset_str == "reddit") {
       train_begin = 0, train_count = 153431,
       train_end = train_begin + train_count;
@@ -83,42 +87,52 @@ public:
                                       val_masks);
     }
 
+    // make sure sampel size isn't greater than what we have to train with
     if (subgraph_sample_size > train_count) {
-      std::cout << "FATAL: subgraph size can not be larger than the size of "
-                   "training set\n";
-      exit(1);
+      GALOIS_DIE("subgraph size can not be larger than the size of training "
+                 "set\n");
     }
 
+    // read features of vertices
     feature_dims[0] = context->read_features(); // input feature dimension: D
+
     for (size_t i = 1; i < num_conv_layers; i++)
       feature_dims[i] = hidden1;                 // hidden1 level embedding: 16
+
     feature_dims[num_conv_layers] = num_classes; // output embedding: E
+
     if (has_l2norm)
       feature_dims[num_conv_layers + 1] =
           num_classes; // l2 normalized embedding: E
+
     if (has_dense)
       feature_dims[num_layers - 1] = num_classes; // MLP embedding: E
+
     feature_dims[num_layers] = num_classes; // normalized output embedding: E
     layers.resize(num_layers);
+
+    // set the subgraph boolean if sample size is greater than 0
     context->set_use_subgraph(subgraph_sample_size > 0);
-    init();
-#endif
   }
 
-  Net()
-      : is_single_class(true), has_l2norm(false), has_dense(false),
-        neighbor_sample_size(0), subgraph_sample_size(0), num_threads(1),
-        num_samples(0), num_classes(0), num_conv_layers(0), num_layers(0),
-        num_epochs(0), learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
-        train_begin(0), train_end(0), train_count(0), val_begin(0), val_end(0),
-        val_count(0), test_begin(0), test_end(0), test_count(0),
-        val_interval(1), num_subgraphs(1), num_vertices_sg(9000),
-        train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
+  //! Default net constructor
+  //Net()
+  //    : is_single_class(true), has_l2norm(false), has_dense(false),
+  //      neighbor_sample_size(0), subgraph_sample_size(0), num_threads(1),
+  //      num_samples(0), num_classes(0), num_conv_layers(0), num_layers(0),
+  //      num_epochs(0), learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
+  //      train_begin(0), train_end(0), train_count(0), val_begin(0), val_end(0),
+  //      val_count(0), test_begin(0), test_end(0), test_count(0),
+  //      val_interval(1), num_subgraphs(1), num_vertices_sg(9000),
+  //      train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
 
-  void init();
+  //! save graph pointer to context object
+  void saveDistGraph(Graph* dGraph);
+
 #ifdef GALOIS_USE_DIST
   void dist_init(Graph* graph, std::string dataset_str);
 #endif
+
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   size_t get_nnodes() { return num_samples; }
@@ -127,13 +141,9 @@ public:
   void regularize(); // add weight decay
 
   void train(optimizer* opt, bool need_validate) {
-    std::string header    = "";
-    std::string seperator = " ";
-#ifdef GALOIS_USE_DIST
     unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
-    header        = "[" + std::to_string(myID) + "] ";
-    seperator     = "\n";
-#endif
+    std::string header        = "[" + std::to_string(myID) + "] ";
+    std::string seperator     = "\n";
 
     double total_train_time = 0.0;
     int num_subg_remain     = 0;

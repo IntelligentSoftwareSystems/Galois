@@ -5,7 +5,7 @@
  */
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/types.h"
-#include "deepgalois/gtypes.h"
+#include "deepgalois/GraphTypes.h"
 
 namespace deepgalois {
 
