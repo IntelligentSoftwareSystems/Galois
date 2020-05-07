@@ -24,12 +24,8 @@ endif()
 ###### Distributed-heterogeneous features ######
 set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
 set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
-set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
-set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
 set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
-set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
-set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 ###### General features ######
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -46,6 +42,11 @@ set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (
 # Putting this here is mostly just a placeholder so people know it's an option.
 # Currently this is really only intended to change anything for the libgalois_shmem target.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+###### Developer features ######
+set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
+set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
+set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
