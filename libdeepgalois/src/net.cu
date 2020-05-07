@@ -7,7 +7,7 @@
 
 // the arguments of the maxima
 __device__ int argmax_device(const int n, const float_t* x) {
-  float_t max    = x[0];
+  float_t max = x[0];
   int max_ind = 0;
   for (int i = 1; i < n; i++) {
     if (x[i] > max) {
@@ -18,15 +18,17 @@ __device__ int argmax_device(const int n, const float_t* x) {
   return max_ind;
 }
 
-__global__ void masked_accuracy_kernel(int num_classes, int begin,
-                                       int end, mask_t* masks,
-                                       float_t* preds, label_t* labels,
+__global__ void masked_accuracy_kernel(int num_classes, int begin, int end,
+                                       mask_t* masks, float_t* preds,
+                                       label_t* labels,
                                        HGAccumulator<acc_t> total) {
   total.thread_entry();
-  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage local_accuracy;
+  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage
+      local_accuracy;
   CUDA_KERNEL_LOOP(i, end - begin) {
     if (masks[begin + i] == 1) {
-      label_t pred = (label_t)argmax_device(num_classes, preds + (begin + i) * num_classes);
+      label_t pred = (label_t)argmax_device(num_classes,
+                                            preds + (begin + i) * num_classes);
       if (pred == labels[begin + i])
         total.reduce(1.0);
     }
@@ -49,13 +51,11 @@ acc_t masked_accuracy_gpu(int num_classes, int begin, int end, int count,
 }
 
 typedef float f1count_t;
-__global__ void masked_f1_score_kernel(int num_classes, int begin,
-                                       int end, mask_t* masks,
-                                       float_t* preds, label_t* labels,
-                                       f1count_t* true_positive,
-                                       f1count_t* false_positive,
-                                       f1count_t* false_negtive,
-                                       f1count_t* true_negtive) {
+__global__ void
+masked_f1_score_kernel(int num_classes, int begin, int end, mask_t* masks,
+                       float_t* preds, label_t* labels,
+                       f1count_t* true_positive, f1count_t* false_positive,
+                       f1count_t* false_negtive, f1count_t* true_negtive) {
   CUDA_KERNEL_LOOP(i, end - begin) {
     int id = begin + i;
     if (masks[id] == 1) {
@@ -83,7 +83,7 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
   f1count_t* h_fp = new f1count_t[num_classes];
   f1count_t* h_fn = new f1count_t[num_classes];
   f1count_t* h_tn = new f1count_t[num_classes];
-  f1count_t* d_tp, *d_fp, *d_fn, *d_tn;
+  f1count_t *d_tp, *d_fp, *d_fn, *d_tn;
   float_malloc_device(num_classes, d_tp);
   float_malloc_device(num_classes, d_fp);
   float_malloc_device(num_classes, d_fn);
@@ -95,41 +95,45 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
   masked_f1_score_kernel<<<CUDA_GET_BLOCKS(end - begin), CUDA_NUM_THREADS>>>(
       num_classes, begin, end, masks, preds, labels, d_tp, d_fp, d_fn, d_tn);
   CudaTest("solving masked_f1_score_kernel kernel failed");
-  CUDA_CHECK(cudaMemcpy(h_tp, d_tp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(h_fp, d_fp, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(h_fn, d_fn, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(h_tn, d_tn, num_classes * sizeof(f1count_t), cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_tp, d_tp, num_classes * sizeof(f1count_t),
+                        cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_fp, d_fp, num_classes * sizeof(f1count_t),
+                        cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_fn, d_fn, num_classes * sizeof(f1count_t),
+                        cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_tn, d_tn, num_classes * sizeof(f1count_t),
+                        cudaMemcpyDeviceToHost));
 
-  acc_t pNumerator = 0.0;
-  acc_t pDenominator = 0.0;
-  acc_t rNumerator = 0.0;
-  acc_t rDenominator = 0.0;
+  acc_t pNumerator     = 0.0;
+  acc_t pDenominator   = 0.0;
+  acc_t rNumerator     = 0.0;
+  acc_t rDenominator   = 0.0;
   acc_t precisionMacro = 0.0;
-  acc_t recallMacro = 0.0;
+  acc_t recallMacro    = 0.0;
   for (size_t i = 0; i < num_classes; i++) {
     acc_t fn = (acc_t)h_fn[i]; // false negtive
     acc_t fp = (acc_t)h_fp[i]; // false positive
-	acc_t tp = (acc_t)h_tp[i]; // true positive
-	//acc_t tn = (acc_t)h_tn[i]; // true positive
+    acc_t tp = (acc_t)h_tp[i]; // true positive
+                               // acc_t tn = (acc_t)h_tn[i]; // true positive
 
     precisionMacro = precisionMacro + (tp / (tp + fp));
-    recallMacro = recallMacro + (tp / (tp + fn));
-	pNumerator = pNumerator + tp;
-	pDenominator = pDenominator + (tp + fp);
-    rNumerator = rNumerator + tp;
-    rDenominator = rDenominator + (tp + fn);
+    recallMacro    = recallMacro + (tp / (tp + fn));
+    pNumerator     = pNumerator + tp;
+    pDenominator   = pDenominator + (tp + fp);
+    rNumerator     = rNumerator + tp;
+    rDenominator   = rDenominator + (tp + fn);
   }
   precisionMacro = precisionMacro / num_classes;
-  recallMacro = recallMacro / num_classes;
-  acc_t f1_macro = (((beta * beta) + 1) * precisionMacro * recallMacro) / 
+  recallMacro    = recallMacro / num_classes;
+  acc_t f1_macro = (((beta * beta) + 1) * precisionMacro * recallMacro) /
                    ((beta * beta) * precisionMacro + recallMacro);
-  acc_t recallMicro = rNumerator / rDenominator;
+  acc_t recallMicro    = rNumerator / rDenominator;
   acc_t precisionMicro = pNumerator / pDenominator;
-  acc_t f1_micro = (((beta * beta) + 1) * precisionMicro * recallMicro) / 
+  acc_t f1_micro       = (((beta * beta) + 1) * precisionMicro * recallMicro) /
                    ((beta * beta) * precisionMicro + recallMicro);
-  std::cout << std::setprecision(3) << std::fixed <<
-      " (f1_micro: " << f1_micro << ", f1_macro: " << f1_macro << ") ";
- 
+  std::cout << std::setprecision(3) << std::fixed << " (f1_micro: " << f1_micro
+            << ", f1_macro: " << f1_macro << ") ";
+
   float_free_device(d_tp);
   float_free_device(d_fp);
   float_free_device(d_fn);
@@ -146,7 +150,8 @@ namespace deepgalois {
 void Net::init() {
   copy_masks_device(num_samples, train_masks, d_train_masks);
   copy_masks_device(num_samples, val_masks, d_val_masks);
-  context->copy_data_to_device(); // copy labels and input features to the device
+  context
+      ->copy_data_to_device(); // copy labels and input features to the device
 }
 
 void Net::copy_test_masks_to_device() {
@@ -156,21 +161,25 @@ void Net::copy_test_masks_to_device() {
 // add weight decay
 void Net::regularize() {
   size_t layer_id = 0;
-  auto n = feature_dims[layer_id] * feature_dims[layer_id+1];
-  axpy_gpu(n, weight_decay, layers[layer_id]->get_weights_device_ptr(), 
-    layers[layer_id]->get_grads_device_ptr());
+  auto n          = feature_dims[layer_id] * feature_dims[layer_id + 1];
+  axpy_gpu(n, weight_decay, layers[layer_id]->get_weights_device_ptr(),
+           layers[layer_id]->get_grads_device_ptr());
 }
 
 void Net::normalize() {}
 
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count, 
-                           mask_t* masks, float_t* preds, label_t* ground_truth) {
-  return masked_accuracy_gpu(num_classes, begin, end, count, masks, preds, ground_truth);
+acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
+                           mask_t* masks, float_t* preds,
+                           label_t* ground_truth) {
+  return masked_accuracy_gpu(num_classes, begin, end, count, masks, preds,
+                             ground_truth);
 }
 
-acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count, 
-                                       mask_t* masks, float_t* preds, label_t* ground_truth) {
-	return masked_f1_score_gpu(num_classes, begin, end, count, masks, preds, ground_truth);
+acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
+                                       mask_t* masks, float_t* preds,
+                                       label_t* ground_truth) {
+  return masked_f1_score_gpu(num_classes, begin, end, count, masks, preds,
+                             ground_truth);
 }
 
-} // end namespace
+} // namespace deepgalois

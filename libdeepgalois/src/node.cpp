@@ -10,7 +10,8 @@ void edge::alloc() {
 
 void edge::merge_grads(float_t* dst) {
   assert(grad_ != NULL);
-  if(dst) delete[] dst;
+  if (dst)
+    delete[] dst;
   dst = new float_t[ft_dim_];
   std::copy(grad_, grad_ + ft_dim_, dst);
   // @todo consider adding parallelism and vectorization

@@ -31,4 +31,4 @@ public:
 protected:
   float_t scale_, bias_;
 };
-} // namespace
+} // namespace deepgalois

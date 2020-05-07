@@ -26,10 +26,11 @@ size_t DistContext::read_labels(std::string dataset_str) {
   in >> m >> num_classes >> std::ws;
   assert(m == dGraph->globalSize());
   // size of labels should be # local nodes
-  h_labels = new label_t[dGraph->size()]; // single-class (one-hot) label for each vertex: N x 1
+  h_labels = new label_t[dGraph->size()]; // single-class (one-hot) label for
+                                          // each vertex: N x 1
 
   uint32_t foundVertices = 0;
-  unsigned v = 0;
+  unsigned v             = 0;
   // each line contains a set of 0s and 1s
   while (std::getline(in, line)) {
     // only bother if local node
@@ -55,8 +56,9 @@ size_t DistContext::read_labels(std::string dataset_str) {
   in.close();
 
   // print the number of vertex classes
-  galois::gPrint("[", myID, "] Done with labels, unique label counts: ",
-                 num_classes, "; set ", foundVertices, " nodes\n");
+  galois::gPrint("[", myID,
+                 "] Done with labels, unique label counts: ", num_classes,
+                 "; set ", foundVertices, " nodes\n");
 
   return num_classes;
 }
@@ -97,8 +99,8 @@ size_t DistContext::read_features(std::string dataset_str) {
   }
   in.close();
 
-  galois::gPrint("[", myID, "] Done with features, feature length: ",
-                 feat_len, "\n");
+  galois::gPrint("[", myID, "] Done with features, feature length: ", feat_len,
+                 "\n");
 
   return feat_len;
 }
@@ -141,50 +143,42 @@ size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
     i++;
   }
   std::cout << mask_type + "_mask range: [" << begin << ", " << end
-    << ") Number of valid samples: " << sample_count << "("
-    << (float)sample_count/(float)n*(float)100 << "\%)\n";
+            << ") Number of valid samples: " << sample_count << "("
+            << (float)sample_count / (float)n * (float)100 << "\%)\n";
   in.close();
   return sample_count;
 }
 
-float_t* DistContext::get_in_ptr() {
-  return &h_feats[0];
-}
+float_t* DistContext::get_in_ptr() { return &h_feats[0]; }
 
-//void DistContext::norm_factor_computing(bool is_subgraph, int subg_id) {
+// void DistContext::norm_factor_computing(bool is_subgraph, int subg_id) {
 void DistContext::norm_factor_computing(bool, int) {
   // TODO: this is a distributed operation
 
   // create for now, TODO need to actually fill it in
   norm_factors = new float_t[localVertices];
-  galois::do_all(galois::iterate((size_t)0, localVertices),
-    [&](auto v) {
-      norm_factors[v] = 1;
-    }, galois::loopname("NormCounting"));
+  galois::do_all(
+      galois::iterate((size_t)0, localVertices),
+      [&](auto v) { norm_factors[v] = 1; }, galois::loopname("NormCounting"));
 
-  //galois::do_all(galois::iterate((size_t)0, localVertices),
+  // galois::do_all(galois::iterate((size_t)0, localVertices),
   //  [&](auto v) {
-  //    auto degree  = std::distance(graph_cpu->edge_begin(v), graph_cpu->edge_end(v));
-  //    float_t temp = std::sqrt(float_t(degree));
-  //    if (temp == 0.0) norm_factors[v] = 0.0;
-  //    else norm_factors[v] = 1.0 / temp;
+  //    auto degree  = std::distance(graph_cpu->edge_begin(v),
+  //    graph_cpu->edge_end(v)); float_t temp = std::sqrt(float_t(degree)); if
+  //    (temp == 0.0) norm_factors[v] = 0.0; else norm_factors[v] = 1.0 / temp;
   //  }, galois::loopname("NormCounting"));
 
   return;
 }
 
 void DistContext::initializeSyncSubstrate() {
-  DistContext::syncSubstrate =
-    new galois::graphs::GluonSubstrate<Graph>(
-      *DistContext::graph_cpu,
-      galois::runtime::getSystemNetworkInterface().ID,
-      galois::runtime::getSystemNetworkInterface().Num,
-      false
-    );
+  DistContext::syncSubstrate = new galois::graphs::GluonSubstrate<Graph>(
+      *DistContext::graph_cpu, galois::runtime::getSystemNetworkInterface().ID,
+      galois::runtime::getSystemNetworkInterface().Num, false);
 }
 
 galois::graphs::GluonSubstrate<Graph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;
 };
 
-}  // deepgalois
+} // namespace deepgalois

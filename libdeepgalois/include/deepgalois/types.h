@@ -19,9 +19,9 @@ typedef std::vector<vec_t>
 typedef std::vector<feature_t> FV; // feature vector
 typedef std::vector<FV> FV2D;      // feature vectors: num_samples x feature_dim
 typedef float acc_t;               // Accuracy type
-typedef uint8_t label_t;  // label is for classification (supervised learning)
-typedef uint8_t mask_t; // mask is used to indicate different uses of labels:
-                        // train, val, test
+typedef uint8_t label_t; // label is for classification (supervised learning)
+typedef uint8_t mask_t;  // mask is used to indicate different uses of labels:
+                         // train, val, test
 typedef uint32_t VertexID;
 typedef uint64_t EdgeID;
 typedef std::vector<VertexID> VertexList;
@@ -44,15 +44,15 @@ enum class net_phase { train, test };
 
 #ifdef GALOIS_USE_DIST
 namespace deepgalois {
-  // TODO only being used by graph conv layer at the moment so extern works,
-  // but this design is bad and needs to be revisited
+// TODO only being used by graph conv layer at the moment so extern works,
+// but this design is bad and needs to be revisited
 
-  //! Set this to let sync struct know where to get data from
-  extern float_t* _dataToSync;
-  //! Set this to let sync struct know the size of the vector to use during
-  //! sync
-  extern long unsigned _syncVectorSize;
-}
+//! Set this to let sync struct know where to get data from
+extern float_t* _dataToSync;
+//! Set this to let sync struct know the size of the vector to use during
+//! sync
+extern long unsigned _syncVectorSize;
+} // namespace deepgalois
 #endif
 
 #endif

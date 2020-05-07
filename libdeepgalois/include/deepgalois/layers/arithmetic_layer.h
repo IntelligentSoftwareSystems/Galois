@@ -25,4 +25,4 @@ public:
     in_grad = out_grad;
   }
 };
-} // namespace
+} // namespace deepgalois

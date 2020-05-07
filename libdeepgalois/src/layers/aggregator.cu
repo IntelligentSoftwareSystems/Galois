@@ -15,16 +15,18 @@ __device__ void scale_add(const int n, const float_t alpha, const float_t* a,
 }
 
 __global__ void update_all_naive(size_t n, size_t len, GraphGPU g,
-                                  const float_t* in, float_t* out,
-                                  bool norm, const float_t* norm_factor) {
+                                 const float_t* in, float_t* out, bool norm,
+                                 const float_t* norm_factor) {
   CUDA_KERNEL_LOOP(src, n) {
     float_t a = 0.0, b = 1.0;
-    if (norm) a = norm_factor[src];
+    if (norm)
+      a = norm_factor[src];
     index_type begin = g.edge_begin(src);
     index_type end   = g.edge_end(src);
     for (index_type e = begin; e != end; e++) {
       index_type dst = g.getEdgeDst(e);
-      if (norm) b = a * norm_factor[dst];
+      if (norm)
+        b = a * norm_factor[dst];
       scale_add(len, b, in + dst * len, out + src * len,
                 out + src * len); // out[src] += in[dst]
     }
@@ -32,31 +34,36 @@ __global__ void update_all_naive(size_t n, size_t len, GraphGPU g,
 }
 
 __global__ void update_all_warp(size_t n, size_t len, GraphGPU g,
-                                  const float_t* in, float_t* out,
-                                  bool norm, const float_t* norm_factor) {
-  __shared__ index_type ptrs[BLOCK_SIZE/WARP_SIZE][2];
-  const int thread_id   = BLOCK_SIZE * blockIdx.x + threadIdx.x;  // global thread index
-  const int thread_lane = threadIdx.x & (WARP_SIZE-1);            // thread index within the warp
-  const int warp_id     = thread_id   / WARP_SIZE;                // global warp index
-  const int warp_lane   = threadIdx.x / WARP_SIZE;                // warp index within the CTA
-  const int num_warps   = (BLOCK_SIZE / WARP_SIZE) * gridDim.x;   // total number of active warps
+                                const float_t* in, float_t* out, bool norm,
+                                const float_t* norm_factor) {
+  __shared__ index_type ptrs[BLOCK_SIZE / WARP_SIZE][2];
+  const int thread_id =
+      BLOCK_SIZE * blockIdx.x + threadIdx.x; // global thread index
+  const int thread_lane =
+      threadIdx.x & (WARP_SIZE - 1);             // thread index within the warp
+  const int warp_id   = thread_id / WARP_SIZE;   // global warp index
+  const int warp_lane = threadIdx.x / WARP_SIZE; // warp index within the CTA
+  const int num_warps =
+      (BLOCK_SIZE / WARP_SIZE) * gridDim.x; // total number of active warps
 
-  for(int src = warp_id; src < n; src += num_warps) {
+  for (int src = warp_id; src < n; src += num_warps) {
     float_t a = 0.0, b = 1.0;
-    if (norm) a = norm_factor[src];
+    if (norm)
+      a = norm_factor[src];
     if (thread_lane < 2)
       ptrs[warp_lane][thread_lane] = g.edge_begin(src + thread_lane);
     __syncthreads();
     const index_type row_begin = ptrs[warp_lane][0];
     const index_type row_end   = ptrs[warp_lane][1];
-    index_type base_src = src * len;
-    for(index_type offset = row_begin; offset < row_end; offset ++) {
+    index_type base_src        = src * len;
+    for (index_type offset = row_begin; offset < row_end; offset++) {
       index_type dst = g.getEdgeDst(offset);
-      if (norm) b = a * norm_factor[dst];
+      if (norm)
+        b = a * norm_factor[dst];
       index_type base_dst = dst * len;
       for (int i = 0; i < len; i += WARP_SIZE)
-        if (thread_lane+i < len)
-          out[base_src+thread_lane+i] += in[base_dst+thread_lane+i] * b;
+        if (thread_lane + i < len)
+          out[base_src + thread_lane + i] += in[base_dst + thread_lane + i] * b;
     }
   }
 }
@@ -65,29 +72,32 @@ void update_all(size_t len, GraphGPU& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.size();
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
-  //update_all_naive<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, g, in, out, norm, norm_factor);
-  update_all_warp<<<(n-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(n, len, g, in, out, norm, norm_factor);
+  // update_all_naive<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, len, g, in,
+  // out, norm, norm_factor);
+  update_all_warp<<<(n - 1) / WARPS_PER_BLOCK + 1, BLOCK_SIZE>>>(
+      n, len, g, in, out, norm, norm_factor);
   CudaTest("solving update_all kernel failed");
 }
 
 void update_all_csrmm(size_t len, GraphGPU& g, const float_t* in, float_t* out,
-                bool norm, const float_t* norm_factor) {
-  //g.print_test();
+                      bool norm, const float_t* norm_factor) {
+  // g.print_test();
   unsigned n = g.size();
-  auto nnz = g.sizeEdges();
+  auto nnz   = g.sizeEdges();
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
-  //std::cout << "[debug]: update_all on GPU, n " << n << " len " << len << " nnz " << nnz << "\n";
-  //print_device_vector(10, norm_factor, "norm_factor");
-  float *temp;
-  const int *row_start = (const int*)g.row_start_ptr();
-  const int *edge_dst = (const int*)g.edge_dst_ptr();
-  //printf("row_start_ptr: 0x%x\n", row_start);
-  //printf("edge_dst_ptr: 0x%x\n", edge_dst);
-  //print_device_int_vector(10, row_start, "row_start");
-  //print_device_int_vector(10, edge_dst, "edge_dst");
-  float_malloc_device(n*len, temp); // TODO: avoid repetitive allocation
-  csrmm_gpu(n, len, n, nnz, 1.0, norm_factor, row_start, edge_dst, in, 0.0, temp, out);
+  // std::cout << "[debug]: update_all on GPU, n " << n << " len " << len << "
+  // nnz " << nnz << "\n"; print_device_vector(10, norm_factor, "norm_factor");
+  float* temp;
+  const int* row_start = (const int*)g.row_start_ptr();
+  const int* edge_dst  = (const int*)g.edge_dst_ptr();
+  // printf("row_start_ptr: 0x%x\n", row_start);
+  // printf("edge_dst_ptr: 0x%x\n", edge_dst);
+  // print_device_int_vector(10, row_start, "row_start");
+  // print_device_int_vector(10, edge_dst, "edge_dst");
+  float_malloc_device(n * len, temp); // TODO: avoid repetitive allocation
+  csrmm_gpu(n, len, n, nnz, 1.0, norm_factor, row_start, edge_dst, in, 0.0,
+            temp, out);
   float_free_device(temp);
 }
 
-}
+} // namespace deepgalois

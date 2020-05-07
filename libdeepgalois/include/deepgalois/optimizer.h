@@ -27,8 +27,8 @@ struct optimizer {
   optimizer(const optimizer&) = default;
   optimizer(optimizer&&)      = default;
   optimizer& operator=(const optimizer&) = default;
-  optimizer& operator=(optimizer&&)                                = default;
-  virtual ~optimizer()                                             = default;
+  optimizer& operator=(optimizer&&)              = default;
+  virtual ~optimizer()                           = default;
   virtual void update(const vec_t& dW, vec_t& W) = 0;
 #ifndef CPU_ONLY
   virtual void update_gpu(const size_t n, const float_t* dW, float_t* W) = 0;
@@ -40,8 +40,10 @@ struct optimizer {
 template <int N>
 struct stateful_optimizer : public optimizer {
   void reset() override {
-    for (auto& e : E_) e.clear();
+    for (auto& e : E_)
+      e.clear();
   }
+
 protected:
   template <int Index>
   vec_t& get(const vec_t& key) {
@@ -53,7 +55,7 @@ protected:
   std::unordered_map<const vec_t*, vec_t> E_[N];
 #ifndef CPU_ONLY
   template <int Index>
-  float_t *get_gpu(const size_t n, const float_t *key);
+  float_t* get_gpu(const size_t n, const float_t* key);
   std::unordered_map<const float_t*, float_t*> dE_[N];
 #endif
 };

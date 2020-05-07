@@ -4,8 +4,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <fcntl.h>    /* For O_RDWR */
-#include <unistd.h>   /* For open(), creat() */
+#include <fcntl.h>  /* For O_RDWR */
+#include <unistd.h> /* For open(), creat() */
 #include <fstream>
 #include <cassert>
 
@@ -27,10 +27,13 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   in >> m >> num_classes >> std::ws;
   if (is_single_class) {
     std::cout << "Using single-class (one-hot) labels\n";
-    labels = new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
+    labels =
+        new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
   } else {
     std::cout << "Using multi-class labels\n";
-   labels = new label_t[m*num_classes]; // multi-class label for each vertex: N x E
+    labels =
+        new label_t[m *
+                    num_classes]; // multi-class label for each vertex: N x E
   }
   unsigned v = 0;
   while (std::getline(in, line)) {
@@ -44,7 +47,7 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
           break;
         }
       } else {
-        labels[v*num_classes+idx] = x;
+        labels[v * num_classes + idx] = x;
       }
     }
     v++;
@@ -54,14 +57,15 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   // print the number of vertex classes
   std::cout << "Done, unique label counts: " << num_classes
             << ", time: " << t_read.Millisecs() << " ms\n";
-  //for (auto i = 0; i < 10; i ++) std::cout << "labels[" << i << "] = " << unsigned(labels[i]) << "\n";
+  // for (auto i = 0; i < 10; i ++) std::cout << "labels[" << i << "] = " <<
+  // unsigned(labels[i]) << "\n";
   return num_classes;
 }
 
 //! Read features, return the length of a feature vector
 //! Features are stored in the Context class
 size_t Reader::read_features(float_t*& feats, std::string filetype) {
-  //filetype = "txt";
+  // filetype = "txt";
   std::cout << "Reading features ... ";
   Timer t_read;
   t_read.Start();
@@ -83,7 +87,7 @@ size_t Reader::read_features(float_t*& feats, std::string filetype) {
   feats = new float_t[m * feat_len];
   if (filetype == "bin") {
     filename = path + dataset_str + "-feats.bin";
-    in.open(filename, std::ios::binary|std::ios::in);
+    in.open(filename, std::ios::binary | std::ios::in);
     in.read((char*)feats, sizeof(float_t) * m * feat_len);
   } else {
     std::string line;
@@ -101,15 +105,17 @@ size_t Reader::read_features(float_t*& feats, std::string filetype) {
   t_read.Stop();
   std::cout << "Done, feature length: " << feat_len
             << ", time: " << t_read.Millisecs() << " ms\n";
-  //for (auto i = 0; i < 6; i ++) 
-    //for (auto j = 0; j < 6; j ++) 
-      //std::cout << "feats[" << i << "][" << j << "] = " << feats[i*feat_len+j] << "\n";
+  // for (auto i = 0; i < 6; i ++)
+  // for (auto j = 0; j < 6; j ++)
+  // std::cout << "feats[" << i << "][" << j << "] = " << feats[i*feat_len+j] <<
+  // "\n";
   return feat_len;
 }
 
 //! Get masks from datafile where first line tells range of
 //! set to create mask from
-size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin, size_t& end, mask_t* masks) {
+size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin,
+                          size_t& end, mask_t* masks) {
   bool dataset_found = false;
   for (int i = 0; i < NUM_DATASETS; i++) {
     if (dataset_str == dataset_names[i]) {
@@ -142,24 +148,25 @@ size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin, size_t
     i++;
   }
   std::cout << mask_type + "_mask range: [" << begin << ", " << end
-    << ") Number of valid samples: " << sample_count << " (" 
-    << (float)sample_count/(float)n*(float)100 << "\%)\n";
+            << ") Number of valid samples: " << sample_count << " ("
+            << (float)sample_count / (float)n * (float)100 << "\%)\n";
   in.close();
   return sample_count;
 }
 
 void Reader::progressPrint(unsigned max, unsigned i) {
   const unsigned nsteps = 10;
-  unsigned ineachstep = (max / nsteps);
-  if(ineachstep == 0) ineachstep = 1;
+  unsigned ineachstep   = (max / nsteps);
+  if (ineachstep == 0)
+    ineachstep = 1;
   if (i % ineachstep == 0) {
-    int progress = ((size_t) i * 100) / max + 1;
+    int progress = ((size_t)i * 100) / max + 1;
     printf("\t%3d%%\r", progress);
     fflush(stdout);
   }
 }
 
-void Reader::readGraphFromGRFile(Graph *g) {
+void Reader::readGraphFromGRFile(Graph* g) {
   std::string filename = path + dataset_str + ".csgr";
   std::ifstream ifs;
   ifs.open(filename);
@@ -175,7 +182,7 @@ void Reader::readGraphFromGRFile(Graph *g) {
     exit(1);
   }
   size_t masterLength = buf.st_size;
-  int _MAP_BASE = MAP_PRIVATE;
+  int _MAP_BASE       = MAP_PRIVATE;
   void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
@@ -185,18 +192,19 @@ void Reader::readGraphFromGRFile(Graph *g) {
   Timer t;
   t.Start();
 
-  uint64_t* fptr = (uint64_t*)m;
+  uint64_t* fptr                           = (uint64_t*)m;
   __attribute__((unused)) uint64_t version = le64toh(*fptr++);
   assert(version == 1);
   uint64_t sizeEdgeTy = le64toh(*fptr++);
-  uint64_t nv = le64toh(*fptr++);
-  uint64_t ne = le64toh(*fptr++);
-  uint64_t *outIdx = fptr;
+  uint64_t nv         = le64toh(*fptr++);
+  uint64_t ne         = le64toh(*fptr++);
+  uint64_t* outIdx    = fptr;
   fptr += nv;
-  uint32_t *fptr32 = (uint32_t*)fptr;
-  uint32_t *outs = fptr32; 
+  uint32_t* fptr32 = (uint32_t*)fptr;
+  uint32_t* outs   = fptr32;
   fptr32 += ne;
-  if (ne % 2) fptr32 += 1;
+  if (ne % 2)
+    fptr32 += 1;
   if (sizeEdgeTy != 0) {
     std::cout << "LearningGraph: currently edge data not supported.\n";
     exit(1);
@@ -206,12 +214,13 @@ void Reader::readGraphFromGRFile(Graph *g) {
   auto rowptr = g->row_start_host_ptr();
   for (unsigned vid = 0; vid < nv; ++vid) {
     g->fixEndEdge(vid, le64toh(outIdx[vid]));
-    auto degree = rowptr[vid+1] - rowptr[vid];
+    auto degree = rowptr[vid + 1] - rowptr[vid];
     for (unsigned jj = 0; jj < degree; ++jj) {
       unsigned eid = rowptr[vid] + jj;
       unsigned dst = le32toh(outs[eid]);
       if (dst >= nv) {
-        printf("\tinvalid edge from %d to %d at index %d(%d).\n", vid, dst, jj, eid);
+        printf("\tinvalid edge from %d to %d at index %d(%d).\n", vid, dst, jj,
+               eid);
         exit(0);
       }
       g->constructEdge(eid, dst);
@@ -220,30 +229,30 @@ void Reader::readGraphFromGRFile(Graph *g) {
   }
   ifs.close();
 
-/*
-  std::string file_dims = path + dataset + "-dims.bin";
-  std::string file_rowptr = path + dataset + "-rowptr.bin";
-  std::string file_colidx = path + dataset + "-colidx.bin";
-  index_t dims[2];
-  ifs.open(file_dims, std::ios::binary|std::ios::in);
-  ifs.read((char*)dims, sizeof(index_t) * 2);
-  ifs.close();
-  num_vertices_ = dims[0];
-  num_edges_ = dims[1];
-  degrees_ = new index_t[num_vertices_];
-  rowptr_ = new index_t[num_vertices_+1];
-  colidx_ = new index_t[num_edges_];
-  ifs.open(file_rowptr, std::ios::binary|std::ios::in);
-  ifs.read((char*)rowptr_, sizeof(index_t) * (num_vertices_+1));
-  ifs.close();
-  ifs.open(file_colidx, std::ios::binary|std::ios::in);
-  ifs.read((char*)colidx_, sizeof(index_t) * num_edges_);
-  ifs.close();
-*/
+  /*
+    std::string file_dims = path + dataset + "-dims.bin";
+    std::string file_rowptr = path + dataset + "-rowptr.bin";
+    std::string file_colidx = path + dataset + "-colidx.bin";
+    index_t dims[2];
+    ifs.open(file_dims, std::ios::binary|std::ios::in);
+    ifs.read((char*)dims, sizeof(index_t) * 2);
+    ifs.close();
+    num_vertices_ = dims[0];
+    num_edges_ = dims[1];
+    degrees_ = new index_t[num_vertices_];
+    rowptr_ = new index_t[num_vertices_+1];
+    colidx_ = new index_t[num_edges_];
+    ifs.open(file_rowptr, std::ios::binary|std::ios::in);
+    ifs.read((char*)rowptr_, sizeof(index_t) * (num_vertices_+1));
+    ifs.close();
+    ifs.open(file_colidx, std::ios::binary|std::ios::in);
+    ifs.read((char*)colidx_, sizeof(index_t) * num_edges_);
+    ifs.close();
+  */
   t.Stop();
   double runtime = t.Millisecs();
-  std::cout << "read " << masterLength << " bytes in " << runtime << " ms (" 
-            << masterLength/1000.0/runtime << " MB/s)\n\n"; 
+  std::cout << "read " << masterLength << " bytes in " << runtime << " ms ("
+            << masterLength / 1000.0 / runtime << " MB/s)\n\n";
 }
 
-}
+} // namespace deepgalois

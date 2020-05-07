@@ -25,21 +25,22 @@
 namespace deepgalois {
 typedef index_t edge_iterator;
 //#ifdef EDGE_LABEL
-//typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::
+// typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::
 //    with_numa_alloc<true>::type ::with_no_lockable<true>::type LCGraph;
 //#else
-//typedef galois::graphs::LC_CSR_Graph<void, void, false, false, false, void, uint64_t, uint64_t>::
+// typedef galois::graphs::LC_CSR_Graph<void, void, false, false, false, void,
+// uint64_t, uint64_t>::
 //    with_numa_alloc<true>::type ::with_no_lockable<true>::type LCGraph;
 //#endif
-//typedef LCGraph Graph;
-//typedef Graph::edge_iterator edge_iterator;
+// typedef LCGraph Graph;
+// typedef Graph::edge_iterator edge_iterator;
 typedef LearningGraph Graph;
 #ifdef USE_CSRGRAPH
 typedef CSRGraph GraphGPU;
 #else
 typedef LearningGraph GraphGPU;
 #endif
-}
+} // namespace deepgalois
 
 #else
 
@@ -47,7 +48,6 @@ namespace deepgalois {
 // TODO check if this needs changing
 typedef index_t edge_iterator;
 using Graph = galois::graphs::DistGraph<char, void>;
-}
+} // namespace deepgalois
 
 #endif
-

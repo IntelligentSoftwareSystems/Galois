@@ -5,7 +5,8 @@ namespace deepgalois {
 
 #ifdef CPU_ONLY
 // 𝑦[𝑙] = max(0, 𝑦[𝑙−1])
-void relu_layer::forward_propagation(const float_t* in_data, float_t* out_data) {
+void relu_layer::forward_propagation(const float_t* in_data,
+                                     float_t* out_data) {
   size_t n = input_dims[0] * input_dims[1];
   math::relu_cpu(n, in_data, out_data);
 }
@@ -19,4 +20,4 @@ void relu_layer::back_propagation(const float_t*, const float_t* out_data,
 }
 #endif
 
-} // namespace
+} // namespace deepgalois

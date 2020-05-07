@@ -48,16 +48,15 @@ public:
 
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
-      : level_(level), begin_(0),
-        end_(0), num_dims(in_dims.size()), input_dims(in_dims),
-        output_dims(out_dims), labels(NULL) { }
+      : level_(level), begin_(0), end_(0), num_dims(in_dims.size()),
+        input_dims(in_dims), output_dims(out_dims), labels(NULL) {}
   virtual ~layer()                       = default;
   virtual std::string layer_type() const = 0;
   virtual void malloc_and_init() {}
   void print_layer_info() { //! debug print function
     std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
               << input_dims[0] << "," << input_dims[1] << "] output["
-              <<  output_dims[0] << "," << output_dims[1] << "]\n";
+              << output_dims[0] << "," << output_dims[1] << "]\n";
   }
   // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }
@@ -73,30 +72,35 @@ public:
   // set methods
   void set_netphase(net_phase ctx) { phase_ = ctx; }
   void set_context(ContextType* ctx) { context = ctx; }
-  void set_trainable(bool trainable) { trainable_ = trainable; } // is this layer trainable?
-  void set_labels_ptr(label_t *ptr) { labels = ptr; }
-  void set_norm_consts_ptr(float_t *ptr) { norm_consts = ptr; }
-  void set_feats_ptr(float_t *ptr) { prev_->set_data(ptr); }
+  void set_trainable(bool trainable) {
+    trainable_ = trainable;
+  } // is this layer trainable?
+  void set_labels_ptr(label_t* ptr) { labels = ptr; }
+  void set_norm_consts_ptr(float_t* ptr) { norm_consts = ptr; }
+  void set_feats_ptr(float_t* ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
 #ifdef CPU_ONLY
-  void set_graph_ptr(Graph *ptr) { graph_cpu = ptr; }
+  void set_graph_ptr(Graph* ptr) { graph_cpu = ptr; }
 #else
-  void set_graph_ptr(GraphGPU *ptr) { graph_gpu = ptr; }
+  void set_graph_ptr(GraphGPU* ptr) { graph_gpu = ptr; }
 #endif
-  void update_dim_size(size_t g_size) { input_dims[0] = output_dims[0] = g_size; }
+  void update_dim_size(size_t g_size) {
+    input_dims[0] = output_dims[0] = g_size;
+  }
 
   //! set the data of the previous layer connected to this one
   void set_in_data(float_t* data) {
-    prev_ = std::make_shared<deepgalois::edge>(this, input_dims[0], input_dims[1]);
+    prev_ =
+        std::make_shared<deepgalois::edge>(this, input_dims[0], input_dims[1]);
     prev_->set_data(data);
     // no need to allocate memory for gradients, since this is the input layer.
   }
 
   virtual void set_sample_mask(size_t sample_begin, size_t sample_end,
                                size_t sample_count, mask_t* masks) {
-    begin_ = sample_begin;
-    end_   = sample_end;
-    count_ = sample_count;
+    begin_   = sample_begin;
+    end_     = sample_end;
+    count_   = sample_count;
     use_mask = false;
     if (masks != NULL) {
       use_mask = true;
@@ -110,7 +114,8 @@ public:
 
   void add_edge() {
     // add an outgoing edge
-    next_ = std::make_shared<deepgalois::edge>(this, output_dims[0], output_dims[1]);
+    next_ = std::make_shared<deepgalois::edge>(this, output_dims[0],
+                                               output_dims[1]);
     // allocate memory for intermediate feature vectors and gradients
     next_->alloc();
   }
@@ -140,10 +145,11 @@ public:
 #ifdef CPU_ONLY
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
-    //bool parallel = (W.size() >= 512);
+    // bool parallel = (W.size() >= 512);
     opt->update(layer::weight_grad, layer::W); // W += grad
 #else
-    opt->update_gpu(input_dims[1]*output_dims[1], d_weight_grad, d_W); // W += grad
+    opt->update_gpu(input_dims[1] * output_dims[1], d_weight_grad,
+                    d_W); // W += grad
 #endif
     // prev()->clear_grads();
     next()->clear_grads();
@@ -174,9 +180,9 @@ protected:
   label_t* labels;
   float_t* norm_consts;
 #ifdef CPU_ONLY
-  Graph *graph_cpu;
+  Graph* graph_cpu;
 #else
-  GraphGPU *graph_gpu;
+  GraphGPU* graph_gpu;
 #endif
 
 #ifdef GALOIS_USE_DIST
@@ -186,9 +192,8 @@ protected:
 #endif
 };
 
-
 //! Connects tail to head's edge and sets that edge's target to tail
-//inline void connect(layer* head, layer* tail) {
+// inline void connect(layer* head, layer* tail) {
 inline void connect(layer* head, layer* tail) {
   tail->prev_ = head->next_;
   tail->prev_->add_next_node(tail);

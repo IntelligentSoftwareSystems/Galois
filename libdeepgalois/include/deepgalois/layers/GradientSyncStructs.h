@@ -6,14 +6,12 @@
 struct GradientSync {
   using ValTy = float_t;
 
-  static ValTy extract(uint32_t, float_t& weight) {
-    return weight;
-  }
+  static ValTy extract(uint32_t, float_t& weight) { return weight; }
 
   static bool reduce(uint32_t, float_t& weight, ValTy y) {
     // TODO merge function here
     // for now make sure the weights are close enough
-    //if (std::abs(weight - y) > 0.00001) {
+    // if (std::abs(weight - y) > 0.00001) {
     //  galois::gInfo("weight ", node_id, " not consistent with one received");
     //}
     weight += y;
@@ -21,22 +19,19 @@ struct GradientSync {
   }
 
   //! reset weight to 0
-  static void reset(uint32_t, float_t &weight) {
-    weight = 0;
-  }
+  static void reset(uint32_t, float_t& weight) { weight = 0; }
 
   //! save weight
-  static void setVal(uint32_t, float_t &weight, ValTy y) {
-    weight = y;
-  }
+  static void setVal(uint32_t, float_t& weight, ValTy y) { weight = y; }
 
   // GPU options TODO for GPU
   static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
     return false;
   }
   static bool extract_batch(unsigned, uint8_t*) { return false; }
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
-                                  DataCommMode*) { return false; }
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
+    return false;
+  }
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
   static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) {
@@ -46,5 +41,5 @@ struct GradientSync {
 };
 
 // TODO bitset; might have to do it manually
-//GALOIS_SYNC_STRUCTURE_BITSET(TODOTHIS?);
+// GALOIS_SYNC_STRUCTURE_BITSET(TODOTHIS?);
 #endif

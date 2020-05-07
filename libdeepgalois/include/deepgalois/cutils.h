@@ -78,9 +78,9 @@ inline const char* cusparseGetErrorString(cusparseStatus_t error) {
   case CUSPARSE_STATUS_INTERNAL_ERROR:
     return "CUSPARSE_STATUS_INTERNAL_ERROR";
   case CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED:
-      return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
+    return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
   case CUSPARSE_STATUS_ZERO_PIVOT:
-        return "CUSPARSE_STATUS_ZERO_PIVOT";
+    return "CUSPARSE_STATUS_ZERO_PIVOT";
   default:
     break;
   }
@@ -173,17 +173,20 @@ inline const char* curandGetErrorString(curandStatus_t error) {
 // CUDA: check for error after kernel execution and exit loudly if there is one.
 #define CUDA_POST_KERNEL_CHECK CUDA_CHECK(cudaPeekAtLastError())
 
-inline void print_device_vector(size_t n, const float_t *d_x, std::string name = "x") {
-  float_t *h_x = new float_t[n];
+inline void print_device_vector(size_t n, const float_t* d_x,
+                                std::string name = "x") {
+  float_t* h_x = new float_t[n];
   CUDA_CHECK(cudaMemcpy(h_x, d_x, n * sizeof(float_t), cudaMemcpyDeviceToHost));
-  for (size_t i = 0; i < n; i ++) std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
+  for (size_t i = 0; i < n; i++)
+    std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
   delete[] h_x;
 }
 
-inline void print_device_int_vector(size_t n, const int *d_x, std::string name = "x") {
-  int *h_x = new int[n];
+inline void print_device_int_vector(size_t n, const int* d_x,
+                                    std::string name = "x") {
+  int* h_x = new int[n];
   CUDA_CHECK(cudaMemcpy(h_x, d_x, n * sizeof(int), cudaMemcpyDeviceToHost));
-  for (size_t i = 0; i < n; i ++) std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
+  for (size_t i = 0; i < n; i++)
+    std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
   delete[] h_x;
 }
-

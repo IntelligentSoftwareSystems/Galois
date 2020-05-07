@@ -11,23 +11,24 @@ namespace deepgalois {
 
 class DistContext {
 protected:
-  size_t localVertices;        // number of samples: N
-  size_t num_classes;          // number of classes: E
-  size_t feat_len;             // input feature length: D
+  size_t localVertices; // number of samples: N
+  size_t num_classes;   // number of classes: E
+  size_t feat_len;      // input feature length: D
   galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
-  Graph* graph_cpu;            // the input graph, |V| = N
+  Graph* graph_cpu; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
-  label_t *h_labels;           // labels for classification. Single-class label: Nx1, multi-class label: NxE 
-  label_t *h_labels_subg;      // labels for subgraph
-  float_t* h_feats;            // input features: N x D
-  float_t* h_feats_subg;       // input features for subgraph
-  label_t* d_labels;           // labels on device
-  label_t *d_labels_subg;      // labels for subgraph on device
-  float_t* d_feats;            // input features on device
-  float_t* d_feats_subg;       // input features for subgraph on device
-  float_t* norm_factors;       // normalization constant based on graph structure
-  float_t* norm_factors_subg;  // normalization constant for subgraph
+  label_t* h_labels;      // labels for classification. Single-class label: Nx1,
+                          // multi-class label: NxE
+  label_t* h_labels_subg; // labels for subgraph
+  float_t* h_feats;       // input features: N x D
+  float_t* h_feats_subg;  // input features for subgraph
+  label_t* d_labels;      // labels on device
+  label_t* d_labels_subg; // labels for subgraph on device
+  float_t* d_feats;       // input features on device
+  float_t* d_feats_subg;  // input features for subgraph on device
+  float_t* norm_factors;  // normalization constant based on graph structure
+  float_t* norm_factors_subg; // normalization constant for subgraph
 
 public:
   DistContext();
@@ -43,19 +44,19 @@ public:
   size_t read_features(std::string dataset_str);
 
   //! read masks of local nodes only
-  size_t read_masks(std::string dataset_str, std::string mask_type,
-                    size_t n, size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
+  size_t read_masks(std::string dataset_str, std::string mask_type, size_t n,
+                    size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
 
   //! find norm factor by looking at degree
   // TODO this is a distributed operation
   void norm_factor_computing(bool is_subgraph, int subg_id = 0);
-  //void createSubgraphs(int num_subgraphs) {}
-  //void gen_subgraph_labels(size_t m, const mask_t *masks) {}
-  //void gen_subgraph_feats(size_t m, const mask_t *masks) {}
+  // void createSubgraphs(int num_subgraphs) {}
+  // void gen_subgraph_labels(size_t m, const mask_t *masks) {}
+  // void gen_subgraph_feats(size_t m, const mask_t *masks) {}
   // TODO define these
   void createSubgraphs(int) {}
-  void gen_subgraph_labels(size_t, const mask_t *) {}
-  void gen_subgraph_feats(size_t, const mask_t *) {}
+  void gen_subgraph_labels(size_t, const mask_t*) {}
+  void gen_subgraph_feats(size_t, const mask_t*) {}
 
   float_t* get_norm_factors_ptr() { return norm_factors; }
   Graph* getGraphPointer() { return graph_cpu; }
@@ -77,6 +78,6 @@ public:
   float_t* get_in_ptr();
 };
 
-} // end deepgalois namespace
+} // namespace deepgalois
 
 #endif

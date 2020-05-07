@@ -7,7 +7,7 @@
 
 /**
  * GraphConv Layer; based on DGL implementation + follows TinyDNN layer
- * convention 
+ * convention
  * https://docs.dgl.ai/en/0.4.x/_modules/dgl/nn/pytorch/conv/graphconv.html
  *
  *   Parameters
@@ -26,11 +26,11 @@
 namespace deepgalois {
 class graph_conv_layer : public layer {
 public:
-  graph_conv_layer(unsigned level, bool act, bool norm, bool bias,
-                   bool dropout, float_t dropout_rate,
-                   std::vector<size_t> in_dims, std::vector<size_t> out_dims)
-    : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),
-      dropout_(dropout), dropout_rate_(dropout_rate) {
+  graph_conv_layer(unsigned level, bool act, bool norm, bool bias, bool dropout,
+                   float_t dropout_rate, std::vector<size_t> in_dims,
+                   std::vector<size_t> out_dims)
+      : layer(level, in_dims, out_dims), act_(act), norm_(norm), bias_(bias),
+        dropout_(dropout), dropout_rate_(dropout_rate) {
     assert(input_dims[0] == output_dims[0]); // num_vertices
     trainable_ = true;
     name_      = layer_type() + "_" + std::to_string(level);
@@ -39,16 +39,17 @@ public:
   }
   graph_conv_layer(unsigned level, std::vector<size_t> in_dims,
                    std::vector<size_t> out_dims)
-      : graph_conv_layer(level, false, true, false, true, 0.5, in_dims, out_dims) {}
+      : graph_conv_layer(level, false, true, false, true, 0.5, in_dims,
+                         out_dims) {}
   ~graph_conv_layer() {}
   void malloc_and_init();
   std::string layer_type() const override { return std::string("graph_conv"); }
   virtual acc_t get_weight_decay_loss();
-  //! Uses weights contained in this layer to update in_data (results from previous)
-  //! and save result to out_data
+  //! Uses weights contained in this layer to update in_data (results from
+  //! previous) and save result to out_data
   virtual void forward_propagation(const float_t* in_data, float_t* out_data);
-  //! Uses gradients from layer after this one to update both own weight gradients
-  //! as well as gradients for the features (in_grad)
+  //! Uses gradients from layer after this one to update both own weight
+  //! gradients as well as gradients for the features (in_grad)
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);
   // user-defined aggregate function
@@ -56,11 +57,13 @@ public:
   virtual void aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
   void d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
 #else
-  virtual void aggregate(size_t len, GraphGPU& g, const float_t* in, float_t* out);
+  virtual void aggregate(size_t len, GraphGPU& g, const float_t* in,
+                         float_t* out);
   void d_aggregate(size_t len, GraphGPU& g, const float_t* in, float_t* out);
 #endif
   // user-defined combine function
-  virtual void combine(size_t dim_x, size_t dim_y, const float_t* self, const float_t* neighbors, float_t* out);
+  virtual void combine(size_t dim_x, size_t dim_y, const float_t* self,
+                       const float_t* neighbors, float_t* out);
 
 private:
   bool act_;     // whether to use activation function at the end
@@ -72,12 +75,13 @@ private:
   float_t* out_temp; //!< intermediate data temporary
   float_t* in_temp;
   float_t* in_temp1;
-  float_t* trans_data;    // y*x
+  float_t* trans_data;  // y*x
   mask_t* dropout_mask; // x*y
 
   // Glorot & Bengio (AISTATS 2010)
-  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix, unsigned seed=1);
+  inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix,
+                               unsigned seed = 1);
   inline void zero_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix);
 };
 
-} // namespace
+} // namespace deepgalois
