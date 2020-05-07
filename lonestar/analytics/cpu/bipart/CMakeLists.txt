@@ -2,4 +2,4 @@ add_executable(bipart bipart.cpp Coarsening.cpp Metric.cpp Partitioning.cpp Refi
 add_dependencies(apps bipart)
 target_link_libraries(bipart PRIVATE Galois::shmem lonestar)
 install(TARGETS bipart DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-add_test_scale(small1 bipart "${BASEINPUT}/hypergraph/ISPD98_ibm01.hgr.part.2.ours" 25 2 2 NOT_QUICK)
+add_test_scale(small1 bipart "${BASEINPUT}/partitioning/ibm02.hgr" NOT_QUICK)

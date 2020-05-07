@@ -306,7 +306,7 @@ void newrouteL(int netID, RouteType ripuptype, Bool viaGuided) {
 
       // ripup the original routing
       if (ripuptype > NOROUTE) // it's been routed
-        newRipup(treeedge, treenodes, x1, y1, x2, y2);
+        newRipup(treeedge, x1, y1, x2, y2);
 
       treeedge->route.type = LROUTE;
       if (x1 == x2) // V-routing
@@ -466,7 +466,7 @@ void newrouteZ_edge(int netID, int edgeID) {
                               // no need to reroute)
     {
       // ripup the original routing
-      newRipup(treeedge, treenodes, x1, y1, x2, y2);
+      newRipup(treeedge, x1, y1, x2, y2);
 
       treeedge->route.type = ZROUTE;
 
@@ -955,7 +955,7 @@ void routeMonotonic(int netID, int edgeID, int threshold) {
                               // no need to reroute)
     {
       // ripup the original routing
-      newRipup(treeedge, treenodes, x1, y1, x2, y2);
+      newRipup(treeedge, x1, y1, x2, y2);
 
       segWidth  = ADIFF(x1, x2);
       segHeight = ADIFF(y1, y2);
@@ -1525,7 +1525,7 @@ void routeLVEnew(int netID, int edgeID, int threshold, int enlarge) {
     y2        = treenodes[n2].y;
 
     // ripup the original routing
-    if (newRipupCheck(treeedge, x1, y1, x2, y2, threshold, netID, edgeID)) {
+    if (newRipupCheck(treeedge, threshold, netID, edgeID)) {
 
       deg  = sttrees[netID].deg;
       xmin = max(x1 - enlarge, 0);
@@ -1787,8 +1787,11 @@ void routeLVEnew(int netID, int edgeID, int threshold, int enlarge) {
       cnt++;
 
       treeedge->route.routelen = cnt - 1;
-      treeedge->route.gridsX   = (short*)calloc(cnt, sizeof(short));
-      treeedge->route.gridsY   = (short*)calloc(cnt, sizeof(short));
+      free(treeedge->route.gridsX);
+      free(treeedge->route.gridsY);
+
+      treeedge->route.gridsX = (short*)calloc(cnt, sizeof(short));
+      treeedge->route.gridsY = (short*)calloc(cnt, sizeof(short));
 
       for (i = 0; i < cnt; i++) {
         treeedge->route.gridsX[i] = gridsX[i];

@@ -12,7 +12,7 @@
 #define HORIZONTAL 1
 #define VERTICAL 0
 
-int edgeShift(Tree* t, int net) {
+int edgeShift(Tree* t) {
   int i, j, k, l, m, deg, root = 0, x, y, n, n1, n2, n3;
   int maxX, minX, maxY, minY, maxX1, minX1, maxY1, minY1, maxX2, minX2, maxY2,
       minY2, bigX, smallX, bigY, smallY, grid, grid1, grid2;
@@ -364,7 +364,7 @@ int edgeShift(Tree* t, int net) {
 }
 
 // exchange Steiner nodes at the same position, then call edgeShift()
-int edgeShiftNew(Tree* t, int net) {
+int edgeShiftNew(Tree* t) {
   int i, j, n;
   int deg, pairCnt, pairN1[MAXNETDEG], pairN2[MAXNETDEG], cur_pairN1,
       cur_pairN2;
@@ -372,7 +372,7 @@ int edgeShiftNew(Tree* t, int net) {
   int numShift;
   Bool isPair;
   // printf("net[%d]\n", net); getchar();
-  numShift = edgeShift(t, net);
+  numShift = edgeShift(t);
   deg      = t->deg;
 
   // if(net==3){printtree(*t);getchar();}
@@ -455,7 +455,7 @@ int edgeShiftNew(Tree* t, int net) {
             t->branch[N1nbrH].n = cur_pairN2;
             t->branch[N2nbrH].n = cur_pairN1;
           }
-          numShift += edgeShift(t, net);
+          numShift += edgeShift(t);
         } else if (N1nbrV >= 0 && N2nbrV >= 0) {
           if (N2nbrV == t->branch[cur_pairN2].n) {
             t->branch[N1nbrV].n     = cur_pairN2;
@@ -465,7 +465,7 @@ int edgeShiftNew(Tree* t, int net) {
             t->branch[N1nbrV].n = cur_pairN2;
             t->branch[N2nbrV].n = cur_pairN1;
           }
-          numShift += edgeShift(t, net);
+          numShift += edgeShift(t);
         }
         // if(net==3){printtree(*t);getchar();}
       } // if(isPair)

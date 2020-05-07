@@ -224,7 +224,6 @@ int main(int argc, char** argv) {
 
     InitLastUsage(upType);
 
-    galois::InsertBag<int> net_shuffle[40]; // 6*6
     // OrderNetEdge* netEO = (OrderNetEdge*)calloc(2000, sizeof(OrderNetEdge));
 
     PRINT_HEAT = 0;
@@ -250,18 +249,18 @@ int main(int argc, char** argv) {
       if (totalOverflow > 2000) {
         enlarge += ESTEP1; // ENLARGE+(i-1)*ESTEP;
         cost_step = CSTEP1;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
 
       } else if (totalOverflow < 500) {
 
         cost_step = CSTEP3;
         enlarge += ESTEP3;
         ripup_threshold = -1;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
       } else {
         cost_step = CSTEP2;
         enlarge += ESTEP2;
-        updateCongestionHistory(i, upType);
+        updateCongestionHistory(upType);
       }
 
       if (totalOverflow > 15000 && maxOverflow > 400) {
@@ -332,22 +331,17 @@ int main(int argc, char** argv) {
              max(OBIM_delta, (int)(costheight / (2 * slope))));
       // L = 2;
       roundtimer.start();
-      galois::runtime::profileVtune(
-          [&](void) {
-            round_num = i;
-            if (finegrain) {
-              printf("finegrain\n");
+      round_num = i;
+      if (finegrain) {
+        printf("finegrain\n");
 
-              mazeRouteMSMD_finegrain_spinlock(
-                  i, enlarge, costheight, ripup_threshold, mazeedge_Threshold,
-                  !(i % 3), cost_type, net_shuffle);
-            } else {
-              mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                            mazeedge_Threshold, !(i % 3), cost_type,
-                            net_shuffle);
-            }
-          },
-          "mazeroute");
+        mazeRouteMSMD_finegrain_spinlock(i, enlarge, costheight,
+                                         ripup_threshold, mazeedge_Threshold,
+                                         !(i % 3), cost_type);
+      } else {
+        mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
+                      mazeedge_Threshold, !(i % 3), cost_type);
+      }
       roundtimer.stop();
       cout << "round : " << i << " time(ms): " << roundtimer.get() - oldtime
            << " acc time(ms): " << roundtimer.get() << endl;
@@ -407,11 +401,10 @@ int main(int argc, char** argv) {
 
                   mazeRouteMSMD_finegrain_spinlock(
                       i, enlarge, costheight, ripup_threshold,
-                      mazeedge_Threshold, !(i % 3), cost_type, net_shuffle);
+                      mazeedge_Threshold, !(i % 3), cost_type);
                 } else {
                   mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                                mazeedge_Threshold, !(i % 3), cost_type,
-                                net_shuffle);
+                                mazeedge_Threshold, !(i % 3), cost_type);
                 }
               },
               "mazeroute");
@@ -467,11 +460,10 @@ int main(int argc, char** argv) {
 
                   mazeRouteMSMD_finegrain_spinlock(
                       i, enlarge, costheight, ripup_threshold,
-                      mazeedge_Threshold, !(i % 3), cost_type, net_shuffle);
+                      mazeedge_Threshold, !(i % 3), cost_type);
                 } else {
                   mazeRouteMSMD(i, enlarge, costheight, ripup_threshold,
-                                mazeedge_Threshold, !(i % 3), cost_type,
-                                net_shuffle);
+                                mazeedge_Threshold, !(i % 3), cost_type);
                 }
               },
               "mazeroute");

@@ -219,11 +219,12 @@ struct SGD_LC_LinearArray_Undirected_Graph {
     _num_nodes = n_n;
     _num_edges = n_e;
     // const int arr_size = (4 + (_num_nodes * SizeNodeData) + (_num_nodes + 1)
-    // + (_num_edges) + (_num_edges * SizeEdgeData) + (_num_edges)); std::cout <<
-    // "Allocating NN: " << _num_nodes << "(" << SizeNodeData << ") , NE :" <<
-    // _num_edges << ", TOTAL:: " << arr_size << "\n"; Num_nodes, num_edges,
+    // + (_num_edges) + (_num_edges * SizeEdgeData) + (_num_edges)); std::cout
+    // << "Allocating NN: " << _num_nodes << "(" << SizeNodeData << ") , NE :"
+    // << _num_edges << ", TOTAL:: " << arr_size << "\n"; Num_nodes, num_edges,
     // [node_data] , [outgoing_index], [out_neighbors], [edge_data] , [src
-    // indices] fprintf(stderr, "GraphSize :: %6.6g MB\n", arr_size / (float(1024
+    // indices] fprintf(stderr, "GraphSize :: %6.6g MB\n", arr_size /
+    // (float(1024
     // * 1024)));
     gpu_graph =
         new int[(4 + (_num_nodes * SizeNodeData) + (_num_nodes + 1) +

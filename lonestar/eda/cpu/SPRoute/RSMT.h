@@ -787,7 +787,7 @@ void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree,
             y1       = treenodes[n1].y;
             x2       = treenodes[n2].x;
             y2       = treenodes[n2].y;
-            newRipup(treeedge, treenodes, x1, y1, x2, y2);
+            newRipup(treeedge, x1, y1, x2, y2);
           }
         }
       } else {
@@ -809,7 +809,7 @@ void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree,
         fluteNormal(i, d, x, y, FLUTEACCURACY, coeffV, &rsmt);
       }
       if (d > 3) {
-        numShift += edgeShiftNew(&rsmt, i);
+        numShift += edgeShiftNew(&rsmt);
       }
     } else {
       // call FLUTE to generate RSMT for each net
@@ -856,6 +856,8 @@ void gen_brk_RSMT(Bool congestionDriven, Bool reRoute, Bool genTree,
         segcnt++;
       }
     } // loop j
+
+    free(rsmt.branch);
 
     seglistCnt[i] = segcnt; // the number of segments for net i
     totalNumSeg += segcnt;

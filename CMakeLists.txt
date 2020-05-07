@@ -96,8 +96,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from boost::counting_iterator
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
     # Avoid warnings from openmpi
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
   endif()
@@ -109,11 +107,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   endif()
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
-
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
-    # Avoid warnings from boost::counting_iterator
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
-  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")

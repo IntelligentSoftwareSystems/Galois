@@ -10,11 +10,7 @@ int round_num = 0;
 
 void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                              int ripup_threshold, int mazeedge_Threshold,
-                             Bool Ordering, int cost_type,
-                             galois::InsertBag<int>* net_shuffle)
-// galois::substrate::PerThreadStorage<THREAD_LOCAL_STORAGE>*
-// thread_local_storage)
-{
+                             Bool Ordering, int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 
@@ -94,7 +90,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
     // printf("order?\n");
   }
 
-  THREAD_LOCAL_STORAGE* thread_local_storage = new THREAD_LOCAL_STORAGE;
+  THREAD_LOCAL_STORAGE thread_local_storage{};
   // for(nidRPC=0; nidRPC<numValidNets; nidRPC++)//parallelize
   PerThread_PQ perthread_pq;
   PerThread_Vec perthread_vec;
@@ -142,23 +138,23 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
     TreeEdge *treeedges, *treeedge;
     TreeNode* treenodes;
 
-    bool* pop_heap2 = thread_local_storage->pop_heap2;
+    bool* pop_heap2 = thread_local_storage.pop_heap2;
 
-    float** d1    = thread_local_storage->d1_p;
-    bool** HV     = thread_local_storage->HV_p;
-    bool** hyperV = thread_local_storage->hyperV_p;
-    bool** hyperH = thread_local_storage->hyperH_p;
+    float** d1    = thread_local_storage.d1_p;
+    bool** HV     = thread_local_storage.HV_p;
+    bool** hyperV = thread_local_storage.hyperV_p;
+    bool** hyperH = thread_local_storage.hyperH_p;
 
-    short** parentX1 = thread_local_storage->parentX1_p;
-    short** parentX3 = thread_local_storage->parentX3_p;
-    short** parentY1 = thread_local_storage->parentY1_p;
-    short** parentY3 = thread_local_storage->parentY3_p;
+    short** parentX1 = thread_local_storage.parentX1_p;
+    short** parentX3 = thread_local_storage.parentX3_p;
+    short** parentY1 = thread_local_storage.parentY1_p;
+    short** parentY3 = thread_local_storage.parentY3_p;
 
-    int** corrEdge = thread_local_storage->corrEdge_p;
+    int** corrEdge = thread_local_storage.corrEdge_p;
 
-    OrderNetEdge* netEO = thread_local_storage->netEO_p;
+    OrderNetEdge* netEO = thread_local_storage.netEO_p;
 
-    bool** inRegion = thread_local_storage->inRegion_p;
+    bool** inRegion = thread_local_storage.inRegion_p;
 
     local_pq pq1 = perthread_pq.get();
     local_vec v2 = perthread_vec.get();
@@ -211,8 +207,7 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -375,9 +370,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curX > regionX1) {
                     grid = curY * (xGrid - 1) + curX - 1;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, h_edges[grid].usage.load(), h_edges[grid].red,
-                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load() +
-                    // h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                    // %d\n",grid, h_edges[grid].usage.load(),
+                    // h_edges[grid].red, h_edges[grid].last_usage, L ,
+                    // h_edges[grid].usage.load() + h_edges[grid].red +
+                    // (int)(L*h_edges[grid].last_usage));
                     if ((preY == curY) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -437,9 +433,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curX < regionX2) {
                     grid = curY * (xGrid - 1) + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, h_edges[grid].usage.load(), h_edges[grid].red,
-                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load() +
-                    // h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                    // %d\n",grid, h_edges[grid].usage.load(),
+                    // h_edges[grid].red, h_edges[grid].last_usage, L ,
+                    // h_edges[grid].usage.load() + h_edges[grid].red +
+                    // (int)(L*h_edges[grid].last_usage));
                     if ((preY == curY) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -502,9 +499,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curY > regionY1) {
                     grid = (curY - 1) * xGrid + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, v_edges[grid].usage.load(), v_edges[grid].red,
-                    // v_edges[grid].last_usage, L , v_edges[grid].usage.load() +
-                    // v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                    // %d\n",grid, v_edges[grid].usage.load(),
+                    // v_edges[grid].red, v_edges[grid].last_usage, L ,
+                    // v_edges[grid].usage.load() + v_edges[grid].red +
+                    // (int)(L*v_edges[grid].last_usage));
                     if ((preX == curX) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -565,9 +563,10 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
                   if (curY < regionY2) {
                     grid = curY * xGrid + curX;
                     // printf("grid: %d usage: %d red:%d last:%d sum%f
-                    // %d\n",grid, v_edges[grid].usage.load(), v_edges[grid].red,
-                    // v_edges[grid].last_usage, L , v_edges[grid].usage.load() +
-                    // v_edges[grid].red + (int)(L*v_edges[grid].last_usage));
+                    // %d\n",grid, v_edges[grid].usage.load(),
+                    // v_edges[grid].red, v_edges[grid].last_usage, L ,
+                    // v_edges[grid].usage.load() + v_edges[grid].red +
+                    // (int)(L*v_edges[grid].last_usage));
                     if ((preX == curX) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +
@@ -1009,16 +1008,12 @@ void mazeRouteMSMD_finegrain(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
-  // thread_local_storage->clear();
-  delete thread_local_storage;
 }
 
 void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
                                       int ripup_threshold,
                                       int mazeedge_Threshold, Bool Ordering,
-                                      int cost_type,
-                                      galois::InsertBag<int>* net_shuffle) {
+                                      int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain maze", "fine grain maze");
 
@@ -1072,8 +1067,8 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
     }
   }
 
-  cout << " i = vCap:" << v_costTable[vCapacity - 1] << " "
-       << v_costTable[vCapacity] << " " << v_costTable[vCapacity + 1] << endl;
+  // cout << " i = vCap:" << v_costTable[vCapacity - 1] << " "
+  //     << v_costTable[vCapacity] << " " << v_costTable[vCapacity + 1] << endl;
 
   /*forange = yGrid*xGrid;
   for(i=0; i<forange; i++)
@@ -1090,7 +1085,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
     // printf("order?\n");
   }
 
-  THREAD_LOCAL_STORAGE* thread_local_storage = new THREAD_LOCAL_STORAGE;
+  THREAD_LOCAL_STORAGE thread_local_storage{};
   // for(nidRPC=0; nidRPC<numValidNets; nidRPC++)//parallelize
   PerThread_PQ perthread_pq;
   PerThread_Vec perthread_vec;
@@ -1144,23 +1139,23 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
     TreeEdge *treeedges, *treeedge;
     TreeNode* treenodes;
 
-    bool* pop_heap2 = thread_local_storage->pop_heap2;
+    bool* pop_heap2 = thread_local_storage.pop_heap2;
 
-    float** d1    = thread_local_storage->d1_p;
-    bool** HV     = thread_local_storage->HV_p;
-    bool** hyperV = thread_local_storage->hyperV_p;
-    bool** hyperH = thread_local_storage->hyperH_p;
+    float** d1    = thread_local_storage.d1_p;
+    bool** HV     = thread_local_storage.HV_p;
+    bool** hyperV = thread_local_storage.hyperV_p;
+    bool** hyperH = thread_local_storage.hyperH_p;
 
-    short** parentX1 = thread_local_storage->parentX1_p;
-    short** parentX3 = thread_local_storage->parentX3_p;
-    short** parentY1 = thread_local_storage->parentY1_p;
-    short** parentY3 = thread_local_storage->parentY3_p;
+    short** parentX1 = thread_local_storage.parentX1_p;
+    short** parentX3 = thread_local_storage.parentX3_p;
+    short** parentY1 = thread_local_storage.parentY1_p;
+    short** parentY3 = thread_local_storage.parentY3_p;
 
-    int** corrEdge = thread_local_storage->corrEdge_p;
+    int** corrEdge = thread_local_storage.corrEdge_p;
 
-    OrderNetEdge* netEO = thread_local_storage->netEO_p;
+    OrderNetEdge* netEO = thread_local_storage.netEO_p;
 
-    bool** inRegion = thread_local_storage->inRegion_p;
+    bool** inRegion = thread_local_storage.inRegion_p;
 
     local_pq pq1 = perthread_pq.get();
     local_vec v2 = perthread_vec.get();
@@ -1213,8 +1208,7 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         // timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         // timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -1981,15 +1975,11 @@ void mazeRouteMSMD_finegrain_spinlock(int iter, int expand, float costHeight,
   }
   free(h_costTable);
   free(v_costTable);
-
-  thread_local_storage->clear();
-  delete thread_local_storage;
 }
 
 void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
                                    int ripup_threshold, int mazeedge_Threshold,
-                                   Bool Ordering, int cost_type,
-                                   galois::InsertBag<int>* net_shuffle) {
+                                   Bool Ordering, int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 
@@ -2057,7 +2047,7 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
     // printf("order?\n");
   }
 
-  THREAD_LOCAL_STORAGE* thread_local_storage = new THREAD_LOCAL_STORAGE;
+  THREAD_LOCAL_STORAGE thread_local_storage{};
   // for(nidRPC=0; nidRPC<numValidNets; nidRPC++)//parallelize
   PerThread_PQ perthread_pq;
   PerThread_Vec perthread_vec;
@@ -2097,23 +2087,23 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
     TreeEdge *treeedges, *treeedge;
     TreeNode* treenodes;
 
-    bool* pop_heap2 = thread_local_storage->pop_heap2;
+    bool* pop_heap2 = thread_local_storage.pop_heap2;
 
-    float** d1    = thread_local_storage->d1_p;
-    bool** HV     = thread_local_storage->HV_p;
-    bool** hyperV = thread_local_storage->hyperV_p;
-    bool** hyperH = thread_local_storage->hyperH_p;
+    float** d1    = thread_local_storage.d1_p;
+    bool** HV     = thread_local_storage.HV_p;
+    bool** hyperV = thread_local_storage.hyperV_p;
+    bool** hyperH = thread_local_storage.hyperH_p;
 
-    short** parentX1 = thread_local_storage->parentX1_p;
-    short** parentX3 = thread_local_storage->parentX3_p;
-    short** parentY1 = thread_local_storage->parentY1_p;
-    short** parentY3 = thread_local_storage->parentY3_p;
+    short** parentX1 = thread_local_storage.parentX1_p;
+    short** parentX3 = thread_local_storage.parentX3_p;
+    short** parentY1 = thread_local_storage.parentY1_p;
+    short** parentY3 = thread_local_storage.parentY3_p;
 
-    int** corrEdge = thread_local_storage->corrEdge_p;
+    int** corrEdge = thread_local_storage.corrEdge_p;
 
-    OrderNetEdge* netEO = thread_local_storage->netEO_p;
+    OrderNetEdge* netEO = thread_local_storage.netEO_p;
 
-    bool** inRegion = thread_local_storage->inRegion_p;
+    bool** inRegion = thread_local_storage.inRegion_p;
 
     local_pq pq1 = perthread_pq.get();
     local_vec v2 = perthread_vec.get();
@@ -2166,8 +2156,7 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -2445,7 +2434,8 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
                       // printf("grid: %d %d usage: %d red:%d last:%d L:%f
                       // sum:%d\n",grid%xGrid, grid/xGrid,
                       // h_edges[grid].usage.load(), h_edges[grid].red,
-                      // h_edges[grid].last_usage, L , h_edges[grid].usage.load()
+                      // h_edges[grid].last_usage, L ,
+                      // h_edges[grid].usage.load()
                       // + h_edges[grid].red +
                       // (int)(L*h_edges[grid].last_usage));
                       if ((preY == curY) || (curr_d1 == 0)) {
@@ -3050,7 +3040,4 @@ void mazeRouteMSMD_finegrain_doall(int iter, int expand, float costHeight,
   //}, "mazeroute vtune function");
   free(h_costTable);
   free(v_costTable);
-
-  thread_local_storage->clear();
-  delete thread_local_storage;
 }

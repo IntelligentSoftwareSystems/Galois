@@ -26,7 +26,7 @@ jobs:
 
           update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 50
 
-          scripts/check_format.sh . || exit 0
+          scripts/check_format.sh .
   "Sanitize":
     docker:
       - image: ubuntu:bionic

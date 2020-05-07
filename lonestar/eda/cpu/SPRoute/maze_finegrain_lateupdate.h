@@ -440,8 +440,7 @@ void setupHeapLate(int netID, int edgeID, galois::InsertBag<lateUpdateReq>& pq1,
 void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
                                         int ripup_threshold,
                                         int mazeedge_Threshold, Bool Ordering,
-                                        int cost_type,
-                                        galois::InsertBag<int>* net_shuffle) {
+                                        int cost_type) {
   // LOCK = 0;
   galois::StatTimer timer_finegrain("fine grain function", "fine grain maze");
 
@@ -632,8 +631,7 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
           mazeedge_Threshold) // only route the non-degraded edges (len>0)
       {
         timer_newripupcheck.start();
-        enter = newRipupCheck(treeedge, n1x, n1y, n2x, n2y, ripup_threshold,
-                              netID, edgeID);
+        enter = newRipupCheck(treeedge, ripup_threshold, netID, edgeID);
         timer_newripupcheck.stop();
 
         // ripup the routing for the edge
@@ -889,8 +887,8 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
                     // printf("grid: %d %d usage: %d red:%d last:%d L:%f
                     // sum:%d\n",grid%xGrid, grid/xGrid,
                     // h_edges[grid].usage.load(), h_edges[grid].red,
-                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load() +
-                    // h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
+                    // h_edges[grid].last_usage, L , h_edges[grid].usage.load()
+                    // + h_edges[grid].red + (int)(L*h_edges[grid].last_usage));
                     if ((preY == curY) || (curr_d1 == 0)) {
                       tmp =
                           curr_d1 +

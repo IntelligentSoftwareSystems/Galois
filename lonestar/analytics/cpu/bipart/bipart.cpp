@@ -75,14 +75,14 @@ static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> csize(cll::Positional,
                                 cll::desc("<size of coarsest graph>"),
-                                cll::Required);
+                                cll::init(25));
 
 static cll::opt<unsigned> refiter(cll::Positional,
                                   cll::desc("<number of iterations in ref>"),
-                                  cll::Required);
+                                  cll::init(2));
 static cll::opt<unsigned> numPartitions(cll::Positional,
                                         cll::desc("<number of partitions>"),
-                                        cll::Required);
+                                        cll::init(2));
 static cll::opt<double> imbalance(
     "balance",
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
@@ -391,7 +391,6 @@ int main(int argc, char** argv) {
           gr.getData(n).netval  = INT_MAX;
           gr.getData(n).nodeid  = n + 1;
         });
-        // GGraph* gr = metisGraph[i].getGraph();
         Partition(&metisG, 25, kValue[i]);
         MetisGraph* mcg = &metisG;
 
@@ -405,7 +404,6 @@ int main(int argc, char** argv) {
           delete mcg->getCoarserGraph();
         }
 
-        // GGraph& gg = *metisGraph[i].getGraph();
         int tmp                   = kValue[i];
         kValue[i]                 = (tmp + 1) / 2;
         kValue[i + (tmp + 1) / 2] = (tmp) / 2;
@@ -420,6 +418,7 @@ int main(int argc, char** argv) {
             graph.getData(v).setPart(i + (tmp + 1) / 2);
           }
         }
+        delete mcg;
       }
     }
 
