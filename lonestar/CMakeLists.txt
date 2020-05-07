@@ -23,7 +23,7 @@ function(add_test_scale type app)
   endforeach()
 endfunction(add_test_scale)
 
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   add_subdirectory(libdistbench)
 
   if(EXISTS /net/ohm/export/iss/dist-outputs)

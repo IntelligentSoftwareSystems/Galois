@@ -1,6 +1,6 @@
 add_subdirectory(cpu)
 
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   add_subdirectory(distributed)
 endif()
 

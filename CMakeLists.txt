@@ -22,7 +22,7 @@ endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
-set(ENABLE_DIST_GALOIS OFF CACHE BOOL "Enable distributed features")
+set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
 set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
 set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
@@ -152,7 +152,7 @@ endif()
 ###### Configure features ######
 
 if(ENABLE_HETERO_GALOIS)
-  set(ENABLE_DIST_GALOIS ON)
+  set(GALOIS_ENABLE_DIST ON)
 endif()
 
 if(USE_VTUNE)
@@ -218,7 +218,7 @@ add_custom_target(apps)
 
 # Core libraries (lib)
 add_subdirectory(libgalois)
-if (ENABLE_DIST_GALOIS)
+if (GALOIS_ENABLE_DIST)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)

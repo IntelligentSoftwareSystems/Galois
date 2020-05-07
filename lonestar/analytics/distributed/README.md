@@ -19,7 +19,7 @@ specified.
 
 For distributed Galois, i.e. D-Galois:
 
-`cmake ${GALOIS_ROOT} -DENABLE_DIST_GALOIS=1`
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1`
 
 For heterogeneous (which is also distributed) Galois, i.e. D-IrGL:
 
