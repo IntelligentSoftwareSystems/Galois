@@ -26,8 +26,7 @@
  * @todo document this file
  */
 
-#ifndef __HOST_EDGEMARSHAL_FORWARD_DECL__
-#define __HOST_EDGEMARSHAL_FORWARD_DECL__
+#pragma once
 #include <string>
 
 #ifndef LSG_CSR_GRAPH
@@ -101,4 +100,3 @@ bool init_CUDA_context(struct CUDA_Context* ctx, int device);
 void load_graph_CUDA(struct CUDA_Context* ctx, EdgeMarshalGraph& g,
                      unsigned num_hosts);
 void reset_CUDA_context(struct CUDA_Context* ctx);
-#endif
