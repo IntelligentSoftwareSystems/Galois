@@ -17,10 +17,13 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'deb https://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
           apt-get -q update -y
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             clang-format-10
 
@@ -34,7 +37,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'ppa:ubuntu-toolchain-r/test'
@@ -42,6 +45,9 @@ jobs:
           apt-add-repository -y 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-add-repository -y 'ppa:mhier/libboost-latest'
           apt-get -q update -y
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             clang-10 \
             cmake \
@@ -78,6 +84,10 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
+          apt-get -q install -y git
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             cmake \
             g++ \
@@ -108,11 +118,13 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
-
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             cmake \
             g++ \
@@ -141,11 +153,13 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
-
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             cmake \
             g++ \
@@ -167,11 +181,13 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
-
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           apt-get -q install -y \
             cmake \
             g++ \
@@ -195,6 +211,10 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q install git
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           yum -y -q install \
             boost-devel \
             cmake \
@@ -236,6 +256,10 @@ jobs:
           # Needs to access PowerTools packages for eigen, so get access to those
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q install git
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           yum -y -q install \
             boost-devel \
             eigen3-devel \
@@ -272,6 +296,10 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
+          pacman -q -S --noconfirm git
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           # NB(ddn): make requires libffi but its package doesn't depend on it.
           pacman -q -S --noconfirm \
             boost \
@@ -298,6 +326,10 @@ jobs:
       - image: alpine:latest
     steps:
       - checkout
+      - run: |
+          apk add --no-cache --no-progress git
+      - run: git submodule sync
+      - run: git submodule update --init
       - run: |
           apk add --no-cache --no-progress \
             boost-dev \
@@ -327,6 +359,10 @@ jobs:
       - image: fedora:latest
     steps:
       - checkout
+      - run: |
+          yum -y -q install git
+      - run: git submodule sync
+      - run: git submodule update --init
       - run: |
           yum -y -q install \
             boost-devel \
@@ -358,6 +394,10 @@ jobs:
     steps:
       - checkout
       - run: |
+          yum -y -q install git
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run: |
           yum -y -q install \
             boost-devel \
             clang \
@@ -368,12 +408,12 @@ jobs:
             make \
             openmpi-devel \
             zlib-devel
-          # Get the "module" function set up before loading MPI.
 
           chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
+          # Get the "module" function set up before loading MPI.
           . /etc/bashrc
           module load mpi
           cmake \

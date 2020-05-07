@@ -2,11 +2,8 @@ dist: bionic
 
 language: c++
 
-# At the moment, our LCI submodule has an additional submodule within it
-# that refers to some non-public copy of googletest. To avoid failing when
-# cloning Galois, we have to turn off cloning submodules.
 git:
-  submodules: false
+  submodules: true
 
 matrix:
   include:
