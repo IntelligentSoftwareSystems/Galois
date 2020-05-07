@@ -45,9 +45,9 @@ __global__ void norm_factor_computing_edge(int n, GraphGPU graph, float_t* norm_
     d_src = 1.0 / sqrt(d_src);
     auto start = graph.edge_begin(src);
     index_t end = graph.edge_end(src);
-	for (index_t e = start; e != end; e++) {
+    for (index_t e = start; e != end; e++) {
       index_t dst = graph.getEdgeDst(e);
-      if (dst >= n) printf("src=%d, dst=%d, e=%d, start=%d, end=%d\n", src, dst, e, start, end);
+      //if (dst >= n) printf("src=%d, dst=%d, e=%d, start=%d, end=%d\n", src, dst, e, start, end);
       assert(dst < n);
       float_t d_dst = float_t(graph.getOutDegree(dst));
       assert(d_dst != 0.0);

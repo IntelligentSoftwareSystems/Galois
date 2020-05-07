@@ -210,7 +210,7 @@ void csrmm_gpu(const int M, const int N, const int K, const int nnz,
                const float alpha, const float* A_nonzeros, 
                const int* A_idx_ptr, const int* A_nnz_idx,
                const float* B, const float beta, float *transpose_C, float* C) {
-  std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K << ", nnz=" << nnz << "\n";
+  //std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K << ", nnz=" << nnz << "\n";
   CUSPARSE_CHECK(cusparseScsrmm2(deepgalois::Context::cusparse_handle(),
                  CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
                  M, N, K, nnz, &alpha, deepgalois::Context::cusparse_matdescr(), A_nonzeros, 

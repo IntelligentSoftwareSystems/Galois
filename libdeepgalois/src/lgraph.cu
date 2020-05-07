@@ -29,14 +29,18 @@ void LearningGraph::allocOnDevice(bool no_edge_data__) {
   is_device = true;
 }
 
+void LearningGraph::print_test() {
+  printf("d_rowptr_: 0x%x\n", d_rowptr_);
+  printf("d_colidx_: 0x%x\n", d_colidx_);
+  print_device_int_vector(10, (const int*)d_rowptr_, "row_start");
+  print_device_int_vector(10, (const int*)d_colidx_, "edge_dst");
+}
+
 void LearningGraph::copy_to_gpu() {
   allocOnDevice(edge_data_ == NULL);
   CUDA_CHECK(cudaMemcpy(d_colidx_, edge_dst_host_ptr(), num_edges_ * sizeof(index_t), cudaMemcpyHostToDevice));
   CUDA_CHECK(cudaMemcpy(d_rowptr_, row_start_host_ptr(), (num_vertices_+1) * sizeof(index_t), cudaMemcpyHostToDevice));
-  printf("row_start_ptr: 0x%x\n", d_rowptr_);
-  printf("edge_dst_ptr: 0x%x\n", d_colidx_);
-  print_device_int_vector(10, (const int*)d_rowptr_, "row_start");
-  print_device_int_vector(10, (const int*)d_colidx_, "edge_dst");
+  print_test();
   //CUDA_CHECK(cudaMemcpy(degrees_ptr(), d_degrees_, num_vertices_ * sizeof(index_t), cudaMemcpyHostToDevice));
   //if (edge_data__ != NULL) CUDA_CHECK(cudaMemcpy(copygraph.edge_data__, edge_data__, num_edges_ * sizeof(edata_t), cudaMemcpyHostToDevice));
   //CUDA_CHECK(cudaMemcpy(copygraph.vertex_data__, vertex_data__, num_vertices_ * sizeof(vdata_t), cudaMemcpyHostToDevice));

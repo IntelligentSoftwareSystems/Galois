@@ -17,6 +17,12 @@
 #include <cassert>
 #include <fstream>
 
+#ifdef __CUDACC__
+#define CUDA_HOSTDEV __host__ __device__
+#else
+#define CUDA_HOSTDEV
+#endif
+
 // Adapted from LSG CSRGraph.h
 
 // TODO: make this template data
@@ -42,20 +48,20 @@ struct CSRGraph {
   unsigned deallocOnDevice();
   void dealloc();
 
-  __device__ __host__ bool valid_node(index_type node) {
+  CUDA_HOSTDEV bool valid_node(index_type node) {
     return (node < nnodes);
   }
 
-  __device__ __host__ bool valid_edge(index_type edge) {
+  CUDA_HOSTDEV bool valid_edge(index_type edge) {
     return (edge < nedges);
   }
 
-  __device__ __host__ index_type getOutDegree(unsigned src) {
+  CUDA_HOSTDEV index_type getOutDegree(unsigned src) {
     assert(src < nnodes);
     return row_start[src + 1] - row_start[src];
   };
 
-  __device__ __host__ index_type getDestination(unsigned src, unsigned edge) {
+  CUDA_HOSTDEV index_type getDestination(unsigned src, unsigned edge) {
     assert(src < nnodes);
     assert(edge < getOutDegree(src));
 
@@ -65,18 +71,18 @@ struct CSRGraph {
     return edge_dst[abs_edge];
   };
 
-  __device__ __host__ index_type getAbsDestination(unsigned abs_edge) {
+  CUDA_HOSTDEV index_type getAbsDestination(unsigned abs_edge) {
     assert(abs_edge < nedges);
 
     return edge_dst[abs_edge];
   };
 
-  __device__ __host__ index_type getFirstEdge(unsigned src) {
+  CUDA_HOSTDEV index_type getFirstEdge(unsigned src) {
     assert(src <= nnodes); // <= is okay
     return row_start[src];
   };
 
-  __device__ __host__ edge_data_type getWeight(unsigned src, unsigned edge) {
+  CUDA_HOSTDEV edge_data_type getWeight(unsigned src, unsigned edge) {
     assert(src < nnodes);
     assert(edge < getOutDegree(src));
 
@@ -86,7 +92,7 @@ struct CSRGraph {
     return edge_data[abs_edge];
   };
 
-  __device__ __host__ edge_data_type getAbsWeight(unsigned abs_edge) {
+  CUDA_HOSTDEV edge_data_type getAbsWeight(unsigned abs_edge) {
     assert(abs_edge < nedges);
 
     return edge_data[abs_edge];
@@ -138,29 +144,29 @@ struct CSRGraph {
 		//print_neighbors(0);
 	}
 
-	__device__ __host__ index_type getEdgeDst(unsigned edge) {
+	CUDA_HOSTDEV index_type getEdgeDst(unsigned edge) {
 		assert(edge < nedges);
 		return edge_dst[edge];
 	};
-	__device__ __host__ node_data_type getData(unsigned vid) {
+	CUDA_HOSTDEV node_data_type getData(unsigned vid) {
 		return node_data[vid];
 	}
-	__device__ __host__ index_type edge_begin(unsigned src) {
+	CUDA_HOSTDEV index_type edge_begin(unsigned src) {
 		assert(src <= nnodes);
 		return row_start[src];
 	};
-	__device__ __host__ index_type edge_end(unsigned src) {
+	CUDA_HOSTDEV index_type edge_end(unsigned src) {
 		assert(src <= nnodes);
 		return row_start[src+1];
 	};
-	__device__ __host__ index_type *row_start_ptr() { return row_start; }
-	__device__ __host__ const index_type *row_start_ptr() const { return row_start; }
-	__device__ __host__ index_type *edge_dst_ptr() { return edge_dst; }
-	__device__ __host__ const index_type *edge_dst_ptr() const { return edge_dst; }
-	__device__ __host__ node_data_type *node_data_ptr() { return node_data; }
-	__device__ __host__ const node_data_type *node_data_ptr() const { return node_data; }
-	__device__ __host__ edge_data_type *edge_data_ptr() { return edge_data; }
-	__device__ __host__ const edge_data_type *edge_data_ptr() const { return edge_data; }
+	CUDA_HOSTDEV index_type *row_start_ptr() { return row_start; }
+	CUDA_HOSTDEV const index_type *row_start_ptr() const { return row_start; }
+	CUDA_HOSTDEV index_type *edge_dst_ptr() { return edge_dst; }
+	CUDA_HOSTDEV const index_type *edge_dst_ptr() const { return edge_dst; }
+	CUDA_HOSTDEV node_data_type *node_data_ptr() { return node_data; }
+	CUDA_HOSTDEV const node_data_type *node_data_ptr() const { return node_data; }
+	CUDA_HOSTDEV edge_data_type *edge_data_ptr() { return edge_data; }
+	CUDA_HOSTDEV const edge_data_type *edge_data_ptr() const { return edge_data; }
 
   size_t size() { return size_t(nnodes); }
   size_t sizeEdges() { return size_t(nedges); }

@@ -142,6 +142,7 @@ public:
 	vdata_t *vertex_data_ptr() { return d_vertex_data_; }
 	//const vdata_t *vertex_data_ptr() const { return vertex_data_; }
 	//const edata_t *edge_data_ptr() const { return edge_data; }
+  void print_test();
 #endif
 
 };
