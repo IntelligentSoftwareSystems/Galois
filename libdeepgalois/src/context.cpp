@@ -1,7 +1,7 @@
 /**
  * Based on common.hpp file of the Caffe deep learning library.
  */
-#include "deepgalois/context.h"
+#include "deepgalois/Context.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/configs.h"
 #include "galois/Galois.h"

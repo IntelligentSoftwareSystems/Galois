@@ -14,7 +14,7 @@
 #include "deepgalois/sampler.h"
 #endif
 #ifndef GALOIS_USE_DIST
-#include "deepgalois/context.h"
+#include "deepgalois/Context.h"
 #else
 #include "deepgalois/GraphTypes.h"
 #include "deepgalois/DistContext.h"

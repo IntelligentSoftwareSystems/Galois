@@ -11,7 +11,7 @@
 #include <iostream>
 #include "deepgalois/gtypes.h"
 #ifndef GALOIS_USE_DIST
-#include "deepgalois/context.h"
+#include "deepgalois/Context.h"
 #else
 #include "deepgalois/DistContext.h"
 #endif
