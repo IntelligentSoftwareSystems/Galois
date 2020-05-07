@@ -66,10 +66,6 @@ if(NUM_TEST_THREADS LESS_EQUAL 0)
   set(NUM_TEST_THREADS 1)
 endif()
 
-if(ENABLE_HETERO_GALOIS)
-  set(USE_ARCH none)
-endif()
-
 ###### Configure (users don't need to go beyond here) ######
 
 include(CTest)
@@ -150,10 +146,6 @@ if(CXX_CLANG_TIDY)
 endif()
 
 ###### Configure features ######
-
-if(ENABLE_HETERO_GALOIS)
-  set(GALOIS_ENABLE_DIST ON)
-endif()
 
 if(USE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
