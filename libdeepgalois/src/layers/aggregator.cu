@@ -74,11 +74,17 @@ void update_all_csrmm(size_t len, GraphGPU& g, const float_t* in, float_t* out,
                 bool norm, const float_t* norm_factor) {
   unsigned n = g.size();
   CUDA_CHECK(cudaMemset(out, 0, n * len * sizeof(float_t)));
-  //std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
-  //print_device_vector(10, norm_factor, "norm_factor");
+  std::cout << "[debug]: update_all on GPU, n=" << n << ", len=" << len << "\n";
+  print_device_vector(10, norm_factor, "norm_factor");
   float *temp;
+  const int *row_start = (const int*)g.row_start_ptr();
+  const int *edge_dst = (const int*)g.edge_dst_ptr();
+  printf("row_start_ptr: 0x%x\n", row_start);
+  printf("edge_dst_ptr: 0x%x\n", edge_dst);
+  print_device_int_vector(10, row_start, "row_start");
+  print_device_int_vector(10, edge_dst, "edge_dst");
   float_malloc_device(n*len, temp); // TODO: avoid repetitive allocation
-  csrmm_gpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, (const int*)g.row_start_ptr(), (const int*)g.edge_dst_ptr(), in, 0.0, temp, out);
+  csrmm_gpu(n, len, n, g.sizeEdges(), 1.0, norm_factor, row_start, edge_dst, in, 0.0, temp, out);
   float_free_device(temp);
 }
 

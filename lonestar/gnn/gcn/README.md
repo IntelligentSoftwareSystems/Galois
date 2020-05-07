@@ -26,12 +26,16 @@ BUILD
 RUN
 ===========
 
+Datasets: 
+(1) single-class: cora citeseer pubmed flickr reddit
+(2) multi-class: ppi yelp amazon
+
 The following are a few example command lines.
 
 $ export OPENBLAS_NUM_THREADS=28
-$ ./gnn cora -t=1 -k=3
-$ ./gnn citeseer -t=3 -k=30
-$ ./gnn reddit -t=56 -k=3
+$ ./gnn cora -t=1 -k=30
+$ ./gnn reddit -t=56 -k=200
+$ ./gcn reddit -k=200 -t=56 -ss=9000 -dr=0.1 -h=128 -vi=20
 
 PERFORMANCE
 ===========

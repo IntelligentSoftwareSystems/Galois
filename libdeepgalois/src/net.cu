@@ -23,8 +23,7 @@ __global__ void masked_accuracy_kernel(int num_classes, int begin,
                                        float_t* preds, label_t* labels,
                                        HGAccumulator<acc_t> total) {
   total.thread_entry();
-  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage
-      local_accuracy;
+  __shared__ cub::BlockReduce<acc_t, CUDA_NUM_THREADS>::TempStorage local_accuracy;
   CUDA_KERNEL_LOOP(i, end - begin) {
     if (masks[begin + i] == 1) {
       label_t pred = (label_t)argmax_device(num_classes, preds + (begin + i) * num_classes);
@@ -72,7 +71,7 @@ __global__ void masked_f1_score_kernel(int num_classes, int begin,
           atomicAdd(&true_negtive[j], 1.0);
         }
       }
-	}
+    }
   }
 }
 

@@ -34,7 +34,6 @@ protected:
 public:
   typedef size_t iterator;
   LearningGraph(bool use_gpu) : is_device(use_gpu), num_vertices_(0), num_edges_(0),
-                                //rowptr_(NULL), colidx_(NULL), degrees_(NULL),
                                 vertex_data_(NULL), edge_data_(NULL) {}
   LearningGraph() : LearningGraph(false) {}
   ~LearningGraph() { dealloc(); }
@@ -58,7 +57,7 @@ public:
     rowptr_[vid+1] = row_end;
   }
   void allocateFrom(index_t nv, index_t ne) {
-    //printf("Allocating num_vertices_=%d, num_edges_=%d.\n", num_vertices_, num_edges_);
+    //printf("Allocating num_vertices %d num_edgesi %d\n", num_vertices_, num_edges_);
     num_vertices_ = nv;
     num_edges_ = ne;
     rowptr_.resize(num_vertices_+1);
@@ -73,8 +72,6 @@ public:
     if (edge_data_) edge_data_[eid] = edata;
   }
   void add_selfloop() {
-    //print_neighbors(nnodes-1);
-    //print_neighbors(0);
     auto old_colidx_ = colidx_;
     colidx_.resize(num_vertices_ + num_edges_);
     for (index_t i = 0; i < num_vertices_; i++) {
@@ -102,8 +99,7 @@ public:
     }
     for (index_t i = 0; i <= num_vertices_; i++) rowptr_[i] += i;
     num_edges_ += num_vertices_;
-    //print_neighbors(nnodes-1);
-    //print_neighbors(0);
+    printf("Selfloop added: num_vertices %d num_edges %d\n", num_vertices_, num_edges_);
   }
 
   bool isLocal(index_t vid);
@@ -114,6 +110,7 @@ public:
   uint64_t globalSize();
 
   index_t* row_start_host_ptr() { return &rowptr_[0]; }
+  index_t* edge_dst_host_ptr() { return &colidx_[0]; }
 #ifdef CPU_ONLY
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }
@@ -132,8 +129,10 @@ public:
 	CUDA_HOSTDEV index_t edge_begin(index_t src) { return d_rowptr_[src]; }
 	CUDA_HOSTDEV index_t edge_end(index_t src) { return d_rowptr_[src+1]; }
 	CUDA_HOSTDEV vdata_t getData(index_t vid) { return d_vertex_data_[vid]; }
-	CUDA_HOSTDEV index_t getDegree(index_t vid) { return d_degrees_[vid]; }
-	CUDA_HOSTDEV index_t getOutDegree(index_t vid) { return d_degrees_[vid]; }
+	//CUDA_HOSTDEV index_t getDegree(index_t vid) { return d_degrees_[vid]; }
+	//CUDA_HOSTDEV index_t getOutDegree(index_t vid) { return d_degrees_[vid]; }
+	CUDA_HOSTDEV index_t getDegree(index_t vid) { return d_rowptr_[vid+1] - d_rowptr_[vid]; }
+	CUDA_HOSTDEV index_t getOutDegree(index_t vid) { return d_rowptr_[vid+1] - d_rowptr_[vid]; }
 	index_t *row_start_ptr() { return d_rowptr_; }
 	const index_t *row_start_ptr() const { return d_rowptr_; }
 	index_t *edge_dst_ptr() { return d_colidx_; }

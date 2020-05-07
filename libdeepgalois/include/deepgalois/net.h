@@ -36,7 +36,7 @@ public:
   neighbor_sample_size(neigh_sz), subgraph_sample_size(subg_sz),
   num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs), 
   learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
-  val_interval(val_itv), is_selfloop(selfloop) {
+  val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     assert(n_conv > 0);
     std::cout << "Configuration: num_threads " << num_threads
               << ", num_conv_layers " << num_conv_layers

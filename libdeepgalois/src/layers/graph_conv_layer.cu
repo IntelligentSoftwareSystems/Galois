@@ -9,24 +9,19 @@ void graph_conv_layer::malloc_and_init() {
   size_t z = output_dims[1];
 
   if (dropout_) CUDA_CHECK(cudaMalloc((void**)&dropout_mask, x * y * sizeof(mask_t)));
-  //CUDA_CHECK(cudaMalloc((void**)&in_temp, x * y * sizeof(float_t)));
   float_malloc_device(x*y, in_temp);
   init_const_gpu(x*y, 0.0, in_temp);
   if (y <= z) {
     float_malloc_device(x*y, in_temp1);
     init_const_gpu(x*y, 0.0, in_temp1);
   }
-  //CUDA_CHECK(cudaMalloc((void**)&out_temp, x * z * sizeof(float_t)));
   float_malloc_device(x*z, out_temp);
   init_const_gpu(x*z, 0.0, out_temp);
-  //CUDA_CHECK(cudaMalloc((void**)&d_W, y * z * sizeof(float_t)));
   float_malloc_device(y*z, d_W);
   auto init_range = sqrt(6.0 / (y + z));
   // Glorot & Bengio (AISTATS 2010)
   rng_uniform_gpu(y * z, -init_range, init_range, d_W);
-  //CUDA_CHECK(cudaMalloc((void**)&layer::d_weight_grad, y * z * sizeof(float_t)));
   float_malloc_device(y*z, layer::d_weight_grad);
-  //CUDA_CHECK(cudaMemset(layer::d_weight_grad, 0, y * z * sizeof(float_t)));
   init_const_gpu(y*z, 0.0, layer::d_weight_grad);
 }
 
@@ -56,9 +51,9 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
   size_t y = input_dims[1];
   size_t z = output_dims[1];
  
+	// currently only support feature length <= 128
   if (z > MAX_NUM_CLASSES) {
     std::cout << "Currently support maximum hidden feature length of " << MAX_NUM_CLASSES << "\n"; 
-	// currently only support feature length <= 128
     exit(0);
   }
   init_const_gpu(x*z, 0.0, out_temp);
@@ -76,8 +71,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data, float_t* out_
 }
 
 // GPU backward: compute input gradients (in_grad) and weight gradients (d_weight_grad)
-void graph_conv_layer::back_propagation(const float_t* in_data,
-                                        const float_t* out_data,
+void graph_conv_layer::back_propagation(const float_t* in_data, const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
   size_t x = input_dims[0];
   size_t y = input_dims[1];

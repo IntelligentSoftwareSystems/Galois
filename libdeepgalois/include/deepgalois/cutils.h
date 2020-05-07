@@ -180,3 +180,10 @@ inline void print_device_vector(size_t n, const float_t *d_x, std::string name =
   delete[] h_x;
 }
 
+inline void print_device_int_vector(size_t n, const int *d_x, std::string name = "x") {
+  int *h_x = new int[n];
+  CUDA_CHECK(cudaMemcpy(h_x, d_x, n * sizeof(int), cudaMemcpyDeviceToHost));
+  for (size_t i = 0; i < n; i ++) std::cout << name << "[" << i << "]=" << h_x[i] << "\n";
+  delete[] h_x;
+}
+
