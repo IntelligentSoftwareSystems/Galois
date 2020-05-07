@@ -49,7 +49,7 @@ class DGAccumulator {
   galois::GAccumulator<Ty> mdata;
   Ty local_mdata, global_mdata;
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
   /**
    * Sum reduction using LWCI
    */
@@ -176,7 +176,7 @@ public:
     if (local_mdata == 0)
       local_mdata = mdata.reduce();
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     reduce_lwci();
 #else
     reduce_mpi();
@@ -204,7 +204,7 @@ class DGReduceMax {
   galois::GReduceMax<Ty> mdata; // local max reducer
   Ty local_mdata, global_mdata;
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
   /**
    * Use LWCI to reduce max across hosts
    */
@@ -312,7 +312,7 @@ public:
     if (local_mdata == 0)
       local_mdata = mdata.reduce();
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     reduce_lwci();
 #else
     reduce_mpi();
@@ -339,7 +339,7 @@ class DGReduceMin {
   galois::GReduceMin<Ty> mdata; // local min reducer
   Ty local_mdata, global_mdata;
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
   /**
    * Use LWCI to reduce min across hosts
    */
@@ -448,7 +448,7 @@ public:
     if (local_mdata == std::numeric_limits<Ty>::max())
       local_mdata = mdata.reduce();
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     reduce_lwci();
 #else
     reduce_mpi();

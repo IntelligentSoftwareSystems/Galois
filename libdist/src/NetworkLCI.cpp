@@ -26,7 +26,7 @@
  * @todo document this file more
  */
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 #include "galois/runtime/Network.h"
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"

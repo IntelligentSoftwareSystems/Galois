@@ -365,7 +365,7 @@ private:
     if (bare_mpi == noBareMPI)
       return;
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     // sanity check of ranks
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);

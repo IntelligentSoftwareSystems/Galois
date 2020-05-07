@@ -28,7 +28,7 @@ if (GALOIS_USE_BARE_MPI)
 endif()
 
 if (GALOIS_USE_LCI)
-  add_definitions(-DGALOIS_USE_LWCI)
+  add_definitions(-DGALOIS_USE_LCI)
   set(LCI_ROOT "${CMAKE_BINARY_DIR}/libdist/external/src/lci")
   set(LCI_INCLUDE "${LCI_ROOT}/include")
   set(LCI_LIBRARY "${LCI_ROOT}/liblci.a")
