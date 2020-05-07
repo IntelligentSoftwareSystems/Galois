@@ -23,11 +23,11 @@ target_link_libraries(galois_dist_async PUBLIC galois_shmem)
 
 target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
 
-if (USE_BARE_MPI)
+if (GALOIS_USE_BARE_MPI)
   target_compile_definitions(galois_dist_async PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
 endif()
 
-if (USE_LCI)
+if (GALOIS_USE_LCI)
   add_definitions(-DGALOIS_USE_LWCI)
   set(LCI_ROOT "${CMAKE_BINARY_DIR}/libdist/external/src/lci")
   set(LCI_INCLUDE "${LCI_ROOT}/include")
@@ -53,7 +53,7 @@ if (USE_LCI)
     $<BUILD_INTERFACE:${LCI_INCLUDE}>
     $<INSTALL_INTERFACE:include>
   )
-endif(USE_LCI)
+endif(GALOIS_USE_LCI)
 
 install(
   DIRECTORY include/
