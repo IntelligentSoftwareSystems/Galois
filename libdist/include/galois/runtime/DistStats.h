@@ -32,13 +32,13 @@
 #define MORE_DIST_STATS 0
 #endif
 //! Turn on if you want more communication statistics to be printed
-#ifndef MORE_COMM_STATS
-#define MORE_COMM_STATS 0
+#ifndef GALOIS_COMM_STATS
+#define GALOIS_COMM_STATS 0
 #endif
 //! Turn on if you want per-bulk-synchronous parallel timers to be printed
 //! (otherwise all rounds are under 1 timer)
-#ifndef DIST_PER_ROUND_TIMER
-#define DIST_PER_ROUND_TIMER 0
+#ifndef GALOIS_PER_ROUND_STATS
+#define GALOIS_PER_ROUND_STATS 0
 #endif
 
 #include "galois/runtime/Statistics.h"

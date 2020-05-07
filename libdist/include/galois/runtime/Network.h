@@ -97,7 +97,7 @@ protected:
   std::atomic<size_t> inflightSends;
   std::atomic<size_t> inflightRecvs;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
 public:
   //! Wrapper that calls into increment mem usage on the memory usage tracker
   inline void incrementMemUsage(uint64_t size) {

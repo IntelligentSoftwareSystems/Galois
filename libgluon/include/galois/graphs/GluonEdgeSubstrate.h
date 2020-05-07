@@ -47,7 +47,7 @@
 //! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
 //! bare_mpi type to use; see options in runtime/BareMPI.h
 BareMPI bare_mpi = BareMPI::noBareMPI;
 #endif
@@ -93,7 +93,7 @@ private:
   //! Maximum size of master or mirror edges on different hosts
   size_t maxSharedSize;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
   // Used for efficient comms
@@ -224,7 +224,7 @@ private:
           [&](size_t n) {
             masterEdges[h][n] = userGraph.getEdgeLID(masterEdges[h][n]);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MasterEdges").c_str()),
 #endif
           galois::no_stats());
@@ -236,7 +236,7 @@ private:
           [&](size_t n) {
             mirrorEdges[h][n] = userGraph.getEdgeLID(mirrorEdges[h][n]);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MirrorEdges").c_str()),
 #endif
           galois::no_stats());
@@ -303,7 +303,7 @@ private:
    * initialized when the network interface was initiailized.
    */
   void initBareMPI() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     if (bare_mpi == noBareMPI)
       return;
 
@@ -413,7 +413,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string offsets_timer_str(syncTypeStr + "Offsets_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
                                                     RNAME);
 
     Toffsets.start();
@@ -535,7 +535,7 @@ private:
               bitset_comm.set(n);
             }
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -578,7 +578,7 @@ private:
           offsets[n] =
               static_cast<uint32_t>(userGraph.getEdgeGID(indices[offsets[n]]));
         },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
         galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
         galois::no_stats());
@@ -604,7 +604,7 @@ private:
     galois::do_all(
         galois::iterate(size_t{0}, offsets.size()),
         [&](size_t n) { offsets[n] = userGraph.getEdgeLID(offsets[n]); },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
         galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
         galois::no_stats());
@@ -672,7 +672,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tserialize(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tserialize(
         serialize_timer_str.c_str(), RNAME);
     if (data_mode == noData) {
       if (!async) {
@@ -739,7 +739,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tdeserialize(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tdeserialize(
         serialize_timer_str.c_str(), RNAME);
     Tdeserialize.start();
 
@@ -928,7 +928,7 @@ private:
             size_t lid         = indices[offset];
             val_vec[n - start] = extractWrapper<FnTy, syncType>(lid);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -999,7 +999,7 @@ private:
             size_t lid         = indices[offset];
             val_vec[n - start] = extractWrapper<FnTy, syncType>(lid, vecIndex);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1065,7 +1065,7 @@ private:
             gSerializeLazy(b, lseq, n - start,
                            extractWrapper<FnTy, syncType>(lid));
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1224,7 +1224,7 @@ private:
             setWrapper<FnTy, syncType, async>(lid, val_vec[n - start],
                                               bit_set_compute);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1329,11 +1329,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
                                                     RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1407,11 +1407,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
                                                     RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1496,15 +1496,15 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
                                                     RNAME);
     std::string extract_alloc_timer_str(syncTypeStr + "ExtractAlloc_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractalloc(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractalloc(
         extract_alloc_timer_str.c_str(), RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1622,7 +1622,7 @@ private:
                                                             1);
   }
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * Sync using MPI instead of network layer.
    */
@@ -1766,7 +1766,7 @@ private:
             bool async>
   void syncSend(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TSendTime.start();
@@ -1801,10 +1801,10 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string set_timer_str(syncTypeStr + "Set_" +
                               get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
     std::string set_batch_timer_str(syncTypeStr + "SetBatch_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tsetbatch(
         set_batch_timer_str.c_str(), RNAME);
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
@@ -1881,7 +1881,7 @@ private:
     return retval;
   }
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * MPI Irecv wrapper for sync
    */
@@ -1964,7 +1964,7 @@ private:
   void syncNetRecv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string wait_timer_str("Wait_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Twait(wait_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Twait(wait_timer_str.c_str(), RNAME);
 
     if (async) {
       size_t syncTypePhase = 0;
@@ -2016,7 +2016,7 @@ private:
             bool async>
   void syncRecv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TRecvTime.start();
@@ -2027,7 +2027,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // MPI sync variants
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * Nonblocking MPI sync
    */
@@ -2035,9 +2035,9 @@ private:
   void syncNonblockingMPI(std::string loopName,
                           bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<std::vector<uint8_t>> rb;
@@ -2087,9 +2087,9 @@ private:
   template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void syncOnesidedMPI(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<MPI_Win> window;
@@ -2183,17 +2183,17 @@ private:
   template <typename ReduceFnTy, typename BitsetFnTy, bool async>
   inline void reduce(std::string loopName) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> TsyncReduce(timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> TsyncReduce(timer_str.c_str(),
                                                        RNAME);
     TsyncReduce.start();
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     switch (bare_mpi) {
     case noBareMPI:
 #endif
       syncSend<syncReduce, ReduceFnTy, BitsetFnTy, async>(loopName);
       syncRecv<syncReduce, ReduceFnTy, BitsetFnTy, async>(loopName);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<syncReduce, ReduceFnTy, BitsetFnTy>(loopName);
@@ -2220,14 +2220,14 @@ private:
   template <typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void broadcast(std::string loopName) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
                                                           RNAME);
 
     TsyncBroadcast.start();
 
     bool use_bitset = true;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     switch (bare_mpi) {
     case noBareMPI:
 #endif
@@ -2238,7 +2238,7 @@ private:
                  async>(loopName);
       }
       syncRecv<syncBroadcast, BroadcastFnTy, BitsetFnTy, async>(loopName);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<syncBroadcast, BroadcastFnTy, BitsetFnTy>(loopName,
@@ -2450,7 +2450,7 @@ public:
    * of its use from code
    */
   inline std::string get_run_identifier() const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::to_string(num_run) + "_" +
                        std::to_string(num_round));
 #else
@@ -2466,7 +2466,7 @@ public:
    * @returns String with run identifier appended to passed in loop name
    */
   inline std::string get_run_identifier(std::string loop_name) const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
                        "_" + std::to_string(num_round));
 #else
@@ -2487,7 +2487,7 @@ public:
    */
   inline std::string get_run_identifier(std::string loop_name,
                                         unsigned alterID) const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
                        "_" + std::to_string(num_run) + "_" +
                        std::to_string(num_round));

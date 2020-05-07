@@ -169,7 +169,7 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGAccum_" + runID);
 
-    galois::CondStatTimer<MORE_COMM_STATS> reduceTimer(timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReducible");
     reduceTimer.start();
 
@@ -305,7 +305,7 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGReduceMax_" + runID);
 
-    galois::CondStatTimer<MORE_COMM_STATS> reduceTimer(timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReduceMax");
 
     reduceTimer.start();
@@ -441,7 +441,7 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGReduceMin_" + runID);
 
-    galois::CondStatTimer<MORE_COMM_STATS> reduceTimer(timer_str.c_str(),
+    galois::CondStatTimer<GALOIS_COMM_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReduceMin");
 
     reduceTimer.start();

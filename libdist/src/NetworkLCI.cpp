@@ -181,7 +181,7 @@ public:
     statSendNum += 1;
     statSendBytes += buf.size();
     // int count = 0;
-#ifndef __GALOIS_HET_ASYNC__
+#ifndef GALOIS_SUPPORT_ASYNC
     if (buf.getVec().size() < 8192) {
       while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag,
                       lc_p2p_ep[phase]) != LC_OK) {

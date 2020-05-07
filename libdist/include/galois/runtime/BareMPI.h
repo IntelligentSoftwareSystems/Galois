@@ -27,7 +27,7 @@
  * MPI usage.
  */
 #pragma once
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
 #include "mpi.h"
 
 //! Defines types of bare MPI to use
