@@ -154,7 +154,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Add, Edges
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #define GALOIS_SYNC_STRUCTURE_ADD_EDGES(fieldtype)                             \
   struct EdgeAddReduce {                                                       \
     using ValTy = fieldtype;                                                   \
@@ -327,7 +327,7 @@ public:
  * in your main program as well as set the bitset appropriately (i.e. when you
  * do a write to a particular node).
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET_EDGES                                     \
   struct Bitset_edges {                                                        \
@@ -373,7 +373,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a sum reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD(fieldname, fieldtype)                 \
   struct Reduce_add_##fieldname {                                              \
@@ -551,7 +551,7 @@ public:
  * Creates a Galois reduction sync structure that does a sum reduction
  * on a field that is represented by an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD_ARRAY(fieldname, fieldtype)           \
   struct Reduce_add_##fieldname {                                              \
@@ -738,7 +738,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a set as a reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET(fieldname, fieldtype)                 \
   struct Reduce_set_##fieldname {                                              \
@@ -901,7 +901,7 @@ public:
  * Creates a Galois reduction sync structure that does a set as a reduction
  * on a field represented by an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET_ARRAY(fieldname, fieldtype)           \
   struct Reduce_set_##fieldname {                                              \
@@ -1073,7 +1073,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a min reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN(fieldname, fieldtype)                 \
   struct Reduce_min_##fieldname {                                              \
@@ -1232,7 +1232,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a max reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MAX(fieldname, fieldtype)                 \
   struct Reduce_max_##fieldname {                                              \
@@ -1394,7 +1394,7 @@ public:
  * Creates a Galois reduction sync structure that does a pairwise
  * min reduction on an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype)           \
   struct Reduce_min_##fieldname {                                              \
@@ -1556,7 +1556,7 @@ public:
  * Creates a Galois reduction sync structure that does a pairwise
  * average on an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
   struct Reduce_pair_wise_avg_array_##fieldname {                              \
@@ -1852,7 +1852,7 @@ public:
  * in your main program as well as set the bitset appropriately (i.e. when you
  * do a write to a particular node).
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)                                \
   struct Bitset_##fieldname {                                                  \

@@ -37,7 +37,7 @@
 #include "galois/runtime/DataCommMode.h"
 #include "galois/DynamicBitset.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/EdgeHostDecls.h"
 #endif
 
@@ -2300,7 +2300,7 @@ public:
   // GPU marshaling
   ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 private:
   using GraphNode     = typename GraphTy::GraphNode;
   using edge_iterator = typename GraphTy::edge_iterator;

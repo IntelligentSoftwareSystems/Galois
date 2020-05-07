@@ -36,14 +36,12 @@ if(GALOIS_ENABLE_DIST)
 
   if(GALOIS_ENABLE_GPU)
     # turn on cuda for distbench as well
-    target_compile_definitions(distbench PRIVATE __GALOIS_HET_CUDA__=1)
+    target_compile_definitions(distbench PRIVATE GALOIS_ENABLE_GPU=1)
 
     # for debugging
-    add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
+    add_definitions(-DGALOIS_CUDA_CHECK_ERROR)
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
       add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>")
-
-      add_definitions(-D__GALOIS_DEBUG_WORKLIST__)
     endif()
   endif()
 
@@ -71,7 +69,7 @@ if(GALOIS_ENABLE_DIST)
     endif()
 
     if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
-      target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
+      target_compile_definitions(${name} PRIVATE GALOIS_ENABLE_GPU=1)
       target_link_libraries(${name} ${name}_cuda)
 
       FILE(GLOB CUSOURCES ${name}*.cu)

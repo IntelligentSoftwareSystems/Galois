@@ -65,7 +65,7 @@ struct InitializeGraph {
     struct SyncerPull_0 {
       static unsigned long long extract(uint32_t node_id,
                                         const struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_dist_current_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -74,7 +74,7 @@ struct InitializeGraph {
       }
       static void setVal(uint32_t node_id, struct NodeData& node,
                          unsigned long long y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_dist_current_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -84,17 +84,17 @@ struct InitializeGraph {
       typedef unsigned long long ValTy;
     };
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       InitializeGraph_cuda(cuda_ctx);
     } else if (personality == CPU)
 #endif
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         InitializeGraph_cuda(cuda_ctx);
       } else if (personality == CPU)
 #endif
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA) {
           InitializeGraph_cuda(cuda_ctx);
         } else if (personality == CPU)
@@ -129,7 +129,7 @@ struct BFS {
       struct SyncerPull_0 {
         static unsigned long long extract(uint32_t node_id,
                                           const struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             return get_node_dist_current_cuda(cuda_ctx, node_id);
           assert(personality == CPU);
@@ -138,7 +138,7 @@ struct BFS {
         }
         static void setVal(uint32_t node_id, struct NodeData& node,
                            unsigned long long y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             set_node_dist_current_cuda(cuda_ctx, node_id, y);
           else if (personality == CPU)
@@ -147,7 +147,7 @@ struct BFS {
         }
         typedef unsigned long long ValTy;
       };
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         int __retval = 0;
         BFS_cuda(__retval, cuda_ctx);

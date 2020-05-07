@@ -32,7 +32,7 @@
 #include "DistributedGraphLoader.h"
 #include "galois/AtomicHelpers.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/EdgeHostDecls.h"
 #else
 // dummy struct declaration to allow non-het code to compile without
@@ -51,7 +51,7 @@ extern cll::opt<bool> verify;
 //! Set method for metadata sends
 extern cll::opt<DataCommMode> commMetadata;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA };
 
 std::string personality_str(Personality p);
@@ -77,7 +77,7 @@ extern cll::opt<std::string> personality_set;
 void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
 void heteroSetup(std::vector<unsigned>& scaleFactor);
@@ -168,7 +168,7 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr,
   Graph* g;
   Substrate* s;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
   g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor,
                                                       loadProxyEdges, cuda_ctx);
@@ -184,7 +184,7 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr,
   s = new Substrate(*g, net.ID, net.Num, !loadProxyEdges, commMetadata);
 
 // marshal graph to GPU as necessary
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   if (net.ID == 0) {
     galois::gPrint("Beginning to marshal graph to GPU\n");
   }

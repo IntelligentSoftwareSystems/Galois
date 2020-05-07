@@ -35,7 +35,7 @@
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "tc_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #endif
@@ -72,7 +72,7 @@ struct TC {
     syncSubstrate->set_num_round(_num_iterations);
     num_triangles.reset();
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
   Graph* hg;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
 #else

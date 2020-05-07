@@ -27,7 +27,7 @@
 #include "galois/graphs/GluonSubstrate.h"
 #include "galois/AtomicHelpers.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/HostDecls.h"
 #else
 // dummy struct declaration to allow non-het code to compile without
@@ -35,7 +35,7 @@
 struct CUDA_Context;
 #endif
 
-#if defined(__GNUC__) && !defined(__GALOIS_HET_CUDA__)
+#if defined(__GNUC__) && !defined(GALOIS_ENABLE_GPU)
 #define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME __attribute__((unused))
 #else
 #define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME
@@ -53,7 +53,7 @@ extern cll::opt<bool> partitionAgnostic;
 //! Set method for metadata sends
 extern cll::opt<DataCommMode> commMetadata;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA };
 
 std::string personality_str(Personality p);
@@ -79,7 +79,7 @@ extern cll::opt<std::string> personality_set;
 void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
 void heteroSetup(std::vector<unsigned>& scaleFactor);
@@ -235,7 +235,7 @@ distGraphInitialization(struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(
   Graph* g;
   Substrate* s;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
   g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
 #else
@@ -247,7 +247,7 @@ distGraphInitialization(struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(
                     partitionAgnostic, commMetadata);
 
 // marshal graph to GPU as necessary
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 
@@ -280,7 +280,7 @@ symmetricDistGraphInitialization(
   Graph* g;
   Substrate* s;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
   g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
 #else
@@ -292,7 +292,7 @@ symmetricDistGraphInitialization(
                     partitionAgnostic, commMetadata);
 
 // marshal graph to GPU as necessary
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 
