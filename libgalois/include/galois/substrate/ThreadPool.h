@@ -69,7 +69,7 @@ protected:
     unsigned wbegin, wend;
     std::atomic<int> done;
     std::atomic<int> fastRelease;
-    threadTopoInfo topo;
+    ThreadTopoInfo topo;
 
     void wakeup(bool fastmode) {
       if (fastmode) {
@@ -99,7 +99,7 @@ protected:
 
   thread_local static per_signal my_box;
 
-  machineTopoInfo mi;
+  MachineTopoInfo mi;
   std::vector<per_signal*> signals;
   std::vector<std::thread> threads;
   unsigned reserved;
