@@ -482,7 +482,7 @@ private:
     std::string offsets_timer_str(syncTypeStr + "Offsets_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
-                                                    RNAME);
+                                                      RNAME);
 
     Toffsets.start();
 
@@ -1622,7 +1622,7 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+                                                      RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
@@ -1700,7 +1700,7 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+                                                      RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
@@ -1788,7 +1788,7 @@ private:
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+                                                      RNAME);
     std::string extract_alloc_timer_str(syncTypeStr + "ExtractAlloc_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textractalloc(
@@ -1948,7 +1948,7 @@ private:
     std::string extract_timer_str(syncTypeStr + "ExtractVector_" +
                                   get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+                                                      RNAME);
 
     Textract.start();
 
@@ -2474,7 +2474,8 @@ private:
   void syncNetRecv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string wait_timer_str("Wait_" + get_run_identifier(loopName));
-    galois::CondStatTimer<GALOIS_COMM_STATS> Twait(wait_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Twait(wait_timer_str.c_str(),
+                                                   RNAME);
 
     if (async) {
       size_t syncTypePhase = 0;
@@ -2710,7 +2711,7 @@ private:
   inline void reduce(std::string loopName) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncReduce(timer_str.c_str(),
-                                                       RNAME);
+                                                         RNAME);
 
     typedef typename ReduceFnTy::ValTy T;
     typedef
@@ -2761,7 +2762,7 @@ private:
   inline void broadcast(std::string loopName) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
-                                                          RNAME);
+                                                            RNAME);
 
     typedef typename BroadcastFnTy::ValTy T;
     typedef
@@ -3276,7 +3277,8 @@ private:
   // Code that handles getting the graph onto the GPU
   template <bool isVoidType,
             typename std::enable_if<isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(MarshalGraph& GALOIS_UNUSED(m), const size_t GALOIS_UNUSED(index),
+  inline void setMarshalEdge(MarshalGraph& GALOIS_UNUSED(m),
+                             const size_t GALOIS_UNUSED(index),
                              const edge_iterator& GALOIS_UNUSED(e)) {
     // do nothing
   }

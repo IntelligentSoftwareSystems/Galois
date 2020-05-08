@@ -160,7 +160,7 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx,
 #else
 distGraphInitialization(
 #endif
-                        bool loadProxyEdges            = true) {
+                        bool loadProxyEdges = true) {
   galois::StatTimer initTimer("DistGraphInitialization", "DistMiningBench");
   using Graph =
       galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>;

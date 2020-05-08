@@ -214,7 +214,7 @@ public:
     std::string timer_str("ReduceDGAccum_" + runID);
 
     galois::CondStatTimer<GALOIS_COMM_STATS> reduceTimer(timer_str.c_str(),
-                                                       "DGReducible");
+                                                         "DGReducible");
     reduceTimer.start();
 
     if (local_mdata == 0)

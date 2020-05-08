@@ -67,7 +67,7 @@ struct TC {
       : graph(_graph), num_triangles(_num_triangles) {}
 
   // use the below line once CPU code is added
-  //void static go(Graph& _graph) {
+  // void static go(Graph& _graph) {
   void static go() {
     unsigned _num_iterations = 0;
     DGAccumulatorTy num_triangles;
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
 
     StatTimer_main.start();
     // use the below line once CPU code is added
-    //TC<false>::go(*hg);
+    // TC<false>::go(*hg);
     TC<false>::go();
     StatTimer_main.stop();
 

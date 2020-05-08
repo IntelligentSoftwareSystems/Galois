@@ -81,4 +81,3 @@ struct TupleOfThree {
 };
 
 } // namespace galois
-
