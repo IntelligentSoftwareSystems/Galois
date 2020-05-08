@@ -226,10 +226,8 @@ distGraphInitialization() {
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
-#else
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
 #endif
+  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
@@ -273,10 +271,8 @@ symmetricDistGraphInitialization() {
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
-  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
-#else
-  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
 #endif
+  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
