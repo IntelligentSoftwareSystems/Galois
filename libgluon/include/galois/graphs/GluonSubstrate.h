@@ -3276,8 +3276,8 @@ private:
   // Code that handles getting the graph onto the GPU
   template <bool isVoidType,
             typename std::enable_if<isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
-                             const edge_iterator& e) {
+  inline void setMarshalEdge(MarshalGraph& GALOIS_UNUSED(m), const size_t GALOIS_UNUSED(index),
+                             const edge_iterator& GALOIS_UNUSED(e)) {
     // do nothing
   }
 
