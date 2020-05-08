@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
   initialize(g);
   galois::for_each(
       galois::iterate(g.begin(), g.end()), // range
-      [&](GNode n, auto& ctx) {            // operator
+      [&](GNode n, auto&) {                // operator
         for (auto e : g.edges(n)) {        // cautious point
           auto dst = g.getEdgeDst(e);
           g.getData(dst) += g.getEdgeData(e);
@@ -118,8 +118,8 @@ int main(int argc, char* argv[]) {
   // after this program finishes
   initialize(g);
   galois::for_each(
-      galois::iterate(g.begin(), g.end()),                     // range
-      [&](GNode n, auto& ctx) { sumEdgeWeightsAtomically(n); } // operator
+      galois::iterate(g.begin(), g.end()),                 // range
+      [&](GNode n, auto&) { sumEdgeWeightsAtomically(n); } // operator
       ,
       galois::loopname("sum_in_for_each_with_push_atomic") // options
       ,

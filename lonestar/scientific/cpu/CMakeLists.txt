@@ -1,0 +1,3 @@
+add_subdirectory(barneshut)
+add_subdirectory(delaunayrefinement)
+add_subdirectory(delaunaytriangulation)

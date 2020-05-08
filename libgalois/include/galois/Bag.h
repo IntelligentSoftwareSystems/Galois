@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,15 +20,17 @@
 #ifndef GALOIS_BAG_H
 #define GALOIS_BAG_H
 
+#include <algorithm>
+#include <stdexcept>
+
+#include <boost/iterator/iterator_facade.hpp>
+
+#include "galois/config.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
-
-#include <boost/iterator/iterator_facade.hpp>
-#include <stdexcept>
-#include <algorithm>
 
 namespace galois {
 
@@ -176,7 +178,7 @@ private:
 
   void destruct_parallel(void) {
     galois::runtime::on_each_gen(
-        [this](const unsigned tid, const unsigned numT) {
+        [this](const unsigned int tid, const unsigned int) {
           PerThread& hpair = *heads.getLocal(tid);
           header*& h       = hpair.first;
           while (h) {

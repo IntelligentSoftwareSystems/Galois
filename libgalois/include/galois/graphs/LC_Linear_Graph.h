@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,12 +20,14 @@
 #ifndef GALOIS_GRAPHS_LC_LINEAR_GRAPH_H
 #define GALOIS_GRAPHS_LC_LINEAR_GRAPH_H
 
+#include <type_traits>
+
+#include <boost/mpl/if.hpp>
+
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-
-#include <boost/mpl/if.hpp>
-#include <type_traits>
 
 namespace galois {
 namespace graphs {
@@ -172,7 +174,7 @@ protected:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   edge_iterator raw_begin(GraphNode N) { return N->edgeBegin(); }
@@ -191,8 +193,8 @@ protected:
 
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
-                          typename FileGraph::edge_iterator nn, EdgeInfo* edge,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
+                          EdgeInfo* edge,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edge->construct();
   }
@@ -234,7 +236,7 @@ public:
 
   edge_data_reference
   getEdgeData(edge_iterator ni,
-              MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) const {
     // galois::runtime::checkWrite(mflag, false);
     return ni->get();
   }

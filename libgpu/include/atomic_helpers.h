@@ -7,11 +7,11 @@ __device__ static double atomicTestAdd(double* address, double val) {
   return (val == 0.0) ? *address : atomicAdd(address, val);
 #else
   unsigned long long int* address_ull = (unsigned long long int*)address;
-  unsigned long long int old = *address_ull;
+  unsigned long long int old          = *address_ull;
   unsigned long long int assumed;
   do {
-    assumed = old;
-    double value = val + __longlong_as_double(assumed);
+    assumed                          = old;
+    double value                     = val + __longlong_as_double(assumed);
     unsigned long long int value_ull = __double_as_longlong(value);
     old = atomicCAS(address_ull, assumed, value_ull);
   } while (assumed != old);
@@ -41,6 +41,10 @@ __device__ static float atomicMin(float* address, float val) {
     old      = __int_as_float(old_as_i);
   }
   return old;
+}
+
+__device__ static int atomicTestAdd(int* address, int val) {
+  return (val == 0) ? *address : atomicAdd(address, val);
 }
 
 __device__ static float atomicTestAdd(float* address, float val) {

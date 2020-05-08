@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,6 +24,8 @@
 #include <cerrno>
 #include <cstdlib>
 #include <string.h>
+
+#include "galois/config.h"
 
 // FIXME: move to Runtime
 
@@ -67,7 +69,7 @@ void gWarn(Args&&... args) {
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
 //! is defined.
 template <typename... Args>
-void gDebug(Args&&... args) {
+void gDebug(Args&&... GALOIS_USED_ONLY_IN_DEBUG(args)) {
 #ifndef NDEBUG
   std::ostringstream os;
   (os << ... << args);
@@ -118,7 +120,7 @@ struct debug {
 template <>
 struct debug<0> {
   template <typename... Args>
-  inline static void print(const Args&... args) {}
+  inline static void print(const Args&...) {}
 };
 
 } // end namespace galois

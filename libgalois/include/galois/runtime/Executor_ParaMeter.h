@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,25 +20,25 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
-#include "galois/Reduction.h"
-#include "galois/PerThreadContainer.h"
-#include "galois/Traits.h"
-#include "galois/Mem.h"
-#include "galois/worklists/Simple.h"
-#include "galois/runtime/config.h"
-#include "galois/runtime/Context.h"
-#include "galois/runtime/Executor_ForEach.h"
-#include "galois/runtime/Executor_DoAll.h"
-#include "galois/runtime/Executor_OnEach.h"
-#include "galois/gIO.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <deque>
-#include <vector>
 #include <random>
+#include <vector>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/Mem.h"
+#include "galois/Reduction.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_OnEach.h"
+#include "galois/PerThreadContainer.h"
+#include "galois/Traits.h"
+#include "galois/worklists/Simple.h"
 
 namespace galois {
 namespace runtime {
@@ -146,7 +146,7 @@ class RAND_WL : public FIFO_WL<T> {
 public:
   auto iterateCurr(void) {
     galois::runtime::on_each_gen(
-        [&](int tid, int numT) {
+        [&](int, int) {
           auto& lwl = Base::curr->get();
 
           std::random_device r;
@@ -168,7 +168,7 @@ public:
 
     // TODO: use reverse iterator instead of std::reverse
     galois::runtime::on_each_gen(
-        [&](int tid, int numT) {
+        [&](int, int) {
           auto& lwl = Base::curr->get();
           std::reverse(lwl.begin(), lwl.end());
         },
@@ -206,11 +206,11 @@ class ParaMeterExecutor {
   using WorkListTy = typename GenericWL::template retype<T>;
   using dbg        = galois::debug<1>;
 
-  constexpr static bool needsStats = !has_trait<no_stats_tag, ArgsTy>();
-  constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsStats  = !has_trait<no_stats_tag, ArgsTy>();
+  constexpr static bool needsPush   = !has_trait<no_pushes_tag, ArgsTy>();
   constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
-  constexpr static bool needsPia = has_trait<per_iter_alloc_tag, ArgsTy>();
-  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
+  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
 
   struct IterationContext {
     T item;
@@ -360,7 +360,7 @@ template <typename R>
 void execute(const R& range) {
 
   galois::runtime::on_each_gen(
-      [&, this](const unsigned tid, const unsigned numT) {
+      [&, this](const unsigned, const unsigned) {
         auto p = range.local_pair();
 
         for (auto i = p.first; i != p.second; ++i) {
@@ -412,7 +412,7 @@ void init(const RangeTy& range) {
 
 // called once on each thread followed by a barrier
 template <typename RangeTy>
-void initThread(const RangeTy& range) const {}
+void initThread(const RangeTy&) const {}
 
 void operator()(void) {}
 

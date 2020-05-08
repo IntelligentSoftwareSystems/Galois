@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,6 +20,10 @@
 #ifndef GALOIS_GRAPHS_DETAILS_H
 #define GALOIS_GRAPHS_DETAILS_H
 
+#include <algorithm>
+#include <boost/mpl/if.hpp>
+
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/LazyObject.h"
 #include "galois/NoDerefIterator.h"
@@ -27,9 +31,6 @@
 #include "galois/runtime/Iterable.h"
 #include "galois/runtime/Context.h"
 #include "galois/substrate/PerThreadStorage.h"
-
-#include <boost/mpl/if.hpp>
-#include <algorithm>
 
 namespace galois {
 namespace graphs {
@@ -106,7 +107,7 @@ struct LocalIteratorFeature<false> {
     return std::min(end, numNodes);
   }
 
-  void setLocalRange(uint64_t begin, uint64_t end) {}
+  void setLocalRange(uint64_t, uint64_t) {}
 };
 
 //! Proxy object for {@link EdgeSortIterator}
@@ -229,7 +230,7 @@ template <>
 class IntrusiveId<void> {
 public:
   char getId() { return 0; }
-  void setId(size_t n) {}
+  void setId(size_t) {}
 };
 
 //! Empty class for HasLockable optimization
@@ -324,14 +325,14 @@ public:
   struct size_of_out_of_line {
     static const size_t value = 0;
   };
-  void outOfLineAcquire(size_t n, MethodFlag mflag) {}
-  void outOfLineAllocateLocal(size_t numNodes) {}
-  void outOfLineAllocateInterleaved(size_t numNodes) {}
+  void outOfLineAcquire(size_t, MethodFlag) {}
+  void outOfLineAllocateLocal(size_t) {}
+  void outOfLineAllocateInterleaved(size_t) {}
   void outOfLineAllocateBlocked(size_t) {}
   void outOfLineAllocateFloating(size_t) {}
-  void outOfLineConstructAt(size_t n) {}
+  void outOfLineConstructAt(size_t) {}
   template <typename RangeArrayType>
-  void outOfLineAllocateSpecified(size_t n, RangeArrayType threadRanges) {}
+  void outOfLineAllocateSpecified(size_t, RangeArrayType) {}
 };
 
 //! Edge specialization for void edge data

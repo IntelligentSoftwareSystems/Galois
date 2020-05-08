@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -250,16 +250,17 @@ void edgeIteratingAlgo(Graph& graph) {
   galois::InsertBag<WorkItem> items;
   galois::GAccumulator<size_t> numTriangles;
 
-  galois::do_all(galois::iterate(graph),
-                 [&](GNode n) {
-                   for (Graph::edge_iterator edge :
-                        graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-                     GNode dst = graph.getEdgeDst(edge);
-                     if (n < dst)
-                       items.push(WorkItem(n, dst));
-                   }
-                 },
-                 galois::loopname("Initialize"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](GNode n) {
+        for (Graph::edge_iterator edge :
+             graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
+          GNode dst = graph.getEdgeDst(edge);
+          if (n < dst)
+            items.push(WorkItem(n, dst));
+        }
+      },
+      galois::loopname("Initialize"));
 
   galois::runtime::profileVtune(
       [&]() {

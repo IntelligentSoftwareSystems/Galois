@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -378,10 +378,12 @@ struct AsyncAlgo {
     Dist newDist = sdist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata)) {
-      if (!UseCas || ddata.compare_exchange_weak(
-                         oldDist, newDist,
-                         std::memory_order_acq_rel)) { // __sync_bool_compare_and_swap(&ddata.dist,
-                                                       // oldDist, newDist)) {
+      if (!UseCas ||
+          ddata.compare_exchange_weak(
+              oldDist, newDist,
+              std::
+                  memory_order_acq_rel)) { // __sync_bool_compare_and_swap(&ddata.dist,
+                                           // oldDist, newDist)) {
         if (!UseCas)
           ddata = newDist;
         if (trackWork && oldDist != DIST_INFINITY)
@@ -689,8 +691,9 @@ struct AsyncAlgoPP {
       do {
         if (ddata.dist.compare_exchange_weak(
                 oldDist, newDist,
-                std::memory_order_acq_rel)) { //__sync_bool_compare_and_swap(&ddata.dist,
-                                              //oldDist, newDist)) {
+                std::
+                    memory_order_acq_rel)) { //__sync_bool_compare_and_swap(&ddata.dist,
+                                             // oldDist, newDist)) {
           if (trackWork && oldDist != DIST_INFINITY)
             *BadWork += 1;
           pusher.push(UpdateRequest(dst, newDist));

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,6 +24,8 @@
  */
 #ifndef GALOIS_GRAPHS_B_LC_CSR_GRAPH_H
 #define GALOIS_GRAPHS_B_LC_CSR_GRAPH_H
+
+#include "galois/config.h"
 
 #include "galois/graphs/LC_CSR_Graph.h"
 
@@ -64,6 +66,7 @@ class B_LC_CSR_Graph
 public:
   //! Graph node typedef
   using GraphNode = uint32_t;
+
 protected:
   // retypedefs of base class
   //! large array for edge data
@@ -72,6 +75,7 @@ protected:
   using EdgeDst = LargeArray<uint32_t>;
   //! large array for edge index data
   using EdgeIndData = LargeArray<uint64_t>;
+
 public:
   //! iterator for edges
   using edge_iterator =
@@ -94,8 +98,8 @@ protected:
 
   //! redefinition of the edge sort iterator in LC_CSR_Graph
   using edge_sort_iterator =
-    internal::EdgeSortIterator<GraphNode, typename EdgeIndData::value_type,
-                               EdgeDst, EdgeDataRep>;
+      internal::EdgeSortIterator<GraphNode, typename EdgeIndData::value_type,
+                                 EdgeDst, EdgeDataRep>;
 
   //! beginning iterator to an edge sorter for in-edges
   edge_sort_iterator in_edge_sort_begin(GraphNode N) {
@@ -146,10 +150,11 @@ protected:
   void determineInEdgeIndices(EdgeIndData& dataBuffer) {
     // counting outgoing edges in the tranpose graph by
     // counting incoming edges in the original graph
-    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numEdges), [&](uint64_t e) {
-      auto dst = BaseGraph::edgeDst[e];
-      __sync_add_and_fetch(&(dataBuffer[dst]), 1);
-    });
+    galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numEdges),
+                   [&](uint64_t e) {
+                     auto dst = BaseGraph::edgeDst[e];
+                     __sync_add_and_fetch(&(dataBuffer[dst]), 1);
+                   });
 
     // prefix sum calculation of the edge index array
     for (uint32_t n = 1; n < BaseGraph::numNodes; ++n) {
@@ -205,7 +210,6 @@ protected:
           }
         });
   }
-
 
 public:
   //! default constructor
@@ -393,10 +397,9 @@ public:
   void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     BaseGraph::acquireNode(N, mflag);
     // depending on value/ref the type of EdgeSortValue changes
-    using EdgeSortVal =
-      EdgeSortValue<GraphNode,
-                    typename std::conditional<EdgeDataByValue, EdgeTy,
-                                              uint64_t>::type>;
+    using EdgeSortVal = EdgeSortValue<
+        GraphNode,
+        typename std::conditional<EdgeDataByValue, EdgeTy, uint64_t>::type>;
 
     std::sort(in_edge_sort_begin(N), in_edge_sort_end(N),
               [=](const EdgeSortVal& e1, const EdgeSortVal& e2) {
@@ -409,20 +412,20 @@ public:
    * getEdgeDst(e).
    */
   void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate((size_t)0, this->size()),
-                   [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
-                   galois::no_stats(), galois::steal());
+    galois::do_all(
+        galois::iterate((size_t)0, this->size()),
+        [=](GraphNode N) { this->sortInEdgesByDst(N, mflag); },
+        galois::no_stats(), galois::steal());
   }
 
   /**
    * Directly reads the GR file to construct CSR graph
-   * and then constructs reverse edges based on that. 
+   * and then constructs reverse edges based on that.
    */
   void readAndConstructBiGraphFromGRFile(const std::string& filename) {
     this->readGraphFromGRFile(filename);
     constructIncomingEdges();
   }
-
 };
 
 } // namespace graphs

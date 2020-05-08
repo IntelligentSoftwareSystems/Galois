@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -174,9 +174,10 @@ protected:
 
   template <typename F>
   void assignPriorityHelper(const F& nodeFunc) {
-    galois::do_all_choice(galois::runtime::makeLocalRange(graph),
-                          [&](GN node) { nodeFunc(node); }, "assign-priority",
-                          galois::chunk_size<DEFAULT_CHUNK_SIZE>());
+    galois::do_all_choice(
+        galois::runtime::makeLocalRange(graph),
+        [&](GN node) { nodeFunc(node); }, "assign-priority",
+        galois::chunk_size<DEFAULT_CHUNK_SIZE>());
   }
 
   static const unsigned MAX_LEVELS = 100;

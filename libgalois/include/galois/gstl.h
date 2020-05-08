@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,8 +20,6 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
-#include "galois/PriorityQueue.h"
-
 #include <algorithm>
 #include <iterator>
 #include <utility>
@@ -33,6 +31,9 @@
 #include <list>
 #include <string>
 #include <sstream>
+
+#include "galois/config.h"
+#include "galois/PriorityQueue.h"
 
 namespace galois {
 
@@ -242,7 +243,7 @@ template <
     typename std::enable_if<!std::is_integral<IterTy>::value>::type* = nullptr>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id,
                                       unsigned num) {
-  size_t dist = std::distance(b, e);
+  size_t dist   = std::distance(b, e);
   size_t numper = std::max((dist + num - 1) / num, (size_t)1); // round up
   size_t A      = std::min(numper * id, dist);
   size_t B      = std::min(numper * (id + 1), dist);

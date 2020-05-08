@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -64,7 +64,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   unsigned long statRecvDequeued;
   bool anyReceivedMessages;
 
-  //using vTy = std::vector<uint8_t>;
+  // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
 
   /**
@@ -159,7 +159,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
   public:
-    optional_t<RecvBuffer> popMsg(uint32_t tag, std::atomic<size_t>& inflightRecvs) {
+    optional_t<RecvBuffer> popMsg(uint32_t tag,
+                                  std::atomic<size_t>& inflightRecvs) {
       std::lock_guard<SimpleLock> lg(qlock);
 #ifndef NO_AGG
       uint32_t len = getLenFromFront(tag);
@@ -243,8 +244,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     struct msg {
       uint32_t tag;
       vTy data;
-      msg(uint32_t t, vTy& _data)
-          : tag(t), data(std::move(_data)) {}
+      msg(uint32_t t, vTy& _data) : tag(t), data(std::move(_data)) {}
     };
 
     std::deque<msg> messages;
@@ -385,7 +385,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
-    std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker, inflightSends, inflightRecvs);
+    std::tie(netio, ID, Num) =
+        makeNetworkIOMPI(memUsageTracker, inflightSends, inflightRecvs);
 
     assert(ID == (unsigned)rank);
     assert(Num == (unsigned)hostSize);
@@ -431,9 +432,9 @@ public:
   using NetworkInterface::Num;
 
   NetworkInterfaceBuffered() {
-    inflightSends = 0;
-    inflightRecvs = 0;
-    ready  = 0;
+    inflightSends       = 0;
+    inflightRecvs       = 0;
+    ready               = 0;
     anyReceivedMessages = false;
     worker = std::thread(&NetworkInterfaceBuffered::workerThread, this);
     while (ready != 1) {
@@ -451,7 +452,8 @@ public:
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;
 
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf, int phase) {
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf,
+                          int phase) {
     ++inflightSends;
     tag += phase;
     statSendNum += 1;
@@ -464,7 +466,8 @@ public:
 
   virtual optional_t<std::pair<uint32_t, RecvBuffer>>
   recieveTagged(uint32_t tag,
-                std::unique_lock<galois::substrate::SimpleLock>* rlg, int phase) {
+                std::unique_lock<galois::substrate::SimpleLock>* rlg,
+                int phase) {
     tag += phase;
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
@@ -518,14 +521,12 @@ public:
       sd.markUrgent();
   }
 
-  virtual bool anyPendingSends() {
-    return (inflightSends > 0);
-  }
+  virtual bool anyPendingSends() { return (inflightSends > 0); }
 
   virtual bool anyPendingReceives() {
     if (anyReceivedMessages) { // might not be acted on by the computation yet
       anyReceivedMessages = false;
-      //galois::gDebug("[", ID, "] receive out of buffer \n");
+      // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
     return (inflightRecvs > 0);

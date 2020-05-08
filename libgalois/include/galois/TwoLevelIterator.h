@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,18 +20,23 @@
 #ifndef GALOIS_TWO_LEVEL_ITER_H
 #define GALOIS_TWO_LEVEL_ITER_H
 
-#include <iterator>
+#include <cassert>
+#include <cstdlib>
 #include <functional>
+#include <iterator>
 #include <type_traits>
 
 #include <cstdlib>
 #include <cassert>
 
+#include "galois/config.h"
+
 namespace galois {
 
 namespace internal {
 template <typename Iter>
-void safe_decrement(Iter& it, const Iter& beg, const Iter& end,
+void safe_decrement(Iter& it, const Iter& beg,
+                    const Iter& GALOIS_USED_ONLY_IN_DEBUG(end),
                     std::forward_iterator_tag) {
 
   Iter next = beg;
@@ -50,8 +55,8 @@ void safe_decrement(Iter& it, const Iter& beg, const Iter& end,
 }
 
 template <typename Iter>
-void safe_decrement(Iter& it, const Iter& beg, const Iter& end,
-                    std::bidirectional_iterator_tag) {
+void safe_decrement(Iter& it, const Iter& GALOIS_USED_ONLY_IN_DEBUG(beg),
+                    const Iter&, std::bidirectional_iterator_tag) {
   assert(it != beg);
   --it;
 }
@@ -662,8 +667,8 @@ struct GetStlIterKind {
   static const bool isConst =
       IsConstIter<C, I>::value || IsRvrsConstIter<C, I>::value;
 
-  static const StlIterKind value =
-      isRvrs ? (isConst ? _CONST_REVERSE : REVERSE) : (isConst ? _CONST : NORMAL);
+  static const StlIterKind value = isRvrs ? (isConst ? _CONST_REVERSE : REVERSE)
+                                          : (isConst ? _CONST : NORMAL);
 };
 
 template <typename C, typename I, enum StlIterKind>

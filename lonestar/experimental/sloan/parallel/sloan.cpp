@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -167,8 +167,8 @@ struct UpdateRequest {
   // !operator==(o); } inline bool operator<=(const X& lhs, const X& rhs){return
   // !operator> (lhs,rhs);} inline bool operator>=(const X& lhs, const X&
   // rhs){return !operator< (lhs,rhs);} bool operator<(const UpdateRequest& o)
-  // const { return prio < o.prio; } bool operator>(const UpdateRequest& o) const
-  // { return prio > o.prio; } unsigned getID() const { return /*
+  // const { return prio < o.prio; } bool operator>(const UpdateRequest& o)
+  // const { return prio > o.prio; } unsigned getID() const { return /*
   // graph.getData(n).id; */ 0; }
 };
 
@@ -232,8 +232,8 @@ static void printSloan() {
        nit++) {
     SNode& data = graph.getData(*nit);
     // std::cerr << "[" << data.id << "] level: " << data.dist << " degree: " <<
-    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree << ")
-    // level: " << data.dist << "\n"; std::cerr << data.id + 1 << "\n";
+    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree <<
+    // ") level: " << data.dist << "\n"; std::cerr << data.id + 1 << "\n";
     std::cerr << data.id << "\n";
   }
   std::cerr << "\n";
@@ -245,8 +245,8 @@ static void printRSloan() {
        nit != perm.rend(); nit++) {
     SNode& data = graph.getData(*nit);
     // std::cerr << "[" << data.id << "] level: " << data.dist << " degree: " <<
-    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree << ")
-    // level: " << data.dist << "\n";
+    // data.degree << "\n"; std::cerr << data.id + 1 << " (" << data.degree <<
+    // ") level: " << data.dist << "\n";
 
     std::cerr << data.id << " (" << degree(*nit) << ") level: " << data.dist
               << "\n";
@@ -302,7 +302,8 @@ static void printAccess(std::string msg) {
 
     std::cerr << "\n";
     // std::cerr << data.id << " (" << degree(*src) << ") level: " << data.dist
-    // << " reads: " << data.read << " writes: " << data.write << "\n"; std::cerr
+    // << " reads: " << data.read << " writes: " << data.write << "\n";
+    // std::cerr
     // << data.id << " (" << degree(*src) << ") level: " << data.dist << "\n";
 
     temp.push_back(sdata.id);
@@ -520,7 +521,8 @@ static void printDegreeDistribution() {
 
   for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
     distr[degree(*n)]++;
-    // std::cerr << graph.getData(*n, galois::MethodFlag::UNPROTECTED).id << "	"
+    // std::cerr << graph.getData(*n, galois::MethodFlag::UNPROTECTED).id << "
+    // "
     // << graph.getData(*n, galois::MethodFlag::UNPROTECTED).dist << "\n";
   }
 
@@ -840,8 +842,8 @@ struct SerialSloan {
     std::cerr << "initFn: " << vTmain[1].get() << "\n";
     std::cerr << "sloanFn: " << vTmain[2].get() << "\n";
     // std::cout << "& " << vTmain[0].get() << " & \\multicolumn{2} {c|} {" <<
-    // vTmain[1].get() << "} & " << vTmain[2].get() << " & " << vTmain[0].get() +
-    // vTmain[1].get()  + vTmain[2].get() << "\n";
+    // vTmain[1].get() << "} & " << vTmain[2].get() << " & " << vTmain[0].get()
+    // + vTmain[1].get()  + vTmain[2].get() << "\n";
 #endif
 
     // printSloan();
@@ -869,7 +871,8 @@ void run(const AlgoTy& algo) {
   // std::endl; std::cout << "original max_wavefront: " <<
   // boost::max_wavefront(*bgraph) << std::endl; std::cout << "original
   // aver_wavefront: " << boost::aver_wavefront(*bgraph) << std::endl; std::cout
-  // << "original rms_wavefront: " << boost::rms_wavefront(*bgraph) << std::endl;
+  // << "original rms_wavefront: " << boost::rms_wavefront(*bgraph) <<
+  // std::endl;
 
   vT[INIT].stop();
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -82,53 +82,47 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
   char* ptr = static_cast<char*>(_ptr);
 
   if (numThreads > 1) {
-    getThreadPool().run(numThreads,
-                        [ptr, pageSize, threadRanges, elementSize]() {
-                          auto myID = ThreadPool::getTID();
+    getThreadPool().run(
+        numThreads, [ptr, pageSize, threadRanges, elementSize]() {
+          auto myID = ThreadPool::getTID();
 
-                          uint64_t beginLocation = threadRanges[myID];
-                          uint64_t endLocation   = threadRanges[myID + 1];
+          uint64_t beginLocation = threadRanges[myID];
+          uint64_t endLocation   = threadRanges[myID + 1];
 
-                          assert(beginLocation <= endLocation);
+          assert(beginLocation <= endLocation);
 
-                          // printf("[%u] begin location %u and end location
-                          // %u\n", myID,
-                          //       beginLocation, endLocation);
+          // printf("[%u] begin location %u and end location
+          // %u\n", myID,
+          //       beginLocation, endLocation);
 
-                          // if equal, then no memory needed to allocate in
-                          // first place
-                          if (beginLocation != endLocation) {
-                            size_t beginByte = beginLocation * elementSize;
-                            size_t endByte;
+          // if equal, then no memory needed to allocate in
+          // first place
+          if (beginLocation != endLocation) {
+            size_t beginByte = beginLocation * elementSize;
+            // -1 since endLocation * elementSize will result in the first
+            // byte of the next element.
+            size_t endByte = endLocation ? (endLocation * elementSize) - 1 : 0;
 
-                            if (endLocation != 0) {
-                              // -1 since end * element will result in the first
-                              // byte of the next element
-                              endByte = (endLocation * elementSize) - 1;
-                            } else {
-                              endByte = 0;
-                            }
+            assert(beginByte <= endByte);
 
-                            assert(beginByte <= endByte);
+            // memset(ptr + beginByte, 0, (endByte - beginByte +
+            // 1));
 
-                            // memset(ptr + beginByte, 0, (endByte - beginByte +
-                            // 1));
+            uint32_t beginPage = beginByte / pageSize;
+            uint32_t endPage   = endByte / pageSize;
 
-                            uint32_t beginPage = beginByte / pageSize;
-                            uint32_t endPage   = endByte / pageSize;
+            assert(beginPage <= endPage);
 
-                            assert(beginPage <= endPage);
+            // printf("thread %u gets begin page %u and end page
+            // %u\n", myID,
+            //        beginPage, endPage);
 
-                            // printf("thread %u gets begin page %u and end page
-                            // %u\n", myID,
-                            //        beginPage, endPage);
-
-                            // write a byte to every page this thread occupies
-                            for (uint32_t i = beginPage; i <= endPage; i++) {
-                              ptr[i * pageSize] = 0;
-                            }
-                          }
-                        });
+            // write a byte to every page this thread occupies
+            for (uint32_t i = beginPage; i <= endPage; i++) {
+              ptr[i * pageSize] = 0;
+            }
+          }
+        });
   } else {
     // 1 thread case
     for (size_t x = 0; x < len; x += pageSize / 2)

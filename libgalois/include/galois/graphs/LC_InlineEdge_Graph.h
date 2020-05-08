@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,11 +20,12 @@
 #ifndef GALOIS_GRAPHS_LC_INLINEEDGE_GRAPH_H
 #define GALOIS_GRAPHS_LC_INLINEEDGE_GRAPH_H
 
+#include <type_traits>
+
+#include "galois/config.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-
-#include <type_traits>
 
 namespace galois {
 namespace graphs {
@@ -161,18 +162,18 @@ protected:
 
   template <bool C_b = HasCompressedNodePtr>
   NodeInfo* getDst(edge_iterator ii,
-                   typename std::enable_if<C_b>::type* x = 0) const {
+                   typename std::enable_if<C_b>::type* = 0) const {
     return const_cast<NodeInfo*>(&nodeData[ii->dst]);
   }
 
   template <bool C_b = HasCompressedNodePtr>
   NodeInfo* getDst(edge_iterator ii,
-                   typename std::enable_if<!C_b>::type* x = 0) const {
+                   typename std::enable_if<!C_b>::type* = 0) const {
     return ii->dst;
   }
 
   template <typename Container, typename Index, bool C_b = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx,
+  void setEdgeDst(Container&, edge_iterator edge, Index idx,
                   typename std::enable_if<C_b>::type* = 0) {
     edge->dst = idx;
   }
@@ -196,7 +197,7 @@ protected:
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag,
+  void acquireNode(GraphNode, MethodFlag,
                    typename std::enable_if<_A2>::type* = 0) {}
 
   edge_iterator raw_begin(GraphNode N) {
@@ -217,8 +218,8 @@ protected:
 
   template <bool _A1 = EdgeInfo::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph,
-                          typename FileGraph::edge_iterator nn, EdgeInfo* edge,
+  void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
+                          EdgeInfo* edge,
                           typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edge->construct();
   }
@@ -250,7 +251,7 @@ public:
 
   edge_data_reference
   getEdgeData(edge_iterator ni,
-              MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+              MethodFlag GALOIS_UNUSED(mflag) = MethodFlag::UNPROTECTED) const {
     // galois::runtime::checkWrite(mflag, false);
     return ni->get();
   }

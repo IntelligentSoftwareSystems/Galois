@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -163,28 +163,28 @@ void perEdge(std::istream& is,
 void go(std::istream& input) {
   try {
     std::deque<uint64_t> edgeCount;
-    perEdge(input,
-            [&edgeCount](uint64_t src, uint64_t, dataTy) {
-              if (edgeCount.size() <= src)
-                edgeCount.resize(src + 1);
-              ++edgeCount[src];
-            },
-            [&edgeCount](uint64_t nodes, uint64_t edges) {
-              edgeCount.resize(nodes);
-            });
+    perEdge(
+        input,
+        [&edgeCount](uint64_t src, uint64_t, dataTy) {
+          if (edgeCount.size() <= src)
+            edgeCount.resize(src + 1);
+          ++edgeCount[src];
+        },
+        [&edgeCount](uint64_t nodes, uint64_t) { edgeCount.resize(nodes); });
     input.clear();
     input.seekg(0, std::ios_base::beg);
     galois::graphs::OfflineGraphWriter outFile(outputFilename, useSmallData);
     outFile.setCounts(edgeCount);
-    perEdge(input,
-            [&outFile, &edgeCount](uint64_t src, uint64_t dst, dataTy data) {
-              auto off = --edgeCount[src];
-              if (useSmallData)
-                outFile.setEdge(src, off, dst, data.i32val);
-              else
-                outFile.setEdge(src, off, dst, data.ival);
-            },
-            [](uint64_t, uint64_t) {});
+    perEdge(
+        input,
+        [&outFile, &edgeCount](uint64_t src, uint64_t dst, dataTy data) {
+          auto off = --edgeCount[src];
+          if (useSmallData)
+            outFile.setEdge(src, off, dst, data.i32val);
+          else
+            outFile.setEdge(src, off, dst, data.ival);
+        },
+        [](uint64_t, uint64_t) {});
   } catch (const char* c) {
     std::cerr << "Failed with: " << c << "\n";
     abort();
@@ -202,25 +202,26 @@ void go_edgesSorted(std::istream& input, uint64_t numNodes) {
     outFile.seekEdgesDstStart();
     uint64_t curr_src           = 0;
     uint64_t curr_src_edgeCount = 0;
-    perEdge(input,
-            [&outFile, &edgeCount, &curr_src,
-             &curr_src_edgeCount](uint64_t src, uint64_t dst, dataTy data) {
-              if (src == curr_src) {
-                ++curr_src_edgeCount;
-              } else {
-                // std::cout << "CHANGES : " << src << " : " << curr_src << "
-                // COUNT : " << curr_src_edgeCount << "\n";
-                if (src < curr_src) {
-                  std::cerr << " ERROR : File is not sorted\n";
-                  abort();
-                }
-                edgeCount[curr_src] = curr_src_edgeCount;
-                curr_src            = src;
-                curr_src_edgeCount  = 1;
-              }
-              outFile.setEdgeSorted(dst);
-            },
-            [](uint64_t, uint64_t) {});
+    perEdge(
+        input,
+        [&outFile, &edgeCount, &curr_src,
+         &curr_src_edgeCount](uint64_t src, uint64_t dst, dataTy) {
+          if (src == curr_src) {
+            ++curr_src_edgeCount;
+          } else {
+            // std::cout << "CHANGES : " << src << " : " << curr_src << "
+            // COUNT : " << curr_src_edgeCount << "\n";
+            if (src < curr_src) {
+              std::cerr << " ERROR : File is not sorted\n";
+              abort();
+            }
+            edgeCount[curr_src] = curr_src_edgeCount;
+            curr_src            = src;
+            curr_src_edgeCount  = 1;
+          }
+          outFile.setEdgeSorted(dst);
+        },
+        [](uint64_t, uint64_t) {});
     // To take care of the last src node ID.
     edgeCount[curr_src] = curr_src_edgeCount;
     outFile.setCounts(edgeCount);

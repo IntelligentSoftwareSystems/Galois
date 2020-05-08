@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -45,7 +45,7 @@ class HostFence : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostFence"; }
 
-  virtual void reinit(unsigned val) {}
+  virtual void reinit(unsigned) {}
 
   //! control-flow barrier across distributed hosts
   //! acts as a distributed-memory fence as well (flushes send and receives)
@@ -80,7 +80,9 @@ public:
     }
     ++galois::runtime::evilPhase;
     if (galois::runtime::evilPhase >=
-        static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) { // limit defined by MPI or LCI
+        static_cast<uint32_t>(
+            std::numeric_limits<int16_t>::max())) { // limit defined by MPI or
+                                                    // LCI
       galois::runtime::evilPhase = 1;
     }
   }
@@ -90,7 +92,7 @@ class HostBarrier : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostBarrier"; }
 
-  virtual void reinit(unsigned val) {}
+  virtual void reinit(unsigned) {}
 
   //! Control-flow barrier across distributed hosts
   virtual void wait() {

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -195,7 +195,7 @@ struct PageRank {
     // " << sdata.value << " diff: " << diff << " tolerance " << ERROR_THRESHOLD
     // <<"\n";
     if (diff > ERROR_THRESHOLD) { //&& (std::find(pg.myFutureWork.begin(),
-                                  //pg.myFutureWork.end(), node) != node)) {
+                                  // pg.myFutureWork.end(), node) != node)) {
       // if strategy is changed that you may have to take into account if a node
       // is already on the second list
       g->work[(g->active_bag + 1) % 2].push(node);
