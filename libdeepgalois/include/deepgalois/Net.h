@@ -24,6 +24,67 @@ namespace deepgalois {
 // layer 1: features N x D, weights D x 16, out N x 16 (hidden1=16)
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  std::string header        = "[" + std::to_string(myID) + "] ";
+  std::string seperator     = "\n";
+
+  bool is_single_class;          // single-class (one-hot) or multi-class label
+  bool has_l2norm;               // whether the net contains an l2_norm layer
+  bool has_dense;                // whether the net contains an dense layer
+  unsigned neighbor_sample_size; // neighbor sampling
+  unsigned subgraph_sample_size; // subgraph sampling
+  int num_threads;               // number of threads
+  size_t num_samples;            // number of samples: N
+  size_t distNumSamples;            // number of samples: N
+  size_t num_classes;            // number of vertex classes: E
+  size_t num_conv_layers;        // number of convolutional layers
+  size_t num_layers;             // total number of layers (conv + output)
+  int num_epochs;                // number of epochs
+  float learning_rate;           // learning rate
+  float dropout_rate;            // dropout rate
+  float weight_decay;            // weighti decay for over-fitting
+  // begins/ends below are global ids
+  size_t globalTrainBegin;
+  size_t globalTrainEnd;
+  size_t globalTrainCount;
+  size_t globalValBegin;
+  size_t globalValEnd;
+  size_t globalValCount;
+  size_t globalTestBegin;
+  size_t globalTestEnd;
+  size_t globalTestCount;
+  int val_interval;
+  int num_subgraphs;
+  int num_vertices_sg;
+  bool is_selfloop;
+
+  mask_t* globalTrainMasks;              // masks for training
+  mask_t* globalValMasks;                // masks for validation
+  mask_t* distTrainMasks;
+  mask_t* distValMasks;
+  mask_t* test_masks;               // masks for test
+
+
+  mask_t* d_train_masks;            // masks for training on device
+  mask_t* d_val_masks;              // masks for validation on device
+  mask_t* d_test_masks;             // masks for test on device
+
+  mask_t* subgraphs_masks;          // masks for subgraphs
+  std::vector<size_t> feature_dims; // feature dimnesions for each layer
+  std::vector<layer*> layers;       // all the layers in the neural network
+
+  // one context is for entire graph; other is for partitioned graph
+  // TODO optimize single host case
+
+  //! context holds all of the graph data
+  deepgalois::Context* context;
+  //! dist context holds graph data of the partitioned graph only
+  deepgalois::DistContext* distContext;
+
+  DGraph* dGraph;
+
+  Sampler* sampler;
+
 public:
   Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
       unsigned hidden1, float lr, float dropout, float wd, bool selfloop,
@@ -34,13 +95,19 @@ public:
         num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs),
         learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
+    // init some identifiers for this host
+    this->myID          = galois::runtime::getSystemNetworkInterface().ID;
+    this->header        = "[" + std::to_string(myID) + "] ";
+    this->seperator     = "\n";
+
     assert(n_conv > 0);
+
     // TODO use galois print
-    std::cout << "Configuration: num_threads " << num_threads
-              << ", num_conv_layers " << num_conv_layers << ", num_epochs "
-              << num_epochs << ", hidden1 " << hidden1 << ", learning_rate "
-              << learning_rate << ", dropout_rate " << dropout_rate
-              << ", weight_decay " << weight_decay << "\n";
+    galois>>gPrint(header, "Configuration: num_threads ", num_threads,
+              ", num_conv_layers ", num_conv_layers, ", num_epochs ",
+              num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
+              learning_rate, ", dropout_rate ", dropout_rate,
+              ", weight_decay ", weight_decay, "\n");
     num_layers = num_conv_layers + 1;
 
     // additional layers to add
@@ -62,30 +129,34 @@ public:
     num_classes = context->read_labels();
 
     // get training and validation sets
-    train_masks = new mask_t[num_samples];
-    val_masks   = new mask_t[num_samples];
-    std::fill(train_masks, train_masks + num_samples, 0);
-    std::fill(val_masks, val_masks + num_samples, 0);
+    globalTrainMasks = new mask_t[num_samples];
+    globalValMasks   = new mask_t[num_samples];
+    std::fill(globalTrainMasks, globalTrainMasks + num_samples, 0);
+    std::fill(globalValMasks, globalValMasks + num_samples, 0);
 
     // reddit is hard coded
     if (dataset_str == "reddit") {
-      train_begin = 0, train_count = 153431,
-      train_end = train_begin + train_count;
-      val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
+      this->globalTrainBegin = 0;
+      this->globalTrainCount = 153431;
+      this->globalTrainEnd = this->globalTrainBegin + this->globalTrainCount;
+      this->globalValBegin = 153431;
+      this->globalValCount = 23831;
+      this->globalValEnd = this->globalValBegin + this->globalValCount;
+
       // TODO do all can be used below
-      for (size_t i = train_begin; i < train_end; i++)
-        train_masks[i] = 1;
-      for (size_t i = val_begin; i < val_end; i++)
-        val_masks[i] = 1;
+      for (size_t i = globalTrainBegin; i < globalTrainEnd; i++)
+        globalTrainMasks[i] = 1;
+      for (size_t i = globalValBegin; i < globalValEnd; i++)
+        globalValMasks[i] = 1;
     } else {
-      train_count = context->read_masks("train", num_samples, train_begin,
-                                        train_end, train_masks);
-      val_count   = context->read_masks("val", num_samples, val_begin, val_end,
-                                      val_masks);
+      globalTrainCount = context->read_masks("train", num_samples, globalTrainBegin,
+                                        globalTrainEnd, globalTrainMasks);
+      globalValCount   = context->read_masks("val", num_samples, globalValBegin, globalValEnd,
+                                      globalValMasks);
     }
 
     // make sure sampel size isn't greater than what we have to train with
-    if (subgraph_sample_size > train_count) {
+    if (subgraph_sample_size > globalTrainCount) {
       GALOIS_DIE("subgraph size can not be larger than the size of training "
                  "set\n");
     }
@@ -118,17 +189,13 @@ public:
   //      neighbor_sample_size(0), subgraph_sample_size(0), num_threads(1),
   //      num_samples(0), num_classes(0), num_conv_layers(0), num_layers(0),
   //      num_epochs(0), learning_rate(0.0), dropout_rate(0.0), weight_decay(0.0),
-  //      train_begin(0), train_end(0), train_count(0), val_begin(0), val_end(0),
-  //      val_count(0), test_begin(0), test_end(0), test_count(0),
+  //      globalTrainBegin(0), globalTrainEnd(0), globalTrainCount(0), globalValBegin(0), globalValEnd(0),
+  //      globalValCount(0), globalTestBegin(0), globalTestEnd(0), globalTestCount(0),
   //      val_interval(1), num_subgraphs(1), num_vertices_sg(9000),
-  //      train_masks(NULL), val_masks(NULL), test_masks(NULL), context(NULL) {}
+  //      globalTrainMasks(NULL), globalValMasks(NULL), test_masks(NULL), context(NULL) {}
 
-  //! save graph pointer to context object
-  void saveDistGraph(Graph* dGraph);
-
-#ifdef GALOIS_USE_DIST
-  void dist_init(Graph* graph, std::string dataset_str);
-#endif
+  //! Initializes metadata for the partition
+  void partitionInit(DGraph* graph, std::string dataset_str);
 
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
@@ -138,9 +205,6 @@ public:
   void regularize(); // add weight decay
 
   void train(optimizer* opt, bool need_validate) {
-    unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
-    std::string header        = "[" + std::to_string(myID) + "] ";
-    std::string seperator     = "\n";
 
     double total_train_time = 0.0;
     int num_subg_remain     = 0;
@@ -149,7 +213,7 @@ public:
       context->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[num_samples * num_subgraphs];
       galois::gPrint(header, " Construct training vertex set induced graph...\n";
-      sampler->initializeMaskedGraph(train_count, train_masks, context->getGraphPointer());
+      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, context->getGraphPointer());
     }
 
     std::cout << "\nStart training...\n";
@@ -269,10 +333,10 @@ public:
     size_t begin = 0, end = 0, count = 0;
     mask_t* masks = NULL;
     if (type == "train") {
-      begin = train_begin;
-      end   = train_end;
-      count = train_count;
-      masks = train_masks;
+      begin = globalTrainBegin;
+      end   = globalTrainEnd;
+      count = globalTrainCount;
+      masks = globalTrainMasks;
       if (subgraph_sample_size) {
         // update masks for subgraph
         masks = NULL;
@@ -281,14 +345,14 @@ public:
         count = num_vertices_sg;
       }
     } else if (type == "val") {
-      begin = val_begin;
-      end   = val_end;
-      count = val_count;
-      masks = val_masks;
+      begin = globalValBegin;
+      end   = globalValEnd;
+      count = globalValCount;
+      masks = globalValMasks;
     } else {
-      begin = test_begin;
-      end   = test_end;
-      count = test_count;
+      begin = globalTestBegin;
+      end   = globalTestEnd;
+      count = globalTestCount;
       masks = test_masks;
     }
 #ifdef CPU_ONLY
@@ -334,14 +398,14 @@ public:
   void read_test_masks(std::string dataset) {
     test_masks = new mask_t[num_samples];
     if (dataset == "reddit") {
-      test_begin = 177262;
-      test_count = 55703;
-      test_end   = test_begin + test_count;
+      globalTestBegin = 177262;
+      globalTestCount = 55703;
+      globalTestEnd   = globalTestBegin + globalTestCount;
 #ifndef GALOIS_USE_DIST
-      for (size_t i = test_begin; i < test_end; i++)
+      for (size_t i = globalTestBegin; i < globalTestEnd; i++)
         test_masks[i] = 1;
 #else
-      for (size_t i = test_begin; i < test_end; i++) {
+      for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
         if (dGraph->isLocal(i)) {
           test_masks[dGraph->getLID(i)] = 1;
         }
@@ -349,11 +413,11 @@ public:
 #endif
     } else {
 #ifndef GALOIS_USE_DIST
-      test_count = context->read_masks("test", num_samples, test_begin,
-                                       test_end, test_masks);
+      globalTestCount = context->read_masks("test", num_samples, globalTestBegin,
+                                       globalTestEnd, test_masks);
 #else
-      test_count = context->read_masks("test", num_samples, test_begin,
-                                       test_end, test_masks, dGraph);
+      globalTestCount = context->read_masks("test", num_samples, globalTestBegin,
+                                       globalTestEnd, test_masks, dGraph);
 #endif
     }
 #ifndef CPU_ONLY
@@ -492,50 +556,6 @@ public:
       layers[i]->print_layer_info();
   }
 
-protected:
-  bool is_single_class;          // single-class (one-hot) or multi-class label
-  bool has_l2norm;               // whether the net contains an l2_norm layer
-  bool has_dense;                // whether the net contains an dense layer
-  unsigned neighbor_sample_size; // neighbor sampling
-  unsigned subgraph_sample_size; // subgraph sampling
-  int num_threads;               // number of threads
-  size_t num_samples;            // number of samples: N
-  size_t num_classes;            // number of vertex classes: E
-  size_t num_conv_layers;        // number of convolutional layers
-  size_t num_layers;             // total number of layers (conv + output)
-  int num_epochs;                // number of epochs
-  float learning_rate;           // learning rate
-  float dropout_rate;            // dropout rate
-  float weight_decay;            // weighti decay for over-fitting
-  size_t train_begin, train_end, train_count;
-  size_t val_begin, val_end, val_count;
-  size_t test_begin, test_end, test_count;
-  int val_interval;
-  int num_subgraphs;
-  int num_vertices_sg;
-  bool is_selfloop;
-
-  mask_t* train_masks;              // masks for training
-  mask_t* d_train_masks;            // masks for training on device
-  mask_t* val_masks;                // masks for validation
-  mask_t* d_val_masks;              // masks for validation on device
-  mask_t* test_masks;               // masks for test
-  mask_t* d_test_masks;             // masks for test on device
-  mask_t* subgraphs_masks;          // masks for subgraphs
-  std::vector<size_t> feature_dims; // feature dimnesions for each layer
-  std::vector<layer*> layers;       // all the layers in the neural network
-#ifndef GALOIS_USE_DIST
-  deepgalois::Context* context;
-#else
-  deepgalois::DistContext* context;
-  Graph* dGraph;
-#endif
-
-#ifdef CPU_ONLY
-#ifndef GALOIS_USE_DIST
-  Sampler* sampler;
-#endif
-#endif
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
                         float_t* preds, label_t* ground_truth);

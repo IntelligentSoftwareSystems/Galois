@@ -10,44 +10,51 @@
 namespace deepgalois {
 
 #ifdef GALOIS_USE_DIST
-void Net::dist_init(Graph* graph, std::string dataset_str) {
-  dGraph      = graph;
-  context     = new deepgalois::DistContext();
-  num_samples = dGraph->size();
-  context->saveGraph(dGraph);
-  // TODO self loop setup?
-  context->initializeSyncSubstrate();
-  num_classes = context->read_labels();
+void Net::partitionInit(DGraph* graph, std::string dataset_str) {
+  this->dGraph          = graph;
+  this->distContext     = new deepgalois::DistContext();
+  this->distContext->saveDistGraph(dGraph);
+  this->distNumSamples = this->dGraph->size();
+
+  // TODO self loop setup would have to be done before this during partitioning
+  // or on master node only
+
+  this->distContext->initializeSyncSubstrate();
+  num_classes = this->distContext->read_labels();
 
   // std::cout << "Reading label masks ... ";
-  train_masks = new mask_t[num_samples];
-  val_masks   = new mask_t[num_samples];
-  std::fill(train_masks, train_masks + num_samples, 0);
-  std::fill(val_masks, val_masks + num_samples, 0);
+  this->distTrainMasks = new mask_t[this->distNumSamples];
+  this->distValMasks   = new mask_t[this->distNumSamples];
+  std::fill(this->distTrainMasks, this->distTrainMasks + this->distNumSamples, 0);
+  std::fill(this->distValMasks, this->distValMasks + this->distNumSamples, 0);
 
   if (dataset_str == "reddit") {
-    train_begin = 0, train_count = 153431,
-    train_end = train_begin + train_count;
-    val_begin = 153431, val_count = 23831, val_end = val_begin + val_count;
+    //this->globalTrainBegin = 0;
+    //this->globalTrainCount = 153431;
+    //this->globalTrainEnd = this->globalTrainBegin + this->globalTrainCount;
+    //this->globalValBegin = 153431;
+    //this->globalValCount = 23831;
+    //this->globalValEnd = this->globalValBegin + this->globalValCount;
+
     // find local ID from global ID, set if it exists
-    for (size_t i = train_begin; i < train_end; i++) {
-      if (dGraph->isLocal(i)) {
-        train_masks[dGraph->getLID(i)] = 1;
+    for (size_t i = globalTrainBegin; i < globalTrainEnd; i++) {
+      if (this->dGraph->isLocal(i)) {
+        this->distTrainMasks[this->dGraph->getLID(i)] = 1;
       }
     }
-    for (size_t i = val_begin; i < val_end; i++) {
-      if (dGraph->isLocal(i)) {
-        val_masks[dGraph->getLID(i)] = 1;
+    for (size_t i = globalValBegin; i < globalValEnd; i++) {
+      if (this->dGraph->isLocal(i)) {
+        this->distValMasks[this->dGraph->getLID(i)] = 1;
       }
     }
   } else {
-    train_count = context->read_masks("train", num_samples, train_begin,
-                                      train_end, train_masks, dGraph);
-    val_count   = context->read_masks("val", num_samples, val_begin, val_end,
-                                    val_masks, dGraph);
+    globalTrainCount = this->distContext->read_masks("train", this->distNumSamples, globalTrainBegin,
+                                      globalTrainEnd, this->distTrainMasks, this->dGraph);
+    globalValCount   = this->distContext->read_masks("val", this->distNumSamples, globalValBegin, globalValEnd,
+                                    this->distValMasks, this->dGraph);
   }
 
-  feature_dims[0] = context->read_features(); // input feature dimension: D
+  feature_dims[0] = this->distContext->read_features(); // input feature dimension: D
   for (size_t i = 1; i < num_conv_layers; i++)
     feature_dims[i] = hidden1;                 // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes; // output embedding: E
@@ -113,10 +120,10 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 #else
         // only look at owned nodes (i.e. masters); the prediction for these
         // should only by handled on the owner
-        if (dGraph->isOwned(i)) {
+        if (this->dGraph->isOwned(i)) {
           sampleCount += 1;
 
-          uint32_t localID = dGraph->getLID(i);
+          uint32_t localID = this->dGraph->getLID(i);
           if (masks[localID] == 1) {
             // get prediction
             auto pred =

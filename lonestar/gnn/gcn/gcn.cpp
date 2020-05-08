@@ -13,16 +13,18 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   LonestarGnnStart(argc, argv, name, desc, url);
 
-  // the neural network to train: loads the entire graph on CPU
+  // Get a partitioned graph first
+  std::vector<unsigned> dummyVec;
+  deepgalois::Graph* dGraph =
+      galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  network.dist_init(dGraph, dataset);
+
+  // initialize entire on CPU
   deepgalois::Net network(dataset, numThreads, num_conv_layers, epochs, hidden1,
                           learning_rate, dropout_rate, weight_decay,
                           add_selfloop, is_single_class, add_l2norm, add_dense,
                           neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
-  std::vector<unsigned> dummyVec;
-  deepgalois::Graph* dGraph =
-      galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
-  network.dist_init(dGraph, dataset);
 
   // read network, features, ground truth, initialize metadata
   // default setting for now; can be customized by the user
