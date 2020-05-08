@@ -94,7 +94,7 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           # Run tests as non-root otherwise MPI will complain
@@ -128,7 +128,7 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
@@ -169,7 +169,7 @@ jobs:
           useradd runner
           mkdir -p build
 
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
@@ -235,7 +235,7 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
@@ -294,7 +294,7 @@ jobs:
           # Get the "module" function set up before loading MPI.
           . /etc/bashrc
           module load mpi
-          cmake -S . -B /tmp/build -DENABLE_DIST_GALOIS=ON
+          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
@@ -329,7 +329,7 @@ jobs:
             -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DENABLE_DIST_GALOIS=ON
+            -DGALOIS_ENABLE_DIST=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \

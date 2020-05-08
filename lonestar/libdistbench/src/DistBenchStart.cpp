@@ -59,7 +59,7 @@ cll::opt<DataCommMode> commMetadata(
                            "non-updated values)")),
     cll::init(noData), cll::Hidden);
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 std::string personality_str(Personality p) {
   switch (p) {
   case CPU:
@@ -159,7 +159,7 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
   galois::runtime::reportParam("DistBench", "Hostname", name);
 }
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 /**
  * Processes/setups the specified heterogeneous configuration (the pset
  * command line option) and sets up the scale factor vector for

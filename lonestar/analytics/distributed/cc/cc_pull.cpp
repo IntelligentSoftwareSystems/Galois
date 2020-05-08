@@ -26,7 +26,7 @@
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "cc_pull_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #else
@@ -83,7 +83,7 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("InitializeGraph_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -131,7 +131,7 @@ struct ConnectedComp {
       syncSubstrate->set_num_round(_num_iterations);
       dga.reset();
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str("ConnectedComp_" +
                              (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -202,7 +202,7 @@ struct ConnectedCompSanityCheck {
     dga.reset();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       uint64_t sum;
       ConnectedCompSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
 
   Graph* hg;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
 
     if ((run + 1) != numRuns) {
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         bitset_comp_current_reset_cuda(cuda_ctx);
 #else
         abort();
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
                                        (*hg).getData(*ii).comp_current);
       }
     } else if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         if ((*hg).isOwned((*hg).getGID(*ii)))

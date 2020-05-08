@@ -113,7 +113,7 @@ private:
       auto& f = inflight.back();
       galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(),
                              galois::runtime::printVec(f.data));
-#ifdef __GALOIS_HET_ASYNC__
+#ifdef GALOIS_SUPPORT_ASYNC
       int rv = MPI_Issend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
                           MPI_COMM_WORLD, &f.req);
 #else
@@ -152,7 +152,7 @@ private:
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
         assert(status.MPI_TAG <= 32767);
         if (status.MPI_TAG != 32767) {
 #endif
@@ -164,7 +164,7 @@ private:
           handleError(rv);
           galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG,
                                  m.data.size());
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
         }
 #endif
       }

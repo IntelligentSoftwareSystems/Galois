@@ -22,8 +22,7 @@
  *
  * Contains copyable tuple classes whose elements are contiguous in memory
  */
-#ifndef __GALOIS_COPYABLE_TUPLE__
-#define __GALOIS_COPYABLE_TUPLE__
+#pragma once
 
 #include "galois/config.h"
 
@@ -82,5 +81,3 @@ struct TupleOfThree {
 };
 
 } // namespace galois
-
-#endif

@@ -29,7 +29,7 @@
 #include "galois/Dist/vGraph.h"
 #include "galois/DistAccumulator.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context* cuda_ctx;
@@ -40,7 +40,7 @@ static const char* const name =
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
 static const char* const url  = 0;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA, GPU_OPENCL };
 std::string personality_str(Personality p) {
   switch (p) {
@@ -67,7 +67,7 @@ static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
 static cll::opt<bool>
     verify("verify", cll::desc("Verify ranks by printing to the output stream"),
            cll::init(false));
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 static cll::opt<int> gpudevice(
     "gpu",
     cll::desc("Select GPU to run on, default is to choose automatically"),
@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_vGraph_init, T_init, T_pageRank;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device            = gpudevice;
     // Parse arg string when running on multiple hosts and update/override
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
 
     T_vGraph_init.start();
     Graph hg(inputFile, partFolder, net.ID, net.Num);
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
@@ -232,14 +232,14 @@ int main(int argc, char** argv) {
 
     // Verify
     /*if(verify){
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == CPU) {
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
 hg.getData(*ii).nout);
         }
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
@@ -264,14 +264,14 @@ get_node_nout_cuda(cuda_ctx, *ii));
 
     // Verify
     if (verify) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == CPU) {
 #endif
         for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
                                        hg.getData(*ii).value);
         }
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       } else if (personality == GPU_CUDA) {
         for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),

@@ -154,7 +154,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Add, Edges
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #define GALOIS_SYNC_STRUCTURE_ADD_EDGES(fieldtype)                             \
   struct EdgeAddReduce {                                                       \
     using ValTy = fieldtype;                                                   \
@@ -243,7 +243,8 @@ public:
       edgeData = 0;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) {                        \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
       if (personality == GPU_CUDA) {                                           \
         batch_reset_edge_cuda(cuda_ctx, begin, end, (ValTy)0);                 \
         return true;                                                           \
@@ -327,7 +328,7 @@ public:
  * in your main program as well as set the bitset appropriately (i.e. when you
  * do a write to a particular node).
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET_EDGES                                     \
   struct Bitset_edges {                                                        \
@@ -373,7 +374,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a sum reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD(fieldname, fieldtype)                 \
   struct Reduce_add_##fieldname {                                              \
@@ -551,7 +552,7 @@ public:
  * Creates a Galois reduction sync structure that does a sum reduction
  * on a field that is represented by an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD_ARRAY(fieldname, fieldtype)           \
   struct Reduce_add_##fieldname {                                              \
@@ -613,7 +614,8 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA) {                                           \
         add_node_##fieldname##_cuda(cuda_ctx, node_id, y);                     \
         return true;                                                           \
@@ -646,14 +648,16 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t node_id,                                        \
+                      struct NodeData& GALOIS_UNUSED(node)) {                  \
       if (personality == GPU_CUDA) {                                           \
         set_node_##fieldname##_cuda(cuda_ctx, node_id, (ValTy)0);              \
       } else if (personality == CPU)                                           \
         galois::set(fieldname[node_id], (ValTy)0);                             \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA)                                             \
         set_node_##fieldname##_cuda(cuda_ctx, node_id, y);                     \
       else if (personality == CPU)                                             \
@@ -697,9 +701,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return false;                                                            \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       {                                                                        \
         galois::add(fieldname[node_id], y);                                    \
         return true;                                                           \
@@ -716,11 +724,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t node_id,                                        \
+                      struct NodeData& GALOIS_UNUSED(node)) {                  \
       galois::set(fieldname[node_id], (ValTy)0);                               \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       fieldname[node_id] = y;                                                  \
     }                                                                          \
                                                                                \
@@ -738,7 +748,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a set as a reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET(fieldname, fieldtype)                 \
   struct Reduce_set_##fieldname {                                              \
@@ -790,7 +800,10 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
     static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA) {                                           \
@@ -825,7 +838,8 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA)                                             \
@@ -901,7 +915,7 @@ public:
  * Creates a Galois reduction sync structure that does a set as a reduction
  * on a field represented by an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET_ARRAY(fieldname, fieldtype)           \
   struct Reduce_set_##fieldname {                                              \
@@ -953,9 +967,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA) {                                           \
         set_node_##fieldname##_cuda(cuda_ctx, node_id, y);                     \
         return true;                                                           \
@@ -988,9 +1006,11 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA)                                             \
         set_node_##fieldname##_cuda(cuda_ctx, node_id, y);                     \
       else if (personality == CPU)                                             \
@@ -1034,9 +1054,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       {                                                                        \
         galois::set(fieldname[node_id], y);                                    \
         return true;                                                           \
@@ -1053,9 +1077,11 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       fieldname[node_id] = y;                                                  \
     }                                                                          \
                                                                                \
@@ -1073,7 +1099,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a min reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN(fieldname, fieldtype)                 \
   struct Reduce_min_##fieldname {                                              \
@@ -1125,7 +1151,10 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
     static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA) {                                           \
@@ -1156,7 +1185,8 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA)                                             \
@@ -1232,7 +1262,7 @@ public:
 /**
  * Creates a Galois reduction sync structure that does a max reduction.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MAX(fieldname, fieldtype)                 \
   struct Reduce_max_##fieldname {                                              \
@@ -1284,7 +1314,10 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
     static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA) {                                           \
@@ -1315,7 +1348,8 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA)                                             \
@@ -1361,9 +1395,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t GALOIS_UNUSED(node_id), struct NodeData& node, \
+                       ValTy y) {                                              \
       { return y > galois::max(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
@@ -1377,9 +1415,11 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t GALOIS_UNUSED(node_id), struct NodeData& node, \
+                       ValTy y) {                                              \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
@@ -1394,7 +1434,7 @@ public:
  * Creates a Galois reduction sync structure that does a pairwise
  * min reduction on an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype)           \
   struct Reduce_min_##fieldname {                                              \
@@ -1446,9 +1486,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA) {                                           \
         return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);          \
       }                                                                        \
@@ -1477,9 +1521,11 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       if (personality == GPU_CUDA)                                             \
         set_node_##fieldname##_cuda(cuda_ctx, node_id, y);                     \
       else if (personality == CPU)                                             \
@@ -1523,9 +1569,13 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return true; }         \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return true;                                                             \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static bool reduce(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       { return y < galois::min(fieldname[node_id], y); }                       \
     }                                                                          \
                                                                                \
@@ -1539,9 +1589,11 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {}              \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& GALOIS_UNUSED(node)) {}                 \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t node_id, struct NodeData& GALOIS_UNUSED(node), \
+                       ValTy y) {                                              \
       fieldname[node_id] = y;                                                  \
     }                                                                          \
                                                                                \
@@ -1556,7 +1608,7 @@ public:
  * Creates a Galois reduction sync structure that does a pairwise
  * average on an array.
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
   struct Reduce_pair_wise_avg_array_##fieldname {                              \
@@ -1608,7 +1660,10 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return false;                                                            \
+    }                                                                          \
                                                                                \
     static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       if (personality == GPU_CUDA) {                                           \
@@ -1643,7 +1698,8 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node) {               \
+    static void reset(uint32_t GALOIS_UNUSED(node_id),                         \
+                      struct NodeData& node) {                                 \
       { galois::resetVec(node.fieldname); }                                    \
     }                                                                          \
                                                                                \
@@ -1802,10 +1858,13 @@ public:
                                                                                \
     static bool extract_reset_batch(unsigned, uint8_t*) { return false; }      \
                                                                                \
-    static bool reset_batch(size_t begin, size_t end) { return false; }        \
+    static bool reset_batch(size_t GALOIS_UNUSED(begin),                       \
+                            size_t GALOIS_UNUSED(end)) {                       \
+      return false;                                                            \
+    }                                                                          \
                                                                                \
-    static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y,       \
-                       unsigned vecIndex) {                                    \
+    static bool reduce(uint32_t GALOIS_UNUSED(node_id), struct NodeData& node, \
+                       ValTy y, unsigned vecIndex) {                           \
       node.fieldname[vecIndex] = node.fieldname[vecIndex] + y;                 \
       return true;                                                             \
     }                                                                          \
@@ -1819,17 +1878,18 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static void reset(uint32_t node_id, struct NodeData& node,                 \
+    static void reset(uint32_t GALOIS_UNUSED(node_id), struct NodeData& node,  \
                       unsigned vecIndex) {                                     \
       node.fieldname[vecIndex] = 0;                                            \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y,       \
-                       unsigned vecIndex) {                                    \
+    static void setVal(uint32_t GALOIS_UNUSED(node_id), struct NodeData& node, \
+                       ValTy y, unsigned vecIndex) {                           \
       node.fieldname[vecIndex] = y;                                            \
     }                                                                          \
                                                                                \
-    static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
+    static void setVal(uint32_t GALOIS_UNUSED(node_id),                        \
+                       struct NodeData& GALOIS_UNUSED(node), ValTy y) {        \
       GALOIS_DIE("Execution shouldn't get here; needs index arg\n");           \
     }                                                                          \
                                                                                \
@@ -1852,7 +1912,7 @@ public:
  * in your main program as well as set the bitset appropriately (i.e. when you
  * do a write to a particular node).
  */
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)                                \
   struct Bitset_##fieldname {                                                  \

@@ -5,11 +5,11 @@ install(TARGETS fsm DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE
 
 #add_test_mine(small1 fsm "${BASEINPUT}/Mining/citeseer.sadj -ft=adj")
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_executable(fsm_gpu fsm_gpu.cpp fsm.cu)
   add_dependencies(apps fsm_gpu)
   target_link_libraries(fsm_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
-  target_compile_definitions(fsm_gpu PRIVATE __GALOIS_HET_CUDA__=1)
+  target_compile_definitions(fsm_gpu PRIVATE GALOIS_ENABLE_GPU=1)
   set_property(TARGET fsm_gpu PROPERTY CUDA_STANDARD 14)
   install(TARGETS fsm_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 endif()

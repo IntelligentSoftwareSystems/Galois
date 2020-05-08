@@ -17,8 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef __DEV_EDGE_SYNC__
-#define __DEV_EDGE_SYNC__
+#pragma once
 /**
  * @file DeviceEdgeSync.h
  *
@@ -32,7 +31,7 @@
 #include "galois/runtime/DataCommMode.h"
 #include "cub/util_allocator.cuh"
 
-#ifdef __GALOIS_CUDA_CHECK_ERROR__
+#ifdef GALOIS_CUDA_CHECK_ERROR
 #define check_cuda_kernel                                                      \
   check_cuda(cudaDeviceSynchronize());                                         \
   check_cuda(cudaGetLastError());
@@ -726,4 +725,3 @@ void batch_set_shared_edge(struct CUDA_Context_Common_Edges* ctx,
   //  timer1.duration_ms(), timer2.duration_ms(),
   //  timer.duration_ms());
 }
-#endif

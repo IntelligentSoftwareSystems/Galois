@@ -5,11 +5,11 @@ install(TARGETS kcl DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE
 
 #add_test_mine(small1 kcl "${BASEINPUT}/Mining/citeseer.csgr")
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_executable(kcl_gpu kcl_gpu.cpp kcl.cu)
   add_dependencies(apps kcl_gpu)
   target_link_libraries(kcl_gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
-  target_compile_definitions(kcl_gpu PRIVATE __GALOIS_HET_CUDA__=1)
+  target_compile_definitions(kcl_gpu PRIVATE GALOIS_ENABLE_GPU=1)
   set_property(TARGET kcl_gpu PROPERTY CUDA_STANDARD 14)
   install(TARGETS kcl_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 endif()
