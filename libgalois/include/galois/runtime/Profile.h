@@ -22,7 +22,7 @@
 
 #include <cstdlib>
 
-#ifdef GALOIS_USE_VTUNE
+#ifdef GALOIS_ENABLE_VTUNE
 #include "ittnotify.h"
 #endif
 
@@ -40,7 +40,7 @@ extern "C" {
 
 namespace galois::runtime {
 
-#ifdef GALOIS_USE_VTUNE
+#ifdef GALOIS_ENABLE_VTUNE
 
 template <typename F>
 void profileVtune(const F& func, const char* region) {
