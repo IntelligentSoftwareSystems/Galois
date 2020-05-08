@@ -167,7 +167,22 @@ struct CSRGraph {
 	CUDA_HOSTDEV const node_data_type *node_data_ptr() const { return node_data; }
 	CUDA_HOSTDEV edge_data_type *edge_data_ptr() { return edge_data; }
 	CUDA_HOSTDEV const edge_data_type *edge_data_ptr() const { return edge_data; }
-
+  CUDA_HOSTDEV void fixEndEdge(index_type vid, index_type row_end) { row_start[vid + 1] = row_end; }
+  CUDA_HOSTDEV void constructEdge(index_type eid, index_type dst, edge_data_type edata = 0) {
+    assert(dst < nnodes);
+    assert(eid < nedges);
+    edge_dst[eid] = dst;
+    //if (edge_data) edge_data[eid] = edata;
+  }
+  void malloc_index_device(index_type n, index_type *ptr);
+  void set_index(index_type pos, index_type value, index_type *ptr);
+  void allocateFrom(index_type nv, index_type ne) {
+    nnodes = nv;
+    nedges = ne;
+    malloc_index_device(nedges, edge_dst);
+    malloc_index_device(nnodes+1, row_start);
+    set_index(0, 0, row_start);
+  }
   size_t size() { return size_t(nnodes); }
   size_t sizeEdges() { return size_t(nedges); }
   void degree_counting() {}

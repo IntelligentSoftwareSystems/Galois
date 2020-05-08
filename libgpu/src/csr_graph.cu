@@ -46,6 +46,15 @@ unsigned CSRGraph::allocOnHost(bool no_edge_data) {
   return ((no_edge_data || edge_data) && row_start && edge_dst && node_data);
 }
 
+void CSRGraph::malloc_index_device(index_type n, index_type *ptr) {
+  check_cuda(cudaMalloc((void **) &ptr, n * sizeof(index_type)));
+}
+
+void CSRGraph::set_index(index_type pos, index_type value, index_type *ptr) {
+  index_type h_value = value;
+  check_cuda(cudaMemcpy(ptr+pos, &h_value, sizeof(index_type), cudaMemcpyHostToDevice));
+}
+
 unsigned CSRGraph::allocOnDevice(bool no_edge_data) {
   if(edge_dst != NULL)  // already allocated
     return true;  
