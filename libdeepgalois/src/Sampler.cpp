@@ -16,7 +16,7 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g) {
   this->count_ = count;
   this->masks_ = masks;
   // save original graph
-  Sampler::graph  = g;
+  Sampler::graph = g;
   // allocate the object for the new masked graph
   Sampler::masked_graph = new Graph();
 
@@ -54,9 +54,9 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g) {
   Sampler::avg_deg  = masked_graph->sizeEdges() / masked_graph->size();
   Sampler::subg_deg = (avg_deg > SAMPLE_CLIP) ? SAMPLE_CLIP : avg_deg;
 
-  //size_t idx = 0;
-  //vertices_.resize(count);
-  //for (size_t i = begin; i < end; i++) {
+  // size_t idx = 0;
+  // vertices_.resize(count);
+  // for (size_t i = begin; i < end; i++) {
   //  if (masks_[i] == 1)
   //    vertices_[idx++] = i;
   //}
@@ -88,8 +88,7 @@ void Sampler::get_masked_degrees(size_t n, mask_t* masks, Graph* g,
 }
 
 //! returns a graph in the variable sub: it is g with the mask applied
-void Sampler::getMaskedGraph(size_t n, mask_t* masks, Graph* g,
-                                    Graph& sub) {
+void Sampler::getMaskedGraph(size_t n, mask_t* masks, Graph* g, Graph& sub) {
   std::vector<uint32_t> degrees(n, 0);
   this->get_masked_degrees(n, masks, g, degrees);
   // auto offsets = deepgalois::parallel_prefix_sum(degrees);
@@ -127,10 +126,9 @@ void Sampler::getMaskedGraph(size_t n, mask_t* masks, Graph* g,
 #endif
 }
 
-
 // helper function for graph saint implementation below
 void Sampler::checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
-                       std::vector<db_t>& DB2, size_t size) {
+                        std::vector<db_t>& DB2, size_t size) {
   if (DB0.capacity() < size) {
     DB0.reserve(DB0.capacity() * 2);
     DB1.reserve(DB1.capacity() * 2);
@@ -222,7 +220,8 @@ void Sampler::select_vertices(size_t n, int m, VertexSet& st, unsigned seed) {
     auto degree = getDegree(Sampler::masked_graph, v);
     neigh_v     = (degree != 0) ? rand_r(&myseed) % degree : db_t(-1);
     if (neigh_v != db_t(-1)) {
-      neigh_v = Sampler::masked_graph->getEdgeDst(Sampler::masked_graph->edge_begin(v) + neigh_v);
+      neigh_v = Sampler::masked_graph->getEdgeDst(
+          Sampler::masked_graph->edge_begin(v) + neigh_v);
       st.insert(neigh_v);
       IA1[DB2[choose] - 1] = 0;
       IA0[DB2[choose] - 1] = 0;
@@ -363,7 +362,8 @@ inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
 
 // Given a subset of vertices and a graph g, generate a subgraph sg from the
 // graph g
-void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& reindexGraph) {
+void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
+                              Graph& reindexGraph) {
   // auto n = origGraph.size(); // old graph size
   auto nv            = keptVertices.size(); // new graph (subgraph) size
   VertexList new_ids = this->reindexVertices(graph->size(), keptVertices);
@@ -379,7 +379,8 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& 
 #ifndef GALOIS_USE_DIST
   reindexGraph.allocateFrom(nv, ne);
   reindexGraph.constructNodes();
-  VertexList old_ids(keptVertices.begin(), keptVertices.end()); // vertex ID mapping
+  VertexList old_ids(keptVertices.begin(),
+                     keptVertices.end()); // vertex ID mapping
 #ifdef PARALLEL_GEN
   galois::do_all(
       galois::iterate((size_t)0, nv),
@@ -390,7 +391,8 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& 
         reindexGraph.fixEndEdge(i, offsets[i + 1]);
         unsigned j  = 0;
         auto old_id = old_ids[i];
-        for (auto e = origGraph.edge_begin(old_id); e != origGraph.edge_end(old_id); e++) {
+        for (auto e = origGraph.edge_begin(old_id);
+             e != origGraph.edge_end(old_id); e++) {
           auto dst = new_ids[origGraph.getEdgeDst(e)];
           assert(dst < nv);
           reindexGraph.constructEdge(offsets[i] + j, dst, 0);
@@ -417,7 +419,8 @@ void Sampler::subgraph_sample(size_t n, Graph& sg, mask_t* masks,
   getMasks(Sampler::graph->size(), sampledSet, masks);
 
   Graph masked_sg;
-  this->getMaskedGraph(Sampler::graph->size(), masks, Sampler::masked_graph,
+  this->getMaskedGraph(
+      Sampler::graph->size(), masks, Sampler::masked_graph,
       masked_sg); // remove edges whose destination is not masked
   this->reindexSubgraph(sampledSet, masked_sg, sg);
 }

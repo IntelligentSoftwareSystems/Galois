@@ -11,6 +11,6 @@
 
 namespace deepgalois {
 using index_t = edge_iterator;
-using DGraph = galois::graphs::DistGraph<char, void>;
-using Graph = LearningGraph;
+using DGraph  = galois::graphs::DistGraph<char, void>;
+using Graph   = LearningGraph;
 } // namespace deepgalois

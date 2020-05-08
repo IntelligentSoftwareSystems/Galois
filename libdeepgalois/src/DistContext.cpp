@@ -7,7 +7,7 @@ DistContext::DistContext() {}
 DistContext::~DistContext() {}
 
 void DistContext::saveGraph(DGraph* dGraph) {
-  graph_cpu = dGraph;
+  graph_cpu     = dGraph;
   localVertices = graph_cpu->size();
 }
 

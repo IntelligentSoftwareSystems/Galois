@@ -691,8 +691,8 @@ void d_softmax_cross_entropy_gpu(int len, int begin, int end,
   // float_t *grad;
   // float_malloc_device((end-begin)*len, grad);
   // d_cross_entropy_kernel<<<CUDA_GET_BLOCKS((end-begin)*len),
-  // CUDA_NUM_THREADS>>>( d_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1,
-  // BLOCK_SIZE>>>(
+  // CUDA_NUM_THREADS>>>(
+  // d_cross_entropy_warp<<<(end-begin-1)/WARPS_PER_BLOCK+1, BLOCK_SIZE>>>(
   //    len, begin, end, masks, labels, out, grad);
   // CudaTest("solving d_cross_entropy kernel failed");
   // d_softmax_kernel<<<CUDA_GET_BLOCKS(end-begin), CUDA_NUM_THREADS>>>(

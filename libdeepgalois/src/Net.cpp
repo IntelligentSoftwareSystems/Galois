@@ -11,8 +11,8 @@ namespace deepgalois {
 
 #ifdef GALOIS_USE_DIST
 void Net::partitionInit(DGraph* graph, std::string dataset_str) {
-  this->dGraph          = graph;
-  this->distContext     = new deepgalois::DistContext();
+  this->dGraph      = graph;
+  this->distContext = new deepgalois::DistContext();
   this->distContext->saveDistGraph(dGraph);
   this->distNumSamples = this->dGraph->size();
 
@@ -25,16 +25,17 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
   // std::cout << "Reading label masks ... ";
   this->distTrainMasks = new mask_t[this->distNumSamples];
   this->distValMasks   = new mask_t[this->distNumSamples];
-  std::fill(this->distTrainMasks, this->distTrainMasks + this->distNumSamples, 0);
+  std::fill(this->distTrainMasks, this->distTrainMasks + this->distNumSamples,
+            0);
   std::fill(this->distValMasks, this->distValMasks + this->distNumSamples, 0);
 
   if (dataset_str == "reddit") {
-    //this->globalTrainBegin = 0;
-    //this->globalTrainCount = 153431;
-    //this->globalTrainEnd = this->globalTrainBegin + this->globalTrainCount;
-    //this->globalValBegin = 153431;
-    //this->globalValCount = 23831;
-    //this->globalValEnd = this->globalValBegin + this->globalValCount;
+    // this->globalTrainBegin = 0;
+    // this->globalTrainCount = 153431;
+    // this->globalTrainEnd = this->globalTrainBegin + this->globalTrainCount;
+    // this->globalValBegin = 153431;
+    // this->globalValCount = 23831;
+    // this->globalValEnd = this->globalValBegin + this->globalValCount;
 
     // find local ID from global ID, set if it exists
     for (size_t i = globalTrainBegin; i < globalTrainEnd; i++) {
@@ -48,13 +49,16 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
       }
     }
   } else {
-    globalTrainCount = this->distContext->read_masks("train", this->distNumSamples, globalTrainBegin,
-                                      globalTrainEnd, this->distTrainMasks, this->dGraph);
-    globalValCount   = this->distContext->read_masks("val", this->distNumSamples, globalValBegin, globalValEnd,
-                                    this->distValMasks, this->dGraph);
+    globalTrainCount = this->distContext->read_masks(
+        "train", this->distNumSamples, globalTrainBegin, globalTrainEnd,
+        this->distTrainMasks, this->dGraph);
+    globalValCount = this->distContext->read_masks(
+        "val", this->distNumSamples, globalValBegin, globalValEnd,
+        this->distValMasks, this->dGraph);
   }
 
-  feature_dims[0] = this->distContext->read_features(); // input feature dimension: D
+  feature_dims[0] =
+      this->distContext->read_features(); // input feature dimension: D
   for (size_t i = 1; i < num_conv_layers; i++)
     feature_dims[i] = hidden1;                 // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes; // output embedding: E

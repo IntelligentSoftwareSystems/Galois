@@ -45,7 +45,8 @@ void Context::gen_subgraph_labels(size_t m, const mask_t* masks) {
       if (Context::is_single_class) {
         Context::h_labels_subg[count] = h_labels[i];
       } else {
-        std::copy(Context::h_labels + i * Context::num_classes, Context::h_labels + (i + 1) * Context::num_classes,
+        std::copy(Context::h_labels + i * Context::num_classes,
+                  Context::h_labels + (i + 1) * Context::num_classes,
                   &Context::h_labels_subg[count * Context::num_classes]);
       }
       count++;
@@ -54,7 +55,7 @@ void Context::gen_subgraph_labels(size_t m, const mask_t* masks) {
   assert(count == m);
 }
 
-//! generate input features for the subgraph, m is subgraph size, 
+//! generate input features for the subgraph, m is subgraph size,
 //! masks tells which vertices to use
 void Context::gen_subgraph_feats(size_t m, const mask_t* masks) {
   size_t count = 0;
@@ -62,7 +63,8 @@ void Context::gen_subgraph_feats(size_t m, const mask_t* masks) {
   Context::h_feats_subg.resize(m * feat_len);
   for (size_t i = 0; i < n; i++) {
     if (masks[i] == 1) {
-      std::copy(Context::h_feats + i * Context::feat_len, Context::h_feats + (i + 1) * Context::feat_len,
+      std::copy(Context::h_feats + i * Context::feat_len,
+                Context::h_feats + (i + 1) * Context::feat_len,
                 &Context::h_feats_subg[count * Context::feat_len]);
       count++;
     }
@@ -112,7 +114,7 @@ void Context::add_selfloop(Graph& og, Graph& g) {
   // TODO not actually implemented yet
   g.allocateFrom(og.size(), og.size() + og.sizeEdges());
   g.constructNodes();
-  //for (size_t src = 0; src < og.size(); src++) {
+  // for (size_t src = 0; src < og.size(); src++) {
   //  //g.getData(src) = 1;
   //  auto begin = og.edge_begin(src);
   //  auto end = og.edge_end(src);

@@ -48,7 +48,7 @@ protected:
   //! average degree cut off to a clip
   int subg_deg;
   //! list  of vertices active in the graph being maintained (masked_graph)
-  //VertexList vertices_;
+  // VertexList vertices_;
   //! List of training nodes; sampling set
   std::vector<index_t> node_train;
   mask_t* masks_;
@@ -67,7 +67,7 @@ protected:
   void getMasks(size_t n, VertexSet vertices, mask_t* masks);
   inline VertexList reindexVertices(size_t n, VertexSet vertex_set);
   void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
-                std::vector<db_t>& DB2, size_t size);
+                 std::vector<db_t>& DB2, size_t size);
 };
 
 } // namespace deepgalois
