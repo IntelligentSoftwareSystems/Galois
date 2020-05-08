@@ -5,10 +5,9 @@
 #include <type_traits>
 
 #include "galois/graphs/MorphGraph.h"
-//#include "galois/graphs/Morph_SepInOut_Graph.h"
 
-static std::string graphType;
-static unsigned int numNodes;
+static unsigned int numNodes = 10;
+static bool verbose          = false;
 
 // only tracks out-going edges
 using OutGraph =
@@ -21,25 +20,33 @@ using InOutGraph =
 // tracks outgoing edges symmetrically w/ shared edge data
 using SymGraph = galois::graphs::MorphGraph<unsigned int, unsigned int, false>;
 
-template<class G>
-void traverseGraph(G& g) {
-  for (auto n: g) {
-    for (auto e: g.edges(n)) {
+template <class G>
+void traverseOutGraph(G& g) {
+  for (auto n : g) {
+    for (auto e : g.edges(n)) {
       auto dst = g.getEdgeDst(e);
       std::cout << "(" << g.getData(n) << " -> " << g.getData(dst) << "): ";
       std::cout << g.getEdgeData(e) << std::endl;
     }
-    for (auto ie: g.in_edges(n)) {
+  }
+}
+
+template <class G>
+void traverseInGraph(G& g) {
+  for (auto n : g) {
+    for (auto ie : g.in_edges(n)) {
       auto src = g.getEdgeDst(ie);
       std::cout << "(" << g.getData(n) << " <- " << g.getData(src) << "): ";
       std::cout << g.getEdgeData(ie) << std::endl;
     }
   }
-  std::cout << std::endl;
 }
 
+template <>
+void traverseInGraph(OutGraph&) {}
+
 // construct a directed clique w/ (i, j) where i < j
-template<class G>
+template <class G>
 void constructGraph(G& g, std::vector<typename G::GraphNode>& v) {
   // add nodes
   for (unsigned int i = 0; i < numNodes; i++) {
@@ -50,184 +57,243 @@ void constructGraph(G& g, std::vector<typename G::GraphNode>& v) {
 
   // add edges
   for (unsigned int i = 0; i < numNodes; i++) {
-    for (unsigned int j = i+1; j < numNodes; j++) {
-      g.getEdgeData(g.addEdge(v[i], v[j])) = (i+j);
+    for (unsigned int j = i + 1; j < numNodes; j++) {
+      g.getEdgeData(g.addEdge(v[i], v[j])) = (i + j);
     }
+  }
+
+  if (verbose) {
+    std::cout << "Original" << std::endl;
+    traverseOutGraph(g);
+    traverseInGraph(g);
   }
 }
 
-template<class G>
-void removeGraphOutEdge(G& g, typename G::GraphNode n1, typename G::GraphNode n2) {
+template <class G>
+void removeGraphOutEdge(G& g, typename G::GraphNode n1,
+                        typename G::GraphNode n2) {
   auto e = g.findEdge(n1, n2);
   if (e != g.edge_end(n1)) {
     g.removeEdge(n1, e);
   }
 }
 
-template<class G>
-void removeGraphInEdge(G& g, typename G::GraphNode n1, typename G::GraphNode n2) {
-  // no incoming edges, do nothing
+void removeGraphInEdge(SymGraph& g, SymGraph::GraphNode n1,
+                       SymGraph::GraphNode n2) {
+  auto e12                            = g.findInEdge(n1, n2);
+  auto GALOIS_USED_ONLY_IN_DEBUG(e21) = g.findEdge(n2, n1);
+
+  if (e12 == g.in_edge_end(n1)) {
+    assert(e21 == g.edge_end(n1));
+  } else {
+    assert(e21 != g.edge_end(n1));
+    assert(n2 == g.getEdgeDst(e12));
+    assert(n1 == g.getEdgeDst(e21));
+    assert(g.getEdgeData(e12) == g.getEdgeData(e21));
+    g.removeEdge(n1, e12);
+    //    g.removeEdge(n2, e21); this is also OK
+  }
 }
 
-template<>
-void removeGraphInEdge(SymGraph& g, SymGraph::GraphNode n1, SymGraph::GraphNode n2) {
-  removeGraphOutEdge(g, n2, n1);
+void removeGraphInEdge(InOutGraph& g, InOutGraph::GraphNode n1,
+                       InOutGraph::GraphNode n2) {
+  auto ie                           = g.findInEdge(n1, n2);
+  auto GALOIS_USED_ONLY_IN_DEBUG(e) = g.findEdge(n2, n1);
+  if (ie == g.in_edge_end(n1)) {
+    assert(e == g.edge_end(n2));
+  } else {
+    assert(e != g.edge_end(n2));
+    assert(n2 == g.getEdgeDst(ie));
+    assert(n1 == g.getEdgeDst(e));
+    assert(g.getEdgeData(ie) == g.getEdgeData(e));
+    //    g.removeEdge(n1, ie); // this leads to compile error
+    g.removeEdge(n2, e);
+  }
 }
 
-template<>
-void removeGraphInEdge(InOutGraph& g, InOutGraph::GraphNode n1, InOutGraph::GraphNode n2) {
-  removeGraphOutEdge(g, n2, n1);
-}
+unsigned int countUnmatchedEdge(OutGraph& g,
+                                std::vector<typename OutGraph::GraphNode>& v,
+                                unsigned int i, unsigned int j) {
+  unsigned int unmatched = 0;
 
-template<class G>
-bool verifyInEdgeRemovalUptoJI(G& g, std::vector<typename G::GraphNode>& v, unsigned int j, unsigned int i) {
-  std::cout << "In-edge removal is done up to (" << j << " <- " << i << ")" << std::endl;
-  bool result = true;
-
-  // nodes whose out-edges are all removed
+  // nodes whose out edges are all removed
   for (unsigned int ri = 0; ri < i; ri++) {
-    for (unsigned int rj = ri+1; rj < numNodes; rj++) {
-      if (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[ri])) {
-        std::cout << "Failed to remove in_edge (" << rj << " <- " << ri << ")" << std::endl;
-        result = false;
-      }
+    for (unsigned int rj = 0; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj]));
     }
   }
 
-  // the node whose out-edges are removed up to j
-  for (unsigned int rj = i+1; rj <= j; rj++) {
-    if (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[i])) {
-      std::cout << "Failed to remove in_edge (" << rj << " <- " << i << ")" << std::endl;
-      result = false;
-    }
+  // the node whose out edge removed up to j
+  for (unsigned int rj = 0; rj < j + 1; rj++) {
+    unmatched += (g.edge_end(v[i]) != g.findEdge(v[i], v[rj]));
   }
-  for (unsigned int rj = j+1; rj < numNodes; rj++) {
-    if (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[i])) {
-      std::cout << "Should not have removed in_edge (" << rj << " <- " << i << ")" << std::endl;
-      result = false;
+  for (unsigned int rj = j + 1; rj < numNodes; rj++) {
+    unmatched += (g.edge_end(v[i]) == g.findEdge(v[i], v[rj]));
+  }
+
+  // nodes whose out edges are kept wholly
+  for (unsigned int ri = i + 1; ri < numNodes; ri++) {
+    for (unsigned int rj = 0; rj < ri + 1; rj++) {
+      unmatched += (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj]));
+    }
+    for (unsigned int rj = ri + 1; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) == g.findEdge(v[ri], v[rj]));
     }
   }
 
-  // nodes whose out-edges are still there
-  for (unsigned int ri = i+1; ri < numNodes; ri++) {
-    for (unsigned int rj = ri+1; rj < numNodes; rj++) {
-      if (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[ri])) {
-        std::cout << "Should not have removed edge (" << rj << " <- " << ri << ")" << std::endl;
-        result = false;
-      }
-    }
-  }
-
-  return result;
+  return unmatched;
 }
 
-template<class G>
-bool verifyOutEdgeRemovalUptoIJ(G& g, std::vector<typename G::GraphNode>& v, unsigned int i, unsigned int j) {
-  std::cout << "Edge removal is done up to (" << i << " -> " << j << ")" << std::endl;
-  bool result = true;
+unsigned int countUnmatchedEdge(InOutGraph& g,
+                                std::vector<typename InOutGraph::GraphNode>& v,
+                                unsigned int i, unsigned int j) {
+  unsigned int unmatched = 0;
 
-  // nodes whose out-edges are all removed
+  // nodes whose out edges are all removed
   for (unsigned int ri = 0; ri < i; ri++) {
-    if (std::distance(g.edge_begin(v[ri]), g.edge_end(v[ri]))) {
-      std::cout << "Some out-edges are not removed from " << ri << std::endl;
-    }
-    for (unsigned int rj = ri+1; rj < numNodes; rj++) {
-      if (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj])) {
-        std::cout << "Failed to remove edge (" << ri << " -> " << rj << ")" << std::endl;
-        result = false;
-      }
+    for (unsigned int rj = 0; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj]));
+      unmatched += (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[ri]));
     }
   }
 
-  // the node whose out-edges are removed up to j
-  if ((numNodes - j - 1) != std::distance(g.edge_begin(v[i]), g.edge_end(v[i]))) {
-    std::cout << "Error in removing out-edges from " << i << std::endl;
+  // the node whose out edge removed up to j
+  for (unsigned int rj = 0; rj < j + 1; rj++) {
+    unmatched += (g.edge_end(v[i]) != g.findEdge(v[i], v[rj]));
+    unmatched += (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[i]));
   }
-  for (unsigned int rj = i+1; rj <= j; rj++) {
-    if (g.edge_end(v[i]) != g.findEdge(v[i], v[rj])) {
-      std::cout << "Failed to remove edge (" << i << " -> " << rj << ")" << std::endl;
-      result = false;
+  for (unsigned int rj = j + 1; rj < numNodes; rj++) {
+    unmatched += (g.edge_end(v[i]) == g.findEdge(v[i], v[rj]));
+    unmatched += (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[i]));
+  }
+
+  // nodes whose out edges are kept wholly
+  for (unsigned int ri = i + 1; ri < numNodes; ri++) {
+    for (unsigned int rj = 0; rj < ri + 1; rj++) {
+      unmatched += (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj]));
+      unmatched += (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[ri]));
     }
-  }
-  for (unsigned int rj = j+1; rj < numNodes; rj++) {
-    if (g.edge_end(v[i]) == g.findEdge(v[i], v[rj])) {
-      std::cout << "Should not have removed edge (" << i << " -> " << rj << ")" << std::endl;
-      result = false;
+    for (unsigned int rj = ri + 1; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) == g.findEdge(v[ri], v[rj]));
+      unmatched += (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[ri]));
     }
   }
 
-  // nodes whose out-edges are still there
-  for (unsigned int ri = i+1; ri < numNodes; ri++) {
-    if ((numNodes - ri - 1) != std::distance(g.edge_begin(v[ri]), g.edge_end(v[ri]))) {
-      std::cout << "Some out-edges are removed prematurely from " << ri << std::endl;
-    }
-    for (unsigned int rj = ri+1; rj < numNodes; rj++) {
-      if (g.edge_end(v[ri]) == g.findEdge(v[ri], v[rj])) {
-        std::cout << "Should not have removed edge (" << ri << " -> " << rj << ")" << std::endl;
-        result = false;
-      }
-    }
-  }
-
-  return result;
+  return unmatched;
 }
 
-template<class G>
-void testGraphOutEdgeRemoval(G& g, std::vector<typename G::GraphNode>& v) {
+unsigned int countUnmatchedEdge(SymGraph& g,
+                                std::vector<typename SymGraph::GraphNode>& v,
+                                unsigned int i, unsigned int j) {
+  unsigned int unmatched = 0;
+
+  // no self loops
+  for (unsigned int k = 0; k < numNodes; k++) {
+    unmatched += (g.edge_end(v[k]) != g.findEdge(v[k], v[k]));
+    unmatched += (g.in_edge_end(v[k]) != g.findInEdge(v[k], v[k]));
+  }
+
+  // nodes whose out edges are all removed
+  for (unsigned int ri = 0; ri < i; ri++) {
+    for (unsigned int rj = ri + 1; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) != g.findEdge(v[ri], v[rj]));
+      unmatched += (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[ri]));
+    }
+  }
+
+  // the node whose out edge removed up to j
+  for (unsigned int rj = i; rj < j + 1; rj++) {
+    unmatched += (g.edge_end(v[i]) != g.findEdge(v[i], v[rj]));
+    unmatched += (g.in_edge_end(v[rj]) != g.findInEdge(v[rj], v[i]));
+  }
+  for (unsigned int rj = j + 1; rj < numNodes; rj++) {
+    unmatched += (g.edge_end(v[i]) == g.findEdge(v[i], v[rj]));
+    unmatched += (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[i]));
+  }
+
+  // nodes whose out edges are kept wholly
+  for (unsigned int ri = i + 1; ri < numNodes; ri++) {
+    for (unsigned int rj = ri + 1; rj < numNodes; rj++) {
+      unmatched += (g.edge_end(v[ri]) == g.findEdge(v[ri], v[rj]));
+      unmatched += (g.in_edge_end(v[rj]) == g.findInEdge(v[rj], v[ri]));
+    }
+  }
+
+  return unmatched;
+}
+
+template <class G>
+unsigned int testGraphOutEdgeRemoval(G& g,
+                                     std::vector<typename G::GraphNode>& v) {
   constructGraph(g, v);
+  unsigned int numFailedRemoval = 0;
 
   for (unsigned int i = 0; i < numNodes; i++) {
-    for (unsigned int j = i+1; j < numNodes; j++) {
+    for (unsigned int j = i + 1; j < numNodes; j++) {
       removeGraphOutEdge(g, v[i], v[j]);
-      if (verifyOutEdgeRemovalUptoIJ(g, v, i, j)) {
-        std::cout << "Normal up to removal of edge (" << i << " -> " << j << ")" << std::endl;
+      numFailedRemoval += (0 != countUnmatchedEdge(g, v, i, j));
+
+      if (verbose) {
+        std::cout << "Removed edge (" << i << " -> " << j << ")" << std::endl;
+        traverseOutGraph(g);
+        traverseInGraph(g);
       }
-#if 1
-      if (std::is_same<G, OutGraph>::value) {
-        continue;
-      }
-      else if (verifyInEdgeRemovalUptoJI(g, v, j, i)) {
-        std::cout << "Normal up to removal of in_edge (" << j << " <- " << i << ")" << std::endl;
-      }
-      traverseGraph(g);
-#endif
     }
   }
+
+  return numFailedRemoval;
 }
 
-int main(int argc, char* argv[]) {
+template <class G>
+unsigned int testGraphInEdgeRemoval(G& g,
+                                    std::vector<typename G::GraphNode>& v) {
+  constructGraph(g, v);
+  unsigned int numFailedRemoval = 0;
+
+  for (unsigned int i = 0; i < numNodes; i++) {
+    for (unsigned int j = i + 1; j < numNodes; j++) {
+      removeGraphInEdge(g, v[j], v[i]);
+      numFailedRemoval += (0 != countUnmatchedEdge(g, v, i, j));
+
+      if (verbose) {
+        std::cout << "Removed in_edge (" << j << " <- " << i << ")"
+                  << std::endl;
+        traverseOutGraph(g);
+        traverseInGraph(g);
+      }
+    }
+  }
+
+  return numFailedRemoval;
+}
+
+int main() {
   galois::SharedMemSys G;
+  unsigned int numFailure = 0;
 
-  if (argc < 3) {
-    std::cout << "Usage: ./test-morphgraph-removal <num_nodes> "
-                 "<out|in-out|symmetric>"
-              << std::endl;
-    return 0;
-  }
+  OutGraph outG;
+  std::vector<OutGraph::GraphNode> outV;
+  auto num = testGraphOutEdgeRemoval(outG, outV);
+  numFailure += num;
+  std::cout << "OutGraph: Failed " << num << " edge removals" << std::endl;
 
-  numNodes = std::stoul(argv[1]);
-  graphType = argv[2];
+  SymGraph symG, symG2;
+  std::vector<SymGraph::GraphNode> symV, symV2;
+  num = testGraphOutEdgeRemoval(symG, symV);
+  numFailure += num;
+  std::cout << "SymGraph: Failed " << num << " edge removals" << std::endl;
+  num = testGraphInEdgeRemoval(symG2, symV2);
+  numFailure += num;
+  std::cout << "SymGraph: Failed " << num << " in_edge removals" << std::endl;
 
-  if ("out" == graphType) {
-//    OutGraph outG;
-//    std::vector<OutGraph::GraphNode> outV;
-//    testGraphOutEdgeRemoval(outG, outV);
-  }
-  else if ("in-out" == graphType) {
-    InOutGraph inOutG;
-    std::vector<InOutGraph::GraphNode> inOutV;
-    testGraphOutEdgeRemoval(inOutG, inOutV);
-  }
-  else if ("symmetric" == graphType) {
-    SymGraph symG;
-    std::vector<SymGraph::GraphNode> symV;
-    testGraphOutEdgeRemoval(symG, symV);
-  }
-  else {
-    std::cout << "Unrecognized graph type " << graphType << std::endl;
-  }
+  InOutGraph inOutG, inOutG2;
+  std::vector<InOutGraph::GraphNode> inOutV, inOutV2;
+  num = testGraphOutEdgeRemoval(inOutG, inOutV);
+  numFailure += num;
+  std::cout << "InOutGraph: Failed " << num << " edge removals" << std::endl;
+  num = testGraphInEdgeRemoval(inOutG2, inOutV2);
+  numFailure += num;
+  std::cout << "InOutGraph: Failed " << num << " in_edge removals" << std::endl;
 
-  galois::runtime::reportParam("MorphGraph Removal", "No. Nodes", numNodes);
-  galois::runtime::reportParam("MorphGraph Removal", "Graph Type", graphType);
-  return 0;
+  return (numFailure > 0) ? -1 : 0;
 }
