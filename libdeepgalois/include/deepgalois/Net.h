@@ -147,18 +147,16 @@ public:
 
     double total_train_time = 0.0;
     int num_subg_remain     = 0;
-#ifdef CPU_ONLY
-#ifndef GALOIS_USE_DIST
+
     if (subgraph_sample_size) {
-      context->createSubgraphs(num_subgraphs);
+      context->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[num_samples * num_subgraphs];
-      std::cout << "\nConstruct training vertex set induced graph...\n";
-      sampler->set_masked_graph(train_begin, train_end, train_count,
-                                train_masks, context->getGraphPointer());
+      galois::gPrint(header, " Construct training vertex set induced graph...\n";
+      sampler->initializeMaskedGraph(train_count, train_masks, context->getGraphPointer());
     }
-#endif
-#endif
+
     std::cout << "\nStart training...\n";
+
     Timer t_epoch;
     // run epochs
     for (int ep = 0; ep < num_epochs; ep++) {

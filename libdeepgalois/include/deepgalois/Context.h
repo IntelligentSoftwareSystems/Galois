@@ -58,7 +58,8 @@ public:
   void norm_factor_computing(bool is_subgraph, int subg_id = 0);
   void gen_subgraph_labels(size_t m, const mask_t* masks);
   void gen_subgraph_feats(size_t m, const mask_t* masks);
-  void createSubgraphs(int num_subgraphs);
+  //! Allocate subgraphs (but don't actually do sampling yet)
+  void allocateSubgraphs(int num_subgraphs);
 
 #ifndef __GALOIS_HET_CUDA__
   Graph* graph_cpu; // the input graph, |V| = N

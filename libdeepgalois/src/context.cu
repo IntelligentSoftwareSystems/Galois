@@ -99,7 +99,7 @@ Context::~Context() {
     CUDA_CHECK(cudaFree(norm_factors));
 }
 
-void Context::createSubgraphs(int n_sg) {}
+void Context::allocateSubgraphs(int n_sg) {}
 
 void Context::gen_subgraph_labels(size_t m, const mask_t* masks) {}
 
