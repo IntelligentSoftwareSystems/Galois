@@ -29,7 +29,6 @@ set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 ###### General features ######
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
-set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
