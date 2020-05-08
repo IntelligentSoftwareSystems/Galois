@@ -33,17 +33,12 @@ extern "C" {
 }
 #endif
 
-#ifdef GALOIS_USE_HPCTK
-#include <hpctoolkit.h>
-#endif
-
 #include "galois/config.h"
 #include "galois/Galois.h"
 #include "galois/gIO.h"
 #include "galois/Timer.h"
 
-namespace galois {
-namespace runtime {
+namespace galois::runtime {
 
 #ifdef GALOIS_USE_VTUNE
 
@@ -74,31 +69,6 @@ void profileVtune(const F& func, const char* region) {
   timeThis(func, region);
 }
 
-#endif
-
-#ifdef GALOIS_USE_HPCTK
-void profileHpcTk(const F& func, const char* region) {
-  region = region ? region : "(NULL)";
-
-  GALOIS_ASSERT(
-      galois::substrate::ThreadPool::getTID() == 0,
-      "profileHpcTk can only be called from master thread (thread 0)");
-
-  hpctoolkit_sampling_start();
-
-  timeThis(func, region);
-
-  hpctoolkit_sampling_stop();
-}
-#else
-template <typename F>
-void profileHpcTk(const F& func, const char* region) {
-
-  region = region ? region : "(NULL)";
-  galois::gWarn("HPC Toolkit not enabled or found");
-
-  timeThis(func, region);
-}
 #endif
 
 #ifdef GALOIS_USE_PAPI
@@ -256,7 +226,6 @@ void profilePapi(const F& func, const char* region) {
 
 #endif
 
-} // namespace runtime
-} // end namespace galois
+} // namespace galois::runtime
 
 #endif
