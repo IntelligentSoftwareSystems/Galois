@@ -25,3 +25,4 @@ target_include_directories(aigRewriting PRIVATE
 )
 
 add_test_scale(small1 aigRewriting "${BASEINPUT}/eda/logic-synthesis/EPFL/arithmetic/adder/aiger/adder.aig" -v)
+add_test_scale(small2 aigRewriting "${BASEINPUT}/eda/logic-synthesis/EPFL/random_control/voter/aiger/voter.aig" -v)
