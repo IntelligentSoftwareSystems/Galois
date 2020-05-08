@@ -32,7 +32,7 @@ endfunction()
 
 add_test_unit(acquire)
 add_test_unit(bandwidth)
-add_test_unit(barriers)
+add_test_unit(barriers 1024 2)
 add_test_unit(empty-member-lcgraph)
 add_test_unit(flatmap)
 add_test_unit(floatingPointErrors)
