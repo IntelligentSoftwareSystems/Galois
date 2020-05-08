@@ -10,13 +10,10 @@
 #include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/utils.h"
-#ifdef CPU_ONLY
-#include "deepgalois/sampler.h"
-#endif
-#ifndef GALOIS_USE_DIST
+#include "deepgalois/Sampler.h"
 #include "deepgalois/Context.h"
-#else
 #include "deepgalois/GraphTypes.h"
+
 #include "deepgalois/DistContext.h"
 #endif
 

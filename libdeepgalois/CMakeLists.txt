@@ -83,7 +83,7 @@ if(NOT ENABLE_HETERO_GALOIS)
     src/math_functions.cpp
     src/optimizer.cpp
     src/Context.cpp
-    src/sampler.cpp
+    src/Sampler.cpp
     src/reader.cpp
     src/lgraph.cpp
     src/utils.cpp

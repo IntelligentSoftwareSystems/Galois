@@ -1,5 +1,5 @@
 #include "deepgalois/utils.h"
-#include "deepgalois/sampler.h"
+#include "deepgalois/Sampler.h"
 #include "galois/Galois.h"
 #include <time.h>
 #include <vector>
