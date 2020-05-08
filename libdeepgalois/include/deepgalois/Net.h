@@ -34,7 +34,7 @@ class Net {
   unsigned neighbor_sample_size; // neighbor sampling
   unsigned subgraph_sample_size; // subgraph sampling
   int num_threads;               // number of threads
-  size_t num_samples;            // number of samples: N
+  size_t globalSamples;            // number of samples: N
   size_t distNumSamples;         // number of samples: N
   size_t num_classes;            // number of vertex classes: E
   size_t num_conv_layers;        // number of convolutional layers
@@ -107,31 +107,31 @@ public:
                      num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
                      learning_rate, ", dropout_rate ", dropout_rate,
                      ", weight_decay ", weight_decay, "\n");
-    num_layers = num_conv_layers + 1;
+    this->num_layers = num_conv_layers + 1;
 
     // additional layers to add
     if (has_l2norm)
-      num_layers++;
+      this->num_layers++;
     if (has_dense)
-      num_layers++;
-
+      this->num_layers++;
     // initialize feature metadata
     feature_dims.resize(num_layers + 1);
 
-    // initialze context
+    // initialze global graph context
     context = new deepgalois::Context();
     context->set_dataset(dataset_str);
-    // read graph, get num nodes
-    num_samples = context->read_graph(selfloop);
+    // read *entire* graph, get num nodes
+    globalSamples = context->read_graph(selfloop);
     context->set_label_class(is_single_class);
     // read ground truth labels
     num_classes = context->read_labels();
 
-    // get training and validation sets
-    globalTrainMasks = new mask_t[num_samples];
-    globalValMasks   = new mask_t[num_samples];
-    std::fill(globalTrainMasks, globalTrainMasks + num_samples, 0);
-    std::fill(globalValMasks, globalValMasks + num_samples, 0);
+    // get training and validation sets: this is to create the training
+    // subgraph in the sampler
+    globalTrainMasks = new mask_t[globalSamples];
+    globalValMasks   = new mask_t[globalSamples];
+    std::fill(globalTrainMasks, globalTrainMasks + globalSamples, 0);
+    std::fill(globalValMasks, globalValMasks + globalSamples, 0);
 
     // reddit is hard coded
     if (dataset_str == "reddit") {
@@ -149,9 +149,9 @@ public:
         globalValMasks[i] = 1;
     } else {
       globalTrainCount =
-          context->read_masks("train", num_samples, globalTrainBegin,
+          context->read_masks("train", globalSamples, globalTrainBegin,
                               globalTrainEnd, globalTrainMasks);
-      globalValCount = context->read_masks("val", num_samples, globalValBegin,
+      globalValCount = context->read_masks("val", globalSamples, globalValBegin,
                                            globalValEnd, globalValMasks);
     }
 
@@ -161,23 +161,8 @@ public:
                  "set\n");
     }
 
-    // read features of vertices
-    feature_dims[0] = context->read_features(); // input feature dimension: D
-
-    for (size_t i = 1; i < num_conv_layers; i++)
-      feature_dims[i] = hidden1; // hidden1 level embedding: 16
-
-    feature_dims[num_conv_layers] = num_classes; // output embedding: E
-
-    if (has_l2norm)
-      feature_dims[num_conv_layers + 1] =
-          num_classes; // l2 normalized embedding: E
-
-    if (has_dense)
-      feature_dims[num_layers - 1] = num_classes; // MLP embedding: E
-
-    feature_dims[num_layers] = num_classes; // normalized output embedding: E
-    layers.resize(num_layers);
+    // features are read in distcontext, not this context (this context only
+    // used for sampling)
 
     // set the subgraph boolean if sample size is greater than 0
     context->set_use_subgraph(subgraph_sample_size > 0);
@@ -187,7 +172,7 @@ public:
   // Net()
   //    : is_single_class(true), has_l2norm(false), has_dense(false),
   //      neighbor_sample_size(0), subgraph_sample_size(0), num_threads(1),
-  //      num_samples(0), num_classes(0), num_conv_layers(0), num_layers(0),
+  //      globalSamples(0), num_classes(0), num_conv_layers(0), num_layers(0),
   //      num_epochs(0), learning_rate(0.0), dropout_rate(0.0),
   //      weight_decay(0.0), globalTrainBegin(0), globalTrainEnd(0),
   //      globalTrainCount(0), globalValBegin(0), globalValEnd(0),
@@ -201,13 +186,10 @@ public:
 
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
-  size_t get_nnodes() { return num_samples; }
 
-  void normalize();  // Scale gradient to counterbalance accumulation
   void regularize(); // add weight decay
 
   void train(optimizer* opt, bool need_validate) {
-
     double total_train_time = 0.0;
     int num_subg_remain     = 0;
 
@@ -416,10 +398,10 @@ public:
     } else {
 #ifndef GALOIS_USE_DIST
       globalTestCount = context->read_masks(
-          "test", num_samples, globalTestBegin, globalTestEnd, test_masks);
+          "test", globalSamples, globalTestBegin, globalTestEnd, test_masks);
 #else
       globalTestCount =
-          context->read_masks("test", num_samples, globalTestBegin,
+          context->read_masks("test", globalSamples, globalTestBegin,
                               globalTestEnd, test_masks, dGraph);
 #endif
     }

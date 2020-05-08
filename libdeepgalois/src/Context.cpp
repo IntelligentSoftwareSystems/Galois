@@ -77,11 +77,7 @@ size_t Context::read_graph(bool selfloop) {
   std::string filetype = "gr";
   galois::StatTimer Tread("GraphReadingTime");
   Tread.start();
-  if (filetype == "el") {
-    filename = path + dataset + ".el";
-    printf("Reading .el file: %s\n", filename.c_str());
-    read_edgelist(filename.c_str(), true); // symmetrize
-  } else if (filetype == "bin") {
+  if (filetype == "bin") {
     graph_cpu->readGraph(dataset);
   } else if (filetype == "gr") {
     graph_cpu            = new Graph();
@@ -207,72 +203,6 @@ void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
       },
       galois::loopname("NormCountingVertex"));
 #endif
-}
-
-void Context::read_edgelist(const char* filename, bool symmetrize,
-                            bool add_self_loop) {
-  std::ifstream in;
-  std::string line;
-  in.open(filename, std::ios::in);
-  size_t m, n;
-  in >> m >> n >> std::ws;
-  size_t num_vertices_ = m;
-  size_t num_edges_    = 0;
-  std::cout << "num_vertices " << num_vertices_ << "\n";
-  std::vector<std::set<uint32_t>> vertices(m);
-  for (size_t i = 0; i < n; i++) {
-    std::set<uint32_t> neighbors;
-    if (add_self_loop)
-      neighbors.insert(i);
-    vertices.push_back(neighbors);
-  }
-  while (std::getline(in, line)) {
-    std::istringstream edge_stream(line);
-    VertexID u, v;
-    edge_stream >> u;
-    edge_stream >> v;
-    vertices[u].insert(v);
-    if (symmetrize)
-      vertices[v].insert(u);
-  }
-  in.close();
-  for (size_t i = 0; i < n; i++)
-    num_edges_ += vertices[i].size();
-  std::cout << "num_edges " << num_edges_ << "\n";
-
-  std::vector<uint32_t> degrees;
-  degrees.resize(num_vertices_);
-  std::fill(degrees.begin(), degrees.end(), 0);
-  for (size_t i = 0; i < num_vertices_; i++)
-    degrees[i] = vertices[i].size();
-  std::vector<uint32_t> offsets(degrees.size() + 1);
-  uint32_t total = 0;
-  for (size_t n = 0; n < degrees.size(); n++) {
-    offsets[n] = total;
-    total += degrees[n];
-  }
-  offsets[degrees.size()] = total;
-  degrees.clear();
-  assert(num_edges_ == offsets[num_vertices_]);
-  EdgeID* colidx_   = new EdgeID[num_edges_];
-  VertexID* rowptr_ = new VertexID[num_vertices_ + 1];
-  for (size_t i = 0; i < num_vertices_ + 1; i++)
-    rowptr_[i] = offsets[i];
-  for (size_t i = 0; i < num_vertices_; i++) {
-    for (auto dst : vertices[i])
-      colidx_[offsets[i]++] = dst;
-  }
-
-  auto g = getGraphPointer();
-  g->allocateFrom(num_vertices_, num_edges_);
-  g->constructNodes();
-  for (size_t i = 0; i < num_vertices_; i++) {
-    auto row_begin = rowptr_[i];
-    auto row_end   = rowptr_[i + 1];
-    g->fixEndEdge(i, row_end);
-    for (auto offset = row_begin; offset < row_end; offset++)
-      g->constructEdge(offset, colidx_[offset], 0);
-  }
 }
 
 } // namespace deepgalois

@@ -17,17 +17,19 @@ int main(int argc, char** argv) {
   std::vector<unsigned> dummyVec;
   deepgalois::Graph* dGraph =
       galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
-  network.dist_init(dGraph, dataset);
 
-  // initialize entire on CPU
+  // initialize network + whole context on CPU
+  // read network, features, ground truth, initialize metadata
+  // default setting for now; can be customized by the user
   deepgalois::Net network(dataset, numThreads, num_conv_layers, epochs, hidden1,
                           learning_rate, dropout_rate, weight_decay,
                           add_selfloop, is_single_class, add_l2norm, add_dense,
                           neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
+  // initialize distributed context
+  network.partitionInit(dGraph, dataset);
 
-  // read network, features, ground truth, initialize metadata
-  // default setting for now; can be customized by the user
+  // construct layers from distributed context
   network.construct_layers();
   network.print_layers_info();
   deepgalois::ResourceManager rm; // tracks peak memory usage

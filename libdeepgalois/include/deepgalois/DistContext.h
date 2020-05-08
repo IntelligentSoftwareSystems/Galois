@@ -10,7 +10,6 @@
 namespace deepgalois {
 
 class DistContext {
-  size_t localVertices; // number of samples: N
   size_t num_classes;   // number of classes: E
   size_t feat_len;      // input feature length: D
   galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
@@ -27,8 +26,6 @@ public:
   DistContext();
   ~DistContext();
 
-  //! save graph pointer to context object
-  void saveDistGraph(Graph* dGraph);
   //! read labels of local nodes only
   size_t read_labels(std::string dataset_str);
   //! read features of local nodes only

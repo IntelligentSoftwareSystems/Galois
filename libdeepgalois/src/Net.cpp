@@ -57,16 +57,20 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
         this->distValMasks, this->dGraph);
   }
 
-  feature_dims[0] =
-      this->distContext->read_features(); // input feature dimension: D
+  // input feature dimension: D
+  feature_dims[0] = this->distContext->read_features();
   for (size_t i = 1; i < num_conv_layers; i++)
     feature_dims[i] = hidden1;                 // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes; // output embedding: E
-  if (has_l2norm)
-    feature_dims[num_conv_layers + 1] =
-        num_classes; // l2 normalized embedding: E
-  if (has_dense)
-    feature_dims[num_layers - 1] = num_classes; // MLP embedding: E
+  if (this->has_l2norm) {
+    // l2 normalized embedding: E
+    feature_dims[num_conv_layers + 1] = num_classes;
+  }
+  if (this->has_dense) {
+     // MLP embedding: E
+    feature_dims[num_layers - 1] = num_classes;
+  }
+
   feature_dims[num_layers] = num_classes; // normalized output embedding: E
   layers.resize(num_layers);
 }
@@ -86,9 +90,6 @@ void Net::regularize() {
   math::axpy(n, weight_decay, layers[layer_id]->get_weights_ptr(),
              layers[layer_id]->get_grads_ptr());
 }
-
-// Scale gradient to counterbalance accumulation
-void Net::normalize() {}
 
 /**
  *
