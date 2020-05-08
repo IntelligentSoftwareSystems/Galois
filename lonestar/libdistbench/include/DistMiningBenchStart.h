@@ -122,8 +122,7 @@ static void marshalGPUGraph(
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>*
-loadDGraph(std::vector<unsigned>& scaleFactor, bool loadProxyEdges,
-           struct CUDA_Context** cuda_ctx = nullptr) {
+loadDGraph(bool loadProxyEdges) {
   using Graph =
       galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>;
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
@@ -156,7 +155,11 @@ template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 std::pair<galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>*,
           galois::graphs::GluonEdgeSubstrate<galois::graphs::MiningGraph<
               NodeData, EdgeData, MiningPolicyDegrees>>*>
-distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr,
+#ifdef GALOIS_ENABLE_GPU
+distGraphInitialization(struct CUDA_Context** cuda_ctx,
+#else
+distGraphInitialization(
+#endif
                         bool loadProxyEdges            = true) {
   galois::StatTimer initTimer("DistGraphInitialization", "DistMiningBench");
   using Graph =
@@ -170,12 +173,8 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr,
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor,
-                                                      loadProxyEdges, cuda_ctx);
-#else
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor,
-                                                      loadProxyEdges);
 #endif
+  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(loadProxyEdges);
 
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();

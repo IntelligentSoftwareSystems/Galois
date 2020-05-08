@@ -196,7 +196,7 @@ private:
 
     // report stats
     if (net.ID == 0) {
-      reportProxyStats(totalMirrorEdges, totalOwnedEdges);
+      reportProxyStats(totalMirrorEdges);
     }
   }
 
@@ -283,9 +283,8 @@ private:
    * calling it actually has the info required.
    *
    * @param totalMirrorEdges number of mirror edges on all hosts
-   * @param totalOwnedEdges number of "owned" edges on all hosts
    */
-  void reportProxyStats(uint64_t totalMirrorEdges, uint64_t totalOwnedEdges) {
+  void reportProxyStats(uint64_t totalMirrorEdges) {
     float replication_factor =
         (float)(totalMirrorEdges + userGraph.globalEdges()) /
         (float)userGraph.globalEdges();
@@ -2309,8 +2308,8 @@ private:
   // Code that handles getting the graph onto the GPU
   template <bool isVoidType,
             typename std::enable_if<isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(EdgeMarshalGraph& m, const size_t index,
-                             const edge_iterator& e) {
+  inline void setMarshalEdge(EdgeMarshalGraph& GALOIS_UNUSED(m), const size_t GALOIS_UNUSED(index),
+                             const edge_iterator& GALOIS_UNUSED(e)) {
     // do nothing
   }
 

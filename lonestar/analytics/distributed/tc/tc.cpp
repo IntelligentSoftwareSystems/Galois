@@ -66,7 +66,9 @@ struct TC {
   TC(Graph* _graph, DGAccumulatorTy& _num_triangles)
       : graph(_graph), num_triangles(_num_triangles) {}
 
-  void static go(Graph& _graph) {
+  // use the below line once CPU code is added
+  //void static go(Graph& _graph) {
+  void static go() {
     unsigned _num_iterations = 0;
     DGAccumulatorTy num_triangles;
     syncSubstrate->set_num_round(_num_iterations);
@@ -132,7 +134,9 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
-    TC<false>::go(*hg);
+    // use the below line once CPU code is added
+    //TC<false>::go(*hg);
+    TC<false>::go();
     StatTimer_main.stop();
 
     syncSubstrate->set_num_run(run + 1);
