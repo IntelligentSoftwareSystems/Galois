@@ -49,7 +49,7 @@ extern DataCommMode enforcedDataMode;
 
 #ifdef GALOIS_USE_BARE_MPI
 //! bare_mpi type to use; see options in runtime/BareMPI.h
-BareMPI bare_mpi = BareMPI::noBareMPI;
+extern BareMPI bare_mpi;
 #endif
 
 namespace galois {

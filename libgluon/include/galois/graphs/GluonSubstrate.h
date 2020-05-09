@@ -41,14 +41,13 @@
 
 #include "galois/runtime/BareMPI.h"
 
-#ifdef GALOIS_USE_BARE_MPI
-//! bare_mpi type to use; see options in runtime/BareMPI.h
-BareMPI bare_mpi = BareMPI::noBareMPI;
-#endif
-
 // TODO find a better way to do this without globals
 //! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
+
+#ifdef GALOIS_USE_BARE_MPI
+extern BareMPI bare_mpi;
+#endif
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -2019,7 +2018,8 @@ private:
    * Sync using MPI instead of network layer.
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_send(std::string loopName) {
     static std::vector<galois::runtime::SendBuffer> b;
     static std::vector<MPI_Request> request;
@@ -2042,7 +2042,8 @@ private:
         b[x].getVec().clear();
       }
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
+                    (loopName, x, b[x]);
 
       MPI_Isend((uint8_t*)b[x].linearData(), b[x].size(), MPI_BYTE, x, 32767,
                 MPI_COMM_WORLD, &request[x]);
@@ -2057,7 +2058,8 @@ private:
    * Sync put using MPI instead of network layer
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_put(std::string loopName, const MPI_Group& mpi_access_group,
                     const std::vector<MPI_Win>& window) {
 
@@ -2073,7 +2075,7 @@ private:
       if (nothingToSend(x, syncType, writeLocation, readLocation))
         continue;
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x, b[x]);
 
       size[x] = b[x].size();
       send_buffers_size += size[x];
@@ -2391,8 +2393,7 @@ private:
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void sync_mpi_recv_post(std::string loopName,
-                          std::vector<MPI_Request>& request,
+  void sync_mpi_recv_post(std::vector<MPI_Request>& request,
                           const std::vector<std::vector<uint8_t>>& rb) {
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + numHosts - h) % numHosts;
@@ -2408,7 +2409,8 @@ private:
    * MPI receive wrapper for sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_recv_wait(std::string loopName,
                           std::vector<MPI_Request>& request,
                           const std::vector<std::vector<uint8_t>>& rb) {
@@ -2425,7 +2427,8 @@ private:
 
       galois::runtime::RecvBuffer rbuf(rb[x].begin(), rb[x].begin() + size);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
+                   (x, rbuf, loopName);
     }
   }
 
@@ -2433,7 +2436,8 @@ private:
    * MPI get wrapper for sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_get(std::string loopName, const std::vector<MPI_Win>& window,
                     const std::vector<std::vector<uint8_t>>& rb) {
     for (unsigned h = 1; h < numHosts; ++h) {
@@ -2451,7 +2455,7 @@ private:
 
       MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf, loopName);
     }
   }
 #endif
@@ -2547,7 +2551,8 @@ private:
    * Nonblocking MPI sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void syncNonblockingMPI(std::string loopName,
                           bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -2582,22 +2587,22 @@ private:
 
     TRecvTime.start();
     sync_mpi_recv_post<writeLocation, readLocation, syncType, SyncFnTy,
-                       BitsetFnTy>(loopName, request, rb);
+                       BitsetFnTy>(request, rb);
     TRecvTime.stop();
 
     TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    BitsetFnTy>(loopName);
+                    BitsetFnTy, VecTy, async>(loopName);
     } else {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    galois::InvalidBitsetFnTy>(loopName);
+                    galois::InvalidBitsetFnTy, VecTy, async>(loopName);
     }
     TSendTime.stop();
 
     TRecvTime.start();
     sync_mpi_recv_wait<writeLocation, readLocation, syncType, SyncFnTy,
-                       BitsetFnTy>(loopName, request, rb);
+                       BitsetFnTy, VecTy, async>(loopName, request, rb);
     TRecvTime.stop();
   }
 
@@ -2605,7 +2610,8 @@ private:
    * Onesided MPI sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void syncOnesidedMPI(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
@@ -2676,17 +2682,19 @@ private:
 
     TSendTime.start();
     if (use_bitset_to_send) {
-      sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+      sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                   VecTy, async>(
           loopName, mpi_access_group, window);
     } else {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy,
-                   galois::InvalidBitsetFnTy>(loopName, mpi_access_group,
-                                              window);
+                   galois::InvalidBitsetFnTy, VecTy, async>
+                     (loopName, mpi_access_group, window);
     }
     TSendTime.stop();
 
     TRecvTime.start();
-    sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+    sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                 VecTy, async>(
         loopName, window, rb);
     TRecvTime.stop();
   }
@@ -2733,11 +2741,11 @@ private:
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                         BitsetFnTy>(loopName);
+                         BitsetFnTy, VecTy, async>(loopName);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                      BitsetFnTy>(loopName);
+                      BitsetFnTy, VecTy, async>(loopName);
       break;
     default:
       GALOIS_DIE("Unsupported bare MPI");
@@ -2812,11 +2820,11 @@ private:
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncBroadcast,
-                         BroadcastFnTy, BitsetFnTy>(loopName, use_bitset);
+                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName, use_bitset);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                      BitsetFnTy>(loopName, use_bitset);
+                      BitsetFnTy, VecTy, async>(loopName, use_bitset);
       break;
     default:
       GALOIS_DIE("Unsupported bare MPI");
