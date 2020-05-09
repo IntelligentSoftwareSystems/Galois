@@ -33,7 +33,7 @@ public:
   void saveDistGraph(DGraph* a) { graph_cpu = a; }
 
   //! read labels of local nodes only
-  size_t read_labels(DGraph* dGraph, std::string dataset_str);
+  size_t read_labels(std::string dataset_str);
   //! read features of local nodes only
   size_t read_features(std::string dataset_str);
   //! read masks of local nodes only

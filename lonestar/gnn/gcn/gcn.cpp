@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 
   // Get a partitioned graph first
   std::vector<unsigned> dummyVec;
-  deepgalois::Graph* dGraph =
+  deepgalois::DGraph* dGraph =
       galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 
   // initialize network + whole context on CPU

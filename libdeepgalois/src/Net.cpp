@@ -20,7 +20,7 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
   // or on master node only
 
   this->distContext->initializeSyncSubstrate();
-  num_classes = this->distContext->read_labels(graph, dataset_str);
+  num_classes = this->distContext->read_labels(dataset_str);
 
   // std::cout << "Reading label masks ... ";
   this->distTrainMasks = new mask_t[this->distNumSamples];
@@ -76,7 +76,7 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
 }
 #endif
 
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
 void Net::init() {
   if (subgraph_sample_size)
     sampler = new deepgalois::Sampler();

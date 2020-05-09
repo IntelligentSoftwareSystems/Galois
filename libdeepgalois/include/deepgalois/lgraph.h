@@ -119,7 +119,7 @@ public:
 
   index_t* row_start_host_ptr() { return &rowptr_[0]; }
   index_t* edge_dst_host_ptr() { return &colidx_[0]; }
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }
   index_t edge_end(index_t vid) { return rowptr_[vid + 1]; }

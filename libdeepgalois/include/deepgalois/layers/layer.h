@@ -72,7 +72,7 @@ public:
   void set_norm_consts_ptr(float_t* ptr) { norm_consts = ptr; }
   void set_feats_ptr(float_t* ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   void set_graph_ptr(Graph* ptr) { graph_cpu = ptr; }
 #else
   void set_graph_ptr(GraphGPU* ptr) { graph_gpu = ptr; }
@@ -97,7 +97,7 @@ public:
     use_mask = false;
     if (masks != NULL) {
       use_mask = true;
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
       masks_ = masks;
 #else
       d_masks_ = masks;
@@ -135,7 +135,7 @@ public:
 
   //! use optimizer to update weights given gradient (weight_grad)
   void update_weight(deepgalois::optimizer* opt) {
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
     // bool parallel = (W.size() >= 512);
@@ -173,7 +173,7 @@ protected:
   label_t* labels;
   float_t* norm_consts;
 // TODO
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   Graph* graph_cpu;
 #else
   GraphGPU* graph_gpu;

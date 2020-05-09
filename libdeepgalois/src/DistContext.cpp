@@ -6,7 +6,7 @@ namespace deepgalois {
 DistContext::DistContext() {}
 DistContext::~DistContext() {}
 
-size_t DistContext::read_labels(DGraph& dGraph, std::string dataset_str) {
+size_t DistContext::read_labels(std::string dataset_str) {
   DGraph* dGraph = DistContext::graph_cpu;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading labels from disk...\n");

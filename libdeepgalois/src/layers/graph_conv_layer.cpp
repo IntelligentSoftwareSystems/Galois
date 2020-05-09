@@ -10,7 +10,7 @@ float_t* _dataToSync = nullptr;
 //! sync
 long unsigned _syncVectorSize = 0;
 
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
 inline void graph_conv_layer::rand_init_matrix(size_t dim_x, size_t dim_y,
                                                vec_t& matrix, unsigned seed) {
   auto init_range = sqrt(6.0 / (dim_x + dim_y));

@@ -215,7 +215,7 @@ public:
           Timer t_subgen;
           t_subgen.Start();
           // generate subgraphs
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
 #ifndef GALOIS_USE_DIST
           for (int sid = 0; sid < num_subgraphs; sid++) {
             // galois::do_all(galois::iterate(size_t(0),
@@ -341,7 +341,7 @@ public:
       count = globalTestCount;
       masks = test_masks;
     }
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
     if (subgraph_sample_size &&
         type != "train") { // switch to the original graph
       for (size_t i = 0; i < num_layers; i++)
@@ -402,7 +402,7 @@ public:
           distContext->read_masks(dataset, std::string("test"), globalSamples, globalTestBegin,
                               globalTestEnd, test_masks, dGraph);
     }
-#ifndef CPU_ONLY
+#ifdef __GALOIS_HET_CUDA__
     copy_test_masks_to_device();
 #endif
   }

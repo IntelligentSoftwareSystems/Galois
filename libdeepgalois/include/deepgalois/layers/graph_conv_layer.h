@@ -53,7 +53,7 @@ public:
   virtual void back_propagation(const float_t* in_data, const float_t* out_data,
                                 float_t* out_grad, float_t* in_grad);
   // user-defined aggregate function
-#ifdef CPU_ONLY
+#ifndef __GALOIS_HET_CUDA__
   virtual void aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
   void d_aggregate(size_t len, Graph& g, const float_t* in, float_t* out);
 #else
