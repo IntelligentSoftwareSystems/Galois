@@ -15,7 +15,6 @@
 #include "deepgalois/GraphTypes.h"
 
 #include "deepgalois/DistContext.h"
-#endif
 
 namespace deepgalois {
 
@@ -40,6 +39,7 @@ class Net {
   size_t num_conv_layers;        // number of convolutional layers
   size_t num_layers;             // total number of layers (conv + output)
   int num_epochs;                // number of epochs
+  unsigned h1;                // hidden layer size
   float learning_rate;           // learning rate
   float dropout_rate;            // dropout rate
   float weight_decay;            // weighti decay for over-fitting
@@ -92,6 +92,7 @@ public:
       : is_single_class(single), has_l2norm(l2norm), has_dense(dense),
         neighbor_sample_size(neigh_sz), subgraph_sample_size(subg_sz),
         num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs),
+        h1(hidden1),
         learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
@@ -102,7 +103,7 @@ public:
     assert(n_conv > 0);
 
     // TODO use galois print
-    galois >> gPrint(header, "Configuration: num_threads ", num_threads,
+    galois::gPrint(header, "Configuration: num_threads ", num_threads,
                      ", num_conv_layers ", num_conv_layers, ", num_epochs ",
                      num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
                      learning_rate, ", dropout_rate ", dropout_rate,
@@ -181,6 +182,7 @@ public:
   //      num_vertices_sg(9000), globalTrainMasks(NULL), globalValMasks(NULL),
   //      test_masks(NULL), context(NULL) {}
 
+  void init();
   //! Initializes metadata for the partition
   void partitionInit(DGraph* graph, std::string dataset_str);
 
@@ -195,8 +197,8 @@ public:
 
     if (subgraph_sample_size) {
       context->allocateSubgraphs(num_subgraphs);
-      subgraphs_masks = new mask_t[num_samples * num_subgraphs];
-      galois::gPrint(header, " Construct training vertex set induced graph...\n";
+      subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
+      galois::gPrint(header, " Construct training vertex set induced graph...\n");
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, context->getGraphPointer());
     }
 
@@ -222,7 +224,7 @@ public:
             // tid = galois::substrate::ThreadPool::getTID();
             sampler->subgraph_sample(subgraph_sample_size,
                                      *(context->getSubgraphPointer(sid)),
-                                     &subgraphs_masks[sid * num_samples], tid);
+                                     &subgraphs_masks[sid * globalSamples], tid);
           } //, galois::loopname("subgraph_gen"));
 #endif
 #endif
@@ -253,12 +255,12 @@ public:
         }
         // update labels for subgraph
         context->gen_subgraph_labels(num_vertices_sg,
-                                     &subgraphs_masks[sg_id * num_samples]);
+                                     &subgraphs_masks[sg_id * globalSamples]);
         layers[num_layers - 1]->set_labels_ptr(context->get_labels_subg_ptr());
 
         // update features for subgraph
         context->gen_subgraph_feats(num_vertices_sg,
-                                    &subgraphs_masks[sg_id * num_samples]);
+                                    &subgraphs_masks[sg_id * globalSamples]);
         layers[0]->set_feats_ptr(
             context->get_feats_subg_ptr()); // feed input data
       }
@@ -343,7 +345,7 @@ public:
     if (subgraph_sample_size &&
         type != "train") { // switch to the original graph
       for (size_t i = 0; i < num_layers; i++)
-        layers[i]->update_dim_size(num_samples);
+        layers[i]->update_dim_size(distNumSamples);
       for (size_t i = 0; i < num_conv_layers; i++) {
         layers[i]->set_graph_ptr(context->getGraphPointer());
         layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
@@ -380,7 +382,7 @@ public:
 
   // read masks of test set
   void read_test_masks(std::string dataset) {
-    test_masks = new mask_t[num_samples];
+    test_masks = new mask_t[distNumSamples];
     if (dataset == "reddit") {
       globalTestBegin = 177262;
       globalTestCount = 55703;
@@ -396,14 +398,9 @@ public:
       }
 #endif
     } else {
-#ifndef GALOIS_USE_DIST
-      globalTestCount = context->read_masks(
-          "test", globalSamples, globalTestBegin, globalTestEnd, test_masks);
-#else
       globalTestCount =
-          context->read_masks("test", globalSamples, globalTestBegin,
+          distContext->read_masks(dataset, std::string("test"), globalSamples, globalTestBegin,
                               globalTestEnd, test_masks, dGraph);
-#endif
     }
 #ifndef CPU_ONLY
     copy_test_masks_to_device();
@@ -443,8 +440,8 @@ public:
   void append_l2norm_layer(size_t layer_id) {
     assert(layer_id > 0); // can not be the first layer
     std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0]       = num_samples;
-    in_dims[0]       = num_samples;
+    in_dims[0]       = distNumSamples;
+    in_dims[0]       = distNumSamples;
     in_dims[1]       = get_in_dim(layer_id);
     out_dims[1]      = get_out_dim(layer_id);
     layers[layer_id] = new l2_norm_layer(layer_id, in_dims, out_dims);
@@ -454,8 +451,8 @@ public:
   void append_dense_layer(size_t layer_id) {
     assert(layer_id > 0); // can not be the first layer
     std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0]  = num_samples;
-    in_dims[0]  = num_samples;
+    in_dims[0]  = distNumSamples;
+    in_dims[0]  = distNumSamples;
     in_dims[1]  = get_in_dim(layer_id);
     out_dims[1] = get_out_dim(layer_id);
     // layers[layer_id] = new dense_layer(layer_id, in_dims, out_dims);
@@ -465,7 +462,7 @@ public:
   void append_out_layer(size_t layer_id) {
     assert(layer_id > 0); // can not be the first layer
     std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0] = out_dims[0] = num_samples;
+    in_dims[0] = out_dims[0] = distNumSamples;
     in_dims[1]               = get_in_dim(layer_id);
     out_dims[1]              = get_out_dim(layer_id);
     if (is_single_class)
@@ -481,7 +478,7 @@ public:
     assert(dropout_rate < 1.0);
     assert(layer_id < num_conv_layers);
     std::vector<size_t> in_dims(2), out_dims(2);
-    in_dims[0] = out_dims[0] = num_samples;
+    in_dims[0] = out_dims[0] = distNumSamples;
     in_dims[1]               = get_in_dim(layer_id);
     out_dims[1]              = get_out_dim(layer_id);
     layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
@@ -491,7 +488,6 @@ public:
 
   // update trainable weights after back-propagation
   void update_weights(optimizer* opt) {
-    normalize();
     regularize();
     for (size_t i = 0; i < num_layers; i++) {
       if (layers[i]->trainable()) {
@@ -528,7 +524,7 @@ public:
   //! Save the context object to all layers of the network
   void set_contexts() {
     for (size_t i = 0; i < num_layers; i++)
-      layers[i]->set_context(context);
+      layers[i]->set_context(distContext);
   }
   //! set netphases for all layers in this network
   void set_netphases(net_phase phase) {

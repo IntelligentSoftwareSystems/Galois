@@ -1,5 +1,3 @@
-#ifndef GALOIS_USE_DIST
-
 #pragma once
 #include "deepgalois/GraphTypes.h"
 
@@ -71,5 +69,3 @@ protected:
 };
 
 } // namespace deepgalois
-
-#endif

@@ -10,10 +10,9 @@
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include <boost/iterator/transform_iterator.hpp>
-#ifdef GALOIS_USE_DIST
+
 #include "galois/DistGalois.h"
 #include "galois/runtime/Network.h"
-#endif
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> dataset(cll::Positional, 
@@ -109,4 +108,4 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   galois::runtime::reportParam("(NULL)", "Hostname", name);
 }
 
-#include "deepgalois/net.h"
+#include "deepgalois/Net.h"

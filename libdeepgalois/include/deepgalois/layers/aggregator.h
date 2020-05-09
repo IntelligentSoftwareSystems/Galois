@@ -5,6 +5,7 @@
 #ifdef CPU_ONLY
 #include "deepgalois/GraphTypes.h"
 namespace deepgalois {
+// TODO template arg
 void update_all(size_t len, Graph& g, const float_t* in, float_t* out,
                 bool norm, float_t* norm_factor);
 void update_all_csrmm(size_t len, Graph& g, const float_t* in, float_t* out,

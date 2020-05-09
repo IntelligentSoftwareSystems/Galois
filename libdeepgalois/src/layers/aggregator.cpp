@@ -2,20 +2,14 @@
 #include "deepgalois/math_functions.hh"
 #include "galois/Galois.h"
 
+// TODO template arg
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in,
                             float_t* out, bool norm, float_t* norm_factor) {
 // std::cout << "[update_all] graph size: " << n << "\n";
-#ifndef GALOIS_USE_DIST
   size_t n = g.size();
   galois::do_all(
       galois::iterate(size_t(0), n),
       [&](const auto src) {
-#else
-  auto& rangeObj = g.allNodesRange();
-  galois::do_all(
-      galois::iterate(rangeObj),
-      [&](const auto src) {
-#endif
         auto src_idx = src * len;
         // zero out the output data
         math::clear_cpu(len, &out[src_idx]);

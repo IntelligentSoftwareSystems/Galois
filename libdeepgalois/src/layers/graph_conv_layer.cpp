@@ -66,7 +66,7 @@ void graph_conv_layer::malloc_and_init() {
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
-#ifdef GALOIS_USE_DIST
+
   // setup gluon
   layer::gradientGraph =
       new deepgalois::GluonGradients(layer::weight_grad, y * z);
@@ -74,14 +74,9 @@ void graph_conv_layer::malloc_and_init() {
       new galois::graphs::GluonSubstrate<deepgalois::GluonGradients>(
           *layer::gradientGraph, layer::gradientGraph->myHostID(),
           layer::gradientGraph->numHosts(), false);
-#endif
 
-#ifdef GALOIS_USE_DIST
   // make sure seed consistent across all hosts for weight matrix
   rand_init_matrix(y, z, W, 1);
-#else
-  rand_init_matrix(y, z, W);
-#endif
 
   // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);

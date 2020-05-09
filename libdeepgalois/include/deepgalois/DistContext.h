@@ -12,9 +12,9 @@ namespace deepgalois {
 class DistContext {
   size_t num_classes;   // number of classes: E
   size_t feat_len;      // input feature length: D
-  galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+  galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
 
-  Graph* graph_cpu; // the input graph, |V| = N
+  DGraph* graph_cpu; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
   label_t* h_labels;      // labels for classification. Single-class label: Nx1,
                           // multi-class label: NxE
@@ -22,17 +22,23 @@ class DistContext {
   float_t* h_feats;       // input features: N x D
   float_t* h_feats_subg;  // input features for subgraph
 
+  // TODO needs to come from whole graph
+  float_t* norm_factors;  // normalization constant based on graph structure
+  std::vector<float_t> norm_factors_subg; // normalization constant for subgraph
+
 public:
   DistContext();
   ~DistContext();
 
+  void saveDistGraph(DGraph* a) { graph_cpu = a; }
+
   //! read labels of local nodes only
-  size_t read_labels(std::string dataset_str);
+  size_t read_labels(DGraph* dGraph, std::string dataset_str);
   //! read features of local nodes only
   size_t read_features(std::string dataset_str);
   //! read masks of local nodes only
   size_t read_masks(std::string dataset_str, std::string mask_type, size_t n,
-                    size_t& begin, size_t& end, mask_t* masks, Graph* dGraph);
+                    size_t& begin, size_t& end, mask_t* masks, DGraph* dGraph);
 
   // TODO define these
   void createSubgraphs(int) {}
@@ -40,16 +46,17 @@ public:
   void gen_subgraph_feats(size_t, const mask_t*) {}
 
   float_t* get_norm_factors_ptr() { return norm_factors; }
-  Graph* getGraphPointer() { return graph_cpu; }
+  // TODO shouldn't return 0 always
+  float_t* get_norm_factors_subg_ptr() { return &norm_factors_subg[0]; }
+  DGraph* getGraphPointer() { return graph_cpu; }
   Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return h_feats_subg; }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return h_labels_subg; }
-  float_t* get_norm_factors_subg_ptr() { return norm_factors_subg; }
 
   void initializeSyncSubstrate();
-  galois::graphs::GluonSubstrate<Graph>* getSyncSubstrate();
+  galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
 
   //! return label for some node
   //! NOTE: this is LID, not GID

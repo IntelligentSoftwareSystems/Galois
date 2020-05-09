@@ -7,7 +7,7 @@ DistContext::DistContext() {}
 DistContext::~DistContext() {}
 
 size_t DistContext::read_labels(DGraph& dGraph, std::string dataset_str) {
-  Graph* dGraph = DistContext::graph_cpu;
+  DGraph* dGraph = DistContext::graph_cpu;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading labels from disk...\n");
 
@@ -58,7 +58,7 @@ size_t DistContext::read_labels(DGraph& dGraph, std::string dataset_str) {
 }
 
 size_t DistContext::read_features(std::string dataset_str) {
-  Graph* dGraph = DistContext::graph_cpu;
+  DGraph* dGraph = DistContext::graph_cpu;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading features from disk...\n");
 
@@ -101,7 +101,7 @@ size_t DistContext::read_features(std::string dataset_str) {
 
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
                                size_t n, size_t& begin, size_t& end,
-                               mask_t* masks, Graph* dGraph) {
+                               mask_t* masks, DGraph* dGraph) {
   bool dataset_found = false;
   for (int i = 0; i < NUM_DATASETS; i++) {
     if (dataset_str == dataset_names[i]) {
@@ -146,12 +146,12 @@ size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
 float_t* DistContext::get_in_ptr() { return &h_feats[0]; }
 
 void DistContext::initializeSyncSubstrate() {
-  DistContext::syncSubstrate = new galois::graphs::GluonSubstrate<Graph>(
+  DistContext::syncSubstrate = new galois::graphs::GluonSubstrate<DGraph>(
       *DistContext::graph_cpu, galois::runtime::getSystemNetworkInterface().ID,
       galois::runtime::getSystemNetworkInterface().Num, false);
 }
 
-galois::graphs::GluonSubstrate<Graph>* DistContext::getSyncSubstrate() {
+galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;
 };
 

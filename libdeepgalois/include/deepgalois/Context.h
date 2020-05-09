@@ -43,6 +43,9 @@ class Context {
   void alloc_norm_factor();
   void alloc_subgraph_norm_factor(int subg_id);
 
+
+public:
+// TODO separate below to public and private
 #ifndef __GALOIS_HET_CUDA__
   Graph* graph_cpu; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
@@ -79,7 +82,6 @@ class Context {
   }
 #endif
 
-public:
   Context();
   //! initializer for gpu; goes ahead and sets a few things
   Context(bool use_gpu)

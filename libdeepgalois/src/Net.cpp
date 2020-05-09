@@ -20,7 +20,7 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
   // or on master node only
 
   this->distContext->initializeSyncSubstrate();
-  num_classes = this->distContext->read_labels();
+  num_classes = this->distContext->read_labels(graph, dataset_str);
 
   // std::cout << "Reading label masks ... ";
   this->distTrainMasks = new mask_t[this->distNumSamples];
@@ -49,18 +49,18 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
       }
     }
   } else {
-    globalTrainCount = this->distContext->read_masks(
+    globalTrainCount = this->distContext->read_masks(dataset_str,
         "train", this->distNumSamples, globalTrainBegin, globalTrainEnd,
         this->distTrainMasks, this->dGraph);
-    globalValCount = this->distContext->read_masks(
+    globalValCount = this->distContext->read_masks(dataset_str,
         "val", this->distNumSamples, globalValBegin, globalValEnd,
         this->distValMasks, this->dGraph);
   }
 
   // input feature dimension: D
-  feature_dims[0] = this->distContext->read_features();
+  feature_dims[0] = this->distContext->read_features(dataset_str);
   for (size_t i = 1; i < num_conv_layers; i++)
-    feature_dims[i] = hidden1;                 // hidden1 level embedding: 16
+    feature_dims[i] = this->h1;                 // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes; // output embedding: E
   if (this->has_l2norm) {
     // l2 normalized embedding: E

@@ -123,7 +123,6 @@ void Sampler::getMaskedGraph(size_t n, mask_t* masks, Graph* g, Graph& sub) {
       ,
       galois::loopname("gen_subgraph"));
 #endif
-#endif
 }
 
 // helper function for graph saint implementation below
@@ -183,7 +182,7 @@ void Sampler::select_vertices(size_t n, int m, VertexSet& st, unsigned seed) {
   for (int i = 0; i < m; i++) {
     auto rand_idx = rand_r(&myseed) % Sampler::node_train.size();
     db_t v = IA3[i] = Sampler::node_train[rand_idx];
-    st.iisert(v);
+    st.insert(v);
     IA0[i] = getDegree(Sampler::masked_graph, v);
     IA0[i] = (IA0[i] > SAMPLE_CLIP) ? SAMPLE_CLIP : IA0[i];
     IA1[i] = 1;
@@ -376,7 +375,6 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
   auto ne      = offsets[nv];
   // galois::gPrint("Generate subgraph: num_vertices=", nv, ", num_edges=", ne,
   // "\n");
-#ifndef GALOIS_USE_DIST
   reindexGraph.allocateFrom(nv, ne);
   reindexGraph.constructNodes();
   VertexList old_ids(keptVertices.begin(),
@@ -402,7 +400,6 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
 #ifdef PARALLEL_GEN
       ,
       galois::loopname("construct_graph"));
-#endif
 #endif
 }
 

@@ -9,19 +9,16 @@
  * Reused/revised under 3-BSD
  */
 #include <iostream>
-#include "deepgalois/gtypes.h"
-#ifndef GALOIS_USE_DIST
+#include "deepgalois/GraphTypes.h"
 #include "deepgalois/Context.h"
-#else
+
 #include "deepgalois/DistContext.h"
-#endif
 #include "deepgalois/optimizer.h"
 #include "deepgalois/layers/node.h"
-#ifdef GALOIS_USE_DIST
+
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/layers/GluonGradients.h"
 #include "deepgalois/layers/GradientSyncStructs.h"
-#endif
 
 namespace deepgalois {
 
@@ -40,11 +37,7 @@ namespace deepgalois {
  **/
 class layer : public deepgalois::node {
 public:
-#ifndef GALOIS_USE_DIST
-  using ContextType = deepgalois::Context;
-#else
   using ContextType = deepgalois::DistContext;
-#endif
 
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
@@ -179,17 +172,16 @@ protected:
   ContextType* context;
   label_t* labels;
   float_t* norm_consts;
+// TODO
 #ifdef CPU_ONLY
   Graph* graph_cpu;
 #else
   GraphGPU* graph_gpu;
 #endif
 
-#ifdef GALOIS_USE_DIST
   // Used for synchronization of weight gradients
   deepgalois::GluonGradients* gradientGraph;
   galois::graphs::GluonSubstrate<deepgalois::GluonGradients>* syncSub;
-#endif
 };
 
 //! Connects tail to head's edge and sets that edge's target to tail
