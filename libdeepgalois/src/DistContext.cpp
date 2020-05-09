@@ -151,6 +151,33 @@ void DistContext::initializeSyncSubstrate() {
       galois::runtime::getSystemNetworkInterface().Num, false);
 }
 
+void DistContext::constructNormFactor(deepgalois::Context* globalContext, bool isSubgraph,
+                         int subgraphID) {
+  // TODO IMPLEMENT THIS; get relevant info from the original context
+  globalContext->norm_factor_computing(isSubgraph, subgraphID);
+
+  // TODO can check if already allocated instead of freeing every time
+  if (this->normFactors) {
+    free(this->normFactors);
+  }
+
+#ifdef USE_MKL
+  this->normFactors = new float_t[graph_cpu->sizeEdges()];
+  galois::do_all(galois::iterate((size_t)0, graph_cpu->sizeEdges()),
+    [&] (unsigned i) {
+      normFactors[i] = 1;
+    }
+  );
+#else
+  this->normFactors = new float_t[graph_cpu->size()];
+  galois::do_all(galois::iterate((size_t)0, graph_cpu->size()),
+    [&] (unsigned i) {
+      normFactors[i] = 1;
+    }
+  );
+#endif
+}
+
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;
 };

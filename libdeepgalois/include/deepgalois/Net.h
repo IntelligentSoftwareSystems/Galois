@@ -202,21 +202,23 @@ public:
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, context->getGraphPointer());
     }
 
-    std::cout << "\nStart training...\n";
+    galois::gPrint(header, "Start training...\n");
 
     Timer t_epoch;
+
     // run epochs
     for (int ep = 0; ep < num_epochs; ep++) {
       t_epoch.Start();
 
+////////////////////////////////////////////////////////////////////////////////
       if (subgraph_sample_size) {
         if (num_subg_remain == 0) {
           std::cout << "Generating " << num_subgraphs << " subgraphs ";
           Timer t_subgen;
           t_subgen.Start();
+
           // generate subgraphs
 #ifndef __GALOIS_HET_CUDA__
-#ifndef GALOIS_USE_DIST
           for (int sid = 0; sid < num_subgraphs; sid++) {
             // galois::do_all(galois::iterate(size_t(0),
             // size_t(num_subgraphs)),[&](const auto sid) {
@@ -227,19 +229,17 @@ public:
                                      &subgraphs_masks[sid * globalSamples], tid);
           } //, galois::loopname("subgraph_gen"));
 #endif
-#endif
           num_subg_remain = num_subgraphs;
           t_subgen.Stop();
           // std::cout << "Done, time: " << t_subgen.Millisecs() << "\n";
         }
-#ifndef GALOIS_USE_DIST
         for (int i = 0; i < num_subgraphs; i++) {
           auto sg_ptr = context->getSubgraphPointer(i);
           sg_ptr->degree_counting();
           // galois::gPrint("\tsubgraph[", i, "]: num_v ", sg_ptr->size(), "
           // num_e ", sg_ptr->sizeEdges(), "\n");
         }
-#endif // GALOIS_USE_DIST
+
         num_subg_remain--;
         int sg_id         = num_subg_remain;
         auto subgraph_ptr = context->getSubgraphPointer(sg_id);
@@ -263,16 +263,19 @@ public:
                                     &subgraphs_masks[sg_id * globalSamples]);
         layers[0]->set_feats_ptr(
             context->get_feats_subg_ptr()); // feed input data
-      }
+      } // end subgraph sample loop
+////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-      std::cout << header << "Epoch " << std::setw(3) << ep << seperator;
+      galois::gPrint(header, "Epoch ", std::setw(3), ep, seperator);
       set_netphases(net_phase::train);
       acc_t train_loss = 0.0, train_acc = 0.0;
 
       // forward: after this phase, layer edges will contain intermediate
       // features for use during backprop
       double fw_time = evaluate("train", train_loss, train_acc);
+
+      galois::gPrint(header, "Back prop\n");
 
       // backward: use intermediate features + ground truth to update layers
       // with feature gradients whcih are then used to calculate weight
@@ -285,11 +288,15 @@ public:
 
       // validation / testing
       set_netphases(net_phase::test);
-      std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
-                << train_loss << " train_acc " << train_acc << seperator;
+
+      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
+                     train_loss, " train_acc ", train_acc, seperator);
+
       t_epoch.Stop();
+
       double epoch_time = t_epoch.Millisecs();
       total_train_time += epoch_time;
+
       if (need_validate && ep % val_interval == 0) {
         // Validation
         acc_t val_loss = 0.0, val_acc = 0.0;
@@ -304,20 +311,22 @@ public:
                   << " ms (fw " << fw_time << ", bw " << epoch_time - fw_time
                   << ")\n";
       }
-    }
+    } // epoch loop
+
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-    std::cout << "\nAverage training time: " << avg_train_time
-              << " ms. Throughput: " << throughput << " epoch/s\n";
+    galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
+                   " ms. Throughput: ", throughput, " epoch/s\n");
   }
 
   // evaluate, i.e. inference or predict
   double evaluate(std::string type, acc_t& loss, acc_t& acc) {
-    // TODO may need to do something for the dist case
     Timer t_eval;
     t_eval.Start();
     size_t begin = 0, end = 0, count = 0;
     mask_t* masks = NULL;
+
+    // TODO global here good for dist case?
     if (type == "train") {
       begin = globalTrainBegin;
       end   = globalTrainEnd;
@@ -341,9 +350,10 @@ public:
       count = globalTestCount;
       masks = test_masks;
     }
+
 #ifndef __GALOIS_HET_CUDA__
-    if (subgraph_sample_size &&
-        type != "train") { // switch to the original graph
+    // switch to the original graph if not training
+    if (subgraph_sample_size && type != "train") {
       for (size_t i = 0; i < num_layers; i++)
         layers[i]->update_dim_size(distNumSamples);
       for (size_t i = 0; i < num_conv_layers; i++) {
@@ -362,6 +372,7 @@ public:
       masks = d_test_masks;
     }
 #endif
+
     loss                 = fprop(begin, end, count, masks);
     float_t* predictions = layers[num_layers - 1]->next()->get_data();
     label_t* labels;
@@ -387,16 +398,11 @@ public:
       globalTestBegin = 177262;
       globalTestCount = 55703;
       globalTestEnd   = globalTestBegin + globalTestCount;
-#ifndef GALOIS_USE_DIST
-      for (size_t i = globalTestBegin; i < globalTestEnd; i++)
-        test_masks[i] = 1;
-#else
       for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
         if (dGraph->isLocal(i)) {
           test_masks[dGraph->getLID(i)] = 1;
         }
       }
-#endif
     } else {
       globalTestCount =
           distContext->read_masks(dataset, std::string("test"), globalSamples, globalTestBegin,
@@ -411,28 +417,40 @@ public:
   void construct_layers() {
     // append conv layers
     std::cout << "\nConstructing layers...\n";
-    for (size_t i = 0; i < num_conv_layers - 1; i++)
+    for (size_t i = 0; i < num_conv_layers - 1; i++) {
       append_conv_layer(i, true);           // conv layers, act=true
+    }
+
     append_conv_layer(num_conv_layers - 1); // the last hidden layer, act=false
-    if (has_l2norm)
+
+    if (has_l2norm) {
       append_l2norm_layer(num_conv_layers); // l2_norm layer
-    if (has_dense)
+    }
+
+    if (has_dense) {
       append_dense_layer(num_layers - 2); // dense layer
+    }
+
     append_out_layer(num_layers - 1);     // output layer
 
     // allocate memory for intermediate features and gradients
     for (size_t i = 0; i < num_layers; i++) {
       layers[i]->add_edge();
     }
-    for (size_t i = 1; i < num_layers; i++)
+    for (size_t i = 1; i < num_layers; i++) {
       connect(layers[i - 1], layers[i]);
-    for (size_t i = 0; i < num_layers; i++)
+    }
+
+    for (size_t i = 0; i < num_layers; i++) {
       layers[i]->malloc_and_init();
-    layers[0]->set_in_data(context->get_feats_ptr()); // feed input data
+    }
+
+    layers[0]->set_in_data(distContext->get_feats_ptr()); // feed input data
     // precompute the normalization constant based on graph structure
-    context->norm_factor_computing(0);
+    //context->norm_factor_computing(false);
+    distContext->constructNormFactor(context, false);
     for (size_t i = 0; i < num_conv_layers; i++)
-      layers[i]->set_norm_consts_ptr(context->get_norm_factors_ptr());
+      layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_ptr());
     set_contexts();
   }
 
@@ -499,14 +517,11 @@ public:
   //! forward propagation: [begin, end) is the range of samples used.
   //! calls "forward" on each layer and returns the loss of the final layer
   acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
-    // set mask for the last layer
+    // set mask for the last layer; globals
     layers[num_layers - 1]->set_sample_mask(begin, end, count, masks);
-    // layer0: from N x D to N x 16
-    // layer1: from N x 16 to N x E
-    // layer2: from N x E to N x E (normalize only)
+
     for (size_t i = 0; i < num_layers; i++) {
       layers[i]->forward();
-      // TODO need to sync model between layers here
     }
     // prediction error
     auto loss = layers[num_layers - 1]->get_prediction_loss();

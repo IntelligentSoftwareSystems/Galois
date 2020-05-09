@@ -5,6 +5,7 @@
  */
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/types.h"
+#include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
 
 namespace deepgalois {
@@ -23,7 +24,7 @@ class DistContext {
   float_t* h_feats_subg;  // input features for subgraph
 
   // TODO needs to come from whole graph
-  float_t* norm_factors;  // normalization constant based on graph structure
+  float_t* normFactors;  // normalization constant based on graph structure
   std::vector<float_t> norm_factors_subg; // normalization constant for subgraph
 
 public:
@@ -45,7 +46,10 @@ public:
   void gen_subgraph_labels(size_t, const mask_t*) {}
   void gen_subgraph_feats(size_t, const mask_t*) {}
 
-  float_t* get_norm_factors_ptr() { return norm_factors; }
+  void constructNormFactor(deepgalois::Context* globalContext, bool is_subgraph,
+                           int subg_id = 0);
+
+  float_t* get_norm_factors_ptr() { return normFactors; }
   // TODO shouldn't return 0 always
   float_t* get_norm_factors_subg_ptr() { return &norm_factors_subg[0]; }
   DGraph* getGraphPointer() { return graph_cpu; }

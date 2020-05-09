@@ -96,17 +96,16 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
-  // std::cout << "layer: " << name_ << "\n";
-  // std::cout << "x=" << x << ", y=" << y << ", z=" << z << "\n";
 
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W
-  if (dropout_ && phase_ == net_phase::train)
+  if (dropout_ && phase_ == net_phase::train) {
     math::dropout_cpu(x, y, scale_, dropout_rate_, in_data, dropout_mask,
                       in_temp);
-  else
+  } else {
     math::copy_cpu(x * y, in_data, in_temp);
+  }
 
   if (y > z) {
     math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp,
@@ -117,16 +116,16 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
     math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp1,
                     &layer::W[0], 0.0, out_data);
   }
-#ifdef GALOIS_USE_DIST
+
   // TODO sync of out_data required here
+  // TODO how to do this for the sampled case?
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
       "AggSync");
-#endif
+
   // run relu activation on output if specified
-  if (act_)
-    math::relu_cpu(x * z, out_data, out_data);
+  if (act_) math::relu_cpu(x * z, out_data, out_data);
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇

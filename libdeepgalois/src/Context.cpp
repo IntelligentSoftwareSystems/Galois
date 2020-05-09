@@ -139,13 +139,13 @@ void Context::add_selfloop(Graph& og, Graph& g) {
 
 void Context::alloc_norm_factor() {
   Graph* g = getGraphPointer();
-  if (norm_factors == NULL)
+  if (norm_factors == NULL) {
 #ifdef USE_MKL
-    // TODO why does MKL use size edges
     norm_factors = new float_t[g->sizeEdges()];
 #else
     norm_factors = new float_t[g->size()];
 #endif
+  }
 }
 
 void Context::alloc_subgraph_norm_factor(int subg_id) {
