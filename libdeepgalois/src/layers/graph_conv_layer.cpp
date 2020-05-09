@@ -119,10 +119,10 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
 
   // TODO sync of out_data required here
   // TODO how to do this for the sampled case?
-  deepgalois::_syncVectorSize = z;
-  deepgalois::_dataToSync     = out_data;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-      "AggSync");
+  //deepgalois::_syncVectorSize = z;
+  //deepgalois::_dataToSync     = out_data;
+  //layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
+  //    "AggSync");
 
   // run relu activation on output if specified
   if (act_) math::relu_cpu(x * z, out_data, out_data);
@@ -163,21 +163,17 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
                     0.0, &layer::weight_grad[0]);
   }
 
-#ifdef GALOIS_USE_DIST
   // sync agg
-  deepgalois::_syncVectorSize = z;
-  deepgalois::_dataToSync     = out_temp;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-      "AggSyncBack");
-#endif
+  //deepgalois::_syncVectorSize = z;
+  //deepgalois::_dataToSync     = out_temp;
+  //layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
+  //    "AggSyncBack");
 
   if (level_ != 0 && dropout_)
     math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
 
-#ifdef GALOIS_USE_DIST
-  layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
+  //layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
   // galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
-#endif
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
