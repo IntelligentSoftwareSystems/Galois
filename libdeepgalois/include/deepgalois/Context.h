@@ -119,6 +119,10 @@ public:
     reader.init(dataset);
   }
 
+  //! Checks if subgraph being used, sets currenet graph, then calls degreex
+  //! counting
+  Graph* getCurrentGraph(bool usingSubGraph, int subID=0);
+
   void set_label_class(bool is_single = true) { is_single_class = is_single; }
   void set_use_subgraph(bool use_subg) { use_subgraph = use_subg; }
   void copy_data_to_device(); // copy labels and input features

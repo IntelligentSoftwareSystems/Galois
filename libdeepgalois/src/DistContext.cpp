@@ -7,7 +7,7 @@ DistContext::DistContext() {}
 DistContext::~DistContext() {}
 
 size_t DistContext::read_labels(std::string dataset_str) {
-  DGraph* dGraph = DistContext::graph_cpu;
+  DGraph* dGraph = DistContext::partitionedGraph;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading labels from disk...\n");
 
@@ -58,7 +58,7 @@ size_t DistContext::read_labels(std::string dataset_str) {
 }
 
 size_t DistContext::read_features(std::string dataset_str) {
-  DGraph* dGraph = DistContext::graph_cpu;
+  DGraph* dGraph = DistContext::partitionedGraph;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading features from disk...\n");
 
@@ -147,36 +147,84 @@ float_t* DistContext::get_in_ptr() { return &h_feats[0]; }
 
 void DistContext::initializeSyncSubstrate() {
   DistContext::syncSubstrate = new galois::graphs::GluonSubstrate<DGraph>(
-      *DistContext::graph_cpu, galois::runtime::getSystemNetworkInterface().ID,
+      *DistContext::partitionedGraph, galois::runtime::getSystemNetworkInterface().ID,
       galois::runtime::getSystemNetworkInterface().Num, false);
 }
 
-void DistContext::constructNormFactor(deepgalois::Context* globalContext, bool isSubgraph,
-                         int subgraphID) {
-  // TODO IMPLEMENT THIS; get relevant info from the original context
-  globalContext->norm_factor_computing(isSubgraph, subgraphID);
-
-  // TODO can check if already allocated instead of freeing every time
-  if (this->normFactors) {
-    free(this->normFactors);
+void DistContext::allocNormFactor() {
+  if (!normFactors) {
+#ifdef USE_MKL
+    normFactors = new float_t[partitionedGraph->sizeEdges()];
+#else
+    normFactors = new float_t[partitionedGraph->size()];
+#endif
   }
+  if (!normFactors) {
+    GALOIS_DIE("norm factors failed to be allocated");
+  }
+}
+
+//void DistContext::allocSubNormFactor(int subID) {
+//  if (!normFactors) {
+//#ifdef USE_MKL
+//    normFactors = new float_t[partitionedGraph->sizeEdges()];
+//#else
+//    normFactors = new float_t[partitionedGraph->size()];
+//#endif
+//  }
+//  if (!normFactors) {
+//    GALOIS_DIE("norm factors failed to be allocated");
+//  }
+//}
+
+void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
+  // TODO IMPLEMENT THIS; get relevant info from the original context
+  // sets current subgraph + gets degrees
+  Graph* wholeGraph = globalContext->getCurrentGraph(false);
+
+  allocNormFactor();
+
+  // this is for testing purposes
+  //galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
+  //  [&] (unsigned i) {
+  //    this->normFactors[i] = 0;
+  //  }
+  //);
 
 #ifdef USE_MKL
-  this->normFactors = new float_t[graph_cpu->sizeEdges()];
-  galois::do_all(galois::iterate((size_t)0, graph_cpu->sizeEdges()),
+  galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
     [&] (unsigned i) {
-      normFactors[i] = 1;
-    }
+      float_t c_i = std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
+
+      for (auto e = partitionedGraph->edge_begin(i); e != partitionedGraph->edge_end(i); e++) {
+        const auto j = partitionedGraph->getEdgeDst(e);
+        float_t c_j  = std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(j))));
+
+        if (c_i == 0.0 || c_j == 0.0) {
+          this->normFactors[e] = 0.0;
+        } else {
+          this->normFactors[e] = 1.0 / (c_i * c_j);
+        }
+    },
+    galois::loopname("NormCountingEdge"));
   );
 #else
-  this->normFactors = new float_t[graph_cpu->size()];
-  galois::do_all(galois::iterate((size_t)0, graph_cpu->size()),
-    [&] (unsigned i) {
-      normFactors[i] = 1;
-    }
-  );
+  galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
+    [&] (unsigned v) {
+      auto degree = wholeGraph->get_degree(partitionedGraph->getGID(v));
+      float_t temp = std::sqrt(float_t(degree));
+      if (temp == 0.0) {
+        this->normFactors[v] = 0.0;
+      } else {
+        this->normFactors[v] = 1.0 / temp;
+      }
+    },
+    galois::loopname("NormCountingNode"));
 #endif
 }
+
+//void DistContext::constructNormFactorSub(deepgalois::Context* globalContext, bool isSubgraph,
+//                         int subgraphID) {
 
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;

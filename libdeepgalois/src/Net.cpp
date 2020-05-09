@@ -9,7 +9,6 @@
 
 namespace deepgalois {
 
-#ifdef GALOIS_USE_DIST
 void Net::partitionInit(DGraph* graph, std::string dataset_str) {
   this->dGraph      = graph;
   this->distContext = new deepgalois::DistContext();
@@ -74,7 +73,6 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str) {
   feature_dims[num_layers] = num_classes; // normalized output embedding: E
   layers.resize(num_layers);
 }
-#endif
 
 #ifndef __GALOIS_HET_CUDA__
 void Net::init() {
@@ -95,21 +93,18 @@ void Net::regularize() {
  *
  * @param begin GLOBAL begin
  * @param end GLOBAL end
+ * @param masks: GLOBAL masks
  * @param count GLOBAL training count
  */
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                            mask_t* masks, float_t* preds,
                            label_t* ground_truth) {
-#ifndef GALOIS_USE_DIST
-  galois::GAccumulator<acc_t> accuracy_all;
-#else
   galois::DGAccumulator<acc_t> accuracy_all;
   galois::DGAccumulator<uint32_t> sampleCount;
-  sampleCount.reset();
-#endif
-
   accuracy_all.reset();
+  sampleCount.reset();
 
+  // TODO figure this out for distributed case
   galois::do_all(
       galois::iterate(begin, end),
       [&](const auto& i) {
@@ -123,29 +118,34 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
             accuracy_all += 1.0;
         }
 #else
+        // TODO dist subraph
+
         // only look at owned nodes (i.e. masters); the prediction for these
         // should only by handled on the owner
         if (this->dGraph->isOwned(i)) {
           sampleCount += 1;
 
           uint32_t localID = this->dGraph->getLID(i);
-          if (masks[localID] == 1) {
-            // get prediction
-            auto pred =
-                math::argmax(num_classes, &preds[localID * num_classes]);
-            // check prediction
-            if ((label_t)pred == ground_truth[localID])
-              accuracy_all += 1.0;
+          if (masks == NULL) {
+            GALOIS_DIE("subgraphs not implemented for dist yet");
+            // subgraph here: TODO
+          } else {
+            if (masks[localID] == 1) {
+              // get prediction
+              auto pred =
+                  math::argmax(num_classes, &preds[localID * num_classes]);
+              // check prediction
+              if ((label_t)pred == ground_truth[localID])
+                accuracy_all += 1.0;
+            }
           }
         }
 #endif
       },
       galois::loopname("getMaskedLoss"));
 
-#ifdef GALOIS_USE_DIST
   count = sampleCount.reduce();
   galois::gDebug("sample count is ", count);
-#endif
 
   // all hosts should get same accuracy
   return accuracy_all.reduce() / (acc_t)count;
@@ -154,6 +154,7 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
                                        mask_t* masks, float_t* preds,
                                        label_t* ground_truth) {
+  // TODO dist version
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes,
                                      ground_truth, preds);
 }

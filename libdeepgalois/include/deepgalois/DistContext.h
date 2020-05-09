@@ -15,7 +15,7 @@ class DistContext {
   size_t feat_len;      // input feature length: D
   galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
 
-  DGraph* graph_cpu; // the input graph, |V| = N
+  DGraph* partitionedGraph; // the input graph, |V| = N
   std::vector<Graph*> subgraphs_cpu;
   label_t* h_labels;      // labels for classification. Single-class label: Nx1,
                           // multi-class label: NxE
@@ -31,7 +31,7 @@ public:
   DistContext();
   ~DistContext();
 
-  void saveDistGraph(DGraph* a) { graph_cpu = a; }
+  void saveDistGraph(DGraph* a) { partitionedGraph = a; }
 
   //! read labels of local nodes only
   size_t read_labels(std::string dataset_str);
@@ -46,13 +46,11 @@ public:
   void gen_subgraph_labels(size_t, const mask_t*) {}
   void gen_subgraph_feats(size_t, const mask_t*) {}
 
-  void constructNormFactor(deepgalois::Context* globalContext, bool is_subgraph,
-                           int subg_id = 0);
 
   float_t* get_norm_factors_ptr() { return normFactors; }
   // TODO shouldn't return 0 always
   float_t* get_norm_factors_subg_ptr() { return &norm_factors_subg[0]; }
-  DGraph* getGraphPointer() { return graph_cpu; }
+  DGraph* getGraphPointer() { return partitionedGraph; }
   Graph* getSubgraphPointer(int id) { return subgraphs_cpu[id]; };
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return h_feats_subg; }
@@ -61,6 +59,11 @@ public:
 
   void initializeSyncSubstrate();
   galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
+
+  //! allocate the norm factor vector
+  void allocNormFactor();
+  //! construct norm factor vector by using data from global graph
+  void constructNormFactor(deepgalois::Context* globalContext);
 
   //! return label for some node
   //! NOTE: this is LID, not GID

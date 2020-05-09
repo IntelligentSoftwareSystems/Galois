@@ -158,6 +158,21 @@ void Context::alloc_subgraph_norm_factor(int subg_id) {
   norm_factors_subg.clear();
 }
 
+// get current graph, also gets degrees of g
+Graph* Context::getCurrentGraph(bool usingSubGraph, int subID) {
+  Graph* g;
+
+  // grab orig or subgraph pointer as necessary
+  if (!usingSubGraph) {
+    g = getGraphPointer();
+  } else {
+    g = getSubgraphPointer(subID);
+  }
+  g->degree_counting();
+
+  return g;
+}
+
 void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
   Graph* g;
   float_t* constants;

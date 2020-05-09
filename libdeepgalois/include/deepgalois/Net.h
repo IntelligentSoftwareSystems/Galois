@@ -248,6 +248,7 @@ public:
         // num_edges: ", subgraph_ptr->sizeEdges(), "\n");
         for (size_t i = 0; i < num_layers; i++)
           layers[i]->update_dim_size(num_vertices_sg);
+        // TODO dist 
         context->norm_factor_computing(1, sg_id);
         for (size_t i = 0; i < num_conv_layers; i++) {
           layers[i]->set_graph_ptr(subgraph_ptr);
@@ -274,8 +275,6 @@ public:
       // forward: after this phase, layer edges will contain intermediate
       // features for use during backprop
       double fw_time = evaluate("train", train_loss, train_acc);
-
-      galois::gPrint(header, "Back prop\n");
 
       // backward: use intermediate features + ground truth to update layers
       // with feature gradients whcih are then used to calculate weight
@@ -375,18 +374,23 @@ public:
 
     loss                 = fprop(begin, end, count, masks);
     float_t* predictions = layers[num_layers - 1]->next()->get_data();
+
+    // labels will be subgraph labels if applicable
     label_t* labels;
     if (type == "train" && subgraph_sample_size) {
       labels = context->get_labels_subg_ptr();
     } else {
+      // note this grabs global labels; everything passed in should be global
       labels = context->get_labels_ptr();
     }
+
     if (is_single_class) {
       acc = masked_accuracy(begin, end, count, masks, predictions, labels);
     } else {
       acc = masked_multi_class_accuracy(begin, end, count, masks, predictions,
                                         labels);
     }
+
     t_eval.Stop();
     return t_eval.Millisecs();
   }
@@ -448,7 +452,7 @@ public:
     layers[0]->set_in_data(distContext->get_feats_ptr()); // feed input data
     // precompute the normalization constant based on graph structure
     //context->norm_factor_computing(false);
-    distContext->constructNormFactor(context, false);
+    distContext->constructNormFactor(context);
     for (size_t i = 0; i < num_conv_layers; i++)
       layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_ptr());
     set_contexts();
@@ -518,6 +522,8 @@ public:
   //! calls "forward" on each layer and returns the loss of the final layer
   acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
     // set mask for the last layer; globals
+    // TODO this should be distirbuted sample begin->end not global; fix later
+    // seems to be unused in code right now anyways
     layers[num_layers - 1]->set_sample_mask(begin, end, count, masks);
 
     for (size_t i = 0; i < num_layers; i++) {
