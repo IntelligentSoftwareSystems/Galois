@@ -1,7 +1,15 @@
 add_executable(motif motif.cpp)
+add_executable(motif_dfs motif_dfs.cpp)
+add_executable(motif_formula motif_formula.cpp)
 add_dependencies(apps motif)
+add_dependencies(apps motif_dfs)
+add_dependencies(apps motif_formula)
 target_link_libraries(motif PRIVATE Galois::pangolin LLVMSupport)
+target_link_libraries(motif_dfs PRIVATE Galois::pangolin LLVMSupport)
+target_link_libraries(motif_formula PRIVATE Galois::pangolin LLVMSupport)
 install(TARGETS motif DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+install(TARGETS motif_dfs DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+install(TARGETS motif_formula DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 #add_test_mine(small1 motif "${BASEINPUT}/Mining/citeseer.csgr")
 
