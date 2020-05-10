@@ -27,10 +27,6 @@
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
 
-#ifndef GALOIS_USE_BARE_MPI
-#define GALOIS_USE_BARE_MPI
-#endif
-
 /**
  * MPI implementation of network IO. ASSUMES THAT MPI IS INITIALIZED
  * UPON CREATION OF THIS OBJECT.
