@@ -127,13 +127,16 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 
           uint32_t localID = this->dGraph->getLID(i);
           if (masks == NULL) {
-            GALOIS_DIE("subgraphs not implemented for dist yet");
+            //GALOIS_DIE("subgraphs not implemented for dist yet");
             // subgraph here: TODO
+            auto pred = math::argmax(num_classes, &preds[localID * num_classes]);
+            // check prediction
+            if ((label_t)pred == ground_truth[localID])
+              accuracy_all += 1.0;
           } else {
             if (masks[localID] == 1) {
               // get prediction
-              auto pred =
-                  math::argmax(num_classes, &preds[localID * num_classes]);
+              auto pred = math::argmax(num_classes, &preds[localID * num_classes]);
               // check prediction
               if ((label_t)pred == ground_truth[localID])
                 accuracy_all += 1.0;

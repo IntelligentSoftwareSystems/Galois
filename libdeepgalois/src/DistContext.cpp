@@ -164,6 +164,16 @@ void DistContext::allocNormFactor() {
   }
 }
 
+void DistContext::allocNormFactorSub(int subID) {
+#ifdef USE_MKL
+  normFactorsSub.resize(partitionedSubgraphs[subID]->sizeEdges());
+#else
+  normFactorsSub.resize(partitionedSubgraphs[subID]->size());
+#endif
+  // TODO clean out?
+}
+
+
 //void DistContext::allocSubNormFactor(int subID) {
 //  if (!normFactors) {
 //#ifdef USE_MKL
@@ -223,11 +233,112 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
 #endif
 }
 
-//void DistContext::constructNormFactorSub(deepgalois::Context* globalContext, bool isSubgraph,
-//                         int subgraphID) {
+void DistContext::constructNormFactorSub(int subgraphID) {
+  // right now norm factor based on subgraph
+  // TODO fix this
+
+  allocNormFactorSub(subgraphID);
+
+  Graph& graphToUse = *partitionedSubgraphs[subgraphID];
+  graphToUse.degree_counting();
+
+  // TODO using partitioned subgraph rather than whoel graph; i.e. dist setting wrong
+#ifdef USE_MKL
+  galois::do_all(galois::iterate((size_t)0, graphToUse->size()),
+    [&] (unsigned i) {
+      //float_t c_i = std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
+      float_t c_i = std::sqrt(float_t(graphToUse.get_degree(i)));
+
+      for (auto e = graphToUse->edge_begin(i); e != graphToUse->edge_end(i); e++) {
+        const auto j = graphToUse->getEdgeDst(e);
+        float_t c_j  = std::sqrt(float_t(graphToUse.get_degree(j)));
+
+        if (c_i == 0.0 || c_j == 0.0) {
+          this->normFactors[e] = 0.0;
+        } else {
+          this->normFactors[e] = 1.0 / (c_i * c_j);
+        }
+    },
+    galois::loopname("NormCountingEdge"));
+  );
+#else
+  galois::do_all(galois::iterate((size_t)0, graphToUse.size()),
+    [&] (unsigned v) {
+      //auto degree = wholeGraph->get_degree(partitionedGraph->getGID(v));
+      auto degree = graphToUse.get_degree(v);
+      float_t temp = std::sqrt(float_t(degree));
+      if (temp == 0.0) {
+        this->normFactors[v] = 0.0;
+      } else {
+        this->normFactors[v] = 1.0 / temp;
+      }
+    },
+    galois::loopname("NormCountingNode"));
+#endif
+}
+//! generate labels for the subgraph, m is subgraph size, mask
+//! tells which vertices to use
+void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
+  // TODO multiclass
+
+  // if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
+  //if (DistContext::is_single_class) {
+  //} else {
+  //  DistContext::h_labels_subg.resize(m * Context::num_classes);
+  //}
+
+  DistContext::h_labels_subg.resize(m);
+
+  size_t count = 0;
+  // see which labels to copy over for this subgraph
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
+      //if (Context::is_single_class) {
+      //} else {
+      //  std::copy(Context::h_labels + i * Context::num_classes,
+      //            Context::h_labels + (i + 1) * Context::num_classes,
+      //            &Context::h_labels_subg[count * Context::num_classes]);
+      //}
+      DistContext::h_labels_subg[count] = h_labels[i];
+      count++;
+    }
+  }
+  GALOIS_ASSERT(count == m);
+}
+
+//! generate input features for the subgraph, m is subgraph size,
+//! masks tells which vertices to use
+void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
+  size_t count = 0;
+  // if (h_feats_subg == NULL) h_feats_subg = new float_t[m*feat_len];
+  DistContext::h_feats_subg.resize(m * feat_len);
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
+      std::copy(DistContext::h_feats + i * DistContext::feat_len,
+                DistContext::h_feats + (i + 1) * DistContext::feat_len,
+                &DistContext::h_feats_subg[count * DistContext::feat_len]);
+      count++;
+    }
+  }
+  GALOIS_ASSERT(count == m);
+}
+
+
+
+
+
+
+
 
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;
 };
+
+void DistContext::allocateSubgraphs(int num_subgraphs) {
+  partitionedSubgraphs.resize(num_subgraphs);
+  for (int i = 0; i < num_subgraphs; i++) {
+    partitionedSubgraphs[i] = new Graph();
+  }
+}
 
 } // namespace deepgalois

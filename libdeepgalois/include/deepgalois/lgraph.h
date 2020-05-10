@@ -68,6 +68,7 @@ public:
     degrees_.resize(num_vertices_);
     rowptr_[0] = 0;
   }
+
   void constructEdge(index_t eid, index_t dst, edata_t edata = 0) {
     assert(dst < num_vertices_);
     assert(eid < num_edges_);
@@ -75,6 +76,7 @@ public:
     if (edge_data_)
       edge_data_[eid] = edata;
   }
+
   void add_selfloop() {
     auto old_colidx_ = colidx_;
     colidx_.resize(num_vertices_ + num_edges_);

@@ -93,6 +93,7 @@ size_t Context::read_graph(bool selfloop) {
       //} else galois::graphs::readGraph(*graph_cpu, filename);
     } else {
       graph_cpu->readGraph(dataset);
+      galois::gPrint("graph read size ", graph_cpu->size());
     }
     // TODO dist version of self loop
   } else {
@@ -155,7 +156,6 @@ void Context::alloc_subgraph_norm_factor(int subg_id) {
 #else
   norm_factors_subg.resize(g->size());
 #endif
-  norm_factors_subg.clear();
 }
 
 // get current graph, also gets degrees of g
