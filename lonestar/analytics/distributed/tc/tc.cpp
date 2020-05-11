@@ -75,7 +75,7 @@ struct TC {
     DGAccumulatorTy numTriangles;
     syncSubstrate->set_num_round(_num_iterations);
     numTriangles.reset();
-    //const auto& allNodes = _graph.allNodesWithEdgesRange();
+    // const auto& allNodes = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.masterNodesRange();
 
     if (personality == GPU_CUDA) { ///< GPU TC.
@@ -91,11 +91,9 @@ struct TC {
       abort();
 #endif
     } else { ///< CPU TC.
-      galois::do_all(galois::iterate(allNodes),
-                     TC(&_graph, numTriangles),
-                     galois::steal(),
-                     galois::loopname(syncSubstrate->
-                       get_run_identifier("TC").c_str()));
+      galois::do_all(
+          galois::iterate(allNodes), TC(&_graph, numTriangles), galois::steal(),
+          galois::loopname(syncSubstrate->get_run_identifier("TC").c_str()));
     }
 
     uint64_t total_triangles = numTriangles.reduce();
@@ -118,15 +116,20 @@ struct TC {
       uint32_t p1Dest, p2Dest;
 
       while (p1p < p1End && p2p < p2End) {
-        p1Dest = graph->getEdgeDst(p1p);
-        p2Dest = graph->getEdgeDst(p2p);
+        p1Dest           = graph->getEdgeDst(p1p);
+        p2Dest           = graph->getEdgeDst(p2p);
         int32_t nodeDiff = p1Dest - p2Dest;
-        if (nodeDiff < 0) { p1p++; }
-        else if (nodeDiff > 0) { p2p++; }
-        else {
-          p1p++; p2p++; numTriangles_local++; }
+        if (nodeDiff < 0) {
+          p1p++;
+        } else if (nodeDiff > 0) {
+          p2p++;
+        } else {
+          p1p++;
+          p2p++;
+          numTriangles_local++;
+        }
       } ///< Finding the intersection between the point 1 and the point 2.
-    } ///< Finding triangles is done.
+    }   ///< Finding triangles is done.
     numTriangles += numTriangles_local;
   } ///< CPU operator is done.
 };
