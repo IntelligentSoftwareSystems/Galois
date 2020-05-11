@@ -616,6 +616,34 @@ private:
         get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
   }
 
+
+  template <typename SyncFnTy>
+  size_t getMaxSendBufferSize(uint32_t numShared) {
+    if (substrateDataMode == gidsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
+                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else if (substrateDataMode == offsetsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
+                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else if (substrateDataMode == bitsetData) {
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t)   // bitset size
+                + sizeof(size_t) // bitset vector size
+                + bitset_alloc_size + sizeof(size_t) +
+                (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else { // onlyData or noData (auto)
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t)   // bitset size
+                + sizeof(size_t) // bitset vector size
+                + bitset_alloc_size + sizeof(size_t) +
+                (numShared * sizeof(typename SyncFnTy::ValTy));
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Local to global ID conversion
   ////////////////////////////////////////////////////////////////////////////////
@@ -1804,29 +1832,7 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      if (substrateDataMode == gidsData) {
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t) + (num * sizeof(unsigned int)) +
-                  sizeof(size_t) + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (substrateDataMode == offsetsData) {
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t) + (num * sizeof(unsigned int)) +
-                  sizeof(size_t) + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (substrateDataMode == bitsetData) {
-        size_t bitset_alloc_size = ((num + 63) / 64) * sizeof(uint64_t);
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t)   // bitset size
-                  + sizeof(size_t) // bitset vector size
-                  + bitset_alloc_size + sizeof(size_t) +
-                  (num * sizeof(typename SyncFnTy::ValTy)));
-      } else { // onlyData or noData (auto)
-        size_t bitset_alloc_size = ((num + 63) / 64) * sizeof(uint64_t);
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t)   // bitset size
-                  + sizeof(size_t) // bitset vector size
-                  + bitset_alloc_size + sizeof(size_t) +
-                  (num * sizeof(typename SyncFnTy::ValTy)));
-      }
+      b.reserve(getMaxSendBufferSize<SyncFnTy>(num));
       Textractalloc.stop();
 
       Textractbatch.start();
@@ -2575,11 +2581,7 @@ private:
         if (nothingToRecv(x, syncType, writeLocation, readLocation))
           continue;
 
-        size_t size =
-            (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
-        size += sizeof(size_t);       // vector size
-        size += sizeof(DataCommMode); // data mode
-
+        size_t size = getMaxSendBufferSize<SyncFnTy>(sharedNodes[x].size());
         rb[x].resize(size);
       }
       TRecvTime.stop();
@@ -2631,14 +2633,9 @@ private:
 
       uint64_t recv_buffers_size = 0;
       for (unsigned x = 0; x < numHosts; ++x) {
-        size_t size =
-            (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
-        size += sizeof(size_t);       // vector size
-        size += sizeof(DataCommMode); // data mode
-        size += sizeof(size_t);       // buffer size
-        recv_buffers_size += size;
-
+        size_t size = getMaxSendBufferSize<SyncFnTy>(sharedNodes[x].size());
         rb[x].resize(size);
+        recv_buffers_size += size;
 
         MPI_Info info;
         MPI_Info_create(&info);
