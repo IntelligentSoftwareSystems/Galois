@@ -95,6 +95,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
     # Avoid warnings from openmpi
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+    # Avoid warnings from boost::counting_iterator (1.71.0)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
   endif()
 endif()
 
