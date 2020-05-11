@@ -30,7 +30,7 @@
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 #define NO_AGG
 #endif
 

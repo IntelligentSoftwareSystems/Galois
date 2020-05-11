@@ -122,6 +122,16 @@ struct EdgeSortReference {
   EdgeSortReference(EdgeIndex x, EdgeDst* dsts, EdgeData* data)
       : at(x), edgeDst(dsts), edgeData(data) {}
 
+  // Explicitly declare what the implicit copy constructor
+  // would do since using the implicit copy constructor
+  // from a class with a non-defaulted copy assignment
+  // operator is deprecated.
+  EdgeSortReference(EdgeSortReference const& x) {
+    at       = x.at;
+    edgeDst  = x.edgeDst;
+    edgeData = x.edgeData;
+  }
+
   EdgeSortReference operator=(const EdgeSortValue<GraphNode, EdgeTy>& x) {
     edgeDst->set(at, x.rawDst);
     edgeData->set(at, x.get());

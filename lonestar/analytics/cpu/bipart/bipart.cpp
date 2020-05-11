@@ -391,7 +391,6 @@ int main(int argc, char** argv) {
           gr.getData(n).netval  = INT_MAX;
           gr.getData(n).nodeid  = n + 1;
         });
-        // GGraph* gr = metisGraph[i].getGraph();
         Partition(&metisG, 25, kValue[i]);
         MetisGraph* mcg = &metisG;
 
@@ -405,7 +404,6 @@ int main(int argc, char** argv) {
           delete mcg->getCoarserGraph();
         }
 
-        // GGraph& gg = *metisGraph[i].getGraph();
         int tmp                   = kValue[i];
         kValue[i]                 = (tmp + 1) / 2;
         kValue[i + (tmp + 1) / 2] = (tmp) / 2;
@@ -420,6 +418,7 @@ int main(int argc, char** argv) {
             graph.getData(v).setPart(i + (tmp + 1) / 2);
           }
         }
+        delete mcg;
       }
     }
 

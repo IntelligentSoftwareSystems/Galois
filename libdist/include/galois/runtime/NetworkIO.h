@@ -122,7 +122,7 @@ public:
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
 makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker,
                  std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 /**
  * Creates/returns a network IO layer that uses LWCI to do communication.
  *

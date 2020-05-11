@@ -53,7 +53,7 @@ class DGTerminator {
   uint64_t snapshot;
   uint64_t global_snapshot;
   bool work_done;
-#ifndef GALOIS_USE_LWCI
+#ifndef GALOIS_USE_LCI
   MPI_Request snapshot_request;
 #else
   lc_colreq snapshot_request;
@@ -138,7 +138,7 @@ public:
   }
 
   void initiate_snapshot() {
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     lc_ialreduce(&snapshot, &global_snapshot, sizeof(Ty),
                  &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep,
                  &snapshot_request);
@@ -157,7 +157,7 @@ public:
     }
     int snapshot_ended = 0;
     if (!active) {
-#ifndef GALOIS_USE_LWCI
+#ifndef GALOIS_USE_LCI
       MPI_Test(&snapshot_request, &snapshot_ended, MPI_STATUS_IGNORE);
 #else
       lc_col_progress(&snapshot_request);
@@ -213,8 +213,8 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGAccum_" + runID);
 
-    galois::CondStatTimer<MORE_COMM_STATS> reduceTimer(timer_str.c_str(),
-                                                       "DGReducible");
+    galois::CondStatTimer<GALOIS_COMM_STATS> reduceTimer(timer_str.c_str(),
+                                                         "DGReducible");
     reduceTimer.start();
 
     if (local_mdata == 0)

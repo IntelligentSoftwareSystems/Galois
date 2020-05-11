@@ -24,7 +24,7 @@
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "pagerank_push_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #else
@@ -95,7 +95,7 @@ struct ResetGraph {
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("ResetGraph_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -140,7 +140,7 @@ struct InitializeGraph {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("InitializeGraph_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -188,7 +188,7 @@ struct PageRank_delta {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("PageRank_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -247,7 +247,7 @@ struct PageRank {
       syncSubstrate->reset_mirrorField<Reduce_add_residual>();
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str("PageRank_" +
                              (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -357,7 +357,7 @@ struct PageRankSanity {
     DGA_residual_over_tolerance.reset();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       float _max_value;
       float _min_value;
       float _sum_value;
@@ -456,7 +456,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
 
   Graph* hg;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
@@ -499,7 +499,7 @@ int main(int argc, char** argv) {
 
     if ((run + 1) != numRuns) {
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         bitset_residual_reset_cuda(cuda_ctx);
         bitset_nout_reset_cuda(cuda_ctx);
 #else
@@ -527,7 +527,7 @@ int main(int argc, char** argv) {
                                      (*hg).getData(*ii).value);
       }
     } else if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       for (auto ii = (*hg).masterNodesRange().begin();
            ii != (*hg).masterNodesRange().end(); ++ii) {
         galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),

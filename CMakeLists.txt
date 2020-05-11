@@ -22,14 +22,10 @@ endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
-set(ENABLE_DIST_GALOIS OFF CACHE BOOL "Enable distributed features")
-set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
-set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
-set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
+set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
+set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
-set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
-set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
-set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -46,6 +42,11 @@ set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (
 # Putting this here is mostly just a placeholder so people know it's an option.
 # Currently this is really only intended to change anything for the libgalois_shmem target.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+###### Developer features ######
+set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
+set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
+set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
@@ -64,10 +65,6 @@ if(NOT NUM_TEST_THREADS)
 endif()
 if(NUM_TEST_THREADS LESS_EQUAL 0)
   set(NUM_TEST_THREADS 1)
-endif()
-
-if(ENABLE_HETERO_GALOIS)
-  set(USE_ARCH none)
 endif()
 
 ###### Configure (users don't need to go beyond here) ######
@@ -96,8 +93,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from boost::counting_iterator
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
     # Avoid warnings from openmpi
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
   endif()
@@ -109,11 +104,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   endif()
 
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
-
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
-    # Avoid warnings from boost::counting_iterator
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
-  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
@@ -129,11 +119,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
 
   # Avoid warnings when using noinline for methods defined inside class defintion.
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd2196>")
-endif()
-
-if(CYGWIN)
-  message(STATUS "On Cygwin")
-  add_definitions(-U__STRICT_ANSI__)
 endif()
 
 # Enable architecture-specific optimizations
@@ -157,10 +142,6 @@ if(CXX_CLANG_TIDY)
 endif()
 
 ###### Configure features ######
-
-if(ENABLE_HETERO_GALOIS)
-  set(ENABLE_DIST_GALOIS ON)
-endif()
 
 if(USE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
@@ -226,13 +207,13 @@ add_custom_target(apps)
 # Core libraries (lib)
 add_subdirectory(libtsuba)
 add_subdirectory(libgalois)
-if (ENABLE_DIST_GALOIS)
+if (GALOIS_ENABLE_DIST)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
 endif()
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   enable_language(CUDA)
   string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
   string(REPLACE "," ";" GENCODES ${GENCODES})

@@ -972,9 +972,10 @@ private:
     bufGraph.resetAndFree();
 
     // receives data
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      receiveEdges(graph, receivedNodes);
-    });
+    galois::on_each(
+        [&](unsigned GALOIS_UNUSED(tid), unsigned GALOIS_UNUSED(nthreads)) {
+          receiveEdges(graph, receivedNodes);
+        });
     base_DistGraph::increment_evilPhase();
     loadEdgeTimer.stop();
 
@@ -1139,7 +1140,7 @@ private:
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
         assert((cur_end - cur) == gdst_vec.size());
-        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
+        deserializeEdges(graph, gdst_vec, cur, cur_end);
         ++receivedNodes;
       }
     }
@@ -1162,9 +1163,8 @@ private:
   }
 
   template <typename GraphTy>
-  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
-                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
-                        uint64_t& cur_end) {
+  void deserializeEdges(GraphTy& graph, std::vector<uint64_t>& gdst_vec,
+                        uint64_t& cur, uint64_t& cur_end) {
     uint64_t i = 0;
     while (cur < cur_end) {
       uint64_t gdst = gdst_vec[i++];
