@@ -31,6 +31,7 @@ typedef std::vector<size_t> dims_t; // dimentions type
 typedef uint32_t index_t; // index type
 typedef float_t edata_t;  // edge data type
 typedef float_t vdata_t;  // vertex data type
+typedef float_t* emb_t;   // embedding (feature vector) type
 
 enum class net_phase { train, test };
 

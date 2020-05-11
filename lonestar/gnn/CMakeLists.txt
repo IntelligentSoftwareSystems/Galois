@@ -24,5 +24,5 @@ if(ENABLE_DIST_GALOIS)
 endif()
 
 add_subdirectory(gcn)
-add_subdirectory(sage)
+#add_subdirectory(sage)
 add_subdirectory(gat)
