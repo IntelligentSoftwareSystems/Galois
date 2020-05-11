@@ -529,6 +529,9 @@ public:
       // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
+    // if (inflightRecvs > 0) {
+      // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // }
     return (inflightRecvs > 0);
   }
 
