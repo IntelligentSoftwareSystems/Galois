@@ -103,6 +103,7 @@ void getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g,
   void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
                  std::vector<db_t>& DB2, size_t size);
 
+  //! convert set of gids to lids
   VertexSet convertToLID(VertexSet& gidSet);
 
 public:

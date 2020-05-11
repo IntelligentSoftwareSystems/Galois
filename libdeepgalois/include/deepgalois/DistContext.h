@@ -66,11 +66,6 @@ public:
   size_t read_masks(std::string dataset_str, std::string mask_type, size_t n,
                     size_t& begin, size_t& end, mask_t* masks, DGraph* dGraph);
 
-  // TODO define these
-  void createSubgraphs(int) {}
-  void gen_subgraph_labels(size_t, const mask_t*) {}
-  void gen_subgraph_feats(size_t, const mask_t*) {}
-
   DGraph* getGraphPointer() { return partitionedGraph; }
   Graph* getLGraphPointer() { return lGraph; }
 

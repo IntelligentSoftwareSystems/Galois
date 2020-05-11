@@ -6,9 +6,23 @@
 #define PARALLEL_GEN
 
 namespace deepgalois {
+
+//! debug function: prints out sets of vertices
+void print_vertex_set(VertexSet vertex_set) {
+  unsigned counter = 0;
+  unsigned n       = vertex_set.size();
+  galois::gPrint("( ");
+  for (int i : vertex_set) {
+    counter++;
+    if (counter > 16 && counter < n - 16)
+      continue;
+    galois::gPrint(i, " ");
+  }
+  galois::gPrint(")\n");
+}
+
+//! helper function to get degree of some vertex given some graph
 inline unsigned getDegree(Graph* g, index_t v) {
-  // return g->get_degree(v);
-  // return std::distance(g->edge_begin(v), g->edge_end(v));
   return g->edge_end(v) - g->edge_begin(v);
 }
 
@@ -58,7 +72,8 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGrap
   Sampler::avg_deg  = globalMaskedGraph->sizeEdges() / globalMaskedGraph->size();
   Sampler::subg_deg = (avg_deg > SAMPLE_CLIP) ? SAMPLE_CLIP : avg_deg;
 
-  // TODO masked part graph as well to save time later
+  // TODO masked part graph as well to save time later; right now constructing
+  // from full part graph
 
   // size_t idx = 0;
   // vertices_.resize(count);
@@ -81,19 +96,7 @@ void Sampler::checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
   DB2.resize(size);
 }
 
-//! debug function: prints out sets of vertices
-void print_vertex_set(VertexSet vertex_set) {
-  unsigned counter = 0;
-  unsigned n       = vertex_set.size();
-  galois::gPrint("( ");
-  for (int i : vertex_set) {
-    counter++;
-    if (counter > 16 && counter < n - 16)
-      continue;
-    galois::gPrint(i, " ");
-  }
-  galois::gPrint(")\n");
-}
+
 
 // implementation from GraphSAINT
 // https://github.com/GraphSAINT/GraphSAINT/blob/master/ipdps19_cpp/sample.cpp
@@ -292,8 +295,7 @@ void Sampler::selectVertices(size_t nv, size_t n, int m, Graph* g,
 void Sampler::createMasks(size_t n, VertexSet vertices, mask_t* masks) {
   // galois::gPrint("Updating masks, size = ", vertices.size(), "\n");
   std::fill(masks, masks + n, 0);
-  for (auto v : vertices)
-    masks[v] = 1;
+  for (auto v : vertices) masks[v] = 1;
 }
 
 inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
@@ -351,13 +353,12 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
 
 VertexSet Sampler::convertToLID(VertexSet& gidSet) {
   VertexSet existingLIDs;
-
+  // find local selected vertices, convert to lid
   for (auto i : gidSet) {
     if (partGraph->isLocal(i)) {
       existingLIDs.insert(partGraph->getLID(i));
     }
   }
-
   return existingLIDs;
 }
 

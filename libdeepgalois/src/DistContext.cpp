@@ -5,6 +5,7 @@
 namespace deepgalois {
 DistContext::~DistContext() {}
 
+// TODO move to reader class
 size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str) {
   DGraph* dGraph = DistContext::partitionedGraph;
   this->usingSingleClass = isSingleClassLabel;
@@ -71,6 +72,7 @@ size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str
   return num_classes;
 }
 
+// TODO move to reader class
 size_t DistContext::read_features(std::string dataset_str) {
   DGraph* dGraph = DistContext::partitionedGraph;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
@@ -120,6 +122,7 @@ size_t DistContext::read_features(std::string dataset_str) {
   return feat_len;
 }
 
+// TODO move to reader class
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
                                size_t n, size_t& begin, size_t& end,
                                mask_t* masks, DGraph* dGraph) {
@@ -193,12 +196,10 @@ void DistContext::allocNormFactorSub(int subID) {
 
 void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
   galois::gPrint("Norm factor construction\n");
-  // TODO IMPLEMENT THIS; get relevant info from the original context
-  // sets current subgraph + gets degrees
-  Graph* wholeGraph = globalContext->getCurrentGraph(false);
+  // using original graph to get ids
+  Graph* wholeGraph = globalContext->getFullGraph();
 
   allocNormFactor();
-
   // this is for testing purposes
   //galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
   //  [&] (unsigned i) {

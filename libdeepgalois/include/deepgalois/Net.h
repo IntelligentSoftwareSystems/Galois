@@ -76,7 +76,7 @@ class Net {
   // TODO optimize single host case
 
   //! context holds all of the graph data
-  deepgalois::Context* context;
+  deepgalois::Context* graphTopologyContext;
   //! dist context holds graph data of the partitioned graph only
   deepgalois::DistContext* distContext;
 
@@ -119,10 +119,10 @@ public:
     feature_dims.resize(num_layers + 1);
 
     // initialze global graph context
-    context = new deepgalois::Context();
-    context->set_dataset(dataset_str);
+    graphTopologyContext = new deepgalois::Context();
+    graphTopologyContext->set_dataset(dataset_str);
     // read *entire* graph, get num nodes
-    globalSamples = context->read_graph(selfloop);
+    globalSamples = graphTopologyContext->read_graph(selfloop);
 
     // get training and validation sets: this is to create the training
     // subgraph in the sampler
@@ -147,9 +147,9 @@ public:
         globalValMasks[i] = 1;
     } else {
       globalTrainCount =
-          context->read_masks("train", globalSamples, globalTrainBegin,
+          graphTopologyContext->read_masks("train", globalSamples, globalTrainBegin,
                               globalTrainEnd, globalTrainMasks);
-      globalValCount = context->read_masks("val", globalSamples, globalValBegin,
+      globalValCount = graphTopologyContext->read_masks("val", globalSamples, globalValBegin,
                                            globalValEnd, globalValMasks);
     }
 
@@ -161,9 +161,6 @@ public:
 
     // features are read in distcontext, not this context (this context only
     // used for sampling)
-
-    // set the subgraph boolean if sample size is greater than 0
-    context->set_use_subgraph(subgraph_sample_size > 0);
 
     this->sampler = new Sampler();
   }
@@ -198,7 +195,7 @@ public:
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
       galois::gPrint(header, "Constructing training vertex set induced graph...\n");
-      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, context->getGraphPointer(),
+      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, graphTopologyContext->getGraphPointer(),
                                      distContext->getGraphPointer());
     }
 
@@ -464,7 +461,7 @@ public:
     layers[0]->set_in_data(distContext->get_feats_ptr()); // feed input data
     // precompute the normalization constant based on graph structure
     //context->norm_factor_computing(false);
-    distContext->constructNormFactor(context);
+    distContext->constructNormFactor(graphTopologyContext);
     for (size_t i = 0; i < num_conv_layers; i++)
       layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_ptr());
     set_contexts();
