@@ -1,5 +1,4 @@
 #pragma once
-#define USE_CSRGRAPH
 
 #include "deepgalois/types.h"
 #ifdef GALOIS_USE_DIST
@@ -11,6 +10,7 @@
 //#include "galois/graphs/LCGraph.h"
 #include "deepgalois/lgraph.h"
 #else
+#define USE_CSRGRAPH
 #ifdef USE_CSRGRAPH
 #include "deepgalois/lgraph.h"
 #include "graph_gpu.h"
