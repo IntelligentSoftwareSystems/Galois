@@ -200,7 +200,7 @@ public:
     if (subgraph_sample_size) {
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
-      galois::gPrint(header, " Construct training vertex set induced graph...\n");
+      galois::gPrint(header, "Constructing training vertex set induced graph...\n");
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, context->getGraphPointer(),
                                      distContext->getGraphPointer());
     }
@@ -272,6 +272,13 @@ public:
         distContext->constructSubgraphFeatures(this->subgraphNumVertices,
                                                &subgraphs_masks[sg_id * globalSamples]);
         layers[0]->set_feats_ptr(distContext->get_feats_subg_ptr()); // feed input data
+
+        //Graph* testing = distContext->getSubgraphPointer(sg_id);
+        //for (size_t i = 0; i < testing->size(); i++) {
+        //  for (auto j = testing->edge_begin(i); j < testing->edge_end(i); j++) {
+        //    galois::gPrint(i, " ", testing->getEdgeDst(j), "\n");
+        //  }
+        //}
       } // end subgraph sample loop
 ////////////////////////////////////////////////////////////////////////////////
 

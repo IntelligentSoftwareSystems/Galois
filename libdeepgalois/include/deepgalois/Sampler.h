@@ -57,8 +57,10 @@ protected:
             auto idx = offsets[src];
             for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
               const auto dst = g->getEdgeDst(e);
-              if (masks[dst] == 1)
+              if (masks[dst] == 1) {
+                //galois::gPrint(src, " ", dst, "\n");
                 sub.constructEdge(idx++, dst, 0);
+              }
             }
           }
         }

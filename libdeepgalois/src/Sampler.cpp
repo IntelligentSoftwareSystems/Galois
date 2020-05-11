@@ -45,8 +45,10 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGrap
           auto idx = offsets[src];
           for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
             const auto dst = g->getEdgeDst(e);
-            if (masks[dst] == 1)
+            if (masks[dst] == 1) {
+              //galois::gPrint(src, " ", dst, "\n");
               Sampler::globalMaskedGraph->constructEdge(idx++, dst, 0);
+            }
           }
         }
       },
@@ -359,8 +361,7 @@ VertexSet Sampler::convertToLID(VertexSet& gidSet) {
   return existingLIDs;
 }
 
-void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks,
-                              unsigned seed) {
+void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks, unsigned seed) {
   VertexSet sampledSet;
   // n = 9000 by default
   // this->selectVertices(count_, n, m_, globalMaskedGraph, vertices_, sampledSet);
@@ -371,6 +372,13 @@ void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks,
   // create new vertex set with LIDs for partitioned graph
   VertexSet sampledLIDs = this->convertToLID(sampledSet);
 
+  //VertexSet sampledLIDs;
+  //galois::gPrint("part graph num edges is ", partGraph->sizeEdges(), "\n");
+  //galois::gPrint("global mask num edges is ", globalMaskedGraph->sizeEdges(), "\n");
+  //for (auto i : this->trainingNodes) {
+  //  sampledLIDs.insert(i);
+  //}
+
   // create the masks
   createMasks(Sampler::partGraph->size(), sampledLIDs, masks);
 
@@ -380,6 +388,8 @@ void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks,
   this->getMaskedGraph(Sampler::partGraph->size(), masks, Sampler::partGraph,
       maskedSG); // remove edges whose destination is not masked
   this->reindexSubgraph(sampledLIDs, maskedSG, sg);
+
+  //galois::gPrint("sg num edges is ", sg.sizeEdges(), "\n");
 }
 
 } // namespace deepgalois

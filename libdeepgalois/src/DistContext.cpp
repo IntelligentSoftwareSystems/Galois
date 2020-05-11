@@ -68,9 +68,17 @@ size_t DistContext::read_features(std::string dataset_str) {
 
   in.open(filename, std::ios::in);
   size_t m; // m = number of global vertices
-
   // header read
   in >> m >> feat_len >> std::ws;
+
+//    std::string file_dims = path + dataset_str + "-dims.txt";
+//    std::ifstream ifs;
+//    ifs.open(file_dims, std::ios::in);
+//    ifs >> m >> feat_len >> std::ws;
+//    ifs.close();
+//
+
+  galois::gPrint("N x D: ", m, " x ", feat_len, "\n");
   // use local size, not global size
   h_feats = new float_t[dGraph->size() * feat_len];
 
@@ -87,9 +95,9 @@ size_t DistContext::read_features(std::string dataset_str) {
       edge_stream >> v;
       // actual feature
       edge_stream >> w;
-
       h_feats[dGraph->getLID(u) * feat_len + v] = w;
     }
+    //galois::gPrint(u, "\n");
   }
   in.close();
 
@@ -235,7 +243,7 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
 
 void DistContext::constructNormFactorSub(int subgraphID) {
   // right now norm factor based on subgraph
-  // TODO fix this
+  // TODO fix this for dist execution
 
   allocNormFactorSub(subgraphID);
 
@@ -254,9 +262,9 @@ void DistContext::constructNormFactorSub(int subgraphID) {
         float_t c_j  = std::sqrt(float_t(graphToUse.get_degree(j)));
 
         if (c_i == 0.0 || c_j == 0.0) {
-          this->normFactors[e] = 0.0;
+          this->normFactorsSub[e] = 0.0;
         } else {
-          this->normFactors[e] = 1.0 / (c_i * c_j);
+          this->normFactorsSub[e] = 1.0 / (c_i * c_j);
         }
     },
     galois::loopname("NormCountingEdge"));
@@ -268,10 +276,11 @@ void DistContext::constructNormFactorSub(int subgraphID) {
       auto degree = graphToUse.get_degree(v);
       float_t temp = std::sqrt(float_t(degree));
       if (temp == 0.0) {
-        this->normFactors[v] = 0.0;
+        this->normFactorsSub[v] = 0.0;
       } else {
-        this->normFactors[v] = 1.0 / temp;
+        this->normFactorsSub[v] = 1.0 / temp;
       }
+      galois::gPrint(this->normFactorsSub[v], "\n");
     },
     galois::loopname("NormCountingNode"));
 #endif
@@ -300,6 +309,7 @@ void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
       //            &Context::h_labels_subg[count * Context::num_classes]);
       //}
       DistContext::h_labels_subg[count] = h_labels[i];
+      //galois::gPrint("l ", (float)DistContext::h_labels_subg[count], "\n");
       count++;
     }
   }
@@ -317,17 +327,17 @@ void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
       std::copy(DistContext::h_feats + i * DistContext::feat_len,
                 DistContext::h_feats + (i + 1) * DistContext::feat_len,
                 &DistContext::h_feats_subg[count * DistContext::feat_len]);
+      //for (unsigned a = 0; a < DistContext::feat_len; a++) {
+      //  if (h_feats_subg[count * DistContext::feat_len + a] != 0) {
+      //    galois::gPrint(h_feats_subg[count * DistContext::feat_len + a], " ");
+      //  }
+      //}
+      //galois::gPrint("\n");
       count++;
     }
   }
   GALOIS_ASSERT(count == m);
 }
-
-
-
-
-
-
 
 
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
