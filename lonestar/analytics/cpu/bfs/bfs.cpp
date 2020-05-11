@@ -61,10 +61,10 @@ static cll::opt<unsigned int>
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { AsyncTile = 0, Async, SyncTile, Sync, Sync2pTile, Sync2p };
+enum Algo { AsyncTile = 0, Async, SyncTile, Sync };
 
 const char* const ALGO_NAMES[] = {"AsyncTile", "Async",      "SyncTile",
-                                  "Sync",      "Sync2pTile", "Sync2p"};
+                                  "Sync"};
 
 static cll::opt<Exec> execution(
     "exec",
@@ -75,9 +75,7 @@ static cll::opt<Exec> execution(
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value SyncTile):"),
     cll::values(clEnumVal(AsyncTile, "AsyncTile"), clEnumVal(Async, "Async"),
-                clEnumVal(SyncTile, "SyncTile"), clEnumVal(Sync, "Sync"),
-                clEnumVal(Sync2pTile, "Sync2pTile"),
-                clEnumVal(Sync2p, "Sync2p")),
+                clEnumVal(SyncTile, "SyncTile"), clEnumVal(Sync, "Sync")),
     cll::init(SyncTile));
 
 using Graph =
@@ -301,62 +299,6 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
   delete next;
 }
 
-template <bool CONCURRENT, typename P, typename R>
-void sync2phaseAlgo(Graph& graph, GNode source, const P& pushWrap,
-                    const R& edgeRange) {
-
-  using NodeCont =
-      typename std::conditional<CONCURRENT, galois::InsertBag<GNode>,
-                                galois::SerStack<GNode>>::type;
-  using TileCont =
-      typename std::conditional<CONCURRENT, galois::InsertBag<EdgeTile>,
-                                galois::SerStack<EdgeTile>>::type;
-
-  using Loop = typename std::conditional<CONCURRENT, galois::DoAll,
-                                         galois::StdForEach>::type;
-
-  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-
-  Loop loop;
-
-  NodeCont activeNodes;
-  TileCont edgeTiles;
-
-  Dist nextLevel              = 0u;
-  graph.getData(source, flag) = 0u;
-
-  activeNodes.push(source);
-
-  while (!activeNodes.empty()) {
-
-    loop(
-        galois::iterate(activeNodes),
-        [&](const GNode& src) { pushWrap(edgeTiles, src); }, galois::steal(),
-        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("activeNodes"));
-
-    ++nextLevel;
-    activeNodes.clear();
-
-    loop(
-        galois::iterate(edgeTiles),
-        [&](const EdgeTile& item) {
-          for (auto e : edgeRange(item)) {
-            auto dst      = graph.getEdgeDst(e);
-            auto& dstData = graph.getData(dst, flag);
-
-            if (dstData == BFS::DIST_INFINITY) {
-              dstData = nextLevel;
-              activeNodes.push(dst);
-            }
-          }
-        },
-        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("edgeTiles"));
-
-    edgeTiles.clear();
-  }
-}
-
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source) {
 
@@ -376,14 +318,6 @@ void runAlgo(Graph& graph, const GNode& source) {
   case Sync:
     syncAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
                                 OutEdgeRangeFn{graph});
-    break;
-  case Sync2pTile:
-    sync2phaseAlgo<CONCURRENT>(graph, source, EdgeTilePushWrap{graph},
-                               TileRangeFn());
-    break;
-  case Sync2p:
-    sync2phaseAlgo<CONCURRENT>(graph, source, OneTilePushWrap{graph},
-                               TileRangeFn());
     break;
   default:
     std::cerr << "ERROR: unkown algo type" << std::endl;
