@@ -2,9 +2,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-maybe-uninitialized>")
 endif()
 
-app(graphgrammar src/GraphGrammar.cpp src/model/Map.cpp src/readers/SrtmReader.cpp src/readers/AsciiReader.cpp
+app(longestedge src/LongestEdge.cpp src/model/Map.cpp src/readers/SrtmReader.cpp src/readers/AsciiReader.cpp
         src/libmgrs/mgrs.c src/libmgrs/polarst.c src/libmgrs/tranmerc.c src/libmgrs/utm.c src/libmgrs/ups.c
         src/utils/Utils.cpp src/readers/InpReader.cpp src/writers/InpWriter.cpp)
 
-app(graphgrammarTest test/TestMain.cpp src/model/Map.cpp src/libmgrs/mgrs.c src/libmgrs/polarst.c src/libmgrs/tranmerc.c
+app(longestedgeTest test/TestMain.cpp src/model/Map.cpp src/libmgrs/mgrs.c src/libmgrs/polarst.c src/libmgrs/tranmerc.c
         src/libmgrs/utm.c src/libmgrs/ups.c src/utils/Utils.cpp)
