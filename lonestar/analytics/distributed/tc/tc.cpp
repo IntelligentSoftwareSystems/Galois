@@ -38,6 +38,9 @@
 #ifdef GALOIS_ENABLE_GPU
 #include "tc_cuda.h"
 struct CUDA_Context* cuda_ctx;
+#else
+enum { CPU, GPU_CUDA };
+int personality = CPU;
 #endif
 
 constexpr static const char* const regionname = "TC";
@@ -61,36 +64,71 @@ template <bool async>
 struct TC {
   Graph* graph;
   using DGAccumulatorTy = galois::DGAccumulator<uint64_t>;
-  DGAccumulatorTy& num_triangles;
+  DGAccumulatorTy& numTriangles;
 
-  TC(Graph* _graph, DGAccumulatorTy& _num_triangles)
-      : graph(_graph), num_triangles(_num_triangles) {}
+  TC(Graph* _graph, DGAccumulatorTy& _numTriangles)
+      : graph(_graph), numTriangles(_numTriangles) {}
 
   // use the below line once CPU code is added
-  // void static go(Graph& _graph) {
-  void static go() {
+  void static go(Graph& _graph) {
     unsigned _num_iterations = 0;
-    DGAccumulatorTy num_triangles;
+    DGAccumulatorTy numTriangles;
     syncSubstrate->set_num_round(_num_iterations);
-    num_triangles.reset();
+    numTriangles.reset();
+    //const auto& allNodes = _graph.allNodesWithEdgesRange();
+    const auto& allNodes = _graph.masterNodesRange();
 
+    if (personality == GPU_CUDA) { ///< GPU TC.
 #ifdef GALOIS_ENABLE_GPU
-    if (personality == GPU_CUDA) {
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       uint64_t num_local_triangles = 0;
       TC_masterNodes_cuda(num_local_triangles, cuda_ctx);
-      num_triangles += num_local_triangles;
+      numTriangles += num_local_triangles;
       StatTimer_cuda.stop();
-    }
+#else
+      abort();
 #endif
+    } else { ///< CPU TC.
+      galois::do_all(galois::iterate(allNodes),
+                     TC(&_graph, numTriangles),
+                     galois::steal(),
+                     galois::loopname(syncSubstrate->
+                       get_run_identifier("TC").c_str()));
+    }
 
-    uint64_t total_triangles = num_triangles.reduce();
+    uint64_t total_triangles = numTriangles.reduce();
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::gPrint("Total number of triangles ", total_triangles, "\n");
     }
   }
+
+  void operator()(GNode p1) const {
+    size_t numTriangles_local = 0;
+    for (auto it_p1 : graph->edges(p1)) {
+      GNode p2 = graph->getEdgeDst(it_p1);
+
+      Graph::edge_iterator p1Begin = graph->edge_begin(p1);
+      Graph::edge_iterator p1End   = graph->edge_end(p1);
+      Graph::edge_iterator p2Begin = graph->edge_begin(p2);
+      Graph::edge_iterator p2End   = graph->edge_end(p2);
+      Graph::edge_iterator p1p     = p1Begin;
+      Graph::edge_iterator p2p     = p2Begin;
+      uint32_t p1Dest, p2Dest;
+
+      while (p1p < p1End && p2p < p2End) {
+        p1Dest = graph->getEdgeDst(p1p);
+        p2Dest = graph->getEdgeDst(p2p);
+        int32_t nodeDiff = p1Dest - p2Dest;
+        if (nodeDiff < 0) { p1p++; }
+        else if (nodeDiff > 0) { p2p++; }
+        else {
+          p1p++; p2p++; numTriangles_local++; }
+      } ///< Finding the intersection between the point 1 and the point 2.
+    } ///< Finding triangles is done.
+    numTriangles += numTriangles_local;
+  } ///< CPU operator is done.
 };
 
 /******************************************************************************/
@@ -115,18 +153,17 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
-#else
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>();
-#endif
-
   std::string timer_str("SortEdgesGPU");
   galois::StatTimer edgeSortTime("SortEdgesGPU", regionname);
   edgeSortTime.start();
   sort_cuda(cuda_ctx);
   edgeSortTime.stop();
+#else
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>();
 
+#endif
   // accumulators for use in operators
-  galois::DGAccumulator<uint64_t> DGAccumulator_num_triangles;
+  galois::DGAccumulator<uint64_t> DGAccumulator_numTriangles;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] TC::go run ", run, " called\n");
@@ -134,9 +171,7 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
-    // use the below line once CPU code is added
-    // TC<false>::go(*hg);
-    TC<false>::go();
+    TC<false>::go(*hg);
     StatTimer_main.stop();
 
     syncSubstrate->set_num_run(run + 1);
