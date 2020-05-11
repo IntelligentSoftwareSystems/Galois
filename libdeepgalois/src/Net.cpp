@@ -9,7 +9,8 @@
 
 namespace deepgalois {
 
-void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel) {
+void Net::partitionInit(DGraph* graph, std::string dataset_str,
+                        bool isSingleClassLabel) {
   this->dGraph      = graph;
   this->distContext = new deepgalois::DistContext();
   this->distContext->saveDistGraph(dGraph);
@@ -48,25 +49,25 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleCla
       }
     }
   } else {
-    globalTrainCount = this->distContext->read_masks(dataset_str,
-        "train", this->distNumSamples, globalTrainBegin, globalTrainEnd,
-        this->distTrainMasks, this->dGraph);
-    globalValCount = this->distContext->read_masks(dataset_str,
-        "val", this->distNumSamples, globalValBegin, globalValEnd,
+    globalTrainCount = this->distContext->read_masks(
+        dataset_str, "train", this->distNumSamples, globalTrainBegin,
+        globalTrainEnd, this->distTrainMasks, this->dGraph);
+    globalValCount = this->distContext->read_masks(
+        dataset_str, "val", this->distNumSamples, globalValBegin, globalValEnd,
         this->distValMasks, this->dGraph);
   }
 
   // input feature dimension: D
   feature_dims[0] = this->distContext->read_features(dataset_str);
   for (size_t i = 1; i < num_conv_layers; i++)
-    feature_dims[i] = this->h1;                 // hidden1 level embedding: 16
+    feature_dims[i] = this->h1;                // hidden1 level embedding: 16
   feature_dims[num_conv_layers] = num_classes; // output embedding: E
   if (this->has_l2norm) {
     // l2 normalized embedding: E
     feature_dims[num_conv_layers + 1] = num_classes;
   }
   if (this->has_dense) {
-     // MLP embedding: E
+    // MLP embedding: E
     feature_dims[num_layers - 1] = num_classes;
   }
 
@@ -127,16 +128,18 @@ acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
 
           uint32_t localID = this->dGraph->getLID(i);
           if (masks == NULL) {
-            //GALOIS_DIE("subgraphs not implemented for dist yet");
+            // GALOIS_DIE("subgraphs not implemented for dist yet");
             // subgraph here: TODO
-            auto pred = math::argmax(num_classes, &preds[localID * num_classes]);
+            auto pred =
+                math::argmax(num_classes, &preds[localID * num_classes]);
             // check prediction
             if ((label_t)pred == ground_truth[localID])
               accuracy_all += 1.0;
           } else {
             if (masks[localID] == 1) {
               // get prediction
-              auto pred = math::argmax(num_classes, &preds[localID * num_classes]);
+              auto pred =
+                  math::argmax(num_classes, &preds[localID * num_classes]);
               // check prediction
               if ((label_t)pred == ground_truth[localID])
                 accuracy_all += 1.0;

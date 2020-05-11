@@ -33,13 +33,13 @@ class Net {
   unsigned neighbor_sample_size; // neighbor sampling
   unsigned subgraph_sample_size; // subgraph sampling
   int num_threads;               // number of threads
-  size_t globalSamples;            // number of samples: N
+  size_t globalSamples;          // number of samples: N
   size_t distNumSamples;         // number of samples: N
   size_t num_classes;            // number of vertex classes: E
   size_t num_conv_layers;        // number of convolutional layers
   size_t num_layers;             // total number of layers (conv + output)
   int num_epochs;                // number of epochs
-  unsigned h1;                // hidden layer size
+  unsigned h1;                   // hidden layer size
   float learning_rate;           // learning rate
   float dropout_rate;            // dropout rate
   float weight_decay;            // weighti decay for over-fitting
@@ -92,8 +92,7 @@ public:
       : is_single_class(single), has_l2norm(l2norm), has_dense(dense),
         neighbor_sample_size(neigh_sz), subgraph_sample_size(subg_sz),
         num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs),
-        h1(hidden1),
-        learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
+        h1(hidden1), learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
     this->myID      = galois::runtime::getSystemNetworkInterface().ID;
@@ -104,10 +103,10 @@ public:
 
     // TODO use galois print
     galois::gPrint(header, "Configuration: num_threads ", num_threads,
-                     ", num_conv_layers ", num_conv_layers, ", num_epochs ",
-                     num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
-                     learning_rate, ", dropout_rate ", dropout_rate,
-                     ", weight_decay ", weight_decay, "\n");
+                   ", num_conv_layers ", num_conv_layers, ", num_epochs ",
+                   num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
+                   learning_rate, ", dropout_rate ", dropout_rate,
+                   ", weight_decay ", weight_decay, "\n");
     this->num_layers = num_conv_layers + 1;
 
     // additional layers to add
@@ -146,11 +145,11 @@ public:
       for (size_t i = globalValBegin; i < globalValEnd; i++)
         globalValMasks[i] = 1;
     } else {
-      globalTrainCount =
-          graphTopologyContext->read_masks("train", globalSamples, globalTrainBegin,
-                              globalTrainEnd, globalTrainMasks);
-      globalValCount = graphTopologyContext->read_masks("val", globalSamples, globalValBegin,
-                                           globalValEnd, globalValMasks);
+      globalTrainCount = graphTopologyContext->read_masks(
+          "train", globalSamples, globalTrainBegin, globalTrainEnd,
+          globalTrainMasks);
+      globalValCount = graphTopologyContext->read_masks(
+          "val", globalSamples, globalValBegin, globalValEnd, globalValMasks);
     }
 
     // make sure sampel size isn't greater than what we have to train with
@@ -180,7 +179,8 @@ public:
 
   void init();
   //! Initializes metadata for the partition
-  void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
+  void partitionInit(DGraph* graph, std::string dataset_str,
+                     bool isSingleClassLabel);
 
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
@@ -194,8 +194,10 @@ public:
     if (subgraph_sample_size) {
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
-      galois::gPrint(header, "Constructing training vertex set induced graph...\n");
-      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, graphTopologyContext->getGraphPointer(),
+      galois::gPrint(header,
+                     "Constructing training vertex set induced graph...\n");
+      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks,
+                                     graphTopologyContext->getGraphPointer(),
                                      distContext->getGraphPointer());
     }
 
@@ -207,12 +209,13 @@ public:
     for (int curEpoch = 0; curEpoch < num_epochs; curEpoch++) {
       t_epoch.Start();
 
-////////////////////////////////////////////////////////////////////////////////
-// Sampling
-////////////////////////////////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////////////////////////////////
+      // Sampling
+      ////////////////////////////////////////////////////////////////////////////////
       if (subgraph_sample_size) {
         if (num_subg_remain == 0) {
-          galois::gPrint(header, "Generating ", num_subgraphs, " subgraph(s)\n");
+          galois::gPrint(header, "Generating ", num_subgraphs,
+                         " subgraph(s)\n");
           // TODO stat timer instead of this timer
           Timer t_subgen;
           t_subgen.Start();
@@ -220,9 +223,9 @@ public:
           // generate subgraphs
 #ifndef __GALOIS_HET_CUDA__
           for (int sid = 0; sid < num_subgraphs; sid++) {
-            sampler->sampleSubgraph(subgraph_sample_size,
-                                     *(distContext->getSubgraphPointer(sid)),
-                                     &subgraphs_masks[sid * globalSamples], curEpoch);
+            sampler->sampleSubgraph(
+                subgraph_sample_size, *(distContext->getSubgraphPointer(sid)),
+                &subgraphs_masks[sid * globalSamples], curEpoch);
           }
 #endif
           num_subg_remain = num_subgraphs;
@@ -239,9 +242,9 @@ public:
 
         // choose a subgraph to use
         num_subg_remain--;
-        int sg_id         = num_subg_remain;
-        auto subgraphPointer = distContext->getSubgraphPointer(sg_id);
-        this->subgraphNumVertices   = subgraphPointer->size();
+        int sg_id                 = num_subg_remain;
+        auto subgraphPointer      = distContext->getSubgraphPointer(sg_id);
+        this->subgraphNumVertices = subgraphPointer->size();
 
         // galois::gPrint("Subgraph num_vertices: ", subgraphNumVertices, ",
         // num_edges: ", subgraphPointer->sizeEdges(), "\n");
@@ -254,27 +257,31 @@ public:
         distContext->constructNormFactorSub(sg_id);
         for (size_t i = 0; i < num_conv_layers; i++) {
           layers[i]->set_graph_ptr(subgraphPointer);
-          layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_subg_ptr());
+          layers[i]->set_norm_consts_ptr(
+              distContext->get_norm_factors_subg_ptr());
         }
 
         // update labels for subgraph
-        distContext->constructSubgraphLabels(this->subgraphNumVertices,
-                                             &subgraphs_masks[sg_id * globalSamples]);
-        layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_subg_ptr());
+        distContext->constructSubgraphLabels(
+            this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
+        layers[num_layers - 1]->set_labels_ptr(
+            distContext->get_labels_subg_ptr());
 
         // update features for subgraph
-        distContext->constructSubgraphFeatures(this->subgraphNumVertices,
-                                               &subgraphs_masks[sg_id * globalSamples]);
-        layers[0]->set_feats_ptr(distContext->get_feats_subg_ptr()); // feed input data
+        distContext->constructSubgraphFeatures(
+            this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
+        layers[0]->set_feats_ptr(
+            distContext->get_feats_subg_ptr()); // feed input data
 
-        //Graph* testing = distContext->getSubgraphPointer(sg_id);
-        //for (size_t i = 0; i < testing->size(); i++) {
-        //  for (auto j = testing->edge_begin(i); j < testing->edge_end(i); j++) {
+        // Graph* testing = distContext->getSubgraphPointer(sg_id);
+        // for (size_t i = 0; i < testing->size(); i++) {
+        //  for (auto j = testing->edge_begin(i); j < testing->edge_end(i); j++)
+        //  {
         //    galois::gPrint(i, " ", testing->getEdgeDst(j), "\n");
         //  }
         //}
       } // end subgraph sample loop
-////////////////////////////////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
       galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, seperator);
@@ -417,9 +424,9 @@ public:
         }
       }
     } else {
-      globalTestCount =
-          distContext->read_masks(dataset, std::string("test"), globalSamples, globalTestBegin,
-                              globalTestEnd, test_masks, dGraph);
+      globalTestCount = distContext->read_masks(
+          dataset, std::string("test"), globalSamples, globalTestBegin,
+          globalTestEnd, test_masks, dGraph);
     }
 #ifdef __GALOIS_HET_CUDA__
     copy_test_masks_to_device();
@@ -431,7 +438,7 @@ public:
     // append conv layers
     std::cout << "\nConstructing layers...\n";
     for (size_t i = 0; i < num_conv_layers - 1; i++) {
-      append_conv_layer(i, true);           // conv layers, act=true
+      append_conv_layer(i, true); // conv layers, act=true
     }
 
     append_conv_layer(num_conv_layers - 1); // the last hidden layer, act=false
@@ -444,7 +451,7 @@ public:
       append_dense_layer(num_layers - 2); // dense layer
     }
 
-    append_out_layer(num_layers - 1);     // output layer
+    append_out_layer(num_layers - 1); // output layer
 
     // allocate memory for intermediate features and gradients
     for (size_t i = 0; i < num_layers; i++) {
@@ -460,7 +467,7 @@ public:
 
     layers[0]->set_in_data(distContext->get_feats_ptr()); // feed input data
     // precompute the normalization constant based on graph structure
-    //context->norm_factor_computing(false);
+    // context->norm_factor_computing(false);
     distContext->constructNormFactor(graphTopologyContext);
     for (size_t i = 0; i < num_conv_layers; i++)
       layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_ptr());

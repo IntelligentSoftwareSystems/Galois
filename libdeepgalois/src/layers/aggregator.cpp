@@ -5,7 +5,7 @@
 // TODO template arg
 void deepgalois::update_all(size_t len, Graph& g, const float_t* in,
                             float_t* out, bool norm, float_t* norm_factor) {
-// std::cout << "[update_all] graph size: " << n << "\n";
+  // std::cout << "[update_all] graph size: " << n << "\n";
   size_t n = g.size();
   galois::do_all(
       galois::iterate(size_t(0), n),

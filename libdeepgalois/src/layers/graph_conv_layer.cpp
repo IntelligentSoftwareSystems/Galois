@@ -119,13 +119,14 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
 
   // TODO sync of out_data required here
   // TODO how to do this for the sampled case?
-  //deepgalois::_syncVectorSize = z;
-  //deepgalois::_dataToSync     = out_data;
-  //layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
+  // deepgalois::_syncVectorSize = z;
+  // deepgalois::_dataToSync     = out_data;
+  // layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
   //    "AggSync");
 
   // run relu activation on output if specified
-  if (act_) math::relu_cpu(x * z, out_data, out_data);
+  if (act_)
+    math::relu_cpu(x * z, out_data, out_data);
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
@@ -164,15 +165,15 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   }
 
   // sync agg
-  //deepgalois::_syncVectorSize = z;
-  //deepgalois::_dataToSync     = out_temp;
-  //layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
+  // deepgalois::_syncVectorSize = z;
+  // deepgalois::_dataToSync     = out_temp;
+  // layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
   //    "AggSyncBack");
 
   if (level_ != 0 && dropout_)
     math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
 
-  //layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
+  // layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
   // galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
 }
 

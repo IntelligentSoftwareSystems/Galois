@@ -63,9 +63,8 @@ public:
   Context();
   //! initializer for gpu; goes ahead and sets a few things
   Context(bool use_gpu)
-      : is_device(use_gpu),
-        is_selfloop_added(false), d_labels(NULL), d_labels_subg(NULL),
-        d_feats(NULL), d_feats_subg(NULL) {}
+      : is_device(use_gpu), is_selfloop_added(false), d_labels(NULL),
+        d_labels_subg(NULL), d_feats(NULL), d_feats_subg(NULL) {}
   ~Context();
 
   size_t read_graph(bool selfloop);

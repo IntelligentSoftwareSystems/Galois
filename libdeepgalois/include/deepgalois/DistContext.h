@@ -11,27 +11,28 @@
 namespace deepgalois {
 
 class DistContext {
-  size_t num_classes;   // number of classes: E
-  size_t feat_len;      // input feature length: D
+  size_t num_classes; // number of classes: E
+  size_t feat_len;    // input feature length: D
   galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
 
-  Graph* lGraph; // laerning graph version
+  Graph* lGraph;            // laerning graph version
   DGraph* partitionedGraph; // the input graph, |V| = N
   std::vector<Graph*> partitionedSubgraphs;
-  label_t* h_labels;      // labels for classification. Single-class label: Nx1,
-                          // multi-class label: NxE
+  label_t* h_labels; // labels for classification. Single-class label: Nx1,
+                     // multi-class label: NxE
   std::vector<label_t> h_labels_subg; // labels for subgraph
-  float_t* h_feats;       // input features: N x D
+  float_t* h_feats;                   // input features: N x D
   std::vector<float_t> h_feats_subg;  // input features for subgraph
 
   //  change regular one to a vector as well
-  std::vector<float_t> normFactors;  // normalization constant based on graph structure
+  std::vector<float_t>
+      normFactors; // normalization constant based on graph structure
   std::vector<float_t> normFactorsSub; // normalization constant for subgraph
   bool usingSingleClass;
 
 public:
   // TODO better constructor
-  DistContext() : usingSingleClass(true) {};
+  DistContext() : usingSingleClass(true){};
   ~DistContext();
 
   void saveDistGraph(DGraph* a) {
@@ -54,8 +55,7 @@ public:
             this->lGraph->constructEdge(idx++, dst, 0);
           }
         },
-        galois::loopname("lgraphcopy")
-    );
+        galois::loopname("lgraphcopy"));
   }
 
   //! read labels of local nodes only
