@@ -3,11 +3,11 @@
 #include "deepgalois/configs.h"
 
 namespace deepgalois {
-DistContext::DistContext() {}
 DistContext::~DistContext() {}
 
-size_t DistContext::read_labels(std::string dataset_str) {
+size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str) {
   DGraph* dGraph = DistContext::partitionedGraph;
+  this->usingSingleClass = isSingleClassLabel;
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reading labels from disk...\n");
 
@@ -17,11 +17,18 @@ size_t DistContext::read_labels(std::string dataset_str) {
   in.open(filename, std::ios::in);
   size_t m;
   // read file header
-  in >> m >> num_classes >> std::ws;
+  in >> m >> this->num_classes >> std::ws;
   assert(m == dGraph->globalSize());
+
   // size of labels should be # local nodes
-  h_labels = new label_t[dGraph->size()]; // single-class (one-hot) label for
-                                          // each vertex: N x 1
+  if (isSingleClassLabel) {
+    galois::gPrint("[", myID, "] One hot labels...\n");
+    this->h_labels = new label_t[dGraph->size()]; // single-class (one-hot) label for
+                                            // each vertex: N x 1
+  } else {
+    galois::gPrint("[", myID, "] Multi-class labels...\n");
+    this->h_labels = new label_t[dGraph->size() * this->num_classes]; // multi-class label for each vertex: N x E
+  }
 
   uint32_t foundVertices = 0;
   unsigned v             = 0;
@@ -32,14 +39,21 @@ size_t DistContext::read_labels(std::string dataset_str) {
       std::istringstream label_stream(line);
       unsigned x;
       // for each class
-      for (size_t idx = 0; idx < num_classes; ++idx) {
+      for (size_t idx = 0; idx < this->num_classes; ++idx) {
         // check if that class is labeled
         label_stream >> x;
-        if (x != 0) {
-          // set local id
-          h_labels[dGraph->getLID(v)] = idx;
+
+        // diff between single and multi class
+        if (isSingleClassLabel) {
+          if (x != 0) {
+            // set local id
+            this->h_labels[dGraph->getLID(v)] = idx;
+            foundVertices++;
+            break;
+          }
+        } else {
+          this->h_labels[dGraph->getLID(v) * this->num_classes + idx] = x;
           foundVertices++;
-          break;
         }
       }
     }
@@ -159,42 +173,26 @@ void DistContext::initializeSyncSubstrate() {
 }
 
 void DistContext::allocNormFactor() {
-  if (!normFactors) {
 #ifdef USE_MKL
-    normFactors = new float_t[partitionedGraph->sizeEdges()];
+  this->normFactors.resize(partitionedGraph->sizeEdges());
 #else
-    normFactors = new float_t[partitionedGraph->size()];
+  this->normFactors.resize(partitionedGraph->size());
 #endif
-  }
-  if (!normFactors) {
-    GALOIS_DIE("norm factors failed to be allocated");
-  }
+  // TODO clean out?
 }
 
 void DistContext::allocNormFactorSub(int subID) {
 #ifdef USE_MKL
-  normFactorsSub.resize(partitionedSubgraphs[subID]->sizeEdges());
+  this->normFactorsSub.resize(partitionedSubgraphs[subID]->sizeEdges());
 #else
-  normFactorsSub.resize(partitionedSubgraphs[subID]->size());
+  this->normFactorsSub.resize(partitionedSubgraphs[subID]->size());
 #endif
   // TODO clean out?
 }
 
 
-//void DistContext::allocSubNormFactor(int subID) {
-//  if (!normFactors) {
-//#ifdef USE_MKL
-//    normFactors = new float_t[partitionedGraph->sizeEdges()];
-//#else
-//    normFactors = new float_t[partitionedGraph->size()];
-//#endif
-//  }
-//  if (!normFactors) {
-//    GALOIS_DIE("norm factors failed to be allocated");
-//  }
-//}
-
 void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
+  galois::gPrint("Norm factor construction\n");
   // TODO IMPLEMENT THIS; get relevant info from the original context
   // sets current subgraph + gets degrees
   Graph* wholeGraph = globalContext->getCurrentGraph(false);
@@ -238,9 +236,11 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
     },
     galois::loopname("NormCountingNode"));
 #endif
+  galois::gPrint("Norm factor construction done\n");
 }
 
 void DistContext::constructNormFactorSub(int subgraphID) {
+  galois::gPrint("Sub norm factor construction\n");
   // right now norm factor based on subgraph
   // TODO fix this for dist execution
 
@@ -283,31 +283,28 @@ void DistContext::constructNormFactorSub(int subgraphID) {
     },
     galois::loopname("NormCountingNode"));
 #endif
+  galois::gPrint("Sub norm factor construction done\n");
 }
 //! generate labels for the subgraph, m is subgraph size, mask
 //! tells which vertices to use
 void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
-  // TODO multiclass
-
-  // if (h_labels_subg == NULL) h_labels_subg = new label_t[m];
-  //if (DistContext::is_single_class) {
-  //} else {
-  //  DistContext::h_labels_subg.resize(m * Context::num_classes);
-  //}
-
-  DistContext::h_labels_subg.resize(m);
+  if (DistContext::usingSingleClass) {
+    DistContext::h_labels_subg.resize(m);
+  } else {
+    DistContext::h_labels_subg.resize(m * DistContext::num_classes);
+  }
 
   size_t count = 0;
   // see which labels to copy over for this subgraph
   for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
     if (masks[i] == 1) {
-      //if (Context::is_single_class) {
-      //} else {
-      //  std::copy(Context::h_labels + i * Context::num_classes,
-      //            Context::h_labels + (i + 1) * Context::num_classes,
-      //            &Context::h_labels_subg[count * Context::num_classes]);
-      //}
-      DistContext::h_labels_subg[count] = h_labels[i];
+      if (DistContext::usingSingleClass) {
+        DistContext::h_labels_subg[count] = h_labels[i];
+      } else {
+        std::copy(DistContext::h_labels + i * DistContext::num_classes,
+                  DistContext::h_labels + (i + 1) * DistContext::num_classes,
+                  &DistContext::h_labels_subg[count * DistContext::num_classes]);
+      }
       //galois::gPrint("l ", (float)DistContext::h_labels_subg[count], "\n");
       count++;
     }

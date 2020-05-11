@@ -25,17 +25,20 @@ class DistContext {
   std::vector<float_t> h_feats_subg;  // input features for subgraph
 
   //  change regular one to a vector as well
-  float_t* normFactors;  // normalization constant based on graph structure
+  std::vector<float_t> normFactors;  // normalization constant based on graph structure
   std::vector<float_t> normFactorsSub; // normalization constant for subgraph
+  bool usingSingleClass;
 
 public:
-  DistContext();
+  // TODO better constructor
+  DistContext() : usingSingleClass(true) {};
   ~DistContext();
 
   void saveDistGraph(DGraph* a) {
     partitionedGraph = a;
 
     // construct lgraph from underlying lc csr graph
+    // TODO fix this so i don't have more than 1 copy of graph in memory
     this->lGraph = new Graph();
     this->lGraph->allocateFrom(a->size(), a->sizeEdges());
     this->lGraph->constructNodes();
@@ -56,7 +59,7 @@ public:
   }
 
   //! read labels of local nodes only
-  size_t read_labels(std::string dataset_str);
+  size_t read_labels(bool isSingleClassLabel, std::string dataset_str);
   //! read features of local nodes only
   size_t read_features(std::string dataset_str);
   //! read masks of local nodes only
@@ -90,7 +93,7 @@ public:
   void constructSubgraphLabels(size_t m, const mask_t* masks);
   void constructSubgraphFeatures(size_t m, const mask_t* masks);
 
-  float_t* get_norm_factors_ptr() { return normFactors; }
+  float_t* get_norm_factors_ptr() { return normFactors.data(); }
   float_t* get_norm_factors_subg_ptr() { return &normFactorsSub[0]; }
 
   //! return label for some node

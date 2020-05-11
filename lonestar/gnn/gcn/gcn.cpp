@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
                           neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
   // initialize distributed context
-  network.partitionInit(dGraph, dataset);
+  network.partitionInit(dGraph, dataset, is_single_class);
 
   // construct layers from distributed context
   network.construct_layers();

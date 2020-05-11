@@ -123,9 +123,6 @@ public:
     context->set_dataset(dataset_str);
     // read *entire* graph, get num nodes
     globalSamples = context->read_graph(selfloop);
-    context->set_label_class(is_single_class);
-    // read ground truth labels
-    num_classes = context->read_labels();
 
     // get training and validation sets: this is to create the training
     // subgraph in the sampler
@@ -186,7 +183,7 @@ public:
 
   void init();
   //! Initializes metadata for the partition
-  void partitionInit(DGraph* graph, std::string dataset_str);
+  void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
 
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
