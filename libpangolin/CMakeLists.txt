@@ -8,8 +8,6 @@ target_sources(pangolin PRIVATE
   src/base_embedding.cpp
   src/vertex_embedding.cpp
   src/BfsMining/embedding_list.cpp
-  src/DfsMining/edgelist.cpp
-  src/DfsMining/embedding_list_dfs.cpp
 )
 
 target_include_directories(pangolin PUBLIC

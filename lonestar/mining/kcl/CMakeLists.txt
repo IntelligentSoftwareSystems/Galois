@@ -1,15 +1,7 @@
 add_executable(kcl kcl.cpp)
-add_executable(kcl_dfs kcl_dfs.cpp)
-add_executable(kcl_shrink kcl_shrink.cpp)
 add_dependencies(apps kcl)
-add_dependencies(apps kcl_dfs)
-add_dependencies(apps kcl_shrink)
 target_link_libraries(kcl PRIVATE Galois::pangolin LLVMSupport)
-target_link_libraries(kcl_dfs PRIVATE Galois::pangolin LLVMSupport)
-target_link_libraries(kcl_shrink PRIVATE Galois::pangolin LLVMSupport)
 install(TARGETS kcl DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-install(TARGETS kcl_dfs DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-install(TARGETS kcl_shrink DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 #add_test_mine(small1 kcl "${BASEINPUT}/Mining/citeseer.csgr")
 

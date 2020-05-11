@@ -1,8 +1,4 @@
 add_executable(sgl sgl.cpp)
-add_executable(sgl_dfs sgl_dfs.cpp)
 add_dependencies(apps sgl)
-add_dependencies(apps sgl_dfs)
 target_link_libraries(sgl PRIVATE Galois::pangolin LLVMSupport)
-target_link_libraries(sgl_dfs PRIVATE Galois::pangolin LLVMSupport)
 install(TARGETS sgl DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-install(TARGETS sgl_dfs DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

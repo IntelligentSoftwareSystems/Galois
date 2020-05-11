@@ -1,11 +1,7 @@
 add_executable(fsm fsm.cpp)
-add_executable(fsm_dfs fsm_dfs.cpp)
 add_dependencies(apps fsm)
-add_dependencies(apps fsm_dfs)
 target_link_libraries(fsm PRIVATE Galois::pangolin LLVMSupport)
-target_link_libraries(fsm_dfs PRIVATE Galois::pangolin LLVMSupport)
 install(TARGETS fsm DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-install(TARGETS fsm_dfs DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
 #add_test_mine(small1 fsm "${BASEINPUT}/Mining/citeseer.sadj -ft=adj")
 
