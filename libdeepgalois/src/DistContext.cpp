@@ -64,42 +64,41 @@ size_t DistContext::read_features(std::string dataset_str) {
 
   std::string filename = path + dataset_str + ".ft";
   std::ifstream in;
-  std::string line;
-
-  in.open(filename, std::ios::in);
-  size_t m; // m = number of global vertices
-  // header read
-  in >> m >> feat_len >> std::ws;
-
-//    std::string file_dims = path + dataset_str + "-dims.txt";
-//    std::ifstream ifs;
-//    ifs.open(file_dims, std::ios::in);
-//    ifs >> m >> feat_len >> std::ws;
-//    ifs.close();
-//
+  size_t m; // m = number of vertices
+  // dimension read
+  std::string file_dims = path + dataset_str + "-dims.txt";
+  std::ifstream ifs;
+  ifs.open(file_dims, std::ios::in);
+  ifs >> m >> this->feat_len >> std::ws;
+  ifs.close();
 
   galois::gPrint("N x D: ", m, " x ", feat_len, "\n");
-  // use local size, not global size
+
+  // TODO read in without using 2 in-memory buffers
+  // full read feats to load into h_feats
+  float_t* fullFeats = new float_t[m * feat_len];
+  // actual stored feats
   h_feats = new float_t[dGraph->size() * feat_len];
 
-  // loop through all features
-  while (std::getline(in, line)) {
-    std::istringstream edge_stream(line);
-    unsigned u, v;
-    float_t w;
-    // vertex to set feature for
-    edge_stream >> u;
-    // only set if local
-    if (dGraph->isLocal(u)) {
-      // feature index
-      edge_stream >> v;
-      // actual feature
-      edge_stream >> w;
-      h_feats[dGraph->getLID(u) * feat_len + v] = w;
-    }
-    //galois::gPrint(u, "\n");
-  }
+  // read in full feats
+  filename = path + dataset_str + "-feats.bin";
+  in.open(filename, std::ios::binary | std::ios::in);
+  in.read((char*)fullFeats, sizeof(float_t) * m * feat_len);
   in.close();
+
+  // get the local ids we want
+  size_t count = 0;
+  for (size_t i = 0; i < m; i++) {
+    if (dGraph->isLocal(i)) {
+      //h_feats[count * feat_len] = fullFeats[i];
+      std::copy(fullFeats + i * DistContext::feat_len,
+                fullFeats + (i + 1) * DistContext::feat_len,
+                &this->h_feats[count * DistContext::feat_len]);
+      count++;
+    }
+  }
+  GALOIS_ASSERT(count == dGraph->size());
+  free(fullFeats);
 
   galois::gPrint("[", myID, "] Done with features, feature length: ", feat_len,
                  "\n");
@@ -280,7 +279,7 @@ void DistContext::constructNormFactorSub(int subgraphID) {
       } else {
         this->normFactorsSub[v] = 1.0 / temp;
       }
-      galois::gPrint(this->normFactorsSub[v], "\n");
+      //galois::gPrint(this->normFactorsSub[v], "\n");
     },
     galois::loopname("NormCountingNode"));
 #endif
