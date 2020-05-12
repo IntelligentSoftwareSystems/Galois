@@ -93,11 +93,13 @@ DistContext::~DistContext() {
 }
 
 size_t DistContext::read_labels(bool isSingleClass, std::string dataset_str) {
-  return reader.read_labels(isSingleClass, h_labels);
+  num_classes = reader.read_labels(isSingleClass, h_labels);
+  return num_classes;
 }
 
 size_t DistContext::read_features(std::string dataset_str) {
-  return reader.read_features(h_feats);
+  feat_len = reader.read_features(h_feats);
+  return feat_len;
 }
 
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, size_t n, 
@@ -119,15 +121,15 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
     exit(0);
   }
 #ifdef USE_CUSPARSE
-  int nnz = partitionedGraph->sizeEdges();
-  CUDA_CHECK(cudaMalloc((void**)&normFactors[0], nnz * sizeof(float_t)));
-  init_const_gpu(nnz, 0.0, &normFactors[0]);
+  auto nnz = partitionedGraph->sizeEdges();
+  CUDA_CHECK(cudaMalloc((void**)&d_normFactors, nnz * sizeof(float_t)));
+  init_const_gpu(nnz, 0.0, d_normFactors);
   norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, *partitionedGraph, &normFactors[0]);
+      n, *partitionedGraph, d_normFactors);
 #else
-  CUDA_CHECK(cudaMalloc((void**)&(&normFactors[0]), n * sizeof(float_t)));
+  CUDA_CHECK(cudaMalloc((void**)&d_normFactors, n * sizeof(float_t)));
   norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, *partitionedGraph, &normFactors[0]);
+      n, *partitionedGraph, d_normFactors);
 #endif
   CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";
@@ -176,6 +178,7 @@ size_t DistContext::read_graph(std::string dataset, bool selfloop) {
 
 void DistContext::copy_data_to_device() {
   auto n = partitionedGraph->size();
+  std::cout << "Copying labels and features to GPU memory. n = " << n << " ... ";
   if (usingSingleClass) {
     CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
     CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
@@ -186,6 +189,7 @@ void DistContext::copy_data_to_device() {
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
   CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
   // print_device_vector(10, d_feats, "d_feats");
+  std::cout << "Done\n";
 }
 
 } // namespace deepgalois

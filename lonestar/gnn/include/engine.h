@@ -63,6 +63,8 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
 int main(int argc, char** argv) {
 #ifdef GALOIS_USE_DIST
   galois::DistMemSys G;
+#else
+  galois::SharedMemSys G;
 #endif
   LonestarGnnStart(argc, argv, name, desc, url);
 

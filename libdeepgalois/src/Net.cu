@@ -180,6 +180,21 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleCla
   feature_dims[num_layers] = num_classes; // normalized output embedding: E
 }
 
+void Net::read_test_masks(std::string dataset) {
+  test_masks = new mask_t[distNumSamples];
+  if (dataset == "reddit") {
+    globalTestBegin = 177262;
+    globalTestCount = 55703;
+    globalTestEnd   = globalTestBegin + globalTestCount;
+    for (size_t i = globalTestBegin; i < globalTestEnd; i++)
+        test_masks[i] = 1;
+  } else {
+    globalTestCount = distContext->read_masks(dataset, std::string("test"), 
+        globalSamples, globalTestBegin, globalTestEnd, test_masks, NULL);
+  }
+  copy_test_masks_to_device();
+}
+
 void Net::copy_test_masks_to_device() {
   copy_masks_device(globalSamples, test_masks, d_test_masks);
 }

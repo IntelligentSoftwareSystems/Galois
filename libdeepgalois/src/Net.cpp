@@ -86,6 +86,23 @@ void Net::regularize() {
              layers[layer_id]->get_grads_ptr());
 }
 
+void Net::read_test_masks(std::string dataset) {
+  test_masks = new mask_t[distNumSamples];
+  if (dataset == "reddit") {
+    globalTestBegin = 177262;
+    globalTestCount = 55703;
+    globalTestEnd   = globalTestBegin + globalTestCount;
+    for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
+      if (dGraph->isLocal(i))
+        test_masks[dGraph->getLID(i)] = 1;
+    }
+  } else {
+    globalTestCount = distContext->read_masks(dataset, std::string("test"), 
+        globalSamples, globalTestBegin, globalTestEnd, test_masks, dGraph);
+  }
+  copy_test_masks_to_device();
+}
+
 /**
  *
  * @param begin GLOBAL begin

@@ -225,19 +225,16 @@ void csrmm_gpu(const int M, const int N, const int K, const int nnz,
                const float alpha, const float* A_nonzeros, const int* A_idx_ptr,
                const int* A_nnz_idx, const float* B, const float beta,
                float* transpose_C, float* C) {
-  // std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K <<
-  // ", nnz=" << nnz << "\n";
-  CUSPARSE_CHECK(cusparseScsrmm2(
-      deepgalois::DistContext::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE,
-      CUSPARSE_OPERATION_TRANSPOSE, M, N, K, nnz, &alpha,
-      deepgalois::DistContext::cusparse_matdescr(), A_nonzeros, A_idx_ptr,
-      A_nnz_idx, B, N, &beta, transpose_C, M));
+  //std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K << ", nnz=" << nnz << "\n";
+  CUSPARSE_CHECK(cusparseScsrmm2(deepgalois::DistContext::cusparse_handle(), 
+             CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+             M, N, K, nnz, &alpha, deepgalois::DistContext::cusparse_matdescr(), 
+             A_nonzeros, A_idx_ptr, A_nnz_idx, B, N, &beta, transpose_C, M));
   // transpose C
   const float one  = 1.0;
   const float zero = 0.0;
   CUBLAS_CHECK(cublasSgeam(deepgalois::DistContext::cublas_handle(), CUBLAS_OP_T,
-                           CUBLAS_OP_T, N, M, &one, transpose_C, M, &zero, NULL,
-                           M, C, N));
+                           CUBLAS_OP_T, N, M, &one, transpose_C, M, &zero, NULL, M, C, N));
 }
 /*
 void csrmm_gpu_new(const int M, const int N, const int K, const int nnz,

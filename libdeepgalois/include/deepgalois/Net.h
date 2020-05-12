@@ -271,14 +271,12 @@ public:
         // update labels for subgraph
         distContext->constructSubgraphLabels(
             this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
-        layers[num_layers - 1]->set_labels_ptr(
-            distContext->get_labels_subg_ptr());
+        layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_subg_ptr());
 
         // update features for subgraph
         distContext->constructSubgraphFeatures(
             this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
-        layers[0]->set_feats_ptr(
-            distContext->get_feats_subg_ptr()); // feed input data
+        layers[0]->set_feats_ptr(distContext->get_feats_subg_ptr()); // feed input data
 
         // Graph* testing = distContext->getSubgraphPointer(sg_id);
         // for (size_t i = 0; i < testing->size(); i++) {
@@ -419,33 +417,7 @@ public:
   }
 
   // read masks of test set
-  void read_test_masks(std::string dataset) {
-    test_masks = new mask_t[distNumSamples];
-    if (dataset == "reddit") {
-      globalTestBegin = 177262;
-      globalTestCount = 55703;
-      globalTestEnd   = globalTestBegin + globalTestCount;
-      for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
-#ifndef __GALOIS_HET_CUDA__
-        if (dGraph->isLocal(i))
-          test_masks[dGraph->getLID(i)] = 1;
-#else
-        // TODO: Read for GPU
-#endif
-      }
-    } else {
-      globalTestCount = distContext->read_masks(
-          dataset, std::string("test"), globalSamples, globalTestBegin,
-#ifdef __GALOIS_HET_CUDA__
-          globalTestEnd, test_masks, NULL);
-#else
-          globalTestEnd, test_masks, dGraph);
-#endif
-    }
-#ifdef __GALOIS_HET_CUDA__
-    copy_test_masks_to_device();
-#endif
-  }
+  void read_test_masks(std::string dataset);
   void copy_test_masks_to_device();
 
   void construct_layers() {
@@ -454,17 +426,14 @@ public:
     for (size_t i = 0; i < num_conv_layers - 1; i++) {
       append_conv_layer(i, true); // conv layers, act=true
     }
-
     append_conv_layer(num_conv_layers - 1); // the last hidden layer, act=false
 
     if (has_l2norm) {
       append_l2norm_layer(num_conv_layers); // l2_norm layer
     }
-
     if (has_dense) {
       append_dense_layer(num_layers - 2); // dense layer
     }
-
     append_out_layer(num_layers - 1); // output layer
 
     // allocate memory for intermediate features and gradients
@@ -474,7 +443,6 @@ public:
     for (size_t i = 1; i < num_layers; i++) {
       connect(layers[i - 1], layers[i]);
     }
-
     for (size_t i = 0; i < num_layers; i++) {
       layers[i]->malloc_and_init();
     }
@@ -537,7 +505,11 @@ public:
     out_dims[1]              = get_out_dim(layer_id);
     layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                             dropout_rate, in_dims, out_dims);
+#ifdef __GALOIS_HET_CUDA__
+    layers[layer_id]->set_graph_ptr(distContext->getGraphPointer());
+#else
     layers[layer_id]->set_graph_ptr(distContext->getLGraphPointer());
+#endif
   }
 
   // update trainable weights after back-propagation

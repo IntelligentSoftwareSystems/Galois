@@ -20,12 +20,14 @@ class DistContext {
   std::string dataset;
   size_t num_classes;     // number of classes: E
   size_t feat_len;        // input feature length: D
-  Graph* lGraph;          // laerning graph version
+  Graph* lGraph;          // learning graph version
 #ifdef __GALOIS_HET_CUDA__
   label_t* d_labels;      // labels on device
   label_t* d_labels_subg; // labels for subgraph on device
   float_t* d_feats;       // input features on device
   float_t* d_feats_subg;  // input features for subgraph on device
+  float_t* d_normFactors;
+  float_t* d_normFactorsSub;
 #else
   galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
 #endif
@@ -69,6 +71,8 @@ public:
   float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }
   label_t* get_labels_subg_ptr() { return d_labels_subg; }
+  float_t* get_norm_factors_ptr() { return d_normFactors; }
+  float_t* get_norm_factors_subg_ptr() { return d_normFactorsSub; }
   void copy_data_to_device(); // copy labels and input features
   static cublasHandle_t cublas_handle_;         // used to call cuBLAS
   static cusparseHandle_t cusparse_handle_;     // used to call cuSPARSE
@@ -85,6 +89,8 @@ public:
   float_t* get_feats_subg_ptr() { return h_feats_subg.data(); }
   label_t* get_labels_ptr() { return h_labels; }
   label_t* get_labels_subg_ptr() { return h_labels_subg.data(); }
+  float_t* get_norm_factors_ptr() { return normFactors.data(); }
+  float_t* get_norm_factors_subg_ptr() { return &normFactorsSub[0]; }
 #endif
 
   void set_dataset(std::string dataset_str) {
@@ -101,9 +107,6 @@ public:
 
   void constructSubgraphLabels(size_t m, const mask_t* masks);
   void constructSubgraphFeatures(size_t m, const mask_t* masks);
-
-  float_t* get_norm_factors_ptr() { return normFactors.data(); }
-  float_t* get_norm_factors_subg_ptr() { return &normFactorsSub[0]; }
 
   //! return label for some node
   //! NOTE: this is LID, not GID
