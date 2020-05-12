@@ -11,14 +11,15 @@
 #include <iostream>
 #include "deepgalois/GraphTypes.h"
 #include "deepgalois/Context.h"
-
-#include "deepgalois/DistContext.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/layers/node.h"
 
+#ifndef __GALOIS_HET_CUDA__
+#include "deepgalois/DistContext.h"
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/layers/GluonGradients.h"
 #include "deepgalois/layers/GradientSyncStructs.h"
+#endif
 
 namespace deepgalois {
 
@@ -37,7 +38,11 @@ namespace deepgalois {
  **/
 class layer : public deepgalois::node {
 public:
+#ifdef __GALOIS_HET_CUDA__
+  using ContextType = deepgalois::Context;
+#else
   using ContextType = deepgalois::DistContext;
+#endif
 
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
@@ -173,15 +178,14 @@ protected:
   label_t* labels;
   float_t* norm_consts;
 // TODO
-#ifndef __GALOIS_HET_CUDA__
-  Graph* graph_cpu;
-#else
+#ifdef __GALOIS_HET_CUDA__
   GraphGPU* graph_gpu;
-#endif
-
+#else
+  Graph* graph_cpu;
   // Used for synchronization of weight gradients
   deepgalois::GluonGradients* gradientGraph;
   galois::graphs::GluonSubstrate<deepgalois::GluonGradients>* syncSub;
+#endif
 };
 
 //! Connects tail to head's edge and sets that edge's target to tail

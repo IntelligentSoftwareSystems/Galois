@@ -25,10 +25,9 @@ include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-if(NOT ENABLE_HETERO_GALOIS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_ONLY")
-else()
+if(ENABLE_HETERO_GALOIS)
   # hetero path
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -D__GALOIS_HET_CUDA__")
   set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
   include_directories("${CUB_ROOT}")
   set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
@@ -71,7 +70,10 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-if(NOT ENABLE_HETERO_GALOIS)
+if(ENABLE_HETERO_GALOIS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__GALOIS_HET_CUDA__")
+  set(sources src/reader.cpp)
+else()
   set(sources
     src/layers/softmax_loss_layer.cpp
     src/layers/sigmoid_loss_layer.cpp
@@ -91,11 +93,7 @@ if(NOT ENABLE_HETERO_GALOIS)
     src/node.cpp
     src/Net.cpp
   )
-else()
-  # dummy sources set for dg_cpu for HETERO build
-  # TODO fix this
-  set(sources src/reader.cpp)
-endif(NOT ENABLE_HETERO_GALOIS)
+endif(ENABLE_HETERO_GALOIS)
 
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem)

@@ -10,11 +10,13 @@
 #include "deepgalois/layers/sigmoid_loss_layer.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/utils.h"
-#include "deepgalois/Sampler.h"
 #include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
 
+#ifndef __GALOIS_HET_CUDA__
+#include "deepgalois/Sampler.h"
 #include "deepgalois/DistContext.h"
+#endif
 
 namespace deepgalois {
 
@@ -23,7 +25,11 @@ namespace deepgalois {
 // layer 1: features N x D, weights D x 16, out N x 16 (hidden1=16)
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
-  unsigned myID         = galois::runtime::getSystemNetworkInterface().ID;
+#ifdef __GALOIS_HET_CUDA__
+  unsigned myID = 0;
+#else
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+#endif
   std::string header    = "[" + std::to_string(myID) + "] ";
   std::string seperator = "\n";
 
@@ -77,36 +83,38 @@ class Net {
 
   //! context holds all of the graph data
   deepgalois::Context* graphTopologyContext;
+
+#ifndef __GALOIS_HET_CUDA__
   //! dist context holds graph data of the partitioned graph only
   deepgalois::DistContext* distContext;
-
   DGraph* dGraph;
-
   Sampler* sampler;
+#endif
 
 public:
   Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
       unsigned hidden1, float lr, float dropout, float wd, bool selfloop,
-      bool single, bool l2norm, bool dense, unsigned neigh_sz, unsigned subg_sz,
-      int val_itv)
+      bool single, bool l2norm, bool dense, unsigned neigh_sz, unsigned subg_sz, int val_itv)
       : is_single_class(single), has_l2norm(l2norm), has_dense(dense),
         neighbor_sample_size(neigh_sz), subgraph_sample_size(subg_sz),
         num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs),
         h1(hidden1), learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
+#ifndef __GALOIS_HET_CUDA__
     this->myID      = galois::runtime::getSystemNetworkInterface().ID;
+#endif
     this->header    = "[" + std::to_string(myID) + "] ";
-    this->seperator = "\n";
+    this->seperator = " ";
 
     assert(n_conv > 0);
 
     // TODO use galois print
-    galois::gPrint(header, "Configuration: num_threads ", num_threads,
-                   ", num_conv_layers ", num_conv_layers, ", num_epochs ",
-                   num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
-                   learning_rate, ", dropout_rate ", dropout_rate,
-                   ", weight_decay ", weight_decay, "\n");
+    std::cout << header << "Configuration: num_threads " << num_threads
+              << ", num_conv_layers " << num_conv_layers << ", num_epochs "
+              << num_epochs << ", hidden1 " << hidden1 << ", learning_rate "
+              << learning_rate << ", dropout_rate " << dropout_rate
+              << ", weight_decay " << weight_decay << "\n";
     this->num_layers = num_conv_layers + 1;
 
     // additional layers to add
@@ -152,6 +160,7 @@ public:
           "val", globalSamples, globalValBegin, globalValEnd, globalValMasks);
     }
 
+#ifndef __GALOIS_HET_CUDA__
     // make sure sampel size isn't greater than what we have to train with
     if (subgraph_sample_size > globalTrainCount) {
       GALOIS_DIE("subgraph size can not be larger than the size of training "
@@ -162,6 +171,7 @@ public:
     // used for sampling)
 
     this->sampler = new Sampler();
+#endif
   }
 
   //! Default net constructor
@@ -178,10 +188,12 @@ public:
   //      test_masks(NULL), context(NULL) {}
 
   void init();
+
+#ifndef __GALOIS_HET_CUDA__
   //! Initializes metadata for the partition
   void partitionInit(DGraph* graph, std::string dataset_str,
                      bool isSingleClassLabel);
-
+#endif
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
 
@@ -194,14 +206,15 @@ public:
     if (subgraph_sample_size) {
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
-      galois::gPrint(header,
-                     "Constructing training vertex set induced graph...\n");
+      std::cout << header << "Constructing training vertex set induced graph...\n";
+#ifndef __GALOIS_HET_CUDA__
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks,
                                      graphTopologyContext->getGraphPointer(),
                                      distContext->getGraphPointer());
+#endif
     }
 
-    galois::gPrint(header, "Start training...\n");
+    std::cout << header << "Start training...\n";
 
     Timer t_epoch;
 
@@ -214,8 +227,7 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
       if (subgraph_sample_size) {
         if (num_subg_remain == 0) {
-          galois::gPrint(header, "Generating ", num_subgraphs,
-                         " subgraph(s)\n");
+          std::cout << header << "Generating " << num_subgraphs << " subgraph(s)\n";
           // TODO stat timer instead of this timer
           Timer t_subgen;
           t_subgen.Start();
@@ -284,7 +296,7 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-      galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, seperator);
+      std::cout << header << "Epoch " << std::setw(3) << curEpoch << seperator;
       set_netphases(net_phase::train);
       acc_t train_loss = 0.0, train_acc = 0.0;
 
@@ -304,8 +316,8 @@ public:
       // validation / testing
       set_netphases(net_phase::test);
 
-      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
-                     train_loss, " train_acc ", train_acc, seperator);
+      std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
+                << train_loss << " train_acc " << train_acc << seperator;
 
       t_epoch.Stop();
 
@@ -330,8 +342,8 @@ public:
 
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-    galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
-                   " ms. Throughput: ", throughput, " epoch/s\n");
+    std::cout << header << "Average training time per epoch: " << avg_train_time
+              << " ms. Throughput: " << throughput << " epoch/s\n";
   }
 
   // evaluate, i.e. inference or predict
@@ -419,14 +431,21 @@ public:
       globalTestCount = 55703;
       globalTestEnd   = globalTestBegin + globalTestCount;
       for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
-        if (dGraph->isLocal(i)) {
+#ifndef __GALOIS_HET_CUDA__
+        if (dGraph->isLocal(i))
           test_masks[dGraph->getLID(i)] = 1;
-        }
+#else
+        // TODO: Read for GPU
+#endif
       }
     } else {
       globalTestCount = distContext->read_masks(
           dataset, std::string("test"), globalSamples, globalTestBegin,
+#ifdef __GALOIS_HET_CUDA__
+          globalTestEnd, test_masks, NULL);
+#else
           globalTestEnd, test_masks, dGraph);
+#endif
     }
 #ifdef __GALOIS_HET_CUDA__
     copy_test_masks_to_device();

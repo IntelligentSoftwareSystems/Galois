@@ -4,7 +4,6 @@
 
 namespace deepgalois {
 
-#ifdef CPU_ONLY
 sigmoid_loss_layer::sigmoid_loss_layer(unsigned level,
                                        std::vector<size_t> in_dims,
                                        std::vector<size_t> out_dims)
@@ -93,6 +92,5 @@ acc_t sigmoid_loss_layer::get_prediction_loss() {
   assert(valid_sample_count.reduce() == count_);
   return total_loss.reduce() / (acc_t)count_;
 }
-#endif
 
 } // namespace deepgalois

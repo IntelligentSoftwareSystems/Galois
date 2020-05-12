@@ -10,7 +10,6 @@ float_t* _dataToSync = nullptr;
 //! sync
 long unsigned _syncVectorSize = 0;
 
-#ifndef __GALOIS_HET_CUDA__
 inline void graph_conv_layer::rand_init_matrix(size_t dim_x, size_t dim_y,
                                                vec_t& matrix, unsigned seed) {
   auto init_range = sqrt(6.0 / (dim_x + dim_y));
@@ -181,5 +180,4 @@ acc_t graph_conv_layer::get_weight_decay_loss() {
   return math::l2_norm(input_dims[1] * output_dims[1], &layer::W[0]);
 }
 
-#endif // end if CPU_ONLY
 } // namespace deepgalois

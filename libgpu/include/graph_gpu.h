@@ -159,6 +159,7 @@ struct CSRGraph {
 		assert(src <= nnodes);
 		return row_start[src+1];
 	};
+	CUDA_HOSTDEV index_type *row_start_host_ptr() { return row_start; }
 	CUDA_HOSTDEV index_type *row_start_ptr() { return row_start; }
 	CUDA_HOSTDEV const index_type *row_start_ptr() const { return row_start; }
 	CUDA_HOSTDEV index_type *edge_dst_ptr() { return edge_dst; }
@@ -172,7 +173,7 @@ struct CSRGraph {
     assert(dst < nnodes);
     assert(eid < nedges);
     edge_dst[eid] = dst;
-    //if (edge_data) edge_data[eid] = edata;
+    if (edge_data) edge_data[eid] = edata;
   }
   void malloc_index_device(index_type n, index_type *ptr);
   void set_index(index_type pos, index_type value, index_type *ptr);
