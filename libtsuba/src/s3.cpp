@@ -43,8 +43,9 @@ void S3Fini() { Aws::ShutdownAPI(sdk_options); }
 
 static inline std::shared_ptr<Aws::S3::S3Client> GetS3Client() {
   Aws::Client::ClientConfiguration cfg;
-  cfg.region   = kDefaultS3Region;
-  cfg.executor = executor;
+  const char* region = std::getenv("KATANA_AWS_REGION");
+  cfg.region         = region ? region : kDefaultS3Region;
+  cfg.executor       = executor;
   return Aws::MakeShared<Aws::S3::S3Client>(kAwsTag, cfg);
 }
 
