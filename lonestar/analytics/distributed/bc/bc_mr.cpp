@@ -197,7 +197,7 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
         }
       },
       galois::loopname(
-          syncSubstrate->get_run_identifier("FindMessageToSync").c_str()),
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_FindMessageToSync").c_str()),
       galois::steal(), galois::no_stats());
 }
 
@@ -220,7 +220,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber) {
         }
       },
       galois::loopname(
-          syncSubstrate->get_run_identifier("ConfirmMessageToSend").c_str()),
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_ConfirmMessageToSend").c_str()),
       galois::no_stats());
 }
 
@@ -276,7 +276,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
       galois::iterate(allNodesWithEdges),
       [&](GNode dst) { SendAPSPMessagesOp(dst, graph, dga); },
       galois::loopname(
-          syncSubstrate->get_run_identifier("SendAPSPMessages").c_str()),
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_SendAPSPMessages").c_str()),
       galois::steal(), galois::no_stats());
 }
 
@@ -304,7 +304,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // Template para's are struct names
     syncSubstrate->sync<writeAny, readAny, APSPReduce, Bitset_minDistances>(
-        std::string("APSP"));
+        std::string(std::string(REGION_NAME) + "_APSP"));
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
@@ -337,7 +337,7 @@ void RoundUpdate(Graph& graph) {
         cur_data.dTree.prepForBackPhase();
       },
       galois::loopname(
-          syncSubstrate->get_run_identifier("RoundUpdate").c_str()),
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_RoundUpdate").c_str()),
       galois::no_stats());
 }
 
@@ -373,7 +373,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
         }
       },
       galois::loopname(
-          syncSubstrate->get_run_identifier("BackFindMessageToSend").c_str()),
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_BackFindMessageToSend").c_str()),
       galois::no_stats());
 }
 
@@ -432,12 +432,12 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     // write destination in this case being the source in the actual graph
     // since we're using the tranpose graph
     syncSubstrate->sync<writeDestination, readSource, DependencyReduce,
-                        Bitset_dependency>(std::string("DependencySync"));
+                        Bitset_dependency>(std::string(std::string(REGION_NAME) + "_DependencySync"));
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
         [&](GNode dst) { BackPropOp(dst, graph); },
-        galois::loopname(syncSubstrate->get_run_identifier("BackProp").c_str()),
+        galois::loopname(syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_BackProp").c_str()),
         galois::steal(), galois::no_stats());
 
     currentRound++;
@@ -467,7 +467,7 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
           }
         }
       },
-      galois::loopname(syncSubstrate->get_run_identifier("BC").c_str()),
+      galois::loopname(syncSubstrate->get_run_identifier(std::string(REGION_NAME)).c_str()),
       galois::no_stats());
 };
 
@@ -590,6 +590,7 @@ int main(int argc, char** argv) {
 
   ////////////////////////////////////////////////////////////////////////////////
 
+  galois::runtime::reportStat_Single(std::string(REGION_NAME), std::string("NumSources"), (unsigned int)totalNumSources);
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
 
