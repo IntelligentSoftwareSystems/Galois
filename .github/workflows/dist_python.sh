@@ -14,7 +14,7 @@ LEAST_PYBIN=/opt/python/cp35-cp35m/bin
 
 yum install -y -q \
   ccache \
-  devtoolset-8-libatomic-devel \
+  devtoolset-9-libatomic-devel \
   llvm7.0-devel \
   llvm7.0-static \
   openmpi-devel
@@ -38,7 +38,7 @@ for pybin in /opt/python/*/bin; do
     -DCMAKE_TOOLCHAIN_FILE=/tmp/conan/conan_paths.cmake \
     -DCMAKE_PREFIX_PATH=/usr/lib64/llvm7.0 \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-    -DUSE_NATIVE=none \
+    -DUSE_ARCH=none \
     "
 
   "${pybin}/pip" wheel -w /tmp/wheelhouse "${SOURCE_DIR}"

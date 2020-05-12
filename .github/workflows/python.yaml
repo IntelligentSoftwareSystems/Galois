@@ -60,6 +60,7 @@ jobs:
     - name: package
       if: startsWith(matrix.os, 'ubuntu-')
       run: |
+        LATEST=sha256:1dd09a895978d784d0d73677ae8d87dbb63f4607a99abb06b518cae9d2b67edd
         docker run \
           -v $HOME/.cache/yum:/var/cache/yum \
           -v $HOME/.cache/pip:/root/.cache/pip \
@@ -67,7 +68,7 @@ jobs:
           -v $HOME/.conan/data:/root/.conan/data \
           -v $(pwd):/work \
           -v $HOME/build:/output \
-          --rm dockcross/manylinux2014-x64 .github/workflows/dist_python.sh
+          --rm dockcross/manylinux2014-x64@${LATEST} .github/workflows/dist_python.sh
     - name: package
       if: startsWith(matrix.os, 'macOS-')
       run: |
