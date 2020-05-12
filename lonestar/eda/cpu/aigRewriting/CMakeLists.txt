@@ -24,3 +24,5 @@ target_include_directories(aigRewriting PRIVATE
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/xxHash>"
 )
 
+add_test_scale(small1 aigRewriting "${BASEINPUT}/eda/logic-synthesis/EPFL/arithmetic/adder/aiger/adder.aig" -v NOT_QUICK)
+add_test_scale(small2 aigRewriting "${BASEINPUT}/eda/logic-synthesis/EPFL/random_control/voter/aiger/voter.aig" -v NOT_QUICK)

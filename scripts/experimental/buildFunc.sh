@@ -10,7 +10,7 @@ mkdir -p "${BUILD_ROOT}"
 cc=${cc:="gcc"}
 cxx=${cxx:="g++"}
 build=${build:="Debug"}
-cmakeOpts=${cmakeOpts:="-DUSE_PAPI=1 -DUSE_VTUNE=1 -DENABLE_DIST_GALOIS=1"}
+cmakeOpts=${cmakeOpts:="-DUSE_PAPI=1 -DUSE_VTUNE=1 -DGALOIS_ENABLE_DIST=1"}
 cleanup=${cleanup:="0"}
 
 galoisCheckStatus() {

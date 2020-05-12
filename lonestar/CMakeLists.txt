@@ -23,7 +23,7 @@ function(add_test_scale type app)
   endforeach()
 endfunction(add_test_scale)
 
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   add_subdirectory(libdistbench)
 
   if(EXISTS /net/ohm/export/iss/dist-outputs)
@@ -34,16 +34,14 @@ if(ENABLE_DIST_GALOIS)
     set(BASEOUTPUT /workspace/dist-outputs)
   endif()
 
-  if(ENABLE_HETERO_GALOIS)
+  if(GALOIS_ENABLE_GPU)
     # turn on cuda for distbench as well
-    target_compile_definitions(distbench PRIVATE __GALOIS_HET_CUDA__=1)
+    target_compile_definitions(distbench PRIVATE GALOIS_ENABLE_GPU=1)
 
     # for debugging
-    add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
+    add_definitions(-DGALOIS_CUDA_CHECK_ERROR)
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
       add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>")
-
-      add_definitions(-D__GALOIS_DEBUG_WORKLIST__)
     endif()
   endif()
 
@@ -60,18 +58,18 @@ if(ENABLE_DIST_GALOIS)
     install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
     target_link_libraries(${name} distbench)
-    if(REPORT_PER_ROUND_STATS)
-      target_compile_definitions(${name} PRIVATE DIST_PER_ROUND_TIMER=1)
+    if(GALOIS_PER_ROUND_STATS)
+      target_compile_definitions(${name} PRIVATE GALOIS_PER_ROUND_STATS=1)
     endif()
-    if(REPORT_COMM_STATS)
-      target_compile_definitions(${name} PRIVATE MORE_COMM_STATS=1)
+    if(GALOIS_COMM_STATS)
+      target_compile_definitions(${name} PRIVATE GALOIS_COMM_STATS=1)
     endif()
-    if(USE_BARE_MPI)
-      target_compile_definitions(${name} PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+    if(GALOIS_USE_BARE_MPI)
+      target_compile_definitions(${name} PRIVATE GALOIS_USE_BARE_MPI=1)
     endif()
 
-    if(ENABLE_HETERO_GALOIS AND NOT ${X_NO_GPU})
-      target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
+    if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
+      target_compile_definitions(${name} PRIVATE GALOIS_ENABLE_GPU=1)
       target_link_libraries(${name} ${name}_cuda)
 
       FILE(GLOB CUSOURCES ${name}*.cu)
@@ -139,7 +137,7 @@ if(ENABLE_DIST_GALOIS)
       add_test_dist_and_verify(${app} ${input} ${type}-cpu ${part} ${num_threads} ${np} ${ARGN})
     endforeach()
 
-    if (NOT ENABLE_HETERO_GALOIS)
+    if (NOT GALOIS_ENABLE_GPU)
       return()
     endif()
 

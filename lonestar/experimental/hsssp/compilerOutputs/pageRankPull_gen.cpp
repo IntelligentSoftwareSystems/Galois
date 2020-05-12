@@ -29,7 +29,7 @@
 #include "galois/Dist/DistGraph.h"
 #include "galois/DistAccumulator.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context* cuda_ctx;
@@ -40,7 +40,7 @@ static const char* const name =
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
 static const char* const url  = 0;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA, GPU_OPENCL };
 std::string personality_str(Personality p) {
   switch (p) {
@@ -67,7 +67,7 @@ static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
 static cll::opt<bool>
     verify("verify", cll::desc("Verify ranks by printing to the output stream"),
            cll::init(false));
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 static cll::opt<int> gpudevice(
     "gpu",
     cll::desc("Select GPU to run on, default is to choose automatically"),
@@ -114,7 +114,7 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
       static float extract(uint32_t node_id, const struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_value_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -122,7 +122,7 @@ struct InitializeGraph {
         return node.value;
       }
       static void setVal(uint32_t node_id, struct PR_NodeData& node, float y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_value_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -133,7 +133,7 @@ struct InitializeGraph {
     };
     struct SyncerPull_1 {
       static int extract(uint32_t node_id, const struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_nout_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -141,7 +141,7 @@ struct InitializeGraph {
         return node.nout;
       }
       static void setVal(uint32_t node_id, struct PR_NodeData& node, int y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_nout_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -150,7 +150,7 @@ struct InitializeGraph {
       }
       typedef int ValTy;
     };
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       InitializeGraph_cuda(alpha, cuda_ctx);
     } else if (personality == CPU)
@@ -177,7 +177,7 @@ struct PrecomputeGraph {
   void static go(Graph& _graph) {
     struct Syncer_0 {
       static int extract(uint32_t node_id, const struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_nout_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -185,7 +185,7 @@ struct PrecomputeGraph {
         return node.nout;
       }
       static void reduce(uint32_t node_id, struct PR_NodeData& node, int y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           add_node_nout_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -195,7 +195,7 @@ struct PrecomputeGraph {
         }
       }
       static void reset(uint32_t node_id, struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_nout_cuda(cuda_ctx, node_id, 0);
         else if (personality == CPU)
@@ -208,7 +208,7 @@ struct PrecomputeGraph {
     };
     struct SyncerPull_0 {
       static int extract(uint32_t node_id, const struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_nout_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -216,7 +216,7 @@ struct PrecomputeGraph {
         return node.nout;
       }
       static void setVal(uint32_t node_id, struct PR_NodeData& node, int y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_nout_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -225,7 +225,7 @@ struct PrecomputeGraph {
       }
       typedef int ValTy;
     };
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       PrecomputeGraph_cuda(cuda_ctx);
     } else if (personality == CPU)
@@ -268,7 +268,7 @@ struct PageRank_pull {
 
       struct SyncerPull_0 {
         static float extract(uint32_t node_id, const struct PR_NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             return get_node_value_cuda(cuda_ctx, node_id);
           assert(personality == CPU);
@@ -277,7 +277,7 @@ struct PageRank_pull {
         }
         static void setVal(uint32_t node_id, struct PR_NodeData& node,
                            float y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             set_node_value_cuda(cuda_ctx, node_id, y);
           else if (personality == CPU)
@@ -286,7 +286,7 @@ struct PageRank_pull {
         }
         typedef float ValTy;
       };
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         int __retval = 0;
         PageRank_pull_cuda(__retval, alpha, tolerance, cuda_ctx);
@@ -337,7 +337,7 @@ int main(int argc, char** argv) {
     galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init,
         T_pageRank;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device            = gpudevice;
     // Parse arg string when running on multiple hosts and update/override
@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_DistGraph_init.start();
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
     Graph hg(inputFile, net.ID, net.Num);
 #else
     Graph hg(inputFile, net.ID, net.Num, scalefactor);
@@ -408,14 +408,14 @@ int main(int argc, char** argv) {
 
     // Verify
     /*if(verify){
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == CPU) {
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
 hg.getData(*ii).nout);
         }
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
@@ -441,14 +441,14 @@ get_node_nout_cuda(cuda_ctx, *ii));
 
     // Verify
     if (verify) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == CPU) {
 #endif
         for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),
                                        hg.getData(*ii).value);
         }
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       } else if (personality == GPU_CUDA) {
         for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
           galois::runtime::printOutput("% %\n", hg.getGID(*ii),

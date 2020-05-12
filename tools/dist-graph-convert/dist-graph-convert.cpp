@@ -625,7 +625,7 @@ int main(int argc, char** argv) {
   galois::setActiveThreads(threadsToUse);
 
 // need to initialize MPI if using LWCI (else already initialized)
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
   int initResult;
   MPICheck(MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &initResult));
 
@@ -682,7 +682,7 @@ int main(int argc, char** argv) {
     abort();
   }
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
   MPICheck(MPI_Finalize());
 #endif
 

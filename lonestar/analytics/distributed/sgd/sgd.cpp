@@ -29,7 +29,7 @@
 #include "galois/ArrayWrapper.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/cuda_device.h"
 #include "sgd_cuda.h"
 struct CUDA_Context* cuda_ctx;
@@ -125,7 +125,7 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       std::string impl_str(
           syncSubstrate->get_run_identifier("InitializeGraph"));
@@ -172,7 +172,7 @@ struct SGD_mergeResidual {
 
     auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       std::string impl_str("SGD_" + (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
@@ -327,7 +327,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
   Graph* hg;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, double>(&cuda_ctx);
 #else
@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
     StatTimer_main.stop();
 
     if ((run + 1) != numRuns) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         // bitset_dist_current_reset_cuda(cuda_ctx);
       } else

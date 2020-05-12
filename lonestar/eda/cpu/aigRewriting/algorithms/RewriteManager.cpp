@@ -260,19 +260,15 @@ int RewriteManager::labelMFFC(ThreadContextData* threadCtx, aig::GNode node,
 
   threadCtx->currentCutMFFCIds.insert(nodeData.id);
 
-  int nConeSize1;
-
-  nConeSize1 = refDerefMFFCNodes(threadCtx, node, threadId, travId, false,
-                                 true); // dereference
-#ifndef NDEBUG
-  int nConeSize2;
-
-  nConeSize2 = refDerefMFFCNodes(threadCtx, node, threadId, travId, true,
-                                 false); // reference
+  int nConeSize1 = refDerefMFFCNodes(threadCtx, node, threadId, travId, false,
+                                     true); // dereference
+  int GALOIS_USED_ONLY_IN_DEBUG(nConeSize2) =
+      refDerefMFFCNodes(threadCtx, node, threadId, travId, true,
+                        false); // reference
 
   assert(nConeSize1 == nConeSize2);
   assert(nConeSize1 > 0);
-#endif
+
   return nConeSize1;
 }
 

@@ -11,6 +11,6 @@ add_subdirectory(sgd)
 add_subdirectory(sssp)
 
 # currently tc only has a GPU implementation
-if(ENABLE_HETERO_GALOIS)
+if(GALOIS_ENABLE_GPU)
   add_subdirectory(tc)
 endif()
