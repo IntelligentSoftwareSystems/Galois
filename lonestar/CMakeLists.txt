@@ -74,6 +74,7 @@ if(GALOIS_ENABLE_DIST)
 
       FILE(GLOB CUSOURCES ${name}*.cu)
       add_library(${name}_cuda ${CUSOURCES})
+      target_compile_options(${name}_cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-w>)
       target_link_libraries(${name}_cuda Galois::gpu)
       set_property(TARGET ${name}_cuda PROPERTY CUDA_STANDARD 14)
     endif()
