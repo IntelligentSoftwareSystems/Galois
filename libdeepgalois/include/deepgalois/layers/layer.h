@@ -13,9 +13,9 @@
 #include "deepgalois/Context.h"
 #include "deepgalois/optimizer.h"
 #include "deepgalois/layers/node.h"
+#include "deepgalois/DistContext.h"
 
 #ifndef __GALOIS_HET_CUDA__
-#include "deepgalois/DistContext.h"
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/layers/GluonGradients.h"
 #include "deepgalois/layers/GradientSyncStructs.h"
@@ -38,11 +38,7 @@ namespace deepgalois {
  **/
 class layer : public deepgalois::node {
 public:
-#ifdef __GALOIS_HET_CUDA__
-  using ContextType = deepgalois::Context;
-#else
   using ContextType = deepgalois::DistContext;
-#endif
 
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)

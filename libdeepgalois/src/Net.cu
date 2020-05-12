@@ -148,14 +148,13 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
 namespace deepgalois {
 
 void Net::init() {
-  copy_masks_device(num_samples, train_masks, d_train_masks);
-  copy_masks_device(num_samples, val_masks, d_val_masks);
-  context
-      ->copy_data_to_device(); // copy labels and input features to the device
+  copy_masks_device(globalSamples, globalTrainMasks, d_train_masks);
+  copy_masks_device(globalSamples, globalValMasks, d_val_masks);
+  distContext->copy_data_to_device(); // copy labels and input features to the device
 }
 
 void Net::copy_test_masks_to_device() {
-  copy_masks_device(num_samples, test_masks, d_test_masks);
+  copy_masks_device(globalSamples, test_masks, d_test_masks);
 }
 
 // add weight decay
@@ -166,7 +165,7 @@ void Net::regularize() {
            layers[layer_id]->get_grads_device_ptr());
 }
 
-void Net::normalize() {}
+//void Net::normalize() {}
 
 acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
                            mask_t* masks, float_t* preds,

@@ -12,10 +12,10 @@
 #include "deepgalois/utils.h"
 #include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
+#include "deepgalois/DistContext.h"
 
 #ifndef __GALOIS_HET_CUDA__
 #include "deepgalois/Sampler.h"
-#include "deepgalois/DistContext.h"
 #endif
 
 namespace deepgalois {
@@ -84,10 +84,11 @@ class Net {
   //! context holds all of the graph data
   deepgalois::Context* graphTopologyContext;
 
-#ifndef __GALOIS_HET_CUDA__
   //! dist context holds graph data of the partitioned graph only
   deepgalois::DistContext* distContext;
   DGraph* dGraph;
+
+#ifndef __GALOIS_HET_CUDA__
   Sampler* sampler;
 #endif
 
@@ -189,14 +190,10 @@ public:
 
   void init();
 
-#ifndef __GALOIS_HET_CUDA__
   //! Initializes metadata for the partition
-  void partitionInit(DGraph* graph, std::string dataset_str,
-                     bool isSingleClassLabel);
-#endif
+  void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
-
   void regularize(); // add weight decay
 
   void train(optimizer* opt, bool need_validate) {

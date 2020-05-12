@@ -39,8 +39,7 @@ public:
   static cublasHandle_t cublas_handle_;         // used to call cuBLAS
   static cusparseHandle_t cusparse_handle_;     // used to call cuSPARSE
   static cusparseMatDescr_t cusparse_matdescr_; // used to call cuSPARSE
-  static curandGenerator_t
-      curand_generator_; // used to generate random numbers on GPU
+  static curandGenerator_t curand_generator_; // used to generate random numbers on GPU
 
   GraphGPU graph_gpu; // the input graph, |V| = N
   std::vector<GraphGPU*> subgraphs_gpu;
@@ -50,14 +49,11 @@ public:
   float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }
   label_t* get_labels_subg_ptr() { return d_labels_subg; }
+
   inline static cublasHandle_t cublas_handle() { return cublas_handle_; }
   inline static cusparseHandle_t cusparse_handle() { return cusparse_handle_; }
-  inline static cusparseMatDescr_t cusparse_matdescr() {
-    return cusparse_matdescr_;
-  }
-  inline static curandGenerator_t curand_generator() {
-    return curand_generator_;
-  }
+  inline static cusparseMatDescr_t cusparse_matdescr() { return cusparse_matdescr_; }
+  inline static curandGenerator_t curand_generator() { return curand_generator_; }
 #endif
 
   Context();

@@ -5,6 +5,29 @@
 namespace deepgalois {
 DistContext::~DistContext() {}
 
+void DistContext::saveDistGraph(DGraph* a) {
+  partitionedGraph = a;
+
+  // construct lgraph from underlying lc csr graph
+  // TODO fix this so i don't have more than 1 copy of graph in memory
+  this->lGraph = new Graph();
+  this->lGraph->allocateFrom(a->size(), a->sizeEdges());
+  this->lGraph->constructNodes();
+
+  galois::do_all(
+      galois::iterate((size_t)0, a->size()),
+      [&](const auto src) {
+        this->lGraph->fixEndEdge(src, *a->edge_end(src));
+        index_t idx = *(a->edge_begin(src));
+
+        for (auto e = a->edge_begin(src); e != a->edge_end(src); e++) {
+          const auto dst = a->getEdgeDst(e);
+          this->lGraph->constructEdge(idx++, dst, 0);
+        }
+      },
+      galois::loopname("lgraphcopy"));
+}
+
 // TODO move to reader class
 size_t DistContext::read_labels(bool isSingleClassLabel,
                                 std::string dataset_str) {

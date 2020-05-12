@@ -3,7 +3,9 @@
 /**
  * Based on common.hpp file of the Caffe deep learning library.
  */
+#ifndef __GALOIS_HET_CUDA__
 #include "galois/graphs/GluonSubstrate.h"
+#endif
 #include "deepgalois/types.h"
 #include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
@@ -13,20 +15,18 @@ namespace deepgalois {
 class DistContext {
   size_t num_classes; // number of classes: E
   size_t feat_len;    // input feature length: D
-  galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
-
   Graph* lGraph;            // laerning graph version
+#ifndef __GALOIS_HET_CUDA__
+  galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
+#endif
   DGraph* partitionedGraph; // the input graph, |V| = N
   std::vector<Graph*> partitionedSubgraphs;
   label_t* h_labels; // labels for classification. Single-class label: Nx1,
                      // multi-class label: NxE
-  std::vector<label_t> h_labels_subg; // labels for subgraph
-  float_t* h_feats;                   // input features: N x D
-  std::vector<float_t> h_feats_subg;  // input features for subgraph
-
-  //  change regular one to a vector as well
-  std::vector<float_t>
-      normFactors; // normalization constant based on graph structure
+  float_t* h_feats;                    // input features: N x D
+  std::vector<label_t> h_labels_subg;  // labels for subgraph
+  std::vector<float_t> h_feats_subg;   // input features for subgraph
+  std::vector<float_t> normFactors;    // normalization constant based on graph structure
   std::vector<float_t> normFactorsSub; // normalization constant for subgraph
   bool usingSingleClass;
 
@@ -34,29 +34,6 @@ public:
   // TODO better constructor
   DistContext() : usingSingleClass(true){};
   ~DistContext();
-
-  void saveDistGraph(DGraph* a) {
-    partitionedGraph = a;
-
-    // construct lgraph from underlying lc csr graph
-    // TODO fix this so i don't have more than 1 copy of graph in memory
-    this->lGraph = new Graph();
-    this->lGraph->allocateFrom(a->size(), a->sizeEdges());
-    this->lGraph->constructNodes();
-
-    galois::do_all(
-        galois::iterate((size_t)0, a->size()),
-        [&](const auto src) {
-          this->lGraph->fixEndEdge(src, *a->edge_end(src));
-          index_t idx = *(a->edge_begin(src));
-
-          for (auto e = a->edge_begin(src); e != a->edge_end(src); e++) {
-            const auto dst = a->getEdgeDst(e);
-            this->lGraph->constructEdge(idx++, dst, 0);
-          }
-        },
-        galois::loopname("lgraphcopy"));
-  }
 
   //! read labels of local nodes only
   size_t read_labels(bool isSingleClassLabel, std::string dataset_str);
@@ -68,7 +45,6 @@ public:
 
   DGraph* getGraphPointer() { return partitionedGraph; }
   Graph* getLGraphPointer() { return lGraph; }
-
   Graph* getSubgraphPointer(int id) { return partitionedSubgraphs[id]; };
   float_t* get_feats_ptr() { return h_feats; }
   float_t* get_feats_subg_ptr() { return h_feats_subg.data(); }
@@ -76,7 +52,10 @@ public:
   label_t* get_labels_subg_ptr() { return h_labels_subg.data(); }
 
   void initializeSyncSubstrate();
+#ifndef __GALOIS_HET_CUDA__
+  void saveDistGraph(DGraph* a);
   galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
+#endif
 
   //! allocate the norm factor vector
   void allocNormFactor();
