@@ -26,8 +26,7 @@ inline unsigned getDegree(Graph* g, index_t v) {
   return g->edge_end(v) - g->edge_begin(v);
 }
 
-void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g,
-                                    DGraph* dg) {
+void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGraph* dg) {
   this->count_ = count;
   // save original graph
   Sampler::globalGraph = g;
@@ -41,7 +40,7 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g,
   // get degrees of nodes that will be in new graph
   this->getMaskedDegrees(g->size(), masks, g, degrees);
   auto offsets = deepgalois::parallel_prefix_sum(degrees);
-  size_t ne    = offsets[g->size()];
+  auto ne    = offsets[g->size()];
 
   // save ids (of original graph) of training nodes to vector
   for (size_t i = 0; i < g->size(); i++) {
@@ -86,7 +85,7 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g,
 
 // helper function for graph saint implementation below
 void Sampler::checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
-                        std::vector<db_t>& DB2, size_t size) {
+                        std::vector<db_t>& DB2, index_t size) {
   if (DB0.capacity() < size) {
     DB0.reserve(DB0.capacity() * 2);
     DB1.reserve(DB1.capacity() * 2);
@@ -99,10 +98,8 @@ void Sampler::checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
 
 // implementation from GraphSAINT
 // https://github.com/GraphSAINT/GraphSAINT/blob/master/ipdps19_cpp/sample.cpp
-void Sampler::selectVertices(size_t n, int m, VertexSet& st, unsigned seed) {
-  if (n < (size_t)m) {
-    m = n;
-  }
+void Sampler::selectVertices(index_t n, VertexSet& st, unsigned seed) {
+  if (n < m) m = n;
   unsigned myseed = seed;
 
   // unsigned myseed = tid;
@@ -127,7 +124,7 @@ void Sampler::selectVertices(size_t n, int m, VertexSet& st, unsigned seed) {
   // for (size_t i = 0; i < 10; i++) std::cout << trainingNodes[i] << " ";
   // printf(")\n");
 
-  for (int i = 0; i < m; i++) {
+  for (index_t i = 0; i < m; i++) {
     auto rand_idx = rand_r(&myseed) % Sampler::trainingNodes.size();
     db_t v = IA3[i] = Sampler::trainingNodes[rand_idx];
     st.insert(v);
@@ -139,11 +136,11 @@ void Sampler::selectVertices(size_t n, int m, VertexSet& st, unsigned seed) {
   // calculate prefix sum for IA0 and store in IA2 to compute the address for
   // each frontier in DB
   IA2[0] = IA0[0];
-  for (int i = 1; i < m; i++)
+  for (index_t i = 1; i < m; i++)
     IA2[i] = IA2[i - 1] + IA0[i];
   // now fill DB accordingly
   checkGSDB(DB0, DB1, DB2, IA2[m - 1]);
-  for (int i = 0; i < m; i++) {
+  for (index_t i = 0; i < m; i++) {
     db_t DB_start = (i == 0) ? 0 : IA2[i - 1];
     db_t DB_end   = IA2[i];
     for (auto j = DB_start; j < DB_end; j++) {
@@ -154,7 +151,7 @@ void Sampler::selectVertices(size_t n, int m, VertexSet& st, unsigned seed) {
   }
 
   db_t choose, neigh_v, newsize, tmp;
-  for (size_t itr = 0; itr < n - m; itr++) {
+  for (index_t itr = 0; itr < n - m; itr++) {
     choose = db_t(-1);
     while (choose == db_t(-1)) {
       tmp = rand_r(&myseed) % DB0.size();
@@ -249,24 +246,24 @@ void Sampler::selectVertices(size_t n, int m, VertexSet& st, unsigned seed) {
 // n: number of vertices in the subgraph;
 // m: number of vertices in the frontier.
 // our implementation of GraphSAINT sampling
-void Sampler::selectVertices(size_t nv, size_t n, int m, Graph* g,
+void Sampler::selectVertices(index_t nv, index_t n, Graph* g,
                              VertexList vertices, VertexSet& vertex_set) {
   // galois::gPrint("Select a vertex set of size ", n, " from ", nv, " vertices,
   // graph size: ", g->size(), "\n");
   assert(nv == vertices.size());
-  auto frontier_indices = deepgalois::select_k_items(
-      m, 0, (int)nv); // randomly select m vertices from vertices as frontier
+  // randomly select m vertices from vertices as frontier
+  auto frontier_indices = deepgalois::select_k_items((int)m, 0, (int)nv);
   VertexList frontier(m);
-  for (int i = 0; i < m; i++)
+  for (index_t i = 0; i < m; i++)
     frontier[i] = vertices[frontier_indices[i]];
   vertex_set.insert(frontier.begin(), frontier.end());
   // galois::gPrint("vertex_set size: ", vertex_set.size(), "\n");
   int* degrees = new int[m];
-  for (int i = 0; i < m; i++) {
-    // galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
+  //galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
+  for (index_t i = 0; i < m; i++) {
     degrees[i] = (int)getDegree(g, frontier[i]);
   } //, galois::loopname("compute_degrees"));
-  for (size_t i = 0; i < n - m; i++) {
+  for (index_t i = 0; i < n - m; i++) {
     auto pos    = select_one_item((int)m, degrees);
     auto u      = frontier[pos];
     auto degree = degrees[pos];
@@ -294,8 +291,7 @@ void Sampler::selectVertices(size_t nv, size_t n, int m, Graph* g,
 void Sampler::createMasks(size_t n, VertexSet vertices, mask_t* masks) {
   // galois::gPrint("Updating masks, size = ", vertices.size(), "\n");
   std::fill(masks, masks + n, 0);
-  for (auto v : vertices)
-    masks[v] = 1;
+  for (auto v : vertices) masks[v] = 1;
 }
 
 inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
@@ -309,8 +305,7 @@ inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
 
 // Given a subset of vertices and a graph g, generate a subgraph sg from the
 // graph g
-void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
-                              Graph& reindexGraph) {
+void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& reindexGraph) {
   // auto n = origGraph.size(); // old graph size
   auto nv            = keptVertices.size(); // new graph (subgraph) size
   VertexList new_ids = this->reindexVertices(globalGraph->size(), keptVertices);
@@ -328,9 +323,7 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
   VertexList old_ids(keptVertices.begin(),
                      keptVertices.end()); // vertex ID mapping
 #ifdef PARALLEL_GEN
-  galois::do_all(
-      galois::iterate((size_t)0, nv),
-      [&](const auto i) {
+  galois::do_all(galois::iterate((size_t)0, nv), [&](const auto i) {
 #else
   for (size_t i = 0; i < nv; i++) {
 #endif
@@ -346,8 +339,7 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
         }
       }
 #ifdef PARALLEL_GEN
-      ,
-      galois::loopname("construct_graph"));
+      , galois::loopname("construct_graph"));
 #endif
 }
 
@@ -362,14 +354,9 @@ VertexSet Sampler::convertToLID(VertexSet& gidSet) {
   return existingLIDs;
 }
 
-void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks,
-                             unsigned seed) {
-  VertexSet sampledSet;
+void Sampler::generateSubgraph(VertexSet &sampledSet, mask_t* masks, Graph* sg) {
   // n = 9000 by default
-  // this->selectVertices(count_, n, m_, globalMaskedGraph, vertices_,
-  // sampledSet); do the sampling of vertices from training set + using masked
-  // graph
-  this->selectVertices(n, m_, sampledSet, seed); // m = 1000 by default
+  // do the sampling of vertices from training set + using masked graph
 
   // sampledSet is a list of *global* ids in the graph
   // create new vertex set with LIDs for partitioned graph
@@ -388,10 +375,9 @@ void Sampler::sampleSubgraph(size_t n, Graph& sg, mask_t* masks,
   // this graph will contain sampled vertices and induced subgraph for it
   Graph maskedSG;
   // TODO use partMaskedGraph once constructed later
-  this->getMaskedGraph(
-      Sampler::partGraph->size(), masks, Sampler::partGraph,
-      maskedSG); // remove edges whose destination is not masked
-  this->reindexSubgraph(sampledLIDs, maskedSG, sg);
+  // remove edges whose destination is not masked
+  this->getMaskedGraph(Sampler::partGraph->size(), masks, Sampler::partGraph, maskedSG);
+  this->reindexSubgraph(sampledLIDs, maskedSG, *sg);
 
   // galois::gPrint("sg num edges is ", sg.sizeEdges(), "\n");
 }

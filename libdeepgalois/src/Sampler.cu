@@ -97,8 +97,7 @@ inline VertexList Sampler::reindexing_vertices(size_t n, VertexSet vertex_set) {
   return new_ids;
 }
 
-void Sampler::generate_masked_graph(index_t n, mask_t* masks, GraphGPU* g,
-                                    GraphGPU* subg) {
+void Sampler::generate_masked_graph(index_t n, mask_t* masks, GraphGPU* g, GraphGPU* subg) {
   index_t *degrees, *offsets;
   CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*n);
   get_masked_degrees<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, g, degrees);
@@ -112,33 +111,26 @@ void Sampler::generate_masked_graph(index_t n, mask_t* masks, GraphGPU* g,
   CUDA_CHECK(cudaFree(pffsets));
 }
 
-// use a random walk to select vertex subset
-void Sampler::select_vertices(size_t n, int m, VertexSet& st) {}
-
 // n: size of the original graph
 // nv: size of the subgraph; i.e. size of vertex_set
 // masks, graph g and subgraph sub are on the device (GPU)
-void Sampler::generate_subgraph(index_t nv, VertexSet vertex_set, mask_t* masks,
-                                GraphGPU* g, GraphGPU* sub) {
+void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* g, GraphGPU* sub) {
+  auto nv = vertex_set.size();
   // convert the vertex_set to a vertex_list and copy it to the device
   VertexList vertex_list(vertex_set.begin(), vertex_set.end());
   index_t* d_vertex_list;
   cudaMalloc((void**)&d_vertex_list, nv * sizeof(index_t));
-  CUDA_CHECK(cudaMemcpy(d_vertex_list, &vertex_list[0], nv * sizeof(index_t),
-                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_vertex_list, &vertex_list[0], nv * sizeof(index_t), cudaMemcpyHostToDevice));
 
   index_t n = graph->size();
-  update_masks(n, d_vertex_list,
-               masks); // set masks for vertices in the vertex_set
-  GraphGPU
-      masked_sg; // size is the same as original graph, but masked dst removed
-  generate_masked_graph(
-      n, masks, g, &masked_sg); // remove edges whose destination is not masked
+  update_masks(n, d_vertex_list, masks); // set masks for vertices in the vertex_set
+  GraphGPU masked_sg; // size is the same as original graph, but masked dst removed
+  generate_masked_graph(n, masks, globalGraph, &masked_sg); // remove edges whose destination is not masked
 
   // re-index the subgraph
-  index_t* d_new_ids; // Given an old vertex ID ∈ [0, n), returns a new vertex
-                      // ID ∈ [0, nv)
+  index_t* d_new_ids;
   cudaMalloc((void**)&d_new_ids, n * sizeof(index_t));
+  // Given an old vertex ID ∈ [0, n), returns a new vertex ID ∈ [0, nv)
   auto new_ids = reindexing_vertices(nv, vertex_set);
   CUDA_CHECK(cudaMemcpy(d_new_ids, &new_ids[0], n * sizeof(index_t),
                         cudaMemcpyHostToDevice));

@@ -270,7 +270,7 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
 }
 
 void DistContext::constructNormFactorSub(int subgraphID) {
-    galois::gPrint("Sub norm factor construction\n");
+    //galois::gPrint("Sub norm factor construction\n");
     // right now norm factor based on subgraph
     // TODO fix this for dist execution
 
@@ -316,7 +316,7 @@ void DistContext::constructNormFactorSub(int subgraphID) {
       },
       galois::loopname("NormCountingNode"));
 #endif
-  galois::gPrint("Sub norm factor construction done\n");
+  //galois::gPrint("Sub norm factor construction done\n");
 }
 //! generate labels for the subgraph, m is subgraph size, mask
 //! tells which vertices to use

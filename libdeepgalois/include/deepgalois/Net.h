@@ -230,9 +230,11 @@ public:
           // generate subgraphs
 #ifndef __GALOIS_HET_CUDA__
           for (int sid = 0; sid < num_subgraphs; sid++) {
-            sampler->sampleSubgraph(
-                subgraph_sample_size, *(distContext->getSubgraphPointer(sid)),
-                &subgraphs_masks[sid * globalSamples], curEpoch);
+            VertexSet sampledSet;
+            sampler->selectVertices(subgraph_sample_size, sampledSet, curEpoch); // m = 1000 by default
+            sampler->generateSubgraph(sampledSet,
+                                      &subgraphs_masks[sid * globalSamples],
+                                      distContext->getSubgraphPointer(sid));
           }
 #endif
           num_subg_remain = num_subgraphs;
