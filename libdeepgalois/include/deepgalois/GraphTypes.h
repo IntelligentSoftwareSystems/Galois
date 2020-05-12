@@ -4,7 +4,10 @@
 #include "deepgalois/lgraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
+#define USE_CSRGRAPH
+#ifdef USE_CSRGRAPH
 #include "graph_gpu.h"
+#endif
 #else
 #include "galois/Galois.h"
 #include "galois/graphs/NewGeneric.h"

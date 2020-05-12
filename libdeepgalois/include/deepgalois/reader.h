@@ -1,5 +1,5 @@
 #pragma once
-#include "deepgalois/GraphTypes.h"
+#include "deepgalois/lgraph.h"
 
 namespace deepgalois {
 
@@ -16,7 +16,7 @@ public:
   size_t read_features(float_t*& feats, std::string filetype = "bin");
   size_t read_masks(std::string mask_type, size_t n, size_t& begin, size_t& end,
                     mask_t* masks);
-  void readGraphFromGRFile(Graph* g);
+  void readGraphFromGRFile(LearningGraph* g);
 };
 
 } // namespace deepgalois

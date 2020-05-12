@@ -1,5 +1,5 @@
 #include "deepgalois/math_functions.hh"
-#include "deepgalois/context.h"
+#include "deepgalois/DistContext.h"
 #include "gg.h"
 #include "ggcuda.h"
 #include "cub/cub.cuh"

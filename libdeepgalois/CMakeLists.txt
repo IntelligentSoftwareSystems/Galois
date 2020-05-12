@@ -27,7 +27,7 @@ link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
 if(ENABLE_HETERO_GALOIS)
   # hetero path
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -D__GALOIS_HET_CUDA__")
+  set(CUDA_NVCC_FLAGS "-D__GALOIS_HET_CUDA__ ${CUDA_NVCC_FLAGS}")
   set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
   include_directories("${CUB_ROOT}")
   set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
@@ -57,7 +57,7 @@ if(ENABLE_HETERO_GALOIS)
     src/layers/aggregator.cu
     src/math_functions.cu
     src/optimizer.cu
-    src/context.cu
+    src/DistContext.cu
     src/lgraph.cu
     src/node.cu
     src/Net.cu

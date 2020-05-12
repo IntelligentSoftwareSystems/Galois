@@ -1,15 +1,65 @@
 #ifdef GALOIS_USE_DIST
 #include "DistributedGraphLoader.h"
+#include "galois/DistGalois.h"
+#include "galois/runtime/Network.h"
+#endif
+#include "deepgalois/Net.h"
+
+//! initialize lonestargnn benchmark
+void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
+                      const char* url) {
+  llvm::cl::SetVersionPrinter(LonestarGnnPrintVersion);
+  llvm::cl::ParseCommandLineOptions(argc, argv);
+  galois::runtime::setStatFile(statFile);
+
+#ifndef __GALOIS_HET_CUDA__
+  numThreads = galois::setActiveThreads(numThreads); // number of threads on CPU
 #endif
 
+#ifdef GALOIS_USE_DIST
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  if (net.ID == 0) {
+#endif
+  LonestarGnnPrintVersion(llvm::outs());
+  std::cout << "Copyright (C) " << galois::getCopyrightYear()
+            << " The University of Texas at Austin\n";
+  std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
+  std::cout << "application: " << (app ? app : "unspecified") << "\n";
+  if (desc)
+    std::cout << desc << "\n";
+  if (url)
+    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
+              << url << "\n";
+  std::cout << "\n";
+  std::ostringstream cmdout;
+  for (int i = 0; i < argc; ++i) {
+    cmdout << argv[i];
+    if (i != argc - 1)
+      cmdout << " ";
+  }
+  galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+  galois::runtime::reportParam("(NULL)", "Threads", numThreads);
+#ifdef GALOIS_USE_DIST
+  }
+#endif
+
+  char name[256];
+  gethostname(name, 256);
+  galois::runtime::reportParam("(NULL)", "Hostname", name);
+}
+
 int main(int argc, char** argv) {
+#ifdef GALOIS_USE_DIST
   galois::DistMemSys G;
+#endif
   LonestarGnnStart(argc, argv, name, desc, url);
 
   // Get a partitioned graph first
   std::vector<unsigned> dummyVec;
-  deepgalois::DGraph* dGraph =
-      galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+  deepgalois::DGraph* dGraph = NULL;
+#ifdef GALOIS_USE_DIST
+  dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
+#endif
 
   // initialize network + whole context on CPU
   // read network, features, ground truth, initialize metadata

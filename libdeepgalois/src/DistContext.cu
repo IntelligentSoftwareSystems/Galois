@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <sys/types.h>
-#include "deepgalois/context.h"
+#include "deepgalois/DistContext.h"
 #include "deepgalois/math_functions.hh"
 #include "deepgalois/configs.h"
 
@@ -27,26 +27,21 @@ int64_t cluster_seedgen(void) {
 namespace deepgalois {
 
 // computing normalization factor for each vertex
-__global__ void norm_factor_computing_node(int n, GraphGPU graph,
-                                           float_t* norm_fac) {
+__global__ void norm_factor_computing_node(int n, GraphGPU graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(i, n) {
     float_t temp = sqrt(float_t(graph.getOutDegree(i)));
-    if (temp == 0.0)
-      norm_fac[i] = 0.0;
-    else
-      norm_fac[i] = 1.0 / temp;
+    if (temp == 0.0) norm_fac[i] = 0.0;
+    else norm_fac[i] = 1.0 / temp;
   }
 }
 
 // TODO: make sure self-loop added for each vertex
 // computing normalization factor for each edge
-__global__ void norm_factor_computing_edge(int n, GraphGPU graph,
-                                           float_t* norm_fac) {
+__global__ void norm_factor_computing_edge(int n, GraphGPU graph, float_t* norm_fac) {
   CUDA_KERNEL_LOOP(src, n) {
     assert(src < n);
     float_t d_src = float_t(graph.getOutDegree(src));
-    assert(d_src !=
-           0.0); // should never be zero since self-loop added for each vertex
+    assert(d_src != 0.0); // should never be zero since self-loop added for each vertex
     d_src       = 1.0 / sqrt(d_src);
     auto start  = graph.edge_begin(src);
     index_t end = graph.edge_end(src);
@@ -63,12 +58,12 @@ __global__ void norm_factor_computing_edge(int n, GraphGPU graph,
   }
 }
 
-cublasHandle_t Context::cublas_handle_         = 0;
-cusparseHandle_t Context::cusparse_handle_     = 0;
-cusparseMatDescr_t Context::cusparse_matdescr_ = 0;
-curandGenerator_t Context::curand_generator_   = 0;
+cublasHandle_t DistContext::cublas_handle_         = 0;
+cusparseHandle_t DistContext::cusparse_handle_     = 0;
+cusparseMatDescr_t DistContext::cusparse_matdescr_ = 0;
+curandGenerator_t DistContext::curand_generator_   = 0;
 
-Context::Context() : Context(true) {
+DistContext::DistContext() : DistContext(true) {
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -82,7 +77,7 @@ Context::Context() : Context(true) {
       curandSetPseudoRandomGeneratorSeed(curand_generator_, cluster_seedgen()));
 }
 
-Context::~Context() {
+DistContext::~DistContext() {
   if (cublas_handle_)
     CUBLAS_CHECK(cublasDestroy(cublas_handle_));
   if (cusparse_handle_)
@@ -95,38 +90,37 @@ Context::~Context() {
     CUDA_CHECK(cudaFree(d_labels));
   if (d_feats)
     CUDA_CHECK(cudaFree(d_feats));
-  if (norm_factors)
-    CUDA_CHECK(cudaFree(norm_factors));
 }
 
-void Context::allocateSubgraphs(int n_sg) {}
+void DistContext::allocateSubgraphs(int n_sg) {}
 
-void Context::gen_subgraph_labels(size_t m, const mask_t* masks) {}
+void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {}
 
-void Context::gen_subgraph_feats(size_t m, const mask_t* masks) {}
+void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {}
 
-void Context::norm_factor_computing(bool is_subgraph, int subg_id) {
+void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
+  auto n = partitionedGraph->size();
   std::cout << "Pre-computing normalization factor (n=" << n << ") ... ";
   if (!is_selfloop_added) {
     std::cout << "Set -sl=1 to add selfloop\n";
     exit(0);
   }
 #ifdef USE_CUSPARSE
-  int nnz = graph_gpu.sizeEdges();
-  CUDA_CHECK(cudaMalloc((void**)&norm_factors, nnz * sizeof(float_t)));
-  init_const_gpu(nnz, 0.0, norm_factors);
+  int nnz = partitionedGraph->sizeEdges();
+  CUDA_CHECK(cudaMalloc((void**)&normFactors[0], nnz * sizeof(float_t)));
+  init_const_gpu(nnz, 0.0, &normFactors[0]);
   norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, norm_factors);
+      n, *partitionedGraph, &normFactors[0]);
 #else
-  CUDA_CHECK(cudaMalloc((void**)&norm_factors, n * sizeof(float_t)));
+  CUDA_CHECK(cudaMalloc((void**)&(&normFactors[0]), n * sizeof(float_t)));
   norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
-      n, graph_gpu, norm_factors);
+      n, *partitionedGraph, &normFactors[0]);
 #endif
   CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";
 }
 /*
-void Context::SetDevice(const int device_id) {
+void DistContext::SetDevice(const int device_id) {
   int current_device;
   CUDA_CHECK(cudaGetDevice(&current_device));
   if (current_device == device_id) return;
@@ -141,7 +135,8 @@ CURAND_RNG_PSEUDO_DEFAULT));
 cluster_seedgen()));
 }
 */
-size_t Context::read_graph(bool selfloop) {
+size_t DistContext::read_graph(std::string dataset, bool selfloop) {
+  partitionedGraph = new DGraph();
 #ifdef USE_CSRGRAPH
   std::string filename = path + dataset + ".csgr";
   GraphGPU g;
@@ -150,41 +145,30 @@ size_t Context::read_graph(bool selfloop) {
     g.add_selfloop();
     is_selfloop_added = selfloop;
   }
-  g.copy_to_gpu(graph_gpu);
+  g.copy_to_gpu(*partitionedGraph);
 #else
-  graph_gpu.readGraph(dataset);
+  partitionedGraph->readGraph(dataset);
   if (selfloop) {
-    graph_gpu.add_selfloop();
+    partitionedGraph->add_selfloop();
     is_selfloop_added = selfloop;
   }
-  graph_gpu.copy_to_gpu();
+  partitionedGraph->copy_to_gpu();
 #endif
-  n = graph_gpu.size();
-  return n;
+  return partitionedGraph->size();
 }
 
-void Context::copy_data_to_device() {
-  if (is_single_class) {
+void DistContext::copy_data_to_device() {
+  auto n = partitionedGraph->size();
+  if (usingSingleClass) {
     CUDA_CHECK(cudaMalloc((void**)&d_labels, n * sizeof(label_t)));
-    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * sizeof(label_t),
-                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * sizeof(label_t), cudaMemcpyHostToDevice));
   } else {
-    CUDA_CHECK(
-        cudaMalloc((void**)&d_labels, n * num_classes * sizeof(label_t)));
-    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * num_classes * sizeof(label_t),
-                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void**)&d_labels, n * num_classes * sizeof(label_t)));
+    CUDA_CHECK(cudaMemcpy(d_labels, h_labels, n * num_classes * sizeof(label_t), cudaMemcpyHostToDevice));
   }
   CUDA_CHECK(cudaMalloc((void**)&d_feats, n * feat_len * sizeof(float_t)));
-  CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t),
-                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_feats, &h_feats[0], n * feat_len * sizeof(float_t), cudaMemcpyHostToDevice));
   // print_device_vector(10, d_feats, "d_feats");
 }
-
-// void Context::copy_data_to_device() {
-// float_malloc_device(n, d_labels);
-// float_copy_device(n, h_labels, d_labels);
-// float_malloc_device(n*feat_len, d_feats);
-// float_copy_device(n*feat_len, &h_feats[0], d_feats);
-//}
 
 } // namespace deepgalois

@@ -131,6 +131,10 @@ public:
     graphTopologyContext->set_dataset(dataset_str);
     // read *entire* graph, get num nodes
     globalSamples = graphTopologyContext->read_graph(selfloop);
+#ifdef __GALOIS_HET_CUDA__
+    this->distContext = new deepgalois::DistContext();
+    this->distNumSamples = this->distContext->read_graph(dataset_str, selfloop);
+#endif
 
     // get training and validation sets: this is to create the training
     // subgraph in the sampler

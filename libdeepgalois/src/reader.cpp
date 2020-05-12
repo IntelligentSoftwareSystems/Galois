@@ -166,7 +166,7 @@ void Reader::progressPrint(unsigned max, unsigned i) {
   }
 }
 
-void Reader::readGraphFromGRFile(Graph* g) {
+void Reader::readGraphFromGRFile(LearningGraph* g) {
   std::string filename = path + dataset_str + ".csgr";
   std::ifstream ifs;
   ifs.open(filename);
