@@ -15,6 +15,7 @@
 
 namespace deepgalois {
 using edge_iterator = index_t;
+using GraphCPU      = LearningGraph;
 #ifdef __GALOIS_HET_CUDA__
 using DGraph        = CSRGraph;
 using Graph         = CSRGraph;

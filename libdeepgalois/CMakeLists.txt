@@ -84,7 +84,6 @@ else()
     src/layers/aggregator.cpp
     src/math_functions.cpp
     src/optimizer.cpp
-    src/Context.cpp
     src/DistContext.cpp
     src/Sampler.cpp
     src/reader.cpp

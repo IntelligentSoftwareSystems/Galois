@@ -56,7 +56,7 @@ public:
   void degree_counting();
   void constructNodes() {}
 
-  void readGraph(std::string dataset);
+  void readGraph(std::string dataset, bool selfloop = false);
   void fixEndEdge(index_t vid, index_t row_end) { rowptr_[vid + 1] = row_end; }
   void allocateFrom(index_t nv, index_t ne) {
     // printf("Allocating num_vertices %d num_edgesi %d\n", num_vertices_,

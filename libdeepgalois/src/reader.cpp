@@ -255,4 +255,36 @@ void Reader::readGraphFromGRFile(LearningGraph* g) {
             << masterLength / 1000.0 / runtime << " MB/s)\n\n";
 }
 
+/*
+void add_selfloop(Graph& og, Graph& g) {
+  g.allocateFrom(og.size(), og.size() + og.sizeEdges());
+  g.constructNodes();
+   for (size_t src = 0; src < og.size(); src++) {
+    //g.getData(src) = 1;
+    auto begin = og.edge_begin(src);
+    auto end = og.edge_end(src);
+    g.fixEndEdge(src, end+src+1);
+    bool self_inserted = false;
+    if (begin == end) {
+      new_edge_dst[begin+i] = i;
+      continue;
+    }
+    for (auto e = begin; e != end; e++) {
+      auto dst = og.getEdgeDst(e);
+      if (!self_inserted) {
+        if (dst > src) {
+          g.constructEdge(e+src, src, 0);
+          g.constructEdge(e+src+1, dst, 0);
+          self_inserted = true;
+        } else if (e+1 == end) {
+          g.constructEdge(e+src+1, src, 0);
+          g.constructEdge(e+src, dst, 0);
+          self_inserted = true;
+        } else g.constructEdge(e+src, dst, 0);
+      } else g.constructEdge(e+src+1, dst, 0);
+    }
+  }
+}
+//*/
+
 } // namespace deepgalois

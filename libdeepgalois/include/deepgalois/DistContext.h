@@ -1,14 +1,15 @@
 #ifndef __DG_DIST_CONTEXT__
 #define __DG_DIST_CONTEXT__
-/**
- * Based on common.hpp file of the Caffe deep learning library.
- */
-#ifndef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
+#include "deepgalois/cutils.h"
+#else
 #include "galois/graphs/GluonSubstrate.h"
 #endif
+
 #include "deepgalois/types.h"
 #include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
+#include "deepgalois/reader.h"
 
 namespace deepgalois {
 
@@ -16,6 +17,7 @@ class DistContext {
   bool is_device;         // is this on device or host
   bool is_selfloop_added; // whether selfloop is added to the input graph
   bool usingSingleClass;
+  std::string dataset;
   size_t num_classes;     // number of classes: E
   size_t feat_len;        // input feature length: D
   Graph* lGraph;          // laerning graph version
@@ -36,6 +38,8 @@ class DistContext {
   std::vector<float_t> h_feats_subg;   // input features for subgraph
   std::vector<float_t> normFactors;    // normalization constant based on graph structure
   std::vector<float_t> normFactorsSub; // normalization constant for subgraph
+
+  Reader reader;
 
 public:
   // TODO better constructor
@@ -58,13 +62,13 @@ public:
   DGraph* getGraphPointer() { return partitionedGraph; }
   Graph* getLGraphPointer() { return lGraph; }
   Graph* getSubgraphPointer(int id) { return partitionedSubgraphs[id]; };
-  float_t* get_feats_ptr() { return h_feats; }
-  float_t* get_feats_subg_ptr() { return h_feats_subg.data(); }
-  label_t* get_labels_ptr() { return h_labels; }
-  label_t* get_labels_subg_ptr() { return h_labels_subg.data(); }
 
   void initializeSyncSubstrate();
 #ifdef __GALOIS_HET_CUDA__
+  float_t* get_feats_ptr() { return d_feats; }
+  float_t* get_feats_subg_ptr() { return d_feats_subg; }
+  label_t* get_labels_ptr() { return d_labels; }
+  label_t* get_labels_subg_ptr() { return d_labels_subg; }
   void copy_data_to_device(); // copy labels and input features
   static cublasHandle_t cublas_handle_;         // used to call cuBLAS
   static cusparseHandle_t cusparse_handle_;     // used to call cuSPARSE
@@ -77,7 +81,16 @@ public:
 #else
   void saveDistGraph(DGraph* a);
   galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
+  float_t* get_feats_ptr() { return h_feats; }
+  float_t* get_feats_subg_ptr() { return h_feats_subg.data(); }
+  label_t* get_labels_ptr() { return h_labels; }
+  label_t* get_labels_subg_ptr() { return h_labels_subg.data(); }
 #endif
+
+  void set_dataset(std::string dataset_str) {
+    dataset = dataset_str;
+    reader.init(dataset);
+  }
 
   //! allocate the norm factor vector
   void allocNormFactor();

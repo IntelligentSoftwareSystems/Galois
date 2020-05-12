@@ -92,6 +92,10 @@ DistContext::~DistContext() {
     CUDA_CHECK(cudaFree(d_feats));
 }
 
+size_t read_masks(std::string mask_type, size_t n, size_t& begin, size_t& end, mask_t* masks) {
+  return reader.read_masks(mask_type, n, begin, end, masks);
+}
+
 void DistContext::allocateSubgraphs(int n_sg) {}
 
 void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {}
@@ -119,6 +123,10 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
   CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";
 }
+
+void DistContext::constructNormFactorSub(int subgraphID) {
+}
+
 /*
 void DistContext::SetDevice(const int device_id) {
   int current_device;

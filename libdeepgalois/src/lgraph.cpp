@@ -20,7 +20,8 @@ uint64_t LearningGraph::numMasters() { return 0; }
 
 uint64_t LearningGraph::globalSize() { return 0; }
 
-void LearningGraph::readGraph(std::string dataset) {
+void LearningGraph::readGraph(std::string dataset, bool selfloop) {
+  if (selfloop) std::cout << "selfloop not yet implemented\n";
   deepgalois::Reader reader(dataset);
   reader.readGraphFromGRFile(this);
 }
@@ -28,10 +29,9 @@ void LearningGraph::readGraph(std::string dataset) {
 void LearningGraph::degree_counting() {
   // if (degrees_ != NULL) return;
   // degrees_ = new index_t[num_vertices_];
-  galois::do_all(
-      galois::iterate(size_t(0), size_t(num_vertices_)),
-      [&](auto v) { degrees_[v] = rowptr_[v + 1] - rowptr_[v]; },
-      galois::loopname("DegreeCounting"));
+  galois::do_all(galois::iterate(size_t(0), size_t(num_vertices_)),
+    [&](auto v) { degrees_[v] = rowptr_[v + 1] - rowptr_[v]; },
+    galois::loopname("DegreeCounting"));
 }
 
 void LearningGraph::dealloc() {}

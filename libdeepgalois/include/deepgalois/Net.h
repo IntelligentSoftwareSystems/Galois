@@ -133,6 +133,7 @@ public:
     globalSamples = graphTopologyContext->read_graph(selfloop);
 #ifdef __GALOIS_HET_CUDA__
     this->distContext = new deepgalois::DistContext();
+    this->distContext->set_dataset(dataset_str);
     this->distNumSamples = this->distContext->read_graph(dataset_str, selfloop);
 #endif
 
