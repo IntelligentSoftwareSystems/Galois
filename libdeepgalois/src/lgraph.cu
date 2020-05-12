@@ -5,7 +5,7 @@
 
 namespace deepgalois {
 
-void LearningGraph::readGraph(std::string dataset) {
+void LearningGraph::readGraph(std::string dataset, bool selfloop) {
   deepgalois::Reader reader(dataset);
   reader.readGraphFromGRFile(this);
 }

@@ -30,8 +30,7 @@ void DistContext::saveDistGraph(DGraph* a) {
 }
 
 // TODO move to reader class
-size_t DistContext::read_labels(bool isSingleClassLabel,
-                                std::string dataset_str) {
+size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str) {
   DGraph* dGraph         = DistContext::partitionedGraph;
   this->usingSingleClass = isSingleClassLabel;
   unsigned myID          = galois::runtime::getSystemNetworkInterface().ID;
@@ -49,14 +48,12 @@ size_t DistContext::read_labels(bool isSingleClassLabel,
   // size of labels should be # local nodes
   if (isSingleClassLabel) {
     galois::gPrint("[", myID, "] One hot labels...\n");
-    this->h_labels =
-        new label_t[dGraph->size()]; // single-class (one-hot) label for
-                                     // each vertex: N x 1
+    // single-class (one-hot) label for each vertex: N x 1
+    this->h_labels = new label_t[dGraph->size()]; 
   } else {
     galois::gPrint("[", myID, "] Multi-class labels...\n");
-    this->h_labels = new label_t[dGraph->size() *
-                                 this->num_classes]; // multi-class label for
-                                                     // each vertex: N x E
+    this->h_labels = new label_t[dGraph->size() * this->num_classes]; 
+    // multi-class label for each vertex: N x E
   }
 
   uint32_t foundVertices = 0;

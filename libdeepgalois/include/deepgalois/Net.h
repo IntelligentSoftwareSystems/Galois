@@ -110,7 +110,7 @@ public:
 
     assert(n_conv > 0);
 
-    // TODO use galois print
+    // TODO use galois print: need avoid including Galois.h for GPU
     std::cout << header << "Configuration: num_threads " << num_threads
               << ", num_conv_layers " << num_conv_layers << ", num_epochs "
               << num_epochs << ", hidden1 " << hidden1 << ", learning_rate "
@@ -131,11 +131,6 @@ public:
     graphTopologyContext->set_dataset(dataset_str);
     // read *entire* graph, get num nodes
     globalSamples = graphTopologyContext->read_graph(selfloop);
-#ifdef __GALOIS_HET_CUDA__
-    this->distContext = new deepgalois::DistContext();
-    this->distContext->set_dataset(dataset_str);
-    this->distNumSamples = this->distContext->read_graph(dataset_str, selfloop);
-#endif
 
     // get training and validation sets: this is to create the training
     // subgraph in the sampler
@@ -166,18 +161,16 @@ public:
           "val", globalSamples, globalValBegin, globalValEnd, globalValMasks);
     }
 
-#ifndef __GALOIS_HET_CUDA__
     // make sure sampel size isn't greater than what we have to train with
-    if (subgraph_sample_size > globalTrainCount) {
-      GALOIS_DIE("subgraph size can not be larger than the size of training "
-                 "set\n");
-    }
+    assert(subgraph_sample_size <= globalTrainCount);
+
+    layers.resize(num_layers);
+    // hidden1 level embedding: 16
+    for (size_t i = 1; i < num_conv_layers; i++) feature_dims[i] = this->h1;
 
     // features are read in distcontext, not this context (this context only
     // used for sampling)
-
-    this->sampler = new Sampler();
-#endif
+    init();
   }
 
   //! Default net constructor

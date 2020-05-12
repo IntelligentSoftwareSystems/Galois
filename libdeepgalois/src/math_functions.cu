@@ -33,12 +33,12 @@ bool isnan_gpu(int n, const float_t* array) {
 
 void gpu_rng_uniform(size_t n, float_t* r) {
   CURAND_CHECK(
-      curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
+      curandGenerateUniform(deepgalois::DistContext::curand_generator(), r, n));
 }
 
 void rng_uniform_gpu(size_t n, const float_t a, const float_t b, float_t* r) {
   CURAND_CHECK(
-      curandGenerateUniform(deepgalois::Context::curand_generator(), r, n));
+      curandGenerateUniform(deepgalois::DistContext::curand_generator(), r, n));
   const float range = b - a;
   if (range != float_t(1))
     scal_gpu(n, range, r);
@@ -48,7 +48,7 @@ void rng_uniform_gpu(size_t n, const float_t a, const float_t b, float_t* r) {
 
 void gpu_rng_gaussian(const int n, const float_t mu, const float_t sigma,
                       float_t* r) {
-  CURAND_CHECK(curandGenerateNormal(deepgalois::Context::curand_generator(), r,
+  CURAND_CHECK(curandGenerateNormal(deepgalois::DistContext::curand_generator(), r,
                                     n, mu, sigma));
 }
 
@@ -203,7 +203,7 @@ void sgemm_gpu(const CBLAS_TRANSPOSE TransA, const CBLAS_TRANSPOSE TransB,
       (TransA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
   cublasOperation_t cuTransB =
       (TransB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  CUBLAS_CHECK(cublasSgemm(deepgalois::Context::cublas_handle(), cuTransB,
+  CUBLAS_CHECK(cublasSgemm(deepgalois::DistContext::cublas_handle(), cuTransB,
                            cuTransA, N, M, K, &alpha, B, ldb, A, lda, &beta, C,
                            N));
 }
@@ -228,14 +228,14 @@ void csrmm_gpu(const int M, const int N, const int K, const int nnz,
   // std::cout << "[debug] csrmm_gpu m=" << M << ", n=" << N << ", k=" << K <<
   // ", nnz=" << nnz << "\n";
   CUSPARSE_CHECK(cusparseScsrmm2(
-      deepgalois::Context::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE,
+      deepgalois::DistContext::cusparse_handle(), CUSPARSE_OPERATION_NON_TRANSPOSE,
       CUSPARSE_OPERATION_TRANSPOSE, M, N, K, nnz, &alpha,
-      deepgalois::Context::cusparse_matdescr(), A_nonzeros, A_idx_ptr,
+      deepgalois::DistContext::cusparse_matdescr(), A_nonzeros, A_idx_ptr,
       A_nnz_idx, B, N, &beta, transpose_C, M));
   // transpose C
   const float one  = 1.0;
   const float zero = 0.0;
-  CUBLAS_CHECK(cublasSgeam(deepgalois::Context::cublas_handle(), CUBLAS_OP_T,
+  CUBLAS_CHECK(cublasSgeam(deepgalois::DistContext::cublas_handle(), CUBLAS_OP_T,
                            CUBLAS_OP_T, N, M, &one, transpose_C, M, &zero, NULL,
                            M, C, N));
 }
@@ -253,21 +253,21 @@ A_nonzeros, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));
 CUSPARSE_ORDER_COL)); cusparseDnMatDescr_t C_descr;
   CUSPARSE_CHECK(cusparseCreateDnMat(&C_descr, M, N, M, C, CUDA_R_32F,
 CUSPARSE_ORDER_COL)); size_t bufferSize;
-  CUSPARSE_CHECK(cusparseSpMM_bufferSize(deepgalois::Context::cusparse_handle(),
+  CUSPARSE_CHECK(cusparseSpMM_bufferSize(deepgalois::DistContext::cusparse_handle(),
                        CUSPARSE_OPERATION_NON_TRANSPOSE,
 CUSPARSE_OPERATION_TRANSPOSE, (void*)&alpha, A_descr, B_descr, (void*)&beta,
 C_descr, CUDA_R_32F, CUSPARSE_COOMM_ALG1, &bufferSize));
   cudaDeviceSynchronize();
   void* buffer = NULL;
   if (bufferSize > 0) CUDA_CHECK(cudaMalloc(&buffer, bufferSize));
-  CUSPARSE_CHECK(cusparseSpMM(deepgalois::Context::cusparse_handle(),
+  CUSPARSE_CHECK(cusparseSpMM(deepgalois::DistContext::cusparse_handle(),
                  CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
                  (const void*)&alpha, A_descr, B_descr, (const void*)&beta,
 C_descr, CUDA_R_32F, CUSPARSE_COOMM_ALG1, buffer)); cudaDeviceSynchronize();
   //transpose C
   const float one = 1.0;
   const float zero = 0.0;
-  CUBLAS_CHECK(cublasSgeam(deepgalois::Context::cublas_handle(), CUBLAS_OP_T,
+  CUBLAS_CHECK(cublasSgeam(deepgalois::DistContext::cublas_handle(), CUBLAS_OP_T,
 CUBLAS_OP_T, N, M, &one, transpose_C, M, &zero, NULL, M, C, N));
 }
 //*/
@@ -276,29 +276,29 @@ void gemv_gpu(const CBLAS_TRANSPOSE TransA, const int M, const int N,
               const float beta, float* y) {
   cublasOperation_t cuTransA =
       (TransA == CblasNoTrans) ? CUBLAS_OP_T : CUBLAS_OP_N;
-  CUBLAS_CHECK(cublasSgemv(deepgalois::Context::cublas_handle(), cuTransA, N, M,
+  CUBLAS_CHECK(cublasSgemv(deepgalois::DistContext::cublas_handle(), cuTransA, N, M,
                            &alpha, A, N, x, 1, &beta, y, 1));
 }
 
 void scal_gpu(const int N, const float alpha, float* X) {
   CUBLAS_CHECK(
-      cublasSscal(deepgalois::Context::cublas_handle(), N, &alpha, X, 1));
+      cublasSscal(deepgalois::DistContext::cublas_handle(), N, &alpha, X, 1));
 }
 
 void dot_gpu(const int n, const float* x, const float* y, float* out) {
   CUBLAS_CHECK(
-      cublasSdot(deepgalois::Context::cublas_handle(), n, x, 1, y, 1, out));
+      cublasSdot(deepgalois::DistContext::cublas_handle(), n, x, 1, y, 1, out));
 }
 
 void asum_gpu(const int n, const float* x, float* y) {
-  CUBLAS_CHECK(cublasSasum(deepgalois::Context::cublas_handle(), n, x, 1, y));
+  CUBLAS_CHECK(cublasSasum(deepgalois::DistContext::cublas_handle(), n, x, 1, y));
 }
 
 void scale_gpu(const int n, const float alpha, const float* x, float* y) {
   CUBLAS_CHECK(
-      cublasScopy(deepgalois::Context::cublas_handle(), n, x, 1, y, 1));
+      cublasScopy(deepgalois::DistContext::cublas_handle(), n, x, 1, y, 1));
   CUBLAS_CHECK(
-      cublasSscal(deepgalois::Context::cublas_handle(), n, &alpha, y, 1));
+      cublasSscal(deepgalois::DistContext::cublas_handle(), n, &alpha, y, 1));
 }
 
 __global__ void set_kernel(const int n, const float_t alpha, float_t* y) {
@@ -341,7 +341,7 @@ __global__ void axpy_kernel(const int n, const float_t a, const float_t* x,
 void axpy_gpu(const int n, const float_t a, const float_t* x, float_t* y) {
   // axpy_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, a, x, y);
   CUBLAS_CHECK(
-      cublasSaxpy(deepgalois::Context::cublas_handle(), n, &a, x, 1, y, 1));
+      cublasSaxpy(deepgalois::DistContext::cublas_handle(), n, &a, x, 1, y, 1));
   CudaTest("solving axpy kernel failed");
 }
 
@@ -354,8 +354,7 @@ __global__ void l2_norm_kernel(const int n, const float_t* a, float_t* sum) {
 
 acc_t l2_norm_gpu(int n, const float_t* x) {
   float_t sum = 0.0;
-  CUBLAS_CHECK(
-      cublasSnrm2(deepgalois::Context::cublas_handle(), n, x, 1, &sum));
+  CUBLAS_CHECK(cublasSnrm2(deepgalois::DistContext::cublas_handle(), n, x, 1, &sum));
   // float_t *d_sum;
   // CUDA_CHECK(cudaMalloc((void**)&d_sum, sizeof(float_t));
   // CUDA_CHECK(cudaMemcpy(d_sum, &sum, sizeof(acc_t), cudaMemcpyHostToDevice));

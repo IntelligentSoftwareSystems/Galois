@@ -92,7 +92,16 @@ DistContext::~DistContext() {
     CUDA_CHECK(cudaFree(d_feats));
 }
 
-size_t read_masks(std::string mask_type, size_t n, size_t& begin, size_t& end, mask_t* masks) {
+size_t DistContext::read_labels(bool isSingleClass, std::string dataset_str) {
+  return reader.read_labels(isSingleClass, h_labels);
+}
+
+size_t DistContext::read_features(std::string dataset_str) {
+  return reader.read_features(h_feats);
+}
+
+size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, size_t n, 
+                               size_t& begin, size_t& end, mask_t* masks, DGraph* dGraph) {
   return reader.read_masks(mask_type, n, begin, end, masks);
 }
 

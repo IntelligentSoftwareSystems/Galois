@@ -1,9 +1,21 @@
+// Execution engine
+#include <iostream>
+#include <sstream>
 #ifdef GALOIS_USE_DIST
 #include "DistributedGraphLoader.h"
 #include "galois/DistGalois.h"
 #include "galois/runtime/Network.h"
 #endif
+#include "galois/Galois.h"
+#include "galois/Version.h"
+#include "galois/Timer.h"
 #include "deepgalois/Net.h"
+
+static void LonestarGnnPrintVersion(llvm::raw_ostream& out) {
+  out << "LoneStarGNN Benchmark Suite v" << galois::getVersion()
+      << " (" << galois::getRevision() << ")\n";
+  out.flush();
+}
 
 //! initialize lonestargnn benchmark
 void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,

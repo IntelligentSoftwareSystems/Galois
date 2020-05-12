@@ -150,7 +150,34 @@ namespace deepgalois {
 void Net::init() {
   copy_masks_device(globalSamples, globalTrainMasks, d_train_masks);
   copy_masks_device(globalSamples, globalValMasks, d_val_masks);
+}
+
+void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel) {
+  this->distContext = new deepgalois::DistContext();
+  this->distContext->set_dataset(dataset_str);
+
+  // read the graph into CPU memory and copy it to GPU memory
+  this->distNumSamples = this->distContext->read_graph(dataset_str, is_selfloop);
+
+  // read labels into CPU memory
+  num_classes = this->distContext->read_labels(isSingleClassLabel, dataset_str);
+
+  // read features into CPU memory
+  feature_dims[0] = this->distContext->read_features(dataset_str);
+
+  // copy labels and features from CPU memory to GPU memory
   distContext->copy_data_to_device(); // copy labels and input features to the device
+
+  feature_dims[num_conv_layers] = num_classes; // output embedding: E
+  if (this->has_l2norm) {
+    // l2 normalized embedding: E
+    feature_dims[num_conv_layers + 1] = num_classes;
+  }
+  if (this->has_dense) {
+    // MLP embedding: E
+    feature_dims[num_layers - 1] = num_classes;
+  }
+  feature_dims[num_layers] = num_classes; // normalized output embedding: E
 }
 
 void Net::copy_test_masks_to_device() {

@@ -59,8 +59,7 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str,
 
   // input feature dimension: D
   feature_dims[0] = this->distContext->read_features(dataset_str);
-  for (size_t i = 1; i < num_conv_layers; i++)
-    feature_dims[i] = this->h1;                // hidden1 level embedding: 16
+
   feature_dims[num_conv_layers] = num_classes; // output embedding: E
   if (this->has_l2norm) {
     // l2 normalized embedding: E
@@ -70,12 +69,9 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str,
     // MLP embedding: E
     feature_dims[num_layers - 1] = num_classes;
   }
-
   feature_dims[num_layers] = num_classes; // normalized output embedding: E
-  layers.resize(num_layers);
 }
 
-#ifndef __GALOIS_HET_CUDA__
 void Net::init() {
   if (subgraph_sample_size)
     sampler = new deepgalois::Sampler();
@@ -164,6 +160,5 @@ acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
   return deepgalois::masked_f1_score(begin, end, count, masks, num_classes,
                                      ground_truth, preds);
 }
-#endif
 
 } // namespace deepgalois

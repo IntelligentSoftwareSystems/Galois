@@ -1,15 +1,6 @@
 #pragma once
 
-#include <sstream>
-#include <iostream>
-#include "galois/Timer.h"
-#include "galois/Galois.h"
-#include "galois/Version.h"
-//#include "galois/Reduction.h"
-//#include "galois/ParallelSTL.h"
-//#include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
-#include <boost/iterator/transform_iterator.hpp>
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> dataset(cll::Positional, 
@@ -52,10 +43,4 @@ llvm::cl::opt<bool> skipVerify("noverify",
 llvm::cl::opt<int>numThreads("t", llvm::cl::desc("Number of threads (default value 1)"), llvm::cl::init(1));
 llvm::cl::opt<std::string> statFile("statFile",
     llvm::cl::desc("ouput file to print stats to (default value empty)"), llvm::cl::init(""));
-
-static void LonestarGnnPrintVersion(llvm::raw_ostream& out) {
-  out << "LoneStarGNN Benchmark Suite v" << galois::getVersion()
-      << " (" << galois::getRevision() << ")\n";
-  out.flush();
-}
 
