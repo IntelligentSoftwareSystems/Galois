@@ -214,23 +214,23 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
 #ifdef USE_MKL
   galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
     [&] (unsigned i) {
-    float_t c_i =
-        std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
+      float_t c_i =
+          std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
 
-    for (auto e = partitionedGraph->edge_begin(i);
-         e != partitionedGraph->edge_end(i); e++) {
-      const auto j = partitionedGraph->getEdgeDst(e);
-      float_t c_j  = std::sqrt(
-          float_t(wholeGraph->get_degree(partitionedGraph->getGID(j))));
+      for (auto e = partitionedGraph->edge_begin(i);
+           e != partitionedGraph->edge_end(i); e++) {
+        const auto j = partitionedGraph->getEdgeDst(e);
+        float_t c_j  = std::sqrt(
+            float_t(wholeGraph->get_degree(partitionedGraph->getGID(j))));
 
-      if (c_i == 0.0 || c_j == 0.0) {
-        this->normFactors[e] = 0.0;
-      } else {
-        this->normFactors[e] = 1.0 / (c_i * c_j);
+        if (c_i == 0.0 || c_j == 0.0) {
+          this->normFactors[*e] = 0.0;
+        } else {
+          this->normFactors[*e] = 1.0 / (c_i * c_j);
+        }
       }
     },
     galois::loopname("NormCountingEdge"));
-  );
 #else
   galois::do_all(
       galois::iterate((size_t)0, partitionedGraph->size()),
@@ -261,15 +261,15 @@ void DistContext::constructNormFactorSub(int subgraphID) {
     // TODO using partitioned subgraph rather than whoel graph; i.e. dist
     // setting wrong
 #ifdef USE_MKL
-  galois::do_all(galois::iterate((size_t)0, graphToUse->size()),
+  galois::do_all(galois::iterate((size_t)0, graphToUse.size()),
     [&] (unsigned i) {
       // float_t c_i =
       // std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
       float_t c_i = std::sqrt(float_t(graphToUse.get_degree(i)));
 
-      for (auto e = graphToUse->edge_begin(i); e != graphToUse->edge_end(i);
+      for (index_t e = graphToUse.edge_begin(i); e != graphToUse.edge_end(i);
            e++) {
-        const auto j = graphToUse->getEdgeDst(e);
+        const auto j = graphToUse.getEdgeDst(e);
         float_t c_j  = std::sqrt(float_t(graphToUse.get_degree(j)));
 
         if (c_i == 0.0 || c_j == 0.0) {
@@ -277,9 +277,8 @@ void DistContext::constructNormFactorSub(int subgraphID) {
         } else {
           this->normFactorsSub[e] = 1.0 / (c_i * c_j);
         }
-      },
-    galois::loopname("NormCountingEdge"));
-  );
+      }
+    }, galois::loopname("NormCountingEdge"));
 #else
   galois::do_all(
       galois::iterate((size_t)0, graphToUse.size()),
