@@ -484,7 +484,7 @@ protected:
       // propogate src's points to info to dst
       if (srcRepr != dstRepr &&
           !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
-        galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
+        //galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
       }
