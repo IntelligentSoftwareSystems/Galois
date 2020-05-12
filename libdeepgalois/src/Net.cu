@@ -192,12 +192,11 @@ void Net::read_test_masks(std::string dataset) {
     globalTestCount = distContext->read_masks(dataset, std::string("test"), 
         globalSamples, globalTestBegin, globalTestEnd, test_masks, NULL);
   }
-  copy_test_masks_to_device();
-}
-
-void Net::copy_test_masks_to_device() {
+  //copy_test_masks_to_device();
   copy_masks_device(globalSamples, test_masks, d_test_masks);
 }
+
+//void Net::copy_test_masks_to_device() {}
 
 // add weight decay
 void Net::regularize() {

@@ -418,7 +418,7 @@ public:
 
   // read masks of test set
   void read_test_masks(std::string dataset);
-  void copy_test_masks_to_device();
+  //void copy_test_masks_to_device();
 
   void construct_layers() {
     // append conv layers

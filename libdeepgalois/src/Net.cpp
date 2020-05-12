@@ -100,7 +100,6 @@ void Net::read_test_masks(std::string dataset) {
     globalTestCount = distContext->read_masks(dataset, std::string("test"), 
         globalSamples, globalTestBegin, globalTestEnd, test_masks, dGraph);
   }
-  copy_test_masks_to_device();
 }
 
 /**
