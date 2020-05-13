@@ -18,12 +18,13 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, GraphCPU* g, DG
   Sampler::globalMaskedGraph = new GraphCPU();
 
   std::vector<uint32_t> degrees(g->size(), 0);
+  galois::gPrint("graph size: ", g->size(), "\n");
   // get degrees of nodes that will be in new graph
   //this->getMaskedDegrees(g->size(), masks, g, degrees);
   galois::do_all(galois::iterate(size_t(0), g->size()), [&](const auto src) {
     if (masks[src] == 1) {
-      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-        const auto dst = g->getEdgeDst(e);
+      for (auto e = g->edge_begin_host(src); e != g->edge_end_host(src); e++) {
+        const auto dst = g->getEdgeDstHost(e);
         if (masks[dst] == 1) degrees[src]++;
       }
     }
@@ -45,8 +46,8 @@ void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, GraphCPU* g, DG
     Sampler::globalMaskedGraph->fixEndEdge(src, offsets[src + 1]);
     if (masks[src] == 1) {
       auto idx = offsets[src];
-      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-        const auto dst = g->getEdgeDst(e);
+      for (auto e = g->edge_begin_host(src); e != g->edge_end_host(src); e++) {
+        const auto dst = g->getEdgeDstHost(e);
         if (masks[dst] == 1) {
           // galois::gPrint(src, " ", dst, "\n");
           Sampler::globalMaskedGraph->constructEdge(idx++, dst, 0);
@@ -131,8 +132,8 @@ void Sampler::selectVertices(index_t n, VertexSet& st, unsigned seed) {
     auto degree = getDegree(Sampler::globalMaskedGraph, v);
     neigh_v     = (degree != 0) ? rand_r(&myseed) % degree : db_t(-1);
     if (neigh_v != db_t(-1)) {
-      neigh_v = Sampler::globalMaskedGraph->getEdgeDst(
-          Sampler::globalMaskedGraph->edge_begin(v) + neigh_v);
+      neigh_v = Sampler::globalMaskedGraph->getEdgeDstHost(
+          Sampler::globalMaskedGraph->edge_begin_host(v) + neigh_v);
       st.insert(neigh_v);
       IA1[DB2[choose] - 1] = 0;
       IA0[DB2[choose] - 1] = 0;

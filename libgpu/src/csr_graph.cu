@@ -21,7 +21,8 @@ unsigned CSRGraph::init() {
   node_data = NULL;
   nnodes = nedges = 0;
   device_graph = false;
-
+  is_allocated = false;
+  max_size = 0;
   return 0;
 }
 
@@ -46,7 +47,11 @@ unsigned CSRGraph::allocOnHost(bool no_edge_data) {
   return ((no_edge_data || edge_data) && row_start && edge_dst && node_data);
 }
 
-void CSRGraph::malloc_index_device(index_type n, index_type *ptr) {
+void CSRGraph::free_index_device(index_type*& ptr) {
+  check_cuda(cudaFree(ptr));
+}
+
+void CSRGraph::malloc_index_device(index_type n, index_type*& ptr) {
   check_cuda(cudaMalloc((void **) &ptr, n * sizeof(index_type)));
 }
 
@@ -213,7 +218,7 @@ unsigned CSRGraph::readFromGR(const char file[], bool read_edge_data) {
   nnodes = numNodes;
   nedges = numEdges;
 
-  printf("nnodes=%d, nedges=%d, sizeEdge=%d.\n", nnodes, nedges, sizeEdgeTy);
+  printf("nnodes %d nedges %d sizeEdge %d\n", nnodes, nedges, sizeEdgeTy);
   allocOnHost(!read_edge_data);
 
   row_start[0] = 0;

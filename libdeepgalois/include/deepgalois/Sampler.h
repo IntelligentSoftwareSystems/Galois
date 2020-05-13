@@ -44,7 +44,7 @@ protected:
 
   //! Set masks bitset with IDs in the vertices VertexSet
   void createMasks(size_t n, VertexSet vertices, mask_t* masks);
-  inline VertexList reindexVertices(size_t n, VertexSet vertex_set);
+  //inline VertexList reindexVertices(size_t n, VertexSet vertex_set);
   //void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1, std::vector<db_t>& DB2, index_t size);
 
   //! convert set of gids to lids
@@ -52,7 +52,16 @@ protected:
 
   //! helper function to get degree of some vertex given some graph
   inline unsigned getDegree(GraphCPU* g, index_t v) {
-    return g->edge_end(v) - g->edge_begin(v);
+    return g->edge_end_host(v) - g->edge_begin_host(v);
+  }
+
+  inline VertexList reindexVertices(size_t n, VertexSet vertex_set) {
+    VertexList new_ids(n, 0);
+    int vid = 0;
+    for (auto v : vertex_set) {
+      new_ids[v] = vid++; // reindex
+    }
+    return new_ids;
   }
 
   // helper function for graph saint implementation below
@@ -78,7 +87,7 @@ public:
 
   //! API function for user-defined selection strategy
   // TODO how to expose this?
-  virtual void selectVertices(index_t nv, index_t n, Graph* g, VertexList vertices, VertexSet& vertex_set);
+  void selectVertices(index_t nv, index_t n, Graph* g, VertexList vertices, VertexSet& vertex_set);
   virtual void selectVertices(index_t n, VertexSet& vertex_set, unsigned seed);
 
   // galois::runtime::iterable<galois::NoDerefIterator<edge_iterator> >

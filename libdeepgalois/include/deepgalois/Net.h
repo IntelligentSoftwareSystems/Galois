@@ -72,6 +72,7 @@ class Net {
   mask_t* d_test_masks;  // masks for test on device
 
   mask_t* subgraphs_masks;          // masks for subgraphs; size of local graph
+  mask_t* d_subgraphs_masks;        // masks for subgraphs on device; size of local graph
   std::vector<size_t> feature_dims; // feature dimnesions for each layer
   std::vector<layer*> layers;       // all the layers in the neural network
 
@@ -164,7 +165,7 @@ public:
 
     // features are read in distcontext, not this context (this context only
     // used for sampling)
-    init();
+    if (subgraph_sample_size) sampler = new deepgalois::Sampler();
   }
 
   //! Default net constructor
@@ -180,7 +181,7 @@ public:
   //      num_vertices_sg(9000), globalTrainMasks(NULL), globalValMasks(NULL),
   //      test_masks(NULL), context(NULL) {}
 
-  void init();
+  void allocateSubgraphsMasks(int num_subgraphs);
 
   //! Initializes metadata for the partition
   void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
@@ -193,8 +194,8 @@ public:
     int num_subg_remain     = 0;
 
     if (subgraph_sample_size) {
-      distContext->allocateSubgraphs(num_subgraphs);
-      subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
+      distContext->allocateSubgraphs(num_subgraphs, subgraph_sample_size);
+      allocateSubgraphsMasks(num_subgraphs);
       std::cout << header << "Constructing training vertex set induced graph...\n";
       //auto gg = distContext->getGraphPointer();
       auto gg = graphTopologyContext->getGraphPointer(); // gloabl graph in CPU mem
@@ -224,7 +225,7 @@ public:
           for (int sid = 0; sid < num_subgraphs; sid++) {
             VertexSet sampledSet;
             sampler->selectVertices(subgraph_sample_size, sampledSet, curEpoch); // m = 1000 by default
-            sampler->generateSubgraph(sampledSet, &subgraphs_masks[sid * globalSamples],
+            sampler->generateSubgraph(sampledSet, subgraphs_masks + sid * globalSamples,
                                       distContext->getSubgraphPointer(sid));
           }
           num_subg_remain = num_subgraphs;
@@ -245,8 +246,8 @@ public:
         auto subgraphPointer      = distContext->getSubgraphPointer(sg_id);
         this->subgraphNumVertices = subgraphPointer->size();
 
-        // galois::gPrint("Subgraph num_vertices: ", subgraphNumVertices, ",
-        // num_edges: ", subgraphPointer->sizeEdges(), "\n");
+        std::cout << "Subgraph num_vertices: " << subgraphNumVertices 
+                  << ", num_edges: " << subgraphPointer->sizeEdges() << "\n";
         for (size_t i = 0; i < num_layers; i++) {
           layers[i]->update_dim_size(this->subgraphNumVertices);
         }
@@ -256,18 +257,17 @@ public:
         distContext->constructNormFactorSub(sg_id);
         for (size_t i = 0; i < num_conv_layers; i++) {
           layers[i]->set_graph_ptr(subgraphPointer);
-          layers[i]->set_norm_consts_ptr(
-              distContext->get_norm_factors_subg_ptr());
+          layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_subg_ptr());
         }
 
         // update labels for subgraph
-        distContext->constructSubgraphLabels(
-            this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
+        distContext->constructSubgraphLabels(this->subgraphNumVertices,
+                                             subgraphs_masks + sg_id * globalSamples);
         layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_subg_ptr());
 
         // update features for subgraph
-        distContext->constructSubgraphFeatures(
-            this->subgraphNumVertices, &subgraphs_masks[sg_id * globalSamples]);
+        distContext->constructSubgraphFeatures(this->subgraphNumVertices,
+                                               subgraphs_masks + sg_id * globalSamples);
         layers[0]->set_feats_ptr(distContext->get_feats_subg_ptr()); // feed input data
 
         // Graph* testing = distContext->getSubgraphPointer(sg_id);

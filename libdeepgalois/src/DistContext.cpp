@@ -321,66 +321,55 @@ void DistContext::constructNormFactorSub(int subgraphID) {
 //! generate labels for the subgraph, m is subgraph size, mask
 //! tells which vertices to use
 void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
+  if (DistContext::usingSingleClass) {
+    DistContext::h_labels_subg.resize(m);
+  } else {
+    DistContext::h_labels_subg.resize(m * DistContext::num_classes);
+  }
+  size_t count = 0;
+  // see which labels to copy over for this subgraph
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
       if (DistContext::usingSingleClass) {
-        DistContext::h_labels_subg.resize(m);
+        DistContext::h_labels_subg[count] = h_labels[i];
       } else {
-        DistContext::h_labels_subg.resize(m * DistContext::num_classes);
+        std::copy(
+            DistContext::h_labels + i * DistContext::num_classes,
+            DistContext::h_labels + (i + 1) * DistContext::num_classes,
+            &DistContext::h_labels_subg[count * DistContext::num_classes]);
       }
-
-      size_t count = 0;
-      // see which labels to copy over for this subgraph
-      for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
-        if (masks[i] == 1) {
-          if (DistContext::usingSingleClass) {
-            DistContext::h_labels_subg[count] = h_labels[i];
-          } else {
-            std::copy(
-                DistContext::h_labels + i * DistContext::num_classes,
-                DistContext::h_labels + (i + 1) * DistContext::num_classes,
-                &DistContext::h_labels_subg[count * DistContext::num_classes]);
-          }
-          // galois::gPrint("l ", (float)DistContext::h_labels_subg[count],
-          // "\n");
-          count++;
-        }
-      }
-      GALOIS_ASSERT(count == m);
+      // galois::gPrint("l ", (float)DistContext::h_labels_subg[count], "\n");
+      count++;
+    }
+  }
+  GALOIS_ASSERT(count == m);
 }
 
 //! generate input features for the subgraph, m is subgraph size,
 //! masks tells which vertices to use
 void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
-      size_t count = 0;
-      // if (h_feats_subg == NULL) h_feats_subg = new float_t[m*feat_len];
-      DistContext::h_feats_subg.resize(m * feat_len);
-      for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
-        if (masks[i] == 1) {
-          std::copy(DistContext::h_feats + i * DistContext::feat_len,
-                    DistContext::h_feats + (i + 1) * DistContext::feat_len,
-                    &DistContext::h_feats_subg[count * DistContext::feat_len]);
-          // for (unsigned a = 0; a < DistContext::feat_len; a++) {
-          //  if (h_feats_subg[count * DistContext::feat_len + a] != 0) {
-          //    galois::gPrint(h_feats_subg[count * DistContext::feat_len + a],
-          //    " ");
-          //  }
-          //}
-          // galois::gPrint("\n");
-          count++;
-        }
-      }
-      GALOIS_ASSERT(count == m);
+  size_t count = 0;
+  DistContext::h_feats_subg.resize(m * feat_len);
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
+      std::copy(DistContext::h_feats + i * DistContext::feat_len,
+          DistContext::h_feats + (i + 1) * DistContext::feat_len,
+          &DistContext::h_feats_subg[count * DistContext::feat_len]);
+      // for (unsigned a = 0; a < DistContext::feat_len; a++) {
+      //  if (h_feats_subg[count * DistContext::feat_len + a] != 0) {
+      //    galois::gPrint(h_feats_subg[count * DistContext::feat_len + a],
+      //    " ");
+      //  }
+      //}
+      // galois::gPrint("\n");
+      count++;
+    }
+  }
+  GALOIS_ASSERT(count == m);
 }
 
-
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
-      return DistContext::syncSubstrate;
-};
-
-void DistContext::allocateSubgraphs(int num_subgraphs) {
-      partitionedSubgraphs.resize(num_subgraphs);
-      for (int i = 0; i < num_subgraphs; i++) {
-        partitionedSubgraphs[i] = new Graph();
-      }
+  return DistContext::syncSubstrate;
 }
 
 } // namespace deepgalois

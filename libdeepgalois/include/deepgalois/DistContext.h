@@ -116,7 +116,13 @@ public:
   float_t* get_in_ptr();
 
   //! allocate memory for subgraphs (don't actually build them)
-  void allocateSubgraphs(int num_subgraphs);
+  void allocateSubgraphs(int num_subgraphs, unsigned max_size) {
+    partitionedSubgraphs.resize(num_subgraphs);
+    for (int i = 0; i < num_subgraphs; i++) {
+      partitionedSubgraphs[i] = new Graph();
+      partitionedSubgraphs[i]->set_max_size(max_size);
+    }
+  }
 };
 
 } // namespace deepgalois

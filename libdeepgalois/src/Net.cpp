@@ -72,9 +72,8 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str,
   feature_dims[num_layers] = num_classes; // normalized output embedding: E
 }
 
-void Net::init() {
-  if (subgraph_sample_size)
-    sampler = new deepgalois::Sampler();
+void Net::allocateSubgraphsMasks(int num_subgraphs) {
+  subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
 }
 
 // add weight decay

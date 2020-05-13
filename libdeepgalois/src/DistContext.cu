@@ -107,11 +107,40 @@ size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, s
   return reader.read_masks(mask_type, n, begin, end, masks);
 }
 
-void DistContext::allocateSubgraphs(int n_sg) {}
+void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
+  size_t labels_size = m;
+  if (!usingSingleClass) labels_size = m * num_classes;
+  h_labels_subg.resize(labels_size);
+  size_t count = 0;
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
+      if (usingSingleClass) h_labels_subg[count] = h_labels[i];
+      else std::copy(h_labels + i * num_classes, h_labels + (i + 1) * num_classes, 
+                     &h_labels_subg[count * num_classes]);
+      count++;
+    }
+  }
+  if (d_labels_subg) uint8_free_device(d_labels_subg);
+  uint8_malloc_device(labels_size, d_labels_subg);
+  uint8_copy_device(labels_size, &h_labels_subg[0], d_labels_subg);
+}
 
-void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {}
+void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
+  size_t count = 0;
+  DistContext::h_feats_subg.resize(m * feat_len);
+  for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
+    if (masks[i] == 1) {
+      std::copy(h_feats + i * feat_len, h_feats + (i + 1) * feat_len, &h_feats_subg[count * feat_len]);
+      count++;
+    }
+  }
+  if (d_feats_subg) float_free_device(d_feats_subg);
+  float_malloc_device(m * feat_len, d_feats_subg);
+  float_copy_device(m * feat_len, &h_feats_subg[0], d_feats_subg);
+}
 
-void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {}
+void DistContext::constructNormFactorSub(int subgraphID) {
+}
 
 void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
   auto n = partitionedGraph->size();
@@ -133,9 +162,6 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
 #endif
   CudaTest("solving norm_factor_computing kernel failed");
   std::cout << "Done\n";
-}
-
-void DistContext::constructNormFactorSub(int subgraphID) {
 }
 
 /*

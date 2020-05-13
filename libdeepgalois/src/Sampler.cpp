@@ -221,15 +221,6 @@ void Sampler::createMasks(size_t n, VertexSet vertices, mask_t* masks) {
   for (auto v : vertices) masks[v] = 1;
 }
 
-inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
-  VertexList new_ids(n, 0);
-  int vid = 0;
-  for (auto v : vertex_set) {
-    new_ids[v] = vid++; // reindex
-  }
-  return new_ids;
-}
-
 // Given a subset of vertices and a graph g, generate a subgraph sg from the
 // graph g
 void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& reindexGraph) {

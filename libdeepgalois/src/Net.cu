@@ -147,12 +147,14 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
 
 namespace deepgalois {
 
-void Net::init() {
-  copy_masks_device(globalSamples, globalTrainMasks, d_train_masks);
-  copy_masks_device(globalSamples, globalValMasks, d_val_masks);
+void Net::allocateSubgraphsMasks(int num_subgraphs) {
+  CUDA_CHECK(cudaMalloc((void**)&subgraphs_masks, distNumSamples * num_subgraphs * sizeof(mask_t)));
 }
 
 void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel) {
+  copy_masks_device(globalSamples, globalTrainMasks, d_train_masks);
+  copy_masks_device(globalSamples, globalValMasks, d_val_masks);
+
   this->distContext = new deepgalois::DistContext();
   this->distContext->set_dataset(dataset_str);
 

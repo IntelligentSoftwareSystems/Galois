@@ -175,15 +175,24 @@ struct CSRGraph {
     edge_dst[eid] = dst;
     if (edge_data) edge_data[eid] = edata;
   }
-  void malloc_index_device(index_type n, index_type *ptr);
+  void malloc_index_device(index_type n, index_type*& ptr);
+  void free_index_device(index_type*& ptr);
   void set_index(index_type pos, index_type value, index_type *ptr);
   void allocateFrom(index_type nv, index_type ne) {
+    bool need_realloc = false;
+    if (nedges < ne) need_realloc = true;
     nnodes = nv;
     nedges = ne;
-    malloc_index_device(nedges, edge_dst);
-    malloc_index_device(nnodes+1, row_start);
+    if (max_size < nnodes) max_size = nnodes;
+    printf("allocating memory on gpu nnodes %d nedges %d\n", max_size, nedges);
+    if (need_realloc) {
+      if (edge_dst) free_index_device(edge_dst);
+      malloc_index_device(nedges, edge_dst);
+    }
+    if (!row_start) malloc_index_device(max_size+1, row_start);
     set_index(0, 0, row_start);
   }
+  void set_max_size(index_type max) { assert(max>0); max_size = max; }
   size_t size() { return size_t(nnodes); }
   size_t sizeEdges() { return size_t(nedges); }
   void degree_counting() {}
@@ -194,5 +203,7 @@ struct CSRGraph {
   edge_data_type* edge_data;
   node_data_type* node_data;
   bool device_graph;
+  index_type max_size; // this is for reallocation; avoid re-malloc
+  bool is_allocated; // this is for reallocation
 };
 #endif

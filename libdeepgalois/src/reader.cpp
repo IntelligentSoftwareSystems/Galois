@@ -209,7 +209,7 @@ void Reader::readGraphFromGRFile(LearningGraph* g) {
     std::cout << "LearningGraph: currently edge data not supported.\n";
     exit(1);
   }
-  printf("num_vertices %lu, num_edges %lu.\n", nv, ne);
+  printf("num_vertices %lu num_edges %lu\n", nv, ne);
   g->allocateFrom(nv, ne);
   auto rowptr = g->row_start_host_ptr();
   for (unsigned vid = 0; vid < nv; ++vid) {

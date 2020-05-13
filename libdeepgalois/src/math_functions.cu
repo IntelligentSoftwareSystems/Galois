@@ -69,15 +69,23 @@ void float_malloc_device(int n, float_t*& ptr) {
 void float_free_device(float_t*& ptr) { CUDA_CHECK(cudaFree(ptr)); }
 
 void float_copy_device(int n, float_t* h_ptr, float_t* d_ptr) {
-  CUDA_CHECK(
-      cudaMemcpy(d_ptr, h_ptr, n * sizeof(float_t), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, n * sizeof(float_t), cudaMemcpyHostToDevice));
+}
+
+void uint8_malloc_device(int n, uint8_t*& ptr) {
+  CUDA_CHECK(cudaMalloc((void**)&ptr, n * sizeof(uint8_t)));
+}
+
+void uint8_free_device(uint8_t*& ptr) { CUDA_CHECK(cudaFree(ptr)); }
+
+void uint8_copy_device(int n, uint8_t* h_ptr, uint8_t* d_ptr) {
+  CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, n * sizeof(uint8_t), cudaMemcpyHostToDevice));
 }
 
 void copy_masks_device(int n, mask_t* h_masks, mask_t*& d_masks) {
   assert(h_masks != NULL);
   CUDA_CHECK(cudaMalloc((void**)&d_masks, n * sizeof(mask_t)));
-  CUDA_CHECK(
-      cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_masks, h_masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
 }
 
 __global__ void setup_curand_kernel(const int n, curandState* state) {

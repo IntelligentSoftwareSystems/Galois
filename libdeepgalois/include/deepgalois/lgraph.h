@@ -16,6 +16,7 @@ class LearningGraph {
   // typedef index_t* IndexList;
 protected:
   bool is_device;
+  index_t max_size_;
   index_t num_vertices_;
   index_t num_edges_;
   IndexList rowptr_;
@@ -34,8 +35,9 @@ protected:
 public:
   typedef size_t iterator;
   LearningGraph(bool use_gpu)
-      : is_device(use_gpu), num_vertices_(0), num_edges_(0), vertex_data_(NULL),
-        edge_data_(NULL) {}
+      : is_device(use_gpu), max_size_(0),
+        num_vertices_(0), num_edges_(0), 
+        vertex_data_(NULL), edge_data_(NULL) {}
   LearningGraph() : LearningGraph(false) {}
   ~LearningGraph() { dealloc(); }
   void init(index_t nv, index_t ne) {
@@ -55,6 +57,7 @@ public:
   void dealloc();
   void degree_counting();
   void constructNodes() {}
+  void set_max_size(index_t max) { assert(max>0); max_size_ = max; }
 
   void readGraph(std::string dataset, bool selfloop = false);
   void fixEndEdge(index_t vid, index_t row_end) { rowptr_[vid + 1] = row_end; }
@@ -121,6 +124,9 @@ public:
 
   index_t* row_start_host_ptr() { return &rowptr_[0]; }
   index_t* edge_dst_host_ptr() { return &colidx_[0]; }
+  index_t getEdgeDstHost(index_t eid) { return colidx_[eid]; }
+  index_t edge_begin_host(index_t vid) { return rowptr_[vid]; }
+  index_t edge_end_host(index_t vid) { return rowptr_[vid + 1]; }
 #ifndef __GALOIS_HET_CUDA__
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }
