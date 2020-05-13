@@ -305,6 +305,60 @@ std::enable_if_t<!std::is_scalar<internal::Val_ty<I>>::value> destroy(I first,
 template <class I>
 std::enable_if_t<std::is_scalar<internal::Val_ty<I>>::value> destroy(I, I) {}
 
+/**
+ * Does a partial sum from first -> last and writes the results to the d_first
+ * iterator.
+ */
+template <class InputIt, class OutputIt>
+OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first) {
+  using ValueType = typename std::iterator_traits<InputIt>::value_type;
+
+  size_t sizeOfVector = std::distance(first, last);
+
+  const size_t blockSize = 1 << 20;
+  // optimization possible here: if num blocks = 1, then no need for 2 passes
+  const size_t numBlocks = (sizeOfVector + blockSize - 1) / blockSize;
+
+  std::vector<ValueType> localSums(numBlocks);
+
+  // get the block sums
+  galois::do_all(
+      galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+        ValueType lsum = 0;
+        // loop over block
+        size_t blockEnd = std::min((block + 1) * blockSize, sizeOfVector);
+        for (size_t i = block * blockSize; i < blockEnd; i++) {
+          lsum += *(first + i);
+        }
+        localSums[block] = lsum;
+      });
+
+  // bulkPrefix[i] holds the starting sum of a particular block i
+  std::vector<ValueType> bulkPrefix(numBlocks);
+  // first block starts at 0; rest start at sum of all previous blocks
+  ValueType total = 0;
+  for (size_t block = 0; block < numBlocks; block++) {
+    bulkPrefix[block] = total;
+    total += localSums[block];
+  }
+
+  galois::do_all(
+      galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+        // start with this block's prefix up to this point
+        ValueType localTotal = bulkPrefix[block];
+        size_t blockEnd      = std::min((block + 1) * blockSize, sizeOfVector);
+
+        for (size_t i = block * blockSize; i < blockEnd; i++) {
+          // add current element first, then save
+          localTotal += *(first + i);
+          *(d_first + i) = localTotal;
+        }
+      });
+
+  // return the iterator past the last element written
+  return d_first + sizeOfVector;
+}
+
 } // end namespace ParallelSTL
 } // end namespace galois
 #endif
