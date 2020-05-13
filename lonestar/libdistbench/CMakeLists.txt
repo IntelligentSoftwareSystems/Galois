@@ -1,7 +1,7 @@
 include_directories("${PROJECT_SOURCE_DIR}/libgluon/include")
 include_directories("${PROJECT_SOURCE_DIR}/lonestardist/include")
 
-add_library(distbench STATIC src/DistBenchStart.cpp src/DistributedGraphLoader.cpp)
+add_library(distbench STATIC src/Start.cpp src/Input.cpp)
 target_include_directories(distbench PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )

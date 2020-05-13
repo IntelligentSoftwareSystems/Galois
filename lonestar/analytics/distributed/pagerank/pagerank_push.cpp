@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
-#include "DistBenchStart.h"
 #include "galois/gstl.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"

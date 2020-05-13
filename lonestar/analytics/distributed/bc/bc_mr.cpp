@@ -19,10 +19,10 @@
 
 constexpr static const char* const REGION_NAME = "MRBC";
 
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
-#include "DistBenchStart.h"
 
 #include <iostream>
 #include <iomanip>

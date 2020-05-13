@@ -17,15 +17,15 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef DIST_BENCH_START_H
-#define DIST_BENCH_START_H
+#ifndef GALOIS_DISTBENCH_START_H
+#define GALOIS_DISTBENCH_START_H
 
+#include "DistBench/Input.h"
+#include "galois/AtomicHelpers.h"
 #include "galois/Galois.h"
+#include "galois/graphs/GluonSubstrate.h"
 #include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
-#include "DistributedGraphLoader.h"
-#include "galois/graphs/GluonSubstrate.h"
-#include "galois/AtomicHelpers.h"
 
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/HostDecls.h"
@@ -139,8 +139,7 @@ loadDGraph(std::vector<unsigned>& scaleFactor) {
 
   galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
   loadedGraph =
-      galois::graphs::constructGraph<NodeData, EdgeData, iterateOutEdges>(
-          scaleFactor);
+      constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   assert(loadedGraph != nullptr);
 
   dGraphTimer.stop();
@@ -176,8 +175,7 @@ loadSymmetricDGraph(std::vector<unsigned>& scaleFactor) {
 
   // make sure that the symmetric graph flag was passed in
   if (inputFileSymmetric) {
-    loadedGraph = galois::graphs::constructSymmetricGraph<NodeData, EdgeData>(
-        scaleFactor);
+    loadedGraph = constructSymmetricGraph<NodeData, EdgeData>(scaleFactor);
   } else {
     GALOIS_DIE("must use -symmetricGraph flag with a symmetric graph for "
                "this benchmark");
