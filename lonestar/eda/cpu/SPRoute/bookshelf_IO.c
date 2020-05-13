@@ -104,21 +104,21 @@ void createHash(char benchmarkPath[], char nodesFile[])
     }
     
     // Reading first few lines 
-    fgets(temp, BUFFERSIZE, fp);
+    if(!fgets(temp, BUFFERSIZE, fp)) abort();
     do {
         currentPos = ftell(fp);
-        fgets(temp, BUFFERSIZE, fp);
+        if(!fgets(temp, BUFFERSIZE, fp)) abort();
     } while( (temp[0] == '#') || (strlen(temp) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
 
     // getting numNodes and numTerminals
-    fscanf(fp, "NumNodes\t:\t%d\n", &numNodes);
-    fscanf(fp, "NumTerminals\t:\t%d\n", &numTerminals);
+    if(fscanf(fp, "NumNodes\t:\t%d\n", &numNodes) != 1) abort();
+    if(fscanf(fp, "NumTerminals\t:\t%d\n", &numTerminals) != 1) abort();
 
     // in case there are any more comments or blank lines before actual cell information
     do {
         currentPos = ftell(fp);
-        fgets(temp, BUFFERSIZE, fp);
+        if(!fgets(temp, BUFFERSIZE, fp)) abort();
     } while( (temp[0] == '#') || (strlen(temp) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
     
@@ -149,7 +149,7 @@ void createHash(char benchmarkPath[], char nodesFile[])
     
     for(nodeNo=1;nodeNo<=numNodes;nodeNo++) {
 
-        fgets(line, BUFFERSIZE, fp);
+        if(!fgets(line, BUFFERSIZE, fp)) abort();
         strcpy(s4, "");
         sscanf(line, "%s%f%f%s\n", temp, &nodeWidth, &nodeHeight, s4);
 
@@ -251,7 +251,7 @@ void readAuxFile(char benchmarkPath[], char auxFile[])
     }
 //    printf("Reading %s ...\n",auxFile);
     
-    fscanf(fp,"%s\t:\t%s%s%s%s%s\n", placementType, nodesFile, netsFile, wtsFile, plFile, sclFile);
+    if(fscanf(fp, "%s\t:\t%s%s%s%s%s\n", placementType, nodesFile, netsFile, wtsFile, plFile, sclFile) != 6) abort();
 
     strcpy(temp, auxFile);
     name = strtok(temp, ".");
@@ -288,19 +288,19 @@ void readNodesFile(char benchmarkPath[], char nodesFile[])
 //    printf("Reading %s ...\n", nodesFile);
 
     // Reading first few lines 
-    fgets(tempStr, BUFFERSIZE, fp);
+    if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     do {
         currentPos = ftell(fp);
-        fgets(tempStr, BUFFERSIZE, fp);
+        if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
 
-    fscanf(fp, "NumNodes\t:\t%d\n", &numNodes);
-    fscanf(fp, "NumTerminals\t:\t%d\n", &numTerminals);
+    if(fscanf(fp, "NumNodes\t:\t%d\n", &numNodes) != 1) abort();
+    if(fscanf(fp, "NumTerminals\t:\t%d\n", &numTerminals) != 1) abort();
 
     do {
        currentPos = ftell(fp);
-       fgets(tempStr, BUFFERSIZE, fp);
+       if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
     
@@ -312,7 +312,7 @@ void readNodesFile(char benchmarkPath[], char nodesFile[])
     
     for(nodeNo=1;nodeNo<=numNodes;nodeNo++) {
 
-        fgets(line, BUFFERSIZE, fp);
+        if(!fgets(line, BUFFERSIZE, fp)) abort();
         strcpy(s4, "");
         sscanf(line, "%s%f%f%s\n", tempStr, &nodeWidth, &nodeHeight, s4);
 
@@ -418,20 +418,20 @@ void readNetsFile(char benchmarkPath[], char netsFile[])
 //    printf("Reading %s ...\n", netsFile);
 
     // Reading first four lines 
-    fgets(tempStr, BUFFERSIZE, fp);
+    if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     do {
         currentPos = ftell(fp);
-        fgets(tempStr, BUFFERSIZE, fp);
+        if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
 
     // getting numNets and numPins
-    fscanf(fp, "NumNets\t:\t%d\n", &numNets);
-    fscanf(fp, "NumPins\t:\t%d\n", &numPins);
+    if(fscanf(fp, "NumNets\t:\t%d\n", &numNets) != 1) abort();
+    if(fscanf(fp, "NumPins\t:\t%d\n", &numPins) != 1) abort();
 
     do {
         currentPos = ftell(fp);
-        fgets(tempStr, BUFFERSIZE, fp);
+        if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
    
@@ -450,7 +450,7 @@ void readNetsFile(char benchmarkPath[], char netsFile[])
 
         do {
             currentPos = ftell(fp);
-            fgets(tempStr, BUFFERSIZE, fp);
+            if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
         } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
 
         sscanf(tempStr, "NetDegree\t:\t%d\n", &degree);
@@ -463,7 +463,7 @@ void readNetsFile(char benchmarkPath[], char netsFile[])
          
             do {
                 currentPos = ftell(fp);
-                fgets(tempStr, BUFFERSIZE, fp);
+                if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
             } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
         
             xOffset = yOffset = 0.0;
@@ -538,10 +538,10 @@ void readPlFile(char benchmarkPath[], char plFile[])
 //    printf("Reading %s ...\n", plFile);
   
     // Reading first four lines 
-    fgets(tempStr, BUFFERSIZE, fp);
+    if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     do {
         currentPos = ftell(fp);
-        fgets(tempStr, BUFFERSIZE, fp);
+        if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);
   
@@ -553,7 +553,7 @@ void readPlFile(char benchmarkPath[], char plFile[])
     movable = numNodes-numTerminals;
     for(nodeNo=1; nodeNo<=numNodes; nodeNo++) {
 
-        fgets(tempStr, BUFFERSIZE, fp);
+        if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
         strcpy(fixedType, "");
         sscanf(tempStr, "%s%f%f\t:\t%*s%s\n", nodeName, &xCoord, &yCoord, fixedType);
 
@@ -621,15 +621,15 @@ void readSclFile(char benchmarkPath[], char sclFile[])
 //    printf("Reading %s ...\n", sclFile);
 
     // Reading first four lines 
-    fgets(tempStr, BUFFERSIZE, fp);
+    if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     do {
       currentPos = ftell(fp);
-      fgets(tempStr, BUFFERSIZE, fp);
+      if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
    
     // getting numRows
-    fscanf(fp, "%*s\t:\t%d\n", &numRows);
+    if(fscanf(fp, "%*s\t:\t%d\n", &numRows) != 1) abort();
 
     rowOriginX = vector(1, numRows);
     rowEndX = vector(1, numRows);
@@ -640,27 +640,27 @@ void readSclFile(char benchmarkPath[], char sclFile[])
     // any blanks or comments after numRows line
     do {
       currentPos = ftell(fp);
-      fgets(tempStr, BUFFERSIZE, fp);
+      if(!fgets(tempStr, BUFFERSIZE, fp)) abort();
     } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
     fseek(fp, currentPos, SEEK_SET);  
 
     siteOriginX = 1.0e6;
     siteEndX = -1.0e6;
     for(row=1; row<=numRows; row++) {
+        // Reading CoreRow Horizontal
+        if(!fgets(junk, BUFFERSIZE, fp)) abort();
     
-        fgets(junk, BUFFERSIZE, fp);   // Reading CoreRow Horizontal
-    
-        fscanf(fp, "\tCoordinate\t:\t%f\n", &originY);
+        if(fscanf(fp, "\tCoordinate\t:\t%f\n", &originY) != 1) abort();
         if(row == 1) siteOriginY = originY;
         
-        fscanf(fp, "Height\t:\t%f\n", &coreRowHeight);
-        fscanf(fp, "Sitewidth\t:\t%f\n", &siteWidth);
-        fscanf(fp, "Sitespacing\t:\t%f\n", &siteSpacing);
-        fscanf(fp, "Siteorient\t:\t%s\n", siteOrient);
-        fscanf(fp, "Sitesymmetry\t:\t%s\n", siteSymmetry);
-        fscanf(fp, "SubrowOrigin\t:\t%f\t%*s\t:\t%d\n", &originX, &totalSites);
-        
-        fgets(junk, BUFFERSIZE, fp);   // Reading End
+        if(fscanf(fp, "Height\t:\t%f\n", &coreRowHeight) != 1) abort();
+        if(fscanf(fp, "Sitewidth\t:\t%f\n", &siteWidth) != 1) abort();
+        if(fscanf(fp, "Sitespacing\t:\t%f\n", &siteSpacing) != 1) abort();
+        if(fscanf(fp, "Siteorient\t:\t%s\n", siteOrient) != 1) abort();
+        if(fscanf(fp, "Sitesymmetry\t:\t%s\n", siteSymmetry)!= 1) abort();
+        if(fscanf(fp, "SubrowOrigin\t:\t%f\t%*s\t:\t%d\n", &originX, &totalSites) != 2) abort();
+        // Reading End
+        if(!fgets(junk, BUFFERSIZE, fp)) abort();
       
         rowOriginX[row] = originX;
         rowEndX[row] = originX + totalSites*siteSpacing;

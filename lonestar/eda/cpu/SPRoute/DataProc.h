@@ -15,8 +15,11 @@
 #include "galois/substrate/SimpleLock.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/runtime/Profile.h"
-
 #include "galois/LargeArray.h"
+
+#include "DataType.h"
+#include "flute.h"
+
 using namespace std;
 
 #define BUFFERSIZE 800
@@ -151,52 +154,75 @@ void readFile(const char* benchFile) {
     exit(1);
   }
 
-  fscanf(fp, "grid	%d %d %d\n", &xGrid, &yGrid, &numLayers);
+  if (fscanf(fp, "grid	%d %d %d\n", &xGrid, &yGrid, &numLayers) != 3)
+    abort_with_message("Failed to read required info from benchfile.");
 
   vCapacity = hCapacity = 0;
 
-  fscanf(fp, "vertical capacity	");
+  if (fscanf(fp, "vertical capacity	"))
+    abort_with_message("Failed to read required info from benchfile.");
   for (i = 0; i < numLayers; i++) {
-    fscanf(fp, "%d", &vCapacity3D[i]);
-    fscanf(fp, " ");
+    if (fscanf(fp, "%d", &vCapacity3D[i]) != 1)
+      abort_with_message("Failed to read required info from benchfile.");
+    if (fscanf(fp, " "))
+      abort_with_message("Failed to read required info from benchfile.");
     vCapacity3D[i] = vCapacity3D[i] / 2;
     vCapacity += vCapacity3D[i];
   }
-  fscanf(fp, "\n");
+  if (fscanf(fp, "\n"))
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "horizontal capacity	");
+  if (fscanf(fp, "horizontal capacity	"))
+    abort_with_message("Failed to read required info from benchfile.");
   for (i = 0; i < numLayers; i++) {
-    fscanf(fp, "%d", &hCapacity3D[i]);
-    fscanf(fp, " ");
+    if (fscanf(fp, "%d", &hCapacity3D[i]) != 1)
+      abort_with_message("Failed to read required info from benchfile.");
+    if (fscanf(fp, " "))
+      abort_with_message("Failed to read required info from benchfile.");
     hCapacity3D[i] = hCapacity3D[i] / 2;
     hCapacity += hCapacity3D[i];
   }
-  fscanf(fp, "\n");
+  if (fscanf(fp, "\n"))
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "minimum width	");
+  if (fscanf(fp, "minimum width	"))
+    abort_with_message("Failed to read required info from benchfile.");
   for (i = 0; i < numLayers; i++) {
-    fscanf(fp, "%d", &(MinWidth[i]));
-    fscanf(fp, " ");
+    if (fscanf(fp, "%d", &(MinWidth[i])) != 1)
+      abort_with_message("Failed to read required info from benchfile.");
+    if (fscanf(fp, " "))
+      abort_with_message("Failed to read required info from benchfile.");
   }
-  fscanf(fp, "\n");
+  if (fscanf(fp, "\n"))
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "minimum spacing	");
+  if (fscanf(fp, "minimum spacing	"))
+    abort_with_message("Failed to read required info from benchfile.");
   for (i = 0; i < numLayers; i++) {
-    fscanf(fp, "%d", &(MinSpacing[i]));
-    fscanf(fp, " ");
+    if (fscanf(fp, "%d", &(MinSpacing[i])) != 1)
+      abort_with_message("Failed to read required info from benchfile.");
+    if (fscanf(fp, " "))
+      abort_with_message("Failed to read required info from benchfile.");
   }
-  fscanf(fp, "\n");
+  if (fscanf(fp, "\n"))
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "via spacing	");
+  if (fscanf(fp, "via spacing	"))
+    abort_with_message("Failed to read required info from benchfile.");
   for (i = 0; i < numLayers; i++) {
-    fscanf(fp, "%d", &(ViaSpacing[i]));
-    fscanf(fp, " ");
+    if (fscanf(fp, "%d", &(ViaSpacing[i])) != 1)
+      abort_with_message("Failed to read required info from benchfile.");
+    if (fscanf(fp, " "))
+      abort_with_message("Failed to read required info from benchfile.");
   }
-  fscanf(fp, "\n");
+  if (fscanf(fp, "\n"))
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "%d %d %d %d\n\n", &xcorner, &ycorner, &wTile, &hTile);
+  if (fscanf(fp, "%d %d %d %d\n\n", &xcorner, &ycorner, &wTile, &hTile) != 4)
+    abort_with_message("Failed to read required info from benchfile.");
 
-  fscanf(fp, "num net %d\n", &numNets);
+  if (fscanf(fp, "num net %d\n", &numNets) != 1)
+    abort_with_message("Failed to read required info from benchfile.");
 
   numGrids = xGrid * yGrid;
 
@@ -231,11 +257,13 @@ void readFile(const char* benchFile) {
   invalid_netID = 0;
   for (i = 0; i < numNets; i++) {
     net++;
-    fscanf(fp, "%s %d %d %d\n", netName, &netID, &numPins, &minwidth);
+    if (fscanf(fp, "%s %d %d %d\n", netName, &netID, &numPins, &minwidth) != 4)
+      abort_with_message("Failed to read required info from benchfile.");
     if (numPins < 1000) {
       pinInd = 0;
       for (j = 0; j < numPins; j++) {
-        fscanf(fp, "%f	%f	%d\n", &pinX_in, &pinY_in, &pinL);
+        if (fscanf(fp, "%f	%f	%d\n", &pinX_in, &pinY_in, &pinL) != 3)
+          abort_with_message("Failed to read required info from benchfile.");
         pinX = (int)((pinX_in - xcorner) / wTile);
         pinY = (int)((pinY_in - ycorner) / hTile);
         if (!(pinX < 0 || pinX >= xGrid || pinY < -1 || pinY >= yGrid ||
@@ -306,7 +334,8 @@ void readFile(const char* benchFile) {
 
     else {
       for (j = 0; j < numPins; j++)
-        fscanf(fp, "%f	%f	%d\n", &pinX_in, &pinY_in, &pinL);
+        if (fscanf(fp, "%f	%f	%d\n", &pinX_in, &pinY_in, &pinL) != 3)
+          abort_with_message("Failed to read required info from benchfile.");
     }
 
   } // loop i
@@ -380,11 +409,13 @@ void readFile(const char* benchFile) {
 
   // modify the capacity of edges according to the input file
 
-  fscanf(fp, "%d\n", &numAdjust);
+  if (fscanf(fp, "%d\n", &numAdjust) != 1)
+    abort_with_message("Failed to read required info from benchfile.");
   printf("num of Adjust is %d\n", numAdjust);
   while (numAdjust > 0) {
-    fscanf(fp, "%d %d %d %d %d %d %d\n", &x1, &y1, &l1, &x2, &y2, &l2,
-           &reducedCap);
+    if (fscanf(fp, "%d %d %d %d %d %d %d\n", &x1, &y1, &l1, &x2, &y2, &l2,
+               &reducedCap) != 7)
+      abort_with_message("Failed to read required info from benchfile.");
     reducedCap = reducedCap / 2;
 
     k = l1 - 1;
