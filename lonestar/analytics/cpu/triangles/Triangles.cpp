@@ -379,21 +379,21 @@ void makeSortedGraph(Graph& graph) {
 
   // create mapping, get degrees out to another vector to get prefix sum
   std::vector<uint32_t> oldToNewMapping(numGraphNodes);
-  std::vector<uint64_t> newPrefixSum(numGraphNodes);
+  std::vector<uint64_t> inProgressPrefixSum(numGraphNodes);
   galois::do_all(
       galois::iterate((size_t)0, numGraphNodes),
       [&](size_t index) {
         // save degree, which is pair.first
-        newPrefixSum[index] = dnPairs[index].first;
+        inProgressPrefixSum[index] = dnPairs[index].first;
         // save mapping; original index is in .second, map it to current index
         oldToNewMapping[dnPairs[index].second] = index;
       },
       galois::loopname("CreateRemappingGetPrefixSum"));
 
-  // get prefix sum
-  for (size_t i = 1; i < numGraphNodes; i++) {
-    newPrefixSum[i] += newPrefixSum[i - 1];
-  }
+  std::vector<uint64_t> newPrefixSum(numGraphNodes);
+  galois::ParallelSTL::partial_sum(inProgressPrefixSum.begin(),
+                                   inProgressPrefixSum.end(),
+                                   newPrefixSum.begin());
 
   // allocate graph
   graph.allocateFrom(numGraphNodes, initial.sizeEdges());
