@@ -20,13 +20,12 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
-#include "galois/DistGalois.h"
-#include "galois/gstl.h"
-#include "DistBenchStart.h"
-
-#include "galois/DReducible.h"
-#include "galois/AtomicWrapper.h"
+#include "DistBench/Start.h"
 #include "galois/ArrayWrapper.h"
+#include "galois/AtomicWrapper.h"
+#include "galois/DistGalois.h"
+#include "galois/DReducible.h"
+#include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef GALOIS_ENABLE_GPU

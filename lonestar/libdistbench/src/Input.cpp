@@ -18,13 +18,13 @@
  */
 
 /**
- * @file DistributedGraphLoader.cpp
+ * @file Reader.cpp
  *
  * Contains definitions for command line arguments related to distributed
  * graph loading.
  */
 
-#include "DistributedGraphLoader.h"
+#include "DistBench/Input.h"
 
 using namespace galois::graphs;
 
@@ -59,13 +59,6 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(SUGAR_O, "sugar-o",
                    "fennel, incoming edge cut, using CuSP")),
     cll::init(OEC));
-
-// cll::opt<std::string>
-//    vertexIDMapFileName("vertexIDMapFileName",
-//                        cll::desc("<file containing the "
-//                                  "vertexID to hosts mapping for "
-//                                  "the custom edge cut.>"),
-//                        cll::init(""), cll::Hidden);
 
 cll::opt<bool> readFromFile("readFromFile",
                             cll::desc("Set this flag if graph is to be "

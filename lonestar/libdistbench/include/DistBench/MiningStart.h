@@ -20,17 +20,17 @@
 // TODO document + merge with regular bench start? have to figure out how to
 // have both substrates coexist
 
-#ifndef _DIST_MINE_BENCH_START_H_
-#define _DIST_MINE_BENCH_START_H_
+#ifndef GALOIS_DISTBENCH_MININGSTART_H
+#define GALOIS_DISTBENCH_MININGSTART_H
 
+#include "DistBench/Input.h"
+#include "galois/AtomicHelpers.h"
 #include "galois/Galois.h"
-#include "galois/Version.h"
-#include "llvm/Support/CommandLine.h"
-#include "galois/graphs/MiningPartitioner.h"
 #include "galois/graphs/GenericPartitioners.h"
 #include "galois/graphs/GluonEdgeSubstrate.h"
-#include "DistributedGraphLoader.h"
-#include "galois/AtomicHelpers.h"
+#include "galois/graphs/MiningPartitioner.h"
+#include "galois/Version.h"
+#include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/EdgeHostDecls.h"

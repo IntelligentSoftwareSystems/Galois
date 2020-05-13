@@ -23,9 +23,9 @@
 
 #include <iostream>
 #include <limits>
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
-#include "DistBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"

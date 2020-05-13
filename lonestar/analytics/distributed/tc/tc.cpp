@@ -26,11 +26,11 @@
 
 #include <iostream>
 #include <limits>
+#include "DistBench/MiningStart.h"
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "galois/graphs/MiningPartitioner.h"
 #include "galois/graphs/GenericPartitioners.h"
-#include "DistMiningBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
