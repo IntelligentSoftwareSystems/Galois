@@ -133,7 +133,7 @@ static void marshalGPUGraph(
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
-loadDGraph(std::vector<unsigned>& scaleFactor) {
+loadDistGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -167,7 +167,7 @@ loadDGraph(std::vector<unsigned>& scaleFactor) {
  */
 template <typename NodeData, typename EdgeData>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
-loadSymmetricDGraph(std::vector<unsigned>& scaleFactor) {
+loadSymmetricDistGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -225,7 +225,7 @@ distGraphInitialization() {
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
 #endif
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
+  g = loadDistGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
@@ -270,7 +270,7 @@ symmetricDistGraphInitialization() {
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
 #endif
-  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
+  g = loadSymmetricDistGraph<NodeData, EdgeData>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
