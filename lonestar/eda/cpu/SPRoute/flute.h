@@ -133,6 +133,11 @@ void init_param() {
   heap = (node_pair*)malloc(sizeof(node_pair) * (max_heap_size + 1));
 }
 
+[[noreturn]] void abort_with_message(std::string message) noexcept {
+  std::cerr << message << std::endl;
+  std::abort();
+}
+
 void readLUT(const char* fluteDir) {
   unsigned char charnum[256], line[32], *linep, c;
   FILE *fpwv, *fprt;
@@ -171,15 +176,18 @@ void readLUT(const char* fluteDir) {
 #endif
 
   for (d = 4; d <= D; d++) {
-    fscanf(fpwv, "d=%d\n", &d);
+    if (fscanf(fpwv, "d=%d\n", &d) != 1)
+      abort_with_message("Unable to get needed info from POWV.");
 #if ROUTING == 1
-    fscanf(fprt, "d=%d\n", &d);
+    if (fscanf(fprt, "d=%d\n", &d) != 1)
+      abort_with_message("Unable to get needed info from POST.");
 #endif
     for (k = 0; k < numgrp[d]; k++) {
       ns = (int)charnum[fgetc(fpwv)];
 
       if (ns == 0) { // same as some previous group
-        fscanf(fpwv, "%d\n", &kk);
+        if (fscanf(fpwv, "%d\n", &kk) != 1)
+          abort_with_message("Unable to get needed info from POWV.");
         numsoln[d][k] = numsoln[d][kk];
         LUT[d][k]     = LUT[d][kk];
       } else {
@@ -198,13 +206,15 @@ void readLUT(const char* fluteDir) {
             ;
 #if ROUTING == 1
           nn = 2 * d - 2;
-          fread(line, 1, d - 2, fprt);
+          if (!fread(line, 1, d - 2, fprt))
+            abort_with_message("Unable to get needed info from POST.");
           linep = line;
           for (j = d; j < nn; j++) {
             c                = charnum[*(linep++)];
             p->rowcol[j - d] = c;
           }
-          fread(line, 1, nn / 2 + 1, fprt);
+          if (!fread(line, 1, nn / 2 + 1, fprt))
+            abort_with_message("Unable to get needed info from POST.");
           linep = line; // last char \n
           for (j = 0; j < nn;) {
             c                = *(linep++);
@@ -251,15 +261,18 @@ void readLUT() {
 #endif
 
   for (d = 4; d <= D; d++) {
-    fscanf(fpwv, "d=%d\n", &d);
+    if (fscanf(fpwv, "d=%d\n", &d) != 1)
+      abort_with_message("Unable to get needed info from POWV.");
 #if ROUTING == 1
-    fscanf(fprt, "d=%d\n", &d);
+    if (fscanf(fprt, "d=%d\n", &d) != 1)
+      abort_with_message("Unable to get needed info from POST.");
 #endif
     for (k = 0; k < numgrp[d]; k++) {
       ns = (int)charnum[fgetc(fpwv)];
 
       if (ns == 0) { // same as some previous group
-        fscanf(fpwv, "%d\n", &kk);
+        if (fscanf(fpwv, "%d\n", &kk) != 1)
+          abort_with_message("Unable to get needed info from POWV.");
         numsoln[d][k] = numsoln[d][kk];
         LUT[d][k]     = LUT[d][kk];
       } else {
@@ -278,13 +291,15 @@ void readLUT() {
             ;
 #if ROUTING == 1
           nn = 2 * d - 2;
-          fread(line, 1, d - 2, fprt);
+          if (!fread(line, 1, d - 2, fprt))
+            abort_with_message("Unable to get needed info from POST.");
           linep = line;
           for (j = d; j < nn; j++) {
             c                = charnum[*(linep++)];
             p->rowcol[j - d] = c;
           }
-          fread(line, 1, nn / 2 + 1, fprt);
+          if (!fread(line, 1, nn / 2 + 1, fprt))
+            abort_with_message("Unable to get needed info from POST.");
           linep = line; // last char \n
           for (j = 0; j < nn;) {
             c                = *(linep++);
