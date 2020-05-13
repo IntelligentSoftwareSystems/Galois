@@ -190,8 +190,10 @@ struct InitializeIteration {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           InitializeIteration{infinity, current_src_node, &_graph},
-          galois::loopname(
-              syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_InitializeIteration").c_str()),
+          galois::loopname(syncSubstrate
+                               ->get_run_identifier(std::string(REGION_NAME) +
+                                                    "_InitializeIteration")
+                               .c_str()),
           galois::no_stats());
     }
   }
@@ -247,7 +249,8 @@ struct ForwardPass {
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
-            //syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_ForwardPass")
+            // syncSubstrate->get_run_identifier(std::string(REGION_NAME) +
+            // "_ForwardPass")
             std::string(REGION_NAME) + "_ForwardPass");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -262,8 +265,10 @@ struct ForwardPass {
         galois::do_all(
             galois::iterate(nodesWithEdges),
             ForwardPass(&_graph, _dga, globalRoundNumber),
-            galois::loopname(
-                syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_ForwardPass").c_str()),
+            galois::loopname(syncSubstrate
+                                 ->get_run_identifier(std::string(REGION_NAME) +
+                                                      "_ForwardPass")
+                                 .c_str()),
             galois::steal(), galois::no_stats());
       }
 
@@ -276,7 +281,8 @@ struct ForwardPass {
             std::string(REGION_NAME) + "_ForwardPass");
         syncSubstrate
             ->sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
-                   Bitset_num_shortest_paths>(std::string(REGION_NAME) + "_ForwardPass");
+                   Bitset_num_shortest_paths>(std::string(REGION_NAME) +
+                                              "_ForwardPass");
       }
 
       globalRoundNumber++;
@@ -393,7 +399,7 @@ struct BackwardPass {
 #ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
             // syncSubstrate->get_run_identifier("BackwardPass")
-           std::string(REGION_NAME) + "_BackwardPass");
+            std::string(REGION_NAME) + "_BackwardPass");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BackwardPass_nodesWithEdges_cuda(backRoundCount, cuda_ctx);
@@ -405,14 +411,17 @@ struct BackwardPass {
         galois::do_all(
             galois::iterate(nodesWithEdges),
             BackwardPass(&_graph, backRoundCount),
-            galois::loopname(
-                syncSubstrate->get_run_identifier(std::string(REGION_NAME) + "_BackwardPass").c_str()),
+            galois::loopname(syncSubstrate
+                                 ->get_run_identifier(std::string(REGION_NAME) +
+                                                      "_BackwardPass")
+                                 .c_str()),
             galois::steal(), galois::no_stats());
       }
 
       if (moreThanOne) {
         syncSubstrate->sync<writeSource, readDestination, Reduce_add_dependency,
-                            Bitset_dependency>(std::string(REGION_NAME) + "_BackwardPass");
+                            Bitset_dependency>(std::string(REGION_NAME) +
+                                               "_BackwardPass");
       }
     }
   }
@@ -479,7 +488,9 @@ struct BC {
         galois::do_all(
             galois::iterate(masters.begin(), masters.end()), BC(&_graph),
             galois::no_stats(),
-            galois::loopname(syncSubstrate->get_run_identifier(std::string(REGION_NAME)).c_str()));
+            galois::loopname(
+                syncSubstrate->get_run_identifier(std::string(REGION_NAME))
+                    .c_str()));
       }
     }
   }
@@ -620,7 +631,9 @@ int main(int argc, char** argv) {
   galois::DGReduceMin<float> dga_min;
   galois::DGAccumulator<float> dga_sum;
 
-  galois::runtime::reportStat_Single(std::string(REGION_NAME), std::string("NumSources"), (unsigned int)numberOfSources);
+  galois::runtime::reportStat_Single(std::string(REGION_NAME),
+                                     std::string("NumSources"),
+                                     (unsigned int)numberOfSources);
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
     std::string timer_str("Timer_" + std::to_string(run));
