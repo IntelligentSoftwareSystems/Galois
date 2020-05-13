@@ -13,10 +13,7 @@
 #include "deepgalois/Context.h"
 #include "deepgalois/GraphTypes.h"
 #include "deepgalois/DistContext.h"
-
-#ifndef __GALOIS_HET_CUDA__
 #include "deepgalois/Sampler.h"
-#endif
 
 namespace deepgalois {
 
@@ -87,10 +84,7 @@ class Net {
   //! dist context holds graph data of the partitioned graph only
   deepgalois::DistContext* distContext;
   DGraph* dGraph;
-
-#ifndef __GALOIS_HET_CUDA__
   Sampler* sampler;
-#endif
 
 public:
   Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
@@ -202,11 +196,13 @@ public:
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
       std::cout << header << "Constructing training vertex set induced graph...\n";
-#ifndef __GALOIS_HET_CUDA__
-      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks,
-                                     graphTopologyContext->getGraphPointer(),
-                                     distContext->getGraphPointer());
+#ifdef __GALOIS_HET_CUDA__
+      auto gg = distContext->getGraphPointer();
+#else
+      auto gg = graphTopologyContext->getGraphPointer();
 #endif
+      sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, gg,
+                                     distContext->getGraphPointer());
     }
 
     std::cout << header << "Start training...\n";
@@ -228,15 +224,12 @@ public:
           t_subgen.Start();
 
           // generate subgraphs
-#ifndef __GALOIS_HET_CUDA__
           for (int sid = 0; sid < num_subgraphs; sid++) {
             VertexSet sampledSet;
             sampler->selectVertices(subgraph_sample_size, sampledSet, curEpoch); // m = 1000 by default
-            sampler->generateSubgraph(sampledSet,
-                                      &subgraphs_masks[sid * globalSamples],
+            sampler->generateSubgraph(sampledSet, &subgraphs_masks[sid * globalSamples],
                                       distContext->getSubgraphPointer(sid));
           }
-#endif
           num_subg_remain = num_subgraphs;
           t_subgen.Stop();
           // std::cout << "Done, time: " << t_subgen.Millisecs() << "\n";
@@ -373,7 +366,6 @@ public:
       masks = test_masks;
     }
 
-#ifndef __GALOIS_HET_CUDA__
     // switch to the original graph if not training
     if (subgraph_sample_size && type != "train") {
       for (size_t i = 0; i < num_layers; i++)
@@ -385,7 +377,7 @@ public:
       layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_ptr());
       layers[0]->set_feats_ptr(distContext->get_feats_ptr()); // feed input data
     }
-#else
+#ifdef __GALOIS_HET_CUDA__
     if (type == "train") {
       masks = d_train_masks;
     } else if (type == "val") {

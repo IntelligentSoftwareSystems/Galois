@@ -35,69 +35,38 @@ protected:
   void reindexSubgraph(VertexSet& keptVertices, Graph& g, Graph& reindexed);
 
   //! Given a graph, return a graph with edges to unmasked vertices removed in mg
-  template <typename GraphTy>
-  void getMaskedGraph(size_t n, mask_t* masks, GraphTy* g, Graph& sub) {
-    std::vector<uint32_t> degrees(n, 0);
-    this->getMaskedDegrees(n, masks, g, degrees);
-    // auto offsets = deepgalois::parallel_prefix_sum(degrees);
-    auto offsets = deepgalois::prefix_sum(degrees);
-    size_t ne    = offsets[n];
-    // galois::gPrint("Generate masked graph: num_vertices=", n, ", num_edges=",
-    // ne, "\n");
-
-    // note this constructs the full graph's nodes; just trims edges
-    sub.allocateFrom(n, ne);
-    sub.constructNodes();
-
-    galois::do_all(
-        galois::iterate((size_t)0, n),
-        [&](const auto src) {
-          sub.fixEndEdge(src, offsets[src + 1]);
-          if (masks[src] == 1) {
-            auto idx = offsets[src];
-            for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-              const auto dst = g->getEdgeDst(e);
-              if (masks[dst] == 1) {
-                // galois::gPrint(src, " ", dst, "\n");
-                sub.constructEdge(idx++, dst, 0);
-              }
-            }
-          }
-        },
-        galois::loopname("gen_subgraph"));
-  }
+  template <typename GraphTy, typename SubgraphTy = Graph>
+  void getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* sub);
 
   //! determine degree of each vertex in a masked graph (given by masks and g)
   template <typename GraphTy>
-  void getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees) {
-    assert(degrees.size() == n);
-#ifdef PARALLEL_GEN
-    galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
-#else
-    for (size_t src = 0; src < n; src++) {
-#endif
-      if (masks[src] == 1) {
-        for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-          const auto dst = g->getEdgeDst(e);
-          if (masks[dst] == 1) {
-            // galois::gInfo("Edge ", src, " ", dst);
-            degrees[src]++;
-          }
-        }
-      }
-    }
-#ifdef PARALLEL_GEN
-    , galois::loopname("update_degrees"));
-#endif
-  }
+  void getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees);
 
   //! Set masks bitset with IDs in the vertices VertexSet
   void createMasks(size_t n, VertexSet vertices, mask_t* masks);
   inline VertexList reindexVertices(size_t n, VertexSet vertex_set);
-  void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1, std::vector<db_t>& DB2, index_t size);
+  //void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1, std::vector<db_t>& DB2, index_t size);
 
   //! convert set of gids to lids
   VertexSet convertToLID(VertexSet& gidSet);
+
+  //! helper function to get degree of some vertex given some graph
+  inline unsigned getDegree(Graph* g, index_t v) {
+    return g->edge_end(v) - g->edge_begin(v);
+  }
+
+  // helper function for graph saint implementation below
+  void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1,
+      std::vector<db_t>& DB2, index_t size) {
+    if (DB0.capacity() < size) {
+      DB0.reserve(DB0.capacity() * 2);
+      DB1.reserve(DB1.capacity() * 2);
+      DB2.reserve(DB2.capacity() * 2);
+    }
+    DB0.resize(size);
+    DB1.resize(size);
+    DB2.resize(size);
+  }
 
 public:
   Sampler() : m(DEFAULT_SIZE_FRONTIER) {}

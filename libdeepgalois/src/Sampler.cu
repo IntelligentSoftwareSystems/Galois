@@ -1,6 +1,7 @@
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
-#include "deepgalois/sampler.h"
+#include "deepgalois/cutils.h"
+#include "deepgalois/Sampler.h"
 
 namespace deepgalois {
 
@@ -76,10 +77,15 @@ __global__ void generate_graph_kernel(index_t n, const index_t* offsets,
   }
 }
 
-void Sampler::update_masks(size_t n, index_t* vertices, mask_t* masks) {
-  set_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, vertices, masks);
+void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGraph* dg) {
+  this->count_ = count;
+  // save original graph
+  Sampler::globalGraph = g;
+  // save partitioned graph
+  Sampler::partGraph = dg;
 }
 
+/*
 void Sampler::indexing(size_t n, index_t* vertices, index_t* new_indices) {
   index_t vid = 0;
   for (index_t i = 0; i < n; i++) {
@@ -87,8 +93,8 @@ void Sampler::indexing(size_t n, index_t* vertices, index_t* new_indices) {
     new_indices[v] = vid++;
   }
 }
-
-inline VertexList Sampler::reindexing_vertices(size_t n, VertexSet vertex_set) {
+*/
+inline VertexList Sampler::reindexVertices(size_t n, VertexSet vertex_set) {
   VertexList new_ids(n, 0);
   int vid = 0;
   for (auto v : vertex_set) {
@@ -97,24 +103,26 @@ inline VertexList Sampler::reindexing_vertices(size_t n, VertexSet vertex_set) {
   return new_ids;
 }
 
-void Sampler::generate_masked_graph(index_t n, mask_t* masks, GraphGPU* g, GraphGPU* subg) {
+template <typename GraphTy, typename SubgraphTy>
+void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* subg) {
   index_t *degrees, *offsets;
-  CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*n);
-  get_masked_degrees<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, g, degrees);
+  CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*n));
+  get_masked_degrees<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, *g, degrees);
   CUDA_CHECK(cudaFree(degrees));
-  CUDA_CHECK(cudaMalloc((void**)&offsets, sizeof(index_t)*(n+1));
+  CUDA_CHECK(cudaMalloc((void**)&offsets, sizeof(index_t)*(n+1)));
   thrust::exclusive_scan(thrust::device, degrees, degrees+n, offsets);
   index_t ne;
   CUDA_CHECK(cudaMemcpy(&ne, offsets+n, sizeof(index_t), cudaMemcpyDeviceToHost));
-  subg.allocateFrom(n, ne); // TODO: avoid reallocation
-  generate_masked_graph_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, offsets, g, subg);
-  CUDA_CHECK(cudaFree(pffsets));
+  subg->allocateFrom(n, ne); // TODO: avoid reallocation
+  generate_masked_graph_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, offsets, *g, *subg);
+  CUDA_CHECK(cudaFree(offsets));
 }
 
 // n: size of the original graph
 // nv: size of the subgraph; i.e. size of vertex_set
 // masks, graph g and subgraph sub are on the device (GPU)
-void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* g, GraphGPU* sub) {
+void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* sub) {
+  index_t n = globalGraph->size();
   auto nv = vertex_set.size();
   // convert the vertex_set to a vertex_list and copy it to the device
   VertexList vertex_list(vertex_set.begin(), vertex_set.end());
@@ -122,33 +130,32 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* g
   cudaMalloc((void**)&d_vertex_list, nv * sizeof(index_t));
   CUDA_CHECK(cudaMemcpy(d_vertex_list, &vertex_list[0], nv * sizeof(index_t), cudaMemcpyHostToDevice));
 
-  index_t n = graph->size();
-  update_masks(n, d_vertex_list, masks); // set masks for vertices in the vertex_set
+  // createMasks: set masks for vertices in the vertex_set
+  set_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, d_vertex_list, masks);
   GraphGPU masked_sg; // size is the same as original graph, but masked dst removed
-  generate_masked_graph(n, masks, globalGraph, &masked_sg); // remove edges whose destination is not masked
+  getMaskedGraph(n, masks, globalGraph, &masked_sg); // remove edges whose destination is not masked
 
   // re-index the subgraph
   index_t* d_new_ids;
   cudaMalloc((void**)&d_new_ids, n * sizeof(index_t));
   // Given an old vertex ID ∈ [0, n), returns a new vertex ID ∈ [0, nv)
-  auto new_ids = reindexing_vertices(nv, vertex_set);
-  CUDA_CHECK(cudaMemcpy(d_new_ids, &new_ids[0], n * sizeof(index_t),
-                        cudaMemcpyHostToDevice));
+  auto new_ids = reindexVertices(nv, vertex_set);
+  CUDA_CHECK(cudaMemcpy(d_new_ids, &new_ids[0], n * sizeof(index_t), cudaMemcpyHostToDevice));
 
   // generate the offsets for the re-indexed subgraph
   index_t *degrees, *offsets;
-  CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*nv);
+  CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*nv));
   get_new_degrees<<<CUDA_GET_BLOCKS(nv), CUDA_NUM_THREADS>>>(nv, d_vertex_list, d_new_ids, masked_sg, degrees);
   CUDA_CHECK(cudaFree(degrees));
-  CUDA_CHECK(cudaMalloc((void**)&offsets, sizeof(index_t)*(nv+1));
+  CUDA_CHECK(cudaMalloc((void**)&offsets, sizeof(index_t)*(nv+1)));
   thrust::exclusive_scan(thrust::device, degrees, degrees+nv, offsets);
   index_t ne;
   CUDA_CHECK(cudaMemcpy(&ne, offsets+nv, sizeof(index_t), cudaMemcpyDeviceToHost));
 
   // allocate memory for the subgraph
-  sub.allocateFrom(nv, ne); // avoid reallocation
+  sub->allocateFrom(nv, ne); // avoid reallocation
   // generate the subgraph
-  generate_graph_kernel<<<CUDA_GET_BLOCKS(nv), CUDA_NUM_THREADS>>>(nv, offsets, d_vertex_list, d_new_ids, masked_sg, sub);
+  generate_graph_kernel<<<CUDA_GET_BLOCKS(nv), CUDA_NUM_THREADS>>>(nv, offsets, d_vertex_list, d_new_ids, masked_sg, *sub);
 }
 
 } // namespace deepgalois

@@ -58,6 +58,7 @@ if(ENABLE_HETERO_GALOIS)
     src/math_functions.cu
     src/optimizer.cu
     src/DistContext.cu
+    src/Sampler.cu
     src/lgraph.cu
     src/node.cu
     src/Net.cu
@@ -72,7 +73,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if(ENABLE_HETERO_GALOIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__GALOIS_HET_CUDA__")
-  set(sources src/reader.cpp)
+  set(sources src/reader.cpp src/RandomWalk.cpp)
 else()
   set(sources
     src/layers/softmax_loss_layer.cpp
@@ -85,6 +86,7 @@ else()
     src/math_functions.cpp
     src/optimizer.cpp
     src/DistContext.cpp
+    src/RandomWalk.cpp
     src/Sampler.cpp
     src/reader.cpp
     src/lgraph.cpp
