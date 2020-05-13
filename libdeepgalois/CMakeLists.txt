@@ -73,7 +73,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if(ENABLE_HETERO_GALOIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__GALOIS_HET_CUDA__")
-  set(sources src/reader.cpp src/RandomWalk.cpp)
+  set(sources src/reader.cpp src/RandomWalk.cpp src/utils.cpp)
 else()
   set(sources
     src/layers/softmax_loss_layer.cpp

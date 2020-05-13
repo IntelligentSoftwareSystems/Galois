@@ -77,14 +77,6 @@ __global__ void generate_graph_kernel(index_t n, const index_t* offsets,
   }
 }
 
-void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGraph* dg) {
-  this->count_ = count;
-  // save original graph
-  Sampler::globalGraph = g;
-  // save partitioned graph
-  Sampler::partGraph = dg;
-}
-
 /*
 void Sampler::indexing(size_t n, index_t* vertices, index_t* new_indices) {
   index_t vid = 0;
@@ -122,7 +114,7 @@ void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* s
 // nv: size of the subgraph; i.e. size of vertex_set
 // masks, graph g and subgraph sub are on the device (GPU)
 void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* sub) {
-  index_t n = globalGraph->size();
+  index_t n = partGraph->size();
   auto nv = vertex_set.size();
   // convert the vertex_set to a vertex_list and copy it to the device
   VertexList vertex_list(vertex_set.begin(), vertex_set.end());
@@ -133,7 +125,7 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* s
   // createMasks: set masks for vertices in the vertex_set
   set_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, d_vertex_list, masks);
   GraphGPU masked_sg; // size is the same as original graph, but masked dst removed
-  getMaskedGraph(n, masks, globalGraph, &masked_sg); // remove edges whose destination is not masked
+  getMaskedGraph(n, masks, partGraph, &masked_sg); // remove edges whose destination is not masked
 
   // re-index the subgraph
   index_t* d_new_ids;

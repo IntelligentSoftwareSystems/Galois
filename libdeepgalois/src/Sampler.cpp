@@ -21,60 +21,6 @@ void print_vertex_set(VertexSet vertex_set) {
   galois::gPrint(")\n");
 }
 
-void Sampler::initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGraph* dg) {
-  this->count_ = count;
-  // save original graph
-  Sampler::globalGraph = g;
-  // save partitioned graph
-  Sampler::partGraph = dg;
-
-  // allocate the object for the new masked graph
-  Sampler::globalMaskedGraph = new Graph();
-
-  std::vector<uint32_t> degrees(g->size(), 0);
-  // get degrees of nodes that will be in new graph
-  this->getMaskedDegrees(g->size(), masks, g, degrees);
-  auto offsets = deepgalois::parallel_prefix_sum(degrees);
-  auto ne    = offsets[g->size()];
-
-  // save ids (of original graph) of training nodes to vector
-  for (size_t i = 0; i < g->size(); i++) {
-    if (masks[i] == 1)
-      Sampler::trainingNodes.push_back(i);
-  }
-
-  Sampler::globalMaskedGraph->allocateFrom(g->size(), ne);
-  Sampler::globalMaskedGraph->constructNodes();
-  // same as original graph, except keep only edges involved in masks
-  galois::do_all(galois::iterate((size_t)0, g->size()), [&](const auto src) {
-    Sampler::globalMaskedGraph->fixEndEdge(src, offsets[src + 1]);
-    if (masks[src] == 1) {
-      auto idx = offsets[src];
-      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-        const auto dst = g->getEdgeDst(e);
-        if (masks[dst] == 1) {
-          // galois::gPrint(src, " ", dst, "\n");
-          Sampler::globalMaskedGraph->constructEdge(idx++, dst, 0);
-        }
-      }
-    }
-  }, galois::loopname("gen_subgraph"));
-
-  Sampler::globalMaskedGraph->degree_counting();
-  Sampler::avg_deg = globalMaskedGraph->sizeEdges() / globalMaskedGraph->size();
-  Sampler::subg_deg = (avg_deg > SAMPLE_CLIP) ? SAMPLE_CLIP : avg_deg;
-
-  // TODO masked part graph as well to save time later; right now constructing
-  // from full part graph
-
-  // size_t idx = 0;
-  // vertices_.resize(count);
-  // for (size_t i = begin; i < end; i++) {
-  //  if (masks_[i] == 1)
-  //    vertices_[idx++] = i;
-  //}
-}
-
 /*
 // implementation from GraphSAINT
 // https://github.com/GraphSAINT/GraphSAINT/blob/master/ipdps19_cpp/sample.cpp
@@ -337,12 +283,11 @@ VertexSet Sampler::convertToLID(VertexSet& gidSet) {
 
 template <typename GraphTy>
 void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees) {
+//template <>
+//void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphCPU* g, std::vector<uint32_t>& degrees) {
   assert(degrees.size() == n);
-#ifdef PARALLEL_GEN
   galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
-#else
-  for (size_t src = 0; src < n; src++) {
-#endif
+  //for (size_t src = 0; src < n; src++) {
     if (masks[src] == 1) {
       for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
         const auto dst = g->getEdgeDst(e);
@@ -352,10 +297,7 @@ void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<
         }
       }
     }
-  }
-#ifdef PARALLEL_GEN
-  , galois::loopname("update_degrees"));
-#endif
+  } , galois::loopname("update_degrees"));
 }
 
 template <typename GraphTy, typename SubgraphTy>

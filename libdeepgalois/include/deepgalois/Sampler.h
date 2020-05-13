@@ -27,8 +27,8 @@ protected:
   std::vector<index_t> trainingNodes;
 
   //! masked original graph; typically to the training set
-  Graph* globalMaskedGraph;
-  Graph* globalGraph;
+  GraphCPU* globalMaskedGraph;
+  GraphCPU* globalGraph;
   DGraph* partGraph;
 
   //! Reindex a graph to only contain those in the vertex set
@@ -39,7 +39,7 @@ protected:
   void getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* sub);
 
   //! determine degree of each vertex in a masked graph (given by masks and g)
-  template <typename GraphTy>
+  template <typename GraphTy = GraphCPU>
   void getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees);
 
   //! Set masks bitset with IDs in the vertices VertexSet
@@ -51,7 +51,7 @@ protected:
   VertexSet convertToLID(VertexSet& gidSet);
 
   //! helper function to get degree of some vertex given some graph
-  inline unsigned getDegree(Graph* g, index_t v) {
+  inline unsigned getDegree(GraphCPU* g, index_t v) {
     return g->edge_end(v) - g->edge_begin(v);
   }
 
@@ -86,7 +86,7 @@ public:
 
   //! Given a mask, construct the graph with only those vertices ans ave as the
   //! masked graph in this class for the sampler.
-  void initializeMaskedGraph(size_t count, mask_t* masks, Graph* g, DGraph* dg);
+  void initializeMaskedGraph(size_t count, mask_t* masks, GraphCPU* g, DGraph* dg);
 };
 
 } // namespace deepgalois

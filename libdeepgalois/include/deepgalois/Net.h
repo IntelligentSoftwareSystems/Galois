@@ -196,11 +196,8 @@ public:
       distContext->allocateSubgraphs(num_subgraphs);
       subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
       std::cout << header << "Constructing training vertex set induced graph...\n";
-#ifdef __GALOIS_HET_CUDA__
-      auto gg = distContext->getGraphPointer();
-#else
-      auto gg = graphTopologyContext->getGraphPointer();
-#endif
+      //auto gg = distContext->getGraphPointer();
+      auto gg = graphTopologyContext->getGraphPointer(); // gloabl graph in CPU mem
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, gg,
                                      distContext->getGraphPointer());
     }
