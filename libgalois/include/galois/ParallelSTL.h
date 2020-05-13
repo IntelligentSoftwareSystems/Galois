@@ -27,6 +27,7 @@
 #include "galois/Reduction.h"
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
+#include "galois/Threads.h"
 #include "galois/worklists/Chunk.h"
 
 namespace galois {
@@ -315,9 +316,10 @@ OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first) {
 
   size_t sizeOfVector = std::distance(first, last);
 
-  const size_t blockSize = 1 << 20;
   // optimization possible here: if num blocks = 1, then no need for 2 passes
-  const size_t numBlocks = (sizeOfVector + blockSize - 1) / blockSize;
+  const size_t numBlocks = galois::getActiveThreads();
+  const size_t blockSize = (sizeOfVector + numBlocks - 1) / numBlocks;
+  assert(numBlocks * blockSize >= sizeOfVector);
 
   std::vector<ValueType> localSums(numBlocks);
 
