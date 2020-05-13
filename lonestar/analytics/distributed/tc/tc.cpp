@@ -47,14 +47,6 @@ constexpr static const char* const regionname = "TC";
 
 namespace cll = llvm::cl;
 
-enum Exec { Sync, Async };
-
-static cll::opt<Exec> execution(
-    "exec", cll::desc("Distributed Execution Model (default value Async):"),
-    cll::values(clEnumVal(Sync, "Bulk-synchronous Parallel (BSP)"),
-                clEnumVal(Async, "Bulk-asynchronous Parallel (BASP)")),
-    cll::init(Async));
-
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
@@ -86,8 +78,8 @@ struct TC {
     // const auto& allNodes = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.masterNodesRange();
 
-    if (personality == GPU_CUDA) { ///< GPU TC.
 #ifdef GALOIS_ENABLE_GPU
+    if (personality == GPU_CUDA) { ///< GPU TC.
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
@@ -95,14 +87,14 @@ struct TC {
       TC_masterNodes_cuda(num_local_triangles, cuda_ctx);
       numTriangles += num_local_triangles;
       StatTimer_cuda.stop();
-#else
-      abort();
-#endif
     } else { ///< CPU TC.
+#endif
       galois::do_all(
           galois::iterate(allNodes), TC(&_graph, numTriangles), galois::steal(),
           galois::loopname(syncSubstrate->get_run_identifier("TC").c_str()));
+#ifdef GALOIS_ENABLE_GPU
     }
+#endif
 
     uint64_t total_triangles = numTriangles.reduce();
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
