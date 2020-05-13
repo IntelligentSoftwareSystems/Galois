@@ -484,7 +484,7 @@ protected:
       // propogate src's points to info to dst
       if (srcRepr != dstRepr &&
           !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
-        //galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
+        // galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
       }
@@ -518,6 +518,14 @@ public:
     }
 
     ocd.init();
+  }
+
+  //! frees memory allocated by the node allocator
+  void freeNodeAllocatorMemory() {
+    for (unsigned i = 0; i < numNodes; i++) {
+      pointsToResult[i].freeAll();
+      outgoingEdges[i].freeAll();
+    }
   }
 
   /**
@@ -764,7 +772,7 @@ public:
  * Method from running PTA.
  */
 template <typename PTAClass, typename Alloc>
-void runPTA(PTAClass& pta, Alloc nodeAllocator) {
+void runPTA(PTAClass& pta, Alloc& nodeAllocator) {
   size_t numNodes = pta.readConstraints(input.c_str());
   pta.initialize(numNodes, nodeAllocator);
 
@@ -785,6 +793,9 @@ void runPTA(PTAClass& pta, Alloc nodeAllocator) {
   if (printAnswer) {
     pta.printPointsToInfo();
   }
+
+  // free everything nodeallocator allocated
+  pta.freeNodeAllocatorMemory();
 }
 
 int main(int argc, char** argv) {

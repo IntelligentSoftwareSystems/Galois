@@ -377,6 +377,12 @@ struct SparseBitVector {
    * Free all nodes allocated with the node allocator
    */
   ~SparseBitVector() {
+    if (nodeAllocator) {
+      this->freeAll();
+    }
+  }
+
+  void freeAll() {
     if (nodeAllocator) { // check to make sure nodeAllocator isn't null
       while (head) {
         Node* current = head;
@@ -385,6 +391,9 @@ struct SparseBitVector {
         nodeAllocator->deallocate(current, 1);
       }
     }
+
+    // set to null pointer so it doesn't try this again later on destructor
+    nodeAllocator = nullptr;
   }
 
   /**
