@@ -75,8 +75,7 @@ struct TC {
     DGAccumulatorTy numTriangles;
     syncSubstrate->set_num_round(_num_iterations);
     numTriangles.reset();
-    // const auto& allNodes = _graph.allNodesWithEdgesRange();
-    const auto& allNodes = _graph.masterNodesRange();
+    const auto& allMasterNodes = _graph.masterNodesRange();
 
 #ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) { ///< GPU TC.
@@ -90,7 +89,7 @@ struct TC {
     } else { ///< CPU TC.
 #endif
       galois::do_all(
-          galois::iterate(allNodes), TC(&_graph, numTriangles), galois::steal(),
+          galois::iterate(allMasterNodes), TC(&_graph, numTriangles), galois::steal(),
           galois::loopname(syncSubstrate->get_run_identifier("TC").c_str()));
 #ifdef GALOIS_ENABLE_GPU
     }
