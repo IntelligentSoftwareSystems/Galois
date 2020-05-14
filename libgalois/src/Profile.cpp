@@ -19,7 +19,7 @@
 
 #include "galois/runtime/Profile.h"
 
-#ifdef GALOIS_USE_PAPI
+#ifdef GALOIS_ENABLE_PAPI
 extern "C" {
 #include <papi.h>
 #include <papiStdEventDefs.h>
@@ -29,4 +29,4 @@ extern "C" {
 unsigned long galois::runtime::internal::papiGetTID(void) {
   return galois::substrate::ThreadPool::getTID();
 }
-#endif // GALOIS_USE_PAPI
+#endif

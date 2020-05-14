@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_RUNTIME_SAMPLING_H
-#define GALOIS_RUNTIME_SAMPLING_H
+#ifndef GALOIS_RUNTIME_PROFILE_H
+#define GALOIS_RUNTIME_PROFILE_H
 
 #include <cstdlib>
 
@@ -26,7 +26,7 @@
 #include "ittnotify.h"
 #endif
 
-#ifdef GALOIS_USE_PAPI
+#ifdef GALOIS_ENABLE_PAPI
 extern "C" {
 #include <papi.h>
 #include <papiStdEventDefs.h>
@@ -71,7 +71,7 @@ void profileVtune(const F& func, const char* region) {
 
 #endif
 
-#ifdef GALOIS_USE_PAPI
+#ifdef GALOIS_ENABLE_PAPI
 
 namespace internal {
 
