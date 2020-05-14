@@ -377,8 +377,7 @@ int main(int argc, char** argv) {
   if (net.ID == 0) {
     galois::runtime::reportParam("SSSP", "Max Iterations",
                                  (unsigned long)maxIterations);
-    galois::runtime::reportParam("SSSP", "Source Node ID",
-                                 (unsigned long)src_node);
+    galois::runtime::reportParam("SSSP", "Source Node ID", uint64_t{src_node});
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);

@@ -59,8 +59,8 @@ static cll::opt<bool>
     singleSourceBC("singleSource",
                    cll::desc("Use for single source BC (default off)"),
                    cll::init(false));
-static cll::opt<unsigned long long>
-    startSource("startNode", // not uint64_t due to a bug in llvm cl
+static cll::opt<uint64_t>
+    startSource("startNode",
                 cll::desc("Starting source node used for "
                           "betweeness-centrality (default 0)"),
                 cll::init(0));
