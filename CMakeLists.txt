@@ -49,7 +49,6 @@ set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-r
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
-set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
 set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
