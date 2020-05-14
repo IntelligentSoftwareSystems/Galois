@@ -474,9 +474,7 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
-        std::string impl_str(
-            // syncSubstrate->get_run_identifier("BC")
-            std::string(REGION_NAME));
+        std::string impl_str("BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BC_masterNodes_cuda(cuda_ctx);
