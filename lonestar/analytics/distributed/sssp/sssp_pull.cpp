@@ -283,7 +283,7 @@ int main(int argc, char** argv) {
     galois::runtime::reportParam(REGION_NAME, "Max Iterations",
                                  (unsigned long)maxIterations);
     galois::runtime::reportParam(REGION_NAME, "Source Node ID",
-                                 (unsigned long long)src_node);
+                                 uint64_t{src_node});
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);

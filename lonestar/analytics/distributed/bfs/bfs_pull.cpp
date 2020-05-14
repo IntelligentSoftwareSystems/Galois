@@ -47,9 +47,8 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"),
                                             cll::init(1000));
 
-static cll::opt<unsigned long long>
-    src_node("startNode", // not uint64_t due to a bug in llvm cl
-             cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<uint64_t>
+    src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 
 enum Exec { Sync, Async };
 
@@ -84,11 +83,11 @@ galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
 struct InitializeGraph {
   const uint32_t& local_infinity;
-  cll::opt<unsigned long long>& local_src_node;
+  cll::opt<uint64_t>& local_src_node;
   Graph* graph;
 
-  InitializeGraph(cll::opt<unsigned long long>& _src_node,
-                  const uint32_t& _infinity, Graph* _graph)
+  InitializeGraph(cll::opt<uint64_t>& _src_node, const uint32_t& _infinity,
+                  Graph* _graph)
       : local_infinity(_infinity), local_src_node(_src_node), graph(_graph) {}
 
   void static go(Graph& _graph) {
@@ -271,7 +270,7 @@ int main(int argc, char** argv) {
     galois::runtime::reportParam(regionname, "Max Iterations",
                                  (unsigned long)maxIterations);
     galois::runtime::reportParam(regionname, "Source Node ID",
-                                 (unsigned long long)src_node);
+                                 uint64_t{src_node});
   }
   galois::StatTimer StatTimer_total("TimerTotal", regionname);
 
