@@ -100,20 +100,20 @@ struct TC {
     }
   }
 
-  void operator()(GNode p1) const {
+  void operator()(GNode v) const {
     size_t numTriangles_local = 0;
-    for (auto it_p1_1 : graph->edges(p1)) {
-      GNode p2                         = graph->getEdgeDst(it_p1_1);
-      Graph::edge_iterator it_p1_begin = graph->edge_begin(p1);
-      Graph::edge_iterator it_p1_end   = graph->edge_end(p1);
+    for (auto vIter : graph->edges(v)) {
+      GNode w                       = graph->getEdgeDst(vIter);
+      Graph::edge_iterator vIterBeg = graph->edge_begin(v);
+      Graph::edge_iterator vIterEnd = graph->edge_end(v);
 
-      for (auto it_p2 : graph->edges(p2)) {
-        auto p3                      = graph->getEdgeDst(it_p2);
-        Graph::edge_iterator it_p1_2 = it_p1_begin;
-        while (graph->getEdgeDst(it_p1_2) < p3 && it_p1_2 < it_p1_end) {
-          it_p1_2++;
+      for (auto wIter : graph->edges(w)) {
+        auto x                      = graph->getEdgeDst(wIter);
+        Graph::edge_iterator vvIter = vIterBeg;
+        while (graph->getEdgeDst(vvIter) < x && vvIter < vIterEnd) {
+          vvIter++;
         }
-        if (it_p1_2 < it_p1_end && p3 == graph->getEdgeDst(it_p1_2)) {
+        if (vvIter < vIterEnd && x == graph->getEdgeDst(vvIter)) {
           ++numTriangles_local;
         }
       }
