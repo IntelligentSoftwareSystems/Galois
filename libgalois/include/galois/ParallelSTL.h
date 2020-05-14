@@ -316,49 +316,65 @@ OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first) {
 
   size_t sizeOfVector = std::distance(first, last);
 
-  // optimization possible here: if num blocks = 1, then no need for 2 passes
-  const size_t numBlocks = galois::getActiveThreads();
-  const size_t blockSize = (sizeOfVector + numBlocks - 1) / numBlocks;
-  assert(numBlocks * blockSize >= sizeOfVector);
+  // only bother with parallel execution if vector is larger than some size
+  if (sizeOfVector >= 1024) {
+    const size_t numBlocks = galois::getActiveThreads();
+    const size_t blockSize = (sizeOfVector + numBlocks - 1) / numBlocks;
+    assert(numBlocks * blockSize >= sizeOfVector);
 
-  std::vector<ValueType> localSums(numBlocks);
+    std::vector<ValueType> localSums(numBlocks);
 
-  // get the block sums
-  galois::do_all(
-      galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
-        ValueType lsum = 0;
-        // loop over block
-        size_t blockEnd = std::min((block + 1) * blockSize, sizeOfVector);
-        for (size_t i = block * blockSize; i < blockEnd; i++) {
-          lsum += *(first + i);
-        }
-        localSums[block] = lsum;
-      });
+    // get the block sums
+    galois::do_all(
+        galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+          // block start can extend past sizeOfVector if doesn't divide evenly
+          size_t blockStart = std::min(block * blockSize, sizeOfVector);
+          size_t blockEnd   = std::min((block + 1) * blockSize, sizeOfVector);
+          assert(blockStart <= blockEnd);
 
-  // bulkPrefix[i] holds the starting sum of a particular block i
-  std::vector<ValueType> bulkPrefix(numBlocks);
-  // first block starts at 0; rest start at sum of all previous blocks
-  ValueType total = 0;
-  for (size_t block = 0; block < numBlocks; block++) {
-    bulkPrefix[block] = total;
-    total += localSums[block];
+          // partial accumulation of each block done now
+          std::partial_sum(first + blockStart, first + blockEnd,
+                           d_first + blockStart);
+          // save the last number in this block: used for block prefix sum
+          if (blockEnd > 0) {
+            localSums[block] = *(d_first + blockEnd - 1);
+          } else {
+            localSums[block] = 0;
+          }
+        });
+
+    // bulkPrefix[i] holds the starting sum of a particular block i
+    std::vector<ValueType> bulkPrefix(numBlocks);
+    // exclusive scan on local sums to get number to add to each block's
+    // set of indices
+    // Not using std::exclusive_scan because apparently it doesn't work for
+    // some compilers
+    ValueType runningSum = 0;
+    for (size_t i = 0; i < numBlocks; i++) {
+      bulkPrefix[i] = runningSum;
+      runningSum += localSums[i];
+    }
+
+    galois::do_all(
+        galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+          // add the sums of previous elements to blocks
+          ValueType numToAdd = bulkPrefix[block];
+          size_t blockStart  = std::min(block * blockSize, sizeOfVector);
+          size_t blockEnd    = std::min((block + 1) * blockSize, sizeOfVector);
+          assert(blockStart <= blockEnd);
+
+          // transform applies addition to appropriate range
+          std::transform(d_first + blockStart, d_first + blockEnd,
+                         d_first + blockStart,
+                         [&](ValueType& val) { return val + numToAdd; });
+        });
+
+    // return the iterator past the last element written
+    return d_first + sizeOfVector;
+  } else {
+    // vector is small; do it serially using standard library
+    return std::partial_sum(first, last, d_first);
   }
-
-  galois::do_all(
-      galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
-        // start with this block's prefix up to this point
-        ValueType localTotal = bulkPrefix[block];
-        size_t blockEnd      = std::min((block + 1) * blockSize, sizeOfVector);
-
-        for (size_t i = block * blockSize; i < blockEnd; i++) {
-          // add current element first, then save
-          localTotal += *(first + i);
-          *(d_first + i) = localTotal;
-        }
-      });
-
-  // return the iterator past the last element written
-  return d_first + sizeOfVector;
 }
 
 } // end namespace ParallelSTL
