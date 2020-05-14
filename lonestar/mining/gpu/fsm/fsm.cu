@@ -290,8 +290,7 @@ __global__ void aggregate(unsigned m, unsigned num_emb, unsigned level, CSRGraph
 	__shared__ history_type his[BLOCK_SIZE][PANGOLIN_MAX_SIZE];
 	if(pos < num_emb) {
 		emb_list.get_edge_embedding(level, pos, vids[tid], his[tid]);
-		unsigned n = level+1;
-		assert(n == 3);
+		assert(level == 2);
 		IndexT first = vids[tid][0];
 		IndexT second = vids[tid][1];
 		IndexT third = vids[tid][2];
