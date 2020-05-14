@@ -47,9 +47,9 @@ namespace cll = llvm::cl;
 extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
 extern cll::opt<std::string> statFile;
-extern cll::opt<bool> verify;
 //! Set method for metadata sends
 extern cll::opt<DataCommMode> commMetadata;
+extern cll::opt<bool> output;
 
 #ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA };

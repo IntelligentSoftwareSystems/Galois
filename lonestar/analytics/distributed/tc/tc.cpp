@@ -24,16 +24,17 @@
  * TODO implement CPU kernel
  */
 
-#include <iostream>
-#include <limits>
 #include "DistBench/MiningStart.h"
 #include "galois/DistGalois.h"
-#include "galois/gstl.h"
-#include "galois/graphs/MiningPartitioner.h"
-#include "galois/graphs/GenericPartitioners.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
+#include "galois/gstl.h"
+#include "galois/graphs/GenericPartitioners.h"
+#include "galois/graphs/MiningPartitioner.h"
 #include "galois/runtime/Tracer.h"
+
+#include <iostream>
+#include <limits>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "tc_cuda.h"
@@ -43,7 +44,7 @@ enum { CPU, GPU_CUDA };
 int personality = CPU;
 #endif
 
-constexpr static const char* const regionname = "TC";
+constexpr static const char* const REGION_NAME = "TC";
 
 /*******************************************************************************
  * Graph structure declarations + other initialization
@@ -78,7 +79,7 @@ struct TC {
 #ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) { ///< GPU TC.
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       uint64_t num_local_triangles = 0;
       TC_masterNodes_cuda(num_local_triangles, cuda_ctx);
@@ -129,7 +130,7 @@ struct TC {
 constexpr static const char* const name =
     "TC - Distributed Multi-GPU Triangle Counting ";
 constexpr static const char* const desc = "TC on Distributed GPU (D-IrGL).";
-constexpr static const char* const url  = 0;
+constexpr static const char* const url  = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -137,7 +138,7 @@ int main(int argc, char** argv) {
 
   const auto& net = galois::runtime::getSystemNetworkInterface();
 
-  galois::StatTimer StatTimer_total("TimerTotal", regionname);
+  galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
   Graph* hg;
@@ -145,13 +146,13 @@ int main(int argc, char** argv) {
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
   std::string timer_str("SortEdgesGPU");
-  galois::StatTimer edgeSortTime("SortEdgesGPU", regionname);
+  galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
   edgeSortTime.start();
   sortEdgesByDestination_cuda(cuda_ctx);
   edgeSortTime.stop();
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
-  galois::StatTimer edgeSortTime("SortEdgesCPU", regionname);
+  galois::StatTimer edgeSortTime("SortEdgesCPU", REGION_NAME);
   edgeSortTime.start();
   hg->sortEdgesByDestination();
   edgeSortTime.stop();
@@ -162,7 +163,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] TC::go run ", run, " called\n");
     std::string timer_str("Timer_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
     TC<false>::go(*hg);
@@ -171,6 +172,11 @@ int main(int argc, char** argv) {
     syncSubstrate->set_num_run(run + 1);
   }
   StatTimer_total.stop();
+
+  if (output) {
+    galois::gError("output requested but this application doesn't support it");
+    return 1;
+  }
 
   return 0;
 }

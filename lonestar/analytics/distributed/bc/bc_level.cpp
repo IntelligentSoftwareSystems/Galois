@@ -24,16 +24,16 @@
 
 //#define BCDEBUG
 
-constexpr static const char* const REGION_NAME = "BC";
-
-#include <iomanip>
-#include <iostream>
-#include <limits>
+#include "DistBench/Output.h"
 #include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
+
+#include <iomanip>
+#include <iostream>
+#include <limits>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "bc_level_cuda.h"
@@ -44,6 +44,8 @@ using ShortPathType = double;
 enum { CPU, GPU_CUDA };
 int personality = CPU;
 #endif
+
+constexpr static const char* const REGION_NAME = "BC";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -117,6 +119,7 @@ galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 /******************************************************************************/
 /* Functors for running the algorithm */
 /******************************************************************************/
+
 struct InitializeGraph {
   Graph* graph;
 
@@ -576,6 +579,47 @@ struct Sanity {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<float> makeResultsCPU(Graph* hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).betweeness_centrality);
+  }
+
+  return values;
+}
+
+#ifdef GALOIS_ENABLE_GPU
+std::vector<float> makeResultsGPU(Graph* hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(get_node_betweeness_centrality_cuda(cuda_ctx, node));
+  }
+
+  return values;
+}
+#else
+std::vector<float> makeResultsGPU(Graph* /*unused*/) { abort(); }
+#endif
+
+std::vector<float> makeResults(Graph* hg) {
+  switch (personality) {
+  case CPU:
+    return makeResultsCPU(hg);
+  case GPU_CUDA:
+    return makeResultsGPU(hg);
+  default:
+    abort();
+  }
+}
+
+/******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
 
@@ -583,7 +627,7 @@ constexpr static const char* const name =
     "Betweeness Centrality Level by Level";
 constexpr static const char* const desc =
     "Betweeness Centrality Level by Level on Distributed Galois.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -603,7 +647,7 @@ int main(int argc, char** argv) {
   std::tie(h_graph, syncSubstrate) = distGraphInitialization<NodeData, void>();
 #endif
 
-  if (sourcesToUse != "") {
+  if (!sourcesToUse.empty()) {
     sourceFile.open(sourcesToUse);
     std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
                             std::istream_iterator<uint64_t>{});
@@ -646,7 +690,7 @@ int main(int argc, char** argv) {
       }
 
       // if provided a file of sources to work with, use that
-      if (sourceVector.size() != 0) {
+      if (!sourceVector.empty()) {
         if (loop_end > sourceVector.size()) {
           loop_end = sourceVector.size();
         }
@@ -721,36 +765,18 @@ int main(int argc, char** argv) {
         bitset_dependency.reset();
       }
 
-      InitializeGraph::go((*h_graph));
+      InitializeGraph::go(*h_graph);
       galois::runtime::getHostBarrier().wait();
     }
   }
 
   StatTimer_total.stop();
 
-  // Verify, i.e. print out graph data for examination
-  if (verify) {
-    if (personality == GPU_CUDA) {
-#ifdef GALOIS_ENABLE_GPU
-      for (auto ii = (*h_graph).masterNodesRange().begin();
-           ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        std::stringstream out;
-        out << (*h_graph).getGID(*ii) << " " << std::setprecision(9)
-            << get_node_betweeness_centrality_cuda(cuda_ctx, *ii) << "\n";
-        galois::runtime::printOutput(out.str().c_str());
-      }
-#else
-      abort();
-#endif
-    } else if (personality == CPU) {
-      for (auto ii = (*h_graph).masterNodesRange().begin();
-           ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        std::stringstream out;
-        out << (*h_graph).getGID(*ii) << " " << std::setprecision(9)
-            << (*h_graph).getData(*ii).betweeness_centrality << "\n";
-        galois::runtime::printOutput(out.str().c_str());
-      }
-    }
+  if (output) {
+    std::vector<float> results = makeResults(h_graph);
+
+    writeOutput(outputLocation, "betweenness_centrality", results.data(),
+                results.size());
   }
 
   return 0;
