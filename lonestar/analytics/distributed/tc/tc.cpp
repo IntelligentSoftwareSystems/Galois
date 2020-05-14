@@ -162,7 +162,10 @@ int main(int argc, char** argv) {
   edgeSortTime.stop();
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
-
+  galois::StatTimer edgeSortTime("SortEdgesCPU", regionname);
+  edgeSortTime.start();
+  hg->sortEdges();
+  edgeSortTime.stop();
 #endif
   // accumulators for use in operators
   galois::DGAccumulator<uint64_t> DGAccumulator_numTriangles;
