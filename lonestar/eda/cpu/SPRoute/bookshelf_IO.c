@@ -35,7 +35,7 @@ Iowa State University Research Foundation, Inc.
     float averageCellWidth, *cellWidth, *cellHeight; 
     
     // from readNetsFile() 
-    int numNets, numPins, *netlist, *netlistIndex;
+    int numPins, *netlist, *netlistIndex;
     float *xPinOffset, *yPinOffset;
        
     // from readPlFile()
