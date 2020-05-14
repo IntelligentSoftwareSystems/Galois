@@ -45,9 +45,9 @@ int personality = CPU;
 
 constexpr static const char* const regionname = "TC";
 
-/******************************************************************************/
-/* Graph structure declarations + other initialization */
-/******************************************************************************/
+/*******************************************************************************
+ * Graph structure declarations + other initialization
+ ******************************************************************************/
 
 struct NodeData {
   char dummy;
@@ -87,7 +87,8 @@ struct TC {
     } else { ///< CPU TC.
 #endif
       galois::do_all(
-          galois::iterate(allMasterNodes), TC(&_graph, numTriangles), galois::steal(),
+          galois::iterate(allMasterNodes), TC(&_graph, numTriangles),
+          galois::steal(),
           galois::loopname(syncSubstrate->get_run_identifier("TC").c_str()));
 #ifdef GALOIS_ENABLE_GPU
     }
@@ -102,19 +103,17 @@ struct TC {
   void operator()(GNode p1) const {
     size_t numTriangles_local = 0;
     for (auto it_p1_1 : graph->edges(p1)) {
-      GNode p2 = graph->getEdgeDst(it_p1_1);
+      GNode p2                         = graph->getEdgeDst(it_p1_1);
       Graph::edge_iterator it_p1_begin = graph->edge_begin(p1);
-      Graph::edge_iterator it_p1_end = graph->edge_end(p1);
+      Graph::edge_iterator it_p1_end   = graph->edge_end(p1);
 
       for (auto it_p2 : graph->edges(p2)) {
-        auto p3 = graph->getEdgeDst(it_p2);
+        auto p3                      = graph->getEdgeDst(it_p2);
         Graph::edge_iterator it_p1_2 = it_p1_begin;
-        while (graph->getEdgeDst(it_p1_2) < p3
-                && it_p1_2 < it_p1_end) {
+        while (graph->getEdgeDst(it_p1_2) < p3 && it_p1_2 < it_p1_end) {
           it_p1_2++;
         }
-        if (it_p1_2 < it_p1_end &&
-            p3 == graph->getEdgeDst(it_p1_2)) {
+        if (it_p1_2 < it_p1_end && p3 == graph->getEdgeDst(it_p1_2)) {
           ++numTriangles_local;
         }
       }
@@ -123,9 +122,9 @@ struct TC {
   } ///< CPU operator is done.
 };
 
-/******************************************************************************/
-/* Main */
-/******************************************************************************/
+/*******************************************************************************
+ * Main
+ ******************************************************************************/
 
 constexpr static const char* const name =
     "TC - Distributed Multi-GPU Triangle Counting ";
@@ -157,7 +156,7 @@ int main(int argc, char** argv) {
   hg->sortEdges();
   edgeSortTime.stop();
 #endif
-  // accumulators for use in operators
+  ///! accumulators for use in operators
   galois::DGAccumulator<uint64_t> DGAccumulator_numTriangles;
 
   for (auto run = 0; run < numRuns; ++run) {
