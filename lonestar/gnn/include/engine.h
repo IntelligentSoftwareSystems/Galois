@@ -12,8 +12,8 @@
 #include "deepgalois/Net.h"
 
 static void LonestarGnnPrintVersion(llvm::raw_ostream& out) {
-  out << "LoneStarGNN Benchmark Suite v" << galois::getVersion()
-      << " (" << galois::getRevision() << ")\n";
+  out << "LoneStarGNN Benchmark Suite v" << galois::getVersion() << " ("
+      << galois::getRevision() << ")\n";
   out.flush();
 }
 
@@ -32,25 +32,25 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
 #endif
-  LonestarGnnPrintVersion(llvm::outs());
-  std::cout << "Copyright (C) " << galois::getCopyrightYear()
-            << " The University of Texas at Austin\n";
-  std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-  std::cout << "application: " << (app ? app : "unspecified") << "\n";
-  if (desc)
-    std::cout << desc << "\n";
-  if (url)
-    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
-              << url << "\n";
-  std::cout << "\n";
-  std::ostringstream cmdout;
-  for (int i = 0; i < argc; ++i) {
-    cmdout << argv[i];
-    if (i != argc - 1)
-      cmdout << " ";
-  }
-  galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
-  galois::runtime::reportParam("(NULL)", "Threads", numThreads);
+    LonestarGnnPrintVersion(llvm::outs());
+    std::cout << "Copyright (C) " << galois::getCopyrightYear()
+              << " The University of Texas at Austin\n";
+    std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
+    std::cout << "application: " << (app ? app : "unspecified") << "\n";
+    if (desc)
+      std::cout << desc << "\n";
+    if (url)
+      std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
+                << url << "\n";
+    std::cout << "\n";
+    std::ostringstream cmdout;
+    for (int i = 0; i < argc; ++i) {
+      cmdout << argv[i];
+      if (i != argc - 1)
+        cmdout << " ";
+    }
+    galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+    galois::runtime::reportParam("(NULL)", "Threads", numThreads);
 #ifdef GALOIS_USE_DIST
   }
 #endif
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
 #endif
 
   // initialize network + whole context on CPU
-  // read network, features, ground truth, initialize metadata
+  // read network, initialize metadata
   // default setting for now; can be customized by the user
   deepgalois::Net network(dataset, numThreads, num_conv_layers, epochs, hidden1,
                           learning_rate, dropout_rate, weight_decay,

@@ -16,7 +16,9 @@ namespace deepgalois {
 // be computed as y.argmax(axis=1) from one-hot encoded vector (y) of labels if
 // required.
 size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
-  std::cout << "Reading labels ... ";
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  galois::gPrint("[", myID, "] Reader: Reading labels...\n");
+
   Timer t_read;
   t_read.Start();
   std::string filename = path + dataset_str + "-labels.txt";
@@ -26,11 +28,12 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   size_t m, num_classes; // m: number of samples
   in >> m >> num_classes >> std::ws;
   if (is_single_class) {
-    std::cout << "Using single-class (one-hot) labels\n";
+    galois::gPrint("[", myID,
+                   "] Reader: Using single-class (one-hot) labels\n");
     labels =
         new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
   } else {
-    std::cout << "Using multi-class labels\n";
+    galois::gPrint("[", myID, "] Reader: Using multi-class (one-hot) labels\n");
     labels =
         new label_t[m *
                     num_classes]; // multi-class label for each vertex: N x E
@@ -55,8 +58,8 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   in.close();
   t_read.Stop();
   // print the number of vertex classes
-  std::cout << "Done, unique label counts: " << num_classes
-            << ", time: " << t_read.Millisecs() << " ms\n";
+  galois::gPrint("[", myID, "] Done, unique label counts: ", num_classes,
+                 ", time: ", t_read.Millisecs(), " ms\n");
   // for (auto i = 0; i < 10; i ++) std::cout << "labels[" << i << "] = " <<
   // unsigned(labels[i]) << "\n";
   return num_classes;
@@ -147,9 +150,9 @@ size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin,
     }
     i++;
   }
-  std::cout << mask_type + "_mask range: [" << begin << ", " << end
-            << ") Number of valid samples: " << sample_count << " ("
-            << (float)sample_count / (float)n * (float)100 << "\%)\n";
+  galois::gPrint("Global read", mask_type, "_mask range: [", begin, ", ", end,
+                 ") Number of valid samples: ", sample_count, " (",
+                 (float)sample_count / (float)n * (float)100, "\%)\n");
   in.close();
   return sample_count;
 }
@@ -209,7 +212,6 @@ void Reader::readGraphFromGRFile(LearningGraph* g) {
     std::cout << "LearningGraph: currently edge data not supported.\n";
     exit(1);
   }
-  printf("num_vertices %lu num_edges %lu\n", nv, ne);
   g->allocateFrom(nv, ne);
   auto rowptr = g->row_start_host_ptr();
   for (unsigned vid = 0; vid < nv; ++vid) {
@@ -250,9 +252,9 @@ void Reader::readGraphFromGRFile(LearningGraph* g) {
     ifs.close();
   */
   t.Stop();
-  double runtime = t.Millisecs();
-  std::cout << "read " << masterLength << " bytes in " << runtime << " ms ("
-            << masterLength / 1000.0 / runtime << " MB/s)\n\n";
+  // double runtime = t.Millisecs();
+  // std::cout << "read " << masterLength << " bytes in " << runtime << " ms ("
+  //          << masterLength / 1000.0 / runtime << " MB/s)\n\n";
 }
 
 /*

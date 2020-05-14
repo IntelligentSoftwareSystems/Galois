@@ -30,7 +30,8 @@ void DistContext::saveDistGraph(DGraph* a) {
 }
 
 // TODO move to reader class
-size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str) {
+size_t DistContext::read_labels(bool isSingleClassLabel,
+                                std::string dataset_str) {
   DGraph* dGraph         = DistContext::partitionedGraph;
   this->usingSingleClass = isSingleClassLabel;
   unsigned myID          = galois::runtime::getSystemNetworkInterface().ID;
@@ -49,10 +50,10 @@ size_t DistContext::read_labels(bool isSingleClassLabel, std::string dataset_str
   if (isSingleClassLabel) {
     galois::gPrint("[", myID, "] One hot labels...\n");
     // single-class (one-hot) label for each vertex: N x 1
-    this->h_labels = new label_t[dGraph->size()]; 
+    this->h_labels = new label_t[dGraph->size()];
   } else {
     galois::gPrint("[", myID, "] Multi-class labels...\n");
-    this->h_labels = new label_t[dGraph->size() * this->num_classes]; 
+    this->h_labels = new label_t[dGraph->size() * this->num_classes];
     // multi-class label for each vertex: N x E
   }
 
@@ -113,7 +114,7 @@ size_t DistContext::read_features(std::string dataset_str) {
   ifs >> m >> this->feat_len >> std::ws;
   ifs.close();
 
-  galois::gPrint("N x D: ", m, " x ", feat_len, "\n");
+  galois::gPrint("[", myID, "] N x D: ", m, " x ", feat_len, "\n");
 
   // TODO read in without using 2 in-memory buffers
   // full read feats to load into h_feats
@@ -151,6 +152,8 @@ size_t DistContext::read_features(std::string dataset_str) {
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
                                size_t n, size_t& begin, size_t& end,
                                mask_t* masks, DGraph* dGraph) {
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+
   bool dataset_found = false;
   for (int i = 0; i < NUM_DATASETS; i++) {
     if (dataset_str == dataset_names[i]) {
@@ -159,8 +162,7 @@ size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
     }
   }
   if (!dataset_found) {
-    std::cout << "Dataset currently not supported\n";
-    exit(1);
+    GALOIS_DIE("Dataset currently not supported");
   }
   size_t i             = 0;
   size_t sample_count  = 0;
@@ -185,9 +187,9 @@ size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
     }
     i++;
   }
-  std::cout << mask_type + "_mask range: [" << begin << ", " << end
-            << ") Number of valid samples: " << sample_count << "("
-            << (float)sample_count / (float)n * (float)100 << "\%)\n";
+  galois::gPrint("[", myID, "] ", mask_type, "_mask range: [", begin, ", ", end,
+                 ") Number of valid samples: ", sample_count, "(",
+                 (float)sample_count / (float)n * (float)100, "\%)\n");
   in.close();
   return sample_count;
 }
@@ -207,7 +209,6 @@ void DistContext::allocNormFactor() {
 #else
   this->normFactors.resize(partitionedGraph->size());
 #endif
-  // TODO clean out?
 }
 
 void DistContext::allocNormFactorSub(int subID) {
@@ -216,11 +217,11 @@ void DistContext::allocNormFactorSub(int subID) {
 #else
   this->normFactorsSub.resize(partitionedSubgraphs[subID]->size());
 #endif
-  // TODO clean out?
 }
 
 void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
-  galois::gPrint("Norm factor construction\n");
+  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+  galois::gPrint("[", myID, "] Norm factor construction\n");
   // using original graph to get ids
   Graph* wholeGraph = globalContext->getFullGraph();
 
@@ -233,25 +234,26 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
   //);
 
 #ifdef USE_MKL
-  galois::do_all(galois::iterate((size_t)0, partitionedGraph->size()),
-    [&] (unsigned i) {
-      float_t c_i =
-          std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
+  galois::do_all(
+      galois::iterate((size_t)0, partitionedGraph->size()),
+      [&](unsigned i) {
+        float_t c_i = std::sqrt(
+            float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
 
-      for (auto e = partitionedGraph->edge_begin(i);
-           e != partitionedGraph->edge_end(i); e++) {
-        const auto j = partitionedGraph->getEdgeDst(e);
-        float_t c_j  = std::sqrt(
-            float_t(wholeGraph->get_degree(partitionedGraph->getGID(j))));
+        for (auto e = partitionedGraph->edge_begin(i);
+             e != partitionedGraph->edge_end(i); e++) {
+          const auto j = partitionedGraph->getEdgeDst(e);
+          float_t c_j  = std::sqrt(
+              float_t(wholeGraph->get_degree(partitionedGraph->getGID(j))));
 
-        if (c_i == 0.0 || c_j == 0.0) {
-          this->normFactors[*e] = 0.0;
-        } else {
-          this->normFactors[*e] = 1.0 / (c_i * c_j);
+          if (c_i == 0.0 || c_j == 0.0) {
+            this->normFactors[*e] = 0.0;
+          } else {
+            this->normFactors[*e] = 1.0 / (c_i * c_j);
+          }
         }
-      }
-    },
-    galois::loopname("NormCountingEdge"));
+      },
+      galois::loopname("NormCountingEdge"));
 #else
   galois::do_all(
       galois::iterate((size_t)0, partitionedGraph->size()),
@@ -266,40 +268,42 @@ void DistContext::constructNormFactor(deepgalois::Context* globalContext) {
       },
       galois::loopname("NormCountingNode"));
 #endif
-  galois::gPrint("Norm factor construction done\n");
+  galois::gPrint("[", myID, "] Norm factor construction done \n");
 }
 
 void DistContext::constructNormFactorSub(int subgraphID) {
-    //galois::gPrint("Sub norm factor construction\n");
-    // right now norm factor based on subgraph
-    // TODO fix this for dist execution
+  // galois::gPrint("Sub norm factor construction\n");
+  // right now norm factor based on subgraph
+  // TODO fix this for dist execution
 
-    allocNormFactorSub(subgraphID);
+  allocNormFactorSub(subgraphID);
 
-    Graph& graphToUse = *partitionedSubgraphs[subgraphID];
-    graphToUse.degree_counting();
+  Graph& graphToUse = *partitionedSubgraphs[subgraphID];
+  graphToUse.degree_counting();
 
-    // TODO using partitioned subgraph rather than whoel graph; i.e. dist
-    // setting wrong
+  // TODO using partitioned subgraph rather than whoel graph; i.e. dist
+  // setting wrong
 #ifdef USE_MKL
-  galois::do_all(galois::iterate((size_t)0, graphToUse.size()),
-    [&] (unsigned i) {
-      // float_t c_i =
-      // std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
-      float_t c_i = std::sqrt(float_t(graphToUse.get_degree(i)));
+  galois::do_all(
+      galois::iterate((size_t)0, graphToUse.size()),
+      [&](unsigned i) {
+        // float_t c_i =
+        // std::sqrt(float_t(wholeGraph->get_degree(partitionedGraph->getGID(i))));
+        float_t c_i = std::sqrt(float_t(graphToUse.get_degree(i)));
 
-      for (index_t e = graphToUse.edge_begin(i); e != graphToUse.edge_end(i);
-           e++) {
-        const auto j = graphToUse.getEdgeDst(e);
-        float_t c_j  = std::sqrt(float_t(graphToUse.get_degree(j)));
+        for (index_t e = graphToUse.edge_begin(i); e != graphToUse.edge_end(i);
+             e++) {
+          const auto j = graphToUse.getEdgeDst(e);
+          float_t c_j  = std::sqrt(float_t(graphToUse.get_degree(j)));
 
-        if (c_i == 0.0 || c_j == 0.0) {
-          this->normFactorsSub[e] = 0.0;
-        } else {
-          this->normFactorsSub[e] = 1.0 / (c_i * c_j);
+          if (c_i == 0.0 || c_j == 0.0) {
+            this->normFactorsSub[e] = 0.0;
+          } else {
+            this->normFactorsSub[e] = 1.0 / (c_i * c_j);
+          }
         }
-      }
-    }, galois::loopname("NormCountingEdge"));
+      },
+      galois::loopname("NormCountingEdge"));
 #else
   galois::do_all(
       galois::iterate((size_t)0, graphToUse.size()),
@@ -316,7 +320,7 @@ void DistContext::constructNormFactorSub(int subgraphID) {
       },
       galois::loopname("NormCountingNode"));
 #endif
-  //galois::gPrint("Sub norm factor construction done\n");
+  // galois::gPrint("Sub norm factor construction done\n");
 }
 //! generate labels for the subgraph, m is subgraph size, mask
 //! tells which vertices to use
@@ -353,8 +357,8 @@ void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
   for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
     if (masks[i] == 1) {
       std::copy(DistContext::h_feats + i * DistContext::feat_len,
-          DistContext::h_feats + (i + 1) * DistContext::feat_len,
-          &DistContext::h_feats_subg[count * DistContext::feat_len]);
+                DistContext::h_feats + (i + 1) * DistContext::feat_len,
+                &DistContext::h_feats_subg[count * DistContext::feat_len]);
       // for (unsigned a = 0; a < DistContext::feat_len; a++) {
       //  if (h_feats_subg[count * DistContext::feat_len + a] != 0) {
       //    galois::gPrint(h_feats_subg[count * DistContext::feat_len + a],

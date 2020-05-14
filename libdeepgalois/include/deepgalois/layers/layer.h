@@ -40,6 +40,44 @@ class layer : public deepgalois::node {
 public:
   using ContextType = deepgalois::DistContext;
 
+protected:
+  const std::string header =
+      "[" + std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
+      "] ";
+  unsigned level_;                 // layer id: [0, num_layers-1]
+  size_t begin_;                   // sample begin index
+  size_t end_;                     // sample end index
+  size_t count_;                   // number of samples
+  size_t num_dims;                 // number of dimensions
+  net_phase phase_;                // in which phase: train, val or test
+  std::vector<size_t> input_dims;  // input dimensions
+  std::vector<size_t> output_dims; // output dimentions
+  std::string name_;               // name of this layer
+  bool trainable_;                 // is this layer trainable
+  bool use_mask;
+  vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
+  vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x
+           // 16, layer1: 16 x E
+  vec_t weight_grad; // weight gradient for updating parameters
+  float_t* d_W;
+  float_t* d_weight_grad;
+  mask_t* masks_; // masks to show which samples are valid
+  mask_t* d_masks_;
+  float_t* loss; // error for each vertex: N x 1
+  ContextType* context;
+  label_t* labels;
+  float_t* norm_consts;
+// TODO
+#ifdef __GALOIS_HET_CUDA__
+  GraphGPU* graph_gpu;
+#else
+  Graph* graph_cpu;
+  // Used for synchronization of weight gradients
+  deepgalois::GluonGradients* gradientGraph;
+  galois::graphs::GluonSubstrate<deepgalois::GluonGradients>* syncSub;
+#endif
+
+public:
   layer(unsigned level, std::vector<size_t> in_dims,
         std::vector<size_t> out_dims)
       : level_(level), begin_(0), end_(0), num_dims(in_dims.size()),
@@ -48,9 +86,10 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void malloc_and_init() {}
   void print_layer_info() { //! debug print function
-    std::cout << "Layer" << level_ << " type: " << layer_type() << " input["
-              << input_dims[0] << "," << input_dims[1] << "] output["
-              << output_dims[0] << "," << output_dims[1] << "]\n";
+    unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
+    galois::gPrint("[", myID, "] Layer", level_, " type: ", layer_type(),
+                   "input[", input_dims[0], ",", input_dims[1], "] output[",
+                   output_dims[0], ",", output_dims[1], "]\n");
   }
   // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }
@@ -148,40 +187,6 @@ public:
     // prev()->clear_grads();
     next()->clear_grads();
   }
-
-protected:
-  unsigned level_;                 // layer id: [0, num_layers-1]
-  size_t begin_;                   // sample begin index
-  size_t end_;                     // sample end index
-  size_t count_;                   // number of samples
-  size_t num_dims;                 // number of dimensions
-  net_phase phase_;                // in which phase: train, val or test
-  std::vector<size_t> input_dims;  // input dimensions
-  std::vector<size_t> output_dims; // output dimentions
-  std::string name_;               // name of this layer
-  bool trainable_;                 // is this layer trainable
-  bool use_mask;
-  vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-  vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x
-           // 16, layer1: 16 x E
-  vec_t weight_grad; // weight gradient for updating parameters
-  float_t* d_W;
-  float_t* d_weight_grad;
-  mask_t* masks_; // masks to show which samples are valid
-  mask_t* d_masks_;
-  float_t* loss; // error for each vertex: N x 1
-  ContextType* context;
-  label_t* labels;
-  float_t* norm_consts;
-// TODO
-#ifdef __GALOIS_HET_CUDA__
-  GraphGPU* graph_gpu;
-#else
-  Graph* graph_cpu;
-  // Used for synchronization of weight gradients
-  deepgalois::GluonGradients* gradientGraph;
-  galois::graphs::GluonSubstrate<deepgalois::GluonGradients>* syncSub;
-#endif
 };
 
 //! Connects tail to head's edge and sets that edge's target to tail

@@ -29,32 +29,26 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str,
             0);
   std::fill(this->distValMasks, this->distValMasks + this->distNumSamples, 0);
 
+  // load the training/val masks
   if (dataset_str == "reddit") {
-    // this->globalTrainBegin = 0;
-    // this->globalTrainCount = 153431;
-    // this->globalTrainEnd = this->globalTrainBegin + this->globalTrainCount;
-    // this->globalValBegin = 153431;
-    // this->globalValCount = 23831;
-    // this->globalValEnd = this->globalValBegin + this->globalValCount;
-
     // find local ID from global ID, set if it exists
-    for (size_t i = globalTrainBegin; i < globalTrainEnd; i++) {
+    for (size_t i = this->globalTrainBegin; i < this->globalTrainEnd; i++) {
       if (this->dGraph->isLocal(i)) {
         this->distTrainMasks[this->dGraph->getLID(i)] = 1;
       }
     }
-    for (size_t i = globalValBegin; i < globalValEnd; i++) {
+    for (size_t i = this->globalValBegin; i < this->globalValEnd; i++) {
       if (this->dGraph->isLocal(i)) {
         this->distValMasks[this->dGraph->getLID(i)] = 1;
       }
     }
   } else {
     globalTrainCount = this->distContext->read_masks(
-        dataset_str, "train", this->distNumSamples, globalTrainBegin,
-        globalTrainEnd, this->distTrainMasks, this->dGraph);
+        dataset_str, "train", this->distNumSamples, this->globalTrainBegin,
+        this->globalTrainEnd, this->distTrainMasks, this->dGraph);
     globalValCount = this->distContext->read_masks(
-        dataset_str, "val", this->distNumSamples, globalValBegin, globalValEnd,
-        this->distValMasks, this->dGraph);
+        dataset_str, "val", this->distNumSamples, this->globalValBegin,
+        this->globalValEnd, this->distValMasks, this->dGraph);
   }
 
   // input feature dimension: D
@@ -96,8 +90,9 @@ void Net::read_test_masks(std::string dataset) {
         test_masks[dGraph->getLID(i)] = 1;
     }
   } else {
-    globalTestCount = distContext->read_masks(dataset, std::string("test"), 
-        globalSamples, globalTestBegin, globalTestEnd, test_masks, dGraph);
+    globalTestCount = distContext->read_masks(
+        dataset, std::string("test"), globalSamples, globalTestBegin,
+        globalTestEnd, test_masks, dGraph);
   }
 }
 

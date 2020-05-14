@@ -71,8 +71,9 @@ class Net {
   mask_t* d_val_masks;   // masks for validation on device
   mask_t* d_test_masks;  // masks for test on device
 
-  mask_t* subgraphs_masks;          // masks for subgraphs; size of local graph
-  mask_t* d_subgraphs_masks;        // masks for subgraphs on device; size of local graph
+  mask_t* subgraphs_masks; // masks for subgraphs; size of local graph
+  mask_t*
+      d_subgraphs_masks; // masks for subgraphs on device; size of local graph
   std::vector<size_t> feature_dims; // feature dimnesions for each layer
   std::vector<layer*> layers;       // all the layers in the neural network
 
@@ -90,7 +91,8 @@ class Net {
 public:
   Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
       unsigned hidden1, float lr, float dropout, float wd, bool selfloop,
-      bool single, bool l2norm, bool dense, unsigned neigh_sz, unsigned subg_sz, int val_itv)
+      bool single, bool l2norm, bool dense, unsigned neigh_sz, unsigned subg_sz,
+      int val_itv)
       : is_single_class(single), has_l2norm(l2norm), has_dense(dense),
         neighbor_sample_size(neigh_sz), subgraph_sample_size(subg_sz),
         num_threads(nt), num_conv_layers(n_conv), num_epochs(epochs),
@@ -98,7 +100,7 @@ public:
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
 #ifndef __GALOIS_HET_CUDA__
-    this->myID      = galois::runtime::getSystemNetworkInterface().ID;
+    this->myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
     this->header    = "[" + std::to_string(myID) + "] ";
     this->seperator = " ";
@@ -161,11 +163,13 @@ public:
 
     layers.resize(num_layers);
     // hidden1 level embedding: 16
-    for (size_t i = 1; i < num_conv_layers; i++) feature_dims[i] = this->h1;
+    for (size_t i = 1; i < num_conv_layers; i++)
+      feature_dims[i] = this->h1;
 
     // features are read in distcontext, not this context (this context only
     // used for sampling)
-    if (subgraph_sample_size) sampler = new deepgalois::Sampler();
+    if (subgraph_sample_size)
+      sampler = new deepgalois::Sampler();
   }
 
   //! Default net constructor
@@ -183,8 +187,9 @@ public:
 
   void allocateSubgraphsMasks(int num_subgraphs);
 
-  //! Initializes metadata for the partition
-  void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
+  //! Initializes metadata for the partition: loads data, labels, etc
+  void partitionInit(DGraph* graph, std::string dataset_str,
+                     bool isSingleClassLabel);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   void regularize(); // add weight decay
@@ -196,14 +201,16 @@ public:
     if (subgraph_sample_size) {
       distContext->allocateSubgraphs(num_subgraphs, subgraph_sample_size);
       allocateSubgraphsMasks(num_subgraphs);
-      std::cout << header << "Constructing training vertex set induced graph...\n";
-      //auto gg = distContext->getGraphPointer();
-      auto gg = graphTopologyContext->getGraphPointer(); // gloabl graph in CPU mem
+      std::cout << header
+                << "Constructing training vertex set induced graph...\n";
+      // auto gg = distContext->getGraphPointer();
+      auto gg =
+          graphTopologyContext->getGraphPointer(); // gloabl graph in CPU mem
       sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, gg,
                                      distContext->getGraphPointer());
     }
 
-    std::cout << header << "Start training...\n";
+    galois::gPrint(header, "Start training...\n");
 
     Timer t_epoch;
 
@@ -216,7 +223,8 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
       if (subgraph_sample_size) {
         if (num_subg_remain == 0) {
-          std::cout << header << "Generating " << num_subgraphs << " subgraph(s)\n";
+          std::cout << header << "Generating " << num_subgraphs
+                    << " subgraph(s)\n";
           // TODO stat timer instead of this timer
           Timer t_subgen;
           t_subgen.Start();
@@ -224,8 +232,10 @@ public:
           // generate subgraphs
           for (int sid = 0; sid < num_subgraphs; sid++) {
             VertexSet sampledSet;
-            sampler->selectVertices(subgraph_sample_size, sampledSet, curEpoch); // m = 1000 by default
-            sampler->generateSubgraph(sampledSet, subgraphs_masks + sid * globalSamples,
+            sampler->selectVertices(subgraph_sample_size, sampledSet,
+                                    curEpoch); // m = 1000 by default
+            sampler->generateSubgraph(sampledSet,
+                                      subgraphs_masks + sid * globalSamples,
                                       distContext->getSubgraphPointer(sid));
           }
           num_subg_remain = num_subgraphs;
@@ -246,7 +256,7 @@ public:
         auto subgraphPointer      = distContext->getSubgraphPointer(sg_id);
         this->subgraphNumVertices = subgraphPointer->size();
 
-        std::cout << "Subgraph num_vertices: " << subgraphNumVertices 
+        std::cout << "Subgraph num_vertices: " << subgraphNumVertices
                   << ", num_edges: " << subgraphPointer->sizeEdges() << "\n";
         for (size_t i = 0; i < num_layers; i++) {
           layers[i]->update_dim_size(this->subgraphNumVertices);
@@ -257,18 +267,21 @@ public:
         distContext->constructNormFactorSub(sg_id);
         for (size_t i = 0; i < num_conv_layers; i++) {
           layers[i]->set_graph_ptr(subgraphPointer);
-          layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_subg_ptr());
+          layers[i]->set_norm_consts_ptr(
+              distContext->get_norm_factors_subg_ptr());
         }
 
         // update labels for subgraph
-        distContext->constructSubgraphLabels(this->subgraphNumVertices,
-                                             subgraphs_masks + sg_id * globalSamples);
-        layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_subg_ptr());
+        distContext->constructSubgraphLabels(
+            this->subgraphNumVertices, subgraphs_masks + sg_id * globalSamples);
+        layers[num_layers - 1]->set_labels_ptr(
+            distContext->get_labels_subg_ptr());
 
         // update features for subgraph
-        distContext->constructSubgraphFeatures(this->subgraphNumVertices,
-                                               subgraphs_masks + sg_id * globalSamples);
-        layers[0]->set_feats_ptr(distContext->get_feats_subg_ptr()); // feed input data
+        distContext->constructSubgraphFeatures(
+            this->subgraphNumVertices, subgraphs_masks + sg_id * globalSamples);
+        layers[0]->set_feats_ptr(
+            distContext->get_feats_subg_ptr()); // feed input data
 
         // Graph* testing = distContext->getSubgraphPointer(sg_id);
         // for (size_t i = 0; i < testing->size(); i++) {
@@ -281,28 +294,31 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-      std::cout << header << "Epoch " << std::setw(3) << curEpoch << seperator;
+      galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
       set_netphases(net_phase::train);
       acc_t train_loss = 0.0, train_acc = 0.0;
 
+      galois::gPrint(header, "Calling into eval for forward propagation\n");
       // forward: after this phase, layer edges will contain intermediate
       // features for use during backprop
       double fw_time = evaluate("train", train_loss, train_acc);
 
+      galois::gPrint(header, "Calling into backward propagation\n");
       // backward: use intermediate features + ground truth to update layers
       // with feature gradients whcih are then used to calculate weight
       // gradients
       Net::bprop();
 
-      // gradient update: use gradients stored on each layer to update model for
-      // next epoch
+      galois::gPrint(header, "Weight update call\n");
+      // gradient update: use gradients stored on each layer to update model
+      // for next epoch
       Net::update_weights(opt); // update parameters
 
       // validation / testing
       set_netphases(net_phase::test);
 
-      std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
-                << train_loss << " train_acc " << train_acc << seperator;
+      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
+                     train_loss, " train_acc ", train_acc, "\n");
 
       t_epoch.Stop();
 
@@ -313,22 +329,22 @@ public:
         // Validation
         acc_t val_loss = 0.0, val_acc = 0.0;
         double val_time = evaluate("val", val_loss, val_acc);
-        std::cout << header << "val_loss " << std::setprecision(3) << std::fixed
-                  << val_loss << " val_acc " << val_acc << seperator;
-        std::cout << header << "time " << std::setprecision(3) << std::fixed
-                  << epoch_time + val_time << " ms (train_time " << epoch_time
-                  << " val_time " << val_time << ")\n";
+        galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
+                       val_loss, " val_acc ", val_acc, "\n");
+        galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
+                       epoch_time + val_time, " ms (train_time ", epoch_time,
+                       " val_time ", val_time, ")\n");
       } else {
-        std::cout << header << "train_time " << std::fixed << epoch_time
-                  << " ms (fw " << fw_time << ", bw " << epoch_time - fw_time
-                  << ")\n";
+        galois::gPrint(header, "train_time ", std::fixed, epoch_time,
+                       " ms (fw ", fw_time, ", bw ", epoch_time - fw_time,
+                       ")\n");
       }
     } // epoch loop
 
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-    std::cout << header << "Average training time per epoch: " << avg_train_time
-              << " ms. Throughput: " << throughput << " epoch/s\n";
+    galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
+                   " ms. Throughput: ", throughput, " epoch/s\n");
   }
 
   // evaluate, i.e. inference or predict
@@ -384,7 +400,9 @@ public:
     }
 #endif
 
+    galois::gPrint(header, "Doing actual forward propagation\n");
     loss                 = fprop(begin, end, count, masks);
+    galois::gPrint(header, "Forward propagation donne, going to check accuracy\n");
     float_t* predictions = layers[num_layers - 1]->next()->get_data();
 
     // labels will be subgraph labels if applicable
@@ -409,11 +427,11 @@ public:
 
   // read masks of test set
   void read_test_masks(std::string dataset);
-  //void copy_test_masks_to_device();
+  // void copy_test_masks_to_device();
 
   void construct_layers() {
     // append conv layers
-    std::cout << "\nConstructing layers...\n";
+    galois::gPrint(header, "Constructing layers...\n");
     for (size_t i = 0; i < num_conv_layers - 1; i++) {
       append_conv_layer(i, true); // conv layers, act=true
     }
@@ -519,11 +537,15 @@ public:
     // set mask for the last layer; globals
     // TODO this should be distirbuted sample begin->end not global; fix later
     // seems to be unused in code right now anyways
+    galois::gPrint(header, "fprop: set sample mask\n");
     layers[num_layers - 1]->set_sample_mask(begin, end, count, masks);
 
     for (size_t i = 0; i < num_layers; i++) {
+      galois::gPrint(header, "fprop: layer ", i, " forward call\n");
       layers[i]->forward();
     }
+
+    galois::gPrint(header, "fprop: getting loss\n");
     // prediction error
     auto loss = layers[num_layers - 1]->get_prediction_loss();
     // Squared Norm Regularization to mitigate overfitting
