@@ -19,7 +19,7 @@ Compile your code and run with Intel VTune to collect statistics.
 
 <a href="http://icl.cs.utk.edt/papi/">PAPI</a> stands for "Performance Application Programming Interface". 
 
-Turn on the use of PAPI by running cmake with -DUSE_PAPI=1 option. Instrument the code region of interest with galois::runtime::profilePapi, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the edge-iterator algorithm for triangle counting with PAPI:
+Turn on the use of PAPI by running cmake with -DGALOIS_ENABLE_PAPI=1 option. Instrument the code region of interest with galois::runtime::profilePapi, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the edge-iterator algorithm for triangle counting with PAPI:
 
 @snippet lonestar/triangles/Triangles.cpp profile w/ papi
 
