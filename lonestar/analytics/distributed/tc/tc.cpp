@@ -103,32 +103,24 @@ struct TC {
 
   void operator()(GNode p1) const {
     size_t numTriangles_local = 0;
-    for (auto it_p1 : graph->edges(p1)) {
-      GNode p2 = graph->getEdgeDst(it_p1);
+    for (auto it_p1_1 : graph->edges(p1)) {
+      GNode p2 = graph->getEdgeDst(it_p1_1);
+      Graph::edge_iterator it_p1_begin = graph->edge_begin(p1);
+      Graph::edge_iterator it_p1_end = graph->edge_end(p1);
 
-      Graph::edge_iterator p1Begin = graph->edge_begin(p1);
-      Graph::edge_iterator p1End   = graph->edge_end(p1);
-      Graph::edge_iterator p2Begin = graph->edge_begin(p2);
-      Graph::edge_iterator p2End   = graph->edge_end(p2);
-      Graph::edge_iterator p1p     = p1Begin;
-      Graph::edge_iterator p2p     = p2Begin;
-      uint32_t p1Dest, p2Dest;
-
-      while (p1p < p1End && p2p < p2End) {
-        p1Dest           = graph->getEdgeDst(p1p);
-        p2Dest           = graph->getEdgeDst(p2p);
-        int32_t nodeDiff = p1Dest - p2Dest;
-        if (nodeDiff < 0) {
-          p1p++;
-        } else if (nodeDiff > 0) {
-          p2p++;
-        } else {
-          p1p++;
-          p2p++;
-          numTriangles_local++;
+      for (auto it_p2 : graph->edges(p2)) {
+        auto p3 = graph->getEdgeDst(it_p2);
+        Graph::edge_iterator it_p1_2 = it_p1_begin;
+        while (graph->getEdgeDst(it_p1_2) < p3
+                && it_p1_2 < it_p1_end) {
+          it_p1_2++;
         }
-      } ///< Finding the intersection between the point 1 and the point 2.
-    }   ///< Finding triangles is done.
+        if (it_p1_2 < it_p1_end &&
+            p3 == graph->getEdgeDst(it_p1_2)) {
+          ++numTriangles_local;
+        }
+      }
+    } ///< Finding triangles is done.
     numTriangles += numTriangles_local;
   } ///< CPU operator is done.
 };
