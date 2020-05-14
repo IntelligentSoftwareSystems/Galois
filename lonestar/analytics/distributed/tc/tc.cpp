@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
   sort_cuda(cuda_ctx);
   edgeSortTime.stop();
 #else
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>();
+  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
 
 #endif
   // accumulators for use in operators
