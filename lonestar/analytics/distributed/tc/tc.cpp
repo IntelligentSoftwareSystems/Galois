@@ -45,8 +45,6 @@ int personality = CPU;
 
 constexpr static const char* const regionname = "TC";
 
-namespace cll = llvm::cl;
-
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
