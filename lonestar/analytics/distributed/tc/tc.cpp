@@ -147,13 +147,13 @@ int main(int argc, char** argv) {
   std::string timer_str("SortEdgesGPU");
   galois::StatTimer edgeSortTime("SortEdgesGPU", regionname);
   edgeSortTime.start();
-  sort_cuda(cuda_ctx);
+  sortEdgesByDestination_cuda(cuda_ctx);
   edgeSortTime.stop();
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
   galois::StatTimer edgeSortTime("SortEdgesCPU", regionname);
   edgeSortTime.start();
-  hg->sortEdges();
+  hg->sortEdgesByDestination();
   edgeSortTime.stop();
 #endif
   ///! accumulators for use in operators

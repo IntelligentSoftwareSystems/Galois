@@ -997,8 +997,9 @@ public:
 
   /**
    * Sort the underlying LC_CSR_Graph by ID (destinations)
+   * It sorts edges of the nodes by destination.
    */
-  void sortEdges() {
+  void sortEdgesByDestination() {
     galois::gPrint("[", id, "] Sorting edges\n");
     using GN = typename GraphTy::GraphNode;
     galois::do_all(
