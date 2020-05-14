@@ -330,7 +330,7 @@ public:
     // base_DistGraph::printEdges();
     // SORT EDGES
     if (doSort) {
-      base_DistGraph::sortEdges();
+      base_DistGraph::sortEdgesByDestination();
     }
     // base_DistGraph::printEdges();
 
