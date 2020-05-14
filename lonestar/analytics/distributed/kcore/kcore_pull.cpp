@@ -21,14 +21,16 @@
 /* Sync code/calls was manually written, not compiler generated */
 /******************************************************************************/
 
-#include <iostream>
-#include <limits>
+#include "DistBench/Output.h"
 #include "DistBench/Start.h"
 #include "galois/DistGalois.h"
-#include "galois/gstl.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
+#include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
+
+#include <iostream>
+#include <limits>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "kcore_pull_cuda.h"
@@ -391,13 +393,54 @@ struct KCoreSanityCheck {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<uint8_t> makeResultsCPU(Graph* hg) {
+  std::vector<uint8_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).flag);
+  }
+
+  return values;
+}
+
+#ifdef GALOIS_ENABLE_GPU
+std::vector<uint8_t> makeResultsGPU(Graph* hg) {
+  std::vector<uint8_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(get_node_flag_cuda(cuda_ctx, node));
+  }
+
+  return values;
+}
+#else
+std::vector<uint8_t> makeResultsGPU(Graph* /*unused*/) { abort(); }
+#endif
+
+std::vector<uint8_t> makeResults(Graph* hg) {
+  switch (personality) {
+  case CPU:
+    return makeResultsCPU(hg);
+  case GPU_CUDA:
+    return makeResultsGPU(hg);
+  default:
+    abort();
+  }
+}
+
+/******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
 
 constexpr static const char* const name = "KCore - Distributed Heterogeneous "
                                           "Pull Topological.";
 constexpr static const char* const desc = "KCore on Distributed Galois.";
-constexpr static const char* const url  = 0;
+constexpr static const char* const url  = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -406,7 +449,7 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
     galois::runtime::reportParam(REGION_NAME, "Max Iterations",
-                                 (unsigned long)maxIterations);
+                                 (unsigned int){maxIterations});
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
@@ -464,39 +507,17 @@ int main(int argc, char** argv) {
         bitset_trim.reset();
       }
 
-      InitializeGraph::go((*h_graph));
+      InitializeGraph::go(*h_graph);
       galois::runtime::getHostBarrier().wait();
     }
   }
 
   StatTimer_total.stop();
 
-  // Verify, i.e. print out graph data for examination
-  if (verify) {
-    if (personality == CPU) {
-      for (auto ii = (*h_graph).masterNodesRange().begin();
-           ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        // prints the flag (alive/dead)
-        galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii),
-                                     (bool)(*h_graph).getData(*ii).flag);
+  if (output) {
+    std::vector<uint8_t> results = makeResults(h_graph);
 
-        // does a sanity check as well:
-        // degree higher than kcore if node is alive
-        if (!((*h_graph).getData(*ii).flag)) {
-          assert((*h_graph).getData(*ii).current_degree < k_core_num);
-        }
-      }
-    } else if (personality == GPU_CUDA) {
-#ifdef GALOIS_ENABLE_GPU
-      for (auto ii = (*h_graph).masterNodesRange().begin();
-           ii != (*h_graph).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii),
-                                     (bool)get_node_flag_cuda(cuda_ctx, *ii));
-      }
-#else
-      abort();
-#endif
-    }
+    writeOutput(outputLocation, "in_kcore", results.data(), results.size());
   }
 
   return 0;

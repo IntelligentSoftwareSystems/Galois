@@ -17,14 +17,16 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include <iostream>
-#include <limits>
+#include "DistBench/Output.h"
 #include "DistBench/Start.h"
 #include "galois/DistGalois.h"
-#include "galois/gstl.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
+#include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
+
+#include <iostream>
+#include <limits>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "bfs_pull_cuda.h"
@@ -34,7 +36,7 @@ enum { CPU, GPU_CUDA };
 int personality = CPU;
 #endif
 
-constexpr static const char* const regionname = "BFS";
+constexpr static const char* const REGION_NAME = "BFS";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -96,7 +98,7 @@ struct InitializeGraph {
 #ifdef GALOIS_ENABLE_GPU
       std::string impl_str("InitializeGraph_" +
                            (syncSubstrate->get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
       StatTimer_cuda.stop();
@@ -142,7 +144,7 @@ struct BFS {
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
         std::string impl_str("BFS_" + (syncSubstrate->get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
         BFS_nodesWithEdges_cuda(__retval, cuda_ctx);
@@ -161,7 +163,7 @@ struct BFS {
                           Bitset_dist_current, async>("BFS");
 
       galois::runtime::reportStat_Tsum(
-          regionname, syncSubstrate->get_run_identifier("NumWorkItems"),
+          REGION_NAME, syncSubstrate->get_run_identifier("NumWorkItems"),
           (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((async || (_num_iterations < maxIterations)) &&
@@ -169,7 +171,7 @@ struct BFS {
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          regionname,
+          REGION_NAME,
           "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
           (unsigned long)_num_iterations);
     }
@@ -254,12 +256,53 @@ struct BFSSanityCheck {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<uint32_t> makeResultsCPU(Graph* hg) {
+  std::vector<uint32_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).dist_current);
+  }
+
+  return values;
+}
+
+#ifdef GALOIS_ENABLE_GPU
+std::vector<uint32_t> makeResultsGPU(Graph* hg) {
+  std::vector<uint32_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(get_node_dist_current_cuda(cuda_ctx, node));
+  }
+
+  return values;
+}
+#else
+std::vector<uint32_t> makeResultsGPU(Graph* /*unused*/) { abort(); }
+#endif
+
+std::vector<uint32_t> makeResults(Graph* hg) {
+  switch (personality) {
+  case CPU:
+    return makeResultsCPU(hg);
+  case GPU_CUDA:
+    return makeResultsGPU(hg);
+  default:
+    abort();
+  }
+}
+
+/******************************************************************************/
 /* Main */
 /******************************************************************************/
 
 static const char* const name = "BFS pull - Distributed Heterogeneous";
 static const char* const desc = "BFS pull on Distributed Galois.";
-static const char* const url  = 0;
+static const char* const url  = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -267,12 +310,12 @@ int main(int argc, char** argv) {
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam(regionname, "Max Iterations",
-                                 (unsigned long)maxIterations);
-    galois::runtime::reportParam(regionname, "Source Node ID",
+    galois::runtime::reportParam(REGION_NAME, "Source Node ID",
                                  uint64_t{src_node});
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
+                                 (unsigned int){maxIterations});
   }
-  galois::StatTimer StatTimer_total("TimerTotal", regionname);
+  galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -299,7 +342,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BFS::go run ", run, " called\n");
     std::string timer_str("Timer_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
     if (execution == Async) {
@@ -324,34 +367,18 @@ int main(int argc, char** argv) {
       }
 
       (*syncSubstrate).set_num_run(run + 1);
-      InitializeGraph::go((*hg));
+      InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
   }
 
   StatTimer_total.stop();
 
-  // Verify
-  if (verify) {
-    if (personality == CPU) {
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-                                     (*hg).getData(*ii).dist_current);
-      }
-    } else if (personality == GPU_CUDA) {
-#ifdef GALOIS_ENABLE_GPU
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        if ((*hg).isOwned((*hg).getGID(*ii)))
-          galois::runtime::printOutput(
-              "% %\n", (*hg).getGID(*ii),
-              get_node_dist_current_cuda(cuda_ctx, *ii));
-      }
-#else
-      abort();
-#endif
-    }
+  if (output) {
+    std::vector<uint32_t> results = makeResults(hg);
+
+    writeOutput(outputLocation, "level", results.data(), results.size());
   }
+
   return 0;
 }

@@ -41,11 +41,13 @@ namespace cll = llvm::cl;
 extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
 extern cll::opt<std::string> statFile;
-extern cll::opt<bool> verify;
 //! If set, ignore partitioning comm optimizations
 extern cll::opt<bool> partitionAgnostic;
 //! Set method for metadata sends
 extern cll::opt<DataCommMode> commMetadata;
+//! Where to write output if output is set
+extern cll::opt<std::string> outputLocation;
+extern cll::opt<bool> output;
 
 #ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA };

@@ -1,9 +1,7 @@
 #ifndef GALOIS_DISTBENCH_OUTPUT_H
 #define GALOIS_DISTBENCH_OUTPUT_H
 
-#include <filesystem>
 #include <string>
-#include <vector>
 #include <fstream>
 
 std::string makeOutputFilename(const std::string& outputDir);
