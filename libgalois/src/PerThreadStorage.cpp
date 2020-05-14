@@ -53,7 +53,7 @@ constexpr unsigned MAX_SIZE = 30;
 // expense of fragmentation by restricting all allocations to be cache-aligned.
 constexpr unsigned MIN_SIZE = 7;
 
-static_assert((1 << MIN_SIZE) == GALOIS_CACHE_LINE_SIZE);
+static_assert((1 << MIN_SIZE) == galois::substrate::GALOIS_CACHE_LINE_SIZE);
 
 galois::substrate::PerBackend::PerBackend() { freeOffsets.resize(MAX_SIZE); }
 
