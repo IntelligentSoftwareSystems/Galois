@@ -27,20 +27,26 @@ inline label_t softmax_loss_layer::get_label(size_t i) {
 // 𝑦[i] = 𝑒^𝑥[i] / Σ 𝑒^𝑥[𝑘]
 void softmax_loss_layer::forward_propagation(const float_t* in_data,
                                              float_t* out_data) {
-  size_t len = input_dims[1];
+  // size_t numSamples = input_dims;
+  size_t featLen = input_dims[1];
   galois::do_all(
       galois::iterate(begin_, end_),
-      [&](const auto& i) {
-        if (!use_mask || masks_[i] == 1) { // masked
-          // output is normalized input for this layer
-          math::softmax(len, &in_data[len * i],
-                        &out_data[len * i]); // normalize using softmax
-          // one hot encoded vector for the labels
-          vec_t groundTruth(output_dims[1], 0.0); // ground truth
-          groundTruth[get_label(i)] = 1.0;        // one-hot
-          // loss calculation
-          loss[i] =
-              math::cross_entropy(len, &groundTruth[0], &out_data[len * i]);
+      [&](const unsigned gid) {
+        // if no mask used it means all are fair game
+        if (!use_mask || masks_[gid] == 1) {
+          if (this->context->isLocal(gid)) {
+            unsigned lid = this->context->getLID(gid);
+            // output is normalized input for this layer
+            math::softmax(featLen, &in_data[featLen * lid],
+                          &out_data[featLen * lid]); // normalize using softmax
+            // one hot encoded vector for the labels
+            vec_t groundTruth(output_dims[1], 0.0); // ground truth
+            // labels are local
+            groundTruth[get_label(lid)] = 1.0; // one-hot
+            // loss calculation
+            loss[lid] = math::cross_entropy(featLen, &groundTruth[0],
+                                            &out_data[featLen * lid]);
+          }
         }
       },
       galois::chunk_size<64>(), galois::steal(),
@@ -54,20 +60,24 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
                                           const float_t* out_data, float_t*,
                                           float_t* in_grad) {
   // note: out_grad is ignored because it shouldn't exist (this is output layer)
-  size_t len = layer::input_dims[1];
+  size_t featLen = layer::input_dims[1];
   galois::do_all(
       galois::iterate(layer::begin_, layer::end_),
-      [&](const auto& i) {
-        if (!use_mask || masks_[i] == 1) { // masked
-          vec_t norm_grad(len);
-          std::vector<acc_t> groundTruth(len, 0.0);
-          groundTruth[get_label(i)] = 1.0;
-          // use ground truth to determine derivative of cross entropy
-          math::d_cross_entropy(len, &groundTruth[0], &out_data[len * i],
-                                &norm_grad[0]);
-          // derviative softmax to gradient used in the next layer
-          math::d_softmax(len, &in_data[len * i], &out_data[len * i],
-                          &in_grad[len * i], &norm_grad[0]);
+      [&](const auto& gid) {
+        if (!use_mask || masks_[gid] == 1) { // masked
+          if (this->context->isLocal(gid)) {
+            unsigned lid = this->context->getLID(gid);
+            vec_t norm_grad(featLen);
+            std::vector<acc_t> groundTruth(featLen, 0.0);
+            groundTruth[get_label(lid)] = 1.0;
+            // use ground truth to determine derivative of cross entropy
+            math::d_cross_entropy(featLen, &groundTruth[0],
+                                  &out_data[featLen * lid], &norm_grad[0]);
+            // derviative softmax to gradient used in the next layer
+            math::d_softmax(featLen, &in_data[featLen * lid],
+                            &out_data[featLen * lid], &in_grad[featLen * lid],
+                            &norm_grad[0]);
+          }
         }
       },
       galois::chunk_size<64>(), galois::steal(),
@@ -77,25 +87,31 @@ void softmax_loss_layer::back_propagation(const float_t* in_data,
 }
 
 acc_t softmax_loss_layer::get_prediction_loss() {
-  assert(count_ > 0);
   galois::GAccumulator<acc_t> total_loss;
   galois::GAccumulator<size_t> valid_sample_count;
   total_loss.reset();
   valid_sample_count.reset();
+
   galois::do_all(
       galois::iterate(layer::begin_, layer::end_),
-      [&](const auto& i) {
-        if (!use_mask || masks_[i]) {
-          total_loss += loss[i];
-          valid_sample_count += 1;
+      [&](const auto& gid) {
+        if (!use_mask || masks_[gid]) {
+          if (this->context->isLocal(gid)) {
+            unsigned lid = this->context->getLID(gid);
+            total_loss += this->loss[lid];
+            valid_sample_count += 1;
+          }
         }
       },
-      galois::chunk_size<64>(), galois::steal(),
+      galois::chunk_size<256>(), galois::steal(),
       galois::loopname("getMaskedLoss"));
-  // std::cout << "begin = " << begin_ << " end = " << end_ << " count = " <<
-  // count_ << " valid_count = " << valid_sample_count.reduce() << "\n";
-  assert(valid_sample_count.reduce() == count_);
-  return total_loss.reduce() / (acc_t)count_;
+
+  size_t c = valid_sample_count.reduce();
+  if (c > 0) {
+    return total_loss.reduce() / (acc_t)valid_sample_count.reduce();
+  } else {
+    return 0;
+  }
 }
 
 } // namespace deepgalois
