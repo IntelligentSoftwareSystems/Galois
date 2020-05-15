@@ -15,6 +15,7 @@ struct GradientSync {
     //  galois::gInfo("weight ", node_id, " not consistent with one received");
     //}
     weight += y;
+    weight /= 2;
     return true;
   }
 

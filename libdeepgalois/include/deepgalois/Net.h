@@ -413,7 +413,7 @@ public:
     if (type == "train" && subgraph_sample_size) {
       localLabels = distContext->get_labels_subg_ptr();
     } else {
-      // note this grabs global labels; everything passed in should be global
+      // note this grabs local labels
       localLabels = distContext->get_labels_ptr();
     }
 

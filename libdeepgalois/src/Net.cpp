@@ -155,7 +155,7 @@ acc_t Net::masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
       galois::loopname("getMaskedLoss"));
 
   gCount = sampleCount.reduce();
-  galois::gDebug("sample count is ", gCount);
+  galois::gDebug("Total sample count is ", gCount);
 
   // all hosts should get same accuracy
   return accuracy_all.reduce() / (acc_t)gCount;
