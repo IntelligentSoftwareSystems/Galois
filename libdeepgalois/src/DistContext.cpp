@@ -148,7 +148,7 @@ size_t DistContext::read_features(std::string dataset_str) {
   return feat_len;
 }
 
-// TODO move to reader class
+// TODO move to reader class/reuse reader class somehow
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type,
                                size_t n, size_t& begin, size_t& end,
                                mask_t* masks, DGraph* dGraph) {
@@ -374,6 +374,31 @@ void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
 
 galois::graphs::GluonSubstrate<DGraph>* DistContext::getSyncSubstrate() {
   return DistContext::syncSubstrate;
+}
+
+//! allocate memory for subgraphs (don't actually build them)
+void DistContext::allocateSubgraphs(int num_subgraphs, unsigned max_size) {
+  this->partitionedSubgraphs.resize(num_subgraphs);
+  for (int i = 0; i < num_subgraphs; i++) {
+    this->partitionedSubgraphs[i] = new Graph();
+    this->partitionedSubgraphs[i]->set_max_size(max_size);
+  }
+}
+
+bool DistContext::isOwned(unsigned gid) {
+  return this->partitionedGraph->isOwned(gid);
+}
+
+bool DistContext::isLocal(unsigned gid) {
+  return this->partitionedGraph->isLocal(gid);
+}
+
+unsigned DistContext::getGID(unsigned lid) {
+  return this->partitionedGraph->getGID(lid);
+}
+
+unsigned DistContext::getLID(unsigned gid) {
+  return this->partitionedGraph->getLID(gid);
 }
 
 } // namespace deepgalois

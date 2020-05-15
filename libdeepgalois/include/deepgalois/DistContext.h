@@ -110,19 +110,22 @@ public:
 
   //! return label for some node
   //! NOTE: this is LID, not GID
-  label_t get_label(size_t i) { return h_labels[i]; }
+  label_t get_label(size_t lid) { return h_labels[lid]; }
 
   //! returns pointer to the features of each local node
   float_t* get_in_ptr();
 
   //! allocate memory for subgraphs (don't actually build them)
-  void allocateSubgraphs(int num_subgraphs, unsigned max_size) {
-    partitionedSubgraphs.resize(num_subgraphs);
-    for (int i = 0; i < num_subgraphs; i++) {
-      partitionedSubgraphs[i] = new Graph();
-      partitionedSubgraphs[i]->set_max_size(max_size);
-    }
-  }
+  void allocateSubgraphs(int num_subgraphs, unsigned max_size);
+
+  //! return if a vertex is owned by the partitioned graph this context contains
+  bool isOwned(unsigned gid);
+  //! return if part graph has provided vertex for given gid locally
+  bool isLocal(unsigned gid);
+  //! get GID of an lid for a vertex
+  unsigned getGID(unsigned lid);
+  //! get local id of a vertex given a global id for that vertex
+  unsigned getLID(unsigned gid);
 };
 
 } // namespace deepgalois
