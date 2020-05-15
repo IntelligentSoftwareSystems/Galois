@@ -80,95 +80,99 @@ void Net::regularize() {
 }
 
 void Net::read_test_masks(std::string dataset) {
-  test_masks = new mask_t[distNumSamples];
+  if (dataset == "reddit") {
+    globalTestBegin = 177262;
+    globalTestCount = 55703;
+    globalTestEnd   = globalTestBegin + globalTestCount;
+    for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
+      globalTestMasks[i] = 1;
+    }
+  } else {
+    globalTestCount = graphTopologyContext->read_masks(
+        "test", globalSamples, globalTestBegin, globalTestEnd, globalTestMasks);
+  }
+}
+
+void Net::readDistributedTestMasks(std::string dataset) {
+  distTestMasks = new mask_t[distNumSamples];
   if (dataset == "reddit") {
     globalTestBegin = 177262;
     globalTestCount = 55703;
     globalTestEnd   = globalTestBegin + globalTestCount;
     for (size_t i = globalTestBegin; i < globalTestEnd; i++) {
       if (dGraph->isLocal(i))
-        test_masks[dGraph->getLID(i)] = 1;
+        distTestMasks[dGraph->getLID(i)] = 1;
     }
   } else {
     globalTestCount = distContext->read_masks(
         dataset, std::string("test"), globalSamples, globalTestBegin,
-        globalTestEnd, test_masks, dGraph);
+        globalTestEnd, distTestMasks, dGraph);
   }
 }
 
 /**
- *
- * @param begin GLOBAL begin
- * @param end GLOBAL end
- * @param masks: GLOBAL masks
- * @param count GLOBAL training count
+ * @param gBegin GLOBAL begin
+ * @param gEnd GLOBAL end
+ * @param gMasks: GLOBAL masks
+ * @param gCount GLOBAL training count
  */
-acc_t Net::masked_accuracy(size_t begin, size_t end, size_t count,
-                           mask_t* masks, float_t* preds,
-                           label_t* ground_truth) {
+acc_t Net::masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
+                           mask_t* gMasks, float_t* preds,
+                           label_t* localGroundTruth) {
   galois::DGAccumulator<acc_t> accuracy_all;
   galois::DGAccumulator<uint32_t> sampleCount;
   accuracy_all.reset();
   sampleCount.reset();
 
-  // TODO figure this out for distributed case
   galois::do_all(
-      galois::iterate(begin, end),
+      galois::iterate(gBegin, gEnd),
       [&](const auto& i) {
-#ifndef GALOIS_USE_DIST
-        if (masks == NULL ||
-            masks[i] == 1) { // use sampled graph when masks is NULL
-          // get prediction
-          auto pred = math::argmax(num_classes, preds + i * num_classes);
-          // check prediction
-          if ((label_t)pred == ground_truth[i])
-            accuracy_all += 1.0;
-        }
-#else
-        // TODO dist subraph
-
         // only look at owned nodes (i.e. masters); the prediction for these
         // should only by handled on the owner
         if (this->dGraph->isOwned(i)) {
           sampleCount += 1;
 
           uint32_t localID = this->dGraph->getLID(i);
-          if (masks == NULL) {
-            // GALOIS_DIE("subgraphs not implemented for dist yet");
-            // subgraph here: TODO
+          if (gMasks == NULL) {
             auto pred =
                 math::argmax(num_classes, &preds[localID * num_classes]);
             // check prediction
-            if ((label_t)pred == ground_truth[localID])
+            if ((label_t)pred == localGroundTruth[localID])
               accuracy_all += 1.0;
           } else {
-            if (masks[localID] == 1) {
+            // TODO masks needs to be local id
+            if (gMasks[localID] == 1) {
               // get prediction
               auto pred =
                   math::argmax(num_classes, &preds[localID * num_classes]);
               // check prediction
-              if ((label_t)pred == ground_truth[localID])
+              if ((label_t)pred == localGroundTruth[localID])
                 accuracy_all += 1.0;
             }
           }
         }
-#endif
       },
       galois::loopname("getMaskedLoss"));
 
-  count = sampleCount.reduce();
-  galois::gDebug("sample count is ", count);
+  gCount = sampleCount.reduce();
+  galois::gDebug("sample count is ", gCount);
 
   // all hosts should get same accuracy
-  return accuracy_all.reduce() / (acc_t)count;
+  return accuracy_all.reduce() / (acc_t)gCount;
 }
 
-acc_t Net::masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
-                                       mask_t* masks, float_t* preds,
-                                       label_t* ground_truth) {
-  // TODO dist version
-  return deepgalois::masked_f1_score(begin, end, count, masks, num_classes,
-                                     ground_truth, preds);
+acc_t Net::masked_multi_class_accuracy(size_t gBegin, size_t gEnd,
+                                       size_t gCount, mask_t* gMasks,
+                                       float_t* preds,
+                                       label_t* localGroundTruth) {
+  // TODO fix this
+  if (galois::runtime::getSystemNetworkInterface().Num > 1) {
+    GALOIS_DIE(
+        "Multi-class accuracy not yet implemented for distributed setting\n");
+  }
+
+  return deepgalois::masked_f1_score(gBegin, gEnd, gCount, gMasks, num_classes,
+                                     localGroundTruth, preds);
 }
 
 } // namespace deepgalois

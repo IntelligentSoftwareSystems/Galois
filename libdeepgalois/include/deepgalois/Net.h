@@ -63,17 +63,19 @@ class Net {
 
   mask_t* globalTrainMasks; // masks for training
   mask_t* globalValMasks;   // masks for validation
+  mask_t* globalTestMasks;  // masks for test
+  // TODO it's looking like we may not even need these dist versions
   mask_t* distTrainMasks;
   mask_t* distValMasks;
-  mask_t* test_masks; // masks for test
+  mask_t* distTestMasks; // masks for test, dst
 
   mask_t* d_train_masks; // masks for training on device
   mask_t* d_val_masks;   // masks for validation on device
   mask_t* d_test_masks;  // masks for test on device
 
   mask_t* subgraphs_masks; // masks for subgraphs; size of local graph
-  mask_t*
-      d_subgraphs_masks; // masks for subgraphs on device; size of local graph
+  // masks for subgraphs on device; size of local graph
+  mask_t* d_subgraphs_masks;
   std::vector<size_t> feature_dims; // feature dimnesions for each layer
   std::vector<layer*> layers;       // all the layers in the neural network
 
@@ -107,12 +109,11 @@ public:
 
     assert(n_conv > 0);
 
-    // TODO use galois print: need avoid including Galois.h for GPU
-    std::cout << header << "Configuration: num_threads " << num_threads
-              << ", num_conv_layers " << num_conv_layers << ", num_epochs "
-              << num_epochs << ", hidden1 " << hidden1 << ", learning_rate "
-              << learning_rate << ", dropout_rate " << dropout_rate
-              << ", weight_decay " << weight_decay << "\n";
+    galois::gPrint(header, "Configuration: num_threads ", num_threads,
+                   ", num_conv_layers ", num_conv_layers, ", num_epochs ",
+                   num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
+                   learning_rate, ", dropout_rate ", dropout_rate,
+                   ", weight_decay ", weight_decay, "\n");
     this->num_layers = num_conv_layers + 1;
 
     // additional layers to add
@@ -133,6 +134,7 @@ public:
     // subgraph in the sampler
     globalTrainMasks = new mask_t[globalSamples];
     globalValMasks   = new mask_t[globalSamples];
+    globalTestMasks  = new mask_t[globalSamples];
     std::fill(globalTrainMasks, globalTrainMasks + globalSamples, 0);
     std::fill(globalValMasks, globalValMasks + globalSamples, 0);
 
@@ -183,7 +185,7 @@ public:
   //      globalValCount(0), globalTestBegin(0), globalTestEnd(0),
   //      globalTestCount(0), val_interval(1), num_subgraphs(1),
   //      num_vertices_sg(9000), globalTrainMasks(NULL), globalValMasks(NULL),
-  //      test_masks(NULL), context(NULL) {}
+  //      globalTestMasks(NULL), context(NULL) {}
 
   void allocateSubgraphsMasks(int num_subgraphs);
 
@@ -351,32 +353,32 @@ public:
   double evaluate(std::string type, acc_t& loss, acc_t& acc) {
     Timer t_eval;
     t_eval.Start();
-    size_t begin = 0, end = 0, count = 0;
-    mask_t* masks = NULL;
+    size_t gBegin = 0, gEnd = 0, gCount = 0;
+    mask_t* gMasks = NULL;
 
     // TODO global here good for dist case?
     if (type == "train") {
-      begin = globalTrainBegin;
-      end   = globalTrainEnd;
-      count = globalTrainCount;
-      masks = globalTrainMasks;
+      gBegin = globalTrainBegin;
+      gEnd   = globalTrainEnd;
+      gCount = globalTrainCount;
+      gMasks = globalTrainMasks;
       if (subgraph_sample_size) {
-        // update masks for subgraph
-        masks = NULL;
-        begin = 0;
-        end   = this->subgraphNumVertices;
-        count = this->subgraphNumVertices;
+        // update gMasks for subgraph
+        gMasks = NULL;
+        gBegin = 0;
+        gEnd   = this->subgraphNumVertices;
+        gCount = this->subgraphNumVertices;
       }
     } else if (type == "val") {
-      begin = globalValBegin;
-      end   = globalValEnd;
-      count = globalValCount;
-      masks = globalValMasks;
+      gBegin = globalValBegin;
+      gEnd   = globalValEnd;
+      gCount = globalValCount;
+      gMasks = globalValMasks;
     } else {
-      begin = globalTestBegin;
-      end   = globalTestEnd;
-      count = globalTestCount;
-      masks = test_masks;
+      gBegin = globalTestBegin;
+      gEnd   = globalTestEnd;
+      gCount = globalTestCount;
+      gMasks = globalTestMasks;
     }
 
     // switch to the original graph if not training
@@ -392,41 +394,46 @@ public:
     }
 #ifdef __GALOIS_HET_CUDA__
     if (type == "train") {
-      masks = d_train_masks;
+      gMasks = d_train_masks;
     } else if (type == "val") {
-      masks = d_val_masks;
+      gMasks = d_val_masks;
     } else {
-      masks = d_test_masks;
+      gMasks = d_test_masks;
     }
 #endif
 
     galois::gPrint(header, "Doing actual forward propagation\n");
-    loss                 = fprop(begin, end, count, masks);
-    galois::gPrint(header, "Forward propagation donne, going to check accuracy\n");
+    loss = fprop(gBegin, gEnd, gCount, gMasks);
+    galois::gPrint(header,
+                   "Forward propagation donne, going to check accuracy\n");
     float_t* predictions = layers[num_layers - 1]->next()->get_data();
 
     // labels will be subgraph labels if applicable
-    label_t* labels;
+    label_t* localLabels;
     if (type == "train" && subgraph_sample_size) {
-      labels = distContext->get_labels_subg_ptr();
+      localLabels = distContext->get_labels_subg_ptr();
     } else {
       // note this grabs global labels; everything passed in should be global
-      labels = distContext->get_labels_ptr();
+      localLabels = distContext->get_labels_ptr();
     }
 
     if (is_single_class) {
-      acc = masked_accuracy(begin, end, count, masks, predictions, labels);
+      acc = masked_accuracy(gBegin, gEnd, gCount, gMasks, predictions,
+                            localLabels);
     } else {
-      acc = masked_multi_class_accuracy(begin, end, count, masks, predictions,
-                                        labels);
+      acc = masked_multi_class_accuracy(gBegin, gEnd, gCount, gMasks,
+                                        predictions, localLabels);
     }
 
     t_eval.Stop();
     return t_eval.Millisecs();
   }
 
-  // read masks of test set
+  //! read masks of test set for GLOBAL set
   void read_test_masks(std::string dataset);
+  //! read test masks only for local nodes; assumes dist context is initialized
+  void readDistributedTestMasks(std::string dataset);
+
   // void copy_test_masks_to_device();
 
   void construct_layers() {
@@ -533,12 +540,12 @@ public:
 
   //! forward propagation: [begin, end) is the range of samples used.
   //! calls "forward" on each layer and returns the loss of the final layer
-  acc_t fprop(size_t begin, size_t end, size_t count, mask_t* masks) {
+  acc_t fprop(size_t gBegin, size_t gEnd, size_t gCount, mask_t* gMasks) {
     // set mask for the last layer; globals
-    // TODO this should be distirbuted sample begin->end not global; fix later
+    // TODO this should be distirbuted sample gBegin->end not global; fix later
     // seems to be unused in code right now anyways
     galois::gPrint(header, "fprop: set sample mask\n");
-    layers[num_layers - 1]->set_sample_mask(begin, end, count, masks);
+    layers[num_layers - 1]->set_sample_mask(gBegin, gEnd, gCount, gMasks);
 
     for (size_t i = 0; i < num_layers; i++) {
       galois::gPrint(header, "fprop: layer ", i, " forward call\n");
@@ -547,7 +554,7 @@ public:
 
     galois::gPrint(header, "fprop: getting loss\n");
     // prediction error
-    auto loss = layers[num_layers - 1]->get_prediction_loss();
+    acc_t loss = layers[num_layers - 1]->get_prediction_loss();
     // Squared Norm Regularization to mitigate overfitting
     loss += weight_decay * layers[0]->get_weight_decay_loss();
     return loss;
@@ -576,11 +583,12 @@ public:
   }
 
   // comparing outputs with the ground truth (labels)
-  acc_t masked_accuracy(size_t begin, size_t end, size_t count, mask_t* masks,
-                        float_t* preds, label_t* ground_truth);
-  acc_t masked_multi_class_accuracy(size_t begin, size_t end, size_t count,
-                                    mask_t* masks, float_t* preds,
-                                    label_t* ground_truth);
+  acc_t masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
+                        mask_t* gMasks, float_t* preds,
+                        label_t* localGroundTruth);
+  acc_t masked_multi_class_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
+                                    mask_t* gMasks, float_t* preds,
+                                    label_t* localGroundTruth);
 };
 
 } // namespace deepgalois

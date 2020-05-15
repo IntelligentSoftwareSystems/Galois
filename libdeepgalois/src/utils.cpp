@@ -60,12 +60,14 @@ parallel_prefix_sum<uint32_t, uint32_t>(const std::vector<uint32_t>& in);
 acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
                       size_t num_classes, label_t* ground_truth,
                       float_t* pred) {
+  // TODO dist version; make aware of distributed execution
   double precision_cls(0.), recall_cls(0.), f1_accum(0.);
   int tp_accum(0), fn_accum(0), fp_accum(0), tn_accum(0);
+
   for (size_t col = 0; col < num_classes; col++) {
     int tp_cls(0), fp_cls(0), fn_cls(0), tn_cls(0);
+
     for (size_t row = begin; row < end; row++) {
-      // galois::do_all(galois::iterate(begin, end), [&](const auto& row) {
       if (masks == NULL || masks[row] == 1) {
         auto idx = row * num_classes + col;
         if (ground_truth[idx] == 1 && pred[idx] > 0.5) {
@@ -83,7 +85,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
         }
       }
     }
-    //}, galois::loopname("MaskedF1Score"));
+
     tp_accum += tp_cls;
     fn_accum += fn_cls;
     fp_accum += fp_cls;
@@ -97,6 +99,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
             ? 2. * (recall_cls * precision_cls) / (recall_cls + precision_cls)
             : 0.;
   }
+
   double f1_macro = f1_accum / (double)num_classes;
   // double accuracy_mic =
   // (double)(tp_accum+tn_accum)/(double)(tp_accum+tn_accum+fp_accum+fn_accum);
@@ -110,9 +113,11 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
       recall_mic + precision_mic > 0.
           ? 2. * (recall_mic * precision_mic) / (recall_mic + precision_mic)
           : 0.;
+
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "]", std::setprecision(3), std::fixed,
                  " (f1_micro:", f1_micro, ", f1_macro: ", f1_macro, ")\n");
+
   return f1_micro;
 }
 

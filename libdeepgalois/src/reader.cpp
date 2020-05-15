@@ -150,7 +150,7 @@ size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin,
     }
     i++;
   }
-  galois::gPrint("Global read", mask_type, "_mask range: [", begin, ", ", end,
+  galois::gPrint("Global read ", mask_type, "_mask range: [", begin, ", ", end,
                  ") Number of valid samples: ", sample_count, " (",
                  (float)sample_count / (float)n * (float)100, "\%)\n");
   in.close();
