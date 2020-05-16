@@ -47,18 +47,6 @@ double Map::get_height(double lon, double lat, bool convert) {
     y = lat;
   }
 
-  // Check if the point is inside the map:
-  const auto south_border = north_border - cell_length * length;
-  const auto east_border = west_border + cell_width * width;
-
-  if (Utils::is_greater(y, north_border) ||
-      Utils::is_lesser(y, south_border)  ||
-      Utils::is_greater(x, east_border)  ||
-      Utils::is_lesser(x, west_border))  {
-	  std::cerr << "Point is outside the map" << std::endl;
-	  exit(EXIT_FAILURE);
-  }
-
   // Compute "grid coordinates".
   // modf returns the fractional part of the number,
   // and assigns the integral part to the second argument.
@@ -109,6 +97,9 @@ double Map::get_height_wo_interpol(const double lon_grid, const double lat_grid,
     //XXX[AOS]: I think we should raise an error, unless it is used elsewhere.
     return MINDOUBLE;
   }
+
+  x = std::max(0, x);
+  y = std::max(0, y);
 
   return data[y][x];
 }
