@@ -43,12 +43,17 @@ protected:
   void getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees);
 
   //! Set masks bitset with IDs in the vertices VertexSet
-  void createMasks(size_t n, VertexSet vertices, mask_t* masks);
+  //void createMasks(size_t n, VertexSet vertices, mask_t* masks);
   //inline VertexList reindexVertices(size_t n, VertexSet vertex_set);
   //void checkGSDB(std::vector<db_t>& DB0, std::vector<db_t>& DB1, std::vector<db_t>& DB2, index_t size);
 
   //! convert set of gids to lids
   VertexSet convertToLID(VertexSet& gidSet);
+
+  void createMasks(size_t n, VertexSet vertices, mask_t* masks) {
+    std::fill(masks, masks + n, 0);
+    for (auto v : vertices) masks[v] = 1;
+  }
 
   //! helper function to get degree of some vertex given some graph
   inline unsigned getDegree(GraphCPU* g, index_t v) {

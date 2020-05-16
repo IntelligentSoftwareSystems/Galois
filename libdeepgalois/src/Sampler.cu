@@ -124,13 +124,17 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* s
   cudaMalloc((void**)&d_vertex_list, nv * sizeof(index_t));
   CUDA_CHECK(cudaMemcpy(d_vertex_list, &vertex_list[0], nv * sizeof(index_t), cudaMemcpyHostToDevice));
 
-  clear_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks); // set all 0
-  CudaTest("solving clear_masks kernel failed");
+  createMasks(n, vertex_set, masks);
+  mask_t* d_masks;
+  cudaMalloc((void**)&d_masks, n * sizeof(mask_t));
+  CUDA_CHECK(cudaMemcpy(d_masks, masks, n * sizeof(mask_t), cudaMemcpyHostToDevice));
+  //clear_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, d_masks); // set all 0
+  //CudaTest("solving clear_masks kernel failed");
   // createMasks: set masks for vertices in the vertex_set
-  set_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, d_vertex_list, masks);
-  CudaTest("solving set_masks kernel failed");
+  //set_masks<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, d_vertex_list, d_masks);
+  //CudaTest("solving set_masks kernel failed");
   GraphGPU masked_sg; // size is the same as original graph, but masked dst removed
-  getMaskedGraph(n, masks, partGraph, &masked_sg); // remove edges whose destination is not masked
+  getMaskedGraph(n, d_masks, partGraph, &masked_sg); // remove edges whose destination is not masked
   std::cout << "maskedGraph generated\n";
 
   // re-index the subgraph

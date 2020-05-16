@@ -215,12 +215,6 @@ void Sampler::selectVertices(index_t nv, index_t n, Graph* g,
   */
 }
 
-void Sampler::createMasks(size_t n, VertexSet vertices, mask_t* masks) {
-  // galois::gPrint("Updating masks, size = ", vertices.size(), "\n");
-  std::fill(masks, masks + n, 0);
-  for (auto v : vertices) masks[v] = 1;
-}
-
 // Given a subset of vertices and a graph g, generate a subgraph sg from the
 // graph g
 void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& reindexGraph) {
