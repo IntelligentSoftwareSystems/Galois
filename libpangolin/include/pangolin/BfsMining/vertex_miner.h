@@ -315,19 +315,15 @@ public:
   inline void canonical_reduce() {
     for (auto i = 0; i < this->num_threads; i++)
       cg_localmaps.getLocal(i)->clear();
-    galois::do_all(
-        galois::iterate(qp_map),
-        [&](auto& element) {
-          StrCgMapFreq* cg_map = cg_localmaps.getLocal();
-          StrCPattern cg(element.first);
-          if (cg_map->find(cg) != cg_map->end())
-            (*cg_map)[cg] += element.second;
-          else
-            (*cg_map)[cg] = element.second;
-          cg.clean();
-        },
-        galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("CanonicalReduction"));
+    galois::do_all(galois::iterate(qp_map),[&](auto& element) {
+      StrCgMapFreq* cg_map = cg_localmaps.getLocal();
+      StrCPattern cg(element.first);
+      if (cg_map->find(cg) != cg_map->end())
+        (*cg_map)[cg] += element.second;
+      else
+        (*cg_map)[cg] = element.second;
+      cg.clean();
+    }, galois::chunk_size<CHUNK_SIZE>(), galois::loopname("CanonicalReduce"));
     qp_map.clear();
   }
   inline void merge_qp_map() {
@@ -374,9 +370,9 @@ public:
     } else {
       if (this->max_size < 9) {
         std::cout << std::endl;
-        // for (auto it = p_map.begin(); it != p_map.end(); ++it)
-        //	std::cout << "{" << it->first << "} --> " << it->second <<
-        // std::endl;
+        for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
+        	std::cout << "{" << it->first << "} --> " << it->second <<
+        std::endl;
       } else {
         std::cout << std::endl;
         for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
