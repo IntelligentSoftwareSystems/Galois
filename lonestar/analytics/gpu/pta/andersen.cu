@@ -1376,7 +1376,12 @@ __device__  void map(uint to, const uint base, const uint myBits, uint* const _s
     }
     pos = numFrom + __popc(bits & myMask);
     if (bitActive) {      
-      _shared_[pos] = (fromRel == CURR_DIFF_PTS) ? __currPtsHead__[var] : var;
+      if (fromRel == CURR_DIFF_PTS) {
+        _shared_[pos] = __currPtsHead__[var];
+      }
+      else {
+        _shared_[pos] = var;
+      }
     }
     numFrom += numOnes;
   }
