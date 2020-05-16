@@ -17,14 +17,11 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-// NOTE: must be before DistBenchStart.h as that relies on some cuda
-// calls
-
 #include <iostream>
 #include <limits>
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
-#include "DistBenchStart.h"
 
 /******************************************************************************/
 /* Declaration of command line arguments */

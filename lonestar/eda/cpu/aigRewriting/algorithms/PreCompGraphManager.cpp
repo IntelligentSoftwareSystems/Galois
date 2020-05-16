@@ -603,15 +603,15 @@ void PreCompGraphManager::incTravId() {
 }
 
 bool PreCompGraphManager::isForestNodeComplement(ForestNode* node) {
-  return (bool)(((unsigned long int)node) & 01u);
+  return (bool)(((unsigned long int)node) & 0x1ul);
 }
 
 ForestNode* PreCompGraphManager::forestNodeRegular(ForestNode* node) {
-  return (ForestNode*)((unsigned long int)(node) & ~01u);
+  return (ForestNode*)((unsigned long int)(node) & ~0x1ul);
 }
 
 ForestNode* PreCompGraphManager::forestNodeComplement(ForestNode* node) {
-  return (ForestNode*)((unsigned long int)(node) ^ 01u);
+  return (ForestNode*)((unsigned long int)(node) ^ 0x1ul);
 }
 
 ForestNode* PreCompGraphManager::forestNodeComplementCond(ForestNode* node,

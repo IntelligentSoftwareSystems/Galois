@@ -17,15 +17,14 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-constexpr static const char* const REGION_NAME = "MRBC";
-
+#include "DistBench/Output.h"
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
-#include "DistBenchStart.h"
 
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 // type of short path
 using ShortPathType = double;
@@ -38,6 +37,8 @@ struct BCData {
   ShortPathType shortPathCount;
   galois::CopyableAtomic<float> dependencyValue;
 };
+
+constexpr static const char* const REGION_NAME = "MRBC";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -65,11 +66,6 @@ static cll::opt<unsigned int> vIndex("index",
                                      cll::desc("DEBUG: Index to print for "
                                                "dist/short paths"),
                                      cll::init(0), cll::Hidden);
-// debug vars
-static cll::opt<bool> outputDistPaths("outputDistPaths",
-                                      cll::desc("DEBUG: Output min distance"
-                                                "/short path counts instead"),
-                                      cll::init(false), cll::Hidden);
 static cll::opt<unsigned int>
     vectorSize("vectorSize",
                cll::desc("DEBUG: Specify size of vector "
@@ -524,13 +520,28 @@ void Sanity(Graph& graph) {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<float> makeResults(Graph* hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).bc);
+  }
+
+  return values;
+}
+
+/******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
 
 constexpr static const char* const name = "Min-Rounds Betweeness Centrality";
 constexpr static const char* const desc = "Min-Rounds Betweeness "
                                           "Centrality on Distributed Galois.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url = nullptr;
 
 uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 
@@ -582,7 +593,7 @@ int main(int argc, char** argv) {
   // reading in list of sources to operate on if provided
   std::ifstream sourceFile;
   std::vector<uint64_t> sourceVector;
-  if (sourcesToUse != "") {
+  if (!sourcesToUse.empty()) {
     sourceFile.open(sourcesToUse);
     std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
                             std::istream_iterator<uint64_t>{});
@@ -590,7 +601,7 @@ int main(int argc, char** argv) {
     sourceFile.close();
   }
 
-  if (startNode && sourceVector.size()) {
+  if (startNode && !sourceVector.empty()) {
     GALOIS_DIE("Should not use startNode cmd-line option with specified "
                "sources");
   }
@@ -622,7 +633,7 @@ int main(int argc, char** argv) {
     uint64_t offset = startNode;
     // node boundary to end search at
     uint64_t nodeBoundary =
-        sourceVector.size() == 0 ? hg->globalSize() : sourceVector.size();
+        sourceVector.empty() ? hg->globalSize() : sourceVector.size();
 
     while (offset < nodeBoundary && totalSourcesFound < totalNumSources) {
       if (useSingleSource) {
@@ -635,7 +646,7 @@ int main(int argc, char** argv) {
                totalSourcesFound < totalNumSources) {
           // choose from read source file or from beginning (0 to n)
           nodesToConsider[sourcesFound] =
-              sourceVector.size() == 0 ? offset : sourceVector[offset];
+              sourceVector.empty() ? offset : sourceVector[offset];
           offset++;
           sourcesFound++;
           totalSourcesFound++;
@@ -706,8 +717,8 @@ int main(int argc, char** argv) {
     // re-init graph for next run
     if ((run + 1) != numRuns) { // not the last run
       galois::runtime::getHostBarrier().wait();
-      (*syncSubstrate).set_num_run(run + 1);
-      (*syncSubstrate).set_num_round(0);
+      syncSubstrate->set_num_run(run + 1);
+      syncSubstrate->set_num_round(0);
       offset             = 0;
       macroRound         = 0;
       numSourcesPerRound = origNumRoundSources;
@@ -726,27 +737,11 @@ int main(int argc, char** argv) {
 
   ////////////////////////////////////////////////////////////////////////////////
 
-  // Verify, i.e. print out graph data for examination
-  if (verify) {
-    for (auto ii = (*hg).masterNodesRange().begin();
-         ii != (*hg).masterNodesRange().end(); ++ii) {
-      if (!outputDistPaths) {
-        // outputs betweenness centrality
-        std::stringstream out;
-        out << (*hg).getGID(*ii) << " " << std::setprecision(9)
-            << (*hg).getData(*ii).bc << "\n";
-        galois::runtime::printOutput(out.str().c_str());
-      } else {
-        uint64_t a      = 0;
-        ShortPathType b = 0;
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          if ((*hg).getData(*ii).sourceData[i].minDistance != infinity) {
-            a += (*hg).getData(*ii).sourceData[i].minDistance;
-          }
-          b += (*hg).getData(*ii).sourceData[i].shortPathCount;
-        }
-      }
-    }
+  if (output) {
+    std::vector<float> results = makeResults(hg);
+
+    writeOutput(outputLocation, "betweenness_centrality", results.data(),
+                results.size());
   }
 
   return 0;

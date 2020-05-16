@@ -202,18 +202,6 @@ protected:
         galois::no_stats(), galois::loopname("CSREdgePrint"), galois::steal());
   }
 
-  /**
-   * Sort the underlying LC_CSR_Graph by ID (destinations)
-   */
-  void sortEdges() {
-    galois::gPrint("[", id, "] Sorting edges\n");
-    using GN = typename GraphTy::GraphNode;
-    galois::do_all(
-        galois::iterate(graph),
-        [&](GN n) { graph.sortEdges(n, IdLess<GN, EdgeTy>()); },
-        galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
-  }
-
 private:
   /**
    * Given an OfflineGraph, compute the masters for each node by
@@ -1005,6 +993,19 @@ public:
   void deallocate() {
     galois::gDebug("Deallocating CSR in DistGraph");
     graph.deallocate();
+  }
+
+  /**
+   * Sort the underlying LC_CSR_Graph by ID (destinations)
+   * It sorts edges of the nodes by destination.
+   */
+  void sortEdgesByDestination() {
+    galois::gPrint("[", id, "] Sorting edges\n");
+    using GN = typename GraphTy::GraphNode;
+    galois::do_all(
+        galois::iterate(graph),
+        [&](GN n) { graph.sortEdges(n, IdLess<GN, EdgeTy>()); },
+        galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
   }
 };
 

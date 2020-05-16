@@ -100,8 +100,7 @@ private:
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
-  void reset_bitset(SyncType syncType,
-                    void (*bitset_reset_range)(size_t, size_t)) {
+  void reset_bitset(SyncType, void (*bitset_reset_range)(size_t, size_t)) {
     if (userGraph.sizeEdges() > 0) {
       bitset_reset_range(0, userGraph.sizeEdges() - 1);
     }

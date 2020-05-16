@@ -25,8 +25,7 @@
 #include "galois/config.h"
 #include "galois/substrate/CompilerSpecific.h"
 
-namespace galois {
-namespace substrate {
+namespace galois::substrate {
 
 // Store an item with padding
 template <typename T>
@@ -52,7 +51,6 @@ struct CacheLineStorage {
   }
 };
 
-} // end namespace substrate
-} // end namespace galois
+} // namespace galois::substrate
 
 #endif

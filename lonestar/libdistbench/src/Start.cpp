@@ -17,7 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "DistBenchStart.h"
+#include "DistBench/Start.h"
 #include "galois/Version.h"
 #include "galois/runtime/Network.h"
 #include "galois/runtime/DistStats.h"
@@ -34,12 +34,7 @@ cll::opt<int> numThreads("t", cll::desc("Number of threads (default 1)"),
 cll::opt<int> numRuns("runs", cll::desc("Number of runs (default 3)"),
                       cll::init(3));
 cll::opt<std::string>
-    statFile("statFile", cll::desc("optional output file to print stats to"),
-             cll::init(""));
-cll::opt<bool> verify("verify",
-                      cll::desc("Verify results by outputting results "
-                                "to file (default false)"),
-                      cll::init(false));
+    statFile("statFile", cll::desc("Optional output file to print stats to"));
 
 cll::opt<bool>
     partitionAgnostic("partitionAgnostic",
@@ -58,6 +53,13 @@ cll::opt<DataCommMode> commMetadata(
                            "Do not use any metadata (sends "
                            "non-updated values)")),
     cll::init(noData), cll::Hidden);
+
+cll::opt<std::string> outputLocation(
+    "outputLocation",
+    cll::desc("Location (directory) to write results to when output is true"));
+
+cll::opt<bool> output("output", cll::desc("Write result (default false)"),
+                      cll::init(false));
 
 #ifdef GALOIS_ENABLE_GPU
 std::string personality_str(Personality p) {
