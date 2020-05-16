@@ -348,12 +348,13 @@ public:
   void copy_to_gpu(struct CSRGraph& copygraph) {
     copygraph.nnodes = nnodes;
     copygraph.nedges = nedges;
-    auto error = copygraph.allocOnDevice(use_node_data);
+    auto error       = copygraph.allocOnDevice(use_node_data);
     if (error == 0) {
       std::cout << "GPU memory allocation failed\n";
       exit(0);
     }
-    printf("edge_dst: host_ptr %x device_ptr %x \n", edge_dst, copygraph.edge_dst);
+    printf("edge_dst: host_ptr %x device_ptr %x \n", edge_dst,
+           copygraph.edge_dst);
     check_cuda(cudaMemcpy(copygraph.edge_dst, edge_dst,
                           nedges * sizeof(index_type), cudaMemcpyHostToDevice));
     check_cuda(cudaMemcpy(copygraph.row_start, row_start,
