@@ -120,6 +120,8 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
 #endif
   std::cout << "[" << myID << "]" << std::setprecision(3) << std::fixed
             << " (f1_micro:" << f1_micro << ", f1_macro: " << f1_macro << ")\n";
+  //galois::gPrint("[", myID, "]", std::setprecision(3), std::fixed,
+  //               " (f1_micro:", f1_micro, ", f1_macro: ", f1_macro, ")\n");
 
   return f1_micro;
 }

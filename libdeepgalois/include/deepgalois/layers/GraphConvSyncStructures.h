@@ -1,3 +1,4 @@
+#ifndef __GALOIS_HET_CUDA__
 #ifndef __GRAPH_CONV_SYNC_STRUCT__
 #define __GRAPH_CONV_SYNC_STRUCT__
 
@@ -61,4 +62,5 @@ struct GraphConvSync {
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 };
 
+#endif
 #endif

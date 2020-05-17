@@ -61,20 +61,15 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 int main(int argc, char** argv) {
-#ifdef GALOIS_USE_DIST
   galois::DistMemSys G;
-#else
-  galois::SharedMemSys G;
-#endif
   LonestarGnnStart(argc, argv, name, desc, url);
 
   // Get a partitioned graph first
   std::vector<unsigned> dummyVec;
   deepgalois::DGraph* dGraph = NULL;
-#ifdef GALOIS_USE_DIST
+#ifndef __GALOIS_HET_CUDA__
   dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
-
   // initialize network + whole context on CPU
   // read network, initialize metadata
   // default setting for now; can be customized by the user

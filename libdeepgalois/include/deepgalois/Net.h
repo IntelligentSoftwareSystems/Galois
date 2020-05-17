@@ -109,11 +109,11 @@ public:
 
     assert(n_conv > 0);
 
-    galois::gPrint(header, "Configuration: num_threads ", num_threads,
-                   ", num_conv_layers ", num_conv_layers, ", num_epochs ",
-                   num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
-                   learning_rate, ", dropout_rate ", dropout_rate,
-                   ", weight_decay ", weight_decay, "\n");
+    //galois::gPrint(header, "Configuration: num_threads ", num_threads,
+    //               ", num_conv_layers ", num_conv_layers, ", num_epochs ",
+    //               num_epochs, ", hidden1 ", hidden1, ", learning_rate ",
+    //               learning_rate, ", dropout_rate ", dropout_rate,
+    //               ", weight_decay ", weight_decay, "\n");
     this->num_layers = num_conv_layers + 1;
 
     // additional layers to add
@@ -201,7 +201,10 @@ public:
     int num_subg_remain     = 0;
 
     if (subgraph_sample_size) {
+// TOOD this needs to be enabled
+#ifndef __GALOIS_HET_CUDA__
       distContext->allocateSubgraphs(num_subgraphs, subgraph_sample_size);
+#endif
       allocateSubgraphsMasks(num_subgraphs);
       std::cout << header
                 << "Constructing training vertex set induced graph...\n";
@@ -212,7 +215,7 @@ public:
                                      distContext->getGraphPointer());
     }
 
-    galois::gPrint(header, "Start training...\n");
+    //galois::gPrint(header, "Start training...\n");
 
     Timer t_epoch;
 
@@ -296,22 +299,24 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-      galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
+      //galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
       set_netphases(net_phase::train);
       acc_t train_loss = 0.0, train_acc = 0.0;
 
-      galois::gPrint(header, "Calling into eval for forward propagation\n");
+      //galois::gPrint(header, "Calling into eval for forward propagation\n");
       // forward: after this phase, layer edges will contain intermediate
       // features for use during backprop
-      double fw_time = evaluate("train", train_loss, train_acc);
+      //double fw_time = evaluate("train", train_loss, train_acc);
+      evaluate("train", train_loss, train_acc);
 
-      galois::gPrint(header, "Calling into backward propagation\n");
+
+      //galois::gPrint(header, "Calling into backward propagation\n");
       // backward: use intermediate features + ground truth to update layers
       // with feature gradients whcih are then used to calculate weight
       // gradients
       Net::bprop();
 
-      galois::gPrint(header, "Weight update call\n");
+      //galois::gPrint(header, "Weight update call\n");
       // gradient update: use gradients stored on each layer to update model
       // for next epoch
       Net::update_weights(opt); // update parameters
@@ -319,8 +324,8 @@ public:
       // validation / testing
       set_netphases(net_phase::test);
 
-      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
-                     train_loss, " train_acc ", train_acc, "\n");
+      //galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
+      //               train_loss, " train_acc ", train_acc, "\n");
 
       t_epoch.Stop();
 
@@ -331,22 +336,25 @@ public:
         // Validation
         acc_t val_loss = 0.0, val_acc = 0.0;
         double val_time = evaluate("val", val_loss, val_acc);
-        galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
-                       val_loss, " val_acc ", val_acc, "\n");
-        galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
-                       epoch_time + val_time, " ms (train_time ", epoch_time,
-                       " val_time ", val_time, ")\n");
+        std::cout << header << "val_loss " << std::setprecision(3) << std::fixed <<
+                       val_loss << " val_acc " << val_acc << " time " << val_time << "\n";
+        //galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
+        //               val_loss, " val_acc ", val_acc, "\n");
+        //galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
+        //               epoch_time + val_time, " ms (train_time ", epoch_time,
+        //               " val_time ", val_time, ")\n");
       } else {
-        galois::gPrint(header, "train_time ", std::fixed, epoch_time,
-                       " ms (fw ", fw_time, ", bw ", epoch_time - fw_time,
-                       ")\n");
+        //galois::gPrint(header, "train_time ", std::fixed, epoch_time,
+        //               " ms (fw ", fw_time, ", bw ", epoch_time - fw_time,
+        //               ")\n");
       }
     } // epoch loop
 
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-    galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
-                   " ms. Throughput: ", throughput, " epoch/s\n");
+    std::cout << "ave training time " << avg_train_time << " through " << throughput << "\n";
+    //galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
+    //               " ms. Throughput: ", throughput, " epoch/s\n");
   }
 
   // evaluate, i.e. inference or predict
@@ -402,10 +410,10 @@ public:
     }
 #endif
 
-    galois::gPrint(header, "Doing actual forward propagation\n");
+    //galois::gPrint(header, "Doing actual forward propagation\n");
     loss = fprop(gBegin, gEnd, gCount, gMasks);
-    galois::gPrint(header,
-                   "Forward propagation donne, going to check accuracy\n");
+    //galois::gPrint(header,
+    //               "Forward propagation donne, going to check accuracy\n");
     float_t* predictions = layers[num_layers - 1]->next()->get_data();
 
     // labels will be subgraph labels if applicable
@@ -438,7 +446,7 @@ public:
 
   void construct_layers() {
     // append conv layers
-    galois::gPrint(header, "Constructing layers...\n");
+    //galois::gPrint(header, "Constructing layers...\n");
     for (size_t i = 0; i < num_conv_layers - 1; i++) {
       append_conv_layer(i, true); // conv layers, act=true
     }
@@ -544,15 +552,15 @@ public:
     // set mask for the last layer; globals
     // TODO this should be distirbuted sample gBegin->end not global; fix later
     // seems to be unused in code right now anyways
-    galois::gPrint(header, "fprop: set sample mask\n");
+    //galois::gPrint(header, "fprop: set sample mask\n");
     layers[num_layers - 1]->set_sample_mask(gBegin, gEnd, gCount, gMasks);
 
     for (size_t i = 0; i < num_layers; i++) {
-      galois::gPrint(header, "fprop: layer ", i, " forward call\n");
+      //galois::gPrint(header, "fprop: layer ", i, " forward call\n");
       layers[i]->forward();
     }
 
-    galois::gPrint(header, "fprop: getting loss\n");
+    //galois::gPrint(header, "fprop: getting loss\n");
     // prediction error
     acc_t loss = layers[num_layers - 1]->get_prediction_loss();
     // Squared Norm Regularization to mitigate overfitting

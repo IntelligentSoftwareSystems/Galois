@@ -1,6 +1,6 @@
 #pragma once
 #include "deepgalois/lgraph.h"
-
+//#include "galois/DistGalois.h"
 namespace deepgalois {
 
 class Reader {

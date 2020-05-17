@@ -1,3 +1,4 @@
+#ifndef __GALOIS_HET_CUDA__
 #ifndef __GRAD_SYNC_STRUCT__
 #define __GRAD_SYNC_STRUCT__
 
@@ -43,4 +44,5 @@ struct GradientSync {
 
 // TODO bitset; might have to do it manually
 // GALOIS_SYNC_STRUCTURE_BITSET(TODOTHIS?);
+#endif
 #endif

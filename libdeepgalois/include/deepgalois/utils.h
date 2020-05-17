@@ -7,11 +7,8 @@
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
-#ifdef GALOIS_USE_DIST
 #include "deepgalois/GraphTypes.h"
-#else
-#include "deepgalois/types.h"
-#endif
+//#include "galois/DistGalois.h"
 
 namespace deepgalois {
 
