@@ -183,19 +183,18 @@ void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleCla
 }
 
 void Net::read_test_masks(std::string dataset) {
-  test_masks = new mask_t[distNumSamples];
   if (dataset == "reddit") {
     globalTestBegin = 177262;
     globalTestCount = 55703;
     globalTestEnd   = globalTestBegin + globalTestCount;
     for (size_t i = globalTestBegin; i < globalTestEnd; i++)
-        test_masks[i] = 1;
+        globalTestMasks[i] = 1;
   } else {
     globalTestCount = distContext->read_masks(dataset, std::string("test"), 
-        globalSamples, globalTestBegin, globalTestEnd, test_masks, NULL);
+        globalSamples, globalTestBegin, globalTestEnd, globalTestMasks, NULL);
   }
   //copy_test_masks_to_device();
-  copy_masks_device(globalSamples, test_masks, d_test_masks);
+  copy_masks_device(globalSamples, globalTestMasks, d_test_masks);
 }
 
 //void Net::copy_test_masks_to_device() {}
