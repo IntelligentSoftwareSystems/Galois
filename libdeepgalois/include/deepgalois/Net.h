@@ -299,15 +299,19 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-      //galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
+#ifdef __GALOIS_HET_CUDA__
+      std::cout << header << "Epoch " << std::setw(3) << curEpoch << " ";
+#else
+      galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
+#endif
       set_netphases(net_phase::train);
       acc_t train_loss = 0.0, train_acc = 0.0;
 
       //galois::gPrint(header, "Calling into eval for forward propagation\n");
       // forward: after this phase, layer edges will contain intermediate
       // features for use during backprop
-      //double fw_time = evaluate("train", train_loss, train_acc);
-      evaluate("train", train_loss, train_acc);
+      double fw_time = evaluate("train", train_loss, train_acc);
+      //evaluate("train", train_loss, train_acc);
 
 
       //galois::gPrint(header, "Calling into backward propagation\n");
@@ -324,9 +328,13 @@ public:
       // validation / testing
       set_netphases(net_phase::test);
 
-      //galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
-      //               train_loss, " train_acc ", train_acc, "\n");
-
+#ifdef __GALOIS_HET_CUDA__
+      std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
+                << train_loss << " train_acc " << train_acc << " ";
+#else
+      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
+                     train_loss, " train_acc ", train_acc, "\n");
+#endif
       t_epoch.Stop();
 
       double epoch_time = t_epoch.Millisecs();
@@ -336,25 +344,39 @@ public:
         // Validation
         acc_t val_loss = 0.0, val_acc = 0.0;
         double val_time = evaluate("val", val_loss, val_acc);
-        std::cout << header << "val_loss " << std::setprecision(3) << std::fixed <<
-                       val_loss << " val_acc " << val_acc << " time " << val_time << "\n";
-        //galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
-        //               val_loss, " val_acc ", val_acc, "\n");
-        //galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
-        //               epoch_time + val_time, " ms (train_time ", epoch_time,
-        //               " val_time ", val_time, ")\n");
+#ifdef __GALOIS_HET_CUDA__
+        std::cout << header << "val_loss " << std::setprecision(3) << std::fixed
+                  << val_loss << " val_acc " << val_acc << " ";
+        std::cout << header << "time " << std::setprecision(3) << std::fixed
+                  << epoch_time + val_time << " ms (train_time " << epoch_time
+                  << " val_time " << val_time << ")\n";
+#else
+        galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
+                       val_loss, " val_acc ", val_acc, "\n");
+        galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
+                       epoch_time + val_time, " ms (train_time ", epoch_time,
+                       " val_time ", val_time, ")\n");
+#endif
       } else {
-        //galois::gPrint(header, "train_time ", std::fixed, epoch_time,
-        //               " ms (fw ", fw_time, ", bw ", epoch_time - fw_time,
-        //               ")\n");
+#ifdef __GALOIS_HET_CUDA__
+        std::cout << header << "train_time " << std::fixed << epoch_time
+                  << " ms (fw " << fw_time << ", bw " << epoch_time - fw_time << ")\n";
+#else
+        galois::gPrint(header, "train_time ", std::fixed, epoch_time,
+                       " ms (fw ", fw_time, ", bw ", epoch_time - fw_time, ")\n");
+#endif
       }
     } // epoch loop
 
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-    std::cout << "ave training time " << avg_train_time << " through " << throughput << "\n";
-    //galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
-    //               " ms. Throughput: ", throughput, " epoch/s\n");
+#ifdef __GALOIS_HET_CUDA__
+    std::cout << "Average training time per epoch: " << avg_train_time 
+              << "ms. Throughput " << throughput << " epoch/s\n";
+#else
+    galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
+                   " ms. Throughput: ", throughput, " epoch/s\n");
+#endif
   }
 
   // evaluate, i.e. inference or predict
