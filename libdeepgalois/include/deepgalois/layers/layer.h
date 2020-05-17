@@ -86,10 +86,13 @@ public:
   virtual std::string layer_type() const = 0;
   virtual void malloc_and_init() {}
   void print_layer_info() { //! debug print function
-    unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
-    galois::gPrint("[", myID, "] Layer", level_, " type: ", layer_type(),
-                   "input[", input_dims[0], ",", input_dims[1], "] output[",
-                   output_dims[0], ",", output_dims[1], "]\n");
+    unsigned myID = 0;
+#ifndef __GALOIS_HET_CUDA__
+    galois::runtime::getSystemNetworkInterface().ID;
+#endif
+    std::cout << "[" << myID << "] Layer" << level_ << " type: " << layer_type()
+              << "input[" << input_dims[0], "," << input_dims[1] << "] output["
+              << output_dims[0] << "," << output_dims[1] << "]\n";
   }
   // get methods
   virtual acc_t get_prediction_loss() { return acc_t(0); }
