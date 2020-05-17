@@ -41,9 +41,9 @@ public:
   using ContextType = deepgalois::DistContext;
 
 protected:
-  const std::string header =
-      "[" + std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
-      "] ";
+  //const std::string header =
+  //    "[" + std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
+  //    "] ";
   unsigned level_;                 // layer id: [0, num_layers-1]
   size_t begin_;                   // sample begin index
   size_t end_;                     // sample end index
