@@ -61,7 +61,11 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 int main(int argc, char** argv) {
+#ifdef __GALOIS_HET_CUDA__
+  galois::SharedMemSys G;
+#else
   galois::DistMemSys G;
+#endif
   LonestarGnnStart(argc, argv, name, desc, url);
 
   // Get a partitioned graph first
