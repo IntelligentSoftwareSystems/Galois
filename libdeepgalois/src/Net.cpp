@@ -126,28 +126,28 @@ acc_t Net::masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
 
   galois::do_all(
       galois::iterate(gBegin, gEnd),
-      [&](const auto& i) {
+      [&](const auto& gid) {
         // only look at owned nodes (i.e. masters); the prediction for these
         // should only by handled on the owner
-        if (this->dGraph->isOwned(i)) {
+        if (this->dGraph->isOwned(gid)) {
           sampleCount += 1;
-
-          uint32_t localID = this->dGraph->getLID(i);
+          uint32_t localID = this->dGraph->getLID(gid);
           if (gMasks == NULL) {
             auto pred =
                 math::argmax(num_classes, &preds[localID * num_classes]);
             // check prediction
-            if ((label_t)pred == localGroundTruth[localID])
+            if ((label_t)pred == localGroundTruth[localID]) {
               accuracy_all += 1.0;
+            }
           } else {
-            // TODO masks needs to be local id
-            if (gMasks[localID] == 1) {
+            if (gMasks[gid] == 1) {
               // get prediction
               auto pred =
                   math::argmax(num_classes, &preds[localID * num_classes]);
               // check prediction
-              if ((label_t)pred == localGroundTruth[localID])
+              if ((label_t)pred == localGroundTruth[localID]) {
                 accuracy_all += 1.0;
+              }
             }
           }
         }
@@ -156,7 +156,6 @@ acc_t Net::masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
 
   gCount = sampleCount.reduce();
   galois::gDebug("Total sample count is ", gCount);
-
   // all hosts should get same accuracy
   return accuracy_all.reduce() / (acc_t)gCount;
 }

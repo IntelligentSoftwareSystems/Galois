@@ -103,7 +103,6 @@ int main(int argc, char** argv) {
 
   if (do_test) {
     // test using test samples
-    galois::gPrint("\n");
     network.read_test_masks(dataset);
     galois::StatTimer Ttest("Test");
     Ttest.start();
