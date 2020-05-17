@@ -201,10 +201,7 @@ public:
     int num_subg_remain     = 0;
 
     if (subgraph_sample_size) {
-// TOOD this needs to be enabled
-#ifndef __GALOIS_HET_CUDA__
       distContext->allocateSubgraphs(num_subgraphs, subgraph_sample_size);
-#endif
       allocateSubgraphsMasks(num_subgraphs);
       std::cout << header
                 << "Constructing training vertex set induced graph...\n";
@@ -261,8 +258,8 @@ public:
         auto subgraphPointer      = distContext->getSubgraphPointer(sg_id);
         this->subgraphNumVertices = subgraphPointer->size();
 
-        std::cout << "Subgraph num_vertices: " << subgraphNumVertices
-                  << ", num_edges: " << subgraphPointer->sizeEdges() << "\n";
+        //std::cout << "Subgraph num_vertices: " << subgraphNumVertices
+        //          << ", num_edges: " << subgraphPointer->sizeEdges() << "\n";
         for (size_t i = 0; i < num_layers; i++) {
           layers[i]->update_dim_size(this->subgraphNumVertices);
         }
@@ -416,7 +413,11 @@ public:
       for (size_t i = 0; i < num_layers; i++)
         layers[i]->update_dim_size(distNumSamples);
       for (size_t i = 0; i < num_conv_layers; i++) {
+#ifdef __GALOIS_HET_CUDA__
+        layers[i]->set_graph_ptr(distContext->getGraphPointer());
+#else
         layers[i]->set_graph_ptr(distContext->getLGraphPointer());
+#endif
         layers[i]->set_norm_consts_ptr(distContext->get_norm_factors_ptr());
       }
       layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_ptr());

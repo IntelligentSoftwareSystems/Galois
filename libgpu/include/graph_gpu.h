@@ -139,7 +139,7 @@ struct CSRGraph {
 		delete edge_dst;
 		edge_dst = new_edge_dst;
 		nedges += nnodes;
-        printf("nnodes = %d, nedges = %d\n", nnodes, nedges);
+    printf("nnodes = %d, nedges = %d\n", nnodes, nedges);
 		//print_neighbors(nnodes-1);
 		//print_neighbors(0);
 	}
@@ -184,7 +184,7 @@ struct CSRGraph {
     nnodes = nv;
     nedges = ne;
     if (max_size < nnodes) max_size = nnodes;
-    printf("allocating memory on gpu nnodes %d nedges %d\n", max_size, nedges);
+    //printf("allocating memory on gpu nnodes %d nedges %d\n", max_size, nedges);
     if (need_realloc) {
       if (edge_dst) free_index_device(edge_dst);
       malloc_index_device(nedges, edge_dst);

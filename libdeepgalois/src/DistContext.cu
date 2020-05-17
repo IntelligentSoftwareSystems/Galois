@@ -64,6 +64,12 @@ cusparseMatDescr_t DistContext::cusparse_matdescr_ = 0;
 curandGenerator_t DistContext::curand_generator_   = 0;
 
 DistContext::DistContext() : DistContext(true) {
+  d_labels = NULL; 
+  d_feats = NULL;
+  d_labels_subg = NULL; 
+  d_feats_subg = NULL;
+  d_normFactors = NULL;
+  d_normFactorsSub = NULL;
   CUBLAS_CHECK(cublasCreate(&cublas_handle_));
   CUSPARSE_CHECK(cusparseCreate(&cusparse_handle_));
   CUSPARSE_CHECK(cusparseCreateMatDescr(&cusparse_matdescr_));
@@ -86,10 +92,12 @@ DistContext::~DistContext() {
     CUSPARSE_CHECK(cusparseDestroyMatDescr(cusparse_matdescr_));
   if (curand_generator_)
     CURAND_CHECK(curandDestroyGenerator(curand_generator_));
-  if (d_labels)
-    CUDA_CHECK(cudaFree(d_labels));
-  if (d_feats)
-    CUDA_CHECK(cudaFree(d_feats));
+  if (d_labels) CUDA_CHECK(cudaFree(d_labels));
+  if (d_feats) CUDA_CHECK(cudaFree(d_feats));
+  if (d_normFactors) CUDA_CHECK(cudaFree(d_normFactors));
+  if (d_labels_subg) CUDA_CHECK(cudaFree(d_labels_subg));
+  if (d_feats_subg) CUDA_CHECK(cudaFree(d_feats_subg));
+  if (d_normFactorsSub) CUDA_CHECK(cudaFree(d_normFactorsSub));
 }
 
 size_t DistContext::read_labels(bool isSingleClass, std::string dataset_str) {
@@ -105,6 +113,15 @@ size_t DistContext::read_features(std::string dataset_str) {
 size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, size_t n, 
                                size_t& begin, size_t& end, mask_t* masks, DGraph* dGraph) {
   return reader.read_masks(mask_type, n, begin, end, masks);
+}
+
+//! allocate memory for subgraphs (don't actually build them)
+void DistContext::allocateSubgraphs(int num_subgraphs, unsigned max_size) {
+  this->partitionedSubgraphs.resize(num_subgraphs);
+  for (int i = 0; i < num_subgraphs; i++) {
+    this->partitionedSubgraphs[i] = new Graph();
+    this->partitionedSubgraphs[i]->set_max_size(max_size);
+  }
 }
 
 void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
@@ -126,6 +143,7 @@ void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
 }
 
 void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
+  //std::cout << "construct subgraph features (d_feats_subg: " << d_feats_subg << ") ... ";
   size_t count = 0;
   DistContext::h_feats_subg.resize(m * feat_len);
   for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
@@ -137,9 +155,27 @@ void DistContext::constructSubgraphFeatures(size_t m, const mask_t* masks) {
   if (d_feats_subg) float_free_device(d_feats_subg);
   float_malloc_device(m * feat_len, d_feats_subg);
   float_copy_device(m * feat_len, &h_feats_subg[0], d_feats_subg);
+  //std::cout << "Done\n";
 }
 
 void DistContext::constructNormFactorSub(int subgraphID) {
+  Graph& graphToUse = *partitionedSubgraphs[subgraphID];
+  auto n = graphToUse.size();
+  //std::cout << "Pre-computing subgraph normalization factor (n=" << n << ") ... ";
+
+ #ifdef USE_CUSPARSE
+  auto nnz = graphToUse.sizeEdges();
+  float_malloc_device(nnz, d_normFactorsSub);
+  init_const_gpu(nnz, 0.0, d_normFactors);
+  norm_factor_computing_edge<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      n, graphToUse, d_normFactorsSub);
+#else
+  float_malloc_device(n, d_normFactorsSub);
+  norm_factor_computing_node<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      n, graphToUse, d_normFactorsSub);
+#endif
+  CudaTest("solving norm_factor_computing kernel failed");
+  //std::cout << "Done\n";
 }
 
 void DistContext::constructNormFactor(deepgalois::Context* globalContext) {

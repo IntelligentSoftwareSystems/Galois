@@ -20,7 +20,7 @@ __global__ void set_masks(index_t n, index_t* vertices, mask_t* masks) {
 __global__ void get_masked_degrees(index_t n, mask_t* masks, GraphGPU g,
                                    index_t* degrees) {
   CUDA_KERNEL_LOOP(src, n) {
-    if (src < 10) printf("masks[%d] = %d\n", src, masks[src]);
+    //if (src < 10) printf("masks[%d] = %d\n", src, masks[src]);
     degrees[src] = 0;
     if (masks[src] == 1) {
       for (auto e = g.edge_begin(src); e != g.edge_end(src); e++) {
@@ -29,7 +29,7 @@ __global__ void get_masked_degrees(index_t n, mask_t* masks, GraphGPU g,
           degrees[src]++;
       }
     }
-    if (src < 10) printf("degrees[%d] = %d\n", src, degrees[src]);
+    //if (src < 10) printf("degrees[%d] = %d\n", src, degrees[src]);
   }
 }
 
@@ -96,7 +96,7 @@ void Sampler::indexing(size_t n, index_t* vertices, index_t* new_indices) {
 
 template <typename GraphTy, typename SubgraphTy>
 void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* subg) {
-  std::cout << "Original graph size: " << g->size() << " edges: " << g->sizeEdges() << "\n";
+  //std::cout << "Original graph size: " << g->size() << " edges: " << g->sizeEdges() << "\n";
   index_t *degrees, *offsets;
   CUDA_CHECK(cudaMalloc((void**)&degrees, sizeof(index_t)*n));
   get_masked_degrees<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, *g, degrees);
@@ -105,7 +105,7 @@ void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* s
   CUDA_CHECK(cudaFree(degrees));
   index_t ne;
   CUDA_CHECK(cudaMemcpy(&ne, &offsets[n], sizeof(index_t), cudaMemcpyDeviceToHost));
-  std::cout << "maskedSG num_edges " << ne << "\n";
+  //std::cout << "maskedSG num_edges " << ne << "\n";
   subg->allocateFrom(n, ne); // TODO: avoid reallocation
   generate_masked_graph_kernel<<<CUDA_GET_BLOCKS(n), CUDA_NUM_THREADS>>>(n, masks, offsets, *g, *subg);
   CUDA_CHECK(cudaFree(offsets));
@@ -117,7 +117,7 @@ void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* s
 void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* sub) {
   index_t n = partGraph->size();
   auto nv = vertex_set.size();
-  std::cout << "g size: " << n << " sg sizes: " << nv << "\n";
+  //std::cout << "g size: " << n << " sg sizes: " << nv << "\n";
   // convert the vertex_set to a vertex_list and copy it to the device
   VertexList vertex_list(vertex_set.begin(), vertex_set.end());
   index_t* d_vertex_list;
@@ -135,7 +135,7 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* s
   //CudaTest("solving set_masks kernel failed");
   GraphGPU masked_sg; // size is the same as original graph, but masked dst removed
   getMaskedGraph(n, d_masks, partGraph, &masked_sg); // remove edges whose destination is not masked
-  std::cout << "maskedGraph generated\n";
+  //std::cout << "maskedGraph generated\n";
 
   // re-index the subgraph
   index_t* d_new_ids;
@@ -154,7 +154,7 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* s
   CUDA_CHECK(cudaFree(degrees));
   index_t ne;
   CUDA_CHECK(cudaMemcpy(&ne, offsets+nv, sizeof(index_t), cudaMemcpyDeviceToHost));
-  std::cout << "subgraph num_edges " << ne << "\n";
+  //std::cout << "subgraph num_edges " << ne << "\n";
 
   // allocate memory for the subgraph
   sub->allocateFrom(nv, ne); // avoid reallocation
@@ -162,7 +162,7 @@ void Sampler::generateSubgraph(VertexSet &vertex_set, mask_t* masks, GraphGPU* s
   generate_graph_kernel<<<CUDA_GET_BLOCKS(nv), CUDA_NUM_THREADS>>>(nv, offsets, d_vertex_list, d_new_ids, masked_sg, *sub);
   CudaTest("solving generate_graph kernel failed");
   CUDA_CHECK(cudaFree(offsets));
-  std::cout << "Subgraph generated\n";
+  //std::cout << "Subgraph generated\n";
 }
 
 } // namespace deepgalois

@@ -21,6 +21,10 @@ class DistContext {
   size_t num_classes;     // number of classes: E
   size_t feat_len;        // input feature length: D
   Graph* lGraph;          // learning graph version
+  DGraph* partitionedGraph; // the input graph, |V| = N
+  std::vector<Graph*> partitionedSubgraphs;
+  label_t* h_labels;      // labels for classification. Single-class: Nx1, multi-class: NxE
+  float_t* h_feats;       // input features: N x D
 #ifdef __GALOIS_HET_CUDA__
   label_t* d_labels;      // labels on device
   label_t* d_labels_subg; // labels for subgraph on device
@@ -31,11 +35,6 @@ class DistContext {
 #else
   galois::graphs::GluonSubstrate<DGraph>* syncSubstrate;
 #endif
-  DGraph* partitionedGraph; // the input graph, |V| = N
-  std::vector<Graph*> partitionedSubgraphs;
-  label_t* h_labels; // labels for classification. Single-class label: Nx1,
-                     // multi-class label: NxE
-  float_t* h_feats;                    // input features: N x D
   std::vector<label_t> h_labels_subg;  // labels for subgraph
   std::vector<float_t> h_feats_subg;   // input features for subgraph
   std::vector<float_t> normFactors;    // normalization constant based on graph structure
@@ -46,7 +45,10 @@ class DistContext {
 public:
   // TODO better constructor
   DistContext();
-  DistContext(bool isDevice) : is_device(isDevice) {}
+  DistContext(bool isDevice) : is_device(isDevice), is_selfloop_added(false),
+                               usingSingleClass(true), dataset(""),
+                               num_classes(0), feat_len(0), lGraph(NULL),
+                               partitionedGraph(NULL), h_labels(0), h_feats(0) {}
   ~DistContext();
 
   size_t read_graph(std::string dataset_str, bool selfloop = false);

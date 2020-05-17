@@ -148,7 +148,8 @@ acc_t masked_f1_score_gpu(int num_classes, int begin, int end, int count,
 namespace deepgalois {
 
 void Net::allocateSubgraphsMasks(int num_subgraphs) {
-  CUDA_CHECK(cudaMalloc((void**)&subgraphs_masks, distNumSamples * num_subgraphs * sizeof(mask_t)));
+  subgraphs_masks = new mask_t[distNumSamples * num_subgraphs];
+  //CUDA_CHECK(cudaMalloc((void**)&subgraphs_masks, distNumSamples * num_subgraphs * sizeof(mask_t)));
 }
 
 void Net::partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel) {

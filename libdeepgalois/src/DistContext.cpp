@@ -3,7 +3,10 @@
 #include "deepgalois/configs.h"
 
 namespace deepgalois {
-DistContext::DistContext() : usingSingleClass(true) {}
+DistContext::DistContext() : DistContext(false) {
+  syncSubstrate = NULL;
+}
+
 DistContext::~DistContext() {}
 
 void DistContext::saveDistGraph(DGraph* a) {
