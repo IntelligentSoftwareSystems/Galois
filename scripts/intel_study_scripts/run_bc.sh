@@ -20,7 +20,7 @@ else
 fi
 
 inputDir="${INPUT_DIR}"
-execDir="${GALOIS_BUILD}/lonestar/${appname}"
+execDir="${GALOIS_BUILD}/lonestar/analytics/cpu/${appname}"
 
 configType=$1
 numRuns=$2
@@ -60,39 +60,39 @@ do
             then
               mkdir -p ${execDir}/logs/${input}
            fi
-           while read p; do
-              source_node=$((${p} - 1))
-              filename="${appname}_${input}_source_${source_node}_${configType}_Run${run}"
-              statfile="${filename}.stats"
-              if [ ${input} == "road" ];
-              then
-                args=" -numOfSources=1 -numOfOutSources=1 -sourcesToUse="${source_node}" "
-              else
-                args=" -numOfSources=1 -singleSource  -startNode=${source_node}"
-              fi
-              ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-               done < $inputDir/sources/GAP-${input}_sources.mtx
-       done
+           for count in {0..15}
+           do
+             filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+             statfile="${filename}.stats"
+             if [ ${input} == "road" ];
+             then
+               args=" -numOfSources=4 -numOfOutSources=4 -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+             else
+               args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+             fi
+             ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+           done 
+         done
 done
 
 extension=gr
 exec="bc-level"
 for run in $(seq 1 ${numRuns})
 do
-       for input in "web" "twitter"
-       do
-        echo "Running on ${input}"
-        echo "Logs will be available in ${execDir}/logs/${input}"
-        if [ ! -d "${execDir}/logs/${input}" ];
-        then
-           mkdir -p ${execDir}/logs/${input}
-        fi
-        while read p; do
-          source_node=$((${p} - 1))
-          filename="${appname}_${input}_source_${source_node}_${configType}_Run${run}"
-          statfile="${filename}.stats"
-          args=" -numOfSources=1 -singleSource  -startNode=${source_node}"
-          ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-          done < $inputDir/sources/GAP-${input}_sources.mtx
-        done
+  for input in "web" "twitter"
+  do
+    echo "Running on ${input}"
+    echo "Logs will be available in ${execDir}/logs/${input}"
+    if [ ! -d "${execDir}/logs/${input}" ];
+    then
+      mkdir -p ${execDir}/logs/${input}
+    fi
+    for count in {0..15}
+    do
+      filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+      statfile="${filename}.stats"
+      args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+      ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+    done
+  done
 done

@@ -20,7 +20,7 @@ else
 fi
 
 inputDir="${INPUT_DIR}"
-execDir="${GALOIS_BUILD}/lonestar/bfs"
+execDir="${GALOIS_BUILD}/lonestar/analytics/cpu/bfs"
 
 configType=$1
 numRuns=$2
