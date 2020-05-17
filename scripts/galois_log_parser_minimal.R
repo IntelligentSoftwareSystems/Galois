@@ -74,7 +74,7 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
  }
 
  ## returnList for distributed galois log
- returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations, "deviceKind" = deviceKind)
+ returnList <- list("benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "deviceKind" = deviceKind, "iterations" = numIterations)
  return(returnList)
 }
 #### END: @function to parse commadline ##################
@@ -201,14 +201,28 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog) {
 }
 #### END: @function entry point for shared memory galois log ##################
 
+#### START: @function entry point for de-duplication of entries ##################
+deDupByMean <- function(output) {
+  logData <- read.csv(output, stringsAsFactors=F,strip.white=T)
+  ## Aggregate results from multiple runs
+  logData_agg <- aggregate(. ~ benchmark + input + partitionScheme + 
+          hosts + numThreads + deviceKind,
+          data = logData, mean)
+  write.csv(logData_agg, output, row.names=FALSE, quote=FALSE)
+}
+#### END: @function entry point for de-duplication of entries ##################
+
+
 #############################################
 ##  Commandline options.
 #######################################
 option_list = list(
                    make_option(c("-i", "--input"), action="store", default=NA, type='character',
-                               help="name of the input file to parse"),
+                               help="Name of the input file to parse"),
                    make_option(c("-o", "--output"), action="store", default=NA, type='character',
-                               help="name of the output file to store output"),
+                               help="Name of the output file to store output"),
+                   make_option(c("-d", "--duplicate"), action="store_true", default=FALSE,
+                               help="Allow duplicate entries. By default takes mean of duplicate entries [default %default]"),
                    make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
                                help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]")
                    )
@@ -226,5 +240,9 @@ if (is.na(opt$i)){
   }
   print(opt$g)
   galoisLogParser(opt$i, opt$o, opt$s)
+  ## Take mean of the duplicate entries ##
+  if(!opt$d){
+    deDupByMean(opt$o)
+  }
 }
 ##################### END #####################
