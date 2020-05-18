@@ -7,8 +7,7 @@
 
 class Production1 : public Production {
 private:
-  bool checkApplicabilityCondition(
-      const NodeData& nodeData,
+  bool checkApplicabilityCondition(const NodeData& nodeData,
       const std::vector<optional<EdgeIterator>>& edgesIterators) const {
     return nodeData.isToRefine() && !connManager.hasBrokenEdge(edgesIterators);
   }

@@ -27,7 +27,7 @@ std::vector<GNode> generateSampleGraph(Graph &graph) {
 int countHEdges(Graph &graph) {
     int counter = 0;
     for(auto n : graph) {
-        if (n->getData().isHyperEdge()) {
+        if (graph.containsNode(n) && n->getData().isHyperEdge()) {
             ++counter;
         }
     }
