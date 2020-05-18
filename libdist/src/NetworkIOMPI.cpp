@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -89,7 +89,7 @@ private:
     std::atomic<size_t>& inflightSends;
 
     sendQueueTy(galois::runtime::MemUsageTracker& tracker,
-        std::atomic<size_t>& sends)
+                std::atomic<size_t>& sends)
         : memUsageTracker(tracker), inflightSends(sends) {}
 
     void complete() {
@@ -113,9 +113,9 @@ private:
       auto& f = inflight.back();
       galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(),
                              galois::runtime::printVec(f.data));
-#ifdef __GALOIS_HET_ASYNC__
+#ifdef GALOIS_SUPPORT_ASYNC
       int rv = MPI_Issend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
-                         MPI_COMM_WORLD, &f.req);
+                          MPI_COMM_WORLD, &f.req);
 #else
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
                          MPI_COMM_WORLD, &f.req);
@@ -136,7 +136,7 @@ private:
     std::atomic<size_t>& inflightRecvs;
 
     recvQueueTy(galois::runtime::MemUsageTracker& tracker,
-        std::atomic<size_t>& recvs)
+                std::atomic<size_t>& recvs)
         : memUsageTracker(tracker), inflightRecvs(recvs) {}
 
     // FIXME: Does synchronous recieves overly halt forward progress?
@@ -152,7 +152,7 @@ private:
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
         assert(status.MPI_TAG <= 32767);
         if (status.MPI_TAG != 32767) {
 #endif
@@ -164,7 +164,7 @@ private:
           handleError(rv);
           galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG,
                                  m.data.size());
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
         }
 #endif
       }
@@ -194,11 +194,11 @@ public:
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */
-  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, 
-      std::atomic<size_t>& sends, std::atomic<size_t>& recvs, 
-      uint32_t& ID, uint32_t& NUM)
-      : NetworkIO(tracker, sends, recvs),
-        sendQueue(tracker, inflightSends), recvQueue(tracker, inflightRecvs) {
+  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker,
+               std::atomic<size_t>& sends, std::atomic<size_t>& recvs,
+               uint32_t& ID, uint32_t& NUM)
+      : NetworkIO(tracker, sends, recvs), sendQueue(tracker, inflightSends),
+        recvQueue(tracker, inflightRecvs) {
     auto p = getIDAndHostNum();
     ID     = p.first;
     NUM    = p.second;
@@ -234,7 +234,9 @@ public:
 }; // end NetworkIOMPI class
 
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>
-galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs) {
+galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker,
+                                  std::atomic<size_t>& sends,
+                                  std::atomic<size_t>& recvs) {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{
       new NetworkIOMPI(tracker, sends, recvs, ID, NUM)};

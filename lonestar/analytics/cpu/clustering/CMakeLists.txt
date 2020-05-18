@@ -1,0 +1,11 @@
+app(louvainClustering louvainClustering.cpp)
+add_dependencies(apps louvainClustering)
+target_link_libraries(louvainClustering PRIVATE Galois::shmem lonestar)
+install(TARGETS louvainClustering DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small1 louvainClustering "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")
+
+app(leidenClustering leidenClustering.cpp)
+add_dependencies(apps leidenClustering)
+target_link_libraries(leidenClustering PRIVATE Galois::shmem lonestar)
+install(TARGETS leidenClustering DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small1 leidenClustering "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,15 +20,11 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
-#include "galois/gIO.h"
-#include "galois/TypeTraits.h"
-
-// For consistent name, use boost rather than C++11
-// std::is_trivially_constuctible
-#include <boost/type_traits/has_trivial_constructor.hpp>
-
 #include <type_traits>
 #include <utility>
+
+#include "galois/config.h"
+#include "galois/gIO.h"
 
 namespace galois {
 
@@ -83,7 +79,7 @@ class LazyObject {
 
     // Declare constructor explicitly because Data must be default
     // constructable regardless of the constructability of T.
-    Data() {} // NOLINT(modernize-use-equals-default)
+    Data() {}  // NOLINT(modernize-use-equals-default)
     ~Data() {} // NOLINT(modernize-use-equals-default)
 
     T& value() { return value_; }
@@ -129,10 +125,10 @@ struct LazyObject<void> {
   };
 
   void destroy() {}
-  void construct(const_reference x) {}
+  void construct(const_reference) {}
 
   template <typename... Args>
-  void construct(Args&&... args) {}
+  void construct(Args&&...) {}
 
   const_reference get() const { return 0; }
 };

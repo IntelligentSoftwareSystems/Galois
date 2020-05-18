@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,21 +20,22 @@
 #ifndef GALOIS_RUNTIME_SHAREDMEM_H
 #define GALOIS_RUNTIME_SHAREDMEM_H
 
-#include "galois/runtime/Statistics.h"
-#include "galois/runtime/PagePool.h"
-#include "galois/substrate/SharedMem.h"
-
 #include <string>
+
+#include "galois/config.h"
+#include "galois/runtime/PagePool.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/substrate/SharedMem.h"
 
 namespace galois::runtime {
 
 template <typename SM>
-class SharedMem: public galois::substrate::SharedMem {
+class SharedMem : public galois::substrate::SharedMem {
   internal::PageAllocState<> m_pa;
   SM m_sm;
 
 public:
-  explicit SharedMem() :  m_pa(), m_sm() {
+  explicit SharedMem() : m_pa(), m_sm() {
     internal::setPagePoolState(&m_pa);
     internal::setSysStatManager(&m_sm);
   }
@@ -52,6 +53,6 @@ public:
   SharedMem& operator=(SharedMem&&) = delete;
 };
 
-}  // namespace galois::runtime
+} // namespace galois::runtime
 
 #endif

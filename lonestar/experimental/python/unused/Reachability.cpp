@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -69,13 +69,14 @@ struct Reach {
 
 static void initialize(Graph* g) {
   // set all distance to infinity
-  galois::do_all(*g,
-                 [=](GNode n) {
-                   auto& data    = (*g).getData(n);
-                   data.II.vInt1 = DIST_INFINITY;
-                   data.II.vInt2 = DIST_INFINITY;
-                 },
-                 galois::steal());
+  galois::do_all(
+      *g,
+      [=](GNode n) {
+        auto& data    = (*g).getData(n);
+        data.II.vInt1 = DIST_INFINITY;
+        data.II.vInt2 = DIST_INFINITY;
+      },
+      galois::steal());
 }
 
 template <bool isBackward>
@@ -100,15 +101,16 @@ template <bool isBackward>
 static NodeSet collectOutward(Graph* g, int hop) {
   NodeSet w;
 
-  galois::do_all(*g,
-                 [g, &w, hop](GNode n) {
-                   auto dist = (!isBackward) ? (*g).getData(n).II.vInt1
-                                             : (*g).getData(n).II.vInt2;
-                   if (dist <= hop) {
-                     w.push_back(n);
-                   }
-                 },
-                 galois::steal());
+  galois::do_all(
+      *g,
+      [g, &w, hop](GNode n) {
+        auto dist =
+            (!isBackward) ? (*g).getData(n).II.vInt1 : (*g).getData(n).II.vInt2;
+        if (dist <= hop) {
+          w.push_back(n);
+        }
+      },
+      galois::steal());
 
   return w;
 }
@@ -117,17 +119,18 @@ static NodeSet collectOutward(Graph* g, int hop) {
 static NodeSet collectBetween(Graph* g, int hop) {
   NodeSet w;
 
-  galois::do_all(*g,
-                 [g, &w, hop](GNode n) {
-                   auto& data = (*g).getData(n);
-                   auto distF = data.II.vInt1, distB = data.II.vInt2;
+  galois::do_all(
+      *g,
+      [g, &w, hop](GNode n) {
+        auto& data = (*g).getData(n);
+        auto distF = data.II.vInt1, distB = data.II.vInt2;
 
-                   // only count nodes on shortest paths
-                   if (distF + distB <= hop) {
-                     w.push_back(n);
-                   }
-                 },
-                 galois::steal());
+        // only count nodes on shortest paths
+        if (distF + distB <= hop) {
+          w.push_back(n);
+        }
+      },
+      galois::steal());
 
   return w;
 }

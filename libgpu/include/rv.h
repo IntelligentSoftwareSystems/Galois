@@ -30,9 +30,9 @@ public:
 
 template <typename Type>
 class HGAccumulator : public HGReducible<Type> {
-  Type local;
 
 public:
+  Type local;
   __device__ void thread_entry() { local = 0; }
 
   template <typename T>

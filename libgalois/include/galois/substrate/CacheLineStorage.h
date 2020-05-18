@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,12 +20,12 @@
 #ifndef GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 #define GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 
-#include "CompilerSpecific.h"
-
 #include <utility>
 
-namespace galois {
-namespace substrate {
+#include "galois/config.h"
+#include "galois/substrate/CompilerSpecific.h"
+
+namespace galois::substrate {
 
 // Store an item with padding
 template <typename T>
@@ -51,7 +51,6 @@ struct CacheLineStorage {
   }
 };
 
-} // end namespace substrate
-} // end namespace galois
+} // namespace galois::substrate
 
 #endif

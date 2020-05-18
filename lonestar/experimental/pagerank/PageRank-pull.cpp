@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -90,14 +90,15 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 }
 
 void initNodeData(Graph& g) {
-  galois::do_all(galois::iterate(g),
-                 [&](const GNode& n) {
-                   auto& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
-                   data.value[0] = (1 - ALPHA);
-                   data.value[1] = (1 - ALPHA);
-                   data.nout     = 0;
-                 },
-                 galois::no_stats(), galois::loopname("initNodeData"));
+  galois::do_all(
+      galois::iterate(g),
+      [&](const GNode& n) {
+        auto& data    = g.getData(n, galois::MethodFlag::UNPROTECTED);
+        data.value[0] = (1 - ALPHA);
+        data.value[1] = (1 - ALPHA);
+        data.nout     = 0;
+      },
+      galois::no_stats(), galois::loopname("initNodeData"));
 }
 
 // Computing outdegrees in the tranpose graph is equivalent to computing the
@@ -109,26 +110,29 @@ void computeOutDeg(Graph& graph) {
   galois::LargeArray<std::atomic<size_t>> vec;
   vec.allocateInterleaved(graph.size());
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) { vec.constructAt(src, 0ul); },
-                 galois::no_stats(), galois::loopname("InitDegVec"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) { vec.constructAt(src, 0ul); }, galois::no_stats(),
+      galois::loopname("InitDegVec"));
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) {
-                   for (auto nbr : graph.edges(src)) {
-                     GNode dst = graph.getEdgeDst(nbr);
-                     vec[dst].fetch_add(1ul);
-                   }
-                 },
-                 galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                 galois::no_stats(), galois::loopname("ComputeDeg"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        for (auto nbr : graph.edges(src)) {
+          GNode dst = graph.getEdgeDst(nbr);
+          vec[dst].fetch_add(1ul);
+        }
+      },
+      galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::no_stats(),
+      galois::loopname("ComputeDeg"));
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) {
-                   auto& srcData = graph.getData(src);
-                   srcData.nout  = vec[src];
-                 },
-                 galois::no_stats(), galois::loopname("CopyDeg"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        auto& srcData = graph.getData(src);
+        srcData.nout  = vec[src];
+      },
+      galois::no_stats(), galois::loopname("CopyDeg"));
 
   outDegreeTimer.stop();
 }
@@ -173,12 +177,13 @@ void computeOutDeg(Graph& graph) {
 */
 
 void finalizePR(Graph& g) {
-  galois::do_all(galois::iterate(g),
-                 [&](const GNode& n) {
-                   LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
-                   data.finalize();
-                 },
-                 galois::no_stats(), galois::loopname("Finalize"));
+  galois::do_all(
+      galois::iterate(g),
+      [&](const GNode& n) {
+        LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
+        data.finalize();
+      },
+      galois::no_stats(), galois::loopname("Finalize"));
 }
 
 // Make use of edge tiling with PageRank topological pull version (array of
@@ -199,101 +204,103 @@ void computePageRankET(Graph& graph) {
   galois::LargeArray<PRTy> nonAtomicVec;
   nonAtomicVec.allocateInterleaved(graph.size());
 
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) {
-                   atomicVec[src]    = 0;
-                   nonAtomicVec[src] = 0;
-                 },
-                 galois::no_stats(), galois::loopname("InitSumsInVectors"));
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        atomicVec[src]    = 0;
+        nonAtomicVec[src] = 0;
+      },
+      galois::no_stats(), galois::loopname("InitSumsInVectors"));
 
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
   // Split work not by nodes but by edges, to take into account high degree
   // nodes.
-  galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) {
-                   constexpr const galois::MethodFlag flag =
-                       galois::MethodFlag::UNPROTECTED;
+  galois::do_all(
+      galois::iterate(graph),
+      [&](const GNode& src) {
+        constexpr const galois::MethodFlag flag =
+            galois::MethodFlag::UNPROTECTED;
 
-                   auto beg       = graph.edge_begin(src, flag);
-                   const auto end = graph.edge_end(src, flag);
-                   assert(beg <= end);
+        auto beg       = graph.edge_begin(src, flag);
+        const auto end = graph.edge_end(src, flag);
+        assert(beg <= end);
 
-                   bool needsAtomicStore = false;
-                   // Edge tiling for large outdegree nodes
-                   if ((end - beg) > EDGE_TILE_SIZE) {
-                     needsAtomicStore = true;
-                     for (; beg + EDGE_TILE_SIZE < end;) {
-                       auto ne = beg + EDGE_TILE_SIZE;
-                       activeNodes.push(ActivePRNode{src, true, beg, ne});
-                       beg = ne;
-                     }
-                   }
+        bool needsAtomicStore = false;
+        // Edge tiling for large outdegree nodes
+        if ((end - beg) > EDGE_TILE_SIZE) {
+          needsAtomicStore = true;
+          for (; beg + EDGE_TILE_SIZE < end;) {
+            auto ne = beg + EDGE_TILE_SIZE;
+            activeNodes.push(ActivePRNode{src, true, beg, ne});
+            beg = ne;
+          }
+        }
 
-                   if ((end - beg) > 0) {
-                     activeNodes.push(ActivePRNode{
-                         src, (needsAtomicStore) ? true : false, beg, end});
-                   }
-                 },
-                 galois::no_stats(), galois::steal(),
-                 galois::chunk_size<CHUNK_SIZE>(),
-                 galois::loopname("SplitWorkByEdges"));
+        if ((end - beg) > 0) {
+          activeNodes.push(
+              ActivePRNode{src, (needsAtomicStore) ? true : false, beg, end});
+        }
+      },
+      galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+      galois::loopname("SplitWorkByEdges"));
 
   while (true) {
 
     // Compute partial contributions to the final pagerank from the edge tiles
-    galois::do_all(galois::iterate(activeNodes),
-                   [&](const ActivePRNode& prNode) {
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
-                     GNode src        = prNode.src;
-                     PRTy partial_sum = 0.0;
-                     for (auto ii = prNode.beg; ii != prNode.end; ++ii) {
-                       GNode dst    = graph.getEdgeDst(ii);
-                       LNode& ddata = graph.getData(dst, flag);
-                       partial_sum += ddata.getPageRank(iteration) / ddata.nout;
-                     }
-                     if (prNode.needAtomic) {
-                       atomicAdd(atomicVec[src], partial_sum);
-                     } else {
-                       nonAtomicVec[src] += partial_sum;
-                     }
-                   },
-                   galois::no_stats(), galois::steal(),
-                   galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("computePartialPRContrib"));
+    galois::do_all(
+        galois::iterate(activeNodes),
+        [&](const ActivePRNode& prNode) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
+          GNode src        = prNode.src;
+          PRTy partial_sum = 0.0;
+          for (auto ii = prNode.beg; ii != prNode.end; ++ii) {
+            GNode dst    = graph.getEdgeDst(ii);
+            LNode& ddata = graph.getData(dst, flag);
+            partial_sum += ddata.getPageRank(iteration) / ddata.nout;
+          }
+          if (prNode.needAtomic) {
+            atomicAdd(atomicVec[src], partial_sum);
+          } else {
+            nonAtomicVec[src] += partial_sum;
+          }
+        },
+        galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("computePartialPRContrib"));
 
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     if (atomicVec[src] > nonAtomicVec[src]) {
-                       assert(nonAtomicVec[prNode.src] == 0);
-                       nonAtomicVec[src] = atomicVec[src];
-                     }
-                   },
-                   galois::no_stats(), galois::loopname("AccumulateContrib"));
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          if (atomicVec[src] > nonAtomicVec[src]) {
+            assert(nonAtomicVec[prNode.src] == 0);
+            nonAtomicVec[src] = atomicVec[src];
+          }
+        },
+        galois::no_stats(), galois::loopname("AccumulateContrib"));
 
     // Finalize pagerank for this iteration
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
-                     LNode& sdata = graph.getData(src, flag);
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
+          LNode& sdata = graph.getData(src, flag);
 
-                     // New value of pagerank after computing contributions from
-                     // incoming edges in the original graph
-                     float value = nonAtomicVec[src] * ALPHA + (1.0 - ALPHA);
-                     // Find the delta in new and old pagerank values
-                     float diff =
-                         std::fabs(value - sdata.getPageRank(iteration));
+          // New value of pagerank after computing contributions from
+          // incoming edges in the original graph
+          float value = nonAtomicVec[src] * ALPHA + (1.0 - ALPHA);
+          // Find the delta in new and old pagerank values
+          float diff = std::fabs(value - sdata.getPageRank(iteration));
 
-                     // Do not update pagerank before the diff is computed since
-                     // there is a
-                     // data dependence on the pagerank value
-                     sdata.setPageRank(iteration, value);
-                     max_delta.update(diff);
-                   },
-                   galois::no_stats(), galois::loopname("PageRankFinalize"));
+          // Do not update pagerank before the diff is computed since
+          // there is a
+          // data dependence on the pagerank value
+          sdata.setPageRank(iteration, value);
+          max_delta.update(diff);
+        },
+        galois::no_stats(), galois::loopname("PageRankFinalize"));
 
     float delta = max_delta.reduce();
 
@@ -310,12 +317,13 @@ void computePageRankET(Graph& graph) {
     // TODO: We can merge this loop to the earlier one, the downside is there
     // will be additional stores in case it was the last iteration. But maybe
     // the overhead of a Galois parallel loop is more than that?
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     nonAtomicVec[src] = 0;
-                     atomicVec[src]    = 0;
-                   },
-                   galois::no_stats(), galois::loopname("ClearVectors"));
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          nonAtomicVec[src] = 0;
+          atomicVec[src]    = 0;
+        },
+        galois::no_stats(), galois::loopname("ClearVectors"));
 
   } // end while(true)
 

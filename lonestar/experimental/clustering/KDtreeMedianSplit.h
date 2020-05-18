@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -84,16 +84,17 @@ public:
     KDcell* root = createCell(mDataArray.begin(), mDataArray.end());
     mRoot        = node;
 
-    galois::for_each(galois::iterate({root}),
-                     [&](KDcell* cell, auto& ctx) {
-                       auto sz = std::distance(cell->mBeg, cell->mEnd);
+    galois::for_each(
+        galois::iterate({root}),
+        [&](KDcell* cell, auto& ctx) {
+          auto sz = std::distance(cell->mBeg, cell->mEnd);
 
-                       if (sz > MAX_POINTS_IN_CELL) {
+          if (sz > MAX_POINTS_IN_CELL) {
 
-                         KDcell* left = createCell(...);
-                       }
-                     },
-                     galois::no_aborts());
+            KDcell* left = createCell(...);
+          }
+        },
+        galois::no_aborts());
 
 
     

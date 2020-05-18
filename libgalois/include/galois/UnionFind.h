@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -21,6 +21,8 @@
 #define GALOIS_UNIONFIND_H
 
 #include <atomic>
+
+#include "galois/config.h"
 
 namespace galois {
 /**
@@ -62,16 +64,17 @@ public:
   //! Compress ONLY node to point directly to the root of the tree;
   //! nodes on path are not altered
   void compress() {
-    if (isRep()) return;
+    if (isRep())
+      return;
 
     // my current component
-    T* rep  = m_component;
+    T* rep = m_component;
 
     // loop until rep == itself; i.e. get root
     while (rep->m_component.load(std::memory_order_relaxed) != rep) {
       // get next parent
       T* next = rep->m_component.load(std::memory_order_relaxed);
-      rep  = next;
+      rep     = next;
     }
 
     // at this point rep is the parent: save as my parent

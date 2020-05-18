@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,6 +25,8 @@
 #include <cstdlib>
 #include <string.h>
 
+#include "galois/config.h"
+
 // FIXME: move to Runtime
 
 namespace galois {
@@ -42,44 +44,44 @@ void gErrorStr(const std::string&);
 
 //! Prints a sequence of things
 template <typename... Args>
-void gPrint(Args... args) {
+void gPrint(Args&&... args) {
   std::ostringstream os;
-  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  (os << ... << args);
   gPrintStr(os.str());
 }
 
 //! Prints an info string from a sequence of things
 template <typename... Args>
-void gInfo(Args... args) {
+void gInfo(Args&&... args) {
   std::ostringstream os;
-  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  (os << ... << args);
   gInfoStr(os.str());
 }
 
 //! Prints a warning string from a sequence of things
 template <typename... Args>
-void gWarn(Args... args) {
+void gWarn(Args&&... args) {
   std::ostringstream os;
-  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  (os << ... << args);
   gWarnStr(os.str());
 }
 
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
 //! is defined.
 template <typename... Args>
-void gDebug(const Args&... args) {
+void gDebug(Args&&... GALOIS_USED_ONLY_IN_DEBUG(args)) {
 #ifndef NDEBUG
   std::ostringstream os;
-  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  (os << ... << args);
   gDebugStr(os.str());
 #endif
 }
 
 //! Prints error message
 template <typename... Args>
-void gError(Args... args) {
+void gError(Args&&... args) {
   std::ostringstream os;
-  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  (os << ... << args);
   gErrorStr(os.str());
 }
 
@@ -118,7 +120,7 @@ struct debug {
 template <>
 struct debug<0> {
   template <typename... Args>
-  inline static void print(const Args&... args) {}
+  inline static void print(const Args&...) {}
 };
 
 } // end namespace galois

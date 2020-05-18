@@ -431,9 +431,10 @@ auto generate_directions(std::size_t latitude_divisions,
   // "is_incoming" now properly handles the case where propagation is
   // exactly orthogonal to a given face, but this avoids benchmarking
   // the unusual branches of execution it needs to take there.
-  double longitude_offset = longitude_divisions <=2 ? .25 * pi : 0.;
+  double longitude_offset = longitude_divisions <= 2 ? .25 * pi : 0.;
   for (std::size_t k = 0; k < longitude_divisions; k++) {
-    average_longitudes[k] = (double(k + .5) / longitude_divisions) * (2 * pi) + longitude_offset;
+    average_longitudes[k] =
+        (double(k + .5) / longitude_divisions) * (2 * pi) + longitude_offset;
   }
 
   // For the latitudes, if there is only one latitude used,
@@ -446,10 +447,10 @@ auto generate_directions(std::size_t latitude_divisions,
     double tilt = .25 * pi;
     for (std::size_t k = 0; k < latitude_divisions; k++) {
       double pre_rotated_average_longitude = average_longitudes[k];
-      directions[k] = {
-        std::cos(pre_rotated_average_longitude),
-        std::sin(pre_rotated_average_longitude) * std::cos(tilt),
-        -std::sin(pre_rotated_average_longitude) * std::sin(tilt)};
+      directions[k] = {std::cos(pre_rotated_average_longitude),
+                       std::sin(pre_rotated_average_longitude) * std::cos(tilt),
+                       -std::sin(pre_rotated_average_longitude) *
+                           std::sin(tilt)};
     }
   } else {
     for (std::size_t j = 0; j < latitude_divisions; j++) {
@@ -487,8 +488,7 @@ auto generate_directions(std::size_t latitude_divisions,
     // very wrong.
     assert(("Dubious values from direction discretization.",
             std::abs(totals[j]) < 1E-7) ||
-            latitude_divisions == 1 ||
-            longitude_divisions == 1);
+           latitude_divisions == 1 || longitude_divisions == 1);
   }
 
   return std::make_tuple(std::move(directions), num_directions);
@@ -512,8 +512,10 @@ bool is_incoming(std::array<double, 3> direction,
   // If they are exactly orthogonal, break ties by only using
   // the normal. Say negative sign indicates incoming.
   for (std::size_t dim_idx = 0; dim_idx < 3; dim_idx++) {
-    if (face_normal[dim_idx] < 0) return true;
-    if (face_normal[dim_idx] > 0) return false;
+    if (face_normal[dim_idx] < 0)
+      return true;
+    if (face_normal[dim_idx] > 0)
+      return false;
   }
   GALOIS_DIE("All zero face_normal passed to is_incoming. Can't disambiguate.");
 }
@@ -540,7 +542,7 @@ int main(int argc, char** argv) noexcept {
   auto ghost_threshold = num_cells;
   auto [directions_owner, num_directions_binding] =
       generate_directions(num_vert_directions, num_horiz_directions);
-  auto &directions = directions_owner;
+  auto& directions    = directions_owner;
   auto num_directions = num_directions_binding;
   auto approx_x_direction_index =
       find_x_direction(directions.get(), num_directions);
@@ -571,7 +573,9 @@ int main(int argc, char** argv) noexcept {
   radiation_magnitudes[boundary_pulse_index + 1].magnitude = pulse_strength;
 
   // Constants used in the differencing scheme at each cell/direction.
-  std::array<double, 3> grid_spacing_inverses{static_cast<double>(nx), static_cast<double>(ny), static_cast<double>(nz)};
+  std::array<double, 3> grid_spacing_inverses{static_cast<double>(nx),
+                                              static_cast<double>(ny),
+                                              static_cast<double>(nz)};
 
   // For the regular grid, this will just be the corners
   // (one work item for each direction that lies in the octant opposite
@@ -597,7 +601,8 @@ int main(int argc, char** argv) noexcept {
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
             if (graph.getEdgeDst(edge) >= ghost_threshold)
               continue;
-            local_counter += is_incoming(directions[dir_idx], graph.getEdgeData(edge));
+            local_counter +=
+                is_incoming(directions[dir_idx], graph.getEdgeData(edge));
           }
           // TODO: This stage is embarassingly parallel,
           // but writing the value as a size_t and then
@@ -613,7 +618,8 @@ int main(int argc, char** argv) noexcept {
         // on the current node.
         auto& node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
         // TODO: Can this be done without atomics as well?
-        node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
+        node_data.scatter_use_counter.store(num_directions,
+                                            std::memory_order_relaxed);
       },
       galois::loopname("Initialize counters"));
 
@@ -625,7 +631,8 @@ int main(int argc, char** argv) noexcept {
     for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
       std::size_t local_counter = 0;
       for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) && graph.getEdgeDst(edge) < ghost_threshold)
+        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) &&
+            graph.getEdgeDst(edge) < ghost_threshold)
           local_counter++;
       }
       assert(("Dependency counter not set propertly.",
@@ -697,12 +704,14 @@ int main(int argc, char** argv) noexcept {
           // previous term later.
           double new_magnitude_denominator = absorption_coef + scattering_coef;
           std::size_t max_size_t = std::numeric_limits<std::size_t>::max();
-          // Use max size_t value for initialization here mainly to make things segfault as fast
-          // as possible if one of them isn't set in the loop over the neighbors.
-          std::array<std::size_t, 3> downstream_neighbors{max_size_t, max_size_t, max_size_t};
+          // Use max size_t value for initialization here mainly to make things
+          // segfault as fast as possible if one of them isn't set in the loop
+          // over the neighbors.
+          std::array<std::size_t, 3> downstream_neighbors{
+              max_size_t, max_size_t, max_size_t};
           std::size_t downstream_index = 0;
           for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-            auto other_node = graph.getEdgeDst(edge);
+            auto other_node   = graph.getEdgeDst(edge);
             auto& face_normal = graph.getEdgeData(edge);
             if (!is_incoming(direction, face_normal)) {
               downstream_neighbors[downstream_index++] = other_node;
@@ -718,7 +727,8 @@ int main(int argc, char** argv) noexcept {
                 face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
             double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
             double term_coef = direction[axis] * sign;
-            new_magnitude_denominator += term_coef * grid_spacing_inverses[axis];
+            new_magnitude_denominator +=
+                term_coef * grid_spacing_inverses[axis];
             std::size_t other_magnitude_idx =
                 num_per_element * other_node +
                 num_per_element_and_direction * dir_idx;
@@ -730,7 +740,8 @@ int main(int argc, char** argv) noexcept {
                   term_coef * other_magnitude * grid_spacing_inverses[axis];
             }
           }
-          assert(("Wrong number of downstream neighbors.", downstream_index == 3));
+          assert(
+              ("Wrong number of downstream neighbors.", downstream_index == 3));
           // Finish computing new flux magnitude.
           // Also compute a new scattering amount
           // for use in the next iteration based
@@ -754,11 +765,15 @@ int main(int argc, char** argv) noexcept {
           atomic_relaxed_double_increment(scattering_atomic,
                                           scattering_contribution);
 
-          if (!(node_data.scatter_use_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
+          if (!(node_data.scatter_use_counter.fetch_sub(
+                    1, std::memory_order_relaxed) -
+                1)) {
             // Reset counter for next time step.
-            node_data.scatter_use_counter.store(num_directions, std::memory_order_relaxed);
+            node_data.scatter_use_counter.store(num_directions,
+                                                std::memory_order_relaxed);
             double abs_change =
-                std::abs(node_data.currently_accumulating_scattering.load(std::memory_order_relaxed) -
+                std::abs(node_data.currently_accumulating_scattering.load(
+                             std::memory_order_relaxed) -
                          node_data.previous_accumulated_scattering);
             atomic_relaxed_double_max(global_abs_change, abs_change);
             // Move currently_accumulating_scattering value into
@@ -766,18 +781,20 @@ int main(int argc, char** argv) noexcept {
             // and then zero currently_accumulating_scattering for the next
             // iteration.
             node_data.previous_accumulated_scattering =
-                node_data.currently_accumulating_scattering.load(std::memory_order_relaxed);
-            node_data.currently_accumulating_scattering.store(0., std::memory_order_relaxed);
+                node_data.currently_accumulating_scattering.load(
+                    std::memory_order_relaxed);
+            node_data.currently_accumulating_scattering.store(
+                0., std::memory_order_relaxed);
           }
           for (auto other_node : downstream_neighbors) {
             // Don't send anything to a ghost node.
             if (other_node >= ghost_threshold)
               continue;
             std::size_t other_magnitude_idx =
-              num_per_element * other_node +
-              num_per_element_and_direction * dir_idx;
+                num_per_element * other_node +
+                num_per_element_and_direction * dir_idx;
             auto& other_counter =
-              radiation_magnitudes[other_magnitude_idx].counter;
+                radiation_magnitudes[other_magnitude_idx].counter;
             if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
               work_t new_work_item{other_node, dir_idx};
               ctx.push(new_work_item);

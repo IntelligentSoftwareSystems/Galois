@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,24 +20,26 @@
 #ifndef GALOIS_STAT_MANAGER_H
 #define GALOIS_STAT_MANAGER_H
 
-#include "galois/gstl.h"
-#include "galois/gIO.h"
-#include "galois/Threads.h"
-#include "galois/substrate/PerThreadStorage.h"
-#include "galois/substrate/ThreadRWlock.h"
-#include "galois/substrate/EnvCheck.h"
+#include <limits>
+#include <map>
+#include <string>
+#include <type_traits>
+
+#include <sys/resource.h>
+#include <sys/time.h>
 
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
-#include <limits>
-#include <string>
-#include <map>
-#include <type_traits>
-
-#include <sys/resource.h>
-#include <sys/time.h>
+#include "galois/config.h"
+#include "galois/gIO.h"
+#include "galois/gstl.h"
+#include "galois/Threads.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadRWlock.h"
+#include "galois/Threads.h"
 
 /**
  * TODO:
@@ -125,7 +127,7 @@ public:
 
   const Str& name(void) const { return m_name; }
 
-  void add(const T& val) const {}
+  void add(const T&) const {}
 };
 
 template <typename T, typename... Bases>
@@ -142,16 +144,12 @@ public:
 
   using with_name = AggregStat<T, NamedStat<T>, Bases...>;
 
-  void add(const T& val) {
-    using Expander = int[];
-
-    (void)Expander{0, ((void)Bases::add(val), 0)...};
-  }
+  void add(const T& val) { (..., Bases::add(val)); }
 };
 
 namespace {
-  static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
-                                                   "TSUM", "TAVG"};
+static constexpr const char* StatTotalNames[] = {"SINGLE", "TMIN", "TMAX",
+                                                 "TSUM", "TAVG"};
 }
 
 struct StatTotal {
@@ -324,7 +322,7 @@ struct ScalarStat {
 
   void add(const T& v) { m_val += v; }
 
-  operator const T&(void)const { return m_val; }
+  operator const T&(void) const { return m_val; }
 
   const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 };
@@ -333,10 +331,6 @@ template <typename T>
 using ScalarStatManager = BasicStatMap<ScalarStat<T>>;
 
 } // end namespace internal
-
-#define STAT_MANAGER_IMPL 0 // 0 or 1 or 2
-
-#if STAT_MANAGER_IMPL == 0
 
 class StatManager {
 
@@ -531,126 +525,13 @@ public:
   }
 
   void print(void);
-
-private:
 };
-
-#else
-
-class StatManager {
-
-  template <typename T>
-  struct StatManagerImpl {
-
-    using Str       = galois::gstl::Str;
-    using StrSet    = galois::gstl::Set<Str>;
-    using Stat      = galois::Accumulator<T>;
-    using StatMap   = galois::gstl::Map<std::tuple<Str*, Str*>, Stat*>> ;
-    using StatAlloc = galois::FixedSizeAllocator<Stat>;
-
-    StrSet symbols;
-    StatMap statMap;
-    StatAlloc statAlloc;
-    substrate::ThreadRWlock rwmutex;
-
-    ~StatManagerImpl(void) {
-
-      for (auto p : statMap) {
-        statAlloc.destruct(p.second);
-        statAlloc.deallocate(p.second, 1);
-      }
-    }
-
-    Stat& getOrInsertMapping(const Str& region, const Str& category) {
-
-      Stat* ret = nullptr;
-
-      auto readAndCheck = [&](void) {
-        const Str* ln  = nullptr;
-        const Str* cat = nullptr;
-
-        auto ia = symbols.find(region);
-
-        if (ia == symbols.end()) {
-          return false; // return early to save a check
-
-        } else {
-          ln = &(*ia);
-        }
-
-        auto ib = symbols.find(category);
-        readOrUpdate
-
-            if (ib == symbols.end()) {
-          return false;
-        }
-        else {
-          cat = &(*ib);
-        }
-
-        assert(ln && cat);
-
-        auto im = statMap.find(std::make_tuple(ln, cat));
-        assert(im != statMap.end() &&
-               "statMap lookup shouldn't fail when both symbols exist");
-
-        ret = im->second;
-
-        return true;
-      };
-
-      auto write = [&](void) {
-        auto p1       = symbols.insert(region);
-        const Str* ln = &(p->first);
-
-        auto p2        = symbols.insert(category);
-        const Str* cat = &(p->first);
-
-        auto tpl = std::make_tuple(ln, cat);
-
-        Stat* s = statAlloc.allocate(1);
-        statAlloc.construct(s);
-
-        auto p = statMap.emplace(tpl, s);
-        assert(p.second && "map insert shouldn't fail");
-
-        ret = s;
-      };
-
-      galois::substrate::readUpdateProtected(rwmutex, readAndCheck, write);
-
-      assert(ret, "readUpdateProtected shouldn't fail");
-
-      return *ret;
-    }
-
-    void addToStat(const Str& region, const Str& category, const T& val) {
-
-      Stat& stat = getOrInserMapping(region, category);
-      stat += val;
-    }
-  };
-
-protected:
-  static const char* const SEP = ", ";
-
-  StatManagerImpl<int64_t> intStats;
-  StatManagerImpl<double> fpStats;
-
-  void addToStat(const Str& region, const Str& category, int64_t val) {
-    intStats.addToStat(region, category, val);
-  }
-
-  void addToStat(const Str& region, const Str& category, double val) {
-    fpStats.addToStat(region, category, val);
-  }
-};
-
-#endif
 
 namespace internal {
+
 void setSysStatManager(StatManager* sm);
 StatManager* sysStatManager(void);
+
 } // namespace internal
 
 template <typename S1, typename S2, typename T>
@@ -737,7 +618,6 @@ void reportParam(const S1& region, const S2& category, const V& value) {
 }
 
 void setStatFile(const std::string& f);
-
 
 //! Reports maximum resident set size and page faults stats using
 //! rusage

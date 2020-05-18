@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -957,14 +957,14 @@ struct Lasso_CD {
       for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode sample_node = g.getEdgeDst(edge_it);
         //			Node& sample_data = g.getData(sample_node,
-        //galois::MethodFlag::UNPROTECTED);
+        // galois::MethodFlag::UNPROTECTED);
 
         double update_val =
             delta * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
         ctx.push(Task{UPDATE, sample_node, update_val});
 
         //			sample_data.alpha += delta*g.getEdgeData(edge_it,
-        //galois::MethodFlag::UNPROTECTED);
+        // galois::MethodFlag::UNPROTECTED);
       }
     }
   }
@@ -1288,7 +1288,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen,
   printf("asdfasdfasdf\n");
   // initialize model w to zero
   //	galois::do_all(boost::counting_iterator<size_t>(0),
-  //boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+  // boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
   //			g_train.getData(i+NUM_VARIABLES).w = 0;
   //		});
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -156,12 +156,12 @@ struct SSSP {
     galois::do_all(_g.begin(), _g.begin() + num, SSSP{&_g},
                    galois::loopname("SSSP"));
     // Do commit
-    galois::do_all(_g.begin(), _g.begin() + num,
-                   [&](GNode src) {
-                     _g.getData(src).swap_version(
-                         BSP_FIELD_NAMES::SSSP_DIST_FIELD);
-                   },
-                   galois::loopname("SSSP-Commit"));
+    galois::do_all(
+        _g.begin(), _g.begin() + num,
+        [&](GNode src) {
+          _g.getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
+        },
+        galois::loopname("SSSP-Commit"));
   }
 
   void operator()(GNode src) const {

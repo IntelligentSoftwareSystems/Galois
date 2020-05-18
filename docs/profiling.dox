@@ -9,7 +9,7 @@ When optimizing Galois apps, you may need to work with an external profiling inf
 
 <a href="https://software.intel.com/en-us/intel-vtune-amplifier-xe">Intel VTune</a> is a profiling tool offered by Intel in Intel Parallel Studio. 
 
-Turn on the use of Intel VTune by running cmake with -DUSE_VTUNE=1 option. Instrument the code region of interest with galois::runtime::profileVtune, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the node-iterator algorithm for triangle counting with Intel VTune:
+Turn on the use of Intel VTune by running cmake with -DGALOIS_ENABLE_VTUNE=1 option. Instrument the code region of interest with galois::runtime::profileVtune, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the node-iterator algorithm for triangle counting with Intel VTune:
 
 @snippet lonestar/triangles/Triangles.cpp profile w/ vtune
 
@@ -19,7 +19,7 @@ Compile your code and run with Intel VTune to collect statistics.
 
 <a href="http://icl.cs.utk.edt/papi/">PAPI</a> stands for "Performance Application Programming Interface". 
 
-Turn on the use of PAPI by running cmake with -DUSE_PAPI=1 option. Instrument the code region of interest with galois::runtime::profilePapi, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the edge-iterator algorithm for triangle counting with PAPI:
+Turn on the use of PAPI by running cmake with -DGALOIS_ENABLE_PAPI=1 option. Instrument the code region of interest with galois::runtime::profilePapi, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the edge-iterator algorithm for triangle counting with PAPI:
 
 @snippet lonestar/triangles/Triangles.cpp profile w/ papi
 

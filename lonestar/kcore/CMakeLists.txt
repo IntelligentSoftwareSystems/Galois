@@ -1,1 +1,0 @@
-app(kcore kcore.cpp)

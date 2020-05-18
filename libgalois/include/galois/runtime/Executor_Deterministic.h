@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,32 +20,32 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 #define GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 
+#include <deque>
+#include <queue>
+#include <type_traits>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+
 #include "galois/Bag.h"
+#include "galois/config.h"
+#include "galois/gIO.h"
 #include "galois/gslist.h"
+#include "galois/ParallelSTL.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/LoopStatistics.h"
+#include "galois/runtime/Mem.h"
+#include "galois/runtime/Range.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/UserContextAccess.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/Threads.h"
 #include "galois/TwoLevelIteratorA.h"
 #include "galois/UnionFind.h"
-#include "galois/ParallelSTL.h"
-#include "galois/runtime/Substrate.h"
-#include "galois/runtime/Executor_ForEach.h"
-#include "galois/runtime/ForEachTraits.h"
-#include "galois/runtime/LoopStatistics.h"
-#include "galois/runtime/Range.h"
-#include "galois/runtime/Statistics.h"
-#include "galois/substrate/Termination.h"
-#include "galois/substrate/ThreadPool.h"
-#include "galois/runtime/UserContextAccess.h"
-#include "galois/gIO.h"
-#include "galois/runtime/Mem.h"
 #include "galois/worklists/WorkList.h"
-
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/iterator/counting_iterator.hpp>
-
-#include <type_traits>
-#include <deque>
-#include <queue>
 
 // TODO deterministic hash
 // TODO deterministic hash: only give ids to window
@@ -458,26 +458,20 @@ struct OptionsCommon {
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
-  static const bool needStats = galois::internal::NeedStats<ArgsTy>::value;
-  static const bool needsPush =
-      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static const bool needsAborts =
-      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static const bool needsPia =
-      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak =
-      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+  constexpr static bool needStats = galois::internal::NeedStats<ArgsTy>::value;
+  constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
+  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
 
-  static const bool hasBreak =
-      exists_by_supertype<det_parallel_break_tag, ArgsTy>::value;
-  static const bool hasId = exists_by_supertype<det_id_tag, ArgsTy>::value;
+  constexpr static bool hasBreak = has_trait<det_parallel_break_tag, ArgsTy>();
+  constexpr static bool hasId    = has_trait<det_id_tag, ArgsTy>();
 
-  static const bool useLocalState =
-      exists_by_supertype<local_state_tag, ArgsTy>::value;
-  static const bool hasFixedNeighborhood =
-      exists_by_supertype<fixed_neighborhood_tag, ArgsTy>::value;
-  static const bool hasIntentToRead =
-      exists_by_supertype<intent_to_read_tag, ArgsTy>::value;
+  constexpr static bool useLocalState = has_trait<local_state_tag, ArgsTy>();
+  constexpr static bool hasFixedNeighborhood =
+      has_trait<fixed_neighborhood_tag, ArgsTy>();
+  constexpr static bool hasIntentToRead =
+      has_trait<intent_to_read_tag, ArgsTy>();
 
   static const int ChunkSize             = 32;
   static const unsigned InitialNumRounds = 100;
@@ -507,20 +501,19 @@ template <typename T, typename FunctionTy, typename ArgsTy>
 struct OptionsBase<T, FunctionTy, ArgsTy, true>
     : public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
-  typedef typename get_type_by_supertype<neighborhood_visitor_tag,
-                                         ArgsTy>::type::type function1_type;
+  typedef typename get_trait_type<neighborhood_visitor_tag, ArgsTy>::type::type
+      function1_type;
 
   function1_type fn1;
 
   OptionsBase(FunctionTy f, ArgsTy a)
-      : SuperTy(f, a),
-        fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) {}
+      : SuperTy(f, a), fn1(get_trait_value<neighborhood_visitor_tag>(a).value) {
+  }
 };
 
 template <typename T, typename FunctionTy, typename ArgsTy>
-using Options =
-    OptionsBase<T, FunctionTy, ArgsTy,
-                exists_by_supertype<neighborhood_visitor_tag, ArgsTy>::value>;
+using Options = OptionsBase<T, FunctionTy, ArgsTy,
+                            has_trait<neighborhood_visitor_tag, ArgsTy>()>;
 
 template <typename OptionsTy, bool Enable>
 class DAGManagerBase {
@@ -528,7 +521,7 @@ class DAGManagerBase {
 
 public:
   void destroyDAGManager() {}
-  void pushDAGTask(Context* ctx) {}
+  void pushDAGTask(Context*) {}
   bool buildDAG() { return false; }
   template <typename Executor, typename ExecutorTLD>
   bool executeDAG(Executor&, ExecutorTLD&) {
@@ -662,26 +655,26 @@ template <typename OptionsTy, bool Enable>
 struct StateManagerBase {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  void allocLocalState(UserContextAccess<value_type>&, function_type& self) {}
+  void allocLocalState(UserContextAccess<value_type>&, function_type&) {}
   void deallocLocalState(UserContextAccess<value_type>&) {}
   void saveLocalState(UserContextAccess<value_type>&, DItem<OptionsTy>&) {}
   void restoreLocalState(UserContextAccess<value_type>&,
                          const DItem<OptionsTy>&) {}
-  void reuseItem(DItem<OptionsTy>& item) {}
+  void reuseItem(DItem<OptionsTy>&) {}
 
   template <typename LWL, typename GWL>
-  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl,
+  typename GWL::value_type* emplaceContext(LWL&, GWL& gwl,
                                            const DItem<OptionsTy>& item) const {
     return gwl.emplace(item);
   }
 
   template <typename LWL, typename GWL>
-  typename GWL::value_type* peekContext(LWL& lwl, GWL& gwl) const {
+  typename GWL::value_type* peekContext(LWL&, GWL& gwl) const {
     return gwl.peek();
   }
 
   template <typename LWL, typename GWL>
-  void popContext(LWL& lwl, GWL& gwl) const {
+  void popContext(LWL&, GWL& gwl) const {
     gwl.pop_peeked();
   }
 };
@@ -690,10 +683,10 @@ template <typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  typedef typename get_type_by_supertype<
+  typedef typename get_trait_type<
       local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
 
-  void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
+  void allocLocalState(UserContextAccess<value_type>& c, function_type&) {
     void* p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     // new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p);
@@ -716,18 +709,18 @@ struct StateManagerBase<OptionsTy, true> {
   }
 
   template <typename LWL, typename GWL>
-  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl,
+  typename LWL::value_type* emplaceContext(LWL& lwl, GWL&,
                                            const DItem<OptionsTy>& item) const {
     return lwl.emplace(item);
   }
 
   template <typename LWL, typename GWL>
-  typename LWL::value_type* peekContext(LWL& lwl, GWL& gwl) const {
+  typename LWL::value_type* peekContext(LWL& lwl, GWL&) const {
     return lwl.peek();
   }
 
   template <typename LWL, typename GWL>
-  void popContext(LWL& lwl, GWL& gwl) const {
+  void popContext(LWL& lwl, GWL&) const {
     lwl.pop_peeked();
   }
 
@@ -746,17 +739,16 @@ public:
 
 template <typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
-  typedef
-      typename get_type_by_supertype<det_parallel_break_tag,
-                                     typename OptionsTy::args_type>::type::type
-          BreakFn;
+  typedef typename get_trait_type<det_parallel_break_tag,
+                                  typename OptionsTy::args_type>::type::type
+      BreakFn;
   BreakFn breakFn;
   substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
 public:
   BreakManagerBase(const OptionsTy& o)
-      : breakFn(get_by_supertype<det_parallel_break_tag>(o.args).value),
+      : breakFn(get_trait_value<det_parallel_break_tag>(o.args).value),
         barrier(getBarrier(activeThreads)) {}
 
   bool checkBreak() {
@@ -775,7 +767,7 @@ class IntentToReadManagerBase {
   typedef DeterministicContext<OptionsTy> Context;
 
 public:
-  void pushIntentToReadTask(Context* ctx) {}
+  void pushIntentToReadTask(Context*) {}
   bool buildIntentToRead() { return false; }
 };
 
@@ -924,15 +916,13 @@ private:
 public:
   ThreadLocalData& getLocalWindowManager() { return data; }
 
-  size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
-    return data.nextWindow();
-  }
+  size_t nextWindow(size_t, size_t, size_t = 0) { return data.nextWindow(); }
 
-  size_t initialWindow(size_t dist, size_t atleast, size_t base = 0) {
+  size_t initialWindow(size_t, size_t, size_t = 0) {
     return std::numeric_limits<size_t>::max();
   }
 
-  void calculateWindow(bool inner) {}
+  void calculateWindow(bool) {}
 };
 
 template <typename OptionsTy>
@@ -949,13 +939,14 @@ struct IdManagerBase {
 template <typename OptionsTy>
 class IdManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename get_type_by_supertype<
-      det_id_tag, typename OptionsTy::args_type>::type::type IdFn;
+  typedef
+      typename get_trait_type<det_id_tag,
+                              typename OptionsTy::args_type>::type::type IdFn;
   IdFn idFn;
 
 public:
   IdManagerBase(const OptionsTy& o)
-      : idFn(get_by_supertype<det_id_tag>(o.args).value) {}
+      : idFn(get_trait_value<det_id_tag>(o.args).value) {}
   uintptr_t id(const value_type& x) { return idFn(x); }
 };
 
@@ -1234,7 +1225,7 @@ class NewWorkManager : public IdManager<OptionsTy> {
   }
 
   template <typename InputIteratorTy>
-  void sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, ...) {}
+  void sortInitialWorkDispatch(InputIteratorTy, InputIteratorTy, ...) {}
 
   template <typename InputIteratorTy, bool HasId = OptionsTy::hasId,
             bool HasFixed = OptionsTy::hasFixedNeighborhood>
@@ -1305,7 +1296,7 @@ public:
   }
 
   template <bool HasId = OptionsTy::hasId>
-  auto pushNew(const value_type& val, unsigned long parent, unsigned count) ->
+  auto pushNew(const value_type& val, unsigned long, unsigned) ->
       typename std::enable_if<HasId, void>::type {
     new_.push(NewItem(val, this->id(val), 1));
   }
@@ -1501,24 +1492,24 @@ void Executor<OptionsTy>::go() {
 
 template <typename OptionsTy>
 int Executor<OptionsTy>::runFunction(ThreadLocalData& tld, Context* ctx) {
-    int result = 0;
+  int result = 0;
 #ifdef GALOIS_USE_LONGJMP_ABORT
-    if ((result = setjmp(execFrame)) == 0) {
-#else
-    try {
+  if ((result = setjmp(execFrame)) == 0) {
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  try {
 #endif
-      tld.fn1(ctx->item.val, tld.facing.data());
+    tld.fn1(ctx->item.val, tld.facing.data());
 #ifdef GALOIS_USE_LONGJMP_ABORT
-    } else {
-      clearConflictLock();
-    }
-#else
-    } catch (const ConflictFlag& flag) {
-      clearConflictLock();
-      result = flag;
-    }
+  } else {
+    clearConflictLock();
+  }
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
+  } catch (const ConflictFlag& flag) {
+    clearConflictLock();
+    result = flag;
+  }
 #endif
-    return result;
+  return result;
 }
 
 template <typename OptionsTy>
@@ -1580,7 +1571,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP_ABORT
   if ((result = setjmp(execFrame)) == 0) {
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   try {
 #endif
     tld.fn2(ctx->item.val, tld.facing.data());
@@ -1588,7 +1579,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   } else {
     clearConflictLock();
   }
-#else
+#elif defined(GALOIS_USE_EXCEPTION_ABORT)
   } catch (const ConflictFlag& flag) {
     clearConflictLock();
     result = flag;

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -137,18 +137,19 @@ template <typename T, typename A>
 void freeBinTreeParallel(T* root, A& alloc) {
   assert(root);
 
-  galois::for_each(galois::iterate({root}),
-                   [&](T* root, auto& ctx) {
-                     T* l = root->leftChild();
-                     T* r = root->rightChild();
+  galois::for_each(
+      galois::iterate({root}),
+      [&](T* root, auto& ctx) {
+        T* l = root->leftChild();
+        T* r = root->rightChild();
 
-                     alloc.destruct(root);
-                     alloc.deallocate(root, 1);
+        alloc.destruct(root);
+        alloc.deallocate(root, 1);
 
-                     ctx.push(l);
-                     ctx.push(r);
-                   },
-                   galois::loopname("freeBinTreeParallel"), galois::no_abort());
+        ctx.push(l);
+        ctx.push(r);
+      },
+      galois::loopname("freeBinTreeParallel"), galois::no_abort());
 }
 
 #endif // CLUSTERING_COMMONG_H

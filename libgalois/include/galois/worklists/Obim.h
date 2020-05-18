@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,16 +20,16 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
+#include <deque>
+#include <limits>
+#include <type_traits>
+
 #include "galois/FlatMap.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
 #include "galois/worklists/Chunk.h"
 #include "galois/worklists/WorkListHelpers.h"
-
-#include <deque>
-#include <limits>
-#include <type_traits>
 
 namespace galois {
 namespace worklists {
@@ -438,7 +438,7 @@ public:
         }
       }
       p.curIndex = storedIndex;
-      p.current = p.local[storedIndex];
+      p.current  = p.local[storedIndex];
     }
     p.hasWork = !p.stored.empty();
 

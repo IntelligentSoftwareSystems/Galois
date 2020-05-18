@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,13 +20,15 @@
 #ifndef GALOIS_PARALLELSTL_H
 #define GALOIS_PARALLELSTL_H
 
-#include "galois/Reduction.h"
+#include "galois/config.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/NoDerefIterator.h"
+#include "galois/runtime/Range.h"
+#include "galois/Reduction.h"
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
+#include "galois/Threads.h"
 #include "galois/worklists/Chunk.h"
-#include "galois/runtime/Range.h"
 
 namespace galois {
 //! Parallel versions of STL library algorithms.
@@ -266,26 +268,32 @@ template <class InputIterator, class T, typename BinaryOperation>
 T accumulate(InputIterator first, InputIterator last, const T& identity,
              const BinaryOperation& binary_op) {
 
-  GSimpleReducible<BinaryOperation, T> R(binary_op, identity);
+  auto id_fn = [=]() { return identity; };
 
-  do_all(galois::iterate(first, last), [&R](const T& v) { R.update(v); });
-  return R.reduce();
+  auto r = make_reducible(binary_op, id_fn);
+
+  do_all(galois::iterate(first, last), [&](const T& v) { r.update(v); });
+
+  return r.reduce();
 }
 
 template <class InputIterator, class T>
 T accumulate(InputIterator first, InputIterator last, const T& identity = T()) {
   return accumulate(first, last, identity, std::plus<T>());
 }
-template <class InputIterator, class MapFn, class T, class ReduceFn>
-T map_reduce(InputIterator first, InputIterator last, MapFn mapFn,
-             ReduceFn reduceFn, const T& identity) {
 
-  galois::GSimpleReducible<ReduceFn, T> reducer(reduceFn, identity);
+template <class InputIterator, class MapFn, class T, class ReduceFn>
+T map_reduce(InputIterator first, InputIterator last, MapFn map_fn,
+             ReduceFn reduce_fn, const T& identity) {
+
+  auto id_fn = [=]() { return identity; };
+
+  auto r = make_reducible(reduce_fn, id_fn);
 
   galois::do_all(galois::iterate(first, last),
-                 [&](const auto& v) { reducer.update(mapFn(v)); });
+                 [&](const auto& v) { r.update(map_fn(v)); });
 
-  return reducer.reduce();
+  return r.reduce();
 }
 
 template <typename I>
@@ -297,6 +305,77 @@ std::enable_if_t<!std::is_scalar<internal::Val_ty<I>>::value> destroy(I first,
 
 template <class I>
 std::enable_if_t<std::is_scalar<internal::Val_ty<I>>::value> destroy(I, I) {}
+
+/**
+ * Does a partial sum from first -> last and writes the results to the d_first
+ * iterator.
+ */
+template <class InputIt, class OutputIt>
+OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first) {
+  using ValueType = typename std::iterator_traits<InputIt>::value_type;
+
+  size_t sizeOfVector = std::distance(first, last);
+
+  // only bother with parallel execution if vector is larger than some size
+  if (sizeOfVector >= 1024) {
+    const size_t numBlocks = galois::getActiveThreads();
+    const size_t blockSize = (sizeOfVector + numBlocks - 1) / numBlocks;
+    assert(numBlocks * blockSize >= sizeOfVector);
+
+    std::vector<ValueType> localSums(numBlocks);
+
+    // get the block sums
+    galois::do_all(
+        galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+          // block start can extend past sizeOfVector if doesn't divide evenly
+          size_t blockStart = std::min(block * blockSize, sizeOfVector);
+          size_t blockEnd   = std::min((block + 1) * blockSize, sizeOfVector);
+          assert(blockStart <= blockEnd);
+
+          // partial accumulation of each block done now
+          std::partial_sum(first + blockStart, first + blockEnd,
+                           d_first + blockStart);
+          // save the last number in this block: used for block prefix sum
+          if (blockEnd > 0) {
+            localSums[block] = *(d_first + blockEnd - 1);
+          } else {
+            localSums[block] = 0;
+          }
+        });
+
+    // bulkPrefix[i] holds the starting sum of a particular block i
+    std::vector<ValueType> bulkPrefix(numBlocks);
+    // exclusive scan on local sums to get number to add to each block's
+    // set of indices
+    // Not using std::exclusive_scan because apparently it doesn't work for
+    // some compilers
+    ValueType runningSum = 0;
+    for (size_t i = 0; i < numBlocks; i++) {
+      bulkPrefix[i] = runningSum;
+      runningSum += localSums[i];
+    }
+
+    galois::do_all(
+        galois::iterate((size_t)0, numBlocks), [&](const size_t& block) {
+          // add the sums of previous elements to blocks
+          ValueType numToAdd = bulkPrefix[block];
+          size_t blockStart  = std::min(block * blockSize, sizeOfVector);
+          size_t blockEnd    = std::min((block + 1) * blockSize, sizeOfVector);
+          assert(blockStart <= blockEnd);
+
+          // transform applies addition to appropriate range
+          std::transform(d_first + blockStart, d_first + blockEnd,
+                         d_first + blockStart,
+                         [&](ValueType& val) { return val + numToAdd; });
+        });
+
+    // return the iterator past the last element written
+    return d_first + sizeOfVector;
+  } else {
+    // vector is small; do it serially using standard library
+    return std::partial_sum(first, last, d_first);
+  }
+}
 
 } // end namespace ParallelSTL
 } // end namespace galois

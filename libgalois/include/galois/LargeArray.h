@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,24 +20,22 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
-#include "galois/ParallelSTL.h"
-#include "galois/Galois.h"
-#include "galois/gIO.h"
-#include "galois/runtime/Mem.h"
-#include "galois/substrate/NumaMem.h"
-
-#include <iostream> // TODO remove this once cerr is removed
+#include <iostream>
 #include <utility>
 
-/*
- * Headers for boost serialization
- */
-#include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/split_member.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/split_member.hpp>
+
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/gIO.h"
+#include "galois/ParallelSTL.h"
+#include "galois/runtime/Mem.h"
+#include "galois/substrate/NumaMem.h"
 
 namespace galois {
 
@@ -109,7 +107,7 @@ private:
    */
   friend class boost::serialization::access;
   template <typename Archive>
-  void save(Archive& ar, const unsigned int version) const {
+  void save(Archive& ar, const unsigned int) const {
 
     // TODO DON'T USE CERR
     // std::cerr << "save m_size : " << m_size << " Threads : " <<
@@ -128,7 +126,7 @@ private:
     // ar << boost::serialization::make_array<T>(m_data, m_size);
   }
   template <typename Archive>
-  void load(Archive& ar, const unsigned int version) {
+  void load(Archive& ar, const unsigned int) {
     ar >> m_size;
 
     // TODO DON'T USE CERR
@@ -208,7 +206,7 @@ public:
   void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
 
   /**
-   * Allocates using blocked memory policy 
+   * Allocates using blocked memory policy
    *
    * @param  n         number of elements to allocate
    */
@@ -288,7 +286,7 @@ public:
   }
 
   template <typename U = T>
-  std::enable_if_t<std::is_scalar<U>::value> destroyAt(size_type n) {}
+  std::enable_if_t<std::is_scalar<U>::value> destroyAt(size_type) {}
 
   // The following methods are not shared with void specialization
   const_pointer data() const { return m_data; }
@@ -307,10 +305,10 @@ private:
    */
   friend class boost::serialization::access;
   template <typename Archive>
-  void serialize(Archive& ar, const unsigned int version) const {}
+  void serialize(Archive&, const unsigned int) const {}
 
 public:
-  LargeArray(void* d, size_t s) {}
+  LargeArray(void*, size_t) {}
   LargeArray()                  = default;
   LargeArray(const LargeArray&) = delete;
   LargeArray& operator=(const LargeArray&) = delete;
@@ -332,35 +330,34 @@ public:
     const static size_t value = 0;
   };
 
-  const_reference at(difference_type x) const { return 0; }
-  reference at(difference_type x) { return 0; }
-  const_reference operator[](size_type x) const { return 0; }
+  const_reference at(difference_type) const { return 0; }
+  reference at(difference_type) { return 0; }
+  const_reference operator[](size_type) const { return 0; }
   template <typename AnyTy>
-  void set(difference_type x, AnyTy v) {}
+  void set(difference_type, AnyTy) {}
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }
   iterator end() { return 0; }
   const_iterator end() const { return 0; }
 
-  void allocateInterleaved(size_type n) {}
-  void allocateBlocked(size_type n) {}
-  void allocateLocal(size_type n, bool prefault = true) {}
-  void allocateFloating(size_type n) {}
+  void allocateInterleaved(size_type) {}
+  void allocateBlocked(size_type) {}
+  void allocateLocal(size_type, bool = true) {}
+  void allocateFloating(size_type) {}
   template <typename RangeArrayTy>
-  void allocateSpecified(size_type number_of_elements,
-                         RangeArrayTy threadRanges) {}
+  void allocateSpecified(size_type, RangeArrayTy) {}
 
   template <typename... Args>
-  void construct(Args&&... args) {}
+  void construct(Args&&...) {}
   template <typename... Args>
-  void constructAt(size_type n, Args&&... args) {}
+  void constructAt(size_type, Args&&...) {}
   template <typename... Args>
-  void create(size_type n, Args&&... args) {}
+  void create(size_type, Args&&...) {}
 
   void deallocate() {}
   void destroy() {}
-  void destroyAt(size_type n) {}
+  void destroyAt(size_type) {}
 
   const_pointer data() const { return 0; }
   pointer data() { return 0; }

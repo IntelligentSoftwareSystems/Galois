@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -17,24 +17,23 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
-#define GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
+#define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
+#include "galois/config.h"
 #include "galois/gIO.h"
-#include "galois/Timer.h"
-
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/runtime/OperatorReferenceTypes.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Barrier.h"
+#include "galois/substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
-#include "galois/substrate/PaddedLock.h"
-#include "galois/substrate/CompilerSpecific.h"
+#include "galois/Timer.h"
 
-namespace galois {
-namespace runtime {
+namespace galois::runtime {
 
 namespace internal {
 
@@ -49,12 +48,12 @@ class DoAllStealingExec {
   constexpr static const bool NEED_STATS =
       galois::internal::NeedStats<ArgsTuple>::value;
   constexpr static const bool MORE_STATS =
-      NEED_STATS && exists_by_supertype<more_stats_tag, ArgsTuple>::value;
+      NEED_STATS && has_trait<more_stats_tag, ArgsTuple>();
   constexpr static const bool USE_TERM = false;
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE substrate::SimpleLock work_mutex;
+    alignas(substrate::GALOIS_CACHE_LINE_SIZE) substrate::SimpleLock work_mutex;
     unsigned id;
 
     Iter shared_beg;
@@ -65,11 +64,11 @@ class DoAllStealingExec {
     // Stats
 
     ThreadContext()
-        : work_mutex(),
-          id(substrate::getThreadPool()
-                 .getMaxThreads()), // TODO: fix this initialization problem,
-                                    // see initThread
-          shared_beg(), shared_end(), m_size(0), num_iter(0) {}
+        : work_mutex(), id(substrate::getThreadPool().getMaxThreads()),
+          shared_beg(), shared_end(), m_size(0), num_iter(0) {
+      // TODO: fix this initialization problem,
+      // see initThread
+    }
 
     ThreadContext(unsigned id, Iter beg, Iter end)
         : work_mutex(), id(id), shared_beg(beg), shared_end(end),
@@ -185,7 +184,7 @@ class DoAllStealingExec {
         if (hasWorkWeak()) {
           succ = true;
 
-          if (amount == HALF && m_size > (decltype(m_size))chunk_size) {
+          if (amount == HALF && m_size > (Diff_ty)chunk_size) {
             steal_size = m_size / 2;
           } else {
             steal_size = m_size;
@@ -322,51 +321,6 @@ private:
     return sawWork || stoleWork;
   }
 
-  /*
-  GALOIS_ATTRIBUTE_NOINLINE bool stealFlat (ThreadContext& poor, const unsigned
-  maxT) {
-
-    // TODO: test performance of sawWork + stoleWork vs stoleWork only
-    bool sawWork = false;
-    bool stoleWork = false;
-
-    assert ((LL::getMaxCores () / LL::getMaxSockets ()) >= 1);
-
-    // TODO: check this steal amount. e.g. all hungry threads in one socket may
-    // steal too much work from full threads in another socket
-    // size_t stealAmt = chunk_size * (LL::getMaxCores () / LL::getMaxSockets
-  ()); size_t stealAmt = chunk_size;
-
-    for (unsigned i = 1; i < maxT; ++i) { // skip poor.id by starting at 1
-
-      unsigned t = (poor.id + i) % maxT;
-
-      if (workers.getRemote (t)->hasWorkWeak ()) {
-        sawWork = true;
-
-        stoleWork = transferWork (*workers.getRemote (t), poor, stealAmt);
-
-        if (stoleWork) {
-          break;
-        }
-      }
-    }
-
-    return sawWork || stoleWork;
-  }
-
-
-  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinActive (ThreadContext& poor) {
-
-    return stealFlat (poor, galois::getActiveThreads ());
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE bool stealGlobal (ThreadContext& poor) {
-    return stealFlat (poor, LL::getMaxThreads ());
-  }
-
-  */
-
   GALOIS_ATTRIBUTE_NOINLINE bool trySteal(ThreadContext& poor) {
     bool ret = false;
 
@@ -394,28 +348,6 @@ private:
     substrate::asmPause();
 
     return ret;
-
-    // if (stealWithinSocket (poor)) {
-    // return true;
-    // } else if (LL::isSocketLeader(poor.id)
-    // && stealOutsideSocket (poor)) {
-    // return true;
-    // } else if (stealOutsideSocket (poor)) {
-    // return true;
-    //
-    // } else {
-    // return false;
-    // }
-
-    // if (stealWithinSocket (poor)) {
-    // return true;
-    // } else if (stealWithinActive (poor)) {
-    // return true;
-    // } else if (stealGlobal (poor)) {
-    // return true;
-    // } else {
-    // return false;
-    // }
   }
 
 private:
@@ -438,15 +370,12 @@ public:
   DoAllStealingExec(const R& _range, F _func, const ArgsTuple& argsTuple)
       : range(_range), func(_func),
         loopname(galois::internal::getLoopName(argsTuple)),
-        chunk_size(get_by_supertype<chunk_size_tag>(argsTuple).value),
+        chunk_size(get_trait_value<chunk_size_tag>(argsTuple).value),
         term(substrate::getSystemTermination(activeThreads)),
         totalTime(loopname, "Total"), initTime(loopname, "Init"),
         execTime(loopname, "Execute"), stealTime(loopname, "Steal"),
         termTime(loopname, "Term") {
     assert(chunk_size > 0);
-    // std::printf ("DoAllStealingExec loopname: %s, work size: %ld, chunk_size:
-    // %u\n", loopname, std::distance(range.begin (), range.end ()),
-    // chunk_size);
   }
 
   // parallel call
@@ -532,15 +461,17 @@ template <bool _STEAL>
 struct ChooseDoAllImpl {
 
   template <typename R, typename F, typename ArgsT>
-  static void call(const R& range, F &&func, const ArgsT& argsTuple) {
+  static void call(const R& range, F&& func, const ArgsT& argsTuple) {
 
-    internal::DoAllStealingExec<R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT> exec(range, std::forward<F>(func), argsTuple);
+    internal::DoAllStealingExec<
+        R, OperatorReferenceType<decltype(std::forward<F>(func))>, ArgsT>
+        exec(range, std::forward<F>(func), argsTuple);
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
-    substrate::getThreadPool().run(activeThreads,
-                                   [&exec](void) { exec.initThread(); },
-                                   std::ref(barrier), std::ref(exec));
+    substrate::getThreadPool().run(
+        activeThreads, [&exec](void) { exec.initThread(); }, std::ref(barrier),
+        std::ref(exec));
   }
 };
 
@@ -551,11 +482,11 @@ struct ChooseDoAllImpl<false> {
   static void call(const R& range, F func, const ArgsT& argsTuple) {
 
     runtime::on_each_gen(
-        [&](const unsigned tid, const unsigned numT) {
+        [&](const unsigned int, const unsigned int) {
           static constexpr bool NEED_STATS =
               galois::internal::NeedStats<ArgsT>::value;
           static constexpr bool MORE_STATS =
-              NEED_STATS && exists_by_supertype<more_stats_tag, ArgsT>::value;
+              NEED_STATS && has_trait<more_stats_tag, ArgsT>();
 
           const char* const loopname = galois::internal::getLoopName(argsTuple);
 
@@ -598,10 +529,9 @@ struct ChooseDoAllImpl<false> {
 template <typename R, typename F, typename ArgsTuple>
 void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
 
-  static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const*, ArgsTuple>::value,
-                "old loopname");
-  static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
+  static_assert(!has_trait<char*, ArgsTuple>(), "old loopname");
+  static_assert(!has_trait<char const*, ArgsTuple>(), "old loopname");
+  static_assert(!has_trait<bool, ArgsTuple>(), "old steal");
 
   auto argsT = std::tuple_cat(
       argsTuple,
@@ -610,12 +540,12 @@ void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
 
   using ArgsT = decltype(argsT);
 
-  constexpr bool TIME_IT = exists_by_supertype<loopname_tag, ArgsT>::value;
+  constexpr bool TIME_IT = has_trait<loopname_tag, ArgsT>();
   CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(argsT));
 
   timer.start();
 
-  constexpr bool STEAL = exists_by_supertype<steal_tag, ArgsT>::value;
+  constexpr bool STEAL = has_trait<steal_tag, ArgsT>();
 
   OperatorReferenceType<decltype(std::forward<F>(func))> func_ref = func;
   internal::ChooseDoAllImpl<STEAL>::call(range, func_ref, argsT);
@@ -623,7 +553,6 @@ void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
   timer.stop();
 }
 
-} // end namespace runtime
-} // end namespace galois
+} // namespace galois::runtime
 
-#endif //  GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
+#endif

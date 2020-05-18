@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,15 +20,16 @@
 #ifndef GALOIS_FIXEDSIZERING_H
 #define GALOIS_FIXEDSIZERING_H
 
-#include "galois/optional.h"
-#include "galois/LazyArray.h"
+#include <atomic>
+#include <utility>
 
 #include <boost/mpl/if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
 
-#include <utility>
-#include <atomic>
+#include "galois/config.h"
+#include "galois/optional.h"
+#include "galois/LazyArray.h"
 
 namespace galois {
 

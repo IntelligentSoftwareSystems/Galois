@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -695,7 +695,7 @@ struct Lasso_CD {
       double r = sample_data.alpha;
       dot += r * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
       //	  printf("%d-%d %lf   ", n-NUM_SAMPLES, sample_node,
-      //g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED));
+      // g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED));
     }
 
     double violation = 0;

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -574,7 +574,8 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
   // cout<<"Number of nodes = "<<std::distance(graph.begin(),graph.end())<<endl;
   // if(galois::runtime::NetworkInterface::ID == 0) {
   //	std::cout << "number of node on host = " <<
-  //galois::runtime::NetworkInterface::ID << " are: = " << last - first << "\n";
+  // galois::runtime::NetworkInterface::ID << " are: = " << last - first <<
+  // "\n";
   printf("host: %u creating rest of the nodes\n",
          galois::runtime::NetworkInterface::ID);
   galois::for_each(first, last, create_nodes(dgraph, lk));

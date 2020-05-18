@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,30 +20,24 @@
 #ifndef GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 #define GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 
-#include "galois/substrate/ThreadPool.h"
+#include <cassert>
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include "galois/config.h"
 #include "galois/substrate/HWTopo.h"
 #include "galois/substrate/PaddedLock.h"
-
-#include <cstddef>
-//#include <boost/utility.hpp>
-
-#include <cassert>
-#include <vector>
-#include <utility>
+#include "galois/substrate/ThreadPool.h"
 
 namespace galois {
 namespace substrate {
 
 class PerBackend {
-  static const unsigned MAX_SIZE = 30;
-  // 16 byte alignment so vectorized initialization is easier
-  // NB(ddn): llvm seems to assume this under some cases because
-  // I've seen weird initialization crashes with MIN_SIZE = 3
-  static const unsigned MIN_SIZE = 4;
   typedef substrate::SimpleLock Lock;
 
-  unsigned int nextLoc;
-  char** heads;
+  std::atomic<unsigned int> nextLoc{0};
+  std::atomic<char*>* heads{nullptr};
   Lock freeOffsetsLock;
   std::vector<std::vector<unsigned>> freeOffsets;
   /**
@@ -53,15 +47,13 @@ class PerBackend {
    * PerBackend object, which may have be destroyed before the PerThread
    * object itself.
    */
-  bool invalid;
+  bool invalid{false};
 
   void initCommon(unsigned maxT);
   static unsigned nextLog2(unsigned size);
 
 public:
-  PerBackend() : nextLoc(0), heads(0), invalid(false) {
-    freeOffsets.resize(MAX_SIZE);
-  }
+  PerBackend();
 
   PerBackend(const PerBackend&) = delete;
   PerBackend& operator=(const PerBackend&) = delete;

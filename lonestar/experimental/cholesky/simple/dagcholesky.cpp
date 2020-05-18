@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -247,7 +247,8 @@ void do_node(Graph* graph, node_t node) {
 #endif
         // if ( src == dest )
         // printf("I-EDGE %4d %4d %4d %10.5f\n", node, src, dest,
-        // bridgedata.data); std::cout << srcd.id << " " << dstd.id << " " << edb
+        // bridgedata.data); std::cout << srcd.id << " " << dstd.id << " " <<
+        // edb
         // << "\n";
 #ifdef EBN
       }

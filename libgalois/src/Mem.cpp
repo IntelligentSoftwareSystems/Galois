@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,7 +35,7 @@ thread_local SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 SizedHeapFactory::SizedHeap*
 SizedHeapFactory::getHeapForSize(const size_t size) {
   if (size == 0)
-    return 0;
+    return nullptr;
   return Base::getInstance()->getHeap(size);
 }
 
@@ -62,7 +62,7 @@ SizedHeapFactory::SizedHeap* SizedHeapFactory::getHeap(const size_t size) {
   }
 }
 
-Pow_2_BlockHeap::Pow_2_BlockHeap(void) throw() : heapTable() {
+Pow_2_BlockHeap::Pow_2_BlockHeap(void) noexcept : heapTable() {
   populateTable();
 }
 

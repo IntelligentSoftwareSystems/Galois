@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,12 +20,12 @@
 #ifndef GALOIS_USERCONTEXT_H
 #define GALOIS_USERCONTEXT_H
 
-#include "galois/Mem.h"
-#include "galois/gdeque.h"
-
-#include "galois/runtime/Context.h"
-
 #include <functional>
+
+#include "galois/config.h"
+#include "galois/gdeque.h"
+#include "galois/Mem.h"
+#include "galois/runtime/Context.h"
 
 namespace galois {
 
@@ -36,15 +36,6 @@ namespace galois {
 template <typename T>
 class UserContext : private boost::noncopyable {
 protected:
-// TODO(ddn): move to a separate class for dedicated speculative executors
-#ifdef GALOIS_USE_EXP
-  typedef std::function<void(void)> Closure;
-  typedef galois::gdeque<Closure, 8> UndoLog;
-  typedef UndoLog CommitLog;
-
-  UndoLog undoLog;
-  CommitLog commitLog;
-#endif
   //! push stuff
   typedef gdeque<T> PushBufferTy;
   static const unsigned int fastPushBackLimit = 64;
@@ -68,24 +59,6 @@ protected:
   void __setFirstPass(void) { firstPassFlag = true; }
 
   void __resetFirstPass(void) { firstPassFlag = false; }
-
-#ifdef GALOIS_USE_EXP
-  void __rollback() {
-    for (auto ii = undoLog.begin(), ei = undoLog.end(); ii != ei; ++ii) {
-      (*ii)();
-    }
-  }
-
-  void __commit() {
-    for (auto ii = commitLog.begin(), ei = commitLog.end(); ii != ei; ++ii) {
-      (*ii)();
-    }
-  }
-
-  void __resetUndoLog() { undoLog.clear(); }
-
-  void __resetCommitLog() { commitLog.clear(); }
-#endif
 
   PushBufferTy& __getPushBuffer() { return pushBuffer; }
 
@@ -142,12 +115,6 @@ public:
     new (localState) LS(std::forward<Args>(args)...);
     return getLocalState<LS>();
   }
-
-#ifdef GALOIS_USE_EXP
-  void addUndoAction(const Closure& f) { undoLog.push_front(f); }
-
-  void addCommitAction(const Closure& f) { commitLog.push_back(f); }
-#endif
 
   //! used by deterministic and ordered
   //! @returns true when the operator is invoked for the first time. The

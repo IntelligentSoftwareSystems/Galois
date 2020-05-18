@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,14 +20,14 @@
 #ifndef GALOIS_PRIORITYQUEUE_H
 #define GALOIS_PRIORITYQUEUE_H
 
-#include "galois/substrate/PaddedLock.h"
-#include "galois/substrate/CompilerSpecific.h"
-
-#include <vector>
 #include <algorithm>
 #include <set>
+#include <vector>
 
+#include "galois/config.h"
 #include "galois/Mem.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 
@@ -56,7 +56,7 @@ public:
   typedef galois::substrate::SimpleLock Lock_ty;
 
 private:
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
+  alignas(substrate::GALOIS_CACHE_LINE_SIZE) Lock_ty mutex;
   Set orderedSet;
 
 public:
@@ -290,7 +290,7 @@ public:
 protected:
   typedef galois::substrate::SimpleLock Lock_ty;
 
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
+  alignas(substrate::GALOIS_CACHE_LINE_SIZE) Lock_ty mutex;
   container_type heap;
 
 public:

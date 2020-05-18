@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -49,7 +49,10 @@ static const char* url = "HyPar";
 static cll::opt<scheduleMode> schedulingMode(
     cll::desc("Choose a inital scheduling mode:"),
     cll::values(clEnumVal(PLD, "PLD"), clEnumVal(PP, "PP"), clEnumVal(WD, "WD"),
-                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),clEnumVal(MDEG, "MDEG"),clEnumVal(DEG, "DEG"),clEnumVal(MWD, "MWD"),clEnumVal(HIS, "HIS"),clEnumVal(RAND, "random"),clEnumValEnd),
+                clEnumVal(RI, "RI"), clEnumVal(MRI, "MRI"),
+                clEnumVal(MDEG, "MDEG"), clEnumVal(DEG, "DEG"),
+                clEnumVal(MWD, "MWD"), clEnumVal(HIS, "HIS"),
+                clEnumVal(RAND, "random"), clEnumValEnd),
     cll::init(PLD));
 
 static cll::opt<bool>
@@ -71,12 +74,12 @@ static cll::opt<std::string>
 static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> csize(cll::Positional,
-                                   cll::desc("<size of coarsest graph>"),
-                                   cll::Required);
+                                cll::desc("<size of coarsest graph>"),
+                                cll::Required);
 
 static cll::opt<unsigned> refiter(cll::Positional,
-                                   cll::desc("<number of iterations in ref>"),
-                                   cll::Required);
+                                  cll::desc("<number of iterations in ref>"),
+                                  cll::Required);
 static cll::opt<double> imbalance(
     "balance",
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
@@ -84,21 +87,19 @@ static cll::opt<double> imbalance(
 
 // const double COARSEN_FRACTION = 0.9;
 
-/*int cutsize(GGraph& g) { 
+/*int cutsize(GGraph& g) {
   unsigned size = std::distance(g.cellList().begin(), g.cellList().end());
   unsigned sizen = std::distance(g.getNets().begin(), g.getNets().end());
   int cutsize = 0;
   std::vector<int> cells;
-  for (auto n : g.getNets()) { 
+  for (auto n : g.getNets()) {
     bool cut_status = false;
     for (auto e : g.edges(n)) {
       auto cell1 = g.getEdgeDst(e);
     for (auto c : g.edges(n)) {
         auto cell2 = g.getEdgeDst(c);
-        if(g.getData(cell1).getPart() != g.getData(cell2).getPart() && cell1 != cell2) {
-          cutsize++;
-          cut_status = true;
-          break;
+        if(g.getData(cell1).getPart() != g.getData(cell2).getPart() && cell1 !=
+cell2) { cutsize++; cut_status = true; break;
         }
       }
       if (cut_status == true)
@@ -110,29 +111,30 @@ static cll::opt<double> imbalance(
 int computingCut(GGraph& g) {
 
   GNodeBag bag;
-  galois::do_all(galois::iterate(g),
-        [&](GNode n) {
-          if (g.hedges <= n) return;
-          for (auto cell : g.edges(n)) {
-            auto c = g.getEdgeDst(cell);
-            int part = g.getData(c).getPart();
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int partc = g.getData(cc).getPart();
-              if (partc != part) {
-                bag.push(n);
-                return;
-              }
-
+  galois::do_all(
+      galois::iterate(g),
+      [&](GNode n) {
+        if (g.hedges <= n)
+          return;
+        for (auto cell : g.edges(n)) {
+          auto c   = g.getEdgeDst(cell);
+          int part = g.getData(c).getPart();
+          for (auto x : g.edges(n)) {
+            auto cc   = g.getEdgeDst(x);
+            int partc = g.getData(cc).getPart();
+            if (partc != part) {
+              bag.push(n);
+              return;
             }
           }
-        },
-        galois::loopname("cutsize"));
+        }
+      },
+      galois::loopname("cutsize"));
   return std::distance(bag.begin(), bag.end());
 }
 
 /**
- * Partitioning 
+ * Partitioning
  */
 void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   galois::StatTimer TM;
@@ -143,19 +145,18 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned refineTo) {
   MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
   T.stop();
 
- galois::StatTimer T2("PartitionSEP");
+  galois::StatTimer T2("PartitionSEP");
   int cuts = std::numeric_limits<int>::max();
   T2.start();
   partition(mcg);
   T2.stop();
 
-
-	std::cout <<"cut sie: " <<computingCut(*(mcg->getGraph())) << std::endl;
+  std::cout << "cut sie: " << computingCut(*(mcg->getGraph())) << std::endl;
   galois::StatTimer T3("Refine");
   T3.start();
   refine(mcg, refineTo);
   T3.stop();
-  int one = 0;
+  int one  = 0;
   int zero = 0;
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
@@ -192,8 +193,10 @@ int computingBalance(GGraph& g) {
   int zero = 0, one = 0;
   for (int c = g.hedges; c < g.size(); c++) {
     int part = g.getData(c).getPart();
-    if (part == 0) zero++;
-    else one++;
+    if (part == 0)
+      zero++;
+    else
+      one++;
   }
   return std::abs(zero - one);
 }
@@ -221,8 +224,8 @@ struct order_by_degree {
 typedef galois::substrate::PerThreadStorage<std::map<GNode, uint64_t>>
     PerThreadDegInfo;
 
-
-std::map<uint64_t, uint64_t> cellToNet(std::map< uint64_t, std::vector< uint64_t> > netToCell) {
+std::map<uint64_t, uint64_t>
+cellToNet(std::map<uint64_t, std::vector<uint64_t>> netToCell) {
   std::map<uint64_t, uint64_t> celltonet;
   for (auto n : netToCell) {
     for (auto c : n.second) {
@@ -234,18 +237,18 @@ std::map<uint64_t, uint64_t> cellToNet(std::map< uint64_t, std::vector< uint64_t
 
 int hash(unsigned val) {
   unsigned long int seed = val * 1103515245 + 12345;
-  return((unsigned)(seed/65536) % 32768);
+  return ((unsigned)(seed / 65536) % 32768);
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
- // srand(-1);
+  // srand(-1);
   MetisGraph metisGraph;
   GGraph& graph = *metisGraph.getGraph();
   std::ifstream f(filename.c_str());
-  //GGraph graph;// = *metisGraph.getGraph();
+  // GGraph graph;// = *metisGraph.getGraph();
   std::string line;
   std::getline(f, line);
   std::stringstream ss(line);
@@ -259,16 +262,22 @@ int main(int argc, char** argv) {
   galois::StatTimer T("buildingG");
   T.start();
   // read rest of input and initialize hedges (build hgraph)
-  std::vector<std::vector<uint32_t> > edges_id(hedges+nodes);
-  std::vector<std::vector<EdgeTy> > edges_data(hedges+nodes);
-  std::vector<uint64_t> prefix_edges(nodes+hedges);
+  std::vector<std::vector<uint32_t>> edges_id(hedges + nodes);
+  std::vector<std::vector<EdgeTy>> edges_data(hedges + nodes);
+  std::vector<uint64_t> prefix_edges(nodes + hedges);
   int cnt = 0, edges = 0;
   while (std::getline(f, line)) {
-    if (cnt >= hedges) {printf("ERROR: too many lines in input file\n"); exit(-1);}
+    if (cnt >= hedges) {
+      printf("ERROR: too many lines in input file\n");
+      exit(-1);
+    }
     std::stringstream ss(line);
     int val;
     while (ss >> val) {
-      if ((val < 1) || (val > nodes)) {printf("ERROR: node value %d out of bounds\n", val); exit(-1);}
+      if ((val < 1) || (val > nodes)) {
+        printf("ERROR: node value %d out of bounds\n", val);
+        exit(-1);
+      }
       unsigned newval = hedges + (val - 1);
       edges_id[cnt].push_back(newval);
       edges++;
@@ -278,45 +287,42 @@ int main(int argc, char** argv) {
   f.close();
   graph.hedges = hedges;
   graph.hnodes = nodes;
-  std::cout<<"number of edges "<<edges<<"\n";
-  uint32_t sizes = hedges+nodes;
+  std::cout << "number of edges " << edges << "\n";
+  uint32_t sizes = hedges + nodes;
   galois::do_all(galois::iterate((uint32_t)0, sizes),
-                [&](uint32_t c){
-                  prefix_edges[c] = edges_id[c].size();
-                });
-  
-  for (uint32_t c = 1; c < nodes+hedges; ++c) {
+                 [&](uint32_t c) { prefix_edges[c] = edges_id[c].size(); });
+
+  for (uint32_t c = 1; c < nodes + hedges; ++c) {
     prefix_edges[c] += prefix_edges[c - 1];
   }
-  // edges = #edges, hedgecount = how many edges each node has, edges_id: for each node, which ndoes it is connected to
-  // edges_data: data for each edge = 1
-  graph.constructFrom(nodes+hedges, edges, prefix_edges, edges_id);//, edges_data);
-  galois::do_all(galois::iterate(graph),
-                  [&](GNode n) {
-                    if (n < hedges){
-                      graph.getData(n).netnum = n+1;
-											graph.getData(n).netrand = hash(n+1);
-										}
-                    else{
-                      graph.getData(n).netnum = INT_MAX;
-                    	graph.getData(n).netrand = INT_MAX;
-											}
-                    graph.getData(n).netval = INT_MAX;
-                    graph.getData(n).nodeid = n+1;
-  
+  // edges = #edges, hedgecount = how many edges each node has, edges_id: for
+  // each node, which ndoes it is connected to edges_data: data for each edge =
+  // 1
+  graph.constructFrom(nodes + hedges, edges, prefix_edges,
+                      edges_id); //, edges_data);
+  galois::do_all(galois::iterate(graph), [&](GNode n) {
+    if (n < hedges) {
+      graph.getData(n).netnum  = n + 1;
+      graph.getData(n).netrand = hash(n + 1);
+    } else {
+      graph.getData(n).netnum  = INT_MAX;
+      graph.getData(n).netrand = INT_MAX;
+    }
+    graph.getData(n).netval = INT_MAX;
+    graph.getData(n).nodeid = n + 1;
   });
   T.stop();
-  std::cout<<"time to build a graph "<<T.get()<<"\n";
+  std::cout << "time to build a graph " << T.get() << "\n";
   graphStat(graph);
-  std::cout<<"\n";
+  std::cout << "\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
   Partition(&metisGraph, csize, refiter);
-  //std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
+  // std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
   galois::runtime::reportStat_Single("HyPar", "Edge Cut", computingCut(graph));
-  galois::runtime::reportStat_Single("HyParzo", "zero-one", computingBalance(graph));
+  galois::runtime::reportStat_Single("HyParzo", "zero-one",
+                                     computingBalance(graph));
   // galois::reportPageAlloc("MeminfoPost");
 
   return 0;
 }
-

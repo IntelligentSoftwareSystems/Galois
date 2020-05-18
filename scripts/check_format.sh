@@ -27,7 +27,7 @@ while read -d '' filename; do
         FAILED=1
     fi
   fi
-done < <(find ${ROOTS} -name experimental -prune -o -name '*.cpp' -print0 -o -name '*.h' -print0)
+done < <(find ${ROOTS} -name experimental -prune -o -name external -prune -o -name '*.cpp' -print0 -o -name '*.h' -print0)
 
 if [ -n "${FAILED}" ]; then
   exit 1

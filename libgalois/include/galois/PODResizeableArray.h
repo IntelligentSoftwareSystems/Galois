@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,14 +27,12 @@
 #include <utility>
 #include <type_traits>
 
-// Statistics & Debug
-// #include "galois/Timer.h"
-// #include "galois/gIO.h"
+#include "galois/config.h"
 
 namespace galois {
 
 /**
- * This is a container that encapsulates a resizeable array 
+ * This is a container that encapsulates a resizeable array
  * of plain-old-datatype (POD) elements.
  * There is no initialization or destruction of elements.
  */
@@ -60,18 +58,15 @@ public:
   PODResizeableArray() : data_(NULL), capacity_(0), size_(0) {}
 
   template <class InputIterator>
-  PODResizeableArray(InputIterator first, InputIterator last) 
-    : data_(NULL), capacity_(0), size_(0) 
-  {
+  PODResizeableArray(InputIterator first, InputIterator last)
+      : data_(NULL), capacity_(0), size_(0) {
     size_t to_add = last - first;
     resize(to_add);
     std::copy_n(first, to_add, begin());
   }
 
-  PODResizeableArray(size_t n) 
-    : data_(NULL), capacity_(0), size_(0) 
-  { 
-    resize(n); 
+  PODResizeableArray(size_t n) : data_(NULL), capacity_(0), size_(0) {
+    resize(n);
   }
 
   //! disabled (shallow) copy constructor
@@ -79,11 +74,10 @@ public:
 
   //! move constructor
   PODResizeableArray(PODResizeableArray&& v)
-    : data_(v.data_), capacity_(v.capacity_), size_(v.size_) 
-  {
-    v.data_ = NULL;
+      : data_(v.data_), capacity_(v.capacity_), size_(v.size_) {
+    v.data_     = NULL;
     v.capacity_ = 0;
-    v.size_ = 0;
+    v.size_     = 0;
   }
 
   //! disabled (shallow) copy assignment operator
@@ -91,17 +85,21 @@ public:
 
   //! move assignment operator
   PODResizeableArray& operator=(PODResizeableArray&& v) {
-    if (data_ != NULL) free(data_);
-    data_ = v.data_;
-    capacity_ = v.capacity_;
-    size_ = v.size_;
-    v.data_ = NULL;
+    if (data_ != NULL)
+      free(data_);
+    data_       = v.data_;
+    capacity_   = v.capacity_;
+    size_       = v.size_;
+    v.data_     = NULL;
     v.capacity_ = 0;
-    v.size_ = 0;
+    v.size_     = 0;
     return *this;
   }
 
-  ~PODResizeableArray() { if (data_ != NULL) free(data_); }
+  ~PODResizeableArray() {
+    if (data_ != NULL)
+      free(data_);
+  }
 
   // iterators:
   iterator begin() { return iterator(&data_[0]); }
@@ -136,7 +134,8 @@ public:
       while (capacity_ < n) {
         capacity_ <<= 1;
       }
-      data_ = static_cast<_Tp*>(realloc(reinterpret_cast<void*>(data_), capacity_ * sizeof(_Tp)));
+      data_ = static_cast<_Tp*>(
+          realloc(reinterpret_cast<void*>(data_), capacity_ * sizeof(_Tp)));
     }
   }
 
@@ -145,9 +144,7 @@ public:
     size_ = n;
   }
 
-  void clear() {
-    size_ = 0;
-  }
+  void clear() { size_ = 0; }
 
   // element access:
   reference operator[](size_type __n) { return data_[__n]; }
@@ -155,12 +152,12 @@ public:
   reference at(size_type __n) {
     if (__n >= size_)
       throw std::out_of_range("PODResizeableArray::at");
-    return data_[__n]; 
+    return data_[__n];
   }
   const_reference at(size_type __n) const {
     if (__n >= size_)
       throw std::out_of_range("PODResizeableArray::at");
-    return data_[__n]; 
+    return data_[__n];
   }
 
   void assign(iterator first, iterator last) {
@@ -183,10 +180,11 @@ public:
   }
 
   template <class InputIterator>
-  void insert(iterator position, InputIterator first, InputIterator last) {
+  void insert(iterator GALOIS_USED_ONLY_IN_DEBUG(position), InputIterator first,
+              InputIterator last) {
     assert(position == end());
     size_t old_size = size_;
-    size_t to_add = last - first;
+    size_t to_add   = last - first;
     resize(old_size + to_add);
     std::copy_n(first, to_add, begin() + old_size);
   }

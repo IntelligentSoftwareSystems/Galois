@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,12 +23,10 @@
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
-#ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
 #include "galois/graphs/OCGraph.h"
 #include "galois/graphs/GraphNodeBag.h"
 #include "galois/DomainSpecificExecutors.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -98,7 +96,6 @@ void readInOutGraph(Graph& graph) {
   }
 }
 
-#ifdef GALOIS_USE_EXP
 template <bool UseGraphChi>
 struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
@@ -233,14 +230,14 @@ struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
                        false);
       // galois::do_all(*output, [&](GNode n) {
       // galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      galois::for_each(*output,
-                       [&](size_t id, galois::UserContext<size_t>&) {
-                         SNode& d =
-                             graph.getData(graph.nodeFromId(id),
-                                           galois::MethodFlag::UNPROTECTED);
-                         d.visited = true;
-                       },
-                       galois::wl<WL>());
+      galois::for_each(
+          *output,
+          [&](size_t id, galois::UserContext<size_t>&) {
+            SNode& d  = graph.getData(graph.nodeFromId(id),
+                                     galois::MethodFlag::UNPROTECTED);
+            d.visited = true;
+          },
+          galois::wl<WL>());
       levels.push_back(output);
       frontier = output;
     }
@@ -293,7 +290,6 @@ struct LigraAlgo : public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
     });
   }
 };
-#endif
 
 template <typename Algo>
 void run() {
@@ -345,14 +341,12 @@ int main(int argc, char** argv) {
   galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-#ifdef GALOIS_USE_EXP
   case Algo::ligra:
     run<LigraAlgo<false>>();
     break;
   case Algo::ligraChi:
     run<LigraAlgo<true>>();
     break;
-#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();

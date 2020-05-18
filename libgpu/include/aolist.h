@@ -14,8 +14,9 @@
 #include "cub/cub.cuh"
 #include "cutil_subset.h"
 #include "bmk2.h"
-#include <kernels/mergesort.cuh>
+#include <moderngpu/kernel_mergesort.hxx>
 
+extern mgpu::standard_context_t context;
 struct AppendOnlyList {
   int* dl;
   int *dindex, index;
@@ -43,7 +44,7 @@ struct AppendOnlyList {
   }
 
   void sort() {
-    MergesortKeys(list.gpu_wr_ptr(), nitems(), mgpu::less<int>(), *mgc);
+    mergesort(list.gpu_wr_ptr(), nitems(), mgpu::less_t<int>(), context);
   }
 
   void update_cpu() { list.cpu_rd_ptr(); }
@@ -114,7 +115,7 @@ struct AppendOnlyList {
       assert(lindex <= size);
     }
 
-    lindex = cub::ShuffleIndex(lindex, first);
+    lindex = cub::ShuffleIndex<32>(lindex, first, 0xffffffff);
     // lindex = cub::ShuffleIndex(lindex, first); // CUB > 1.3.1
     return lindex + offset;
   }

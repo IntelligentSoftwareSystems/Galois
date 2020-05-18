@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,6 +24,8 @@
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
+
+#include "galois/config.h"
 
 namespace galois {
 
@@ -102,7 +104,7 @@ public:
   flat_map() : _data(), _comp() {}
 
   explicit flat_map(const _Compare& __comp,
-                    const allocator_type& __a = allocator_type())
+                    const allocator_type& = allocator_type())
       // XXX :_data(_Pair_alloc_type(__a)), _comp(__comp) {}
       : _data(), _comp(__comp) {}
 
@@ -126,8 +128,8 @@ public:
   }
 
   template <typename _InputIterator>
-  flat_map(_InputIterator __first, _InputIterator __last,
-           const _Compare& __comp, const allocator_type& __a = allocator_type())
+  flat_map(_InputIterator __first, _InputIterator __last, const _Compare&,
+           const allocator_type& __a = allocator_type())
       : _data(__first, __last, _Pair_alloc_type(__a)) {
     resort();
   }

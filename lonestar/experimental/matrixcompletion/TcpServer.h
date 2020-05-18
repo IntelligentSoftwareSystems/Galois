@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -52,13 +52,14 @@ struct AuxData {
   void initialize() {
     updateMargins();
     galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
-    executor.execute(graph.begin(), graph.begin() + numItems,
-                     graph.begin() + numItems, graph.end(), 1000, 1000,
-                     [&](GNode src, GNode dst, typename Graph::edge_iterator) {
-                       graph.getData(src).count += 1;
-                       graph.getData(dst).count += 1;
-                     },
-                     true);
+    executor.execute(
+        graph.begin(), graph.begin() + numItems, graph.begin() + numItems,
+        graph.end(), 1000, 1000,
+        [&](GNode src, GNode dst, typename Graph::edge_iterator) {
+          graph.getData(src).count += 1;
+          graph.getData(dst).count += 1;
+        },
+        true);
   }
 
   void update() {
@@ -74,16 +75,16 @@ struct AuxData {
     galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     double norm1 = 1.0 / (graph.size() - numItems);
     double norm2 = 1.0 / (numItems);
-    executor.executeDense(graph.begin(), graph.begin() + numItems,
-                          graph.begin() + numItems, graph.end(), 100, 100,
-                          [&](GNode src, GNode dst) {
-                            auto e = predictionError(
-                                graph.getData(src).latentVector,
-                                graph.getData(dst).latentVector, 0);
-                            graph.getData(src).sum += e;
-                            graph.getData(dst).sum += e;
-                          },
-                          true);
+    executor.executeDense(
+        graph.begin(), graph.begin() + numItems, graph.begin() + numItems,
+        graph.end(), 100, 100,
+        [&](GNode src, GNode dst) {
+          auto e = predictionError(graph.getData(src).latentVector,
+                                   graph.getData(dst).latentVector, 0);
+          graph.getData(src).sum += e;
+          graph.getData(dst).sum += e;
+        },
+        true);
     galois::do_all(graph, [&](GNode n) {
       if (n < numItems)
         graph.getData(n).sum *= norm1;

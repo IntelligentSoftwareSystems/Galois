@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,29 +26,7 @@
 //! Global thread context for each active thread
 static thread_local galois::runtime::SimpleRuntimeContext* thread_ctx = 0;
 
-#ifdef GALOIS_USE_LONGJMP_ABORT
-
 thread_local jmp_buf galois::runtime::execFrame;
-
-void galois::runtime::signalFailSafe(void) {
-  longjmp(galois::runtime::execFrame, galois::runtime::REACHED_FAILSAFE);
-  std::abort(); // shouldn't reach here after longjmp
-}
-
-void galois::runtime::signalConflict(Lockable* lockable) {
-  longjmp(galois::runtime::execFrame, galois::runtime::CONFLICT);
-  std::abort(); // shouldn't reach here after longjmp
-}
-
-#else
-void galois::runtime::signalFailSafe(void) {
-  throw galois::runtime::REACHED_FAILSAFE;
-}
-
-void galois::runtime::signalConflict(Lockable* lockable) {
-  throw galois::runtime::CONFLICT; // Conflict
-}
-#endif
 
 void galois::runtime::setThreadContext(
     galois::runtime::SimpleRuntimeContext* ctx) {
@@ -58,16 +36,6 @@ void galois::runtime::setThreadContext(
 galois::runtime::SimpleRuntimeContext* galois::runtime::getThreadContext() {
   return thread_ctx;
 }
-
-#ifdef GALOIS_USE_EXP
-bool galois::runtime::owns(Lockable* lockable, MethodFlag m) {
-  SimpleRuntimeContext* ctx = getThreadContext();
-  if (ctx) {
-    return ctx->owns(lockable, m);
-  }
-  return false;
-}
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // LockManagerBase & SimpleRuntimeContext
@@ -94,20 +62,6 @@ else if (getOwner(lockable) == this) {
   return ALREADY_OWNER;
 }
 return FAIL;
-}
-
-void galois::runtime::SimpleRuntimeContext::acquire(
-    galois::runtime::Lockable* lockable, galois::MethodFlag m) {
-  AcquireStatus i;
-  if (customAcquire) {
-    subAcquire(lockable, m);
-  } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
-    if (i == AcquireStatus::NEW_OWNER) {
-      addToNhood(lockable);
-    }
-  } else {
-    galois::runtime::signalConflict(lockable);
-  }
 }
 
 void galois::runtime::SimpleRuntimeContext::release(
@@ -140,13 +94,6 @@ unsigned galois::runtime::SimpleRuntimeContext::cancelIteration() {
 }
 
 void galois::runtime::SimpleRuntimeContext::subAcquire(
-    galois::runtime::Lockable* lockable, galois::MethodFlag) {
+    galois::runtime::Lockable*, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }
-
-#ifdef GALOIS_USE_EXP
-bool galois::runtime::SimpleRuntimeContext::owns(
-    galois::runtime::Lockable* lockable, galois::MethodFlag) const {
-  GALOIS_DIE("SimpleRuntimeContext::owns Not Implemented");
-}
-#endif

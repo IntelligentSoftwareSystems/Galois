@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -201,15 +201,16 @@ struct GBPartitionerDisk {
       std::vector<size_t> hosts;
       for (size_t i = 0; i < numhost; ++i)
         hosts.push_back(i);
-      galois::do_all(hosts.begin(), hosts.end(),
-                     [&](size_t h) {
-                       for (size_t n = 0; n < g.size(); ++n) {
-                         if (_vertexOwnersPacked[n][h]) {
-                           global2Local[h][n] = verticesPerHost[h]++;
-                         }
-                       }
-                     },
-                     galois::loopname("localIDs"));
+      galois::do_all(
+          hosts.begin(), hosts.end(),
+          [&](size_t h) {
+            for (size_t n = 0; n < g.size(); ++n) {
+              if (_vertexOwnersPacked[n][h]) {
+                global2Local[h][n] = verticesPerHost[h]++;
+              }
+            }
+          },
+          galois::loopname("localIDs"));
 #else
       for (size_t h = 0; h < numhost; ++h) {
         for (size_t n = 0; n < g.size(); ++n) {

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,9 +27,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_USE_EXP
 #include "galois/worklists/WorkListDebug.h"
-#endif
 
 #include <atomic>
 #include <string>
@@ -423,7 +421,7 @@ struct PullAlgo2 {
 
 /* ------------------------- Joyce's codes start ------------------------- */
 //---------- parallel synchronous algorithm (original copy: PullAlgo2, readGraph
-//is re-written.)
+// is re-written.)
 
 int idcount = 0;
 
@@ -707,11 +705,7 @@ struct PrtRsd {
     using namespace galois::worklists;
     typedef PerSocketChunkLIFO<4> PSchunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk> OBIM;
-#ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
-#else
-    typedef OBIM dOBIM;
-#endif
     galois::InsertBag<UpdateRequest> initialWL;
     galois::do_all(graph, [&initialWL, &graph](GNode src) {
       LNode& data = graph.getData(src);

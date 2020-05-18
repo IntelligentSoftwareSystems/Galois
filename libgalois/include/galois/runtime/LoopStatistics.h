@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -19,6 +19,10 @@
 
 #ifndef GALOIS_RUNTIME_LOOPSTATISTICS_H
 #define GALOIS_RUNTIME_LOOPSTATISTICS_H
+
+#include "galois/config.h"
+#include "galois/runtime/Statistics.h"
+
 namespace galois {
 namespace runtime {
 
@@ -57,14 +61,14 @@ public:
 template <>
 class LoopStatistics<false> {
 public:
-  explicit LoopStatistics(const char* ln) {}
+  explicit LoopStatistics(const char*) {}
 
   size_t iterations(void) const { return 0; }
   size_t pushes(void) const { return 0; }
   size_t conflicts(void) const { return 0; }
 
   inline void inc_iterations() const {}
-  inline void inc_pushes(size_t v = 0) const {}
+  inline void inc_pushes(size_t = 0) const {}
   inline void inc_conflicts() const {}
 };
 

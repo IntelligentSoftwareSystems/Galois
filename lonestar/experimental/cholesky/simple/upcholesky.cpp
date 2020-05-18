@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -237,10 +237,11 @@ void do_node(PerThread<Graph>* mypts, Graph* graph, node_t node) {
       // printf("  => %10.5f\n", densecol[jdest]);
 
       // printf("  L[%4d,%4d] == %10.5f, L[%4d,%4d] == %10.5f\n", node, jdest,
-      // densecol[jdest], colnode, jdest, jdata); printf("  b -= (%10.5f * %10.5f
+      // densecol[jdest], colnode, jdest, jdata); printf("  b -= (%10.5f *
+      // %10.5f
       // == %10.5f) => %10.5f\n", densecol[jdest], jdata, delta, b);
       ////printf(" L[%4d,%4d] -= L[%4d,%4d]*L[%4d,%4d] == %10.5f => %10.5f\n",
-      ///node, colnode, node, idest, colnode, jdest, delta, b);
+      /// node, colnode, node, idest, colnode, jdest, delta, b);
       // printf("  %u\n", jdest);
     }
     {

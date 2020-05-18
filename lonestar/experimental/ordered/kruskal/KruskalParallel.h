@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -540,13 +540,14 @@ void runMSTsimple(const size_t numNodes, const VecEdge& edges,
   galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   fillUpTimer.start();
-  galois::do_all(boost::counting_iterator<size_t>(0),
-                 boost::counting_iterator<size_t>(numNodes),
-                 [&repVec, &repOwnerCtxVec](size_t i) {
-                   repVec.initialize(i, -1);
-                   repOwnerCtxVec.initialize(i, AtomicCtxPtr(nullptr));
-                 },
-                 galois::loopname("init-vectors"));
+  galois::do_all(
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(numNodes),
+      [&repVec, &repOwnerCtxVec](size_t i) {
+        repVec.initialize(i, -1);
+        repOwnerCtxVec.initialize(i, AtomicCtxPtr(nullptr));
+      },
+      galois::loopname("init-vectors"));
 
   EdgeCtxWL initWL;
   unsigned numT = galois::getActiveThreads();
@@ -719,13 +720,14 @@ void runMSTfilter(const size_t numNodes, const VecEdge& edges,
 
   VecRep_ty repVec(numNodes);
   VecAtomicCtxPtr repOwnerCtxVec(numNodes);
-  galois::do_all(boost::counting_iterator<size_t>(0),
-                 boost::counting_iterator<size_t>(numNodes),
-                 [&repVec, &repOwnerCtxVec](size_t i) {
-                   repVec.initialize(i, -1);
-                   repOwnerCtxVec.initialize(i, AtomicCtxPtr(nullptr));
-                 },
-                 galois::loopname("init-vectors"));
+  galois::do_all(
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(numNodes),
+      [&repVec, &repOwnerCtxVec](size_t i) {
+        repVec.initialize(i, -1);
+        repOwnerCtxVec.initialize(i, AtomicCtxPtr(nullptr));
+      },
+      galois::loopname("init-vectors"));
 
   runningTime.start();
 

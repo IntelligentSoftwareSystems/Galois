@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -49,26 +49,21 @@ static cll::opt<std::string>
 
 static cll::opt<unsigned int>
     clique_size("k", // not uint64_t due to a bug in llvm cl
-             cll::desc("Clique Size"),
-             cll::init(3));
-
+                cll::desc("Clique Size"), cll::init(3));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
 
-//typedef galois::graphs::MorphGraph<int,int,true,false,false,true> DAG;
-typedef galois::graphs::MorphGraph<int,int,true> DAG;
+// typedef galois::graphs::MorphGraph<int,int,true,false,false,true> DAG;
+typedef galois::graphs::MorphGraph<int, int, true> DAG;
 
 typedef Graph::GraphNode GNode;
 typedef DAG::GraphNode DAGNode;
 
-
-
 struct WorkItem {
-		std::vector<DAGNode> clique; //set of graph nodes that form a clique
-		std::vector<DAGNode> neighbors; //set of neighbors of the clique
+  std::vector<DAGNode> clique;    // set of graph nodes that form a clique
+  std::vector<DAGNode> neighbors; // set of neighbors of the clique
 };
-
 
 /**
  * Compares the given two graph nodes n1 and n2.
@@ -82,19 +77,17 @@ struct WorkItem {
  * \return True if n1 < n2 else False.
  */
 
-bool lessThan(Graph &g, const GNode& n1, const GNode& n2) {
-	  int n1_degree=std::distance(g.edge_begin(n1), g.edge_end(n1));
-	  int n2_degree=std::distance(g.edge_begin(n2), g.edge_end(n2));
+bool lessThan(Graph& g, const GNode& n1, const GNode& n2) {
+  int n1_degree = std::distance(g.edge_begin(n1), g.edge_end(n1));
+  int n2_degree = std::distance(g.edge_begin(n2), g.edge_end(n2));
 
-	  if(n1_degree < n2_degree) {
-		  return true;
-	  }
-	  else if ((n1_degree == n2_degree ) && (g.getData(n1) < g.getData(n2))) {
-		  return true;
-	  }
-  	  else {
-	  	  return false;
-  	  }
+  if (n1_degree < n2_degree) {
+    return true;
+  } else if ((n1_degree == n2_degree) && (g.getData(n1) < g.getData(n2))) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /**
@@ -105,38 +98,41 @@ bool lessThan(Graph &g, const GNode& n1, const GNode& n2) {
  * \param dag is the input DAG
  */
 
-void getNeighbors(DAGNode &n, std::vector<DAGNode> &neighbors, DAG &dag) {
-	int i=0;
-	for (auto jj : dag.edges(n)) {
-		DAGNode dst  = dag.getEdgeDst(jj);
-		neighbors[i]=dst;
-		i++;
-	}
+void getNeighbors(DAGNode& n, std::vector<DAGNode>& neighbors, DAG& dag) {
+  int i = 0;
+  for (auto jj : dag.edges(n)) {
+    DAGNode dst  = dag.getEdgeDst(jj);
+    neighbors[i] = dst;
+    i++;
+  }
 }
 
 /**
- * Gives the intersection two neighbor vector. It requires the vectors be sorted according to the node ids.
+ * Gives the intersection two neighbor vector. It requires the vectors be sorted
+ * according to the node ids.
  *
  * \param jointNeighbors is the output neighbor vector
  * \param srcNeighbors is the first input neighbor vector
  * \param dstNeighbors is the second input neighbor vector
  */
 
-size_t intersect(std::vector<DAGNode> &jointNeighbors, std::vector<DAGNode> &srcNeighbors, std::vector<DAGNode> &dstNeighbors) {
-  std::vector<DAGNode>::iterator srcItr= srcNeighbors.begin();
-  std::vector<DAGNode>::iterator dstItr= dstNeighbors.begin();
-  size_t size=0;
+size_t intersect(std::vector<DAGNode>& jointNeighbors,
+                 std::vector<DAGNode>& srcNeighbors,
+                 std::vector<DAGNode>& dstNeighbors) {
+  std::vector<DAGNode>::iterator srcItr = srcNeighbors.begin();
+  std::vector<DAGNode>::iterator dstItr = dstNeighbors.begin();
+  size_t size                           = 0;
 
   while (srcItr != srcNeighbors.end() && dstItr != dstNeighbors.end()) {
     if (*srcItr < *dstItr) {
-    	++srcItr;
+      ++srcItr;
     } else if (*dstItr < *srcItr) {
-    	++dstItr;
+      ++dstItr;
     } else {
-    	jointNeighbors[size] = (*srcItr);
-    	size++;
-		++srcItr;
-    	++dstItr;
+      jointNeighbors[size] = (*srcItr);
+      size++;
+      ++srcItr;
+      ++dstItr;
     }
   }
   return size;
@@ -148,15 +144,17 @@ size_t intersect(std::vector<DAGNode> &jointNeighbors, std::vector<DAGNode> &src
  * \param dag is the input directed acyclic graph
  */
 
-void printDAG(DAG &dag) {
-	std::cout << "DAG: " << "\n";
-	for (DAG::iterator ii = dag.begin();  ii != dag.end(); ++ii) {
-		DAGNode src = *ii;
-		for (DAG::edge_iterator jj = dag.edge_begin(src); jj != dag.edge_end(src); ++jj) {
-			 DAGNode dst = dag.getEdgeDst(jj);
-			 std::cout << "(" << dag.getData(src) << "," << dag.getData(dst) <<")\n";
-		}
-	}
+void printDAG(DAG& dag) {
+  std::cout << "DAG: "
+            << "\n";
+  for (DAG::iterator ii = dag.begin(); ii != dag.end(); ++ii) {
+    DAGNode src = *ii;
+    for (DAG::edge_iterator jj = dag.edge_begin(src); jj != dag.edge_end(src);
+         ++jj) {
+      DAGNode dst = dag.getEdgeDst(jj);
+      std::cout << "(" << dag.getData(src) << "," << dag.getData(dst) << ")\n";
+    }
+  }
 }
 
 /**
@@ -166,18 +164,20 @@ void printDAG(DAG &dag) {
  * \param dag is a directed acyclic graph
  */
 
-void print_workitem(WorkItem &w, DAG &dag) {
-	std::cout << "\n-------------------------------------------------------- \n";
-	std::cout << "Clique: ";
-	for (std::vector<DAGNode>::iterator v=w.clique.begin(); v != w.clique.end(); ++v) {
-		std::cout << dag.getData(*v) << " ";
-	}
+void print_workitem(WorkItem& w, DAG& dag) {
+  std::cout << "\n-------------------------------------------------------- \n";
+  std::cout << "Clique: ";
+  for (std::vector<DAGNode>::iterator v = w.clique.begin(); v != w.clique.end();
+       ++v) {
+    std::cout << dag.getData(*v) << " ";
+  }
 
-	std::cout << "Neighborhood:";
-	for (std::vector<DAGNode>::iterator nitr=w.neighbors.begin(); nitr != w.neighbors.end(); ++nitr) {
-	   std::cout << dag.getData(*nitr) << " ";
-	}
-	std::cout << "\n-------------------------------------------------------- \n";
+  std::cout << "Neighborhood:";
+  for (std::vector<DAGNode>::iterator nitr = w.neighbors.begin();
+       nitr != w.neighbors.end(); ++nitr) {
+    std::cout << dag.getData(*nitr) << " ";
+  }
+  std::cout << "\n-------------------------------------------------------- \n";
 }
 
 /**
@@ -187,13 +187,14 @@ void print_workitem(WorkItem &w, DAG &dag) {
  * \param dag is a directed acyclic graph
  */
 
-void print_clique(WorkItem &w, DAG &dag) {
+void print_clique(WorkItem& w, DAG& dag) {
 
-	std::cout << "Clique: ";
-	for (std::vector<DAGNode>::iterator v=w.clique.begin(); v != w.clique.end(); ++v) {
-		std::cout << dag.getData(*v) << " ";
-	}
-	std::cout << "\n\n";
+  std::cout << "Clique: ";
+  for (std::vector<DAGNode>::iterator v = w.clique.begin(); v != w.clique.end();
+       ++v) {
+    std::cout << dag.getData(*v) << " ";
+  }
+  std::cout << "\n\n";
 }
 
 /**
@@ -204,280 +205,282 @@ void print_clique(WorkItem &w, DAG &dag) {
  * \param size the number of vertices in the neighbors to be printed
  */
 
-void print_neighbors(std::vector<DAGNode> neighbors, DAG &dag, int size) {
+void print_neighbors(std::vector<DAGNode> neighbors, DAG& dag, int size) {
 
-	int i=0;
-	std::cout << "Neighbors ";
-	for (std::vector<DAGNode>::iterator nitr=neighbors.begin(); nitr != neighbors.end() && (i<size); ++nitr, ++i) {
-		std::cout << dag.getData(*nitr) << " ";
-	}
-	std::cout << "\n";
+  int i = 0;
+  std::cout << "Neighbors ";
+  for (std::vector<DAGNode>::iterator nitr = neighbors.begin();
+       nitr != neighbors.end() && (i < size); ++nitr, ++i) {
+    std::cout << dag.getData(*nitr) << " ";
+  }
+  std::cout << "\n";
 }
 
 /**
  * This procedure computes the number of k-cliques of a given graph.
  *
  * \param k is the clique size
- * \param dag is a directed acyclic graph, which is obtained using an input graph.
+ * \param dag is a directed acyclic graph, which is obtained using an input
+ * graph.
  */
 
 void compute_kcliques(unsigned int k, DAG& dag) {
 
-	galois::InsertBag<WorkItem> items; // worklist that monitors the cliques and their neighborhood
-	galois::GAccumulator<size_t> num_kcliques; // maintains the number k cliques
+  galois::InsertBag<WorkItem>
+      items; // worklist that monitors the cliques and their neighborhood
+  galois::GAccumulator<size_t> num_kcliques; // maintains the number k cliques
 
-	//Initialize the worklist. Each work item contains a single vertex, and all its neighbors.
+  // Initialize the worklist. Each work item contains a single vertex, and all
+  // its neighbors.
 
-	galois::StatTimer TWorkInit("Work list initialization");
-	galois::StatTimer Tsort("Sorting");
-	galois::StatTimer TCliqueResize("Clique Resize");
-	galois::StatTimer TNeighborResize("Neighbor Resize");
-	galois::StatTimer TProcessWorkItem("Processing work item");
-	galois::StatTimer TProcessEdge("Processing Edges");
-	galois::StatTimer TIntersect("Neighbor Intersection");
-	galois::StatTimer TGetNeighbor("Get Neighbors");
+  galois::StatTimer TWorkInit("Work list initialization");
+  galois::StatTimer Tsort("Sorting");
+  galois::StatTimer TCliqueResize("Clique Resize");
+  galois::StatTimer TNeighborResize("Neighbor Resize");
+  galois::StatTimer TProcessWorkItem("Processing work item");
+  galois::StatTimer TProcessEdge("Processing Edges");
+  galois::StatTimer TIntersect("Neighbor Intersection");
+  galois::StatTimer TGetNeighbor("Get Neighbors");
 
-	TWorkInit.start();
-	galois::do_all(galois::iterate(dag),
-				 [&](DAGNode n) {
-					WorkItem w;
+  TWorkInit.start();
+  galois::do_all(
+      galois::iterate(dag),
+      [&](DAGNode n) {
+        WorkItem w;
 
-					TCliqueResize.start();
-					w.clique.resize(1);
-					TCliqueResize.stop();
+        TCliqueResize.start();
+        w.clique.resize(1);
+        TCliqueResize.stop();
 
-					w.clique[0]=n;
-					int neigh_size=std::distance(dag.edge_begin(n), dag.edge_end(n));
+        w.clique[0]    = n;
+        int neigh_size = std::distance(dag.edge_begin(n), dag.edge_end(n));
 
-					TNeighborResize.start();
-					w.neighbors.resize(neigh_size);
-					TNeighborResize.stop();
-					getNeighbors(n, w.neighbors, dag);
+        TNeighborResize.start();
+        w.neighbors.resize(neigh_size);
+        TNeighborResize.stop();
+        getNeighbors(n, w.neighbors, dag);
 
-					Tsort.start();
-					std::sort (w.neighbors.begin(), w.neighbors.end());
-					Tsort.stop();
-					items.push(w);
+        Tsort.start();
+        std::sort(w.neighbors.begin(), w.neighbors.end());
+        Tsort.stop();
+        items.push(w);
 
-					#ifdef DEBUG
-						print_workitem(w,dag);
-					#endif
-				 },
-				 galois::loopname("Initialize")
-				);
-	TWorkInit.stop();
+#ifdef DEBUG
+        print_workitem(w, dag);
+#endif
+      },
+      galois::loopname("Initialize"));
+  TWorkInit.stop();
 
+  // Process a work item w containing a clique C and neighbood N.
+  auto processClique = [&](WorkItem& w, auto& ctx) {
+    TProcessWorkItem.start();
 
-	//Process a work item w containing a clique C and neighbood N.
-	auto processClique = [&](WorkItem& w, auto& ctx) {
-		TProcessWorkItem.start();
+    if (w.clique.size() == k) {
+      // If the clique size is k, increment number of k-cliques by 1. No new
+      // work item is generated here.
+      num_kcliques += 1;
 
-		if(w.clique.size() == k) {
-			//If the clique size is k, increment number of k-cliques by 1. No new work item is generated here.
-			num_kcliques += 1;
+#ifdef DEBUG
+      print_clique(w, dag);
+#endif
+    } else if (w.clique.size() == k - 1) {
+      /**
+       * Clique size is k-1, so form a new clique of size k by adding a vertex
+       * from the neighborhood. So, for a neighborhood for size N, new N
+       * K-cliques are formed.
+       */
 
-			#ifdef DEBUG
-				print_clique(w,dag);
-			#endif
-		}
-		else if(w.clique.size() == k-1) {
-			/**
-			 * Clique size is k-1, so form a new clique of size k by adding a vertex from the neighborhood.
-			 * So, for a neighborhood for size N, new N K-cliques are formed.
-			 */
+#ifdef DEBUG
+      std::cout << "Processing Work Item:";
+      print_workitem(w, dag);
+#endif
 
-			#ifdef DEBUG
-				std::cout <<"Processing Work Item:";
-				print_workitem(w,dag);
-			#endif
+      for (std::vector<DAGNode>::iterator neighitr = w.neighbors.begin();
+           neighitr != w.neighbors.end(); ++neighitr) {
+        WorkItem nextItem;
 
-			for (std::vector<DAGNode>::iterator neighitr=w.neighbors.begin(); neighitr != w.neighbors.end(); ++neighitr) {
-				WorkItem nextItem;
+        TCliqueResize.start();
+        nextItem.clique.resize(w.clique.size() + 1);
+        TCliqueResize.stop();
 
-				TCliqueResize.start();
-				nextItem.clique.resize(w.clique.size()+1);
-				TCliqueResize.stop();
+        int i = 0;
+        for (std::vector<DAGNode>::iterator v = w.clique.begin();
+             v != w.clique.end(); ++v) {
+          nextItem.clique[i] = (*v);
+          i++;
+        }
+        nextItem.clique[i] = *neighitr;
 
-				int i=0;
-				for (std::vector<DAGNode>::iterator v=w.clique.begin(); v != w.clique.end(); ++v) {
-					nextItem.clique[i] = (*v);
-					i++;
-				}
-				nextItem.clique[i] = *neighitr;
+#ifdef DEBUG
+        print_clique(nextItem, dag);
+#endif
 
-				#ifdef DEBUG
-					print_clique(nextItem,dag);
-				#endif
+        num_kcliques += 1;
+      }
+    } else {
+      /**
+       * For each edge u->v present in N, construct a new work W with (C', N')
+       * and insert it into the work list where C' = C U {u,v} and N' =
+       * intersection{N, neighbors of u, neighbors of v)
+       */
 
-				num_kcliques += 1;
-			}
-		}
-		else {
-			/**
-			 * For each edge u->v present in N, construct a new work W with (C', N') and insert it into the work list
-			 * where C' = C U {u,v} and
-			 * N' = intersection{N, neighbors of u, neighbors of v)
-			 */
+      for (std::vector<DAGNode>::iterator src = w.neighbors.begin();
+           src != w.neighbors.end(); ++src) {
+        for (std::vector<DAGNode>::iterator dst = w.neighbors.begin();
+             dst != w.neighbors.end(); ++dst) {
+          if ((dag.getData(*src) != dag.getData(*dst)) &&
+              (dag.findEdge(*src, *dst) !=
+               dag.edge_end(*src, galois::MethodFlag::UNPROTECTED))) {
 
-			for (std::vector<DAGNode>::iterator src=w.neighbors.begin(); src != w.neighbors.end(); ++src) {
-				for (std::vector<DAGNode>::iterator dst=w.neighbors.begin(); dst != w.neighbors.end(); ++dst) {
-					if((dag.getData(*src) != dag.getData(*dst)) &&
-							(dag.findEdge(*src,*dst) != dag.edge_end(*src, galois::MethodFlag::UNPROTECTED))) {
+            TProcessEdge.start();
+#ifdef DEBUG
+            std::cout << "Processing Work Item:";
+            print_workitem(w, dag);
+#endif
 
-						TProcessEdge.start();
-						#ifdef DEBUG
-							std::cout <<"Processing Work Item:";
-							print_workitem(w,dag);
-						#endif
+            WorkItem nextItem;
 
-						WorkItem nextItem;
+            TCliqueResize.start();
+            nextItem.clique.resize(w.clique.size() + 2);
+            TCliqueResize.stop();
 
-						TCliqueResize.start();
-						nextItem.clique.resize(w.clique.size()+2);
-						TCliqueResize.stop();
+            int i = 0;
 
-						int i=0;
+            for (std::vector<DAGNode>::iterator itr = w.clique.begin();
+                 itr != w.clique.end(); ++itr) {
+              nextItem.clique[i] = (*itr);
+              i++;
+            }
+            nextItem.clique[i]     = *src;
+            nextItem.clique[i + 1] = *dst;
 
+            TGetNeighbor.start();
+            std::vector<DAGNode> srcNeighbors;
+            std::vector<DAGNode> dstNeighbors;
+            std::vector<DAGNode> jointNeighbors;
+            std::vector<DAGNode> tmpNeighbors;
 
-						for (std::vector<DAGNode>::iterator itr=w.clique.begin(); itr != w.clique.end(); ++itr) {
-							nextItem.clique[i] = (*itr);
-							i++;
-						}
-						nextItem.clique[i]=*src;
-						nextItem.clique[i+1]=*dst;
+            size_t srcDegree =
+                std::distance(dag.edge_begin(*src), dag.edge_end(*src));
+            size_t dstDegree =
+                std::distance(dag.edge_begin(*dst), dag.edge_end(*dst));
 
+            TGetNeighbor.stop();
 
-						TGetNeighbor.start();
-						std::vector<DAGNode> srcNeighbors;
-						std::vector<DAGNode> dstNeighbors;
-						std::vector<DAGNode> jointNeighbors;
-						std::vector<DAGNode> tmpNeighbors;
+            TNeighborResize.start();
+            srcNeighbors.resize(srcDegree);
+            dstNeighbors.resize(dstDegree);
+            tmpNeighbors.resize(std::min(srcDegree, w.neighbors.size()));
+            TNeighborResize.stop();
 
+            TGetNeighbor.start();
+            getNeighbors(*src, srcNeighbors, dag);
+            TGetNeighbor.stop();
 
-						size_t srcDegree = std::distance(dag.edge_begin(*src), dag.edge_end(*src));
-						size_t dstDegree = std::distance(dag.edge_begin(*dst), dag.edge_end(*dst));
+            Tsort.start();
+            std::sort(srcNeighbors.begin(), srcNeighbors.end());
+            Tsort.stop();
 
-						TGetNeighbor.stop();
+            getNeighbors(*dst, dstNeighbors, dag);
 
-						TNeighborResize.start();
-						srcNeighbors.resize(srcDegree);
-						dstNeighbors.resize(dstDegree);
-						tmpNeighbors.resize(std::min(srcDegree, w.neighbors.size()));
-						TNeighborResize.stop();
+            Tsort.start();
+            std::sort(dstNeighbors.begin(), dstNeighbors.end());
+            Tsort.stop();
 
-						TGetNeighbor.start();
-						getNeighbors(*src, srcNeighbors, dag);
-						TGetNeighbor.stop();
+            TIntersect.start();
+            size_t tmp_neighborsize =
+                intersect(tmpNeighbors, srcNeighbors, w.neighbors);
+            TIntersect.stop();
 
-						Tsort.start();
-						std::sort (srcNeighbors.begin(), srcNeighbors.end());
-						Tsort.stop();
+            nextItem.neighbors.resize(tmp_neighborsize);
 
+            TIntersect.start();
+            size_t nextItem_neighborsize =
+                intersect(nextItem.neighbors, dstNeighbors, tmpNeighbors);
+            TIntersect.stop();
 
-						getNeighbors(*dst, dstNeighbors, dag);
+            TNeighborResize.start();
+            nextItem.neighbors.resize(nextItem_neighborsize);
+            TNeighborResize.stop();
 
+            ctx.push(nextItem);
 
-						Tsort.start();
-						std::sort (dstNeighbors.begin(), dstNeighbors.end());
-						Tsort.stop();
+#ifdef DEBUG
+            std::cout << "Processing an edge with Source : "
+                      << dag.getData(*src)
+                      << " Destination : " << dag.getData(*dst) << "\n";
+            std::cout << "Source Neighborhood: ";
+            print_neighbors(srcNeighbors, dag, srcNeighbors.size());
+            std::cout << "Temporary Neighborhood: Intersection of Source "
+                         "Neighborhood and WorkItem Neighborhood: ";
+            print_neighbors(tmpNeighbors, dag, tmp_neighborsize);
+            std::cout << "Destination Neighborhood: ";
+            print_neighbors(dstNeighbors, dag, dstNeighbors.size());
+            std::cout << "NextItem Neighborhood: Intersection of Temporary "
+                         "Neighborhood and Destination Neighborhood: ";
+            print_neighbors(nextItem.neighbors, dag, nextItem_neighborsize);
+#endif
 
-						TIntersect.start();
-						size_t tmp_neighborsize=intersect(tmpNeighbors, srcNeighbors, w.neighbors);
-						TIntersect.stop();
+            TProcessEdge.stop();
+          }
+        }
+      }
+    }
+    TProcessWorkItem.stop();
+  };
 
-						nextItem.neighbors.resize(tmp_neighborsize);
+  // parallel loop that processes work list until it is empty.
+  galois::for_each(
+      galois::iterate(items), // initial range using initializer list
+      processClique,          // operator
+      galois::loopname("process clique"), galois::steal());
 
-
-						TIntersect.start();
-						size_t nextItem_neighborsize = intersect(nextItem.neighbors, dstNeighbors, tmpNeighbors);
-						TIntersect.stop();
-
-						TNeighborResize.start();
-						nextItem.neighbors.resize(nextItem_neighborsize);
-						TNeighborResize.stop();
-
-
-						ctx.push(nextItem);
-
-
-						#ifdef DEBUG
-							std::cout<< "Processing an edge with Source : " << dag.getData(*src) << " Destination : " << dag.getData(*dst) << "\n";
-							std::cout<< "Source Neighborhood: ";
-							print_neighbors(srcNeighbors, dag, srcNeighbors.size());
-							std::cout<< "Temporary Neighborhood: Intersection of Source Neighborhood and WorkItem Neighborhood: ";
-							print_neighbors(tmpNeighbors, dag, tmp_neighborsize);
-							std::cout<< "Destination Neighborhood: ";
-							print_neighbors(dstNeighbors, dag, dstNeighbors.size());
-							std::cout<< "NextItem Neighborhood: Intersection of Temporary Neighborhood and Destination Neighborhood: ";
-							print_neighbors(nextItem.neighbors, dag, nextItem_neighborsize);
-						#endif
-
-						TProcessEdge.stop();
-
-					}
-		   		}
-		   	}
-
-		}
-		TProcessWorkItem.stop();
-	};
-
-
-	// parallel loop that processes work list until it is empty.
-	galois::for_each(
-		 galois::iterate(items), // initial range using initializer list
-		 processClique,                   // operator
-		 galois::loopname("process clique"),
-		 galois::steal());
-
-	std::cout << "Number of K-Cliques: " << num_kcliques.reduce() << "\n";
-
+  std::cout << "Number of K-Cliques: " << num_kcliques.reduce() << "\n";
 }
 
 /*
- * For a given graph (G), it constructs a directed acyclic graph (DAG) corresponding to it.
- * The graph DAG represents a total order among the vertices of the graph G.
- * Procedure:
- * V (DAG) = V(G)
- * An edge u->v is present in DAG if
- *  (1) (u,v) is in E(G) and
- *  (2) (degree(u) < degree(v)) or (degree(u) = degree(v) and u < v)
+ * For a given graph (G), it constructs a directed acyclic graph (DAG)
+ * corresponding to it. The graph DAG represents a total order among the
+ * vertices of the graph G. Procedure: V (DAG) = V(G) An edge u->v is present in
+ * DAG if (1) (u,v) is in E(G) and (2) (degree(u) < degree(v)) or (degree(u) =
+ * degree(v) and u < v)
  *
  * \param graph is the input graph
  * \param dag is the output directed acyclic graph
  */
-void constructDAG(Graph& graph, DAG& dag){
+void constructDAG(Graph& graph, DAG& dag) {
 
-	std::vector<DAGNode> nodes;
-	nodes.resize(graph.size());
+  std::vector<DAGNode> nodes;
+  nodes.resize(graph.size());
 
-	// Creating the DAG vertices
-	galois::do_all(galois::iterate(graph),
-		  [&graph, &dag, &nodes](GNode N) {
-				int index = graph.getData(N);
-				nodes[index] = dag.createNode(index);
-				dag.addNode(nodes[index]);
-		  }	  // operator as lambda expression
-	);
+  // Creating the DAG vertices
+  galois::do_all(galois::iterate(graph),
+                 [&graph, &dag, &nodes](GNode N) {
+                   int index    = graph.getData(N);
+                   nodes[index] = dag.createNode(index);
+                   dag.addNode(nodes[index]);
+                 } // operator as lambda expression
+  );
 
-	// Adding the edges depending on the degree of source and destination.
-	galois::do_all(galois::iterate(graph),
-		  [&graph, &dag, &nodes](GNode N) {
-			  for (Graph::edge_iterator edge :
-				graph.out_edges(N, galois::MethodFlag::UNPROTECTED)) {
-					  GNode dst = graph.getEdgeDst(edge);
-					  if (lessThan(graph, N, dst )) {
-						  DAGNode srcNode = nodes[graph.getData(N)];
-						  DAGNode dstNode = nodes[graph.getData(dst)];
-						  dag.addEdge(srcNode, dstNode);
-					  }
-				  }
-		  }  // operator as lambda expression
-	);
+  // Adding the edges depending on the degree of source and destination.
+  galois::do_all(galois::iterate(graph),
+                 [&graph, &dag, &nodes](GNode N) {
+                   for (Graph::edge_iterator edge :
+                        graph.out_edges(N, galois::MethodFlag::UNPROTECTED)) {
+                     GNode dst = graph.getEdgeDst(edge);
+                     if (lessThan(graph, N, dst)) {
+                       DAGNode srcNode = nodes[graph.getData(N)];
+                       DAGNode dstNode = nodes[graph.getData(dst)];
+                       dag.addEdge(srcNode, dstNode);
+                     }
+                   }
+                 } // operator as lambda expression
+  );
 
-	#ifdef DEBUG
-		printDAG(dag);
-	#endif
+#ifdef DEBUG
+  printDAG(dag);
+#endif
 }
 
 /**
@@ -487,51 +490,50 @@ void constructDAG(Graph& graph, DAG& dag){
  */
 void readGraph(Graph& graph) {
 
-	galois::graphs::readGraph(graph, inputFilename);
-	size_t index = 0;
-	for (GNode n : graph) {
-		graph.getData(n) = index++;
-	}
+  galois::graphs::readGraph(graph, inputFilename);
+  size_t index = 0;
+  for (GNode n : graph) {
+    graph.getData(n) = index++;
+  }
 }
 
 /**
  * This is an implementation for computing number of k-cliques in a given graph.
- * It uses the edge parallel algorithm described in Danisch et al. WWW 2018 (https://dl.acm.org/citation.cfm?id=3186125).
- * It is implemented using Galois framework.
+ * It uses the edge parallel algorithm described in Danisch et al. WWW 2018
+ * (https://dl.acm.org/citation.cfm?id=3186125). It is implemented using Galois
+ * framework.
  */
 
 int main(int argc, char** argv) {
-	galois::SharedMemSys G;
-	LonestarStart(argc, argv, name, desc, url);
+  galois::SharedMemSys G;
+  LonestarStart(argc, argv, name, desc, url);
 
-	Graph graph;
-	DAG dag;
+  Graph graph;
+  DAG dag;
 
-	// Read the input Graph
-	galois::StatTimer Tinitial("GraphReadingTime");
-	Tinitial.start();
-	readGraph(graph);
-	Tinitial.stop();
+  // Read the input Graph
+  galois::StatTimer Tinitial("GraphReadingTime");
+  Tinitial.start();
+  readGraph(graph);
+  Tinitial.stop();
 
-	// Constructing a DAG from the original graph
-	galois::StatTimer Tdag("DAG Construction Time");
-	Tdag.start();
-	constructDAG(graph, dag);
-	Tdag.stop();
+  // Constructing a DAG from the original graph
+  galois::StatTimer Tdag("DAG Construction Time");
+  Tdag.start();
+  constructDAG(graph, dag);
+  Tdag.stop();
 
-	galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
-									galois::runtime::pagePoolSize());
-	galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
+                                    galois::runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
-	galois::StatTimer T;
-	T.start();
-	// the main procedure that computes k-cliques
-	compute_kcliques(clique_size, dag);
+  galois::StatTimer T;
+  T.start();
+  // the main procedure that computes k-cliques
+  compute_kcliques(clique_size, dag);
 
-	T.stop();
+  T.stop();
 
-	galois::reportPageAlloc("MeminfoPost");
-	return 0;
+  galois::reportPageAlloc("MeminfoPost");
+  return 0;
 }
-
-

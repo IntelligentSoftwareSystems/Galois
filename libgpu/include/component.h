@@ -153,8 +153,8 @@ __device__ bool ComponentSpace::unify(unsigned one, unsigned two) {
 
     unsigned boss        = twocomp;
     unsigned subordinate = onecomp;
-    // if (complen[onecomp] > complen[twocomp]) {	// one is larger, make it the
-    // representative: can create cycles.
+    // if (complen[onecomp] > complen[twocomp]) {	// one is larger, make it
+    // the representative: can create cycles.
     if (boss < subordinate) { // break cycles by id.
       boss        = onecomp;
       subordinate = twocomp;

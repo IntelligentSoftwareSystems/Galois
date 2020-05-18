@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -495,7 +495,7 @@ struct sgd_algo {
     */
 
     //	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " <<
-    //movie_host1 <<std::endl; galois::for_each(g, Process(this,g), "Process");
+    // movie_host1 <<std::endl; galois::for_each(g, Process(this,g), "Process");
     galois::for_each(g->begin(), ii, Process(this, g), "SGD Process");
     // galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
 
@@ -616,7 +616,7 @@ void runBlockSlices(Graphp g) {
       // getSystemNetworkInterface().handleReceives();
       //	std::cout << "inside create node on HOST ---> " << networkHostID <<
       //"\n"; 	if(networkHostID == 1) 	    std::cout<<"host 1 >>>>>>" <<
-      //HostIDMap[n]<<"\n";
+      // HostIDMap[n]<<"\n";
       /*Check that we have the right nodes*/
       /*	l.lock();
           mapping[item] = n;
