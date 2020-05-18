@@ -12,7 +12,6 @@ using std::vector;
  */
 class ProductionState {
 private:
-
   //! hyperedge ID
   GNode& interior;
   //! hyperedge data
@@ -41,7 +40,8 @@ public:
    * a triangle
    *
    * There's an assumption from getNeighbours that the edges will be in
-   * 0->1, 1->2, 2->0 order that getTriangleEdges from connection manager relies on.
+   * 0->1, 1->2, 2->0 order that getTriangleEdges from connection manager relies
+   * on.
    */
   ProductionState(ConnectivityManager& connManager, GNode& interior,
                   bool version2D, std::function<double(double, double)> zGetter)
@@ -55,9 +55,10 @@ public:
     for (int i = 0; i < 3; ++i) {
       auto maybeEdgeIter = edgesIterators[i];
       edgesData.push_back(
-          maybeEdgeIter ? graph.getEdgeData(maybeEdgeIter.get())
-                        : galois::optional<EdgeData>()); // TODO: Look for
-                                                         // possible optimization
+          maybeEdgeIter
+              ? graph.getEdgeData(maybeEdgeIter.get())
+              : galois::optional<EdgeData>()); // TODO: Look for
+                                               // possible optimization
       lengths.push_back(maybeEdgeIter ? edgesData[i].get().getLength() : -1);
       verticesData.push_back(
           graph.getData(vertices[i])); // TODO: Look for possible optimization

@@ -75,7 +75,8 @@ std::pair<double, double> Utils::convertToUtm(double latitude, double longitude,
   }
   if (map.getZone() != -1) {
     if (map.getZone() != zone || map.getHemisphere() != hemisphere) {
-      fprintf(stderr, "Error: All the points must be within the same UTM zone.\n");
+      fprintf(stderr,
+              "Error: All the points must be within the same UTM zone.\n");
       exit(14);
     }
   } else {

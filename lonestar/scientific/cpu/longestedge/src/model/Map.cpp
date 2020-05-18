@@ -51,18 +51,24 @@ double Map::get_height(double lon, double lat, bool convert) {
   // modf returns the fractional part of the number,
   // and assigns the integral part to the second argument.
   //
-  // The integral part let us know in which "cell" of the map the point is located,
-  // and the fractional part let us interpolate the heights.
+  // The integral part let us know in which "cell" of the map the point is
+  // located, and the fractional part let us interpolate the heights.
   double x_grid_int_part, y_grid_int_part;
-  const auto y_fract = std::modf((north_border - y) / cell_length, &y_grid_int_part );
-  const auto x_fract = std::modf((x - west_border) / cell_width,  &x_grid_int_part);
+  const auto y_fract =
+      std::modf((north_border - y) / cell_length, &y_grid_int_part);
+  const auto x_fract =
+      std::modf((x - west_border) / cell_width, &x_grid_int_part);
 
   // using Lagrange bilinear interpolation
   // Compute the height of the four corners
-  double top_left_height     = get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 1);
-  double top_right_height    = get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 2);
-  double bottom_right_height = get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 3);
-  double bottom_left_height  = get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 4);
+  double top_left_height =
+      get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 1);
+  double top_right_height =
+      get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 2);
+  double bottom_right_height =
+      get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 3);
+  double bottom_left_height =
+      get_height_wo_interpol(x_grid_int_part, y_grid_int_part, 4);
 
   // Sum the contributions of each corner
   double height = 0.;
@@ -75,10 +81,11 @@ double Map::get_height(double lon, double lat, bool convert) {
 }
 
 // corner: 1 - top_left, 2 - top_right, 3 - bottom_right, 4 - bottom_left
-double Map::get_height_wo_interpol(const double lon_grid, const double lat_grid, const int corner) {
+double Map::get_height_wo_interpol(const double lon_grid, const double lat_grid,
+                                   const int corner) {
 
-  auto x = (int)lon_grid; 
-  auto y = (int)lat_grid; 
+  auto x = (int)lon_grid;
+  auto y = (int)lat_grid;
 
   switch (corner) {
   case 1:
@@ -94,7 +101,7 @@ double Map::get_height_wo_interpol(const double lon_grid, const double lat_grid,
     ++y;
     break;
   default:
-    //XXX[AOS]: I think we should raise an error, unless it is used elsewhere.
+    // XXX[AOS]: I think we should raise an error, unless it is used elsewhere.
     return MINDOUBLE;
   }
 

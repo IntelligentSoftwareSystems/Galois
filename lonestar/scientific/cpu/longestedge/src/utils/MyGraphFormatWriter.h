@@ -16,9 +16,10 @@ private:
                                    const set<Edge>& edges, const string& path) {
     std::ofstream file;
     file.open(path);
-    printNodes(vertices, "N,n", [](NodeData n) { return n.isHanging(); }, file);
-    printNodes(interiors, "H,h", [](NodeData n) { return n.isToRefine(); },
-               file);
+    printNodes(
+        vertices, "N,n", [](NodeData n) { return n.isHanging(); }, file);
+    printNodes(
+        interiors, "H,h", [](NodeData n) { return n.isToRefine(); }, file);
     printEdges(edges, file);
     file.close();
   }

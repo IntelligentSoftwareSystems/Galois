@@ -33,9 +33,9 @@ namespace cll = llvm::cl;
 static const char* name = "Longest edge mesh generator";
 static const char* desc = "Implementation of Rivara's Longest Edge algorithm "
                           "based on hyper-graph grammars.";
-static const char* url  = "longest_edge";
+static const char* url = "longest_edge";
 
-//Command line arguments
+// Command line arguments
 static cll::opt<std::string> dataDir("data", cll::Positional,
                                      cll::desc("Directory with data files"));
 static cll::opt<std::string> output("o", cll::Positional,
@@ -47,8 +47,7 @@ static cll::opt<int>
 static cll::opt<bool>
     version2D("version2D",
               cll::desc("Calculate distances using only XY coordinates"));
-static cll::opt<int> steps("s", cll::Positional,
-                           cll::desc("Number of steps"));
+static cll::opt<int> steps("s", cll::Positional, cll::desc("Number of steps"));
 static cll::opt<double> N("N", cll::desc("Latitude of north border"));
 static cll::opt<double> S("S", cll::desc("Latitude of south border"));
 static cll::opt<double> E("E", cll::desc("Longitude of east border"));
@@ -67,7 +66,8 @@ static cll::opt<char> hemisphere("hemisphere",
 static cll::opt<bool> altOutput(
     "altOutput",
     cll::desc("Write to .ele,.node,.poly files instead of AVS UCD (.inp)"));
-static cll::opt<bool> display("display", cll::desc("Use external visualizator."));
+static cll::opt<bool> display("display",
+                              cll::desc("Use external visualizator."));
 
 void afterStep(int i, Graph& graph);
 
@@ -92,7 +92,6 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre2");
 
   galois::gInfo("Initial configuration set.");
-
 
   Map* map;
 
@@ -125,8 +124,10 @@ int main(int argc, char** argv) {
     Convert_UTM_To_Geodetic(zone, hemisphere, W, N, &y3, &x3);
     Convert_UTM_To_Geodetic(zone, hemisphere, W, S, &y4, &x4);
 
-    std::tie(W, E) = std::minmax({Utils::r2d(x1), Utils::r2d(x2), Utils::r2d(x3), Utils::r2d(x4)});
-    std::tie(S, N) = std::minmax({Utils::r2d(y1), Utils::r2d(y2), Utils::r2d(y3), Utils::r2d(y4)});
+    std::tie(W, E) = std::minmax(
+        {Utils::r2d(x1), Utils::r2d(x2), Utils::r2d(x3), Utils::r2d(x4)});
+    std::tie(S, N) = std::minmax(
+        {Utils::r2d(y1), Utils::r2d(y2), Utils::r2d(y3), Utils::r2d(y4)});
 
     // Create the map
     SrtmReader reader;
@@ -135,17 +136,17 @@ int main(int argc, char** argv) {
     map = reader.read(W, N, E, S, dataDir.c_str());
     galois::gInfo("Terrain data read.");
 
-
     map->setZone(zone);
     map->setHemisphere(hemisphere);
 
-    // Update the coordinates of all graph nodes (mesh nodes, and the interior nodes)
+    // Update the coordinates of all graph nodes (mesh nodes, and the interior
+    // nodes)
     for (auto node : graph) {
-            const auto coords = node->getData().getCoords();
+      const auto coords = node->getData().getCoords();
 
-            node->getData().setCoords(Coordinates{coords.getX(), coords.getY(), *map});
+      node->getData().setCoords(
+          Coordinates{coords.getX(), coords.getY(), *map});
     }
-
   }
 
   // initialize wrapper over graph object (ConnManager)
@@ -216,14 +217,14 @@ int main(int argc, char** argv) {
   galois::gInfo("All steps finished.");
 
   // final result writing
- if (!output.empty()) {
-   if (altOutput) {
-     triangleFormatWriter(output, graph);
-   } else {
-     inpWriter(output + ".inp", graph);
-   }
-   galois::gInfo("Graph written to file ", output);
- }
+  if (!output.empty()) {
+    if (altOutput) {
+      triangleFormatWriter(output, graph);
+    } else {
+      inpWriter(output + ".inp", graph);
+    }
+    galois::gInfo("Graph written to file ", output);
+  }
 
   if (display) {
     system((std::string("./display.sh ") + output).c_str());
@@ -240,6 +241,4 @@ bool basicCondition(const Graph& graph, GNode& node) {
 }
 
 //! Writes intermediate data to file
-void afterStep(int step, Graph& graph) {
-
-}
+void afterStep(int step, Graph& graph) {}

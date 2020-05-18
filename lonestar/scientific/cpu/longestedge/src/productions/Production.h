@@ -46,7 +46,6 @@ protected:
            !less(lengths[2] + lengths[3], lengths[1]);
   }
 
-
   //! vertices of an edge
   //! assumption: edges connect vertices that have adjacent IDs
   std::pair<int, int> getEdgeVertices(int edge) const {
@@ -55,9 +54,7 @@ protected:
 
   //! get the vertex not connected to the edge
   //! assumption: edges are 0->1, 1->2, 2->0
-  int getNeutralVertex(int edgeToBreak) const {
-    return (edgeToBreak + 2) % 3;
-  }
+  int getNeutralVertex(int edgeToBreak) const { return (edgeToBreak + 2) % 3; }
 
   void breakElementWithHangingNode(int edgeToBreak, ProductionState& pState,
                                    galois::UserContext<GNode>& ctx) const {
@@ -89,7 +86,6 @@ protected:
   }
 
 private:
-
   //! Creates a new node on an edge + its endpoints; does not
   //! create corresponding hyperedges
   GNode createNodeOnEdge(int edgeToBreak, ProductionState& pState,
@@ -114,12 +110,11 @@ private:
     connManager.removeEdge(pState.getVertices()[edgeVertices.first],
                            pState.getVertices()[edgeVertices.second]);
 
-    // new point is midway point; height comes from terrain 
+    // new point is midway point; height comes from terrain
     const Coordinates& newPointCoords = getNewPointCoords(
         pState.getVerticesData()[edgeVertices.first].getCoords(),
         pState.getVerticesData()[edgeVertices.second].getCoords(),
         pState.getZGetter());
-
 
     // create the new node, push to graph and worklist
     // note: border nodes are never hanging; hanging means it needs to be
@@ -133,7 +128,7 @@ private:
     for (int i = 0; i < 3; ++i) {
       auto vertexData = pState.getVerticesData()[i];
       // addition of the new edge
-      auto edge       = graph.addEdge(newNode, pState.getVertices()[i]);
+      auto edge = graph.addEdge(newNode, pState.getVertices()[i]);
 
       graph.getEdgeData(edge).setBorder(i != neutralVertex ? breakingOnBorder
                                                            : false);
@@ -156,8 +151,8 @@ private:
                              galois::UserContext<GNode>& ctx) const {
     const std::pair<int, int>& brokenEdgeVertices =
         getEdgeVertices(edgeToBreak);
-    Graph& graph       = connManager.getGraph();
-    int neutralVertex  = getNeutralVertex(edgeToBreak);
+    Graph& graph      = connManager.getGraph();
+    int neutralVertex = getNeutralVertex(edgeToBreak);
     // newly added hangingnode
     NodeData hNodeData = hangingNode->getData();
     double length      = 0;

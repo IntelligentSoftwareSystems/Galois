@@ -26,21 +26,20 @@ Map* SrtmReader::read(
   const auto map_E_border = (double)east_border_int / VALUES_IN_DEGREE;
   const auto map_W_border = (double)west_border_int / VALUES_IN_DEGREE;
 
-  size_t cols       = (size_t)(east_border_int - west_border_int);
-  size_t rows       = (size_t)(north_border_int - south_border_int);
+  size_t cols = (size_t)(east_border_int - west_border_int);
+  size_t rows = (size_t)(north_border_int - south_border_int);
   // mallocs an entire grid of doubles based on borders; to be read in later
   // from disk
   double** map_data = Map::init_map_data(rows, cols);
   Map* map          = new Map(map_data, cols, rows, 1. / VALUES_IN_DEGREE,
                      1. / VALUES_IN_DEGREE);
 
-
   map->setNorthBorder(map_N_border);
   map->setWestBorder(map_W_border);
 
   // read in points within specified borders
-  read_from_multiple_files(map_W_border, map_N_border, map_E_border, map_S_border,
-                           map_dir, map_data);
+  read_from_multiple_files(map_W_border, map_N_border, map_E_border,
+                           map_S_border, map_dir, map_data);
 
   skip_outliers(map_data, map->getLength(), map->getWidth());
 

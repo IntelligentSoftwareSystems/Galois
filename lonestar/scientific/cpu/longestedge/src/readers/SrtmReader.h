@@ -45,7 +45,7 @@ private:
 
 public:
   static const int VALUES_IN_DEGREE = 60 * 60 / RESOLUTION;
-  static const int MARGIN = 3;
+  static const int MARGIN           = 3;
 
   Map* read(const double west_border, const double north_border,
             const double east_border, const double south_border,

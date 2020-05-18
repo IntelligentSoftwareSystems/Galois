@@ -1,27 +1,27 @@
 #ifndef POLARST_H
-  #define POLARST_H
+#define POLARST_H
 /***************************************************************************/
-/* RSC IDENTIFIER: POLAR STEREOGRAPHIC 
+/* RSC IDENTIFIER: POLAR STEREOGRAPHIC
  *
  *
  * ABSTRACT
  *
  *    This component provides conversions between geodetic (latitude and
- *    longitude) coordinates and Polar Stereographic (easting and northing) 
+ *    longitude) coordinates and Polar Stereographic (easting and northing)
  *    coordinates.
  *
  * ERROR HANDLING
  *
- *    This component checks parameters for valid values.  If an invalid 
- *    value is found the error code is combined with the current error code 
- *    using the bitwise or.  This combining allows multiple error codes to 
+ *    This component checks parameters for valid values.  If an invalid
+ *    value is found the error code is combined with the current error code
+ *    using the bitwise or.  This combining allows multiple error codes to
  *    be returned. The possible error codes are:
  *
  *          POLAR_NO_ERROR           : No errors occurred in function
  *          POLAR_LAT_ERROR          : Latitude outside of valid range
  *                                      (-90 to 90 degrees)
  *          POLAR_LON_ERROR          : Longitude outside of valid range
- *                                      (-180 to 360 degrees) 
+ *                                      (-180 to 360 degrees)
  *          POLAR_ORIGIN_LAT_ERROR   : Latitude of true scale outside of valid
  *                                      range (-90 to 90 degrees)
  *          POLAR_ORIGIN_LON_ERROR   : Longitude down from pole outside of valid
@@ -35,14 +35,14 @@
  *          POLAR_RADIUS_ERROR       : Coordinates too far from pole,
  *                                      depending on ellipsoid and
  *                                      projection parameters
- *          POLAR_A_ERROR            : Semi-major axis less than or equal to zero
- *          POLAR_INV_F_ERROR        : Inverse flattening outside of valid range
- *								  	                  (250 to 350)
+ *          POLAR_A_ERROR            : Semi-major axis less than or equal to
+ *zero POLAR_INV_F_ERROR        : Inverse flattening outside of valid range (250
+ *to 350)
  *
  *
  * REUSE NOTES
  *
- *    POLAR STEREOGRAPHIC is intended for reuse by any application that  
+ *    POLAR STEREOGRAPHIC is intended for reuse by any application that
  *    performs a Polar Stereographic projection.
  *
  *
@@ -88,22 +88,21 @@
  *
  */
 
-
 /**********************************************************************/
 /*
  *                        DEFINES
  */
 
-  #define POLAR_NO_ERROR                0x0000
-  #define POLAR_LAT_ERROR               0x0001
-  #define POLAR_LON_ERROR               0x0002
-  #define POLAR_ORIGIN_LAT_ERROR        0x0004
-  #define POLAR_ORIGIN_LON_ERROR        0x0008
-  #define POLAR_EASTING_ERROR			  0x0010
-  #define POLAR_NORTHING_ERROR		  0x0020
-  #define POLAR_A_ERROR                 0x0040
-  #define POLAR_INV_F_ERROR             0x0080
-  #define POLAR_RADIUS_ERROR            0x0100
+#define POLAR_NO_ERROR 0x0000
+#define POLAR_LAT_ERROR 0x0001
+#define POLAR_LON_ERROR 0x0002
+#define POLAR_ORIGIN_LAT_ERROR 0x0004
+#define POLAR_ORIGIN_LON_ERROR 0x0008
+#define POLAR_EASTING_ERROR 0x0010
+#define POLAR_NORTHING_ERROR 0x0020
+#define POLAR_A_ERROR 0x0040
+#define POLAR_INV_F_ERROR 0x0080
+#define POLAR_RADIUS_ERROR 0x0100
 
 /**********************************************************************/
 /*
@@ -111,17 +110,16 @@
  */
 
 /* ensure proper linkage to c++ programs */
-  #ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-  #endif
+#endif
 
-  long Set_Polar_Stereographic_Parameters (double a,
-                                           double f,
-                                           double Latitude_of_True_Scale,
-                                           double Longitude_Down_from_Pole,
-                                           double False_Easting,
-                                           double False_Northing);
-/*  
+long Set_Polar_Stereographic_Parameters(double a, double f,
+                                        double Latitude_of_True_Scale,
+                                        double Longitude_Down_from_Pole,
+                                        double False_Easting,
+                                        double False_Northing);
+/*
  *  The function Set_Polar_Stereographic_Parameters receives the ellipsoid
  *  parameters and Polar Stereograpic projection parameters as inputs, and
  *  sets the corresponding state variables.  If any errors occur, error
@@ -135,13 +133,11 @@ extern "C" {
  *  False_Northing   : Northing (Y) at center of projection, in meters (input)
  */
 
-
-  void Get_Polar_Stereographic_Parameters (double *a,
-                                           double *f,
-                                           double *Latitude_of_True_Scale,
-                                           double *Longitude_Down_from_Pole,
-                                           double *False_Easting,
-                                           double *False_Northing);
+void Get_Polar_Stereographic_Parameters(double* a, double* f,
+                                        double* Latitude_of_True_Scale,
+                                        double* Longitude_Down_from_Pole,
+                                        double* False_Easting,
+                                        double* False_Northing);
 /*
  * The function Get_Polar_Stereographic_Parameters returns the current
  * ellipsoid parameters and Polar projection parameters.
@@ -154,11 +150,8 @@ extern "C" {
  *  False_Northing   : Northing (Y) at center of projection, in meters (output)
  */
 
-
-  long Convert_Geodetic_To_Polar_Stereographic (double Latitude,
-                                                double Longitude,
-                                                double *Easting,
-                                                double *Northing);
+long Convert_Geodetic_To_Polar_Stereographic(double Latitude, double Longitude,
+                                             double* Easting, double* Northing);
 /*
  * The function Convert_Geodetic_To_Polar_Stereographic converts geodetic
  * coordinates (latitude and longitude) to Polar Stereographic coordinates
@@ -172,12 +165,9 @@ extern "C" {
  *    Northing   :  Northing (Y), in meters                   (output)
  */
 
-
-
-  long Convert_Polar_Stereographic_To_Geodetic (double Easting,
-                                                double Northing,
-                                                double *Latitude,
-                                                double *Longitude);
+long Convert_Polar_Stereographic_To_Geodetic(double Easting, double Northing,
+                                             double* Latitude,
+                                             double* Longitude);
 
 /*
  *  The function Convert_Polar_Stereographic_To_Geodetic converts Polar
@@ -194,9 +184,8 @@ extern "C" {
  *
  */
 
-  #ifdef __cplusplus
+#ifdef __cplusplus
 }
-  #endif
+#endif
 
-#endif  /* POLARST_H  */
-
+#endif /* POLARST_H  */

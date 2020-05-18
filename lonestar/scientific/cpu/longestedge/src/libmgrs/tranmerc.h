@@ -1,19 +1,19 @@
 #ifndef TRANMERC_H
-  #define TRANMERC_H
+#define TRANMERC_H
 
 /***************************************************************************/
 /* RSC IDENTIFIER: TRANSVERSE MERCATOR
  *
  * ABSTRACT
  *
- *    This component provides conversions between Geodetic coordinates 
+ *    This component provides conversions between Geodetic coordinates
  *    (latitude and longitude) and Transverse Mercator projection coordinates
  *    (easting and northing).
  *
  * ERROR HANDLING
  *
  *    This component checks parameters for valid values.  If an invalid value
- *    is found the error code is combined with the current error code using 
+ *    is found the error code is combined with the current error code using
  *    the bitwise or.  This combining allows multiple error codes to be
  *    returned. The possible error codes are:
  *
@@ -33,25 +33,25 @@
  *                                      (-90 to 90 degrees)
  *       TRANMERC_CENT_MER_ERROR     : Central meridian outside of valid range
  *                                      (-180 to 360 degrees)
- *       TRANMERC_A_ERROR            : Semi-major axis less than or equal to zero
- *       TRANMERC_INV_F_ERROR        : Inverse flattening outside of valid range
+ *       TRANMERC_A_ERROR            : Semi-major axis less than or equal to
+ *zero TRANMERC_INV_F_ERROR        : Inverse flattening outside of valid range
  *								  	                  (250 to 350)
  *       TRANMERC_SCALE_FACTOR_ERROR : Scale factor outside of valid
  *                                     range (0.3 to 3.0)
- *		 TM_LON_WARNING              : Distortion will result if longitude is more
- *                                      than 9 degrees from the Central Meridian
+ *		 TM_LON_WARNING              : Distortion will result if longitude is
+ *more than 9 degrees from the Central Meridian
  *
  * REUSE NOTES
  *
- *    TRANSVERSE MERCATOR is intended for reuse by any application that 
+ *    TRANSVERSE MERCATOR is intended for reuse by any application that
  *    performs a Transverse Mercator projection or its inverse.
- *    
+ *
  * REFERENCES
  *
- *    Further information on TRANSVERSE MERCATOR can be found in the 
+ *    Further information on TRANSVERSE MERCATOR can be found in the
  *    Reuse Manual.
  *
- *    TRANSVERSE MERCATOR originated from :  
+ *    TRANSVERSE MERCATOR originated from :
  *                      U.S. Army Topographic Engineering Center
  *                      Geospatial Information Division
  *                      7701 Telegraph Road
@@ -67,7 +67,7 @@
  *
  * ENVIRONMENT
  *
- *    TRANSVERSE MERCATOR was tested and certified in the following 
+ *    TRANSVERSE MERCATOR was tested and certified in the following
  *    environments:
  *
  *    1. Solaris 2.5 with GCC, version 2.8.1
@@ -82,24 +82,22 @@
  *
  */
 
-
 /***************************************************************************/
 /*
  *                              DEFINES
  */
 
-  #define TRANMERC_NO_ERROR           0x0000
-  #define TRANMERC_LAT_ERROR          0x0001
-  #define TRANMERC_LON_ERROR          0x0002
-  #define TRANMERC_EASTING_ERROR      0x0004
-  #define TRANMERC_NORTHING_ERROR     0x0008
-  #define TRANMERC_ORIGIN_LAT_ERROR   0x0010
-  #define TRANMERC_CENT_MER_ERROR     0x0020
-  #define TRANMERC_A_ERROR            0x0040
-  #define TRANMERC_INV_F_ERROR        0x0080
-  #define TRANMERC_SCALE_FACTOR_ERROR 0x0100
-  #define TRANMERC_LON_WARNING        0x0200
-
+#define TRANMERC_NO_ERROR 0x0000
+#define TRANMERC_LAT_ERROR 0x0001
+#define TRANMERC_LON_ERROR 0x0002
+#define TRANMERC_EASTING_ERROR 0x0004
+#define TRANMERC_NORTHING_ERROR 0x0008
+#define TRANMERC_ORIGIN_LAT_ERROR 0x0010
+#define TRANMERC_CENT_MER_ERROR 0x0020
+#define TRANMERC_A_ERROR 0x0040
+#define TRANMERC_INV_F_ERROR 0x0080
+#define TRANMERC_SCALE_FACTOR_ERROR 0x0100
+#define TRANMERC_LON_WARNING 0x0200
 
 /***************************************************************************/
 /*
@@ -108,18 +106,13 @@
  */
 
 /* ensure proper linkage to c++ programs */
-  #ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-  #endif
+#endif
 
-
-  long Set_Transverse_Mercator_Parameters(double a,      
-                                          double f,
-                                          double Origin_Latitude,
-                                          double Central_Meridian,
-                                          double False_Easting,
-                                          double False_Northing,
-                                          double Scale_Factor);
+long Set_Transverse_Mercator_Parameters(
+    double a, double f, double Origin_Latitude, double Central_Meridian,
+    double False_Easting, double False_Northing, double Scale_Factor);
 /*
  * The function Set_Tranverse_Mercator_Parameters receives the ellipsoid
  * parameters and Tranverse Mercator projection parameters as inputs, and
@@ -135,17 +128,12 @@ extern "C" {
  *                         projection
  *    False_Easting     : Easting/X at the center of the projection  (input)
  *    False_Northing    : Northing/Y at the center of the projection (input)
- *    Scale_Factor      : Projection scale factor                    (input) 
+ *    Scale_Factor      : Projection scale factor                    (input)
  */
 
-
-  void Get_Transverse_Mercator_Parameters(double *a,
-                                          double *f,
-                                          double *Origin_Latitude,
-                                          double *Central_Meridian,
-                                          double *False_Easting,
-                                          double *False_Northing,
-                                          double *Scale_Factor);
+void Get_Transverse_Mercator_Parameters(
+    double* a, double* f, double* Origin_Latitude, double* Central_Meridian,
+    double* False_Easting, double* False_Northing, double* Scale_Factor);
 /*
  * The function Get_Transverse_Mercator_Parameters returns the current
  * ellipsoid and Transverse Mercator projection parameters.
@@ -158,14 +146,11 @@ extern "C" {
  *                         projection
  *    False_Easting     : Easting/X at the center of the projection  (output)
  *    False_Northing    : Northing/Y at the center of the projection (output)
- *    Scale_Factor      : Projection scale factor                    (output) 
+ *    Scale_Factor      : Projection scale factor                    (output)
  */
 
-
-  long Convert_Geodetic_To_Transverse_Mercator (double Latitude,
-                                                double Longitude,
-                                                double *Easting,
-                                                double *Northing);
+long Convert_Geodetic_To_Transverse_Mercator(double Latitude, double Longitude,
+                                             double* Easting, double* Northing);
 
 /*
  * The function Convert_Geodetic_To_Transverse_Mercator converts geodetic
@@ -181,11 +166,9 @@ extern "C" {
  *    Northing      : Northing/Y in meters                        (output)
  */
 
-
-  long Convert_Transverse_Mercator_To_Geodetic (double Easting,
-                                                double Northing,
-                                                double *Latitude,
-                                                double *Longitude);
+long Convert_Transverse_Mercator_To_Geodetic(double Easting, double Northing,
+                                             double* Latitude,
+                                             double* Longitude);
 
 /*
  * The function Convert_Transverse_Mercator_To_Geodetic converts Transverse
@@ -201,9 +184,8 @@ extern "C" {
  *    Longitude     : Longitude in radians                        (output)
  */
 
-
-  #ifdef __cplusplus
+#ifdef __cplusplus
 }
-  #endif
+#endif
 
 #endif /* TRANMERC_H */

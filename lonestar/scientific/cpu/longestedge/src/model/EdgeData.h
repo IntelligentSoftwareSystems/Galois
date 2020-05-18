@@ -6,8 +6,8 @@
 
 class EdgeData {
 private:
-  bool border; //!< tells if this is a border edge
-  double length; //!< length
+  bool border;             //!< tells if this is a border edge
+  double length;           //!< length
   Coordinates middlePoint; //!< point at middle of this edge
 
 public:

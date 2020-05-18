@@ -7,9 +7,9 @@
 class ConnectivityManager {
 private:
   Graph& graph;
+
 public:
   ConnectivityManager(Graph& graph) : graph(graph) {}
-
 
   //! Return a vector of neighbors given some vertex
   std::vector<GNode> getNeighbours(GNode node) const {

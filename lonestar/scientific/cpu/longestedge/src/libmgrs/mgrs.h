@@ -1,37 +1,35 @@
 #ifndef MGRS_H
-  #define MGRS_H
-
+#define MGRS_H
 
 #ifdef _WIN32
-#   define USE_DLL   __declspec(dllexport)
+#define USE_DLL __declspec(dllexport)
 #else
-#   define USE_DLL
+#define USE_DLL
 #endif
-
 
 /***************************************************************************/
 /* RSC IDENTIFIER:  MGRS
  *
  * ABSTRACT
  *
- *    This component converts between geodetic coordinates (latitude and 
- *    longitude) and Military Grid Reference System (MGRS) coordinates. 
+ *    This component converts between geodetic coordinates (latitude and
+ *    longitude) and Military Grid Reference System (MGRS) coordinates.
  *
  * ERROR HANDLING
  *
  *    This component checks parameters for valid values.  If an invalid value
- *    is found, the error code is combined with the current error code using 
+ *    is found, the error code is combined with the current error code using
  *    the bitwise or.  This combining allows multiple error codes to be
  *    returned. The possible error codes are:
  *
  *          MGRS_NO_ERROR          : No errors occurred in function
- *          MGRS_LAT_ERROR         : Latitude outside of valid range 
+ *          MGRS_LAT_ERROR         : Latitude outside of valid range
  *                                    (-90 to 90 degrees)
  *          MGRS_LON_ERROR         : Longitude outside of valid range
  *                                    (-180 to 360 degrees)
  *          MGRS_STR_ERROR         : An MGRS string error: string too long,
  *                                    too short, or badly formed
- *          MGRS_PRECISION_ERROR   : The precision must be between 0 and 5 
+ *          MGRS_PRECISION_ERROR   : The precision must be between 0 and 5
  *                                    inclusive.
  *          MGRS_A_ERROR           : Semi-major axis less than or equal to zero
  *          MGRS_INV_F_ERROR       : Inverse flattening outside of valid range
@@ -82,25 +80,23 @@
  *
  */
 
-
 /***************************************************************************/
 /*
  *                              DEFINES
  */
 
-  #define MGRS_NO_ERROR                0x0000
-  #define MGRS_LAT_ERROR               0x0001
-  #define MGRS_LON_ERROR               0x0002
-  #define MGRS_STRING_ERROR            0x0004
-  #define MGRS_PRECISION_ERROR         0x0008
-  #define MGRS_A_ERROR                 0x0010
-  #define MGRS_INV_F_ERROR             0x0020
-  #define MGRS_EASTING_ERROR           0x0040
-  #define MGRS_NORTHING_ERROR          0x0080
-  #define MGRS_ZONE_ERROR              0x0100
-  #define MGRS_HEMISPHERE_ERROR        0x0200
-  #define MGRS_LAT_WARNING             0x0400
-
+#define MGRS_NO_ERROR 0x0000
+#define MGRS_LAT_ERROR 0x0001
+#define MGRS_LON_ERROR 0x0002
+#define MGRS_STRING_ERROR 0x0004
+#define MGRS_PRECISION_ERROR 0x0008
+#define MGRS_A_ERROR 0x0010
+#define MGRS_INV_F_ERROR 0x0020
+#define MGRS_EASTING_ERROR 0x0040
+#define MGRS_NORTHING_ERROR 0x0080
+#define MGRS_ZONE_ERROR 0x0100
+#define MGRS_HEMISPHERE_ERROR 0x0200
+#define MGRS_LAT_WARNING 0x0400
 
 /***************************************************************************/
 /*
@@ -108,14 +104,11 @@
  */
 
 /* ensure proper linkage to c++ programs */
-  #ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-  #endif
+#endif
 
-
-  long USE_DLL Set_MGRS_Parameters(double a,
-                           double f,
-                           char   *Ellipsoid_Code);
+long USE_DLL Set_MGRS_Parameters(double a, double f, char* Ellipsoid_Code);
 /*
  * The function Set_MGRS_Parameters receives the ellipsoid parameters and sets
  * the corresponding state variables. If any errors occur, the error code(s)
@@ -126,10 +119,7 @@ extern "C" {
  *   Ellipsoid_Code   : 2-letter code for ellipsoid            (input)
  */
 
-
-  void USE_DLL Get_MGRS_Parameters(double *a,
-                           double *f,
-                           char   *Ellipsoid_Code);
+void USE_DLL Get_MGRS_Parameters(double* a, double* f, char* Ellipsoid_Code);
 /*
  * The function Get_MGRS_Parameters returns the current ellipsoid
  * parameters.
@@ -139,50 +129,40 @@ extern "C" {
  *  Ellipsoid_Code   : 2-letter code for ellipsoid             (output)
  */
 
-
-  long USE_DLL Convert_Geodetic_To_MGRS (double Latitude,
-                                 double Longitude,
-                                 long   Precision,
-                                 char *MGRS);
+long USE_DLL Convert_Geodetic_To_MGRS(double Latitude, double Longitude,
+                                      long Precision, char* MGRS);
 /*
  * The function Convert_Geodetic_To_MGRS converts geodetic (latitude and
- * longitude) coordinates to an MGRS coordinate string, according to the 
- * current ellipsoid parameters.  If any errors occur, the error code(s) 
+ * longitude) coordinates to an MGRS coordinate string, according to the
+ * current ellipsoid parameters.  If any errors occur, the error code(s)
  * are returned by the  function, otherwise MGRS_NO_ERROR is returned.
  *
  *    Latitude   : Latitude in radians              (input)
  *    Longitude  : Longitude in radians             (input)
  *    Precision  : Precision level of MGRS string   (input)
  *    MGRS       : MGRS coordinate string           (output)
- *  
+ *
  */
 
-
-  long USE_DLL Convert_MGRS_To_Geodetic (char *MGRS,
-                                 double *Latitude,
-                                 double *Longitude);
+long USE_DLL Convert_MGRS_To_Geodetic(char* MGRS, double* Latitude,
+                                      double* Longitude);
 /*
  * This function converts an MGRS coordinate string to Geodetic (latitude
- * and longitude in radians) coordinates.  If any errors occur, the error 
- * code(s) are returned by the  function, otherwise MGRS_NO_ERROR is returned.  
+ * and longitude in radians) coordinates.  If any errors occur, the error
+ * code(s) are returned by the  function, otherwise MGRS_NO_ERROR is returned.
  *
  *    MGRS       : MGRS coordinate string           (input)
  *    Latitude   : Latitude in radians              (output)
  *    Longitude  : Longitude in radians             (output)
- *  
+ *
  */
 
-
-  long USE_DLL Convert_UTM_To_MGRS (long Zone,
-                            char Hemisphere,
-                            double Easting,
-                            double Northing,
-                            long Precision,
-                            char *MGRS);
+long USE_DLL Convert_UTM_To_MGRS(long Zone, char Hemisphere, double Easting,
+                                 double Northing, long Precision, char* MGRS);
 /*
  * The function Convert_UTM_To_MGRS converts UTM (zone, easting, and
- * northing) coordinates to an MGRS coordinate string, according to the 
- * current ellipsoid parameters.  If any errors occur, the error code(s) 
+ * northing) coordinates to an MGRS coordinate string, according to the
+ * current ellipsoid parameters.  If any errors occur, the error code(s)
  * are returned by the  function, otherwise MGRS_NO_ERROR is returned.
  *
  *    Zone       : UTM zone                         (input)
@@ -193,17 +173,13 @@ extern "C" {
  *    MGRS       : MGRS coordinate string           (output)
  */
 
-
-  long USE_DLL Convert_MGRS_To_UTM (char   *MGRS,
-                            long   *Zone,
-                            char   *Hemisphere,
-                            double *Easting,
-                            double *Northing); 
+long USE_DLL Convert_MGRS_To_UTM(char* MGRS, long* Zone, char* Hemisphere,
+                                 double* Easting, double* Northing);
 /*
  * The function Convert_MGRS_To_UTM converts an MGRS coordinate string
- * to UTM projection (zone, hemisphere, easting and northing) coordinates 
- * according to the current ellipsoid parameters.  If any errors occur, 
- * the error code(s) are returned by the function, otherwise UTM_NO_ERROR 
+ * to UTM projection (zone, hemisphere, easting and northing) coordinates
+ * according to the current ellipsoid parameters.  If any errors occur,
+ * the error code(s) are returned by the function, otherwise UTM_NO_ERROR
  * is returned.
  *
  *    MGRS       : MGRS coordinate string           (input)
@@ -213,19 +189,14 @@ extern "C" {
  *    Northing   : Northing (Y) in meters           (output)
  */
 
-
-
-  long USE_DLL Convert_UPS_To_MGRS ( char   Hemisphere,
-                             double Easting,
-                             double Northing,
-                             long Precision,
-                             char *MGRS);
+long USE_DLL Convert_UPS_To_MGRS(char Hemisphere, double Easting,
+                                 double Northing, long Precision, char* MGRS);
 
 /*
- *  The function Convert_UPS_To_MGRS converts UPS (hemisphere, easting, 
- *  and northing) coordinates to an MGRS coordinate string according to 
+ *  The function Convert_UPS_To_MGRS converts UPS (hemisphere, easting,
+ *  and northing) coordinates to an MGRS coordinate string according to
  *  the current ellipsoid parameters.  If any errors occur, the error
- *  code(s) are returned by the function, otherwise UPS_NO_ERROR is 
+ *  code(s) are returned by the function, otherwise UPS_NO_ERROR is
  *  returned.
  *
  *    Hemisphere    : Hemisphere either 'N' or 'S'     (input)
@@ -235,15 +206,12 @@ extern "C" {
  *    MGRS          : MGRS coordinate string           (output)
  */
 
-
-  long USE_DLL Convert_MGRS_To_UPS ( char   *MGRS,
-                             char   *Hemisphere,
-                             double *Easting,
-                             double *Northing);
+long USE_DLL Convert_MGRS_To_UPS(char* MGRS, char* Hemisphere, double* Easting,
+                                 double* Northing);
 /*
  *  The function Convert_MGRS_To_UPS converts an MGRS coordinate string
- *  to UPS (hemisphere, easting, and northing) coordinates, according 
- *  to the current ellipsoid parameters. If any errors occur, the error 
+ *  to UPS (hemisphere, easting, and northing) coordinates, according
+ *  to the current ellipsoid parameters. If any errors occur, the error
  *  code(s) are returned by the function, otherwide UPS_NO_ERROR is returned.
  *
  *    MGRS          : MGRS coordinate string           (input)
@@ -252,11 +220,11 @@ extern "C" {
  *    Northing      : Northing/Y in meters             (output)
  */
 
-  void initlibmgrs();
-  void PyInit_libmgrs();
+void initlibmgrs();
+void PyInit_libmgrs();
 
-  #ifdef __cplusplus
+#ifdef __cplusplus
 }
-  #endif
+#endif
 
 #endif /* MGRS_H */

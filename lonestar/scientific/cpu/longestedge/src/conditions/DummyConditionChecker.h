@@ -7,7 +7,6 @@
 //! returns true
 class DummyConditionChecker : ConditionChecker {
 public:
-
   //! Sets refinement and returns true for hyperedge nodes
   bool execute(GNode& node) override {
     NodeData& nodeData = node->getData();

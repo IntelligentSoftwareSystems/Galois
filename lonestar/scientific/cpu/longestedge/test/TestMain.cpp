@@ -9,4 +9,4 @@
 #include "utils/UtilsTest.cpp"
 #include "model/MapTest.cpp"
 
-#endif //GALOIS_TESTMAIN_H
+#endif // GALOIS_TESTMAIN_H

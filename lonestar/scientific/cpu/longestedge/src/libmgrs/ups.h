@@ -1,5 +1,5 @@
 #ifndef UPS_H
-  #define UPS_H
+#define UPS_H
 /********************************************************************/
 /* RSC IDENTIFIER: UPS
  *
@@ -13,10 +13,10 @@
  *
  * ERROR HANDLING
  *
- *    This component checks parameters for valid values.  If an 
- *    invalid value is found the error code is combined with the 
- *    current error code using the bitwise or.  This combining allows  
- *    multiple error codes to be returned. The possible error codes 
+ *    This component checks parameters for valid values.  If an
+ *    invalid value is found the error code is combined with the
+ *    current error code using the bitwise or.  This combining allows
+ *    multiple error codes to be returned. The possible error codes
  *    are:
  *
  *         UPS_NO_ERROR           : No errors occurred in function
@@ -79,21 +79,19 @@
  *
  */
 
-
 /**********************************************************************/
 /*
  *                        DEFINES
  */
 
-  #define UPS_NO_ERROR                0x0000
-  #define UPS_LAT_ERROR               0x0001
-  #define UPS_LON_ERROR               0x0002
-  #define UPS_HEMISPHERE_ERROR        0x0004
-  #define UPS_EASTING_ERROR           0x0008
-  #define UPS_NORTHING_ERROR          0x0010
-  #define UPS_A_ERROR                 0x0020
-  #define UPS_INV_F_ERROR             0x0040
-
+#define UPS_NO_ERROR 0x0000
+#define UPS_LAT_ERROR 0x0001
+#define UPS_LON_ERROR 0x0002
+#define UPS_HEMISPHERE_ERROR 0x0004
+#define UPS_EASTING_ERROR 0x0008
+#define UPS_NORTHING_ERROR 0x0010
+#define UPS_A_ERROR 0x0020
+#define UPS_INV_F_ERROR 0x0040
 
 /**********************************************************************/
 /*
@@ -102,12 +100,11 @@
  */
 
 /* ensure proper linkage to c++ programs */
-  #ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-  #endif
+#endif
 
-  long Set_UPS_Parameters( double a,
-                           double f);
+long Set_UPS_Parameters(double a, double f);
 /*
  * The function SET_UPS_PARAMETERS receives the ellipsoid parameters and sets
  * the corresponding state variables. If any errors occur, the error code(s)
@@ -117,9 +114,7 @@ extern "C" {
  *   f     : Flattening of ellipsoid                (input)
  */
 
-
-  void Get_UPS_Parameters( double *a,
-                           double *f);
+void Get_UPS_Parameters(double* a, double* f);
 /*
  * The function Get_UPS_Parameters returns the current ellipsoid parameters.
  *
@@ -127,17 +122,14 @@ extern "C" {
  *  f      : Flattening of ellipsoid                 (output)
  */
 
-
-  long Convert_Geodetic_To_UPS ( double Latitude,
-                                 double Longitude,
-                                 char   *Hemisphere,
-                                 double *Easting,
-                                 double *Northing);
+long Convert_Geodetic_To_UPS(double Latitude, double Longitude,
+                             char* Hemisphere, double* Easting,
+                             double* Northing);
 /*
  *  The function Convert_Geodetic_To_UPS converts geodetic (latitude and
  *  longitude) coordinates to UPS (hemisphere, easting, and northing)
- *  coordinates, according to the current ellipsoid parameters. If any 
- *  errors occur, the error code(s) are returned by the function, 
+ *  coordinates, according to the current ellipsoid parameters. If any
+ *  errors occur, the error code(s) are returned by the function,
  *  otherwide UPS_NO_ERROR is returned.
  *
  *    Latitude      : Latitude in radians                       (input)
@@ -147,18 +139,14 @@ extern "C" {
  *    Northing      : Northing/Y in meters                      (output)
  */
 
-
-  long Convert_UPS_To_Geodetic(char   Hemisphere,
-                               double Easting,
-                               double Northing,
-                               double *Latitude,
-                               double *Longitude);
+long Convert_UPS_To_Geodetic(char Hemisphere, double Easting, double Northing,
+                             double* Latitude, double* Longitude);
 
 /*
- *  The function Convert_UPS_To_Geodetic converts UPS (hemisphere, easting, 
+ *  The function Convert_UPS_To_Geodetic converts UPS (hemisphere, easting,
  *  and northing) coordinates to geodetic (latitude and longitude) coordinates
- *  according to the current ellipsoid parameters.  If any errors occur, the 
- *  error code(s) are returned by the function, otherwise UPS_NO_ERROR is 
+ *  according to the current ellipsoid parameters.  If any errors occur, the
+ *  error code(s) are returned by the function, otherwise UPS_NO_ERROR is
  *  returned.
  *
  *    Hemisphere    : Hemisphere either 'N' or 'S'              (input)
@@ -168,8 +156,8 @@ extern "C" {
  *    Longitude     : Longitude in radians                      (output)
  */
 
-  #ifdef __cplusplus
+#ifdef __cplusplus
 }
-  #endif
+#endif
 
-#endif  /* UPS_H  */
+#endif /* UPS_H  */

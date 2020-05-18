@@ -5,8 +5,8 @@
 #include "NodeData.h"
 #include "EdgeData.h"
 
-using Graph = galois::graphs::MorphGraph<NodeData, EdgeData, false>;
-using GNode = Graph::GraphNode;
+using Graph        = galois::graphs::MorphGraph<NodeData, EdgeData, false>;
+using GNode        = Graph::GraphNode;
 using EdgeIterator = Graph::edge_iterator;
 using galois::optional;
 

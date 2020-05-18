@@ -17,14 +17,12 @@ public:
                                    ConnectivityManager& connManager, Map& map)
       : tolerance(tolerance), connManager(connManager), map(map) {}
 
-
   //! Only refine if meets inside_condition + is hyperedge node
   bool execute(GNode& node) override {
     NodeData& nodeData = node->getData();
     if (!nodeData.isHyperEdge()) {
       return false;
     }
-
 
     // gets coordinates of vertices connected by this hyperedge
     vector<Coordinates> verticesCoords = connManager.getVerticesCoords(node);
@@ -42,8 +40,7 @@ private:
   ConnectivityManager& connManager;
   Map& map;
 
-  bool inside_condition(
-      const vector<Coordinates>& verticesCoords) {
+  bool inside_condition(const vector<Coordinates>& verticesCoords) {
 
     // lowest x among 3
     double lowest_x = verticesCoords[0].getX() < verticesCoords[1].getX()

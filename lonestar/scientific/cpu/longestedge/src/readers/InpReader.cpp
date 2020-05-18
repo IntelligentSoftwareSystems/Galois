@@ -87,7 +87,7 @@ void inpRead(const std::string& filename, Graph& graph, double N, double S,
         inpEdge{std::min(conc2, conc3), std::max(conc2, conc3)},
         inpEdge{std::min(conc3, conc1), std::max(conc3, conc1)}};
 
-    for (const auto &edge : edges) {
+    for (const auto& edge : edges) {
       if (edgeSet.insert(edge).second) {
         // First time it's inserted we assume it's on the boundary.
         isEdgeBoundary[edge] = true;
@@ -100,7 +100,7 @@ void inpRead(const std::string& filename, Graph& graph, double N, double S,
   }
 
   // Finally, generate edges
-  for (const auto &edge : edgeSet) {
+  for (const auto& edge : edgeSet) {
     auto node1 = nodes[edge.first];
     auto node2 = nodes[edge.second];
 

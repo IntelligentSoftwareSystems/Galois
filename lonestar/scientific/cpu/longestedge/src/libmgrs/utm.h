@@ -1,19 +1,19 @@
 #ifndef UTM_H
-  #define UTM_H
+#define UTM_H
 
 /***************************************************************************/
 /* RSC IDENTIFIER: UTM
  *
  * ABSTRACT
  *
- *    This component provides conversions between geodetic coordinates 
+ *    This component provides conversions between geodetic coordinates
  *    (latitude and longitudes) and Universal Transverse Mercator (UTM)
  *    projection (zone, hemisphere, easting, and northing) coordinates.
  *
  * ERROR HANDLING
  *
  *    This component checks parameters for valid values.  If an invalid value
- *    is found, the error code is combined with the current error code using 
+ *    is found, the error code is combined with the current error code using
  *    the bitwise or.  This combining allows multiple error codes to be
  *    returned. The possible error codes are:
  *
@@ -38,7 +38,7 @@
  *
  *    UTM is intended for reuse by any application that performs a Universal
  *    Transverse Mercator (UTM) projection or its inverse.
- *    
+ *
  * REFERENCES
  *
  *    Further information on UTM can be found in the Reuse Manual.
@@ -71,23 +71,21 @@
  *
  */
 
-
 /***************************************************************************/
 /*
  *                              DEFINES
  */
 
-  #define UTM_NO_ERROR            0x0000
-  #define UTM_LAT_ERROR           0x0001
-  #define UTM_LON_ERROR           0x0002
-  #define UTM_EASTING_ERROR       0x0004
-  #define UTM_NORTHING_ERROR      0x0008
-  #define UTM_ZONE_ERROR          0x0010
-  #define UTM_HEMISPHERE_ERROR    0x0020
-  #define UTM_ZONE_OVERRIDE_ERROR 0x0040
-  #define UTM_A_ERROR             0x0080
-  #define UTM_INV_F_ERROR         0x0100
-
+#define UTM_NO_ERROR 0x0000
+#define UTM_LAT_ERROR 0x0001
+#define UTM_LON_ERROR 0x0002
+#define UTM_EASTING_ERROR 0x0004
+#define UTM_NORTHING_ERROR 0x0008
+#define UTM_ZONE_ERROR 0x0010
+#define UTM_HEMISPHERE_ERROR 0x0020
+#define UTM_ZONE_OVERRIDE_ERROR 0x0040
+#define UTM_A_ERROR 0x0080
+#define UTM_INV_F_ERROR 0x0100
 
 /***************************************************************************/
 /*
@@ -96,17 +94,15 @@
  */
 
 /* ensure proper linkage to c++ programs */
-  #ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-  #endif
+#endif
 
-  long Set_UTM_Parameters(double a,      
-                          double f,
-                          long   override);
+long Set_UTM_Parameters(double a, double f, long override);
 /*
  * The function Set_UTM_Parameters receives the ellipsoid parameters and
  * UTM zone override parameter as inputs, and sets the corresponding state
- * variables.  If any errors occur, the error code(s) are returned by the 
+ * variables.  If any errors occur, the error code(s) are returned by the
  * function, otherwise UTM_NO_ERROR is returned.
  *
  *    a                 : Semi-major axis of ellipsoid, in meters       (input)
@@ -114,10 +110,7 @@ extern "C" {
  *    override          : UTM override zone, zero indicates no override (input)
  */
 
-
-  void Get_UTM_Parameters(double *a,
-                          double *f,
-                          long   *override);
+void Get_UTM_Parameters(double* a, double* f, long* override);
 /*
  * The function Get_UTM_Parameters returns the current ellipsoid
  * parameters and UTM zone override parameter.
@@ -127,13 +120,9 @@ extern "C" {
  *    override          : UTM override zone, zero indicates no override (output)
  */
 
-
-  long Convert_Geodetic_To_UTM (double Latitude,
-                                double Longitude,
-                                long   *Zone,
-                                char   *Hemisphere,
-                                double *Easting,
-                                double *Northing); 
+long Convert_Geodetic_To_UTM(double Latitude, double Longitude, long* Zone,
+                             char* Hemisphere, double* Easting,
+                             double* Northing);
 /*
  * The function Convert_Geodetic_To_UTM converts geodetic (latitude and
  * longitude) coordinates to UTM projection (zone, hemisphere, easting and
@@ -149,15 +138,11 @@ extern "C" {
  *    Northing          : Northing (Y) in meters              (output)
  */
 
-
-  long Convert_UTM_To_Geodetic(long   Zone,
-                               char   Hemisphere,
-                               double Easting,
-                               double Northing,
-                               double *Latitude,
-                               double *Longitude);
+long Convert_UTM_To_Geodetic(long Zone, char Hemisphere, double Easting,
+                             double Northing, double* Latitude,
+                             double* Longitude);
 /*
- * The function Convert_UTM_To_Geodetic converts UTM projection (zone, 
+ * The function Convert_UTM_To_Geodetic converts UTM projection (zone,
  * hemisphere, easting and northing) coordinates to geodetic(latitude
  * and  longitude) coordinates, according to the current ellipsoid
  * parameters.  If any errors occur, the error code(s) are returned
@@ -171,8 +156,8 @@ extern "C" {
  *    Longitude         : Longitude in radians                   (output)
  */
 
-  #ifdef __cplusplus
+#ifdef __cplusplus
 }
-  #endif
+#endif
 
 #endif /* UTM_H */

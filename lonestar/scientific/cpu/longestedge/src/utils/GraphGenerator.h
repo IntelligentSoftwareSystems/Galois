@@ -5,7 +5,6 @@
 
 class GraphGenerator {
 public:
-
   static void generateSampleGraphWithDataWithConversionToUtm(
       Graph& graph, Map& map, const double west_border,
       const double north_border, const double east_border,
@@ -33,7 +32,7 @@ public:
         Coordinates{Utils::convertToUtm(north_border, east_border, map), map};
 
     std::vector<Coordinates> coords;
-    if(!square) {
+    if (!square) {
       coords.push_back(coordinates0);
       coords.push_back(coordinates1);
       coords.push_back(coordinates2);
@@ -41,11 +40,11 @@ public:
     } else {
       double north = std::min(coordinates1.getY(), coordinates3.getY());
       double south = std::max(coordinates0.getY(), coordinates2.getY());
-      double east = std::min(coordinates2.getX(), coordinates3.getX());
-      double west = std::max(coordinates0.getX(), coordinates1.getX());
-      double diff = std::min(fabs(north - south), fabs(east - west));
-      north = south + diff;
-      east = west + diff;
+      double east  = std::min(coordinates2.getX(), coordinates3.getX());
+      double west  = std::max(coordinates0.getX(), coordinates1.getX());
+      double diff  = std::min(fabs(north - south), fabs(east - west));
+      north        = south + diff;
+      east         = west + diff;
       coords.emplace_back(west, south, map);
       coords.emplace_back(west, north, map);
       coords.emplace_back(east, south, map);
@@ -54,24 +53,20 @@ public:
 
     // create the node points for the border intersections
     // NOT a hyperedge or a hanging node (because border points)
-    nodes.push_back(
-        connManager.createNode(NodeData{false, coords[0], false}));
-    nodes.push_back(
-        connManager.createNode(NodeData{false, coords[1], false}));
-    nodes.push_back(
-        connManager.createNode(NodeData{false, coords[2], false}));
-    nodes.push_back(
-        connManager.createNode(NodeData{false, coords[3], false}));
+    nodes.push_back(connManager.createNode(NodeData{false, coords[0], false}));
+    nodes.push_back(connManager.createNode(NodeData{false, coords[1], false}));
+    nodes.push_back(connManager.createNode(NodeData{false, coords[2], false}));
+    nodes.push_back(connManager.createNode(NodeData{false, coords[3], false}));
     galois::gInfo("Nodes created.");
 
-    //nodes.push_back(connManager.createNode(NodeData{false,
-    //Coordinates{west_border, south_border}, false}));
-    //nodes.push_back(connManager.createNode(NodeData{false,
-    //Coordinates{west_border, north_border}, false}));
-    //nodes.push_back(connManager.createNode(NodeData{false,
-    //Coordinates{east_border, south_border}, false}));
-    //nodes.push_back(connManager.createNode(NodeData{false,
-    //Coordinates{east_border, north_border}, false}));
+    // nodes.push_back(connManager.createNode(NodeData{false,
+    // Coordinates{west_border, south_border}, false}));
+    // nodes.push_back(connManager.createNode(NodeData{false,
+    // Coordinates{west_border, north_border}, false}));
+    // nodes.push_back(connManager.createNode(NodeData{false,
+    // Coordinates{east_border, south_border}, false}));
+    // nodes.push_back(connManager.createNode(NodeData{false,
+    // Coordinates{east_border, north_border}, false}));
 
     // 0 = SW, 1 = NW, 2 = SE, 3 = NE
     double leftBorderLength = nodes[0]->getData().getCoords().dist(
@@ -207,7 +202,6 @@ public:
     connManager.createInterior(nodes[0], nodes[1], nodes[3]);
     connManager.createInterior(nodes[0], nodes[3], nodes[2]);
   }
-
 };
 
 #endif // GALOIS_GRAPHGENERATOR_H
