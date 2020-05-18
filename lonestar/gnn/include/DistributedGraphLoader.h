@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,17 +42,18 @@ namespace graphs {
 
 //! enums of partitioning schemes supported
 enum PARTITIONING_SCHEME {
-  OEC,                   //!< outgoing edge cut
-  IEC,                   //!< incoming edge cut
-  HOVC,                  //!< outgoing hybrid vertex cut
-  HIVC,                  //!< incoming hybrid vertex cut
-  CART_VCUT,             //!< cartesian vertex cut
-  CART_VCUT_IEC,         //!< cartesian vertex cut using iec
-  GINGER_O,              //!< Ginger, outgoing
-  GINGER_I,              //!< Ginger, incoming
-  FENNEL_O,              //!< Fennel, oec
-  FENNEL_I,              //!< Fennel, iec
-  SUGAR_O                //!< Sugar, oec
+  OEC,           //!< outgoing edge cut
+  IEC,           //!< incoming edge cut
+  HOVC,          //!< outgoing hybrid vertex cut
+  HIVC,          //!< incoming hybrid vertex cut
+  CART_VCUT,     //!< cartesian vertex cut
+  CART_VCUT_IEC, //!< cartesian vertex cut using iec
+  GINGER_O,      //!< Ginger, outgoing
+  GINGER_I,      //!< Ginger, incoming
+  FENNEL_O,      //!< Fennel, oec
+  FENNEL_I,      //!< Fennel, iec
+  SUGAR_O,       //!< Sugar, oec
+  GNN_OEC        //!< gnn, oec
 };
 
 /**
@@ -85,6 +86,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "fennel-iec";
   case SUGAR_O:
     return "sugar-oec";
+  case GNN_OEC:
+    return "gnn-oec";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -121,8 +124,7 @@ namespace graphs {
  * loaded based on command line arguments
  */
 template <typename NodeData, typename EdgeData>
-DistGraph<NodeData, EdgeData>*
-constructSymmetricGraph(std::vector<unsigned>&) {
+DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&) {
   std::string inputFile = deepgalois::path + dataset + ".csgr";
   galois::gInfo("File to read is ", inputFile);
 
@@ -130,36 +132,19 @@ constructSymmetricGraph(std::vector<unsigned>&) {
   case OEC:
   case IEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
   case HOVC:
   case HIVC:
     return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
 
   case CART_VCUT:
   case CART_VCUT_IEC:
     return cuspPartitionGraph<GenericCVC, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
-
-  case GINGER_O:
-  case GINGER_I:
-    return cuspPartitionGraph<GingerP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
-
-  case FENNEL_O:
-  case FENNEL_I:
-    return cuspPartitionGraph<FennelP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
-
-  case SUGAR_O:
-    return cuspPartitionGraph<SugarP, NodeData, EdgeData>(
-      inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, ""
-    );
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+  case GNN_OEC:
+    return cuspPartitionGraph<GnnOEC, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;

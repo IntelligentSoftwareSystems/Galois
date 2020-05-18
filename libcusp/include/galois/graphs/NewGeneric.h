@@ -73,6 +73,28 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
   uint32_t nodesToReceive;
 
+  std::vector<uint32_t> getGNNBreakpoints(std::string filename) {
+    // contains 2 numbers: begin and end of test
+    // everything else can be split evenly among hosts as they are not
+    // performance critical
+    std::vector<uint32_t> bps;
+
+    // if through all possible GNN outputs
+    if (filename.find("cora") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(140);
+    } else if (filename.find("reddit") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(153431);
+    } else if (filename.find("ppi") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(9716);
+    }
+    // TODO hardcode the rest
+
+    return bps;
+  }
+
 public:
   //! typedef for base DistGraph class
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
@@ -173,6 +195,7 @@ public:
     }
 
     galois::graphs::OfflineGraph g(filename);
+
     base_DistGraph::numGlobalNodes = g.size();
     base_DistGraph::numGlobalEdges = g.sizeEdges();
     std::vector<unsigned> dummy;
@@ -189,6 +212,41 @@ public:
                         base_DistGraph::numGlobalEdges);
     // TODO abstract this away somehow
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
+
+    // get training nodes and split evenly among hosts
+    std::vector<uint32_t> trainPoints = this->getGNNBreakpoints(filename);
+    if (!trainPoints.empty()) {
+      std::vector<unsigned> testDistribution =
+          galois::graphs::determineUnitRangesFromPrefixSum(
+              base_DistGraph::numHosts, g, trainPoints[0], trainPoints[1]);
+
+      std::vector<unsigned> restDistribution =
+          galois::graphs::determineUnitRangesFromPrefixSum(
+              base_DistGraph::numHosts, g, trainPoints[1], g.size());
+
+      // create global distribution of edges
+      std::vector<uint32_t> mappings(g.size());
+      galois::do_all(
+          galois::iterate((size_t)0, (size_t)base_DistGraph::numHosts),
+          [&](size_t h) {
+            // test
+            uint32_t hCur = testDistribution[h];
+            uint32_t hEnd = testDistribution[h + 1];
+            for (; hCur < hEnd; hCur++) {
+              mappings[hCur] = h;
+            }
+            // the rest
+            hCur = restDistribution[h];
+            hEnd = restDistribution[h + 1];
+            for (; hCur < hEnd; hCur++) {
+              mappings[hCur] = h;
+            }
+          });
+      bool validPart = graphPartitioner->predeterminedMapping(mappings);
+      if (!validPart) {
+        galois::gWarn("partitioning policy used doesn't use trainpoints");
+      }
+    }
 
     uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
     typename galois::graphs::OfflineGraph::edge_iterator edgeBegin =

@@ -909,4 +909,51 @@ public:
   }
 };
 
+class GnnOEC : public galois::graphs::CustomMasterAssignment {
+public:
+  GnnOEC(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
+         uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges){};
+
+  template <typename EdgeTy>
+  uint32_t getMaster(uint32_t src, galois::graphs::BufferedGraph<EdgeTy>&,
+                     const std::vector<uint32_t>&,
+                     std::unordered_map<uint64_t, uint32_t>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&) {
+    // this is expected to be set
+    return _globalHostMap[src];
+  }
+
+  uint32_t retrieveMaster(uint32_t gid) const { return _globalHostMap[gid]; }
+
+  //! outgoing edge cut
+  uint32_t getEdgeOwner(uint32_t src, uint32_t, uint64_t) const {
+    return retrieveMaster(src);
+  }
+
+  bool noCommunication() { return false; }
+  bool isVertexCut() const { return false; }
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(0u, 0u);
+  }
+
+  bool predeterminedMapping(std::vector<uint32_t>& mappings) {
+    if (mappings.size() != _numNodes) {
+      GALOIS_DIE("predetermined mapping size not equal to num nodes");
+    }
+    _globalHostMap.resize(_numNodes);
+
+    galois::do_all(galois::iterate((size_t)0, mappings.size()),
+                   [&](size_t n) { _globalHostMap[n] = mappings[n]; });
+
+    return true;
+  }
+};
+
 #endif

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of the 3-Clause BSD License (a
- * copy is located in LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of the 3-Clause BSD
+ * License (a copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2019, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,17 +32,11 @@ namespace cll = llvm::cl;
 
 cll::opt<PARTITIONING_SCHEME> partitionScheme(
     "partition", cll::desc("Type of partitioning."),
-    cll::values(
-        clEnumValN(OEC, "oec", "Outgoing Edge-Cut (default)"),
-        clEnumValN(IEC, "iec", "Incoming Edge-Cut"),
-        clEnumValN(HOVC, "hovc", "Outgoing Hybrid Vertex-Cut"),
-        clEnumValN(HIVC, "hivc", "Incoming Hybrid Vertex-Cut"),
-        clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
-        clEnumValN(CART_VCUT_IEC, "cvc-iec", "Cartesian Vertex-Cut of iec"),
-        //clEnumValN(CEC, "cec", "Custom edge cut from vertexID mapping"),
-        clEnumValN(GINGER_O, "ginger-o", "ginger, outgiong edges, using CuSP"),
-        clEnumValN(GINGER_I, "ginger-i", "ginger, incoming edges, using CuSP"),
-        clEnumValN(FENNEL_O, "fennel-o", "fennel, outgoing edge cut, using CuSP"),
-        clEnumValN(FENNEL_I, "fennel-i", "fennel, incoming edge cut, using CuSP"),
-        clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using CuSP")),
-    cll::init(OEC));
+    cll::values(clEnumValN(OEC, "oec", "Outgoing Edge-Cut (default)"),
+                clEnumValN(IEC, "iec", "Incoming Edge-Cut"),
+                clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
+                clEnumValN(CART_VCUT_IEC, "cvc-iec",
+                           "Cartesian Vertex-Cut of iec"),
+                clEnumValN(GNN_OEC, "g-oec",
+                           "gnn oec: train nodes evenly distributed")),
+    cll::init(GNN_OEC));

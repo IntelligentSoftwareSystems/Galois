@@ -65,6 +65,8 @@ public:
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
   }
+
+  bool predeterminedMapping(std::vector<uint32_t>&) { return false; }
 };
 
 /**
@@ -149,8 +151,13 @@ protected:
   char _status; //!< Specifies what phase of master assignment partitioner is on
   //! Metadata for determining where a node's master is
   std::vector<uint32_t> _localNodeToMaster;
-  //! Map GID to its master
+  //! Map GID to its master; only for nodes we own
   std::unordered_map<uint64_t, uint32_t> _gid2masters;
+  //! Unlike gid2masters, this contains a mapping in vector form of ALL mappings
+  //! for all nodes in the graph instead of just local ones; only used if it is
+  //! known exactly where everything ends up before partitioning
+  std::vector<uint32_t> _globalHostMap;
+
   //! This host's node offset (each host reads a distinct contiguous portion
   //! of graph
   uint64_t _nodeOffset;
@@ -183,6 +190,8 @@ public:
    * mapping is not found but instead returns -1 if in stage 1, else
    * fails.
    *
+   * ONLY WORKS IF GID IS ON LOCAL HOST ELSE WILL FAIL
+   *
    * @param gid GID to get master of
    * @returns Master of specified GID, -1, unsigned, if not found
    */
@@ -202,11 +211,13 @@ public:
         } else {
           // NOT FOUND (not necessarily a bad thing, and required for
           // some cases)
-          galois::gDebug("[", _hostID, "] ", gid, " not found!");
+          galois::gDebug("[", _hostID, "] ", gid,
+                         " not found for retrieveMaster!");
           if (_status == 2) {
             // die if we expect all gids to be mapped already (stage 2)
             GALOIS_DIE("should not fail to find a GID after stage 2 "
-                       "of master assignment phase");
+                       "of master assignment phase; that or passed in gid that"
+                       " doesn't exist on this host");
           }
           return (uint32_t)-1;
         }
