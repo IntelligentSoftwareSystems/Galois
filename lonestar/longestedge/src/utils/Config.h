@@ -36,12 +36,14 @@ public:
 
   std::string output;
 
+  bool square;
+
   Config(int argc, char** argv)
-      : tolerance(5), version2D(false), steps(11), cores(-1), display(false),
-        N(50.2), S(49.9), E(20.2), W(19.7), dataDir("data"), ascii(false),
+      : tolerance(50), version2D(false), steps(8), cores(-1), display(false),
+        N(52.4), S(49.), E(23.1), W(18.1), dataDir("data"), ascii(false),
         asciiFile(""), inputMeshFile(""), zone(34), hemisphere('N'),
         output(std::string("graph") +
-               std::to_string(galois::getActiveThreads()) + ".mgf") {
+               std::to_string(galois::getActiveThreads())), square(true) {
     parseArguments(argc, argv);
   }
 

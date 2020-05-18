@@ -85,7 +85,8 @@ int main(int argc, char** argv) {
 
 
     GraphGenerator::generateSampleGraphWithDataWithConversionToUtm(
-      graph, *map, config.W, config.N, config.E, config.S, config.version2D);
+      graph, *map, config.W, config.N, config.E, config.S, config.version2D,
+          config.square);
 
   galois::gInfo("Initial graph generated");
   } else {
@@ -193,7 +194,7 @@ int main(int argc, char** argv) {
           // Write the inp file
 //          inpWriter("output_" + std::to_string(j) + ".inp", graph);
     }
-    
+
     step.stop();
     galois::gInfo("Step ", j, " finished.");
   }
@@ -204,6 +205,7 @@ int main(int argc, char** argv) {
    galois::gInfo("Graph written to file ", config.output);
 
   triangleFormatWriter(config.output, graph);
+  inpWriter("inp.inp", graph);
 
   if (config.display) {
     system((std::string("./display.sh ") + config.output).c_str());
