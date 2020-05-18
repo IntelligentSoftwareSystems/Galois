@@ -16,6 +16,7 @@
 #include "readers/SrtmReader.h"
 #include "utils/Config.h"
 #include "writers/InpWriter.h"
+#include "writers/TriangleFormatWriter.h"
 #include "utils/ConnectivityManager.h"
 #include "utils/GraphGenerator.h"
 #include "utils/MyGraphFormatWriter.h"
@@ -190,7 +191,7 @@ int main(int argc, char** argv) {
           },
           galois::loopname(("step" + std::to_string(j)).c_str()));
           // Write the inp file
-          inpWriter("output_" + std::to_string(j) + ".inp", graph);
+//          inpWriter("output_" + std::to_string(j) + ".inp", graph);
     }
     
     step.stop();
@@ -200,10 +201,9 @@ int main(int argc, char** argv) {
 
   // final result writing
   // MyGraphFormatWriter::writeToFile(graph, config.output);
-  // galois::gInfo("Graph written to file ", config.output);
+   galois::gInfo("Graph written to file ", config.output);
 
-
-  inpWriter("output_test.inp", graph);
+  triangleFormatWriter(config.output, graph);
 
   if (config.display) {
     system((std::string("./display.sh ") + config.output).c_str());
