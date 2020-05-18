@@ -23,7 +23,7 @@ private:
 
   double west_border;
 
-  bool utm; // TODO: Consider moving it to some better place
+  bool utm;
 
   long zone;
 
@@ -35,7 +35,7 @@ public:
   Map(double** data, size_t width, size_t length, double cellWidth,
       double cellLength)
       : width(width), length(length), cell_width(cellWidth),
-        cell_length(cellLength), data(data), utm(true) {}
+        cell_length(cellLength), data(data), utm(true), zone(-1) {}
 
   static double** init_map_data(size_t rows, size_t cols);
 
