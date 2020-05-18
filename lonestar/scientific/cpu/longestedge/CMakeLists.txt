@@ -1,6 +1,4 @@
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-error>")
-endif()
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-error>")
 
 add_executable(longestedge src/LongestEdge.cpp src/model/Map.cpp
                src/readers/SrtmReader.cpp src/readers/AsciiReader.cpp
