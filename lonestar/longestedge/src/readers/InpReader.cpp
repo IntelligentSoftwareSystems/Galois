@@ -1,12 +1,7 @@
 #include "InpReader.h"
 
-#include "../model/Coordinates.h"
-#include "../model/Graph.h"
-#include "../model/NodeData.h"
-#include "../utils/Config.h"
 #include "../utils/ConnectivityManager.h"
 
-#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -19,15 +14,16 @@
 
 using inpEdge = std::pair<size_t, size_t>;
 
-void inpRead(const std::string& filename, Graph& graph, Config& config) {
+void inpRead(const std::string& filename, Graph& graph, double N, double S,
+             double E, double W, bool version2D) {
 
   auto connManager = ConnectivityManager{graph};
 
   // First, assign corners to max and min values
-  config.E = std::numeric_limits<double>::lowest();
-  config.N = std::numeric_limits<double>::lowest();
-  config.S = std::numeric_limits<double>::max();
-  config.W = std::numeric_limits<double>::max();
+  E = std::numeric_limits<double>::lowest();
+  N = std::numeric_limits<double>::lowest();
+  S = std::numeric_limits<double>::max();
+  W = std::numeric_limits<double>::max();
 
   std::ifstream file(filename, std::ios_base::in);
 
@@ -60,10 +56,10 @@ void inpRead(const std::string& filename, Graph& graph, Config& config) {
     nodes[i] = connManager.createNode(NodeData{false, coordinates, false});
 
     // Update the four corners
-    config.N = std::max(y, config.N);
-    config.S = std::min(y, config.S);
-    config.E = std::max(x, config.E);
-    config.W = std::min(x, config.W);
+    N = std::max(y, N);
+    S = std::min(y, S);
+    E = std::max(x, E);
+    W = std::min(x, W);
   }
 
   // Containers for edges
@@ -113,7 +109,7 @@ void inpRead(const std::string& filename, Graph& graph, Config& config) {
 
     auto midPointCoords = (node1Coords + node2Coords) / 2.;
 
-    const auto length = node1Coords.dist(node2Coords, config.version2D);
+    const auto length = node1Coords.dist(node2Coords, version2D);
 
     connManager.createEdge(node1, node2, isEdgeBoundary.at(edge),
                            midPointCoords, length);

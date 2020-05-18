@@ -2,7 +2,6 @@
 #define INP_READER_H
 
 #include "../model/Graph.h"
-#include "../utils/Config.h"
 
 #include <string>
 
@@ -13,6 +12,7 @@
 //! \param config Config object. The four corners E, W, N, S are populated in the function. version2D is used for the edge length
 //!
 
-void inpRead(const std::string& filename, Graph& graph, Config &config);
+void inpRead(const std::string& filename, Graph& graph, double N, double S,
+             double E, double W, bool version2D);
 
 #endif // INP_READER_H

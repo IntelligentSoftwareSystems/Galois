@@ -43,8 +43,7 @@ private:
   Map& map;
 
   bool inside_condition(
-      const vector<Coordinates>&
-          verticesCoords) { // TODO: Find better point location algorithm
+      const vector<Coordinates>& verticesCoords) {
 
     // lowest x among 3
     double lowest_x = verticesCoords[0].getX() < verticesCoords[1].getX()

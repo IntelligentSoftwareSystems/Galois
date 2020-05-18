@@ -97,11 +97,8 @@ public:
 
   //! Adds a new node to the graph; returns node id
   GNode createNode(NodeData nodeData) const {
-    galois::gInfo("Node creation...");
     auto node = graph.createNode(nodeData);
-    galois::gInfo("Node created.");
     graph.addNode(node);
-    galois::gInfo("Node added.");
     return node;
   }
 
