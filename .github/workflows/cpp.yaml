@@ -174,17 +174,18 @@ jobs:
         sudo sysctl -w kern.corefile=$HOME/build/dumps/core.%N.%P.%H.%I
     - name: pre-build
       run: |
+        set -x
         mkdir -p $HOME/build/dumps
 
         GRAPH_FILE="$HOME/.cache/graph/inputs.tar.gz"
         GRAPH_LOCATION="$HOME/.cache/graph/inputs"
         INPUT_URL="http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz"
-        mkdir -p "$(dirname \"$GRAPH_FILE\")"
+        mkdir -p "$(dirname $GRAPH_FILE)"
         if [[ ! -f "$GRAPH_FILE.timestamp" ]]; then
           touch -t 197001010000 "$GRAPH_FILE.timestamp"
         fi
         curl -fL --time-cond "$GRAPH_FILE.timestamp" --output "$GRAPH_FILE" "$INPUT_URL"
-        if [[ "$GRAPH_FILE" -nt "GRAPH_FILE.timestamp" ]]; then
+        if [[ "$GRAPH_FILE" -nt "$GRAPH_FILE.timestamp" ]]; then
           rm -rf "$GRAPH_LOCATION"
           mkdir -p "$GRAPH_LOCATION"
           tar -C "$GRAPH_LOCATION" -xz -f "$GRAPH_FILE"
