@@ -43,7 +43,6 @@ enum class net_phase { train, test };
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
 #define USE_CUSPARSE
 
-#ifdef GALOIS_USE_DIST
 namespace deepgalois {
 // TODO only being used by graph conv layer at the moment so extern works,
 // but this design is bad and needs to be revisited
@@ -54,6 +53,5 @@ extern float_t* _dataToSync;
 //! sync
 extern long unsigned _syncVectorSize;
 } // namespace deepgalois
-#endif
 
 #endif

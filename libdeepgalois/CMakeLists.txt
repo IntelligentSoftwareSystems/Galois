@@ -106,7 +106,7 @@ target_include_directories(dg_cpu PUBLIC
 )
 
 # dist galois setup/linking to dg_cpu
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   target_link_libraries(dg_cpu galois_dist_async galois_cusp galois_gluon)
   target_include_directories(dg_cpu PUBLIC
     ${CMAKE_SOURCE_DIR}/libdist/include

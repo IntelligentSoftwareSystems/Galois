@@ -1,6 +1,6 @@
 app(gin gin.cpp)
 target_link_libraries(gin dg_cpu)
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   target_link_libraries(gin distgraphloader)
 endif()
 if(ENABLE_HETERO_GALOIS)

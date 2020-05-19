@@ -1,9 +1,7 @@
 // Graph Neural Networks
 // Xuhao Chen <cxh@utexas.edu>
 #include "lonestargnn.h"
-#ifdef GALOIS_USE_DIST
 #include "DistributedGraphLoader.h"
-#endif
 
 const char* name = "Graph Isomorphism Network (GIN)";
 const char* desc = "Graph isomorphism neural networks on an undirected graph";

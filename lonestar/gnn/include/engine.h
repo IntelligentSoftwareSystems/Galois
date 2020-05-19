@@ -1,12 +1,9 @@
 // Execution engine
 #include <iostream>
 #include <sstream>
-#ifdef GALOIS_USE_DIST
 #include "DistributedGraphLoader.h"
 #include "galois/DistGalois.h"
 #include "galois/runtime/Network.h"
-#endif
-#include "galois/Galois.h"
 #include "galois/Version.h"
 #include "galois/Timer.h"
 #include "deepgalois/Net.h"
@@ -28,10 +25,8 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   numThreads = galois::setActiveThreads(numThreads); // number of threads on CPU
 #endif
 
-#ifdef GALOIS_USE_DIST
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-#endif
     LonestarGnnPrintVersion(llvm::outs());
     std::cout << "Copyright (C) " << galois::getCopyrightYear()
               << " The University of Texas at Austin\n";
@@ -51,9 +46,7 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
     }
     galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
     galois::runtime::reportParam("(NULL)", "Threads", numThreads);
-#ifdef GALOIS_USE_DIST
   }
-#endif
 
   char name[256];
   gethostname(name, 256);

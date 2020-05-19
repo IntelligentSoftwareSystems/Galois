@@ -17,7 +17,7 @@ if(ENABLE_HETERO_GALOIS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__GALOIS_HET_CUDA__")
 endif()
 
-if(ENABLE_DIST_GALOIS)
+if(GALOIS_ENABLE_DIST)
   add_library(distgraphloader STATIC src/DistributedGraphLoader.cpp)
   target_include_directories(distgraphloader PUBLIC include)
   target_link_libraries(distgraphloader galois_cusp LLVMSupport)
