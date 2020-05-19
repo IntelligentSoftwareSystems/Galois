@@ -24,7 +24,7 @@ namespace tsuba {
 
 static Aws::SDKOptions sdk_options;
 
-static constexpr const char* kDefaultS3Region = "us-east-2";
+static constexpr const char* kDefaultS3Region = "us-east-1";
 static constexpr const char* kAwsTag          = "TsubaS3Client";
 static const std::regex kS3UriRegex("s3://([-a-z0-9.]+)/(.+)");
 static const std::string_view kTmpTag("/tmp/tsuba_s3.XXXXXX");
@@ -32,6 +32,7 @@ static constexpr const uint64_t kS3BufSize    = MB(5);
 static constexpr const uint64_t kNumS3Threads = 36;
 
 std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> executor;
+
 int S3Init() {
   Aws::InitAPI(sdk_options);
   executor = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>(
