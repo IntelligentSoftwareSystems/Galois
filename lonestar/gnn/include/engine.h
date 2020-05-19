@@ -1,9 +1,13 @@
 // Execution engine
 #include <iostream>
 #include <sstream>
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/Galois.h"
+#else
 #include "DistributedGraphLoader.h"
 #include "galois/DistGalois.h"
 #include "galois/runtime/Network.h"
+#endif
 #include "galois/Version.h"
 #include "galois/Timer.h"
 #include "deepgalois/Net.h"
@@ -21,12 +25,13 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   galois::runtime::setStatFile(statFile);
 
+  unsigned hostID = 0;
 #ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads); // number of threads on CPU
+  hostID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
 
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  if (net.ID == 0) {
+  if (hostID == 0) {
     LonestarGnnPrintVersion(llvm::outs());
     std::cout << "Copyright (C) " << galois::getCopyrightYear()
               << " The University of Texas at Austin\n";

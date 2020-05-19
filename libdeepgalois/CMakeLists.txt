@@ -27,7 +27,7 @@ link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
 if(GALOIS_ENABLE_GPU)
   # hetero path
-  set(CUDA_NVCC_FLAGS "-DGALOIS_ENABLE_GPU ${CUDA_NVCC_FLAGS}")
+  set(CUDA_NVCC_FLAGS "-DGALOIS_ENABLE_GPU --extended-lambda ${CUDA_NVCC_FLAGS}")
   set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
   include_directories("${CUB_ROOT}")
   set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
