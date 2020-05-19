@@ -119,7 +119,7 @@ __global__ void warp(CSRGraph graph, unsigned begin, unsigned end, HGAccumulator
 	num_local_triangles.thread_exit<cub::BlockReduce<unsigned long, TB_SIZE> >(num_local_triangles_ts);
 }
 
-void sort_cuda(struct CUDA_Context* ctx) {
+void sortEdgesByDestination_cuda(struct CUDA_Context* ctx) {
         mgpu::segmented_sort(ctx->gg.edge_dst, ctx->gg.nedges, (const int *) ctx->gg.row_start + 1, ctx->gg.nnodes - 1, mgpu::less_t<int>(), context);
 }
 

@@ -862,16 +862,7 @@ public:
       }
     });
 
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-
-      auto r = divideByNode(0, 1, tid, total).first;
-
-      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
-      // "\n");
-      this->setLocalRange(*r.first, *r.second);
-    });
+    initializeLocalRanges();
   }
   void constructFrom(
       uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum,
@@ -900,16 +891,7 @@ public:
       }
     });
 
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-
-      auto r = divideByNode(0, 1, tid, total).first;
-
-      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
-      // "\n");
-      this->setLocalRange(*r.first, *r.second);
-    });
+    initializeLocalRanges();
   }
 
   /**
@@ -989,12 +971,8 @@ public:
     graphFile.seekg(readPosition);
     graphFile.read(reinterpret_cast<char*>(edgeData.data()),
                    sizeof(EdgeTy) * numEdges);
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-      auto r = divideByNode(0, 1, tid, total).first;
-      this->setLocalRange(*r.first, *r.second);
-    });
+
+    initializeLocalRanges();
     graphFile.close();
   }
 
@@ -1052,14 +1030,22 @@ public:
     } else {
       GALOIS_DIE("ERROR: Unknown graph file version.");
     }
+
+    initializeLocalRanges();
+    graphFile.close();
+  }
+
+  /**
+   * Given a manually created graph, initialize the local ranges on this graph
+   * so that threads can iterate over a balanced number of vertices.
+   */
+  void initializeLocalRanges() {
     galois::on_each([&](unsigned tid, unsigned total) {
       std::vector<unsigned>
           dummy_scale_factor; // dummy passed in to function call
       auto r = divideByNode(0, 1, tid, total).first;
       this->setLocalRange(*r.first, *r.second);
     });
-
-    graphFile.close();
   }
 };
 } // namespace graphs
