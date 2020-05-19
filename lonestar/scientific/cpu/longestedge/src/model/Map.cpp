@@ -5,8 +5,8 @@
 
 #include <cstdio>
 #include <cmath>
+#include <limits>
 #include <iostream>
-#include <values.h>
 
 double** Map::init_map_data(size_t rows, size_t cols) {
   double** map;
@@ -102,7 +102,7 @@ double Map::get_height_wo_interpol(const double lon_grid, const double lat_grid,
     break;
   default:
     // XXX[AOS]: I think we should raise an error, unless it is used elsewhere.
-    return MINDOUBLE;
+    return std::numeric_limits<double>::min();
   }
 
   x = std::max(0, x);

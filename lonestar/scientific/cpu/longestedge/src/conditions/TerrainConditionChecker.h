@@ -1,7 +1,6 @@
 #ifndef GALOIS_TERRAINCONDITIONCHECKER_H
 #define GALOIS_TERRAINCONDITIONCHECKER_H
 
-#include <values.h>
 #include <cmath>
 #include "../utils/ConnectivityManager.h"
 #include "../utils/GaloisUtils.h"
