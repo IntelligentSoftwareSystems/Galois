@@ -151,21 +151,21 @@ struct SGD_LC_LinearArray_Undirected_Graph {
     // node_data
     memset(node_data(), 0, sizeof(unsigned int) * _num_nodes);
     for (unsigned int i = 0; i < _num_edges; ++i) {
-      out_neighbors()[i] = *le64toh(outs + i);
+      out_neighbors()[i] = le32toh(outs[i]);
     }
     outgoing_index()[0] = 0;
     for (unsigned int i = 0; i < _num_nodes; ++i) {
-      outgoing_index()[i + 1] = *le64toh(outIdx + i);
+      outgoing_index()[i + 1] = le32toh(outIdx[i]);
     }
     unsigned int start        = 0;
     unsigned int displacement = 0;
     for (unsigned int i = 0; i < _num_nodes; ++i) {
-      unsigned int end = *le64toh(outIdx + i);
+      unsigned int end = le32toh(outIdx[i]);
       for (unsigned int idx = start; idx < end; ++idx) {
         // node i's idx neighbor is to be populated here.
-        out_edge_data()[displacement] = *le64toh(edgeData + idx);
+        out_edge_data()[displacement] = le32toh(edgeData[idx]);
         // out_edge_data()[displacement] = 1;
-        out_neighbors()[displacement] = *le64toh(outs + idx);
+        out_neighbors()[displacement] = le32toh(outs[idx]);
         displacement++;
       }
       start = end;

@@ -100,7 +100,7 @@ private:
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
-  void reset_bitset(SyncType, void (*bitset_reset_range)(size_t, size_t)) {
+  void reset_bitset(void (*bitset_reset_range)(size_t, size_t)) {
     if (userGraph.sizeEdges() > 0) {
       bitset_reset_range(0, userGraph.sizeEdges() - 1);
     }
@@ -1654,7 +1654,7 @@ private:
     }
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
   }
 
@@ -1694,7 +1694,7 @@ private:
     net.decrementMemUsage(send_buffers_size);
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
   }
 #endif
@@ -1744,7 +1744,7 @@ private:
     }
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
 
     galois::runtime::reportStat_Tsum(RNAME, statNumMessages_str, numMessages);
