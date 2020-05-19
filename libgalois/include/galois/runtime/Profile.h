@@ -17,24 +17,20 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_RUNTIME_SAMPLING_H
-#define GALOIS_RUNTIME_SAMPLING_H
+#ifndef GALOIS_RUNTIME_PROFILE_H
+#define GALOIS_RUNTIME_PROFILE_H
 
 #include <cstdlib>
 
-#ifdef GALOIS_USE_VTUNE
+#ifdef GALOIS_ENABLE_VTUNE
 #include "ittnotify.h"
 #endif
 
-#ifdef GALOIS_USE_PAPI
+#ifdef GALOIS_ENABLE_PAPI
 extern "C" {
 #include <papi.h>
 #include <papiStdEventDefs.h>
 }
-#endif
-
-#ifdef GALOIS_USE_HPCTK
-#include <hpctoolkit.h>
 #endif
 
 #include "galois/config.h"
@@ -42,10 +38,9 @@ extern "C" {
 #include "galois/gIO.h"
 #include "galois/Timer.h"
 
-namespace galois {
-namespace runtime {
+namespace galois::runtime {
 
-#ifdef GALOIS_USE_VTUNE
+#ifdef GALOIS_ENABLE_VTUNE
 
 template <typename F>
 void profileVtune(const F& func, const char* region) {
@@ -76,32 +71,7 @@ void profileVtune(const F& func, const char* region) {
 
 #endif
 
-#ifdef GALOIS_USE_HPCTK
-void profileHpcTk(const F& func, const char* region) {
-  region = region ? region : "(NULL)";
-
-  GALOIS_ASSERT(
-      galois::substrate::ThreadPool::getTID() == 0,
-      "profileHpcTk can only be called from master thread (thread 0)");
-
-  hpctoolkit_sampling_start();
-
-  timeThis(func, region);
-
-  hpctoolkit_sampling_stop();
-}
-#else
-template <typename F>
-void profileHpcTk(const F& func, const char* region) {
-
-  region = region ? region : "(NULL)";
-  galois::gWarn("HPC Toolkit not enabled or found");
-
-  timeThis(func, region);
-}
-#endif
-
-#ifdef GALOIS_USE_PAPI
+#ifdef GALOIS_ENABLE_PAPI
 
 namespace internal {
 
@@ -256,7 +226,6 @@ void profilePapi(const F& func, const char* region) {
 
 #endif
 
-} // namespace runtime
-} // end namespace galois
+} // namespace galois::runtime
 
 #endif

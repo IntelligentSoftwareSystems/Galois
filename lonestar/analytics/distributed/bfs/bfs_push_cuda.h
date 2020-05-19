@@ -133,14 +133,13 @@ void FirstItr_BFS_masterNodes_cuda(struct CUDA_Context* ctx);
 void FirstItr_BFS_nodesWithEdges_cuda(struct CUDA_Context* ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end,
                           const uint32_t& local_infinity,
-                          unsigned long long local_src_node,
-                          struct CUDA_Context* ctx);
+                          uint64_t local_src_node, struct CUDA_Context* ctx);
 void InitializeGraph_allNodes_cuda(const uint32_t& local_infinity,
-                                   unsigned long long local_src_node,
+                                   uint64_t local_src_node,
                                    struct CUDA_Context* ctx);
 void InitializeGraph_masterNodes_cuda(const uint32_t& local_infinity,
-                                      unsigned long long local_src_node,
+                                      uint64_t local_src_node,
                                       struct CUDA_Context* ctx);
 void InitializeGraph_nodesWithEdges_cuda(const uint32_t& local_infinity,
-                                         unsigned long long local_src_node,
+                                         uint64_t local_src_node,
                                          struct CUDA_Context* ctx);

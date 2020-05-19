@@ -12,7 +12,7 @@ struct ThreadWork t_work;
 bool enable_lb = true;
 #include "bfs_pull_cuda.cuh"
 static const int __tb_BFS = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, unsigned long long local_src_node, uint32_t * p_dist_current)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint64_t local_src_node, uint32_t * p_dist_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -390,7 +390,7 @@ __global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned in
   DGMax.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGMax_ts);
   // FP: "16 -> 17;
 }
-void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context*  ctx)
 {
   t_work.init_thread_work(ctx->gg.nnodes);
   dim3 blocks;
@@ -406,19 +406,19 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_allNodes_cuda(const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)
+void InitializeGraph_allNodes_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(0, ctx->gg.nnodes, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void InitializeGraph_masterNodes_cuda(const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)
+void InitializeGraph_masterNodes_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void InitializeGraph_nodesWithEdges_cuda(const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)
+void InitializeGraph_nodesWithEdges_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_infinity, local_src_node, ctx);
