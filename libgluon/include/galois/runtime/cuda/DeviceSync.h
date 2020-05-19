@@ -33,7 +33,7 @@
 #include "galois/runtime/DataCommMode.h"
 #include "cub/util_allocator.cuh"
 
-#ifdef __GALOIS_CUDA_CHECK_ERROR__
+#ifdef GALOIS_CUDA_CHECK_ERROR
 #define check_cuda_kernel                                                      \
   check_cuda(cudaDeviceSynchronize());                                         \
   check_cuda(cudaGetLastError());

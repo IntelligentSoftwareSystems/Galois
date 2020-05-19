@@ -17,8 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef __GALOIS_RUNTIME_ATOMIC_HELPER_FUNCTIONS_H__
-#define __GALOIS_RUNTIME_ATOMIC_HELPER_FUNCTIONS_H__
+#pragma once
 #include <atomic>
 #include <algorithm>
 #include <vector>
@@ -209,4 +208,3 @@ void reset(std::atomic<Ty>& var, Ty val) {
   var = val;
 }
 } // end namespace galois
-#endif

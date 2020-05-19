@@ -440,7 +440,8 @@ void record_path(const Info info, nodeArray& nodelist, edgeArray& h_edge,
           nodelist[neighborid].dist == 0 && node.in_direction[0] &&
           nodelist[neighborid].in_direction[2])
       //&& h_edge[nodeid].utilization + net.min_width +
-      //horizontal_min_spacing(info, h_edge, nodeid) <= h_edge[nodeid].capacity)
+      // horizontal_min_spacing(info, h_edge, nodeid) <=
+      // h_edge[nodeid].capacity)
       {
         Path* path       = new Path;
         path->src_tile_x = nodeid % (info.grid_x - 1);
@@ -473,7 +474,7 @@ void record_path(const Info info, nodeArray& nodelist, edgeArray& h_edge,
       if (neighborid <= info.num_tiles - 1 && nodelist[neighborid].dist == 0 &&
           node.in_direction[1] && nodelist[neighborid].in_direction[3])
       //&& v_edge[nodeid].utilization + net.min_width +
-      //vertical_min_spacing(info, v_edge, nodeid) <= v_edge[nodeid].capacity)
+      // vertical_min_spacing(info, v_edge, nodeid) <= v_edge[nodeid].capacity)
       {
         Path* path       = new Path;
         path->src_tile_x = nodeid % (info.grid_x - 1);
@@ -1039,7 +1040,8 @@ void print_path(const Info info, Net* netlist) {
       int dst_layer = path->dst_layer;
 
       // outfile<< "(" << path->src_tile_x << "," << path->src_tile_y << "," <<
-      // src_layer << ")-(" << path->dst_tile_x << "," << path->dst_tile_y << ","
+      // src_layer << ")-(" << path->dst_tile_x << "," << path->dst_tile_y <<
+      // ","
       // << dst_layer << ")" << endl;
       outfile << "(" << src_cor_x << "," << src_cor_y << "," << src_layer
               << ")-(" << dst_cor_x << "," << dst_cor_y << "," << dst_layer
@@ -1170,9 +1172,9 @@ int main(int argc, char* argv[]) {
   //        [&] (const unsigned tid, const unsigned numT)
   {
     unsigned total_nodes = (info.grid_x - 1) * (info.grid_y - 1);
-    unsigned start = 0;         // total_nodes / numT * tid;
+    unsigned start       = 0;   // total_nodes / numT * tid;
     unsigned end = total_nodes; //(tid == numT - 1)? total_nodes : total_nodes /
-                                //numT * (tid + 1);
+                                // numT * (tid + 1);
     for (unsigned i = start; i < end; i++)
       allNodeBag.push(i);
   }

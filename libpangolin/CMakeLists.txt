@@ -22,7 +22,7 @@ target_include_directories(pangolin PUBLIC
 
 target_link_libraries(pangolin PUBLIC galois_shmem)
 
-if (ENABLE_HETERO_GALOIS)
+if (GALOIS_ENABLE_GPU)
   add_library(pangolin_gpu INTERFACE)
   add_library(Galois::pangolin_gpu ALIAS pangolin_gpu)
   add_dependencies(lib pangolin_gpu)

@@ -27,3 +27,10 @@
 #include "galois/graphs/GluonSubstrate.h"
 
 DataCommMode enforcedDataMode = DataCommMode::noData;
+
+#ifdef GALOIS_USE_BARE_MPI
+//! bare_mpi type to use; see options in runtime/BareMPI.h
+//BareMPI bare_mpi = BareMPI::noBareMPI;
+BareMPI bare_mpi = BareMPI::nonBlockingBareMPI;
+#endif
+

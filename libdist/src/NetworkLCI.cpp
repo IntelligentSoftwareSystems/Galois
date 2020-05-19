@@ -26,7 +26,7 @@
  * @todo document this file more
  */
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 #include "galois/runtime/Network.h"
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
@@ -181,7 +181,7 @@ public:
     statSendNum += 1;
     statSendBytes += buf.size();
     // int count = 0;
-#ifndef __GALOIS_HET_ASYNC__
+#ifndef GALOIS_SUPPORT_ASYNC
     if (buf.getVec().size() < 8192) {
       while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag,
                       lc_p2p_ep[phase]) != LC_OK) {
@@ -256,7 +256,9 @@ public:
       // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
-    galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // if (inflightRecvs > 0) {
+      // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // }
     return (inflightRecvs > 0);
   }
 

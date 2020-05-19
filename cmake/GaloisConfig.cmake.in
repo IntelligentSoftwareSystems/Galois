@@ -22,7 +22,7 @@ set(Galois_LIBRARIES galois_shmem)
 
 find_dependency(Threads REQUIRED)
 find_dependency(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
-if (@ENABLE_DIST_GALOIS@)
+if (@GALOIS_ENABLE_DIST@)
   find_dependency(MPI REQUIRED)
 endif()
 

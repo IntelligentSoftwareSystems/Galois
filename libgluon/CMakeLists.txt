@@ -17,12 +17,12 @@ target_include_directories(galois_gluon PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-if (REPORT_COMM_STATS)
-  target_compile_definitions(galois_gluon PRIVATE MORE_COMM_STATS=1)
+if (GALOIS_COMM_STATS)
+  target_compile_definitions(galois_gluon PRIVATE GALOIS_COMM_STATS=1)
 endif()
 
-if (USE_BARE_MPI)
-  target_compile_definitions(galois_gluon PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+if (GALOIS_USE_BARE_MPI)
+  target_compile_definitions(galois_gluon PRIVATE GALOIS_USE_BARE_MPI=1)
 endif()
 
 install(

@@ -35,20 +35,19 @@
 #include "galois/runtime/DataCommMode.h"
 #include "galois/DynamicBitset.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/HostDecls.h"
 #endif
 
 #include "galois/runtime/BareMPI.h"
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-//! bare_mpi type to use; see options in runtime/BareMPI.h
-BareMPI bare_mpi = BareMPI::noBareMPI;
-#endif
-
 // TODO find a better way to do this without globals
 //! Specifies what format to send metadata in
 extern DataCommMode enforcedDataMode;
+
+#ifdef GALOIS_USE_BARE_MPI
+extern BareMPI bare_mpi;
+#endif
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -124,7 +123,7 @@ private:
   //! Maximum size of master or mirror nodes on different hosts
   size_t maxSharedSize;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
   // Used for efficient comms
@@ -278,7 +277,7 @@ private:
           [&](size_t n) {
             masterNodes[h][n] = userGraph.getLID(masterNodes[h][n]);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MasterNodes").c_str()),
 #endif
           galois::no_stats());
@@ -290,7 +289,7 @@ private:
           [&](size_t n) {
             mirrorNodes[h][n] = userGraph.getLID(mirrorNodes[h][n]);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MirrorNodes").c_str()),
 #endif
           galois::no_stats());
@@ -361,11 +360,11 @@ private:
    * initialized when the network interface was initiailized.
    */
   void initBareMPI() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     if (bare_mpi == noBareMPI)
       return;
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     // sanity check of ranks
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
@@ -481,8 +480,8 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string offsets_timer_str(syncTypeStr + "Offsets_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
-                                                    RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Toffsets(offsets_timer_str.c_str(),
+                                                      RNAME);
 
     Toffsets.start();
 
@@ -603,7 +602,7 @@ private:
               bitset_comm.set(n);
             }
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -615,6 +614,34 @@ private:
 
     data_mode =
         get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
+  }
+
+
+  template <typename SyncFnTy>
+  size_t getMaxSendBufferSize(uint32_t numShared) {
+    if (substrateDataMode == gidsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
+                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else if (substrateDataMode == offsetsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
+                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else if (substrateDataMode == bitsetData) {
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t)   // bitset size
+                + sizeof(size_t) // bitset vector size
+                + bitset_alloc_size + sizeof(size_t) +
+                (numShared * sizeof(typename SyncFnTy::ValTy));
+    } else { // onlyData or noData (auto)
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+                sizeof(size_t)   // bitset size
+                + sizeof(size_t) // bitset vector size
+                + bitset_alloc_size + sizeof(size_t) +
+                (numShared * sizeof(typename SyncFnTy::ValTy));
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -644,7 +671,7 @@ private:
           offsets[n] =
               static_cast<uint32_t>(userGraph.getGID(indices[offsets[n]]));
         },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
         galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
         galois::no_stats());
@@ -668,7 +695,7 @@ private:
     galois::do_all(
         galois::iterate(size_t{0}, offsets.size()),
         [&](size_t n) { offsets[n] = userGraph.getLID(offsets[n]); },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
         galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
         galois::no_stats());
@@ -755,7 +782,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tserialize(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tserialize(
         serialize_timer_str.c_str(), RNAME);
     if (data_mode == noData) {
       if (!async) {
@@ -822,7 +849,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tdeserialize(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tdeserialize(
         serialize_timer_str.c_str(), RNAME);
     Tdeserialize.start();
 
@@ -1126,7 +1153,7 @@ private:
             size_t lid         = indices[offset];
             val_vec[n - start] = extractWrapper<FnTy, syncType>(lid);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1197,7 +1224,7 @@ private:
             size_t lid         = indices[offset];
             val_vec[n - start] = extractWrapper<FnTy, syncType>(lid, vecIndex);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1263,7 +1290,7 @@ private:
             gSerializeLazy(b, lseq, n - start,
                            extractWrapper<FnTy, syncType>(lid));
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1441,7 +1468,7 @@ private:
             setWrapper<FnTy, syncType, async>(lid, val_vec[n - start],
                                               bit_set_compute);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1517,7 +1544,7 @@ private:
             setWrapper<FnTy, syncType, async>(lid, val_vec[n - start],
                                               bit_set_compute, vecIndex);
           },
-#if MORE_COMM_STATS
+#if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
 #endif
           galois::no_stats());
@@ -1621,11 +1648,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
+                                                      RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1699,11 +1726,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
+                                                      RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1787,15 +1814,15 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
+                                                      RNAME);
     std::string extract_alloc_timer_str(syncTypeStr + "ExtractAlloc_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractalloc(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractalloc(
         extract_alloc_timer_str.c_str(), RNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textractbatch(
         extract_batch_timer_str.c_str(), RNAME);
 
     DataCommMode data_mode;
@@ -1805,29 +1832,7 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      if (substrateDataMode == gidsData) {
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t) + (num * sizeof(unsigned int)) +
-                  sizeof(size_t) + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (substrateDataMode == offsetsData) {
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t) + (num * sizeof(unsigned int)) +
-                  sizeof(size_t) + (num * sizeof(typename SyncFnTy::ValTy)));
-      } else if (substrateDataMode == bitsetData) {
-        size_t bitset_alloc_size = ((num + 63) / 64) * sizeof(uint64_t);
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t)   // bitset size
-                  + sizeof(size_t) // bitset vector size
-                  + bitset_alloc_size + sizeof(size_t) +
-                  (num * sizeof(typename SyncFnTy::ValTy)));
-      } else { // onlyData or noData (auto)
-        size_t bitset_alloc_size = ((num + 63) / 64) * sizeof(uint64_t);
-        b.reserve(sizeof(DataCommMode) + sizeof(bit_set_count) +
-                  sizeof(size_t)   // bitset size
-                  + sizeof(size_t) // bitset vector size
-                  + bitset_alloc_size + sizeof(size_t) +
-                  (num * sizeof(typename SyncFnTy::ValTy)));
-      }
+      b.reserve(getMaxSendBufferSize<SyncFnTy>(num));
       Textractalloc.stop();
 
       Textractbatch.start();
@@ -1947,8 +1952,8 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "ExtractVector_" +
                                   get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
-                                                    RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Textract(extract_timer_str.c_str(),
+                                                      RNAME);
 
     Textract.start();
 
@@ -2014,12 +2019,13 @@ private:
     // galois::runtime::reportStat_Single(RNAME, metadata_str, 1);
   }
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * Sync using MPI instead of network layer.
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_send(std::string loopName) {
     static std::vector<galois::runtime::SendBuffer> b;
     static std::vector<MPI_Request> request;
@@ -2042,7 +2048,8 @@ private:
         b[x].getVec().clear();
       }
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
+                    (loopName, x, b[x]);
 
       MPI_Isend((uint8_t*)b[x].linearData(), b[x].size(), MPI_BYTE, x, 32767,
                 MPI_COMM_WORLD, &request[x]);
@@ -2057,7 +2064,8 @@ private:
    * Sync put using MPI instead of network layer
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_put(std::string loopName, const MPI_Group& mpi_access_group,
                     const std::vector<MPI_Win>& window) {
 
@@ -2073,7 +2081,7 @@ private:
       if (nothingToSend(x, syncType, writeLocation, readLocation))
         continue;
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x, b[x]);
 
       size[x] = b[x].size();
       send_buffers_size += size[x];
@@ -2167,7 +2175,7 @@ private:
             typename VecTy, bool async>
   void syncSend(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TSendTime.start();
@@ -2204,10 +2212,10 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string set_timer_str(syncTypeStr + "Set_" +
                               get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
     std::string set_batch_timer_str(syncTypeStr + "SetBatch_" +
                                     get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tsetbatch(
         set_batch_timer_str.c_str(), RNAME);
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
@@ -2316,7 +2324,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string set_timer_str(syncTypeStr + "SetVector_" +
                               get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tset(set_timer_str.c_str(), RNAME);
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
     static VecTy val_vec;
@@ -2385,14 +2393,13 @@ private:
     return retval;
   }
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * MPI Irecv wrapper for sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void sync_mpi_recv_post(std::string loopName,
-                          std::vector<MPI_Request>& request,
+  void sync_mpi_recv_post(std::vector<MPI_Request>& request,
                           const std::vector<std::vector<uint8_t>>& rb) {
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + numHosts - h) % numHosts;
@@ -2408,7 +2415,8 @@ private:
    * MPI receive wrapper for sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_recv_wait(std::string loopName,
                           std::vector<MPI_Request>& request,
                           const std::vector<std::vector<uint8_t>>& rb) {
@@ -2425,7 +2433,8 @@ private:
 
       galois::runtime::RecvBuffer rbuf(rb[x].begin(), rb[x].begin() + size);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
+                   (x, rbuf, loopName);
     }
   }
 
@@ -2433,7 +2442,8 @@ private:
    * MPI get wrapper for sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void sync_mpi_get(std::string loopName, const std::vector<MPI_Win>& window,
                     const std::vector<std::vector<uint8_t>>& rb) {
     for (unsigned h = 1; h < numHosts; ++h) {
@@ -2451,7 +2461,7 @@ private:
 
       MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf, loopName);
     }
   }
 #endif
@@ -2474,7 +2484,8 @@ private:
   void syncNetRecv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string wait_timer_str("Wait_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Twait(wait_timer_str.c_str(), RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> Twait(wait_timer_str.c_str(),
+                                                   RNAME);
 
     if (async) {
       size_t syncTypePhase = 0;
@@ -2529,7 +2540,7 @@ private:
             typename VecTy, bool async>
   void syncRecv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     TRecvTime.start();
@@ -2541,18 +2552,19 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // MPI sync variants
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
   /**
    * Nonblocking MPI sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void syncNonblockingMPI(std::string loopName,
                           bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<std::vector<uint8_t>> rb;
@@ -2569,11 +2581,7 @@ private:
         if (nothingToRecv(x, syncType, writeLocation, readLocation))
           continue;
 
-        size_t size =
-            (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
-        size += sizeof(size_t);       // vector size
-        size += sizeof(DataCommMode); // data mode
-
+        size_t size = getMaxSendBufferSize<SyncFnTy>(sharedNodes[x].size());
         rb[x].resize(size);
       }
       TRecvTime.stop();
@@ -2581,22 +2589,22 @@ private:
 
     TRecvTime.start();
     sync_mpi_recv_post<writeLocation, readLocation, syncType, SyncFnTy,
-                       BitsetFnTy>(loopName, request, rb);
+                       BitsetFnTy>(request, rb);
     TRecvTime.stop();
 
     TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    BitsetFnTy>(loopName);
+                    BitsetFnTy, VecTy, async>(loopName);
     } else {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    galois::InvalidBitsetFnTy>(loopName);
+                    galois::InvalidBitsetFnTy, VecTy, async>(loopName);
     }
     TSendTime.stop();
 
     TRecvTime.start();
     sync_mpi_recv_wait<writeLocation, readLocation, syncType, SyncFnTy,
-                       BitsetFnTy>(loopName, request, rb);
+                       BitsetFnTy, VecTy, async>(loopName, request, rb);
     TRecvTime.stop();
   }
 
@@ -2604,12 +2612,13 @@ private:
    * Onesided MPI sync
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void syncOnesidedMPI(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
-    galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), RNAME);
-    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
+    galois::CondStatTimer<GALOIS_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), RNAME);
 
     static std::vector<MPI_Win> window;
@@ -2624,14 +2633,9 @@ private:
 
       uint64_t recv_buffers_size = 0;
       for (unsigned x = 0; x < numHosts; ++x) {
-        size_t size =
-            (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
-        size += sizeof(size_t);       // vector size
-        size += sizeof(DataCommMode); // data mode
-        size += sizeof(size_t);       // buffer size
-        recv_buffers_size += size;
-
+        size_t size = getMaxSendBufferSize<SyncFnTy>(sharedNodes[x].size());
         rb[x].resize(size);
+        recv_buffers_size += size;
 
         MPI_Info info;
         MPI_Info_create(&info);
@@ -2675,17 +2679,19 @@ private:
 
     TSendTime.start();
     if (use_bitset_to_send) {
-      sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+      sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                   VecTy, async>(
           loopName, mpi_access_group, window);
     } else {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy,
-                   galois::InvalidBitsetFnTy>(loopName, mpi_access_group,
-                                              window);
+                   galois::InvalidBitsetFnTy, VecTy, async>
+                     (loopName, mpi_access_group, window);
     }
     TSendTime.stop();
 
     TRecvTime.start();
-    sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+    sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                 VecTy, async>(
         loopName, window, rb);
     TRecvTime.stop();
   }
@@ -2709,8 +2715,8 @@ private:
             typename ReduceFnTy, typename BitsetFnTy, bool async>
   inline void reduce(std::string loopName) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> TsyncReduce(timer_str.c_str(),
-                                                       RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> TsyncReduce(timer_str.c_str(),
+                                                         RNAME);
 
     typedef typename ReduceFnTy::ValTy T;
     typedef
@@ -2720,7 +2726,7 @@ private:
 
     TsyncReduce.start();
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     switch (bare_mpi) {
     case noBareMPI:
 #endif
@@ -2728,15 +2734,15 @@ private:
                VecTy, async>(loopName);
       syncRecv<writeLocation, readLocation, syncReduce, ReduceFnTy, BitsetFnTy,
                VecTy, async>(loopName);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                         BitsetFnTy>(loopName);
+                         BitsetFnTy, VecTy, async>(loopName);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                      BitsetFnTy>(loopName);
+                      BitsetFnTy, VecTy, async>(loopName);
       break;
     default:
       GALOIS_DIE("Unsupported bare MPI");
@@ -2760,8 +2766,8 @@ private:
             typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void broadcast(std::string loopName) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
-                                                          RNAME);
+    galois::CondStatTimer<GALOIS_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
+                                                            RNAME);
 
     typedef typename BroadcastFnTy::ValTy T;
     typedef
@@ -2794,7 +2800,7 @@ private:
       }
     }
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
     switch (bare_mpi) {
     case noBareMPI:
 #endif
@@ -2807,15 +2813,15 @@ private:
       }
       syncRecv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
                BitsetFnTy, VecTy, async>(loopName);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef GALOIS_USE_BARE_MPI
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncBroadcast,
-                         BroadcastFnTy, BitsetFnTy>(loopName, use_bitset);
+                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName, use_bitset);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                      BitsetFnTy>(loopName, use_bitset);
+                      BitsetFnTy, VecTy, async>(loopName, use_bitset);
       break;
     default:
       GALOIS_DIE("Unsupported bare MPI");
@@ -3267,7 +3273,7 @@ private:
   // GPU marshaling
   ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 private:
   using GraphNode     = typename GraphTy::GraphNode;
   using edge_iterator = typename GraphTy::edge_iterator;
@@ -3276,8 +3282,9 @@ private:
   // Code that handles getting the graph onto the GPU
   template <bool isVoidType,
             typename std::enable_if<isVoidType>::type* = nullptr>
-  inline void setMarshalEdge(MarshalGraph& m, const size_t index,
-                             const edge_iterator& e) {
+  inline void setMarshalEdge(MarshalGraph& GALOIS_UNUSED(m),
+                             const size_t GALOIS_UNUSED(index),
+                             const edge_iterator& GALOIS_UNUSED(e)) {
     // do nothing
   }
 
@@ -3450,7 +3457,7 @@ public:
    * of its use from code
    */
   inline std::string get_run_identifier() const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::to_string(num_run) + "_" +
                        std::to_string(num_round));
 #else
@@ -3466,7 +3473,7 @@ public:
    * @returns String with run identifier appended to passed in loop name
    */
   inline std::string get_run_identifier(std::string loop_name) const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
                        "_" + std::to_string(num_round));
 #else
@@ -3487,7 +3494,7 @@ public:
    */
   inline std::string get_run_identifier(std::string loop_name,
                                         unsigned alterID) const {
-#if DIST_PER_ROUND_TIMER
+#if GALOIS_PER_ROUND_STATS
     return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
                        "_" + std::to_string(num_run) + "_" +
                        std::to_string(num_round));
@@ -3531,7 +3538,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 // @todo Checkpointing code needs updates to make it work.
-#ifdef __GALOIS_CHECKPOINT__
+#ifdef GALOIS_CHECKPOINT
 ///*
 // * Headers for boost serialization
 // */

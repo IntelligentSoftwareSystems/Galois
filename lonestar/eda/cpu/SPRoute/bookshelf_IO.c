@@ -467,7 +467,7 @@ void readNetsFile(char benchmarkPath[], char netsFile[])
             } while( (tempStr[0] == '#') || (strlen(tempStr) < 5) );  
         
             xOffset = yOffset = 0.0;
-            sscanf(tempStr, "%s%*s%*s%f%f", &nodeName, &xOffset, &yOffset);
+            sscanf(tempStr, "%s%f%f", nodeName, &xOffset, &yOffset);
 
             // find the nodeIndex corresponding to nodeName
             hashfunc = 0;

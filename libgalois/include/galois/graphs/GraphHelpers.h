@@ -17,8 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef __GALOIS_GRAPH_HELPERS__
-#define __GALOIS_GRAPH_HELPERS__
+#pragma once
 
 #include <cassert>
 #include <vector>
@@ -572,4 +571,3 @@ determineUnitRangesFromPrefixSum(uint32_t unitsToSplit, VectorTy& edgePrefixSum,
 
 } // end namespace graphs
 } // end namespace galois
-#endif

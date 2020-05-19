@@ -1,4 +1,5 @@
 include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 function(add_test_mine type app)
   set(options NOT_QUICK)

@@ -30,7 +30,7 @@
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 #define NO_AGG
 #endif
 
@@ -529,6 +529,9 @@ public:
       // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
+    // if (inflightRecvs > 0) {
+      // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // }
     return (inflightRecvs > 0);
   }
 

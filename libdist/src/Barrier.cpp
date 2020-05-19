@@ -96,7 +96,7 @@ public:
 
   //! Control-flow barrier across distributed hosts
   virtual void wait() {
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
     lc_barrier(lc_col_ep);
 #else
     MPI_Barrier(MPI_COMM_WORLD); // assumes MPI_THREAD_MULTIPLE

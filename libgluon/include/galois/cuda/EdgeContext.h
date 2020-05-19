@@ -25,8 +25,7 @@
  * @todo document this file
  */
 
-#ifndef __EDGE_CONTEXT__
-#define __EDGE_CONTEXT__
+#pragma once
 
 #pragma once
 #include <cuda.h>
@@ -216,4 +215,3 @@ size_t mem_usage_CUDA_field_edges(struct CUDA_Context_Field_Edges<Type>* field,
   mem_usage += ((g.nedges + 63) / 64) * sizeof(unsigned long long int);
   return mem_usage;
 }
-#endif

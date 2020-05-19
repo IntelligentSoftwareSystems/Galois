@@ -7,7 +7,7 @@ function(app_gpu name)
   add_executable(${name}_gpu ${name}.cu)
   install(TARGETS ${name}_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" EXCLUDE_FROM_ALL)
 
-  if(ENABLE_HETERO_GALOIS AND NOT ${X_NO_GPU})
+  if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
 
     #target_compile_options(${name}_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-dc>)
 

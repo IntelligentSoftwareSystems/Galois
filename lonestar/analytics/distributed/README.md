@@ -19,11 +19,11 @@ specified.
 
 For distributed Galois, i.e. D-Galois:
 
-`cmake ${GALOIS_ROOT} -DENABLE_DIST_GALOIS=1`
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1`
 
 For heterogeneous (which is also distributed) Galois, i.e. D-IrGL:
 
-`cmake ${GALOIS_ROOT} -DENABLE_HETERO_GALOIS=1`
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_ENABLE_GPU=1`
 
 Note that heterogeneous Galois requires CUDA 8.0 and above and a compiler
 that is compatible with the CUDA version that you use, and also note that

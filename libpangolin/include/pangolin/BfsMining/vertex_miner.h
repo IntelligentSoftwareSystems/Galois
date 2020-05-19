@@ -376,7 +376,7 @@ public:
         std::cout << std::endl;
         // for (auto it = p_map.begin(); it != p_map.end(); ++it)
         //	std::cout << "{" << it->first << "} --> " << it->second <<
-        //std::endl;
+        // std::endl;
       } else {
         std::cout << std::endl;
         for (auto it = cg_map.begin(); it != cg_map.end(); ++it)

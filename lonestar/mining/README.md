@@ -22,7 +22,7 @@ BUILD
 ===========
 
 Pangolin built by default. To enable GPU mining, you can give the
-`-DENABLE_HETERO_GALOIS=ON` setting to `cmake`.
+`-DGALOIS_ENABLE_GPU=ON` setting to `cmake`.
 
 INPUT
 ===========

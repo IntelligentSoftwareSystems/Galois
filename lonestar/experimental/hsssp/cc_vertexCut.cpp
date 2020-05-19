@@ -70,7 +70,7 @@ struct InitializeGraph {
     struct SyncerPull_0 {
       static unsigned long long extract(uint32_t node_id,
                                         const struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           return get_node_comp_current_cuda(cuda_ctx, node_id);
         assert(personality == CPU);
@@ -79,7 +79,7 @@ struct InitializeGraph {
       }
       static void setVal(uint32_t node_id, struct NodeData& node,
                          unsigned long long y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         if (personality == GPU_CUDA)
           set_node_comp_current_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
@@ -89,12 +89,12 @@ struct InitializeGraph {
       typedef unsigned long long ValTy;
     };
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       InitializeGraph_cuda(cuda_ctx);
     } else if (personality == CPU)
 #endif
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         InitializeGraph_cuda(cuda_ctx);
       } else if (personality == CPU)
@@ -122,7 +122,7 @@ struct ConnectedComp {
     do {
       DGAccumulator_accum.reset();
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         ConnectedComp_cuda(cuda_ctx);
       } else if (personality == CPU)
@@ -130,7 +130,7 @@ struct ConnectedComp {
         struct Syncer_0 {
           static unsigned long long extract(uint32_t node_id,
                                             const struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
             if (personality == GPU_CUDA)
               return get_node_comp_current_cuda(cuda_ctx, node_id);
             assert(personality == CPU);
@@ -139,7 +139,7 @@ struct ConnectedComp {
           }
           static void reduce(uint32_t node_id, struct NodeData& node,
                              unsigned long long y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
             if (personality == GPU_CUDA)
               add_node_comp_current_cuda(cuda_ctx, node_id, y);
             else if (personality == CPU)
@@ -149,7 +149,7 @@ struct ConnectedComp {
             }
           }
           static void reset(uint32_t node_id, struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
             if (personality == GPU_CUDA)
               set_node_comp_current_cuda(cuda_ctx, node_id, 0);
             else if (personality == CPU)
@@ -164,7 +164,7 @@ struct ConnectedComp {
       struct SyncerPull_0 {
         static unsigned long long extract(uint32_t node_id,
                                           const struct NodeData& node) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             return get_node_comp_current_cuda(cuda_ctx, node_id);
           assert(personality == CPU);
@@ -173,7 +173,7 @@ struct ConnectedComp {
         }
         static void setVal(uint32_t node_id, struct NodeData& node,
                            unsigned long long y) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
           if (personality == GPU_CUDA)
             set_node_comp_current_cuda(cuda_ctx, node_id, y);
           else if (personality == CPU)
@@ -182,7 +182,7 @@ struct ConnectedComp {
         }
         typedef unsigned long long ValTy;
       };
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       if (personality == GPU_CUDA) {
         ConnectedComp_cuda(cuda_ctx);
       } else if (personality == CPU)

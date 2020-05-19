@@ -1,5 +1,4 @@
-#ifndef __MGRAPH_HPP__
-#define __MGRAPH_HPP__
+#pragma once
 #include <set>
 #include <string>
 #include <vector>
@@ -421,4 +420,3 @@ private:
     }
   }
 };
-#endif

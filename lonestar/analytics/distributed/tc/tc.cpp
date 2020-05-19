@@ -35,7 +35,7 @@
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "tc_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #endif
@@ -66,13 +66,15 @@ struct TC {
   TC(Graph* _graph, DGAccumulatorTy& _num_triangles)
       : graph(_graph), num_triangles(_num_triangles) {}
 
-  void static go(Graph& _graph) {
+  // use the below line once CPU code is added
+  // void static go(Graph& _graph) {
+  void static go() {
     unsigned _num_iterations = 0;
     DGAccumulatorTy num_triangles;
     syncSubstrate->set_num_round(_num_iterations);
     num_triangles.reset();
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (personality == GPU_CUDA) {
       std::string impl_str(syncSubstrate->get_run_identifier("TC"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
@@ -110,7 +112,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
   Graph* hg;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
 #else
@@ -132,7 +134,9 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
-    TC<false>::go(*hg);
+    // use the below line once CPU code is added
+    // TC<false>::go(*hg);
+    TC<false>::go();
     StatTimer_main.stop();
 
     syncSubstrate->set_num_run(run + 1);

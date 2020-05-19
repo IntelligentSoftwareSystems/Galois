@@ -27,18 +27,12 @@
 #include "galois/graphs/GluonSubstrate.h"
 #include "galois/AtomicHelpers.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "galois/cuda/HostDecls.h"
 #else
 // dummy struct declaration to allow non-het code to compile without
 // having to include cuda_context_decl
 struct CUDA_Context;
-#endif
-
-#if defined(__GNUC__) && !defined(__GALOIS_HET_CUDA__)
-#define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME __attribute__((unused))
-#else
-#define GALOIS_USED_ONLY_IN_HETEROGENEOUS(NAME) NAME
 #endif
 
 //! standard global options to the benchmarks
@@ -53,7 +47,7 @@ extern cll::opt<bool> partitionAgnostic;
 //! Set method for metadata sends
 extern cll::opt<DataCommMode> commMetadata;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 enum Personality { CPU, GPU_CUDA };
 
 std::string personality_str(Personality p);
@@ -79,7 +73,7 @@ extern cll::opt<std::string> personality_set;
 void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
 void heteroSetup(std::vector<unsigned>& scaleFactor);
@@ -134,16 +128,12 @@ static void marshalGPUGraph(
  *
  * @param scaleFactor Vector that specifies how much of the graph each
  * host should get
- * @param cuda_ctx CUDA context of the currently running program; only matters
- * if using GPU
  *
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
-loadDGraph(std::vector<unsigned>& scaleFactor,
-           struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) =
-               nullptr) {
+loadDGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -173,16 +163,12 @@ loadDGraph(std::vector<unsigned>& scaleFactor,
  *
  * @param scaleFactor Vector that specifies how much of the graph each
  * host should get
- * @param cuda_ctx CUDA context of the currently running program; only matters
- * if using GPU
  *
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
 static galois::graphs::DistGraph<NodeData, EdgeData>*
-loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
-                    struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(
-                        cuda_ctx) = nullptr) {
+loadSymmetricDGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
@@ -227,27 +213,28 @@ template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
           galois::graphs::GluonSubstrate<
               galois::graphs::DistGraph<NodeData, EdgeData>>*>
-distGraphInitialization(struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(
-                            cuda_ctx) = nullptr) {
+#ifdef GALOIS_ENABLE_GPU
+distGraphInitialization(struct CUDA_Context** cuda_ctx) {
+#else
+distGraphInitialization() {
+#endif
   using Graph     = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
   Graph* g;
   Substrate* s;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
-#else
-  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
 #endif
+  g = loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
                     partitionAgnostic, commMetadata);
 
 // marshal graph to GPU as necessary
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 
@@ -271,28 +258,28 @@ template <typename NodeData, typename EdgeData>
 std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
           galois::graphs::GluonSubstrate<
               galois::graphs::DistGraph<NodeData, EdgeData>>*>
-symmetricDistGraphInitialization(
-    struct CUDA_Context** GALOIS_USED_ONLY_IN_HETEROGENEOUS(cuda_ctx) =
-        nullptr) {
+#ifdef GALOIS_ENABLE_GPU
+symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx) {
+#else
+symmetricDistGraphInitialization() {
+#endif
   using Graph     = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
   Graph* g;
   Substrate* s;
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
-  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
-#else
-  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
 #endif
+  g = loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
   s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
                     partitionAgnostic, commMetadata);
 
 // marshal graph to GPU as necessary
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 

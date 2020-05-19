@@ -36,7 +36,7 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "bc_level_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #else
@@ -128,7 +128,7 @@ struct InitializeGraph {
     const auto& allNodes = _graph.allNodesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str(
           // syncSubstrate->get_run_identifier("InitializeGraph")
           "InitializeGraph");
@@ -175,7 +175,7 @@ struct InitializeIteration {
     const auto& allNodes = _graph.allNodesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str(
           // syncSubstrate->get_run_identifier("InitializeIteration")
           "InitializeIteration");
@@ -245,7 +245,7 @@ struct ForwardPass {
       _dga.reset();
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
             // syncSubstrate->get_run_identifier("ForwardPass")
             "ForwardPass");
@@ -335,7 +335,7 @@ struct MiddleSync {
       const auto& masters = _graph.masterNodesRange();
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
             // syncSubstrate->get_run_identifier("MiddleSync")
             "MiddleSync");
@@ -390,7 +390,7 @@ struct BackwardPass {
 
     for (; backRoundCount > 0; backRoundCount--) {
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
             // syncSubstrate->get_run_identifier("BackwardPass")
             "BackwardPass");
@@ -464,7 +464,7 @@ struct BC {
       // finally, since dependencies are finalized for this round at this
       // point, add them to the betweeness centrality measure on each node
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str(
             // syncSubstrate->get_run_identifier("BC")
             "BC");
@@ -523,7 +523,7 @@ struct Sanity {
     DGA_sum.reset();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       // std::string impl_str(syncSubstrate->get_run_identifier("Sanity"));
       std::string impl_str("Sanity");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -588,7 +588,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
 
   Graph* h_graph;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(h_graph, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
@@ -697,7 +697,7 @@ int main(int argc, char** argv) {
       (*syncSubstrate).set_num_run(run + 1);
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         bitset_num_shortest_paths_reset_cuda(cuda_ctx);
         bitset_current_length_reset_cuda(cuda_ctx);
         bitset_dependency_reset_cuda(cuda_ctx);
@@ -720,7 +720,7 @@ int main(int argc, char** argv) {
   // Verify, i.e. print out graph data for examination
   if (verify) {
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       for (auto ii = (*h_graph).masterNodesRange().begin();
            ii != (*h_graph).masterNodesRange().end(); ++ii) {
         std::stringstream out;

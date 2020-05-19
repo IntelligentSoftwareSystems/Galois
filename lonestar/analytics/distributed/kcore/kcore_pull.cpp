@@ -30,7 +30,7 @@
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "kcore_pull_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #else
@@ -99,7 +99,7 @@ struct DegreeCounting {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("DegreeCounting_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -151,7 +151,7 @@ struct InitializeGraph {
     const auto& allNodes = _graph.allNodesRange();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("InitializeGraph_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -204,7 +204,7 @@ struct LiveUpdate {
     dga.reset();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::string impl_str("LiveUpdate_" +
                            (syncSubstrate->get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -285,7 +285,7 @@ struct KCore {
       syncSubstrate->set_num_round(iterations);
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::string impl_str("KCore_" + (syncSubstrate->get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -357,7 +357,7 @@ struct KCoreSanityCheck {
     dga.reset();
 
     if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       uint64_t sum = 0;
       KCoreSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
@@ -414,7 +414,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
 
   Graph* h_graph;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   std::tie(h_graph, syncSubstrate) =
       symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
 #else
@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
       (*syncSubstrate).set_num_run(run + 1);
 
       if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         bitset_current_degree_reset_cuda(cuda_ctx);
         bitset_trim_reset_cuda(cuda_ctx);
 #else
@@ -487,7 +487,7 @@ int main(int argc, char** argv) {
         }
       }
     } else if (personality == GPU_CUDA) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       for (auto ii = (*h_graph).masterNodesRange().begin();
            ii != (*h_graph).masterNodesRange().end(); ++ii) {
         galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii),

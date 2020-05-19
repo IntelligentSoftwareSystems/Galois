@@ -25,7 +25,7 @@
  */
 
 #pragma once
-#ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LCI
 #include "lc.h"
 
 extern lc_ep lc_col_ep;
