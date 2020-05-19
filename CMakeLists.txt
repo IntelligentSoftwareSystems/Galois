@@ -254,7 +254,14 @@ if(USE_DEEPGALOIS)
 endif(USE_DEEPGALOIS)
 
 if (GALOIS_ENABLE_GPU)
-  # TODO may require cleanup
+  enable_language(CUDA)
+  string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
+  string(REPLACE "," ";" GENCODES ${GENCODES})
+  foreach(GENCODE ${GENCODES})
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
+  endforeach()
+  add_subdirectory(libgpu)
+
   if (USE_DEEPGALOIS)
     SET(CUDA_SEPARABLE_COMPILATION ON)
     find_package(CUDA REQUIRED)
@@ -279,15 +286,6 @@ if (GALOIS_ENABLE_GPU)
 
     #find_package(OpenCL REQUIRED)
   endif()
-
-  enable_language(CUDA)
-  string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
-  string(REPLACE "," ";" GENCODES ${GENCODES})
-  foreach(GENCODE ${GENCODES})
-    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
-  endforeach()
-
-  add_subdirectory(libgpu)
 endif()
 add_subdirectory(libpangolin)
 

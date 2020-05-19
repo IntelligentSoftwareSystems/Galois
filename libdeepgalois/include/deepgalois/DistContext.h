@@ -1,6 +1,6 @@
 #ifndef __DG_DIST_CONTEXT__
 #define __DG_DIST_CONTEXT__
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #include "deepgalois/cutils.h"
 #else
 #include "galois/graphs/GluonSubstrate.h"
@@ -25,7 +25,7 @@ class DistContext {
   std::vector<Graph*> partitionedSubgraphs;
   label_t* h_labels;      // labels for classification. Single-class: Nx1, multi-class: NxE
   float_t* h_feats;       // input features: N x D
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   label_t* d_labels;      // labels on device
   label_t* d_labels_subg; // labels for subgraph on device
   float_t* d_feats;       // input features on device
@@ -68,7 +68,7 @@ public:
   Graph* getSubgraphPointer(int id) { return partitionedSubgraphs[id]; };
 
   void initializeSyncSubstrate();
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   float_t* get_feats_ptr() { return d_feats; }
   float_t* get_feats_subg_ptr() { return d_feats_subg; }
   label_t* get_labels_ptr() { return d_labels; }

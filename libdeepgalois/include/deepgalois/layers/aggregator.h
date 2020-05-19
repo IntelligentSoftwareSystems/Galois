@@ -2,7 +2,7 @@
 #include "deepgalois/types.h"
 //! For each node in the graph, add the embeddings of all of its neighbors
 //! together (using norm_factor if specified)
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
 #include "deepgalois/GraphTypes.h"
 namespace deepgalois {
 // TODO template arg

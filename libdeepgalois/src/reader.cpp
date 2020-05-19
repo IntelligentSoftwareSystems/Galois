@@ -17,7 +17,7 @@ namespace deepgalois {
 // required.
 size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   unsigned myID = 0;
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   myID = galois::runtime::getSystemNetworkInterface().ID;
   galois::gPrint("[", myID, "] Reader: Reading labels...\n");
 #endif

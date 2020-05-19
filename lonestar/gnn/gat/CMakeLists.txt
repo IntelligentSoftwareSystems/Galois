@@ -1,7 +1,7 @@
 add_executable(gat gat.cpp)
 target_link_libraries(gat PRIVATE Galois::shmem lonestar)
 
-if(ENABLE_HETERO_GALOIS)
+if(GALOIS_ENABLE_GPU)
   set_property(TARGET gat PROPERTY CUDA_STANDARD 14)
   set_property(TARGET gat PROPERTY CUDA_SEPARABLE_COMPILATION ON)
   target_link_libraries(gat PRIVATE dg_gpu dg_cpu)

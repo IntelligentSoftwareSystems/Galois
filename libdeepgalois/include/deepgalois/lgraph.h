@@ -127,7 +127,7 @@ public:
   index_t getEdgeDstHost(index_t eid) { return colidx_[eid]; }
   index_t edge_begin_host(index_t vid) { return rowptr_[vid]; }
   index_t edge_end_host(index_t vid) { return rowptr_[vid + 1]; }
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   index_t getEdgeDst(index_t eid) { return colidx_[eid]; }
   index_t edge_begin(index_t vid) { return rowptr_[vid]; }
   index_t edge_end(index_t vid) { return rowptr_[vid + 1]; }

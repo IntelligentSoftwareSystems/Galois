@@ -115,7 +115,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
           : 0.;
 
   unsigned myID = 0;
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
   std::cout << "[" << myID << "]" << std::setprecision(3) << std::fixed

@@ -15,7 +15,7 @@
 #include "deepgalois/layers/node.h"
 #include "deepgalois/DistContext.h"
 
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/layers/GluonGradients.h"
 #include "deepgalois/layers/GradientSyncStructs.h"
@@ -41,7 +41,7 @@ public:
   using ContextType = deepgalois::DistContext;
 
 protected:
-  #ifndef __GALOIS_HET_CUDA__
+  #ifndef GALOIS_ENABLE_GPU
   const std::string header =
       "[" + std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
       "] ";
@@ -70,7 +70,7 @@ protected:
   label_t* labels;
   float_t* norm_consts;
 // TODO
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   GraphGPU* graph_gpu;
 #else
   Graph* graph_cpu;
@@ -89,7 +89,7 @@ public:
   virtual void malloc_and_init() {}
   void print_layer_info() { //! debug print function
     unsigned myID = 0;
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
     myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
     std::cout << "[" << myID << "] Layer " << level_ << " type: " << layer_type()
@@ -120,7 +120,7 @@ public:
   void set_norm_consts_ptr(float_t* ptr) { norm_consts = ptr; }
   void set_feats_ptr(float_t* ptr) { prev_->set_data(ptr); }
   void set_name(std::string name) { name_ = name; } // name metadata
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   void set_graph_ptr(Graph* ptr) { graph_cpu = ptr; }
 #else
   void set_graph_ptr(GraphGPU* ptr) { graph_gpu = ptr; }
@@ -145,7 +145,7 @@ public:
     use_mask = false;
     if (masks != NULL) {
       use_mask = true;
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
       masks_ = masks;
 #else
       d_masks_ = masks;
@@ -183,7 +183,7 @@ public:
 
   //! use optimizer to update weights given gradient (weight_grad)
   void update_weight(deepgalois::optimizer* opt) {
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
     // parallelize only when target size is big enough to mitigate thread
     // spawning overhead.
     // bool parallel = (W.size() >= 512);

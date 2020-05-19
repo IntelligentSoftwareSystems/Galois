@@ -3,7 +3,7 @@
 #include "deepgalois/types.h"
 #include "deepgalois/lgraph.h"
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 #define USE_CSRGRAPH
 #ifdef USE_CSRGRAPH
 #include "graph_gpu.h"
@@ -16,7 +16,7 @@
 namespace deepgalois {
 using edge_iterator = index_t;
 using GraphCPU      = LearningGraph;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
 using DGraph        = CSRGraph;
 using Graph         = CSRGraph;
 using GraphGPU      = CSRGraph;

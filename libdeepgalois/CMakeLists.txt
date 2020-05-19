@@ -25,9 +25,9 @@ include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libgalois)
 
-if(ENABLE_HETERO_GALOIS)
+if(GALOIS_ENABLE_GPU)
   # hetero path
-  set(CUDA_NVCC_FLAGS "-D__GALOIS_HET_CUDA__ ${CUDA_NVCC_FLAGS}")
+  set(CUDA_NVCC_FLAGS "-DGALOIS_ENABLE_GPU ${CUDA_NVCC_FLAGS}")
   set(CUB_ROOT "${CMAKE_SOURCE_DIR}/cub") # only required headers
   include_directories("${CUB_ROOT}")
   set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/moderngpu") # only required headers
@@ -71,8 +71,8 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-if(ENABLE_HETERO_GALOIS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__GALOIS_HET_CUDA__")
+if(GALOIS_ENABLE_GPU)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGALOIS_ENABLE_GPU")
   set(sources src/reader.cpp src/RandomWalk.cpp src/utils.cpp)
 else()
   set(sources
@@ -94,7 +94,7 @@ else()
     src/node.cpp
     src/Net.cpp
   )
-endif(ENABLE_HETERO_GALOIS)
+endif(GALOIS_ENABLE_GPU)
 
 add_library(dg_cpu STATIC ${sources})
 target_link_libraries(dg_cpu galois_shmem)
@@ -114,7 +114,7 @@ if(GALOIS_ENABLE_DIST)
     ${CMAKE_SOURCE_DIR}/libgluon/include
   )
 
-  if(ENABLE_HETERO_GALOIS)
+  if(GALOIS_ENABLE_GPU)
     target_link_libraries(dg_gpu galois_dist_async galois_cusp galois_gluon)
     target_include_directories(dg_gpu PUBLIC
       ${CMAKE_SOURCE_DIR}/libdist/include

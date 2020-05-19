@@ -1,4 +1,4 @@
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
 #ifndef __GRAPH_CONV_SYNC_STRUCT__
 #define __GRAPH_CONV_SYNC_STRUCT__
 

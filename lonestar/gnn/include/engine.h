@@ -21,7 +21,7 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   galois::runtime::setStatFile(statFile);
 
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads); // number of threads on CPU
 #endif
 
@@ -54,7 +54,7 @@ void LonestarGnnStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 int main(int argc, char** argv) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   galois::SharedMemSys G;
 #else
   galois::DistMemSys G;
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
   // Get a partitioned graph first
   std::vector<unsigned> dummyVec;
   deepgalois::DGraph* dGraph = NULL;
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
   dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
   // initialize network + whole context on CPU

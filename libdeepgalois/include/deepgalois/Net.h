@@ -22,7 +22,7 @@ namespace deepgalois {
 // layer 1: features N x D, weights D x 16, out N x 16 (hidden1=16)
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
   unsigned myID = 0;
 #else
   unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
@@ -101,7 +101,7 @@ public:
         h1(hidden1), learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
         val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
-#ifndef __GALOIS_HET_CUDA__
+#ifndef GALOIS_ENABLE_GPU
     this->myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
     this->header    = "[" + std::to_string(myID) + "] ";
@@ -296,7 +296,7 @@ public:
       ////////////////////////////////////////////////////////////////////////////////
 
       // training steps
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::cout << header << "Epoch " << std::setw(3) << curEpoch << " ";
 #else
       galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
@@ -325,7 +325,7 @@ public:
       // validation / testing
       set_netphases(net_phase::test);
 
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
       std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
                 << train_loss << " train_acc " << train_acc << " ";
 #else
@@ -341,7 +341,7 @@ public:
         // Validation
         acc_t val_loss = 0.0, val_acc = 0.0;
         double val_time = evaluate("val", val_loss, val_acc);
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::cout << header << "val_loss " << std::setprecision(3) << std::fixed
                   << val_loss << " val_acc " << val_acc << " ";
         std::cout << header << "time " << std::setprecision(3) << std::fixed
@@ -355,7 +355,7 @@ public:
                        " val_time ", val_time, ")\n");
 #endif
       } else {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         std::cout << header << "train_time " << std::fixed << epoch_time
                   << " ms (fw " << fw_time << ", bw " << epoch_time - fw_time << ")\n";
 #else
@@ -367,7 +367,7 @@ public:
 
     double avg_train_time = total_train_time / (double)num_epochs;
     double throughput     = 1000.0 * (double)num_epochs / total_train_time;
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     std::cout << "Average training time per epoch: " << avg_train_time 
               << "ms. Throughput " << throughput << " epoch/s\n";
 #else
@@ -413,7 +413,7 @@ public:
       for (size_t i = 0; i < num_layers; i++)
         layers[i]->update_dim_size(distNumSamples);
       for (size_t i = 0; i < num_conv_layers; i++) {
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
         layers[i]->set_graph_ptr(distContext->getGraphPointer());
 #else
         layers[i]->set_graph_ptr(distContext->getLGraphPointer());
@@ -423,7 +423,7 @@ public:
       layers[num_layers - 1]->set_labels_ptr(distContext->get_labels_ptr());
       layers[0]->set_feats_ptr(distContext->get_feats_ptr()); // feed input data
     }
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     if (type == "train") {
       gMasks = d_train_masks;
     } else if (type == "val") {
@@ -552,7 +552,7 @@ public:
     out_dims[1]              = get_out_dim(layer_id);
     layers[layer_id] = new graph_conv_layer(layer_id, act, norm, bias, dropout,
                                             dropout_rate, in_dims, out_dims);
-#ifdef __GALOIS_HET_CUDA__
+#ifdef GALOIS_ENABLE_GPU
     layers[layer_id]->set_graph_ptr(distContext->getGraphPointer());
 #else
     layers[layer_id]->set_graph_ptr(distContext->getLGraphPointer());
