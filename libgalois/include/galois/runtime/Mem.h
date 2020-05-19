@@ -643,9 +643,23 @@ class FixedSizeHeap {
   SizedHeapFactory::SizedHeap* heap;
 
 public:
-  FixedSizeHeap(size_t size) { heap = SizedHeapFactory::getHeapForSize(size); }
+  FixedSizeHeap(size_t size) {
+    heap = SizedHeapFactory::getHeapForSize(size);
+    if (!heap && size != 0) {
+      fprintf(stderr, "ERROR: Cannot init a fixed sized heap from "
+                      "SizedHeapFactory\n");
+      throw std::bad_alloc();
+    }
+  }
 
-  inline void* allocate(size_t size) { return heap->allocate(size); }
+  inline void* allocate(size_t size) {
+    void* alloc = heap->allocate(size);
+    if (alloc == nullptr && size != 0) {
+      fprintf(stderr, "ERROR: Fixed sized heap allocate called failed\n");
+      throw std::bad_alloc();
+    }
+    return alloc;
+  }
 
   inline void deallocate(void* ptr) { heap->deallocate(ptr); }
 

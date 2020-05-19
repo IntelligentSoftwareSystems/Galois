@@ -56,7 +56,7 @@ public:
   typedef galois::substrate::SimpleLock Lock_ty;
 
 private:
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
+  alignas(substrate::GALOIS_CACHE_LINE_SIZE) Lock_ty mutex;
   Set orderedSet;
 
 public:
@@ -290,7 +290,7 @@ public:
 protected:
   typedef galois::substrate::SimpleLock Lock_ty;
 
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
+  alignas(substrate::GALOIS_CACHE_LINE_SIZE) Lock_ty mutex;
   container_type heap;
 
 public:

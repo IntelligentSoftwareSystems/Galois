@@ -20,7 +20,7 @@ else
 fi
 
 inputDir="${INPUT_DIR}"
-execDir="${GALOIS_BUILD}/lonestar/${appname}"
+execDir="${GALOIS_BUILD}/lonestar/analytics/cpu/${appname}"
 echo ${execDir}
 
 configType=$1
