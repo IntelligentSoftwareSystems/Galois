@@ -41,23 +41,10 @@ jobs:
     - name: install dependencies
       if: startsWith(matrix.os, 'ubuntu-')
       run: |
-        sudo apt install -yq ccache curl gcc-9 g++-9 libopenmpi-dev
-        sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
-        sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
-
-        sudo apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
-        curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-        sudo apt update
-        sudo apt install -yq clang-format-10 clang-tidy-10 llvm-10-dev
-
-        sudo update-alternatives --verbose --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 90
-        sudo update-alternatives --verbose --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 90
+        sudo -H .github/workflows/setup_ubuntu.sh
 
         clang-format --version
         clang-tidy --version
-
-        sudo -H pip3 install --upgrade pip setuptools
-        sudo -H pip3 install conan==1.24
     - name: pre-build
       run: mkdir -p $HOME/build
     - name: install C++ dependencies
@@ -80,7 +67,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DCMAKE_TOOLCHAIN_FILE=$HOME/build/conan_paths.cmake \
           -DCXX_CLANG_TIDY=clang-tidy \
-          -DENABLE_DIST_GALOIS=on
+          -DGALOIS_ENABLE_DIST=on
     - name: build
       run: cmake --build $HOME/build --parallel 4
 
@@ -147,29 +134,13 @@ jobs:
     - name: install dependencies
       if: startsWith(matrix.os, 'ubuntu-')
       run: |
-        sudo apt install -yq ccache curl gcc-9 g++-9 libopenmpi-dev
-        sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
-        sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
-
-        sudo apt-add-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
-        curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-        sudo apt update
-        # Install llvm via apt instead of as a conan package because existing
-        # conan packages do yet enable RTTI, which is required for boost
-        # serialization.
-        sudo apt install -yq clang-10 clang++-10 llvm-10-dev
-
-        sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
-        sudo update-alternatives --verbose --install /usr/bin/clang clang /usr/bin/clang-10 90
-
-        sudo -H pip3 install --upgrade pip setuptools
-        sudo -H pip3 install conan==1.24
+        sudo -H .github/workflows/setup_ubuntu.sh
 
         sudo sysctl -w kernel.core_pattern=$HOME/build/dumps/core.%e.%p.%h.%t
     - name: install dependencies
       if: startsWith(matrix.os, 'macOS-')
       run: |
-        brew install ccache conan openmpi llvm
+        brew install apache-arrow ccache conan llvm openmpi
 
         sudo sysctl -w kern.corefile=$HOME/build/dumps/core.%N.%P.%H.%I
     - name: pre-build
@@ -220,7 +191,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{matrix.cxx}} \
           -DCMAKE_C_COMPILER=$CC \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DENABLE_DIST_GALOIS=on \
+          -DGALOIS_ENABLE_DIST=on \
           -DUSE_ARCH=none \
           -DGRAPH_LOCATION=$HOME/.cache/graph/inputs
     - name: build

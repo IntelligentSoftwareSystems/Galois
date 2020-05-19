@@ -39,7 +39,7 @@ for ver in ${PYTHON_VERSIONS}; do
   export GALOIS_CMAKE_ARGS="\
     -DCMAKE_TOOLCHAIN_FILE=/tmp/conan/conan_paths.cmake \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-    -DUSE_NATIVE=none \
+    -DUSE_ARCH=none \
     "
 
   "${pybin}/pip3" wheel -w /tmp/wheelhouse "${SOURCE_DIR}"
