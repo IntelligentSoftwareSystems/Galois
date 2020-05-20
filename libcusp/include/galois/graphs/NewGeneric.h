@@ -1973,7 +1973,7 @@ private:
 #ifndef NDEBUG
     for (uint32_t i : masterMap) {
       assert(i != (uint32_t)-1);
-      assert(i >= 0 && i < base_DistGraph::numHosts);
+      assert(i < base_DistGraph::numHosts);
     }
 #endif
 
