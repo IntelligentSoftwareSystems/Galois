@@ -25,8 +25,7 @@ public:
     assert(brokenEdge != -1);
 
     if (checkIfBrokenEdgeIsTheLongest(brokenEdge, pState.getEdgesIterators(),
-                                      pState.getVertices(),
-                                      pState.getVerticesData())) {
+                                      pState.getVertices())) {
       return false;
     }
 

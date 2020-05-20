@@ -18,8 +18,7 @@ protected:
 
   bool checkIfBrokenEdgeIsTheLongest(
       int brokenEdge, const std::vector<optional<EdgeIterator>>& edgesIterators,
-      const std::vector<GNode>& vertices,
-      const std::vector<NodeData>& verticesData) const {
+      const std::vector<GNode>& vertices) const {
     std::vector<double> lengths(4);
     Graph& graph = connManager.getGraph();
     for (int i = 0, j = 0; i < 3; ++i) {
@@ -27,6 +26,9 @@ protected:
         lengths[j++] = graph.getEdgeData(edgesIterators[i].get()).getLength();
       } else {
         std::pair<int, int> brokenEdgeVertices = getEdgeVertices(brokenEdge);
+        // Suppress warning false positive.
+        // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
+        GALOIS_IGNORE_MAYBE_UNINITIALIZED
         GNode& hangingNode =
             connManager
                 .findNodeBetween(vertices[brokenEdgeVertices.first],
@@ -40,6 +42,7 @@ protected:
                          .getEdgeData(graph.findEdge(
                              vertices[brokenEdgeVertices.second], hangingNode))
                          .getLength();
+        GALOIS_END_IGNORE_MAYBE_UNINITIALIZED
       }
     }
     return !less(lengths[2] + lengths[3], lengths[0]) &&

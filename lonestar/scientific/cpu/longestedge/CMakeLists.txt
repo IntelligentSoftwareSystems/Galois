@@ -1,5 +1,3 @@
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-error>")
-
 add_executable(longestedge src/LongestEdge.cpp src/model/Map.cpp
                src/readers/SrtmReader.cpp src/readers/AsciiReader.cpp
                src/libmgrs/mgrs.c src/libmgrs/polarst.c src/libmgrs/tranmerc.c
