@@ -78,7 +78,7 @@ galois::substrate::createPthreadBarrier(unsigned activeThreads) {
 #else
 
 std::unique_ptr<galois::substrate::Barrier>
-galois::substrate::createPthreadBarrier(unsigned activeThreads) {
+galois::substrate::createPthreadBarrier(unsigned GALOIS_UNUSED(activeThreads)) {
   return std::unique_ptr<Barrier>(nullptr);
 }
 
