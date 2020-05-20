@@ -88,11 +88,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
   endif()
-
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from openmpi
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
-  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
