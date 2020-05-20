@@ -113,8 +113,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
   endif()
-
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
