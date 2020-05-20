@@ -52,7 +52,7 @@ protected:
   static inline bool is_all_connected_dag(Graph& g, unsigned dst,
                                           const EmbeddingTy& emb, unsigned end,
                                           unsigned start = 0) {
-    assert(start >= 0 && end > 0);
+    assert(end > 0);
     bool all_connected = true;
     for (unsigned i = start; i < end; ++i) {
       unsigned from = emb.get_vertex(i);

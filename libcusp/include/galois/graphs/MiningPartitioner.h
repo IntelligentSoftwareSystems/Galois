@@ -750,7 +750,7 @@ private:
           uint64_t gid = base_DistGraph::localToGlobalVector[lid];
           assert(gid < base_DistGraph::numGlobalNodes);
           unsigned hostReader = getHostReader(gid);
-          assert(hostReader >= 0 && hostReader < base_DistGraph::numHosts);
+          assert(hostReader < base_DistGraph::numHosts);
           assert(hostReader != base_DistGraph::id); // self shouldn't be proxy
 
           uint64_t nodeOffset = base_DistGraph::gid2host[hostReader].first;
