@@ -84,11 +84,12 @@ void papiInit() {
   int retval = PAPI_library_init(PAPI_VER_CURRENT);
 
   if (retval != PAPI_VER_CURRENT && retval > 0) {
-    GALOIS_DIE("PAPI library version mismatch!");
+    GALOIS_DIE("PAPI library version mismatch: ", retval,
+               " != ", PAPI_VER_CURRENT);
   }
 
   if (retval < 0) {
-    GALOIS_DIE("Initialization error!");
+    GALOIS_DIE("initialization error!");
   }
 
   if ((retval = PAPI_thread_init(&papiGetTID)) != PAPI_OK) {
@@ -102,7 +103,7 @@ void decodePapiEvents(const V1& eventNames, V2& papiEvents) {
     char buf[256];
     std::strcpy(buf, eventNames[i].c_str());
     if (PAPI_event_name_to_code(buf, &papiEvents[i]) != PAPI_OK) {
-      GALOIS_DIE("Failed to recognize eventName = ", eventNames[i],
+      GALOIS_DIE("failed to recognize eventName = ", eventNames[i],
                  ", event code: ", papiEvents[i]);
     }
   }
@@ -112,7 +113,7 @@ template <typename V1, typename V2, typename V3>
 void papiStart(V1& eventSets, V2& papiResults, V3& papiEvents) {
   galois::on_each([&](const unsigned tid, const unsigned numT) {
     if (PAPI_register_thread() != PAPI_OK) {
-      GALOIS_DIE("Failed to register thread with PAPI");
+      GALOIS_DIE("failed to register thread with PAPI");
     }
 
     int& eventSet = *eventSets.getLocal();
@@ -121,11 +122,11 @@ void papiStart(V1& eventSets, V2& papiResults, V3& papiEvents) {
     papiResults.getLocal()->resize(papiEvents.size());
 
     if (PAPI_create_eventset(&eventSet) != PAPI_OK) {
-      GALOIS_DIE("Failed to init event set");
+      GALOIS_DIE("failed to init event set");
     }
     if (PAPI_add_events(eventSet, papiEvents.data(), papiEvents.size()) !=
         PAPI_OK) {
-      GALOIS_DIE("Failed to add events");
+      GALOIS_DIE("failed to add events");
     }
 
     if (PAPI_start(eventSet) != PAPI_OK) {
@@ -160,7 +161,7 @@ void papiStop(V1& eventSets, V2& papiResults, V3& eventNames,
     }
 
     if (PAPI_unregister_thread() != PAPI_OK) {
-      GALOIS_DIE("Failed to un-register thread with PAPI");
+      GALOIS_DIE("failed to un-register thread with PAPI");
     }
   });
 }

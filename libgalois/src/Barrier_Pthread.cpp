@@ -38,31 +38,35 @@ class PthreadBarrier : public galois::substrate::Barrier {
 
 public:
   PthreadBarrier() {
-    if (pthread_barrier_init(&bar, 0, ~0))
-      GALOIS_DIE("PTHREAD");
+    int err = 0;
+    if ((err = pthread_barrier_init(&bar, 0, ~0)))
+      GALOIS_DIE("pthread ", err);
   }
 
   PthreadBarrier(unsigned int v) {
-    if (pthread_barrier_init(&bar, 0, v))
-      GALOIS_DIE("PTHREAD");
+    int err = 0;
+    if ((err = pthread_barrier_init(&bar, 0, v)))
+      GALOIS_DIE("pthread ", err);
   }
 
   virtual ~PthreadBarrier() {
-    if (pthread_barrier_destroy(&bar))
-      GALOIS_DIE("PTHREAD");
+    int err = 0;
+    if ((err = pthread_barrier_destroy(&bar)))
+      GALOIS_DIE("pthread ", err);
   }
 
   virtual void reinit(unsigned val) {
-    if (pthread_barrier_destroy(&bar))
-      GALOIS_DIE("PTHREAD");
-    if (pthread_barrier_init(&bar, 0, val))
-      GALOIS_DIE("PTHREAD");
+    int err = 0;
+    if ((err = pthread_barrier_destroy(&bar)))
+      GALOIS_DIE("pthread ", err);
+    if ((err = pthread_barrier_init(&bar, 0, val)))
+      GALOIS_DIE("pthread ", err);
   }
 
   virtual void wait() {
     int rc = pthread_barrier_wait(&bar);
     if (rc && rc != PTHREAD_BARRIER_SERIAL_THREAD)
-      GALOIS_DIE("PTHREAD");
+      GALOIS_DIE("pthread ", rc);
   }
 
   virtual const char* name() const { return "PthreadBarrier"; }

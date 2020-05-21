@@ -159,7 +159,7 @@ template <typename Graph>
 void verify(Graph& g, const std::string& prefix) {
   std::cout << countEdges(g) << " : " << g.sizeEdges() << "\n";
   if (countEdges(g) != g.sizeEdges()) {
-    GALOIS_DIE("Error: edge list of input graph probably not sorted");
+    GALOIS_DIE("edge list of input graph probably not sorted");
   }
 
   double error = sumSquaredError(g);
@@ -1479,7 +1479,7 @@ void run() {
       writeAsciiLatentVectors(g, outputFilename);
       break;
     default:
-      GALOIS_DIE("Invalid output type for latent vector output");
+      GALOIS_DIE("invalid output type for latent vector output");
     }
   }
 

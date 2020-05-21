@@ -219,7 +219,7 @@ public:
       }
     } else {
       // stage 0 = this function shouldn't be called
-      GALOIS_DIE("Master setup incomplete");
+      GALOIS_DIE("master setup incomplete");
       return (uint32_t)-1;
     }
   }
@@ -327,7 +327,7 @@ public:
         return false;
       }
     } else {
-      GALOIS_DIE("add master mapping should only be called in stage 0/1");
+      GALOIS_DIE("unexpected status in add master mapping: ", _status);
       return false;
     }
   }

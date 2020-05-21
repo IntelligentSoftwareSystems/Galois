@@ -652,7 +652,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
     for (int phase = 0; phase < 2; ++phase) {
       std::ifstream infile(infilename.c_str());
       if (!infile) {
-        GALOIS_DIE("Failed to open input file");
+        GALOIS_DIE("failed to open input file");
       }
 
       // Skip comments
@@ -676,7 +676,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
         }
       }
       if (tokens.size() != 3) {
-        GALOIS_DIE("Unknown problem specification line: ", line.str());
+        GALOIS_DIE("unknown problem specification line: ", line.str());
       }
       // Prefer C functions for maximum compatibility
       // nnodes = std::stoull(tokens[0]);
@@ -705,10 +705,10 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
 
         infile >> cur_id >> neighbor_id >> weight;
         if (cur_id == 0 || cur_id > nnodes) {
-          GALOIS_DIE("Error: node id out of range: ", cur_id);
+          GALOIS_DIE("node id out of range: ", cur_id);
         }
         if (neighbor_id == 0 || neighbor_id > nnodes) {
-          GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
+          GALOIS_DIE("neighbor id out of range: ", neighbor_id);
         }
 
         // 1 indexed
@@ -724,7 +724,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
 
       infile.peek();
       if (!infile.eof()) {
-        GALOIS_DIE("Error: additional lines in file");
+        GALOIS_DIE("additional lines in file");
       }
     }
     // this is for the progress print
@@ -2236,7 +2236,7 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
         }
       }
       if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
-        GALOIS_DIE("Unknown problem specification line: ", line.str());
+        GALOIS_DIE("unknown problem specification line: ", line.str());
       }
       // Prefer C functions for maximum compatibility
       // nnodes = std::stoull(tokens[tokens.size() - 2]);
@@ -2270,10 +2270,10 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
 
         infile >> cur_id >> neighbor_id >> weight;
         if (cur_id == 0 || cur_id > nnodes) {
-          GALOIS_DIE("Error: node id out of range: ", cur_id);
+          GALOIS_DIE("node id out of range: ", cur_id);
         }
         if (neighbor_id == 0 || neighbor_id > nnodes) {
-          GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
+          GALOIS_DIE("neighbor id out of range: ", neighbor_id);
         }
 
         // 1 indexed
@@ -2288,7 +2288,7 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
 
       infile.peek();
       if (!infile.eof()) {
-        GALOIS_DIE("Error: additional lines in file");
+        GALOIS_DIE("additional lines in file");
       }
     }
 
@@ -2333,7 +2333,7 @@ struct Pbbs2Gr : public HasOnlyVoidSpecialization {
 
     infile >> header >> nnodes >> nedges;
     if (header != "AdjacencyGraph") {
-      GALOIS_DIE("Error: unknown file format");
+      GALOIS_DIE("unknown file format");
     }
 
     p.setNumNodes(nnodes);

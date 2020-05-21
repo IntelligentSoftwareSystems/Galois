@@ -907,7 +907,7 @@ public:
   void readGraphFromGRFile(const std::string& filename) {
     std::ifstream graphFile(filename.c_str());
     if (!graphFile.is_open()) {
-      GALOIS_DIE("ERROR: Failed to open file.");
+      GALOIS_DIE("failed to open file");
     }
     uint64_t header[4];
     graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
@@ -923,7 +923,7 @@ public:
      **/
     assert(edgeIndData.data());
     if (!edgeIndData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+      GALOIS_DIE("out of memory");
     }
 
     // start position to read index data
@@ -936,7 +936,7 @@ public:
      **/
     assert(edgeDst.data());
     if (!edgeDst.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+      GALOIS_DIE("out of memory");
     }
 
     readPosition = ((4 + numNodes) * sizeof(uint64_t));
@@ -959,14 +959,14 @@ public:
         readPosition += sizeof(uint64_t);
       }
     } else {
-      GALOIS_DIE("ERROR: Unknown graph file version.");
+      GALOIS_DIE("unknown file version: ", version);
     }
     /**
      * Load edge data array
      **/
     assert(edgeData.data());
     if (!edgeData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeData.");
+      GALOIS_DIE("out of memory");
     }
     graphFile.seekg(readPosition);
     graphFile.read(reinterpret_cast<char*>(edgeData.data()),
@@ -989,7 +989,7 @@ public:
   void readGraphFromGRFile(const std::string& filename) {
     std::ifstream graphFile(filename.c_str());
     if (!graphFile.is_open()) {
-      GALOIS_DIE("ERROR: Failed to open file.");
+      GALOIS_DIE("failed to open file");
     }
     uint64_t header[4];
     graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
@@ -1005,7 +1005,7 @@ public:
      **/
     assert(edgeIndData.data());
     if (!edgeIndData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+      GALOIS_DIE("out of memory");
     }
     // start position to read index data
     uint64_t readPosition = (4 * sizeof(uint64_t));
@@ -1017,7 +1017,7 @@ public:
      **/
     assert(edgeDst.data());
     if (!edgeDst.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+      GALOIS_DIE("out of memory");
     }
     readPosition = ((4 + numNodes) * sizeof(uint64_t));
     graphFile.seekg(readPosition);
@@ -1028,7 +1028,7 @@ public:
       graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
                      sizeof(uint64_t) * numEdges);
     } else {
-      GALOIS_DIE("ERROR: Unknown graph file version.");
+      GALOIS_DIE("unknown file version: ", version);
     }
 
     initializeLocalRanges();

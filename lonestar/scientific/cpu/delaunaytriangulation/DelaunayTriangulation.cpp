@@ -312,7 +312,7 @@ public:
   void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
     if (!scanner.good()) {
-      GALOIS_DIE("Could not open file: ", name);
+      GALOIS_DIE("could not open file: ", name);
     }
     if (name.find(".node") == name.size() - 5) {
       fromTriangle(scanner);
@@ -324,7 +324,7 @@ public:
     if (points.size())
       addBoundaryPoints();
     else {
-      GALOIS_DIE("No points found in file: ", name);
+      GALOIS_DIE("no points found in file: ", name);
     }
   }
 };
@@ -535,7 +535,7 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     Verifier verifier;
     if (!verifier.verify(&graph)) {
-      GALOIS_DIE("Triangulation failed");
+      GALOIS_DIE("triangulation failed");
     }
     std::cout << "Triangulation OK\n";
   }

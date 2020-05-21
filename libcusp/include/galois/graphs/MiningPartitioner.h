@@ -88,7 +88,7 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
 
     uint64_t* outIndexBuffer = (uint64_t*)malloc(sizeof(uint64_t) * numNodes);
     if (outIndexBuffer == nullptr) {
-      GALOIS_DIE("OOM, get node degrees");
+      GALOIS_DIE("out of memory");
     }
     uint64_t numBytesToLoad = numNodes * sizeof(uint64_t);
     uint64_t bytesRead      = 0;
@@ -699,7 +699,7 @@ private:
         // no data sent; just clear again
         numOutgoingEdges[sendingHost].clear();
       } else {
-        GALOIS_DIE("invalid recv inspection data metadata mode, outgoing");
+        GALOIS_DIE("unreachable: ", outgoingExists);
       }
     }
 
@@ -864,7 +864,7 @@ public:
         return *edge;
       }
     }
-    GALOIS_DIE("edge lid should be found from edge gid");
+    GALOIS_DIE("unreachable");
     return (uint64_t)-1;
   }
 
@@ -883,7 +883,7 @@ public:
       }
     }
 
-    GALOIS_DIE("source not found for edge, shouldn't happen");
+    GALOIS_DIE("unreachable");
     return (uint32_t)-1;
   }
 
