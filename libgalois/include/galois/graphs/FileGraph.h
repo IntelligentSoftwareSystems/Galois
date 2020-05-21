@@ -327,7 +327,7 @@ public:
                 internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode, EdgeTy>,
                                               CompTy>(comp));
     } else {
-      GALOIS_DIE("unknown file version at sortEdgesByEdgeData", graphVersion);
+      GALOIS_DIE("unknown file version: ", graphVersion);
     }
   }
 
@@ -372,7 +372,7 @@ public:
           &edgeDst, &ed);
       std::sort(begin, end, comp);
     } else {
-      GALOIS_DIE("unknown file version at sortEdgesByEdgeData", graphVersion);
+      GALOIS_DIE("unknown file version: ", graphVersion);
     }
   }
 

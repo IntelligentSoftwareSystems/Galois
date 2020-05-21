@@ -200,11 +200,11 @@ int main(int argc, char** argv) {
     int size = galois::ParallelSTL::count_if(graph.begin(), graph.end(),
                                              is_bad(graph));
     if (size != 0) {
-      GALOIS_DIE("Bad triangles remaining");
+      GALOIS_DIE("bad triangles remaining");
     }
     Verifier v;
     if (!v.verify(graph)) {
-      GALOIS_DIE("Refinement failed");
+      GALOIS_DIE("refinement failed");
     }
     std::cout << std::distance(graph.begin(), graph.end())
               << " total triangles\n";

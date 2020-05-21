@@ -713,7 +713,8 @@ private:
           assert(!loadsClear.test(sendingHost));
           loadsClear.set(sendingHost);
         } else {
-          GALOIS_DIE("Invalid message type for async load synchronization");
+          GALOIS_DIE("unexpected message type in async load synchronization: ",
+                     messageType);
         }
       }
     } while (p);
@@ -961,7 +962,7 @@ private:
         } else if (phase == 0) {
           net.sendTagged(h, galois::runtime::evilPhase, b);
         } else {
-          GALOIS_DIE("phase in send all clears should be 0 or 1");
+          GALOIS_DIE("unexpected phase: ", phase);
         }
       }
     }
@@ -1030,7 +1031,8 @@ private:
       galois::runtime::gDeserialize(p->second, receivedOffsets);
       galois::runtime::gDeserialize(p->second, receivedMasters);
     } else if (messageType != 0) {
-      GALOIS_DIE("Invalid message type for sync of master assignments");
+      GALOIS_DIE("invalid message type for sync of master assignments: ",
+                 messageType);
     }
 
     galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
@@ -1087,7 +1089,8 @@ private:
           assert(!hostFinished.test(sendingHost));
           hostFinished.set(sendingHost);
         } else if (messageType != 0) {
-          GALOIS_DIE("Invalid message type for sync of master assignments");
+          GALOIS_DIE("invalid message type for sync of master assignments: ",
+                     messageType);
         }
 
         galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,

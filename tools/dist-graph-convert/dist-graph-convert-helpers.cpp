@@ -111,8 +111,8 @@ uint32_t findOwner(const uint64_t gID,
     } else if (gID >= currentPair.second) { // gid >= currentPair.second
       // MOVE UP
       lb = mid + 1;
-    } else { // die; we should fall into one of the above cases
-      GALOIS_DIE("Issue in findOwner in dist-graph-convert helpers.");
+    } else {
+      GALOIS_DIE("unreachable");
     }
   }
 

@@ -602,8 +602,7 @@ int main(int argc, char** argv) {
   }
 
   if (startNode && !sourceVector.empty()) {
-    GALOIS_DIE("Should not use startNode cmd-line option with specified "
-               "sources");
+    GALOIS_DIE("startNode option not compatible with sourcesToUse");
   }
 
   // "sourceVector" if file not provided

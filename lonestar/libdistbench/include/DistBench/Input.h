@@ -82,7 +82,7 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
   case SUGAR_O:
     return "sugar-oec";
   default:
-    GALOIS_DIE("Unsupported partition");
+    GALOIS_DIE("unsupported partition scheme: ", e);
   }
 }
 
@@ -130,8 +130,9 @@ template <typename NodeData, typename EdgeData>
 galois::graphs::DistGraph<NodeData, EdgeData>*
 constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
   if (!inputFileSymmetric) {
-    GALOIS_DIE("Calling constructSymmetricGraph without inputFileSymmetric "
-               "flag");
+    GALOIS_DIE("application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph");
   }
 
   switch (partitionScheme) {
@@ -173,7 +174,7 @@ constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
         inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true,
         inputFileTranspose);
   default:
-    GALOIS_DIE("Error: partition scheme specified is invalid");
+    GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
     return nullptr;
   }
 }
@@ -214,8 +215,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
           inputFileTranspose, mastersFile);
     } else {
-      GALOIS_DIE("Error: attempting incoming edge cut without transpose "
-                 "graph");
+      GALOIS_DIE("incoming edge cut requires transpose graph");
       break;
     }
 
@@ -229,8 +229,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting incoming hybrid cut without transpose "
-                 "graph");
+      GALOIS_DIE("incoming hybrid cut requires transpose graph");
       break;
     }
 
@@ -245,8 +244,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting cvc incoming cut without "
-                 "transpose graph");
+      GALOIS_DIE("cvc incoming cut requires transpose graph");
       break;
     }
 
@@ -264,7 +262,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      GALOIS_DIE("Ginger requires transpose graph");
       break;
     }
 
@@ -278,7 +276,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSR, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      GALOIS_DIE("Fennel requires transpose graph");
       break;
     }
 
@@ -288,7 +286,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
         inputFileTranspose);
 
   default:
-    GALOIS_DIE("Error: partition scheme specified is invalid");
+    GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
     return nullptr;
   }
 }
@@ -341,8 +339,7 @@ constructGraph(std::vector<unsigned>&) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
           inputFileTranspose, mastersFile);
     } else {
-      GALOIS_DIE("Error: attempting incoming edge cut without transpose "
-                 "graph");
+      GALOIS_DIE("iec requires transpose graph");
       break;
     }
 
@@ -356,7 +353,7 @@ constructGraph(std::vector<unsigned>&) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
+      GALOIS_DIE("hivc requires transpose graph");
       break;
     }
 
@@ -371,7 +368,7 @@ constructGraph(std::vector<unsigned>&) {
                                                   galois::CUSP_CSC, false,
                                                   inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
+      GALOIS_DIE("cvc requires transpose graph");
       break;
     }
 
@@ -385,7 +382,7 @@ constructGraph(std::vector<unsigned>&) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      GALOIS_DIE("Ginger requires transpose graph");
       break;
     }
 
@@ -399,7 +396,7 @@ constructGraph(std::vector<unsigned>&) {
           inputFile, galois::CUSP_CSC, galois::CUSP_CSC, false,
           inputFileTranspose);
     } else {
-      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      GALOIS_DIE("Fennel requires transpose graph");
       break;
     }
 
@@ -409,7 +406,7 @@ constructGraph(std::vector<unsigned>&) {
         inputFileTranspose);
 
   default:
-    GALOIS_DIE("Error: partition scheme specified is invalid");
+    GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
     return nullptr;
   }
 }
