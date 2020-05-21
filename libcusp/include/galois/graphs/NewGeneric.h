@@ -28,6 +28,7 @@
 
 #include "galois/graphs/DistributedGraph.h"
 #include "galois/DReducible.h"
+#include <optional>
 #include <sstream>
 
 #define CUSP_PT_TIMER 0
@@ -2934,18 +2935,10 @@ private:
         GRNAME, std::string("EdgeLoadingMaxBytesSent"), maxBytesSent.reduce());
   }
 
-  //! Optional type
-  //! @tparam T type that the variable may possibly take
-  template <typename T>
-#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
-  using optional_t = std::experimental::optional<T>;
-#else
-  using optional_t = boost::optional<T>;
-#endif
   //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
   template <typename GraphTy>
   void processReceivedEdgeBuffer(
-      optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
+      std::optional<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
       GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
     if (buffer) {
       auto& rb = buffer->second;
