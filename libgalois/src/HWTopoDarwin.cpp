@@ -17,17 +17,19 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "galois/substrate/HWTopo.h"
 #include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/HWTopo.h"
+#include "galois/substrate/SimpleLock.h"
 #include "galois/gIO.h"
 
 #include <mach/mach_interface.h>
 #include <mach/thread_policy.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
-#include <pthread.h>
-
 #include <algorithm>
+#include <memory>
+#include <mutex>
+#include <pthread.h>
 
 using namespace galois::substrate;
 
@@ -45,17 +47,14 @@ int getIntValue(const char* name) {
   return value;
 }
 
-} // namespace
-
-std::pair<machineTopoInfo, std::vector<threadTopoInfo>>
-galois::substrate::getHWTopo() {
-  machineTopoInfo mti;
+HWTopoInfo makeHWTopo() {
+  MachineTopoInfo mti;
   mti.maxSockets   = getIntValue("hw.packages");
   mti.maxThreads   = getIntValue("hw.logicalcpu_max");
   mti.maxCores     = getIntValue("hw.physicalcpu_max");
   mti.maxNumaNodes = mti.maxSockets;
 
-  std::vector<threadTopoInfo> tti;
+  std::vector<ThreadTopoInfo> tti;
   tti.reserve(mti.maxThreads);
 
   // Darwin doesn't expose more fine-grained topology information,
@@ -68,7 +67,7 @@ galois::substrate::getHWTopo() {
   //          |- core 1 +
   // thread 3 +
 
-  const int threadsPerSocket =
+  const unsigned threadsPerSocket =
       (mti.maxThreads + mti.maxThreads - 1) / mti.maxSockets;
 
   // Describe dense configuration first; then, sort logical threads to the
@@ -76,7 +75,7 @@ galois::substrate::getHWTopo() {
   for (unsigned i = 0; i < mti.maxThreads; ++i) {
     unsigned socket = i / threadsPerSocket;
     unsigned leader = socket * threadsPerSocket;
-    tti.push_back(threadTopoInfo{
+    tti.push_back(ThreadTopoInfo{
         .socketLeader = leader,
         .socket       = socket,
         .numaNode     = socket,
@@ -85,11 +84,11 @@ galois::substrate::getHWTopo() {
     });
   }
 
-  const int logicalPerPhysical =
+  const unsigned logicalPerPhysical =
       (mti.maxThreads + mti.maxThreads - 1) / mti.maxCores;
 
   std::sort(tti.begin(), tti.end(),
-            [&](const threadTopoInfo& a, const threadTopoInfo& b) {
+            [&](const ThreadTopoInfo& a, const ThreadTopoInfo& b) {
               int smtA = a.osContext % logicalPerPhysical;
               int smtB = b.osContext % logicalPerPhysical;
               if (smtA == smtB) {
@@ -104,8 +103,13 @@ galois::substrate::getHWTopo() {
     tti[i].cumulativeMaxSocket = m;
   }
 
-  return std::make_pair(mti, tti);
+  return {
+      .machineTopoInfo = mti,
+      .threadTopoInfo  = tti,
+  };
 }
+
+} // namespace
 
 //! binds current thread to OS HW context "proc"
 bool galois::substrate::bindThreadSelf(unsigned osContext) {
@@ -121,4 +125,15 @@ bool galois::substrate::bindThreadSelf(unsigned osContext) {
   }
 
   return true;
+}
+
+HWTopoInfo galois::substrate::getHWTopo() {
+  static SimpleLock lock;
+  static std::unique_ptr<HWTopoInfo> data;
+
+  std::lock_guard<SimpleLock> guard(lock);
+  if (!data) {
+    data = std::make_unique<HWTopoInfo>(makeHWTopo());
+  }
+  return *data;
 }
