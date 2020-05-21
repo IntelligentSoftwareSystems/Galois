@@ -418,9 +418,8 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("SSSP", "Max Iterations",
-                                 (unsigned int){maxIterations});
-    galois::runtime::reportParam("SSSP", "Source Node ID", uint64_t{src_node});
+    galois::runtime::reportParam("SSSP", "Max Iterations", maxIterations);
+    galois::runtime::reportParam("SSSP", "Source Node ID", src_node);
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
