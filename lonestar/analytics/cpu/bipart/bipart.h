@@ -25,9 +25,14 @@
 
 class MetisNode;
 typedef uint32_t EdgeTy;
-using GGraph =
-    galois::graphs::LC_CSR_Graph<MetisNode, EdgeTy>::with_no_lockable<
-        true>::type::with_numa_alloc<true>::type;
+
+struct GGraph
+    : public galois::graphs::LC_CSR_Graph<MetisNode, EdgeTy>::with_no_lockable<
+          true>::type::with_numa_alloc<true>::type {
+  size_t hedges;
+  size_t hnodes;
+};
+
 using GNode    = GGraph::GraphNode;
 using GNodeBag = galois::InsertBag<GNode>;
 

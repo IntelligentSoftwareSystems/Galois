@@ -321,18 +321,15 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    base_DistGraph::printStatistics();
     loadEdges(base_DistGraph::graph, bufGraph, proxiesOnOtherHosts);
     // TODO this might be useful to keep around
     proxiesOnOtherHosts.clear();
     ndegrees.clear();
 
-    // base_DistGraph::printEdges();
     // SORT EDGES
     if (doSort) {
       base_DistGraph::sortEdgesByDestination();
     }
-    // base_DistGraph::printEdges();
 
     if (setupGluon) {
       galois::CondStatTimer<MORE_DIST_STATS> TfillMirrorsEdges(
