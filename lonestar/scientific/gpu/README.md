@@ -26,10 +26,12 @@ The dependencies for LonestarGPU suite are the same as shared-memory. Note that 
 
 To build the LonestarGPU suite, first, create a build directory and run CMake with DGALOIS\_ENABLE\_GPU flag in the build directory, as shown below.
 
+```Shell
 `cd ${GALOIS_ROOT}`
 `mkdir build`
 `cd build`
 `cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_GPU=1`
+```
 
 After compiling through CMake, the system will create the 'lonestar/analytics/gpu' and 'lonestar/scientific/gpu' 
 directories in ${GALOIS\_ROOT}/build directory. 
@@ -43,8 +45,10 @@ following command in the ${GALOIS\_ROOT}/build/lonestar/scientific/gpu directory
 
 You can compile a specific app by executing the following commands (shown for barneshut).
 
+```Shell
 `cd barneshut`
 `make -j`
+```
 
 # Running Scientific Applications
 
