@@ -43,7 +43,7 @@ following command in the dist_apps directory.
 
 You can compile a specific app by specifying it by name:
 
-`make -j bfs_push`
+`make -j bfs-push`
 
 Running Provided Apps
 ================================================================================
@@ -51,7 +51,7 @@ Running Provided Apps
 You can learn how to run compiled applications by running them with the -help
 command line option:
 
-`./bfs_push -help`
+`./bfs-push -help`
 
 Most of the provided graph applications take graphs in a .gr format, which
 is a Galois graph format that stores the graph in a CSR or CSC format. We 
@@ -68,7 +68,7 @@ performance.
 If using MPI, multiple processes split across multiple hosts can be specified
 with the following:
 
-`GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=<# of processes> -hosts=<machines to run on> ./bfs_push <input graph>`
+`GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=<# of processes> -hosts=<machines to run on> ./bfs-push <input graph>`
 
 The distributed applications have a few common command line flags that are
 worth noting. More details can be found by running a distributed application
