@@ -14,6 +14,6 @@ following command in the ${GALOIS\_ROOT}/build/lonestar/analytics/gpu/triangle d
 
 ## RUN
 
-Execute as: ./triangle [-o output-file] undirected-graph-file
+Execute as: ./triangle-counting [-o output-file] undirected-graph-file
 
-e.g., ./triangle -o outfile.txt road-USA.sgr
+e.g., ./triangle-counting -o outfile.txt road-USA.sgr
