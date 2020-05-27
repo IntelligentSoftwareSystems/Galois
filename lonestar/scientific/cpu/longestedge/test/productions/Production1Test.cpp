@@ -49,7 +49,7 @@ TEST_CASE("Production1 simple Test") {
   ConnectivityManager connManager{graph};
   Production1 production{connManager};
   ProductionState pState(connManager, nodes[5], false,
-                         [](double x, double y) { return 0.; });
+                         [](double, double) { return 0.; });
   production.execute(pState, ctx);
 
   REQUIRE(countHEdges(graph) == 3);
@@ -68,16 +68,16 @@ TEST_CASE("Production1 complex Test") {
   ConnectivityManager connManager{graph};
   Production1 production{connManager};
   ProductionState pState1(connManager, nodes[6], false,
-                          [](double x, double y) { return 0.; });
+                          [](double, double) { return 0.; });
   production.execute(pState1, ctx);
   ProductionState pState2(connManager, nodes[7], false,
-                          [](double x, double y) { return 0.; });
+                          [](double, double) { return 0.; });
   production.execute(pState2, ctx);
   ProductionState pState3(connManager, nodes[8], false,
-                          [](double x, double y) { return 0.; });
+                          [](double, double) { return 0.; });
   production.execute(pState3, ctx);
   ProductionState pState4(connManager, nodes[9], false,
-                          [](double x, double y) { return 0.; });
+                          [](double, double) { return 0.; });
   production.execute(pState4, ctx);
 
   REQUIRE(countHEdges(graph) == 6);

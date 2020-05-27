@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
   //    afterStep(0, graph);
   for (int j = 0; j < steps; j++) {
     galois::for_each(galois::iterate(graph.begin(), graph.end()),
-                     [&](GNode node, auto& ctx) {
+                     [&](GNode node, auto&) {
                        if (basicCondition(graph, node)) {
 
                          // terrain checker to see if refinement needed
@@ -227,7 +227,8 @@ int main(int argc, char** argv) {
   }
 
   if (display) {
-    system((std::string("./display.sh ") + output).c_str());
+    if (system((std::string("./display.sh ") + output).c_str()))
+      std::abort();
   }
 
   delete map;
@@ -241,4 +242,4 @@ bool basicCondition(const Graph& graph, GNode& node) {
 }
 
 //! Writes intermediate data to file
-void afterStep(int step, Graph& graph) {}
+void afterStep(int GALOIS_UNUSED(step), Graph& GALOIS_UNUSED(graph)) {}

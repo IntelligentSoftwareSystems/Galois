@@ -9,7 +9,7 @@ TEST_CASE("ProductionState construction lengths test") {
   std::vector<GNode> nodes = generateSampleGraph(graph);
   ConnectivityManager connManager{graph};
   ProductionState pState{connManager, nodes[4], false,
-                         [](double x, double y) { return 0.; }};
+                         [](double, double) { return 0.; }};
 
   REQUIRE(fabs(pState.getLengths()[0] - 1) <= 1e-6);
   REQUIRE(fabs(pState.getLengths()[1] - 1) <= 1e-6);
