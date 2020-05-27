@@ -124,7 +124,8 @@ void SrtmReader::read_from_file(int north_border_int, int west_border_int,
   }
   uint16_t* buffer = (uint16_t*)malloc(PIXEL_SIZE * cols);
   for (size_t i = 0; i < rows; ++i) {
-    fread(buffer, PIXEL_SIZE, cols, map_file);
+    if (cols != fread(buffer, PIXEL_SIZE, cols, map_file))
+      std::abort();
     if (fseek(map_file, (cells_in_degree - cols) * PIXEL_SIZE, SEEK_CUR) ==
         -1) {
       fprintf(stderr, "%s\n", strerror(errno));

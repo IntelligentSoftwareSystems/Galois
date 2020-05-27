@@ -227,7 +227,8 @@ int main(int argc, char** argv) {
   }
 
   if (display) {
-    system((std::string("./display.sh ") + output).c_str());
+    if (system((std::string("./display.sh ") + output).c_str()))
+      std::abort();
   }
 
   delete map;
