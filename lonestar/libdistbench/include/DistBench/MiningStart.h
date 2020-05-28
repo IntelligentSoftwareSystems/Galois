@@ -107,7 +107,7 @@ static void marshalGPUGraph(
     *cuda_ctx = get_CUDA_context(my_host_id);
 
     if (!init_CUDA_context(*cuda_ctx, gpudevice)) {
-      GALOIS_DIE("Failed to initialize CUDA context");
+      GALOIS_DIE("failed to initialize CUDA context");
     }
 
     EdgeMarshalGraph m;

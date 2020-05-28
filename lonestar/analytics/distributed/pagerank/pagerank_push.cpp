@@ -487,8 +487,7 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
-                                 (unsigned int){maxIterations});
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", maxIterations);
     std::ostringstream ss;
     ss << tolerance;
     galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());

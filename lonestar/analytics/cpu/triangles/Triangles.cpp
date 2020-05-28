@@ -435,7 +435,7 @@ void makeSortedGraph(Graph& graph) {
         }
         // this assert makes sure reindex was correct + makes sure all edges
         // are accounted for
-        assert(currentEdgeIndex = newPrefixSum[newIndex]);
+        assert(currentEdgeIndex == newPrefixSum[newIndex]);
       },
       galois::steal(), galois::loopname("ReindexingGraph"));
 

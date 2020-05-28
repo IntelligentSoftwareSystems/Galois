@@ -10,6 +10,7 @@ function(app_gpu name)
   if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
 
     #target_compile_options(${name}_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-dc>)
+    target_compile_options(${name}_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-w>)
 
     target_link_libraries(${name}_gpu Galois::gpu)
     set_property(TARGET ${name}_gpu PROPERTY CUDA_STANDARD 14)

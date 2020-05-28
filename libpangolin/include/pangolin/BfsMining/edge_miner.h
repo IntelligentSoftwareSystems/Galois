@@ -265,7 +265,7 @@ public:
           for (unsigned i = 0; i < num_domains; i++) {
             if ((*lmap)[cg]->has_domain_reached_support(i) == false) {
               unsigned qp_idx = cg.get_quick_pattern_index(i);
-              assert(qp_idx >= 0 && qp_idx < num_domains);
+              assert(qp_idx < num_domains);
               UintSet equ_set = equivalences.get_equivalent_set(qp_idx);
               for (unsigned idx : equ_set) {
                 DomainSupport* support = element.second;

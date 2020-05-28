@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
     if (BFS::verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
-      GALOIS_DIE("Verification failed");
+      GALOIS_DIE("verification failed");
     }
   }
 

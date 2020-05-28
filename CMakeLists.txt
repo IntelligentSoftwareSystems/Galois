@@ -83,11 +83,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from openmpi
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
   endif()
 endif()
 
@@ -96,13 +95,19 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
+
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")

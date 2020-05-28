@@ -1155,7 +1155,7 @@ void start(int N, int numEdges, int numGroups) {
       typename GraphTypes<G>::Matching matching;
       PrepareForVerifier<G, Algo>()(g, &matching);
       if (!Verifier<G>()(g, matching)) {
-        GALOIS_DIE("Verification failed");
+        GALOIS_DIE("verification failed");
       } else {
         std::cout << "Verification successful.\n";
       }

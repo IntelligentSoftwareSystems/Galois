@@ -132,8 +132,7 @@ struct InitializeGraph {
     if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
       std::string impl_str(
-          // syncSubstrate->get_run_identifier("InitializeGraph")
-          "InitializeGraph");
+          syncSubstrate->get_run_identifier("InitializeGraph"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph_allNodes_cuda(cuda_ctx);
@@ -179,8 +178,7 @@ struct InitializeIteration {
     if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
       std::string impl_str(
-          // syncSubstrate->get_run_identifier("InitializeIteration")
-          std::string(REGION_NAME) + "_InitializeIteration");
+          syncSubstrate->get_run_identifier("InitializeIteration"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeIteration_allNodes_cuda(infinity, current_src_node, cuda_ctx);
@@ -250,10 +248,8 @@ struct ForwardPass {
 
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
-        std::string impl_str(
-            // syncSubstrate->get_run_identifier(std::string(REGION_NAME) +
-            // "_ForwardPass")
-            std::string(REGION_NAME) + "_ForwardPass");
+        std::string impl_str(syncSubstrate->get_run_identifier(
+            std::string(REGION_NAME) + "_ForwardPass"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
@@ -344,9 +340,7 @@ struct MiddleSync {
 
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
-        std::string impl_str(
-            // syncSubstrate->get_run_identifier("MiddleSync")
-            std::string(REGION_NAME) + "_MiddleSync");
+        std::string impl_str(syncSubstrate->get_run_identifier("MiddleSync"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         MiddleSync_masterNodes_cuda(infinity, cuda_ctx);
@@ -399,9 +393,7 @@ struct BackwardPass {
     for (; backRoundCount > 0; backRoundCount--) {
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
-        std::string impl_str(
-            // syncSubstrate->get_run_identifier("BackwardPass")
-            std::string(REGION_NAME) + "_BackwardPass");
+        std::string impl_str(syncSubstrate->get_run_identifier("BackwardPass"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BackwardPass_nodesWithEdges_cuda(backRoundCount, cuda_ctx);
@@ -476,7 +468,7 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
       if (personality == GPU_CUDA) {
 #ifdef GALOIS_ENABLE_GPU
-        std::string impl_str("BC");
+        std::string impl_str(syncSubstrate->get_run_identifier("BC"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BC_masterNodes_cuda(cuda_ctx);
