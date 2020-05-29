@@ -1,10 +1,10 @@
 #ifndef VERTEX_MINER_H
 #define VERTEX_MINER_H
-#include "pangolin/BfsMining/embedding_list.h"
-#include "pangolin/canonical_graph.h"
 #include "pangolin/miner.h"
 #include "pangolin/ptypes.h"
 #include "pangolin/quick_pattern.h"
+#include "pangolin/canonical_graph.h"
+#include "pangolin/BfsMining/embedding_list.h"
 
 template <typename ElementTy, typename EmbeddingTy, typename API,
           bool enable_dag = false, bool is_single = true,
