@@ -548,6 +548,7 @@ uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
+
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // Total timer

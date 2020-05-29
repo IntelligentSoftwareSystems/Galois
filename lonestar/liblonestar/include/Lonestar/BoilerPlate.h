@@ -28,6 +28,7 @@
 extern llvm::cl::opt<bool> skipVerify;
 extern llvm::cl::opt<int> numThreads;
 extern llvm::cl::opt<std::string> statFile;
+extern llvm::cl::opt<bool> symmetricGraph;
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, const char* app,

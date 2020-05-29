@@ -5,6 +5,7 @@
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarMineStart(argc, argv, name, desc, url);
+
   AppMiner miner(k, numThreads);
   galois::StatTimer Tinitial("GraphReadingTime");
   Tinitial.start();

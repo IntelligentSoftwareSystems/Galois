@@ -33,24 +33,24 @@ static const char* desc = "Computes the betweenness centrality of all nodes in "
                           "a graph";
 static const char* url = "betweenness_centrality";
 
-static llvm::cl::opt<std::string> filename(llvm::cl::Positional,
-                                           llvm::cl::desc("<input file>"),
-                                           llvm::cl::Required);
-static llvm::cl::opt<int> iterLimit("limit",
-                                    llvm::cl::desc("Limit number of iterations "
-                                                   "to value (0 is all nodes)"),
-                                    llvm::cl::init(0));
-static llvm::cl::opt<unsigned int> startNode("startNode",
-                                             llvm::cl::desc("Node to start "
-                                                            "search from"),
-                                             llvm::cl::init(0));
-static llvm::cl::opt<bool> forceVerify("forceVerify",
-                                       llvm::cl::desc("Abort if not verified; "
-                                                      "only makes sense for "
-                                                      "torus graphs"));
-static llvm::cl::opt<bool> printAll("printAll",
-                                    llvm::cl::desc("Print betweenness values "
-                                                   "for all nodes"));
+namespace cll = llvm::cl;
+
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<int> iterLimit("limit",
+                               cll::desc("Limit number of iterations "
+                                         "to value (0 is all nodes)"),
+                               cll::init(0));
+static cll::opt<unsigned int> startNode("startNode",
+                                        cll::desc("Node to start "
+                                                  "search from"),
+                                        cll::init(0));
+static cll::opt<bool> forceVerify("forceVerify",
+                                  cll::desc("Abort if not verified; "
+                                            "only makes sense for "
+                                            "torus graphs"));
+static cll::opt<bool> printAll("printAll", cll::desc("Print betweenness values "
+                                                     "for all nodes"));
 
 using Graph = galois::graphs::LC_CSR_Graph<void, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type;

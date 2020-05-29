@@ -49,6 +49,13 @@ static cll::opt<bool>
     outputVerbose("v", cll::desc("verbose output (default: false)"),
                   cll::init(false));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! AIG format.
+static cll::opt<bool> AIG(
+    "AIG",
+    cll::desc("Specify that the input graph is a AND-Inverter Graph format"),
+    cll::init(false));
+
 using namespace std::chrono;
 
 void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
@@ -62,10 +69,15 @@ void rdCut(aig::Aig& aig, std::string& fileName, int nThreads, bool verbose);
 std::string getFileName(std::string path);
 
 int main(int argc, char* argv[]) {
-
   // shared-memory system object initializes global variables for galois
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!AIG) {
+    GALOIS_DIE("This application requires an AND-Inverter Graph (AIG) format;"
+               " please use the -AIG flag "
+               " to indicate the input is a AIG format.");
+  }
 
   int nThreads         = numThreads;
   std::string path     = inputFileName;

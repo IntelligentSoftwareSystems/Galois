@@ -53,6 +53,13 @@ static cll::opt<std::string>
              cll::desc("directory of POWV9.dat and POST9.dat (REQUIRED)"),
              cll::Required);
 
+//! Flag that forces user to be aware that they should be passing in a
+//! ISPD2008 graph.
+static cll::opt<bool> ISPD2008Graph(
+    "ISPD2008Graph",
+    cll::desc("Specify that the input graph is a ISPD2008 graph format"),
+    cll::init(false));
+
 int main(int argc, char** argv) {
   //    char benchFile[FILESTRLEN];
   clock_t t1, t2, t3;
@@ -88,6 +95,12 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
   galois::preAlloc(numThreads * 2);
+
+  if (!ISPD2008Graph) {
+    GALOIS_DIE("This application requires a ISPD2008 graph input;"
+               " please use the -ISPD2008Graph flag "
+               " to indicate the input is a ISPD2008 graph format.");
+  }
 
   if (outfile != "") {
     needOUTPUT = true;

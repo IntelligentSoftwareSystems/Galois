@@ -57,6 +57,12 @@ static cll::opt<std::string>
                 cll::desc("Write the mesh out to files with basename"),
                 cll::value_desc("basename"));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! mesh graph.
+static cll::opt<bool>
+    meshGraph("meshGraph", cll::desc("Specify that the input graph is a mesh"),
+              cll::init(false));
+
 using Tree = typename galois::graphs::SpatialTree2d<Point*>;
 
 //! All Point* refer to elements in this bag
@@ -514,6 +520,12 @@ static void writeMesh(const std::string& filename, Graph& graph) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!meshGraph) {
+    GALOIS_DIE("This application requires a mesh graph input;"
+               " please use the -meshGraph flag "
+               " to indicate the input is a mesh graph.");
+  }
 
   Graph graph;
   Tree tree;

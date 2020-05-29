@@ -44,10 +44,6 @@ enum Algo { parallel, exp_parallel };
 
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Graph already symmetric (default value false)"),
-                   cll::init(false));
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value parallel):"),
          cll::values(clEnumVal(parallel, "Parallel")), cll::init(parallel));

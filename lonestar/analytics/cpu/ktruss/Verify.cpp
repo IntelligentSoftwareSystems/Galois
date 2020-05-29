@@ -207,6 +207,12 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
+  if (!symmetricGraph) {
+    GALOIS_DIE("This application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph.");
+  }
+
   if (2 > trussNum) {
     std::cerr << "trussNum >= 2" << std::endl;
     return -1;

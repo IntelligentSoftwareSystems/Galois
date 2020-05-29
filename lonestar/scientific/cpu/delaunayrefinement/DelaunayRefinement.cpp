@@ -53,6 +53,12 @@ static cll::opt<DetAlgo>
                         clEnumVal(detDisjoint, "Disjoint execution")),
             cll::init(nondet));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! mesh graph.
+static cll::opt<bool>
+    meshGraph("meshGraph", cll::desc("Specify that the input graph is a mesh"),
+              cll::init(false));
+
 template <typename WL, int Version = detBase>
 void refine(galois::InsertBag<GNode>& initialBad, Graph& graph) {
 
@@ -129,6 +135,12 @@ struct DetLessThan {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!meshGraph) {
+    GALOIS_DIE("This application requires a mesh graph input;"
+               " please use the -meshGraph flag "
+               " to indicate the input is a mesh graph.");
+  }
 
   Graph graph;
   {

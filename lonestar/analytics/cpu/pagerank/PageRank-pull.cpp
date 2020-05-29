@@ -36,6 +36,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                                        clEnumVal(Residual, "Residual")),
                            cll::init(Residual));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! transposed graph.
+static cll::opt<bool>
+    transposedGraph("transposedGraph",
+                    cll::desc("Specify that the input graph is transposed"),
+                    cll::init(false));
+
 constexpr static const unsigned CHUNK_SIZE = 32;
 
 struct LNode {
@@ -267,6 +274,12 @@ void prResidual(Graph& graph) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!transposedGraph) {
+    GALOIS_DIE("This application requires a transposed graph input;"
+               " please use the -transposedGraph flag "
+               " to indicate the input is a transposed graph.");
+  }
 
   galois::StatTimer overheadTime("OverheadTime");
   overheadTime.start();

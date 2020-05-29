@@ -57,6 +57,7 @@ static cll::opt<double>
                cll::desc("Decay rate to be used in step size function "
                          "(DECAY_RATE): Default 0.9"),
                cll::init(0.9));
+
 /******************************************************************************/
 /* Graph structure declarations + helper functions + other initialization */
 /******************************************************************************/
