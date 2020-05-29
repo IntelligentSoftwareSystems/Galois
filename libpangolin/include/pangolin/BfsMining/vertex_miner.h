@@ -1,10 +1,10 @@
 #ifndef VERTEX_MINER_H
 #define VERTEX_MINER_H
+#include "pangolin/BfsMining/embedding_list.h"
+#include "pangolin/canonical_graph.h"
 #include "pangolin/miner.h"
 #include "pangolin/ptypes.h"
 #include "pangolin/quick_pattern.h"
-#include "pangolin/canonical_graph.h"
-#include "pangolin/BfsMining/embedding_list.h"
 
 template <typename ElementTy, typename EmbeddingTy, typename API,
           bool enable_dag = false, bool is_single = true,
@@ -106,7 +106,8 @@ public:
                   if (is_single)
                     total_num += 1;
                   else {
-                    // unsigned pid  = getPattern(n, i, dst, emb, pos);
+                    // unsigned pid  = getPattern(n, i, dst, emb,
+                    // pos);
                     if (n < 4) {
                       unsigned pid =
                           this->find_motif_pattern_id(n, i, dst, emb, pos);
@@ -315,15 +316,18 @@ public:
   inline void canonical_reduce() {
     for (auto i = 0; i < this->num_threads; i++)
       cg_localmaps.getLocal(i)->clear();
-    galois::do_all(galois::iterate(qp_map),[&](auto& element) {
-      StrCgMapFreq* cg_map = cg_localmaps.getLocal();
-      StrCPattern cg(element.first);
-      if (cg_map->find(cg) != cg_map->end())
-        (*cg_map)[cg] += element.second;
-      else
-        (*cg_map)[cg] = element.second;
-      cg.clean();
-    }, galois::chunk_size<CHUNK_SIZE>(), galois::loopname("CanonicalReduce"));
+    galois::do_all(
+        galois::iterate(qp_map),
+        [&](auto& element) {
+          StrCgMapFreq* cg_map = cg_localmaps.getLocal();
+          StrCPattern cg(element.first);
+          if (cg_map->find(cg) != cg_map->end())
+            (*cg_map)[cg] += element.second;
+          else
+            (*cg_map)[cg] = element.second;
+          cg.clean();
+        },
+        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("CanonicalReduce"));
     qp_map.clear();
   }
   inline void merge_qp_map() {
@@ -371,8 +375,7 @@ public:
       if (this->max_size < 9) {
         std::cout << std::endl;
         for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
-        	std::cout << "{" << it->first << "} --> " << it->second <<
-        std::endl;
+          std::cout << "{" << it->first << "} --> " << it->second << std::endl;
       } else {
         std::cout << std::endl;
         for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
