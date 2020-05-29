@@ -20,7 +20,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include "galois/graphs/BufferedGraph.h"
-#include "galois/graphs/B_LC_CSR_Graph.h"
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/Bag.h"
 
 #include "BCNode.h"
@@ -75,7 +75,7 @@ static cll::opt<bool> generateCert("generateCertificate",
 //                                   cll::init(true));
 
 using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
-using Graph    = galois::graphs::B_LC_CSR_Graph<NodeType, BCEdge, false, true>;
+using Graph = galois::graphs::LC_CSR_CSC_Graph<NodeType, BCEdge, false, true>;
 
 // Work items for the forward phase
 struct ForwardPhaseWorkItem {
