@@ -257,7 +257,7 @@ public:
       return true;
     }
     // if (inflightRecvs > 0) {
-      // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
     // }
     return (inflightRecvs > 0);
   }

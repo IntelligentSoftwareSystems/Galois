@@ -616,31 +616,30 @@ private:
         get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
   }
 
-
   template <typename SyncFnTy>
   size_t getMaxSendBufferSize(uint32_t numShared) {
     if (substrateDataMode == gidsData) {
-      return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
-                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else if (substrateDataMode == offsetsData) {
-      return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
-                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else if (substrateDataMode == bitsetData) {
       size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
       return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t)   // bitset size
-                + sizeof(size_t) // bitset vector size
-                + bitset_alloc_size + sizeof(size_t) +
-                (numShared * sizeof(typename SyncFnTy::ValTy));
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else { // onlyData or noData (auto)
       size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
       return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t)   // bitset size
-                + sizeof(size_t) // bitset vector size
-                + bitset_alloc_size + sizeof(size_t) +
-                (numShared * sizeof(typename SyncFnTy::ValTy));
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     }
   }
 
@@ -2048,8 +2047,8 @@ private:
         b[x].getVec().clear();
       }
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
-                    (loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x,
+                                                                  b[x]);
 
       MPI_Isend((uint8_t*)b[x].linearData(), b[x].size(), MPI_BYTE, x, 32767,
                 MPI_COMM_WORLD, &request[x]);
@@ -2081,7 +2080,8 @@ private:
       if (nothingToSend(x, syncType, writeLocation, readLocation))
         continue;
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x,
+                                                                  b[x]);
 
       size[x] = b[x].size();
       send_buffers_size += size[x];
@@ -2433,8 +2433,8 @@ private:
 
       galois::runtime::RecvBuffer rbuf(rb[x].begin(), rb[x].begin() + size);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
-                   (x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf,
+                                                                  loopName);
     }
   }
 
@@ -2461,7 +2461,8 @@ private:
 
       MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf,
+                                                                  loopName);
     }
   }
 #endif
@@ -2594,8 +2595,8 @@ private:
 
     TSendTime.start();
     if (use_bitset_to_send) {
-      sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    BitsetFnTy, VecTy, async>(loopName);
+      sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                    VecTy, async>(loopName);
     } else {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
                     galois::InvalidBitsetFnTy, VecTy, async>(loopName);
@@ -2680,19 +2681,17 @@ private:
     TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
-                   VecTy, async>(
-          loopName, mpi_access_group, window);
+                   VecTy, async>(loopName, mpi_access_group, window);
     } else {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy,
-                   galois::InvalidBitsetFnTy, VecTy, async>
-                     (loopName, mpi_access_group, window);
+                   galois::InvalidBitsetFnTy, VecTy, async>(
+          loopName, mpi_access_group, window);
     }
     TSendTime.stop();
 
     TRecvTime.start();
     sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
-                 VecTy, async>(
-        loopName, window, rb);
+                 VecTy, async>(loopName, window, rb);
     TRecvTime.stop();
   }
 #endif
@@ -2817,7 +2816,8 @@ private:
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncBroadcast,
-                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName, use_bitset);
+                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName,
+                                                                  use_bitset);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
