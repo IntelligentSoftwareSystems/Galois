@@ -196,7 +196,7 @@ public:
   bool propagate() { return this->find()->isReady(); }
 
   virtual void alwaysAcquire(Lockable*, galois::MethodFlag) {
-    GALOIS_DIE("shouldn't reach here");
+    GALOIS_DIE("unreachable");
   }
 };
 
@@ -1593,7 +1593,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
     return false;
     break;
   default:
-    GALOIS_DIE("Unknown conflict flag");
+    GALOIS_DIE("unknown conflict flag");
     break;
   }
 
@@ -1605,7 +1605,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
     for (auto& item : tld.facing.getPushBuffer()) {
       this->pushNew(item, parent, ++count);
       if (count == 0) {
-        GALOIS_DIE("Counter overflow");
+        GALOIS_DIE("counter overflow");
       }
     }
     if (count)

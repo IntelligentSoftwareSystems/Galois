@@ -95,5 +95,5 @@ unsigned galois::runtime::SimpleRuntimeContext::cancelIteration() {
 
 void galois::runtime::SimpleRuntimeContext::subAcquire(
     galois::runtime::Lockable*, galois::MethodFlag) {
-  GALOIS_DIE("Shouldn't get here");
+  GALOIS_DIE("unreachable");
 }

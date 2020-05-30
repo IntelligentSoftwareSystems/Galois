@@ -354,73 +354,108 @@ void edgeIteratingAlgo(Graph& graph) {
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
 
-void makeGraph(Graph& graph, const std::string& triangleFilename) {
-  typedef galois::graphs::FileGraph G;
-  typedef G::GraphNode N;
-
-  G initial, permuted;
-
+//! Sorts read graph by degree (high degree nodes are reindexed to beginning)
+void makeSortedGraph(Graph& graph) {
+  // read original graph
+  galois::graphs::FileGraph initial;
   initial.fromFileInterleaved<void>(inputFilename);
 
-  // Getting around lack of resize for deque
-  std::deque<N> nodes;
-  std::copy(initial.begin(), initial.end(), std::back_inserter(nodes));
+  size_t numGraphNodes = initial.size();
+  // create node -> degree pairs
+  using DegreeNodePair = std::pair<uint64_t, uint32_t>;
+  std::vector<DegreeNodePair> dnPairs(numGraphNodes);
+  galois::do_all(
+      galois::iterate((size_t)0, numGraphNodes),
+      [&](size_t nodeID) {
+        size_t nodeDegree =
+            std::distance(initial.edge_begin(nodeID), initial.edge_end(nodeID));
+        dnPairs[nodeID] = DegreeNodePair(nodeDegree, nodeID);
+      },
+      galois::loopname("CreateDegreeNodeVector"));
 
-  /* Sort by degree:
-   *  DegreeLess: Sorts in the ascending order of node degrees
-   *  DegreeGreater: Sorts in the descending order of the node degrees
-   *
-   *  The order of sorting has a huge impact on performance
-   *  For this algorithm, sorting in descending order delivers the
-   *  best performance due to the way ties are broken.
-   */
-  galois::ParallelSTL::sort(nodes.begin(), nodes.end(),
-                            DegreeGreater<G>(initial));
+  // sort by degree (first item)
+  galois::ParallelSTL::sort(dnPairs.begin(), dnPairs.end(),
+                            std::greater<DegreeNodePair>());
 
-  std::deque<N> p;
-  std::copy(nodes.begin(), nodes.end(), std::back_inserter(p));
-  // Transpose
-  size_t idx = 0;
-  for (N n : nodes) {
-    p[n] = idx++;
-  }
+  // create mapping, get degrees out to another vector to get prefix sum
+  std::vector<uint32_t> oldToNewMapping(numGraphNodes);
+  std::vector<uint64_t> inProgressPrefixSum(numGraphNodes);
+  galois::do_all(
+      galois::iterate((size_t)0, numGraphNodes),
+      [&](size_t index) {
+        // save degree, which is pair.first
+        inProgressPrefixSum[index] = dnPairs[index].first;
+        // save mapping; original index is in .second, map it to current index
+        oldToNewMapping[dnPairs[index].second] = index;
+      },
+      galois::loopname("CreateRemappingGetPrefixSum"));
 
-  galois::graphs::permute<void>(initial, p, permuted);
-  galois::do_all(galois::iterate(permuted),
-                 [&](N x) { permuted.sortEdges<void>(x, IdLess<N, void>()); });
+  std::vector<uint64_t> newPrefixSum(numGraphNodes);
+  galois::ParallelSTL::partial_sum(inProgressPrefixSum.begin(),
+                                   inProgressPrefixSum.end(),
+                                   newPrefixSum.begin());
 
-  if (storeRelabeledGraph) {
-    std::cout << "Writing new input file: " << triangleFilename << "\n";
-    permuted.toFile(triangleFilename);
-  }
-  galois::graphs::readGraph(graph, permuted);
+  // allocate graph
+  graph.allocateFrom(numGraphNodes, initial.sizeEdges());
+  // construct nodes
+  graph.constructNodes();
+  // set edge endpoints using prefix sum
+  galois::do_all(
+      galois::iterate((size_t)0, numGraphNodes),
+      [&](size_t nodeIndex) {
+        graph.fixEndEdge(nodeIndex, newPrefixSum[nodeIndex]);
+      },
+      galois::loopname("SetEdgeEndpoints"));
+
+  // construct edges by looping through filegraph and saving to correct
+  // locations
+  galois::do_all(
+      galois::iterate(initial.begin(), initial.end()),
+      [&](uint32_t oldNodeID) {
+        uint32_t newIndex = oldToNewMapping[oldNodeID];
+
+        // get the start location of this reindex'd nodes edges
+        uint64_t currentEdgeIndex;
+        if (newIndex != 0) {
+          currentEdgeIndex = newPrefixSum[newIndex - 1];
+        } else {
+          currentEdgeIndex = 0;
+        }
+
+        // construct the graph, reindexing as it goes along
+        for (auto e = initial.edge_begin(oldNodeID);
+             e < initial.edge_end(oldNodeID); e++) {
+          // get destination, reindex
+          uint32_t oldEdgeDst       = initial.getEdgeDst(e);
+          uint32_t reindexedEdgeDst = oldToNewMapping[oldEdgeDst];
+
+          // construct edge
+          graph.constructEdge(currentEdgeIndex, reindexedEdgeDst);
+          currentEdgeIndex++;
+        }
+        // this assert makes sure reindex was correct + makes sure all edges
+        // are accounted for
+        assert(currentEdgeIndex == newPrefixSum[newIndex]);
+      },
+      galois::steal(), galois::loopname("ReindexingGraph"));
+
+  // sort by destinations
+  graph.sortAllEdgesByDst();
+  // initialize local ranges
+  graph.initializeLocalRanges();
 }
 
 void readGraph(Graph& graph) {
-  if (relabel && inputFilename.find(".gr.triangles") !=
-                     inputFilename.size() - strlen(".gr.triangles")) {
-    // Not directly passed .gr.triangles file
-    std::string triangleFilename = inputFilename + ".triangles";
-    std::ifstream triangleFile(triangleFilename.c_str());
-    if (!triangleFile.good()) {
-      // triangles doesn't already exist, create it
-      galois::StatTimer Trelabel("GraphRelabelTimer");
-      galois::gPrint("WARNING: Sorted graph does not exist; Relabelling and "
-                     "Creating a sorted graph\n");
-      Trelabel.start();
-      makeGraph(graph, triangleFilename);
-      Trelabel.stop();
-    } else {
-      // triangles does exist, load it
-      galois::graphs::readGraph(graph, triangleFilename);
-    }
+  if (relabel) {
+    galois::gInfo("Relabeling and sorting graph...");
+    galois::StatTimer Trelabel("GraphRelabelTimer");
+    Trelabel.start();
+    makeSortedGraph(graph);
+    Trelabel.stop();
   } else {
     galois::graphs::readGraph(graph, inputFilename);
-  }
-
-  size_t index = 0;
-  for (GNode n : graph) {
-    graph.getData(n) = index++;
+    // algorithm correctness requires sorting edges by destination
+    graph.sortAllEdgesByDst();
   }
 }
 
@@ -439,6 +474,7 @@ int main(int argc, char** argv) {
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
+  galois::gInfo("Starting triangle counting...");
   galois::StatTimer T;
   T.start();
   // case by case preAlloc to avoid allocating unnecessarily

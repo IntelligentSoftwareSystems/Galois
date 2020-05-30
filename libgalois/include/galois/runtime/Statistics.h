@@ -280,7 +280,7 @@ struct VecStat : public VecStat_with_MinMaxSum<T> {
       return Base::avg();
 
     default:
-      GALOIS_DIE("Shouldn't reach this point");
+      GALOIS_DIE("unreachable");
     }
   }
 };
@@ -305,7 +305,7 @@ struct VecStat<gstl::Str> : public AggregStat<gstl::Str>::with_mem {
       return Base::values()[0];
 
     default:
-      GALOIS_DIE("Shouldn't reach this point. m_totalTy has unsupported value");
+      GALOIS_DIE("unreachable");
     }
   }
 };

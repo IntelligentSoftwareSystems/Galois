@@ -99,11 +99,11 @@ Number of threads to use on a single machine excluding a communication thread
 that is used by all of the provided distributed benchmarks. Note that 
 GPUs only use 1 thread (excluding the communication thread).
 
-`-verify`
+`-output` / `-outputLocation=<directory>`
 
-Outputs a file with the result of running the application. For example, 
-specifying this flag on a bfs application will output the shortest distances
-to each node.
+Outputs the result of running the application to a file. For example,
+specifying this flag on a bfs application will output the shortest distances to
+each node.
 
 Running Provided Apps (Distributed Heterogeneous Apps)
 ================================================================================

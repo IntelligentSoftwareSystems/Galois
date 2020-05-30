@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
-#define GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
+#define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
 #include "galois/config.h"
 #include "galois/gIO.h"
@@ -33,8 +33,7 @@
 #include "galois/substrate/ThreadPool.h"
 #include "galois/Timer.h"
 
-namespace galois {
-namespace runtime {
+namespace galois::runtime {
 
 namespace internal {
 
@@ -54,7 +53,7 @@ class DoAllStealingExec {
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE substrate::SimpleLock work_mutex;
+    alignas(substrate::GALOIS_CACHE_LINE_SIZE) substrate::SimpleLock work_mutex;
     unsigned id;
 
     Iter shared_beg;
@@ -65,11 +64,11 @@ class DoAllStealingExec {
     // Stats
 
     ThreadContext()
-        : work_mutex(),
-          id(substrate::getThreadPool()
-                 .getMaxThreads()), // TODO: fix this initialization problem,
-                                    // see initThread
-          shared_beg(), shared_end(), m_size(0), num_iter(0) {}
+        : work_mutex(), id(substrate::getThreadPool().getMaxThreads()),
+          shared_beg(), shared_end(), m_size(0), num_iter(0) {
+      // TODO: fix this initialization problem,
+      // see initThread
+    }
 
     ThreadContext(unsigned id, Iter beg, Iter end)
         : work_mutex(), id(id), shared_beg(beg), shared_end(end),
@@ -185,7 +184,7 @@ class DoAllStealingExec {
         if (hasWorkWeak()) {
           succ = true;
 
-          if (amount == HALF && m_size > (decltype(m_size))chunk_size) {
+          if (amount == HALF && m_size > (Diff_ty)chunk_size) {
             steal_size = m_size / 2;
           } else {
             steal_size = m_size;
@@ -322,51 +321,6 @@ private:
     return sawWork || stoleWork;
   }
 
-  /*
-  GALOIS_ATTRIBUTE_NOINLINE bool stealFlat (ThreadContext& poor, const unsigned
-  maxT) {
-
-    // TODO: test performance of sawWork + stoleWork vs stoleWork only
-    bool sawWork = false;
-    bool stoleWork = false;
-
-    assert ((LL::getMaxCores () / LL::getMaxSockets ()) >= 1);
-
-    // TODO: check this steal amount. e.g. all hungry threads in one socket may
-    // steal too much work from full threads in another socket
-    // size_t stealAmt = chunk_size * (LL::getMaxCores () / LL::getMaxSockets
-  ()); size_t stealAmt = chunk_size;
-
-    for (unsigned i = 1; i < maxT; ++i) { // skip poor.id by starting at 1
-
-      unsigned t = (poor.id + i) % maxT;
-
-      if (workers.getRemote (t)->hasWorkWeak ()) {
-        sawWork = true;
-
-        stoleWork = transferWork (*workers.getRemote (t), poor, stealAmt);
-
-        if (stoleWork) {
-          break;
-        }
-      }
-    }
-
-    return sawWork || stoleWork;
-  }
-
-
-  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinActive (ThreadContext& poor) {
-
-    return stealFlat (poor, galois::getActiveThreads ());
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE bool stealGlobal (ThreadContext& poor) {
-    return stealFlat (poor, LL::getMaxThreads ());
-  }
-
-  */
-
   GALOIS_ATTRIBUTE_NOINLINE bool trySteal(ThreadContext& poor) {
     bool ret = false;
 
@@ -394,28 +348,6 @@ private:
     substrate::asmPause();
 
     return ret;
-
-    // if (stealWithinSocket (poor)) {
-    // return true;
-    // } else if (LL::isSocketLeader(poor.id)
-    // && stealOutsideSocket (poor)) {
-    // return true;
-    // } else if (stealOutsideSocket (poor)) {
-    // return true;
-    //
-    // } else {
-    // return false;
-    // }
-
-    // if (stealWithinSocket (poor)) {
-    // return true;
-    // } else if (stealWithinActive (poor)) {
-    // return true;
-    // } else if (stealGlobal (poor)) {
-    // return true;
-    // } else {
-    // return false;
-    // }
   }
 
 private:
@@ -444,9 +376,6 @@ public:
         execTime(loopname, "Execute"), stealTime(loopname, "Steal"),
         termTime(loopname, "Term") {
     assert(chunk_size > 0);
-    // std::printf ("DoAllStealingExec loopname: %s, work size: %ld, chunk_size:
-    // %u\n", loopname, std::distance(range.begin (), range.end ()),
-    // chunk_size);
   }
 
   // parallel call
@@ -624,7 +553,6 @@ void do_all_gen(const R& range, F&& func, const ArgsTuple& argsTuple) {
   timer.stop();
 }
 
-} // end namespace runtime
-} // end namespace galois
+} // namespace galois::runtime
 
-#endif //  GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
+#endif

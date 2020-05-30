@@ -43,7 +43,7 @@ inline void* alloc() {
   // alloc a single page, don't prefault
   void* toReturn = galois::substrate::allocPages(1, true);
   if (toReturn == nullptr) {
-    GALOIS_DIE("Out of memory in per thread storage allocation");
+    GALOIS_DIE("per-thread storage out of memory");
   }
   return toReturn;
 }
@@ -53,7 +53,7 @@ constexpr unsigned MAX_SIZE = 30;
 // expense of fragmentation by restricting all allocations to be cache-aligned.
 constexpr unsigned MIN_SIZE = 7;
 
-static_assert((1 << MIN_SIZE) == GALOIS_CACHE_LINE_SIZE);
+static_assert((1 << MIN_SIZE) == galois::substrate::GALOIS_CACHE_LINE_SIZE);
 
 galois::substrate::PerBackend::PerBackend() { freeOffsets.resize(MAX_SIZE); }
 
@@ -100,7 +100,7 @@ unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
     ;
 
   if (index == MAX_SIZE) {
-    GALOIS_DIE("PTS out of memory");
+    GALOIS_DIE("per-thread storage out of memory");
     return ptAllocSize;
   }
 

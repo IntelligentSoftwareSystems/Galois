@@ -20,13 +20,12 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
-#include "galois/DistGalois.h"
-#include "galois/gstl.h"
-#include "DistBenchStart.h"
-
-#include "galois/DReducible.h"
-#include "galois/AtomicWrapper.h"
+#include "DistBench/Start.h"
 #include "galois/ArrayWrapper.h"
+#include "galois/AtomicWrapper.h"
+#include "galois/DistGalois.h"
+#include "galois/DReducible.h"
+#include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef GALOIS_ENABLE_GPU
@@ -35,7 +34,7 @@
 struct CUDA_Context* cuda_ctx;
 #endif
 
-constexpr static const char* const regionname = "SGD";
+constexpr static const char* const REGION_NAME = "SGD";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -75,9 +74,7 @@ struct NodeData {
   std::vector<double> latent_vector;
 };
 
-// typedef galois::graphs::DistGraph<NodeData, double> Graph;
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
-// typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
 typedef typename Graph::GraphNode GNode;
 
 galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
@@ -100,15 +97,9 @@ double getstep_size(unsigned int round) {
 double calcPrediction(const NodeData& movie_data, const NodeData& user_data) {
   double pred = galois::innerProduct(movie_data.latent_vector,
                                      user_data.latent_vector, 0.0);
-  // double p = pred;
 
   pred = std::min(MAXVAL, pred);
   pred = std::max(MINVAL, pred);
-
-  //#ifndef NDEBUG
-  // if (p != pred)
-  //  std::cerr << "clamped " << p << " to " << pred << "\n";
-  //#endif
 
   return pred;
 }
@@ -249,16 +240,13 @@ struct SGD {
       rms_normalized = std::sqrt(dga.reduce() / _graph.globalSizeEdges());
       galois::gDebug("RMS Normalized : ", rms_normalized);
       galois::gPrint("RMS Normalized: ", rms_normalized, "\n");
-      // galois::runtime::reportStat_Single(regionname,
-      // syncSubstrate->get_run_identifier("RMS_NORMALIZED"),
-      //(double)rms_normalized);
     } while ((_num_iterations < maxIterations) && (rms_normalized > 1));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single(
-          regionname,
+          REGION_NAME,
           "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
-          (unsigned long)_num_iterations);
+          _num_iterations);
     }
   }
 
@@ -311,7 +299,7 @@ struct SGD {
 /******************************************************************************/
 constexpr static const char* const name = "SGD - Distributed Heterogeneous";
 constexpr static const char* const desc = "SGD on Distributed Galois.";
-constexpr static const char* const url  = 0;
+constexpr static const char* const url  = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -319,11 +307,10 @@ int main(int argc, char** argv) {
 
   const auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam(regionname, "Max Iterations",
-                                 (unsigned long)maxIterations);
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", maxIterations);
   }
 
-  galois::StatTimer StatTimer_total("TimerTotal", regionname);
+  galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
   Graph* hg;
@@ -346,25 +333,25 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] SGD::go run ", run, " called\n");
     std::string timer_str("Timer_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
     SGD::go((*hg), DGAccumulator_accum);
     StatTimer_main.stop();
 
     if ((run + 1) != numRuns) {
-#ifdef GALOIS_ENABLE_GPU
-      if (personality == GPU_CUDA) {
-        // bitset_dist_current_reset_cuda(cuda_ctx);
-      } else
-#endif
-        (*syncSubstrate).set_num_run(run + 1);
-      InitializeGraph::go((*hg));
+      syncSubstrate->set_num_run(run + 1);
+      InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
   }
 
   StatTimer_total.stop();
+
+  if (output) {
+    galois::gError("output requested but this application doesn't support it");
+    return 1;
+  }
 
   return 0;
 }

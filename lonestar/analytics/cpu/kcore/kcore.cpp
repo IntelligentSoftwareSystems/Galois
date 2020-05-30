@@ -235,8 +235,9 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   if (!symmetricGraph) {
-    GALOIS_DIE("User did not pass in symmetric graph flag signifying they are "
-               "aware this program needs to be passed a symmetric graph.");
+    GALOIS_DIE("kcore requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph");
   }
 
   //! Some initial stat reporting.
@@ -287,7 +288,7 @@ int main(int argc, char** argv) {
     //! Synchronous k-core.
     syncCascadeKCore(graph);
   } else {
-    GALOIS_DIE("Invalid specification of k-core algorithm");
+    GALOIS_DIE("invalid specification of k-core algorithm");
   }
 
   runtimeTimer.stop();

@@ -29,7 +29,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
-#include "galois/graphs/B_LC_CSR_Graph.h"
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/DynamicBitset.h"
 
@@ -110,9 +110,9 @@ static cll::opt<Algo>
          cll::init(SyncDO));
 
 using Graph =
-    // galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-    galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-// galois::graphs::B_LC_CSR_Graph<unsigned,
+    // galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
+    galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
+// galois::graphs::LC_CSR_CSC_Graph<unsigned,
 // void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
 

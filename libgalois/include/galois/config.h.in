@@ -8,10 +8,62 @@
 #error Exactly one of GALOIS_USE_LONGJMP_ABORT or GALOIS_USE_EXCEPTION_ABORT must be defined.
 #endif
 
+#if defined(__GNUC__)
+#define GALOIS_ALLOW_WARNINGS                \
+_Pragma("GCC diagnostic push")               \
+_Pragma("GCC diagnostic warning \"-Wall\"")  \
+_Pragma("GCC diagnostic warning \"-Wextra\"")
+#define GALOIS_END_ALLOW_WARNINGS _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_ALLOW_WARNINGS
+#define GALOIS_END_ALLOW_WARNINGS
+#endif
+
+#if defined(__GNUC__)
+#define GALOIS_IGNORE_WARNINGS               \
+_Pragma("GCC diagnostic push")               \
+_Pragma("GCC diagnostic ignored \"-Wall\"")  \
+_Pragma("GCC diagnostic ignored \"-Wextra\"")
+#define GALOIS_END_IGNORE_WARNINGS _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_IGNORE_WARNINGS
+#define GALOIS_END_IGNORE_WARNINGS
+#endif
+
+#if defined(__GNUC__)
+#define GALOIS_IGNORE_UNUSED_PARAMETERS                 \
+_Pragma("GCC diagnostic push")                          \
+_Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")
+#define GALOIS_END_IGNORE_UNUSED_PARAMETERS _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_IGNORE_UNUSED_PARAMETERS
+#define GALOIS_END_IGNORE_UNUSED_PARAMETERS
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+#define GALOIS_IGNORE_MAYBE_UNINITIALIZED                  \
+_Pragma("GCC diagnostic push")                             \
+_Pragma("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
+#define GALOIS_END_IGNORE_MAYBE_UNINITIALIZED _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_IGNORE_MAYBE_UNINITIALIZED
+#define GALOIS_END_IGNORE_MAYBE_UNINITIALIZED
+#endif
+
+#if defined(__GNUC__)
+#define GALOIS_IGNORE_UNUSED_BUT_SET                           \
+_Pragma("GCC diagnostic push")                                 \
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
+#define GALOIS_END_IGNORE_UNUSED_BUT_SET _Pragma("GCC diagnostic pop")
+#else
+#define GALOIS_IGNORE_UNUSED_BUT_SET
+#define GALOIS_END_IGNORE_UNUSED_BUT_SET
+#endif
+
 // Macro to suppress compiler warnings that a variable is set but unused.
 // This warning is buggy in gcc 7.
 #if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 8
-#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET                           \
+#define GALOIS_GCC7_IGNORE_UNUSED_BUT_SET                      \
 _Pragma("GCC diagnostic push")                                 \
 _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
 #define GALOIS_END_GCC7_IGNORE_UNUSED_BUT_SET _Pragma("GCC diagnostic pop")

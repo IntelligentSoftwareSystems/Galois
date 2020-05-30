@@ -2,11 +2,8 @@ dist: bionic
 
 language: c++
 
-# At the moment, our LCI submodule has an additional submodule within it
-# that refers to some non-public copy of googletest. To avoid failing when
-# cloning Galois, we have to turn off cloning submodules.
 git:
-  submodules: false
+  submodules: true
 
 matrix:
   include:
@@ -77,7 +74,26 @@ matrix:
             - llvm-7-dev
             - libz-dev
     - env:
-        - GCC_VER=9
+        - GCC_VER=10
+      addons:
+        apt:
+          sources:
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+            - sourceline: 'deb https://apt.kitware.com/ubuntu/ bionic main'
+              key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-10
+            - g++-10
+            - cmake
+            - libboost1.70-dev
+            - libeigen3-dev
+            - openmpi-bin
+            - libopenmpi-dev
+            - llvm-7-dev
+            - libz-dev
+    - env:
+        - GCC_VER=10
         - BUILD_TYPE=Debug
       addons:
         apt:
@@ -87,8 +103,8 @@ matrix:
               key_url: 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - gcc-9
-            - g++-9
+            - gcc-10
+            - g++-10
             - cmake
             - libboost1.70-dev
             - libeigen3-dev

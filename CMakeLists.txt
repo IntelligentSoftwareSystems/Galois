@@ -27,11 +27,9 @@ set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
-set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
-set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
-set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
+set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
+set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
@@ -51,12 +49,7 @@ set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-r
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
-set(USE_HTM OFF CACHE BOOL "Use HTM")
-set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
-
-# Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
-set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
 
 set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
 
@@ -90,11 +83,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from openmpi
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
   endif()
 endif()
 
@@ -103,13 +95,19 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
+
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -121,21 +119,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd2196>")
 endif()
 
-if(CYGWIN)
-  message(STATUS "On Cygwin")
-  add_definitions(-U__STRICT_ANSI__)
-endif()
-
 # Enable architecture-specific optimizations
 include(CheckArchFlags)
 if(ARCH_FLAGS_FOUND)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}>")
   add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
   add_link_options(${ARCH_LINK_FLAGS})
-endif()
-
-if(USE_SANITIZER)
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
 endif()
 
 if(CXX_CLANG_TIDY)
@@ -148,20 +137,17 @@ endif()
 
 ###### Configure features ######
 
-if(USE_VTUNE)
+if(GALOIS_ENABLE_VTUNE)
   set(VTune_ROOT /opt/intel/vtune_amplifier)
   find_package(VTune REQUIRED)
   include_directories(${VTune_INCLUDE_DIRS})
-  add_definitions(-DGALOIS_USE_VTUNE)
+  add_definitions(-DGALOIS_ENABLE_VTUNE)
 endif()
 
-if(USE_PAPI)
-  if (PAPI_ROOT STREQUAL "")
-    set(PAPI_ROOT /usr)
-  endif()
+if(GALOIS_ENABLE_PAPI)
   find_package(PAPI REQUIRED)
   include_directories(${PAPI_INCLUDE_DIRS})
-  add_definitions(-DGALOIS_USE_PAPI)
+  add_definitions(-DGALOIS_ENABLE_PAPI)
 endif()
 
 find_package(Threads REQUIRED)

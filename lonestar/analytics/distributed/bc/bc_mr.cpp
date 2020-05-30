@@ -17,15 +17,14 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-constexpr static const char* const REGION_NAME = "MRBC";
-
+#include "DistBench/Output.h"
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
-#include "DistBenchStart.h"
 
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 // type of short path
 using ShortPathType = double;
@@ -38,6 +37,8 @@ struct BCData {
   ShortPathType shortPathCount;
   galois::CopyableAtomic<float> dependencyValue;
 };
+
+constexpr static const char* const REGION_NAME = "MRBC";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -65,11 +66,6 @@ static cll::opt<unsigned int> vIndex("index",
                                      cll::desc("DEBUG: Index to print for "
                                                "dist/short paths"),
                                      cll::init(0), cll::Hidden);
-// debug vars
-static cll::opt<bool> outputDistPaths("outputDistPaths",
-                                      cll::desc("DEBUG: Output min distance"
-                                                "/short path counts instead"),
-                                      cll::init(false), cll::Hidden);
 static cll::opt<unsigned int>
     vectorSize("vectorSize",
                cll::desc("DEBUG: Specify size of vector "
@@ -196,8 +192,10 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
           dga += 1;
         }
       },
-      galois::loopname(
-          syncSubstrate->get_run_identifier("FindMessageToSync").c_str()),
+      galois::loopname(syncSubstrate
+                           ->get_run_identifier(std::string(REGION_NAME) +
+                                                "_FindMessageToSync")
+                           .c_str()),
       galois::steal(), galois::no_stats());
 }
 
@@ -219,8 +217,10 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber) {
           cur_data.dTree.markSent(roundNumber);
         }
       },
-      galois::loopname(
-          syncSubstrate->get_run_identifier("ConfirmMessageToSend").c_str()),
+      galois::loopname(syncSubstrate
+                           ->get_run_identifier(std::string(REGION_NAME) +
+                                                "_ConfirmMessageToSend")
+                           .c_str()),
       galois::no_stats());
 }
 
@@ -275,8 +275,10 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   galois::do_all(
       galois::iterate(allNodesWithEdges),
       [&](GNode dst) { SendAPSPMessagesOp(dst, graph, dga); },
-      galois::loopname(
-          syncSubstrate->get_run_identifier("SendAPSPMessages").c_str()),
+      galois::loopname(syncSubstrate
+                           ->get_run_identifier(std::string(REGION_NAME) +
+                                                "_SendAPSPMessages")
+                           .c_str()),
       galois::steal(), galois::no_stats());
 }
 
@@ -304,7 +306,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // Template para's are struct names
     syncSubstrate->sync<writeAny, readAny, APSPReduce, Bitset_minDistances>(
-        std::string("APSP"));
+        std::string(std::string(REGION_NAME) + "_APSP"));
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
@@ -337,7 +339,9 @@ void RoundUpdate(Graph& graph) {
         cur_data.dTree.prepForBackPhase();
       },
       galois::loopname(
-          syncSubstrate->get_run_identifier("RoundUpdate").c_str()),
+          syncSubstrate
+              ->get_run_identifier(std::string(REGION_NAME) + "_RoundUpdate")
+              .c_str()),
       galois::no_stats());
 }
 
@@ -372,8 +376,10 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
           }
         }
       },
-      galois::loopname(
-          syncSubstrate->get_run_identifier("BackFindMessageToSend").c_str()),
+      galois::loopname(syncSubstrate
+                           ->get_run_identifier(std::string(REGION_NAME) +
+                                                "_BackFindMessageToSend")
+                           .c_str()),
       galois::no_stats());
 }
 
@@ -432,12 +438,16 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     // write destination in this case being the source in the actual graph
     // since we're using the tranpose graph
     syncSubstrate->sync<writeDestination, readSource, DependencyReduce,
-                        Bitset_dependency>(std::string("DependencySync"));
+                        Bitset_dependency>(
+        std::string(std::string(REGION_NAME) + "_DependencySync"));
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
         [&](GNode dst) { BackPropOp(dst, graph); },
-        galois::loopname(syncSubstrate->get_run_identifier("BackProp").c_str()),
+        galois::loopname(
+            syncSubstrate
+                ->get_run_identifier(std::string(REGION_NAME) + "_BackProp")
+                .c_str()),
         galois::steal(), galois::no_stats());
 
     currentRound++;
@@ -467,7 +477,8 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
           }
         }
       },
-      galois::loopname(syncSubstrate->get_run_identifier("BC").c_str()),
+      galois::loopname(
+          syncSubstrate->get_run_identifier(std::string(REGION_NAME)).c_str()),
       galois::no_stats());
 };
 
@@ -509,13 +520,28 @@ void Sanity(Graph& graph) {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<float> makeResults(Graph* hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).bc);
+  }
+
+  return values;
+}
+
+/******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
 
 constexpr static const char* const name = "Min-Rounds Betweeness Centrality";
 constexpr static const char* const desc = "Min-Rounds Betweeness "
                                           "Centrality on Distributed Galois.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url = nullptr;
 
 uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 
@@ -567,7 +593,7 @@ int main(int argc, char** argv) {
   // reading in list of sources to operate on if provided
   std::ifstream sourceFile;
   std::vector<uint64_t> sourceVector;
-  if (sourcesToUse != "") {
+  if (!sourcesToUse.empty()) {
     sourceFile.open(sourcesToUse);
     std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
                             std::istream_iterator<uint64_t>{});
@@ -575,9 +601,8 @@ int main(int argc, char** argv) {
     sourceFile.close();
   }
 
-  if (startNode && sourceVector.size()) {
-    GALOIS_DIE("Should not use startNode cmd-line option with specified "
-               "sources");
+  if (startNode && !sourceVector.empty()) {
+    GALOIS_DIE("startNode option not compatible with sourcesToUse");
   }
 
   // "sourceVector" if file not provided
@@ -590,6 +615,9 @@ int main(int argc, char** argv) {
 
   ////////////////////////////////////////////////////////////////////////////////
 
+  galois::runtime::reportStat_Single(std::string(REGION_NAME),
+                                     std::string("NumSources"),
+                                     (unsigned int)totalNumSources);
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
 
@@ -604,7 +632,7 @@ int main(int argc, char** argv) {
     uint64_t offset = startNode;
     // node boundary to end search at
     uint64_t nodeBoundary =
-        sourceVector.size() == 0 ? hg->globalSize() : sourceVector.size();
+        sourceVector.empty() ? hg->globalSize() : sourceVector.size();
 
     while (offset < nodeBoundary && totalSourcesFound < totalNumSources) {
       if (useSingleSource) {
@@ -617,7 +645,7 @@ int main(int argc, char** argv) {
                totalSourcesFound < totalNumSources) {
           // choose from read source file or from beginning (0 to n)
           nodesToConsider[sourcesFound] =
-              sourceVector.size() == 0 ? offset : sourceVector[offset];
+              sourceVector.empty() ? offset : sourceVector[offset];
           offset++;
           sourcesFound++;
           totalSourcesFound++;
@@ -688,8 +716,8 @@ int main(int argc, char** argv) {
     // re-init graph for next run
     if ((run + 1) != numRuns) { // not the last run
       galois::runtime::getHostBarrier().wait();
-      (*syncSubstrate).set_num_run(run + 1);
-      (*syncSubstrate).set_num_round(0);
+      syncSubstrate->set_num_run(run + 1);
+      syncSubstrate->set_num_round(0);
       offset             = 0;
       macroRound         = 0;
       numSourcesPerRound = origNumRoundSources;
@@ -708,27 +736,11 @@ int main(int argc, char** argv) {
 
   ////////////////////////////////////////////////////////////////////////////////
 
-  // Verify, i.e. print out graph data for examination
-  if (verify) {
-    for (auto ii = (*hg).masterNodesRange().begin();
-         ii != (*hg).masterNodesRange().end(); ++ii) {
-      if (!outputDistPaths) {
-        // outputs betweenness centrality
-        std::stringstream out;
-        out << (*hg).getGID(*ii) << " " << std::setprecision(9)
-            << (*hg).getData(*ii).bc << "\n";
-        galois::runtime::printOutput(out.str().c_str());
-      } else {
-        uint64_t a      = 0;
-        ShortPathType b = 0;
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          if ((*hg).getData(*ii).sourceData[i].minDistance != infinity) {
-            a += (*hg).getData(*ii).sourceData[i].minDistance;
-          }
-          b += (*hg).getData(*ii).sourceData[i].shortPathCount;
-        }
-      }
-    }
+  if (output) {
+    std::vector<float> results = makeResults(hg);
+
+    writeOutput(outputLocation, "betweenness_centrality", results.data(),
+                results.size());
   }
 
   return 0;

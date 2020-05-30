@@ -119,13 +119,13 @@ void readTruss(Graph& g) {
   if (ktrussEdges && edges != ktrussEdges) {
     std::cerr << "edges read not equal to -trussEdges=" << ktrussEdges
               << std::endl;
-    GALOIS_DIE("Verification error");
+    GALOIS_DIE("verification error");
   }
 
   if (ktrussNodes && nodes.size() != ktrussNodes) {
     std::cerr << "nodes read not equal to -trussNodes=" << ktrussNodes
               << std::endl;
-    GALOIS_DIE("Verification error");
+    GALOIS_DIE("verification error");
   }
 }
 

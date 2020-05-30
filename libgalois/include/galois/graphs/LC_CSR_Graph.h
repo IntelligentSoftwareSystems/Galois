@@ -36,8 +36,7 @@
 #include "galois/graphs/GraphHelpers.h"
 #include "galois/PODResizeableArray.h"
 
-namespace galois {
-namespace graphs {
+namespace galois::graphs {
 /**
  * Local computation graph (i.e., graph structure does not change). The data
  * representation is the traditional compressed-sparse-row (CSR) format.
@@ -58,9 +57,8 @@ namespace graphs {
  */
 //! [doxygennuma]
 template <typename NodeTy, typename EdgeTy, bool HasNoLockable = false,
-          bool UseNumaAlloc =
-              false, // true => numa-blocked, false => numa-interleaved
-          bool HasOutOfLineLockable = false, typename FileEdgeTy = EdgeTy>
+          bool UseNumaAlloc = false, bool HasOutOfLineLockable = false,
+          typename FileEdgeTy = EdgeTy>
 class LC_CSR_Graph :
     //! [doxygennuma]
     private boost::noncopyable,
@@ -109,7 +107,8 @@ public:
       LC_CSR_Graph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
                    HasOutOfLineLockable, FileEdgeTy>;
 
-  //! If true, use NUMA-aware graph allocation
+  //! If true, use NUMA-aware graph allocation; otherwise, use NUMA interleaved
+  //! allocation.
   template <bool _use_numa_alloc>
   struct with_numa_alloc {
     typedef LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
@@ -152,24 +151,10 @@ public:
   typedef typename NodeInfoTypes::reference node_data_reference;
   using edge_iterator =
       boost::counting_iterator<typename EdgeIndData::value_type>;
-  // for hypergraphs
-  size_t hedges;
-  size_t hnodes;
   using iterator = boost::counting_iterator<typename EdgeDst::value_type>;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
-  uint32_t* degrees;
-  void degree_counting() {
-    degrees = new uint32_t[numNodes];
-    galois::do_all(
-        galois::iterate(begin(), end()),
-        [&](auto v) {
-          degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
-        },
-        galois::loopname("DegreeCounting"));
-  }
-  uint32_t get_degree(uint32_t n) { return degrees[n]; }
 
 protected:
   NodeData nodeData;
@@ -239,6 +224,7 @@ protected:
 
 private:
   friend class boost::serialization::access;
+
   template <typename Archive>
   void save(Archive& ar, const unsigned int) const {
     ar << numNodes;
@@ -275,6 +261,7 @@ private:
       }
     }
   }
+
   // The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes
   // the save or load depending on whether the archive is used for saving or
   // loading
@@ -282,7 +269,9 @@ private:
 
 public:
   LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
-  LC_CSR_Graph()                   = default;
+
+  LC_CSR_Graph() = default;
+
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
 
   /**
@@ -353,7 +342,6 @@ public:
   LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges, EdgeNumFnTy edgeNum,
                EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
       : numNodes(_numNodes), numEdges(_numEdges) {
-    // std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
       //! [numaallocex]
       nodeData.allocateBlocked(numNodes);
@@ -369,21 +357,16 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-    // std::cerr << "Done Alloc\n";
     for (size_t n = 0; n < numNodes; ++n) {
       nodeData.constructAt(n);
     }
-    // std::cerr << "Done Node Construct\n";
     uint64_t cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
       cur += edgeNum(n);
       edgeIndData[n] = cur;
     }
-    // std::cerr << "Done Edge Reserve\n";
     cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
-      // if (n % (1024*128) == 0)
-      //  std::cout << n << " " << cur << "\n";
       for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
         if (EdgeData::has_value)
           edgeData.set(cur, _edgeData(n, e));
@@ -391,8 +374,6 @@ public:
         ++cur;
       }
     }
-
-    // std::cerr << "Done Construct\n";
   }
 
   friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
@@ -529,15 +510,7 @@ public:
         galois::no_stats(), galois::steal());
   }
 
-  template <typename F>
-  ptrdiff_t partition_neighbors(GraphNode N, const F& func) {
-    auto beg = &edgeDst[*raw_begin(N)];
-    auto end = &edgeDst[*raw_end(N)];
-    auto mid = std::partition(beg, end, func);
-    return (mid - beg);
-  }
-
-  void allocateFrom(FileGraph& graph) {
+  void allocateFrom(const FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
@@ -677,7 +650,7 @@ public:
           edgeDst_old[e] = dst;
           // counting outgoing edges in the tranpose graph by
           // counting incoming edges in the original graph
-          __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
+          __sync_add_and_fetch(&edgeIndData_temp[dst], 1);
         },
         galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
 
@@ -862,16 +835,7 @@ public:
       }
     });
 
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-
-      auto r = divideByNode(0, 1, tid, total).first;
-
-      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
-      // "\n");
-      this->setLocalRange(*r.first, *r.second);
-    });
+    initializeLocalRanges();
   }
   void constructFrom(
       uint32_t numNodes, uint64_t numEdges, std::vector<uint64_t>& prefix_sum,
@@ -900,16 +864,7 @@ public:
       }
     });
 
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-
-      auto r = divideByNode(0, 1, tid, total).first;
-
-      // galois::gPrint("[", tid, "] : Ranges : ", *r.first, ", ", *r.second,
-      // "\n");
-      this->setLocalRange(*r.first, *r.second);
-    });
+    initializeLocalRanges();
   }
 
   /**
@@ -925,7 +880,7 @@ public:
   void readGraphFromGRFile(const std::string& filename) {
     std::ifstream graphFile(filename.c_str());
     if (!graphFile.is_open()) {
-      GALOIS_DIE("ERROR: Failed to open file.");
+      GALOIS_DIE("failed to open file");
     }
     uint64_t header[4];
     graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
@@ -941,7 +896,7 @@ public:
      **/
     assert(edgeIndData.data());
     if (!edgeIndData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+      GALOIS_DIE("out of memory");
     }
 
     // start position to read index data
@@ -954,7 +909,7 @@ public:
      **/
     assert(edgeDst.data());
     if (!edgeDst.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+      GALOIS_DIE("out of memory");
     }
 
     readPosition = ((4 + numNodes) * sizeof(uint64_t));
@@ -977,24 +932,20 @@ public:
         readPosition += sizeof(uint64_t);
       }
     } else {
-      GALOIS_DIE("ERROR: Unknown graph file version.");
+      GALOIS_DIE("unknown file version: ", version);
     }
     /**
      * Load edge data array
      **/
     assert(edgeData.data());
     if (!edgeData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeData.");
+      GALOIS_DIE("out of memory");
     }
     graphFile.seekg(readPosition);
     graphFile.read(reinterpret_cast<char*>(edgeData.data()),
                    sizeof(EdgeTy) * numEdges);
-    galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
-      auto r = divideByNode(0, 1, tid, total).first;
-      this->setLocalRange(*r.first, *r.second);
-    });
+
+    initializeLocalRanges();
     graphFile.close();
   }
 
@@ -1011,7 +962,7 @@ public:
   void readGraphFromGRFile(const std::string& filename) {
     std::ifstream graphFile(filename.c_str());
     if (!graphFile.is_open()) {
-      GALOIS_DIE("ERROR: Failed to open file.");
+      GALOIS_DIE("failed to open file");
     }
     uint64_t header[4];
     graphFile.read(reinterpret_cast<char*>(header), sizeof(uint64_t) * 4);
@@ -1027,7 +978,7 @@ public:
      **/
     assert(edgeIndData.data());
     if (!edgeIndData.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeIndData.");
+      GALOIS_DIE("out of memory");
     }
     // start position to read index data
     uint64_t readPosition = (4 * sizeof(uint64_t));
@@ -1039,7 +990,7 @@ public:
      **/
     assert(edgeDst.data());
     if (!edgeDst.data()) {
-      GALOIS_DIE("Failed: memory not allocated for edgeDst.");
+      GALOIS_DIE("out of memory");
     }
     readPosition = ((4 + numNodes) * sizeof(uint64_t));
     graphFile.seekg(readPosition);
@@ -1050,19 +1001,25 @@ public:
       graphFile.read(reinterpret_cast<char*>(edgeDst.data()),
                      sizeof(uint64_t) * numEdges);
     } else {
-      GALOIS_DIE("ERROR: Unknown graph file version.");
+      GALOIS_DIE("unknown file version: ", version);
     }
+
+    initializeLocalRanges();
+    graphFile.close();
+  }
+
+  /**
+   * Given a manually created graph, initialize the local ranges on this graph
+   * so that threads can iterate over a balanced number of vertices.
+   */
+  void initializeLocalRanges() {
     galois::on_each([&](unsigned tid, unsigned total) {
-      std::vector<unsigned>
-          dummy_scale_factor; // dummy passed in to function call
       auto r = divideByNode(0, 1, tid, total).first;
       this->setLocalRange(*r.first, *r.second);
     });
-
-    graphFile.close();
   }
 };
-} // namespace graphs
-} // namespace galois
+
+} // namespace galois::graphs
 
 #endif

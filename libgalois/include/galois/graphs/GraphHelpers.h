@@ -157,7 +157,7 @@ auto divideNodesBinarySearch(
 
   assert(nodeWeight != 0 || edgeWeight != 0);
   assert(total >= 1);
-  assert(id >= 0 && id < total);
+  assert(id < total);
 
   // weight of all data
   uint64_t weight = numNodes * nodeWeight + (numEdges + 1) * edgeWeight;
