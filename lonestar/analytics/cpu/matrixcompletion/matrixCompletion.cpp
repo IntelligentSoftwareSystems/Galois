@@ -368,6 +368,8 @@ struct SGDBlockJumpAlgo {
          << " updates: " << updates << "\n";
       return os;
     }
+
+    ~BlockInfo() { delete[] userOffsets; }
   };
 
   struct Process {
@@ -637,6 +639,10 @@ struct SGDBlockJumpAlgo {
                             galois::on_each(fn);
                           });
     executeTimer.stop();
+
+    delete[] xLocks;
+    delete[] yLocks;
+    delete[] blocks;
   }
 };
 
