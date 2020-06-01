@@ -399,6 +399,8 @@ struct SGDBlockJumpAlgo {
     template <bool Enable = precomputeOffsets>
     size_t runBlock(BlockInfo& si,
                     typename std::enable_if<!Enable>::type* = 0) {
+      if (si.updates >= maxUpdates)
+        return 0;
       typedef galois::NoDerefIterator<Graph::edge_iterator> no_deref_iterator;
       typedef boost::transform_iterator<GetDst, no_deref_iterator>
           edge_dst_iterator;
@@ -457,6 +459,8 @@ struct SGDBlockJumpAlgo {
 
     template <bool Enable = precomputeOffsets>
     size_t runBlock(BlockInfo& si, typename std::enable_if<Enable>::type* = 0) {
+      if (si.updates >= maxUpdates)
+        return 0;
       LatentValue stepSize = steps[si.updates - maxUpdates + updatesPerEdge];
       size_t seen          = 0;
       double error         = 0.0;
