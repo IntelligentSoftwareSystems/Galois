@@ -155,8 +155,6 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   std::cout << "Time:  " << TM.get() << '\n';
 }
 
-// printGraphBeg(*graph)
-
 typedef galois::graphs::FileGraph FG;
 typedef FG::GraphNode FN;
 template <typename GNode, typename Weights>

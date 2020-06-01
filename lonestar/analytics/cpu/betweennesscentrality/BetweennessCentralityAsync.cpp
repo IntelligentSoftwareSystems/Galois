@@ -17,19 +17,18 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "Lonestar/BoilerPlate.h"
-
-#include "galois/graphs/BufferedGraph.h"
-#include "galois/graphs/LC_CSR_CSC_Graph.h"
-#include "galois/Bag.h"
-
 #include "BCNode.h"
 #include "BCEdge.h"
+
+#include "galois/Bag.h"
+#include "galois/graphs/BufferedGraph.h"
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <iomanip>
 
 // WARNING: optimal chunk size may differ depending on input graph
-constexpr static const unsigned CHUNK_SIZE = 64u;
+constexpr static const unsigned CHUNK_SIZE = 64U;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -409,7 +408,7 @@ static const char* desc = "Computes betwenness centrality in an unweighted "
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, NULL);
+  LonestarStart(argc, argv, name, desc, nullptr);
 
   if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
@@ -458,10 +457,11 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MemAllocPre");
   galois::gInfo("Going to pre-allocate pages");
   galois::preAlloc(
-      std::min((uint64_t)(std::min(galois::getActiveThreads(), 100u) *
-                          std::max((nnodes / 4500000), (unsigned)5) *
-                          std::max((nedges / 30000000), (uint64_t)5) * 2.5),
-               (uint64_t)1500) +
+      std::min(static_cast<uint64_t>(
+                   std::min(galois::getActiveThreads(), 100U) *
+                   std::max((nnodes / 4500000), unsigned{5}) *
+                   std::max((nedges / 30000000), uint64_t{5}) * 2.5),
+               uint64_t{1500}) +
       5);
   galois::gInfo("Pre-allocation complete");
   galois::reportPageAlloc("MemAllocMid");

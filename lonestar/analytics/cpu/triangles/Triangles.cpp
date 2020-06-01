@@ -18,15 +18,14 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
+#include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-
-#include "galois/runtime/Profile.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -38,9 +37,9 @@
 
 const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
-const char* url  = 0;
+const char* url  = nullptr;
 
-constexpr static const unsigned CHUNK_SIZE = 64u;
+constexpr static const unsigned CHUNK_SIZE = 64U;
 enum Algo { nodeiterator, edgeiterator, orderedCount };
 
 namespace cll = llvm::cl;
@@ -76,8 +75,13 @@ typedef Graph::GraphNode GNode;
  */
 template <typename Iterator, typename Compare>
 Iterator lowerBound(Iterator first, Iterator last, Compare comp) {
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
+
   Iterator it;
-  typename std::iterator_traits<Iterator>::difference_type count, half;
+  difference_type count;
+  difference_type half;
+
   count = std::distance(first, last);
   while (count > 0) {
     it   = first;
@@ -365,7 +369,7 @@ void makeSortedGraph(Graph& graph) {
   using DegreeNodePair = std::pair<uint64_t, uint32_t>;
   std::vector<DegreeNodePair> dnPairs(numGraphNodes);
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t nodeID) {
         size_t nodeDegree =
             std::distance(initial.edge_begin(nodeID), initial.edge_end(nodeID));
@@ -381,7 +385,7 @@ void makeSortedGraph(Graph& graph) {
   std::vector<uint32_t> oldToNewMapping(numGraphNodes);
   std::vector<uint64_t> inProgressPrefixSum(numGraphNodes);
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t index) {
         // save degree, which is pair.first
         inProgressPrefixSum[index] = dnPairs[index].first;
@@ -401,7 +405,7 @@ void makeSortedGraph(Graph& graph) {
   graph.constructNodes();
   // set edge endpoints using prefix sum
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t nodeIndex) {
         graph.fixEndEdge(nodeIndex, newPrefixSum[nodeIndex]);
       },

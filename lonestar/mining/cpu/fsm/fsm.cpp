@@ -3,7 +3,7 @@
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining in a graph using BFS extension";
-const char* url  = 0;
+const char* url  = nullptr;
 
 #include "pangolin/BfsMining/edge_miner_api.h"
 class MyAPI : public EdgeMinerAPI<EdgeEmbedding> {

@@ -145,9 +145,6 @@ void readGraph(MetisGraph* metisGraph, const char* filename,
   int numNodes = pnumNodes.reduce();
   int numEdges = pnumEdges.reduce();
 
-  // metisGraph->setNumNodes(numNodes);
-  // metisGraph->setNumEdges(numEdges/2);
-
   cout << "Done Reading Graph ";
   cout << "numNodes: " << numNodes << "|numEdges: " << numEdges / 2 << "\n";
 }

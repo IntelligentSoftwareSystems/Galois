@@ -19,17 +19,18 @@
 
 #include "galois/Galois.h"
 #include "galois/AtomicHelpers.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/OCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
+#include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <utility>
 #include <vector>
@@ -41,7 +42,7 @@
 
 const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
-const char* url  = 0;
+const char* url  = nullptr;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>

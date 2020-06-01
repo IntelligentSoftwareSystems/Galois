@@ -19,9 +19,9 @@
 
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 
@@ -326,7 +326,7 @@ int main(int argc, char** argv) {
   bcOuter.run(v);
   T.stop();
 
-  bcOuter.printBCValues(0, std::min(10ul, NumNodes), std::cout, 6);
+  bcOuter.printBCValues(0, std::min(10UL, NumNodes), std::cout, 6);
 
   if (printAll)
     bcOuter.printBCcertificate();

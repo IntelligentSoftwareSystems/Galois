@@ -21,14 +21,12 @@
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
-
 #include "Lonestar/BFS_SSSP.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 #include <deque>
@@ -84,7 +82,7 @@ using Graph =
 using GNode = Graph::GraphNode;
 
 constexpr static const bool TRACK_WORK          = false;
-constexpr static const unsigned CHUNK_SIZE      = 256u;
+constexpr static const unsigned CHUNK_SIZE      = 256U;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
 
 using BFS = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
@@ -255,11 +253,11 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   Loop loop;
 
-  Cont* curr = new Cont();
-  Cont* next = new Cont();
+  auto curr = std::make_unique<Cont>();
+  auto next = std::make_unique<Cont>();
 
-  Dist nextLevel              = 0u;
-  graph.getData(source, flag) = 0u;
+  Dist nextLevel              = 0U;
+  graph.getData(source, flag) = 0U;
 
   if (CONCURRENT) {
     pushWrap(*next, source, "parallel");
@@ -291,9 +289,6 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
         galois::loopname("Sync"));
   }
-
-  delete curr;
-  delete next;
 }
 
 template <bool CONCURRENT>
@@ -326,7 +321,8 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
   std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename);
@@ -336,7 +332,6 @@ int main(int argc, char** argv) {
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
               << " or failed to set source: " << startNode << "\n";
-    assert(0);
     abort();
   }
 
@@ -348,8 +343,6 @@ int main(int argc, char** argv) {
   report = *it;
 
   size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
   galois::preAlloc(8 * numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
 

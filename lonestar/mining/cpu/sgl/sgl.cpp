@@ -4,7 +4,7 @@
 const char* name = "Sgl";
 const char* desc = "Listing edge-induced subgraphs of a given pattern in a "
                    "graph using BFS extension";
-const char* url = 0;
+const char* url = nullptr;
 
 #define CYCLE
 #ifdef CYCLE

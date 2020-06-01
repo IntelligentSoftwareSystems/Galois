@@ -51,7 +51,6 @@ static cll::opt<bool>
 
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
                        const char* url) {
-  // llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 #ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads);

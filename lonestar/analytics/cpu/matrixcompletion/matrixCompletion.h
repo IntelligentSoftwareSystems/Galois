@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef _SGD_H_
-#define _SGD_H_
+#ifndef LONESTAR_MATRIXCOMPLETION_H
+#define LONESTAR_MATRIXCOMPLETION_H
 
 #include <cassert>
 #include <galois/gstl.h>

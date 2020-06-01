@@ -24,8 +24,9 @@
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "galois/runtime/Statistics.h"
-#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 #include <deque>

@@ -17,24 +17,23 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "clustering.h"
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
+#include "galois/DynamicBitset.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
+#include "Lonestar/BoilerPlate.h"
+
 #include "llvm/Support/CommandLine.h"
-#include "galois/AtomicHelpers.h"
 
 #include <iostream>
 #include <fstream>
 #include <deque>
 #include <type_traits>
-
-#include "Lonestar/BoilerPlate.h"
-#include "clustering.h"
-#include "galois/DynamicBitset.h"
 
 static const char* name = "Louvain Clustering";
 

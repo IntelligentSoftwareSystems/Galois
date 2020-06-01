@@ -19,15 +19,17 @@
 
 constexpr static const char* const REGION_NAME = "BC";
 
-#include <limits>
-#include <fstream>
+#include "galois/AtomicHelpers.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/AtomicHelpers.h"
 #include "galois/graphs/LCGraph.h"
-#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
+
+#include <limits>
+#include <fstream>
 
 // type of the num shortest paths variable
 using ShortPathType = double;
@@ -47,8 +49,8 @@ static cll::opt<bool>
     singleSourceBC("singleSource",
                    cll::desc("Use for single source BC (default off)"),
                    cll::init(false));
-static cll::opt<unsigned long long>
-    startSource("startNode", // not uint64_t due to a bug in llvm cl
+static cll::opt<uint64_t>
+    startSource("startNode",
                 cll::desc("Starting source node used for "
                           "betweeness-centrality (default 0); works with "
                           "singleSource flag only"),
@@ -283,7 +285,7 @@ constexpr static const char* const desc =
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, NULL);
+  LonestarStart(argc, argv, name, desc, nullptr);
 
   // some initial stat reporting
   galois::gInfo("Worklist chunk size of ", CHUNK_SIZE,
@@ -307,8 +309,8 @@ int main(int argc, char** argv) {
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(
-      std::max((size_t)galois::getActiveThreads() * (graph.size() / 2000000),
-               std::max(10u, galois::getActiveThreads()) * (size_t)10));
+      std::max(size_t{galois::getActiveThreads()} * (graph.size() / 2000000),
+               std::max(10U, galois::getActiveThreads()) * size_t{10}));
   preallocTime.stop();
   galois::reportPageAlloc("MemAllocMid");
 
