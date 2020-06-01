@@ -182,8 +182,7 @@ void syncPageRank(Graph& graph) {
   }
 
   if (iter >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iter << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iter << " iterations\n";
   }
 }
 

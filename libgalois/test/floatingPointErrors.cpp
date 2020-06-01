@@ -78,15 +78,13 @@ void multiplyTestRational(const Rational& mpcand, const Rational& mplier,
       partial = remainMplier;
     }
 
-    // std::cout << "Rational partial mpcand: " << partial << std::endl;
-
     remainMplier -= partial;
 
     computed += mpcand * partial;
   }
 
   std::cout << "Error in multiplication with Rational: " << (ans - computed)
-            << std::endl;
+            << "\n";
 }
 
 void rationalConversionError(double fpVal) {

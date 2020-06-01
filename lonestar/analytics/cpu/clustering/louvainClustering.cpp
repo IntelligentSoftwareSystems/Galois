@@ -805,7 +805,7 @@ int main(int argc, char** argv) {
             << " is symmetric graph without duplicate edges" << std::endl;
   galois::graphs::readGraph(graph, filename);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   graph_curr = &graph;
 

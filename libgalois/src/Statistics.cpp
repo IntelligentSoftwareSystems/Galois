@@ -89,10 +89,9 @@ void StatManager::printStats(std::ostream& out) {
 
 void StatManager::printHeader(std::ostream& out) const {
 
-  // out << "RUN_UUID" << SEP;
   out << "STAT_TYPE" << SEP << "REGION" << SEP << "CATEGORY" << SEP;
   out << "TOTAL_TYPE" << SEP << "TOTAL";
-  out << std::endl;
+  out << "\n";
 }
 
 StatManager::int_iterator StatManager::intBegin(void) const {

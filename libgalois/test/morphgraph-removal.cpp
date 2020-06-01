@@ -26,7 +26,7 @@ void traverseOutGraph(G& g) {
     for (auto e : g.edges(n)) {
       auto dst = g.getEdgeDst(e);
       std::cout << "(" << g.getData(n) << " -> " << g.getData(dst) << "): ";
-      std::cout << g.getEdgeData(e) << std::endl;
+      std::cout << g.getEdgeData(e) << "\n";
     }
   }
 }
@@ -37,7 +37,7 @@ void traverseInGraph(G& g) {
     for (auto ie : g.in_edges(n)) {
       auto src = g.getEdgeDst(ie);
       std::cout << "(" << g.getData(n) << " <- " << g.getData(src) << "): ";
-      std::cout << g.getEdgeData(ie) << std::endl;
+      std::cout << g.getEdgeData(ie) << "\n";
     }
   }
 }
@@ -63,7 +63,7 @@ void constructGraph(G& g, std::vector<typename G::GraphNode>& v) {
   }
 
   if (verbose) {
-    std::cout << "Original" << std::endl;
+    std::cout << "Original\n";
     traverseOutGraph(g);
     traverseInGraph(g);
   }
@@ -234,7 +234,7 @@ unsigned int testGraphOutEdgeRemoval(G& g,
       numFailedRemoval += (0 != countUnmatchedEdge(g, v, i, j));
 
       if (verbose) {
-        std::cout << "Removed edge (" << i << " -> " << j << ")" << std::endl;
+        std::cout << "Removed edge (" << i << " -> " << j << ")\n";
         traverseOutGraph(g);
         traverseInGraph(g);
       }
@@ -256,8 +256,7 @@ unsigned int testGraphInEdgeRemoval(G& g,
       numFailedRemoval += (0 != countUnmatchedEdge(g, v, i, j));
 
       if (verbose) {
-        std::cout << "Removed in_edge (" << j << " <- " << i << ")"
-                  << std::endl;
+        std::cout << "Removed in_edge (" << j << " <- " << i << ")\n";
         traverseOutGraph(g);
         traverseInGraph(g);
       }
@@ -275,25 +274,25 @@ int main() {
   std::vector<OutGraph::GraphNode> outV;
   auto num = testGraphOutEdgeRemoval(outG, outV);
   numFailure += num;
-  std::cout << "OutGraph: Failed " << num << " edge removals" << std::endl;
+  std::cout << "OutGraph: Failed " << num << " edge removals\n";
 
   SymGraph symG, symG2;
   std::vector<SymGraph::GraphNode> symV, symV2;
   num = testGraphOutEdgeRemoval(symG, symV);
   numFailure += num;
-  std::cout << "SymGraph: Failed " << num << " edge removals" << std::endl;
+  std::cout << "SymGraph: Failed " << num << " edge removals\n";
   num = testGraphInEdgeRemoval(symG2, symV2);
   numFailure += num;
-  std::cout << "SymGraph: Failed " << num << " in_edge removals" << std::endl;
+  std::cout << "SymGraph: Failed " << num << " in_edge removals\n";
 
   InOutGraph inOutG, inOutG2;
   std::vector<InOutGraph::GraphNode> inOutV, inOutV2;
   num = testGraphOutEdgeRemoval(inOutG, inOutV);
   numFailure += num;
-  std::cout << "InOutGraph: Failed " << num << " edge removals" << std::endl;
+  std::cout << "InOutGraph: Failed " << num << " edge removals\n";
   num = testGraphInEdgeRemoval(inOutG2, inOutV2);
   numFailure += num;
-  std::cout << "InOutGraph: Failed " << num << " in_edge removals" << std::endl;
+  std::cout << "InOutGraph: Failed " << num << " in_edge removals\n";
 
   return (numFailure > 0) ? -1 : 0;
 }
