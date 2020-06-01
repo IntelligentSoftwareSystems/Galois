@@ -231,7 +231,7 @@ public:
     num_edges_    = el.size();
     MakeGraphFromEL();
   }
-  void read_gr(Graph& g) {
+  void read_gr(PangolinGraph& g) {
     num_vertices_ = g.size();
     for (auto it = g.begin(); it != g.end(); it++) {
       GNode src = *it;
