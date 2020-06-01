@@ -295,7 +295,6 @@ int main(int argc, char** argv) {
     for (auto pb = perm.begin(), pe = perm.end(); pb != pe; pb++) {
       int prevId    = nodeIdMap[*pb];
       perm2[prevId] = id;
-      // std::cout<<prevId <<" "<<id<<std::endl;
       id++;
     }
     galois::graphs::FileGraph out;

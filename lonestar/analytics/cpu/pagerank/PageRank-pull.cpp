@@ -175,8 +175,8 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
   } ///< End while(true).
 
   if (iterations >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iterations << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iterations
+              << " iterations\n";
   }
 }
 
@@ -236,8 +236,8 @@ void computePRTopological(Graph& graph) {
   } ///< End while(true).
 
   if (iteration >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iteration << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iteration
+              << " iterations\n";
   }
 }
 

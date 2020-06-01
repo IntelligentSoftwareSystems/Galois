@@ -121,7 +121,7 @@ public:
 
     std::cerr << "v" << src;
 
-    std::cerr << std::endl;
+    std::cerr << "\n";
   }
 };
 

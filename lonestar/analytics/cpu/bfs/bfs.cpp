@@ -279,9 +279,7 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         galois::iterate(*curr),
         [&](const T& item) {
           for (auto e : edgeRange(item)) {
-            auto dst = graph.getEdgeDst(e);
-            // if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " <<
-            // dst << " visited"<<std::endl;
+            auto dst      = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
             if (dstData == BFS::DIST_INFINITY) {
@@ -319,7 +317,7 @@ void runAlgo(Graph& graph, const GNode& source) {
                                 OutEdgeRangeFn{graph});
     break;
   default:
-    std::cerr << "ERROR: unkown algo type" << std::endl;
+    std::cerr << "ERROR: unkown algo type\n";
   }
 }
 
@@ -333,7 +331,7 @@ int main(int argc, char** argv) {
   std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -362,8 +360,7 @@ int main(int argc, char** argv) {
   graph.getData(source) = 0;
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
-            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
-            << std::endl;
+            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
   galois::StatTimer Tmain;
   Tmain.start();
@@ -373,9 +370,7 @@ int main(int argc, char** argv) {
   } else if (execution == PARALLEL) {
     runAlgo<true>(graph, source);
   } else {
-    std::cerr << "ERROR: unknown type of execution passed to -exec"
-              << std::endl;
-    std::abort();
+    std::cerr << "ERROR: unknown type of execution passed to -exec\n";
   }
 
   Tmain.stop();

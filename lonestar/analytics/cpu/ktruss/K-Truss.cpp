@@ -302,7 +302,7 @@ void reportKTruss(Graph& g) {
 
   std::ofstream of(outName);
   if (!of.is_open()) {
-    std::cerr << "Cannot open " << outName << " for output." << std::endl;
+    std::cerr << "Cannot open " << outName << " for output.\n";
     return;
   }
 
@@ -310,7 +310,7 @@ void reportKTruss(Graph& g) {
     for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
       if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
-        of << n << " " << dst << " " << g.getEdgeData(e) << std::endl;
+        of << n << " " << dst << " " << g.getEdgeData(e) << "\n";
       }
     }
   }
@@ -623,9 +623,9 @@ void run() {
   std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename, true);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
   std::cout << "Running " << algo.name() << " algorithm for maximal "
-            << trussNum << "-truss" << std::endl;
+            << trussNum << "-truss\n";
 
   size_t approxEdgeData = 4 * (graph.size() + graph.sizeEdges());
   galois::preAlloc(numThreads +
@@ -669,7 +669,7 @@ int main(int argc, char** argv) {
   }
 
   if (2 > trussNum) {
-    std::cerr << "trussNum >= 2" << std::endl;
+    std::cerr << "trussNum >= 2\n";
     return -1;
   }
 

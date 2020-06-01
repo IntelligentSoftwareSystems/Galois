@@ -645,7 +645,7 @@ bool verify(Graph& graph, Algo&) {
             nodedata.flag = OTHER_MATCHED;
           } else
             std::cout << "error in verify_change! Some nodes are not decided."
-                      << std::endl;
+                      << "\n";
         },
         galois::loopname("verify_change"));
   }

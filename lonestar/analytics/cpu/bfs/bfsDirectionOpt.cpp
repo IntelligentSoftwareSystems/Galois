@@ -404,7 +404,7 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
     break;
 
   default:
-    std::cerr << "ERROR: unkown algo type" << std::endl;
+    std::cerr << "ERROR: unkown algo type\n";
   }
 }
 
@@ -420,7 +420,7 @@ int main(int argc, char** argv) {
   graph.readAndConstructBiGraphFromGRFile(filename);
   StatTimer_graphConstuct.stop();
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -446,8 +446,7 @@ int main(int argc, char** argv) {
   graph.getData(source) = 0;
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
-            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
-            << std::endl;
+            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
   std::cout
       << "WARNING: This bfs version uses bi-directional CSR graph "
@@ -475,8 +474,7 @@ int main(int argc, char** argv) {
       galois::runtime::profileVtune(
           [&]() { runAlgo<true>(graph, source, run); }, "runAlgo");
     } else {
-      std::cerr << "ERROR: unknown type of execution passed to -exec"
-                << std::endl;
+      std::cerr << "ERROR: unknown type of execution passed to -exec\n";
       std::abort();
     }
 

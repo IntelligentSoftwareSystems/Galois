@@ -284,7 +284,7 @@ double calCPMQuality(GraphTy& graph, CommArrayTy& c_info, double& e_xx,
   /* Variables needed for Modularity calculation */
   double mod = -1;
 
-  std::cout << "graph size: " << graph.size() << std::endl;
+  std::cout << "graph size: " << graph.size() << "\n";
   largeArrayEdgeTy cluster_wt_internal;
 
   /*** Initialization ***/
@@ -1268,7 +1268,7 @@ void buildNextLevelGraphSubComm(GraphTy& graph, GraphTy& graph_next,
                            edges_id, edges_data);
   TimerConstructFrom.stop();
 
-  std::cout << " c1:" << calConstantForSecondTerm(graph) << std::endl;
+  std::cout << " c1:" << calConstantForSecondTerm(graph) << "\n";
   TimerGraphBuild.stop();
   galois::gPrint("Graph construction done\n");
 }

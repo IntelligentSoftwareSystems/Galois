@@ -362,7 +362,7 @@ int main(int argc, char** argv) {
   std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -399,7 +399,7 @@ int main(int argc, char** argv) {
 
   graph.getData(source) = 0;
 
-  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm" << std::endl;
+  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
   galois::StatTimer Tmain;
   Tmain.start();
