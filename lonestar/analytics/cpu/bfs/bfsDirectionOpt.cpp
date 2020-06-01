@@ -17,32 +17,27 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include <stdio.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
+#include "galois/DynamicBitset.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
-#include "galois/AtomicHelpers.h"
-#include "galois/DynamicBitset.h"
-
+#include "galois/runtime/Profile.h"
+#include "Lonestar/BFS_SSSP.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "galois/runtime/Profile.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/BFS_SSSP.h"
-
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <iostream>
 #include <deque>
 #include <type_traits>
-
 #include <cstdlib>
 
 namespace cll = llvm::cl;
@@ -56,9 +51,8 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
-static cll::opt<unsigned long long>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<uint64_t>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
               cll::init(0));
@@ -413,7 +407,8 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
   galois::StatTimer StatTimer_graphConstuct("TimerConstructGraph", "BFS");
   StatTimer_graphConstuct.start();
@@ -430,10 +425,10 @@ int main(int argc, char** argv) {
   }
 
   auto it = graph.begin();
-  std::advance(it, static_cast<unsigned long long>(startNode));
+  std::advance(it, startNode.getValue());
   source = *it;
   it     = graph.begin();
-  std::advance(it, static_cast<unsigned long long>(reportNode));
+  std::advance(it, reportNode.getValue());
   report = *it;
 
   galois::preAlloc(preAlloc);

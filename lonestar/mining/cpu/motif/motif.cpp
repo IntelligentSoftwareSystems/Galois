@@ -4,7 +4,7 @@
 const char* name = "Motif Counting";
 const char* desc =
     "Counts the vertex-induced motifs in a graph using BFS extension";
-const char* url     = 0;
+const char* url     = nullptr;
 int num_patterns[3] = {2, 6, 21};
 
 #include "pangolin/BfsMining/vertex_miner_api.h"

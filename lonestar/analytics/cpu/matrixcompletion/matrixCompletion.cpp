@@ -17,15 +17,16 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "matrixCompletion.h"
+#include "galois/ParallelSTL.h"
+#include "galois/graphs/Graph.h"
+#include "galois/runtime/TiledExecutor.h"
+#include "Lonestar/BoilerPlate.h"
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <ostream>
-#include "matrixCompletion.h"
-#include "galois/runtime/TiledExecutor.h"
-#include "galois/ParallelSTL.h"
-#include "galois/graphs/Graph.h"
-#include "Lonestar/BoilerPlate.h"
 
 #ifdef HAS_EIGEN
 #include <Eigen/Sparse>
@@ -40,7 +41,7 @@ static const char* const name = "Matrix Completion";
 static const char* const desc =
     "Computes Matrix Decomposition using Stochastic "
     "Gradient Descent or Alternating Least Squares";
-static const char* const url = 0;
+static const char* const url = nullptr;
 
 enum Algo {
   syncALS,
@@ -625,7 +626,6 @@ struct SGDBlockJumpAlgo {
     }
     preProcessTimer.stop();
 
-    // galois::StatTimer executeTimer("Total Execution Time");
     galois::StatTimer executeTimer("Time");
     executeTimer.start();
     executeUntilConverged(sf, g,
@@ -705,7 +705,6 @@ public:
     verify(g, "sgdItemsAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    // galois::StatTimer executeTimer("Total Execution Time");
     galois::StatTimer executeTimer("Time");
     executeTimer.start();
 
@@ -808,7 +807,6 @@ public:
     verify(g, "sgdEdgeItem");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    // galois::StatTimer executeTimer("Total Execution Time");
     galois::StatTimer executeTimer("Time");
     executeTimer.start();
 
@@ -884,7 +882,6 @@ public:
     verify(g, "sgdBlockEdgeAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    // galois::StatTimer executeTimer("Total Execution Time");
     galois::StatTimer executeTimer("Time");
     executeTimer.start();
 

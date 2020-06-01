@@ -3,7 +3,7 @@
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
-const char* url  = 0;
+const char* url  = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {

@@ -34,7 +34,7 @@ namespace cll = llvm::cl;
 const char* name = "Points-to Analysis";
 const char* desc = "Performs inclusion-based points-to analysis over the input "
                    "constraints.";
-const char* url = NULL;
+const char* url = nullptr;
 
 static cll::opt<std::string>
     input(cll::Positional, cll::desc("Constraints file"), cll::Required);
@@ -750,9 +750,7 @@ public:
             }
           },
           galois::loopname("PointsToMainUpdateLoop"), galois::no_conflicts(),
-          galois::wl<galois::worklists::PerSocketChunkFIFO<8>>() // TODO exp
-                                                                 // with this
-      );
+          galois::wl<galois::worklists::PerSocketChunkFIFO<8>>());
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
 

@@ -18,16 +18,16 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
 #include "galois/runtime/Profile.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <atomic>
 #include <utility>
@@ -412,7 +412,7 @@ void run() {
   auto get_weight = [](const Edge& e) { return *e.weight; };
 
   auto w = galois::ParallelSTL::map_reduce(
-      algo.mst.begin(), algo.mst.end(), get_weight, std::plus<size_t>(), 0ul);
+      algo.mst.begin(), algo.mst.end(), get_weight, std::plus<size_t>(), 0UL);
 
   std::cout << "MST weight: " << w << "\n";
 

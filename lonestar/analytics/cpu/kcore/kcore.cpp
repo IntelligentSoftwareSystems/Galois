@@ -19,13 +19,14 @@
 
 #include "galois/Galois.h"
 #include "galois/gstl.h"
-#include "galois/Reduction.h"
 #include "galois/AtomicHelpers.h"
+#include "galois/Reduction.h"
 #include "galois/graphs/LCGraph.h"
 #include "Lonestar/BoilerPlate.h"
+
 #include "llvm/Support/CommandLine.h"
 
-constexpr static const char* const url         = 0;
+constexpr static const char* const url         = nullptr;
 constexpr static const char* const REGION_NAME = "k-core";
 constexpr static const char* const name        = "k-core";
 constexpr static const char* const desc        = "Finds the k-core of a graph, "
@@ -261,8 +262,8 @@ int main(int argc, char** argv) {
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(
-      std::max((size_t)galois::getActiveThreads() * (graph.size() / 1000000),
-               std::max(10u, galois::getActiveThreads()) * (size_t)10));
+      std::max(size_t{galois::getActiveThreads()} * (graph.size() / 1000000),
+               std::max(10U, galois::getActiveThreads()) * size_t{10}));
   preallocTime.stop();
   galois::reportPageAlloc("MemAllocMid");
 

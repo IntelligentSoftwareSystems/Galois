@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "bipart.h"
+#include "galois/graphs/ReadGraph.h"
+#include "galois/Timer.h"
+#include "Lonestar/BoilerPlate.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/LargeArray.h"
+
 #include <vector>
 #include <set>
 #include <map>
@@ -30,14 +37,6 @@
 #include <iostream>
 #include <array>
 #include <unordered_set>
-
-#include "bipart.h"
-#include "galois/graphs/ReadGraph.h"
-#include "galois/Timer.h"
-//#include "GraphReader.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/graphs/FileGraph.h"
-#include "galois/LargeArray.h"
 
 namespace cll = llvm::cl;
 
@@ -135,7 +134,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
   std::cout << "Refinement:," << T3.get() << "\n";
-  return;
 }
 
 int computingCut(GGraph& g) {
@@ -286,7 +284,6 @@ int main(int argc, char** argv) {
   std::cout << "\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
-  //  Partition(&metisGraph, csize, refiter);
   galois::do_all(
       galois::iterate(graph.hedges, graph.size()),
       [&](GNode item) {

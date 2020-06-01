@@ -22,13 +22,12 @@
 #include "galois/Reduction.h"
 #include "galois/PriorityQueue.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 
@@ -85,8 +84,6 @@ static cll::opt<Algo>
                      clEnumVal(topoTile, "topoTile")),
          cll::init(deltaTile));
 
-// typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>,
-// uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 //! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
     with_no_lockable<true>::type ::with_numa_alloc<true>::type;
@@ -94,7 +91,7 @@ using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
 typedef Graph::GraphNode GNode;
 
 constexpr static const bool TRACK_WORK          = false;
-constexpr static const unsigned CHUNK_SIZE      = 64u;
+constexpr static const unsigned CHUNK_SIZE      = 64U;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 512;
 
 using SSSP                 = BFS_SSSP<Graph, uint32_t, true, EDGE_TILE_SIZE>;
@@ -182,7 +179,7 @@ void serDeltaAlgo(Graph& graph, const GNode& source, const P& pushWrap,
 
   pushWrap(wl, source, 0);
 
-  size_t iter = 0ul;
+  size_t iter = 0UL;
   while (!wl.empty()) {
 
     auto& curr = wl.minBucket();
@@ -357,7 +354,8 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
   std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename);
@@ -379,8 +377,6 @@ int main(int argc, char** argv) {
   report = *it;
 
   size_t approxNodeData = graph.size() * 64;
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
   galois::preAlloc(numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");

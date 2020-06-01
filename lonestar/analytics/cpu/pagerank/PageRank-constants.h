@@ -25,7 +25,7 @@
 #define DEBUG 0
 
 static const char* name = "Page Rank";
-static const char* url  = 0;
+static const char* url  = nullptr;
 
 //! All PageRank algorithm variants use the same constants for ease of
 //! comparison.

@@ -17,13 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "galois/Galois.h"
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
-#include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
@@ -159,18 +158,18 @@ struct PreflowPush {
       Graph* g;
       Graph::edge_iterator ei;
 
-      EdgeDstIter(void) : g(nullptr) {}
+      EdgeDstIter() : g(nullptr) {}
 
       EdgeDstIter(Graph* g, Graph::edge_iterator ei) : g(g), ei(ei) {}
 
     private:
       friend boost::iterator_core_access;
 
-      GNode dereference(void) const { return g->getEdgeDst(ei); }
+      GNode dereference() const { return g->getEdgeDst(ei); }
 
-      void increment(void) { ++ei; }
+      void increment() { ++ei; }
 
-      void decrement(void) { --ei; }
+      void decrement() { --ei; }
 
       bool equal(const EdgeDstIter& that) const {
         assert(this->g == that.g);
@@ -237,9 +236,7 @@ struct PreflowPush {
 
   template <typename C>
   bool discharge(const GNode& src, C& ctx) {
-    // Node& node = graph.getData(src, galois::MethodFlag::WRITE);
-    Node& node = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-    // int prevHeight = node.height;
+    Node& node     = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     bool relabeled = false;
 
     if (node.excess == 0 || node.height >= (int)graph.size()) {
@@ -247,8 +244,6 @@ struct PreflowPush {
     }
 
     while (true) {
-      // galois::MethodFlag flag = relabeled ? galois::MethodFlag::UNPROTECTED :
-      // galois::MethodFlag::WRITE;
       galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
       bool finished           = false;
       int current             = node.current;

@@ -18,14 +18,14 @@
  */
 
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
+
 #include "llvm/Support/CommandLine.h"
-#include "galois/AtomicHelpers.h"
 
 #include <iostream>
 #include <fstream>
@@ -115,7 +115,7 @@ double algoLeidenWithLocking(Graph& graph, double lower, double threshold,
 
     galois::do_all(galois::iterate(graph), [&](GNode n) {
       auto& n_data = graph.getData(n);
-      galois::atomicAdd(c_info[n_data.curr_comm_ass].size, (uint64_t)1);
+      galois::atomicAdd(c_info[n_data.curr_comm_ass].size, uint64_t{1});
       galois::atomicAdd(c_info[n_data.curr_comm_ass].node_wt, n_data.node_wt);
       galois::atomicAdd(c_info[n_data.curr_comm_ass].degree_wt,
                         n_data.degree_wt);
@@ -172,13 +172,13 @@ double algoLeidenWithLocking(Graph& graph, double lower, double threshold,
               local_target != UNASSIGNED) {
 
             galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
-            galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
+            galois::atomicAdd(c_info[local_target].size, uint64_t{1});
             galois::atomicAdd(c_info[local_target].node_wt, n_data.node_wt);
 
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].degree_wt,
                                    n_data.degree_wt);
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].size,
-                                   (uint64_t)1);
+                                   uint64_t{1});
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].node_wt,
                                    n_data.node_wt);
 
@@ -277,12 +277,12 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size,
 
       if (phase == 1) {
         galois::do_all(
-            galois::iterate((uint64_t)0, num_nodes_orig), [&](GNode n) {
+            galois::iterate(uint64_t{0}, num_nodes_orig), [&](GNode n) {
               clusters_orig[n] = (*graph_curr).getData(n).curr_subcomm_ass;
             });
       } else {
         galois::do_all(
-            galois::iterate((uint64_t)0, num_nodes_orig),
+            galois::iterate(uint64_t{0}, num_nodes_orig),
             [&](GNode n) {
               assert(clusters_orig[n] < (*graph_curr).size());
               clusters_orig[n] =

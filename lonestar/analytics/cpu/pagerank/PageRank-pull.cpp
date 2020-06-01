@@ -288,21 +288,18 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
-  case Topo: {
+  case Topo:
     std::cout << "Running Pull Topological version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prTopological(transposeGraph);
     break;
-  }
-  case Residual: {
+  case Residual:
     std::cout << "Running Pull Residual version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prResidual(transposeGraph);
     break;
-  }
-  default: {
+  default:
     std::abort();
-  }
   }
 
   galois::reportPageAlloc("MeminfoPost");
