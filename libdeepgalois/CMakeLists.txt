@@ -73,7 +73,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if(GALOIS_ENABLE_GPU)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGALOIS_ENABLE_GPU")
-  set(sources src/reader.cpp src/RandomWalk.cpp src/utils.cpp)
+  set(sources src/reader.cpp src/RandomWalk.cpp src/utils.cpp src/Train.cpp)
 else()
   set(sources
     src/layers/softmax_loss_layer.cpp
@@ -91,6 +91,7 @@ else()
     src/reader.cpp
     src/lgraph.cpp
     src/utils.cpp
+    src/Train.cpp
     src/node.cpp
     src/Net.cpp
   )
