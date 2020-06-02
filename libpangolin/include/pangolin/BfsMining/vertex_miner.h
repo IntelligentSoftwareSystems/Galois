@@ -106,7 +106,8 @@ public:
                   if (is_single)
                     total_num += 1;
                   else {
-                    // unsigned pid  = getPattern(n, i, dst, emb, pos);
+                    // unsigned pid  = getPattern(n, i, dst, emb,
+                    // pos);
                     if (n < 4) {
                       unsigned pid =
                           this->find_motif_pattern_id(n, i, dst, emb, pos);
@@ -326,8 +327,7 @@ public:
             (*cg_map)[cg] = element.second;
           cg.clean();
         },
-        galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("CanonicalReduction"));
+        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("CanonicalReduce"));
     qp_map.clear();
   }
   inline void merge_qp_map() {
@@ -374,9 +374,8 @@ public:
     } else {
       if (this->max_size < 9) {
         std::cout << std::endl;
-        // for (auto it = p_map.begin(); it != p_map.end(); ++it)
-        //	std::cout << "{" << it->first << "} --> " << it->second <<
-        // std::endl;
+        for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
+          std::cout << "{" << it->first << "} --> " << it->second << std::endl;
       } else {
         std::cout << std::endl;
         for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
