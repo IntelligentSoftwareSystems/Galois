@@ -48,12 +48,18 @@ static cll::opt<std::string>
 static cll::opt<bool>
     verify("v", llvm::cl::desc("do verification step (default value false)"),
            llvm::cl::init(false));
+#ifndef GALOIS_ENABLE_GPU
+static cll::opt<std::string>
+    statFile("statFile",
+             llvm::cl::desc("Optional output file to print stats to"));
+#endif
 
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
                        const char* url) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
 #ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads);
+  galois::runtime::setStatFile(statFile);
 #endif
   std::cout << "Copyright (C) 2020 The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
