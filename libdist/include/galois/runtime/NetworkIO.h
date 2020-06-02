@@ -122,17 +122,17 @@ public:
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
 makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker,
                  std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
-#ifdef GALOIS_USE_LCI
-/**
- * Creates/returns a network IO layer that uses LWCI to do communication.
- *
- * @returns tuple with pointer to the LWCI IO layer, this host's ID, and the
- * total number of hosts in the system
- */
-std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
-makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker,
-                  std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
-#endif
+// #ifdef GALOIS_USE_LCI
+// /**
+//  * Creates/returns a network IO layer that uses LWCI to do communication.
+//  *
+//  * @returns tuple with pointer to the LWCI IO layer, this host's ID, and the
+//  * total number of hosts in the system
+//  */
+// std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
+// makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker,
+//                   std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
+// #endif
 
 } // namespace runtime
 } // namespace galois
