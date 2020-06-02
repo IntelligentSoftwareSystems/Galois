@@ -141,8 +141,8 @@ public:
   }
 
 protected:
-  Graph graph;
-  Graph pattern;
+  PangolinGraph graph;
+  PangolinGraph pattern;
   unsigned max_size;
   int num_threads;
   unsigned max_degree;
@@ -183,7 +183,7 @@ protected:
         return true;
     return false;
   }
-  unsigned get_degree(Graph* g, VertexId vid) {
+  unsigned get_degree(PangolinGraph* g, VertexId vid) {
     return std::distance(g->edge_begin(vid), g->edge_end(vid));
   }
   inline unsigned intersect_merge(unsigned src, unsigned dst) {
@@ -337,8 +337,8 @@ protected:
     // return serial_search(key, begin, end);
     return binary_search(key, begin, end);
   }
-  inline bool serial_search(unsigned key, Graph::edge_iterator begin,
-                            Graph::edge_iterator end) {
+  inline bool serial_search(unsigned key, PangolinGraph::edge_iterator begin,
+                            PangolinGraph::edge_iterator end) {
     for (auto offset = begin; offset != end; ++offset) {
       unsigned d = graph.getEdgeDst(offset);
       if (d == key)
@@ -348,8 +348,8 @@ protected:
     }
     return false;
   }
-  inline bool binary_search(unsigned key, Graph::edge_iterator begin,
-                            Graph::edge_iterator end) {
+  inline bool binary_search(unsigned key, PangolinGraph::edge_iterator begin,
+                            PangolinGraph::edge_iterator end) {
     auto l = begin;
     auto r = end - 1;
     while (r >= l) {
@@ -364,7 +364,7 @@ protected:
     }
     return false;
   }
-  inline int binary_search(unsigned key, Graph::edge_iterator begin,
+  inline int binary_search(unsigned key, PangolinGraph::edge_iterator begin,
                            int length) {
     if (length < 1)
       return -1;
@@ -461,7 +461,7 @@ protected:
     return h.get_value();
   }
 
-  // unsigned orientation(Graph &og, Graph &g);
+  // unsigned orientation(PangolinGraph &og, PangolinGraph &g);
 };
 
 #endif // MINER_HPP_

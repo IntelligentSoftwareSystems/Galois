@@ -17,7 +17,7 @@
 #include "galois/LargeArray.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/BoilerPlate.h"
+#include "BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
 
 #include "DataType.h"

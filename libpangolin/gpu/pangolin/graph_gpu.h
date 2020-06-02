@@ -348,7 +348,13 @@ public:
   void copy_to_gpu(struct CSRGraph& copygraph) {
     copygraph.nnodes = nnodes;
     copygraph.nedges = nedges;
-    assert(copygraph.allocOnDevice(use_node_data));
+    auto error       = copygraph.allocOnDevice(use_node_data);
+    if (error == 0) {
+      std::cout << "GPU memory allocation failed\n";
+      exit(0);
+    }
+    printf("edge_dst: host_ptr %x device_ptr %x \n", edge_dst,
+           copygraph.edge_dst);
     check_cuda(cudaMemcpy(copygraph.edge_dst, edge_dst,
                           nedges * sizeof(index_type), cudaMemcpyHostToDevice));
     check_cuda(cudaMemcpy(copygraph.row_start, row_start,
@@ -381,8 +387,13 @@ public:
   }
 
   unsigned allocOnDevice(bool use_label) {
+    if (edge_dst != NULL) {
+      std::cout << "already allocated\n";
+      exit(0);
+    }
     assert(edge_dst == NULL); // make sure not already allocated
     device_graph = true;
+    std::cout << "Allocating memory on GPU\n";
     check_cuda(cudaMalloc((void**)&edge_dst, nedges * sizeof(index_type)));
     check_cuda(
         cudaMalloc((void**)&row_start, (nnodes + 1) * sizeof(index_type)));
