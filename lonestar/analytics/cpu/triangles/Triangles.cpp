@@ -37,14 +37,14 @@
 
 const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
-const char* url  = nullptr;
 
 constexpr static const unsigned CHUNK_SIZE = 64U;
 enum Algo { nodeiterator, edgeiterator, orderedCount };
 
 namespace cll = llvm::cl;
+
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
@@ -362,7 +362,7 @@ void edgeIteratingAlgo(Graph& graph) {
 void makeSortedGraph(Graph& graph) {
   // read original graph
   galois::graphs::FileGraph initial;
-  initial.fromFileInterleaved<void>(inputFilename);
+  initial.fromFileInterleaved<void>(inputFile);
 
   size_t numGraphNodes = initial.size();
   // create node -> degree pairs
@@ -457,7 +457,7 @@ void readGraph(Graph& graph) {
     makeSortedGraph(graph);
     Trelabel.stop();
   } else {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
     // algorithm correctness requires sorting edges by destination
     graph.sortAllEdgesByDst();
   }
@@ -465,22 +465,26 @@ void readGraph(Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
 
-  galois::StatTimer Tinitial("GraphReadingTime");
-  Tinitial.start();
+  galois::StatTimer initialTime("GraphReadingTime");
+  initialTime.start();
   readGraph(graph);
-  Tinitial.stop();
+  initialTime.stop();
 
   galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::gInfo("Starting triangle counting...");
-  galois::StatTimer T;
-  T.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   // case by case preAlloc to avoid allocating unnecessarily
   switch (algo) {
   case nodeiterator:
@@ -498,8 +502,11 @@ int main(int argc, char** argv) {
   default:
     std::cerr << "Unknown algo: " << algo << "\n";
   }
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
+
+  totalTime.stop();
+
   return 0;
 }

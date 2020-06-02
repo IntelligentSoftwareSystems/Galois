@@ -45,6 +45,8 @@ static const char* desc =
     "Partitions a hypergraph into K parts and minimizing the graph cut";
 static const char* url = "HyPar";
 
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<scheduleMode> schedulingMode(
     cll::desc("Choose a inital scheduling mode:"),
     cll::values(clEnumVal(PLD, "PLD"), clEnumVal(PP, "PP"), clEnumVal(WD, "WD"),
@@ -70,8 +72,6 @@ static cll::opt<std::string>
     orderedfile("ordered", cll::desc("output ordered graph file name"));
 static cll::opt<std::string>
     permutationfile("permutation", cll::desc("output permutation file name"));
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> csize(cll::Positional,
                                 cll::desc("<size of coarsest graph>"),
                                 cll::init(25));
@@ -114,8 +114,8 @@ cell2) { cutsize++; cut_status = true; break;
  * Partitioning
  */
 void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
-  galois::StatTimer TM;
-  TM.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   galois::StatTimer T("CoarsenSEP");
   T.start();
@@ -134,6 +134,8 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
   std::cout << "Refinement:," << T3.get() << "\n";
+
+  execTime.stop();
 }
 
 int computingCut(GGraph& g) {
@@ -208,12 +210,15 @@ int hash(unsigned val) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   // srand(-1);
   MetisGraph metisGraph;
   GGraph& graph = *metisGraph.getGraph();
-  std::ifstream f(filename.c_str());
+  std::ifstream f(inputFile.c_str());
   // GGraph graph;// = *metisGraph.getGraph();
   std::string line;
   std::getline(f, line);
@@ -427,6 +432,8 @@ int main(int argc, char** argv) {
   galois::runtime::reportStat_Single("HyParzo", "zero-one",
                                      computingBalance(graph));
   // galois::reportPageAlloc("MeminfoPost");
+
+  totalTime.stop();
 
   return 0;
 }

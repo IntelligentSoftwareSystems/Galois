@@ -38,8 +38,6 @@ static const int LATENT_VECTOR_SIZE = 20; // Purdue, CSGD: 100; Intel: 20
 enum OutputType { binary, ascii };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /*
  * (Purdue, Neflix): 0.012, (Purdue, Yahoo Music): 0.00075, (Purdue, HugeWiki):

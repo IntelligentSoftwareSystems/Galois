@@ -43,7 +43,7 @@ static const char* url = "aigRewriting";
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>
-    inputFileName(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 static cll::opt<bool>
     outputVerbose("v", cll::desc("verbose output (default: false)"),
@@ -65,10 +65,10 @@ int main(int argc, char* argv[]) {
 
   // shared-memory system object initializes global variables for galois
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
 
   int nThreads         = numThreads;
-  std::string path     = inputFileName;
+  std::string path     = inputFile;
   std::string fileName = getFileName(path);
 
   aig::Aig aig;

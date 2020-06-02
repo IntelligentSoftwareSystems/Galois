@@ -244,10 +244,11 @@ void computePRTopological(Graph& graph) {
 void prTopological(Graph& graph) {
   initNodeDataTopological(graph);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRTopological(graph);
-  prTimer.stop();
+  execTime.stop();
 }
 
 void prResidual(Graph& graph) {
@@ -258,27 +259,28 @@ void prResidual(Graph& graph) {
 
   initNodeDataResidual(graph, delta, residual);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRResidual(graph, delta, residual);
-  prTimer.stop();
+  execTime.stop();
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
 
-  galois::StatTimer overheadTime("OverheadTime");
-  overheadTime.start();
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph transposeGraph;
   std::cout << "WARNING: pull style algorithms work on the transpose of the "
                "actual graph\n"
-            << "WARNING: this program assumes that " << filename
+            << "WARNING: this program assumes that " << inputFile
             << " contains transposed representation\n\n"
-            << "Reading graph: " << filename << std::endl;
+            << "Reading graph: " << inputFile << "\n";
 
-  galois::graphs::readGraph(transposeGraph, filename);
+  galois::graphs::readGraph(transposeGraph, inputFile);
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
@@ -338,6 +340,7 @@ int main(int argc, char** argv) {
   printPageRank(transposeGraph);
 #endif
 
-  overheadTime.stop();
+  totalTime.stop();
+
   return 0;
 }

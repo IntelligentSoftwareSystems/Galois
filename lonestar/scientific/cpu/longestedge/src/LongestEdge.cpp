@@ -76,7 +76,7 @@ bool basicCondition(const Graph& graph, GNode& node);
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, nullptr);
   Graph graph{};
 
   galois::reportPageAlloc("MeminfoPre1");

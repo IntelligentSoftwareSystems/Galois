@@ -43,8 +43,7 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
@@ -318,14 +317,17 @@ void runAlgo(Graph& graph, const GNode& source) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
   GNode source;
   GNode report;
 
-  std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
 
@@ -355,8 +357,8 @@ int main(int argc, char** argv) {
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
             << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
-  galois::StatTimer Tmain;
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   if (execution == SERIAL) {
     runAlgo<false>(graph, source);
@@ -366,7 +368,7 @@ int main(int argc, char** argv) {
     std::cerr << "ERROR: unknown type of execution passed to -exec\n";
   }
 
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -409,6 +411,8 @@ int main(int argc, char** argv) {
       GALOIS_DIE("verification failed");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }

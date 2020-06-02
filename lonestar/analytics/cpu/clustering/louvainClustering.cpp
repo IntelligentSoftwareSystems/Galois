@@ -44,8 +44,7 @@ static const char* url = "louvain_clustering";
 enum Algo { coloring, foreach, delay, doall };
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::coloring, "Coloring",
@@ -791,18 +790,19 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint32_t min_graph_size,
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
 
-  Graph graph, graph_next;
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  Graph graph;
+  Graph graph_next;
   Graph* graph_curr;
 
-  galois::StatTimer TEnd2End("Timer_end2end");
-  TEnd2End.start();
-
-  std::cout << "Reading from file: " << filename << std::endl;
-  std::cout << "[WARNING:] Make sure " << filename
-            << " is symmetric graph without duplicate edges" << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  std::cout << "[WARNING:] Make sure " << inputFile
+            << " is symmetric graph without duplicate edges\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
 
@@ -848,13 +848,11 @@ int main(int argc, char** argv) {
     printGraphCharateristics(*graph_curr);
   }
 
-  galois::StatTimer Tmain("Timer_LC");
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold,
                                 clusters_orig);
-  Tmain.stop();
-
-  TEnd2End.stop();
+  execTime.stop();
 
   /*
    * Sanity check: Check modularity at the end
@@ -863,5 +861,8 @@ int main(int argc, char** argv) {
   if (output_CID) {
     printNodeClusterId(graph, output_CID_filename);
   }
+
+  totalTime.stop();
+
   return 0;
 }

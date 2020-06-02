@@ -41,7 +41,6 @@ static const char* const name = "Matrix Completion";
 static const char* const desc =
     "Computes Matrix Decomposition using Stochastic "
     "Gradient Descent or Alternating Least Squares";
-static const char* const url = nullptr;
 
 enum Algo {
   syncALS,
@@ -53,6 +52,9 @@ enum Algo {
 };
 
 enum Step { bold, bottou, intel, inverse, purdue };
+
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /*
  * Commandline options for different Algorithms
@@ -345,7 +347,7 @@ struct SGDBlockJumpAlgo {
       ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   size_t userIdToUserNode(size_t userId) { return userId + NUM_ITEM_NODES; }
 
@@ -661,7 +663,7 @@ public:
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   std::string name() const { return "sgdItemsAlgo"; }
 
@@ -742,7 +744,7 @@ public:
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   std::string name() const { return "sgdEdgeItem"; }
 
@@ -843,7 +845,7 @@ public:
       ::template with_out_of_line_lockable<true>::type ::
           template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   std::string name() const { return "sgdBlockEdge"; }
 
@@ -920,7 +922,7 @@ struct SimpleALSalgo {
   Sp A;
   Sp AT;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   void copyToGraph(Graph& g, MT& WT, MT& HT) {
     // Copy out
@@ -1098,7 +1100,7 @@ struct SyncALSalgo {
   Sp A;
   Sp AT;
 
-  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFile); }
 
   void copyToGraph(Graph& g, MT& WT, MT& HT) {
     // Copy out
@@ -1457,10 +1459,10 @@ void run() {
   }
 
   // algorithm call
-  galois::StatTimer totalTimer("Total Time");
-  totalTimer.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   algo(g, *sf);
-  totalTimer.stop();
+  execTime.stop();
 
   if (!skipVerify) {
     verify(g, "Final");
@@ -1485,7 +1487,10 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   switch (algo) {
 #ifdef HAS_EIGEN
@@ -1512,6 +1517,8 @@ int main(int argc, char** argv) {
     GALOIS_DIE("unknown algorithm");
     break;
   }
+
+  totalTime.stop();
 
   return 0;
 }

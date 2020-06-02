@@ -34,11 +34,9 @@ namespace cll = llvm::cl;
 const char* name = "Points-to Analysis";
 const char* desc = "Performs inclusion-based points-to analysis over the input "
                    "constraints.";
-const char* url = nullptr;
 
 static cll::opt<std::string>
-    input(cll::Positional, cll::desc("Constraints file"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<bool>
     useSerial("serial",
               cll::desc("Runs serial version of the algorithm "
@@ -771,14 +769,14 @@ public:
  */
 template <typename PTAClass, typename Alloc>
 void runPTA(PTAClass& pta, Alloc& nodeAllocator) {
-  size_t numNodes = pta.readConstraints(input.c_str());
+  size_t numNodes = pta.readConstraints(inputFile.c_str());
   pta.initialize(numNodes, nodeAllocator);
 
-  galois::StatTimer T; // main timer
+  galois::StatTimer execTime("Timer_0");
 
-  T.start();
+  execTime.start();
   pta.run();
-  T.stop();
+  execTime.stop();
 
   galois::gInfo("No of points-to facts computed = ", pta.countPointsToFacts());
 
@@ -798,7 +796,10 @@ void runPTA(PTAClass& pta, Alloc& nodeAllocator) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   // depending on serial or concurrent, create the correct class and pass it
   // into the run harness which takes care of the rest
@@ -823,6 +824,8 @@ int main(int argc, char** argv) {
         nodeAllocator;
     runPTA(p, nodeAllocator);
   }
+
+  totalTime.stop();
 
   return 0;
 }

@@ -188,13 +188,13 @@ void syncPageRank(Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
 
-  galois::StatTimer T("OverheadTime");
-  T.start();
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
 
@@ -210,8 +210,8 @@ int main(int argc, char** argv) {
       galois::iterate(graph), [&graph](GNode n) { graph.getData(n).init(); },
       galois::no_stats(), galois::loopname("Initialize"));
 
-  galois::StatTimer Tmain;
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   switch (algo) {
   case Async:
@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
     std::abort();
   }
 
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
   printPageRank(graph);
 #endif
 
-  T.stop();
+  totalTime.stop();
 
   return 0;
 }
