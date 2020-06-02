@@ -26,7 +26,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-constexpr static const char* const url         = nullptr;
 constexpr static const char* const REGION_NAME = "k-core";
 constexpr static const char* const name        = "k-core";
 constexpr static const char* const desc        = "Finds the k-core of a graph, "
@@ -41,10 +40,8 @@ namespace cll = llvm::cl;
 
 enum Algo { Async = 0, Sync };
 
-//! Input file: should be symmetric graph.
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"),
-                  cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 //! Choose algorithm: worklist vs. sync.
 static cll::opt<Algo> algo("algo",
@@ -59,11 +56,10 @@ static cll::opt<unsigned int> k_core_num("kcore", cll::desc("k-core value"),
 
 //! Flag that forces user to be aware that they should be passing in a
 //! symmetric graph.
-static cll::opt<bool> symmetricGraph(
-    "symmetricGraph",
-    cll::desc("Flag should be used to make user aware they should be passing a "
-              "symmetric graph to this program"),
-    cll::init(false));
+static cll::opt<bool>
+    symmetricGraph("symmetricGraph",
+                   cll::desc("Set this flag if graph is symmetric"),
+                   cll::init(false));
 
 /*******************************************************************************
  * Graph structure declarations + other inits
@@ -233,7 +229,10 @@ void kCoreSanity(Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!symmetricGraph) {
     GALOIS_DIE("kcore requires a symmetric graph input;"
@@ -248,14 +247,11 @@ int main(int argc, char** argv) {
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize", CHUNK_SIZE);
   galois::reportPageAlloc("MemAllocPre");
 
-  galois::StatTimer totalTimer("TotalTime", REGION_NAME);
-  totalTimer.start();
-
   //! Read graph from disk.
   galois::StatTimer graphReadingTimer("GraphConstructTime", REGION_NAME);
   graphReadingTimer.start();
   Graph graph;
-  galois::graphs::readGraph(graph, inputFilename);
+  galois::graphs::readGraph(graph, inputFile);
   graphReadingTimer.stop();
 
   //! Preallocate pages in memory so allocation doesn't occur during compute.
@@ -271,9 +267,9 @@ int main(int argc, char** argv) {
   degreeCounting(graph);
 
   //! Begins main computation.
-  galois::StatTimer runtimeTimer;
+  galois::StatTimer execTime("Timer_0");
 
-  runtimeTimer.start();
+  execTime.start();
 
   if (algo == Async) {
     galois::gInfo("Running asynchronous k-core with k-core number ",
@@ -292,15 +288,16 @@ int main(int argc, char** argv) {
     GALOIS_DIE("invalid specification of k-core algorithm");
   }
 
-  runtimeTimer.stop();
+  execTime.stop();
 
-  totalTimer.stop();
   galois::reportPageAlloc("MemAllocPost");
 
   //! Sanity check.
   if (!skipVerify) {
     kCoreSanity(graph);
   }
+
+  totalTime.stop();
 
   return 0;
 }

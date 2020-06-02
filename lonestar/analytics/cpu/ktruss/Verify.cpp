@@ -36,10 +36,9 @@ namespace cll = llvm::cl;
 
 static const char* name = "verify_ktruss";
 static const char* desc = "Verify for maximal k-truss";
-static const char* url  = nullptr;
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string> trussFile("trussFile",
                                        cll::desc("edgelist for the trusses"),
                                        cll::Required);
@@ -202,7 +201,10 @@ bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (2 > trussNum) {
     std::cerr << "trussNum >= 2\n";
@@ -210,14 +212,17 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "Verifying maximal " << trussNum << "-truss\n";
-  std::cout << "Truss is computed for " << filename << " and stored in "
+  std::cout << "Truss is computed for " << inputFile << " and stored in "
             << trussFile << "\n";
 
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  galois::graphs::readGraph(g, filename, true);
+  galois::graphs::readGraph(g, inputFile, true);
   std::cout << "Read " << g.size() << " nodes\n";
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   initialize(g);
   readTruss(g);
@@ -280,6 +285,10 @@ int main(int argc, char** argv) {
     std::cerr << "Verification failed!\n";
     return 1;
   }
+
+  execTime.start();
+
+  totalTime.stop();
 
   return 0;
 }

@@ -40,8 +40,8 @@ static const char* desc = "Refines a Delaunay triangulation mesh such that no "
                           "angle in the mesh is less than 30 degrees";
 static const char* url = "delaunay_mesh_refinement";
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo { nondet, detBase, detPrefix, detDisjoint };
 
@@ -128,12 +128,15 @@ struct DetLessThan {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
   {
     Mesh m;
-    m.read(graph, filename.c_str(), detAlgo == nondet);
+    m.read(graph, inputFile.c_str(), detAlgo == nondet);
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
       GALOIS_DIE("bad input mesh");
@@ -154,8 +157,8 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPre2");
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   galois::InsertBag<GNode> initialBad;
 
@@ -192,7 +195,7 @@ int main(int argc, char** argv) {
     abort();
   }
   Trefine.stop();
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -210,6 +213,8 @@ int main(int argc, char** argv) {
               << " total triangles\n";
     std::cout << "Refinement OK\n";
   }
+
+  totalTime.stop();
 
   return 0;
 }

@@ -38,8 +38,9 @@ using ShortPathType = double;
 /* Declaration of command line arguments */
 /******************************************************************************/
 namespace cll = llvm::cl;
+
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string>
     sourcesToUse("sourcesToUse",
                  cll::desc("Whitespace separated list of sources in a file to "
@@ -285,7 +286,10 @@ constexpr static const char* const desc =
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, nullptr);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   // some initial stat reporting
   galois::gInfo("Worklist chunk size of ", CHUNK_SIZE,
@@ -294,14 +298,11 @@ int main(int argc, char** argv) {
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize", CHUNK_SIZE);
   galois::reportPageAlloc("MemAllocPre");
 
-  galois::StatTimer totalTimer("TimerTotal", REGION_NAME);
-  totalTimer.start();
-
   // Graph construction
   galois::StatTimer graphConstructTimer("TimerConstructGraph", "BFS");
   graphConstructTimer.start();
   Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
   graphConstructTimer.stop();
   galois::gInfo("Graph construction complete");
 
@@ -346,7 +347,7 @@ int main(int argc, char** argv) {
   InitializeGraph(graph);
 
   galois::gInfo("Beginning main computation");
-  galois::StatTimer runtimeTimer;
+  galois::StatTimer execTime("Timer_0");
 
   // loop over all specified sources for SSSP/Brandes calculation
   for (uint64_t i = 0; i < loop_end; i++) {
@@ -363,14 +364,14 @@ int main(int argc, char** argv) {
     }
 
     // here begins main computation
-    runtimeTimer.start();
+    execTime.start();
     InitializeIteration(graph);
     // worklist; last one will be empty
     galois::gstl::Vector<WorklistType> worklists = SSSP(graph);
     BackwardBrandes(graph, worklists);
-    runtimeTimer.stop();
+    execTime.stop();
   }
-  totalTimer.stop();
+
   galois::reportPageAlloc("MemAllocPost");
 
   // sanity checking numbers
@@ -386,6 +387,8 @@ int main(int argc, char** argv) {
     }
     free(v_out);
   }
+
+  totalTime.stop();
 
   return 0;
 }

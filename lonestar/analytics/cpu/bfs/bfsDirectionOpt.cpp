@@ -404,7 +404,10 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
   GNode source;
@@ -412,7 +415,7 @@ int main(int argc, char** argv) {
 
   galois::StatTimer StatTimer_graphConstuct("TimerConstructGraph", "BFS");
   StatTimer_graphConstuct.start();
-  graph.readAndConstructBiGraphFromGRFile(filename);
+  graph.readAndConstructBiGraphFromGRFile(inputFile);
   StatTimer_graphConstuct.stop();
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
@@ -454,8 +457,9 @@ int main(int argc, char** argv) {
   }
 
   std::cout << " Execution started\n";
-  galois::StatTimer Tmain;
-  Tmain.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   for (unsigned int run = 0; run < numRuns; ++run) {
     galois::gPrint("BFS::go run ", run, " called\n");
@@ -483,7 +487,9 @@ int main(int argc, char** argv) {
       }
     }
   }
-  Tmain.stop();
+
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Node " << reportNode << " has parent " << graph.getData(report)
@@ -494,6 +500,8 @@ int main(int argc, char** argv) {
       galois::gPrint("parent[", n, "] : ", graph.getData(n), "\n");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }

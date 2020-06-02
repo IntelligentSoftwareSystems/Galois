@@ -43,7 +43,7 @@ static const char* url  = "mst";
 enum Algo { parallel, exp_parallel };
 
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<bool>
     symmetricGraph("symmetricGraph",
                    cll::desc("Graph already symmetric (default value false)"),
@@ -362,7 +362,7 @@ struct ParallelAlgo {
     galois::graphs::FileGraph origGraph;
     galois::graphs::FileGraph symGraph;
 
-    origGraph.fromFileInterleaved<EdgeData>(inputFilename);
+    origGraph.fromFileInterleaved<EdgeData>(inputFile);
     if (!symmetricGraph)
       galois::graphs::makeSymmetric<EdgeData>(origGraph, symGraph);
     else
@@ -401,11 +401,10 @@ void run() {
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::StatTimer T;
-
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   galois::runtime::profileVtune([&](void) { algo(); }, "boruvka");
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -423,7 +422,10 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   switch (algo) {
   case parallel:
@@ -435,6 +437,8 @@ int main(int argc, char** argv) {
   default:
     std::cerr << "Unknown algo: " << algo << "\n";
   }
+
+  totalTime.stop();
 
   return 0;
 }

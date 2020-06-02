@@ -44,9 +44,9 @@ const char* url = "independent_set";
 enum Algo { serial, pull, nondet, detBase, prio, edgetiledprio };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input graph (symmetric)>"),
-                                      cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -62,6 +62,11 @@ static cll::opt<Algo> algo(
             edgetiledprio,
             "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")),
     cll::init(prio));
+
+static cll::opt<bool>
+    symmetricGraph("symmetricGraph",
+                   cll::desc("Set this flag if graph is symmetric"),
+                   cll::init(false));
 
 enum MatchFlag : char { UNMATCHED, OTHER_MATCHED, MATCHED };
 
@@ -661,7 +666,7 @@ void run() {
 
   Algo algo;
   Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
 
   // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads /
   // 8) / galois::runtime::MM::hugePageSize); Tighter upper bound
@@ -675,11 +680,12 @@ void run() {
   }
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::StatTimer T;
+  galois::StatTimer execTime("Timer_0");
 
-  T.start();
+  execTime.start();
   algo(graph);
-  T.stop();
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify(graph, algo)) {
@@ -696,7 +702,16 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("independent set requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph");
+  }
 
   switch (algo) {
   case serial:
@@ -721,5 +736,8 @@ int main(int argc, char** argv) {
     std::cerr << "Unknown algorithm" << algo << "\n";
     abort();
   }
+
+  totalTime.stop();
+
   return 0;
 }

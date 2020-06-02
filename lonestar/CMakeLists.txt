@@ -54,7 +54,7 @@ if(GALOIS_ENABLE_DIST)
     FILE(GLOB CPPSOURCES ${name}*.cpp)
     add_executable(${name} ${CPPSOURCES})
     add_dependencies(apps ${name})
-    target_link_libraries(${name} lonestar Galois::shmem LLVMSupport)
+    target_link_libraries(${name} Galois::shmem LLVMSupport)
     install(TARGETS ${name} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
     target_link_libraries(${name} distbench)

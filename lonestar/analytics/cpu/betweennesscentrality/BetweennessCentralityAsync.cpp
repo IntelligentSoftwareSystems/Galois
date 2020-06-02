@@ -36,11 +36,8 @@ constexpr static const unsigned CHUNK_SIZE = 64U;
 
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input graph in Galois bin "
-                                                "format>"),
-                                      cll::Required);
-
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                           cll::desc("Whitespace separated list "
                                                     "of sources in a file to "
@@ -408,7 +405,10 @@ static const char* desc = "Computes betwenness centrality in an unweighted "
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, nullptr);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
@@ -424,7 +424,7 @@ int main(int argc, char** argv) {
   graphConstructTimer.start();
 
   galois::graphs::BufferedGraph<void> fileReader;
-  fileReader.loadGraph(filename);
+  fileReader.loadGraph(inputFile);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
   bcGraph.constructNodes();
 
@@ -508,8 +508,8 @@ int main(int argc, char** argv) {
 
   galois::gInfo("Beginning execution");
 
-  galois::StatTimer executionTimer;
-  executionTimer.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   for (uint32_t i = 0; i < numOfSources; ++i) {
     uint32_t sourceToUse = i;
     if (sourceVector.size() != 0) {
@@ -546,7 +546,7 @@ int main(int argc, char** argv) {
     if (numOfOutSources != 0 && goodSource >= numOfOutSources)
       break;
   }
-  executionTimer.stop();
+  execTime.stop();
 
   galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
@@ -574,6 +574,8 @@ int main(int argc, char** argv) {
     }
     outfile.close();
   }
+
+  totalTime.stop();
 
   return 0;
 }

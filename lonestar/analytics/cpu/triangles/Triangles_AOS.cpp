@@ -38,15 +38,15 @@
 
 const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
-const char* url  = nullptr;
 
 enum Algo {
   nodeiteratorpre,
 };
 
 namespace cll = llvm::cl;
+
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumValN(Algo::nodeiteratorpre,
                                                   "nodeiteratorpre",
@@ -246,7 +246,7 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
   G initial;
   G permuted;
 
-  initial.fromFileInterleaved<void>(inputFilename);
+  initial.fromFileInterleaved<void>(inputFile);
 
   // Getting around lack of resize for deque
   std::deque<N> nodes;
@@ -273,10 +273,10 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
 }
 
 void readGraph(Graph& graph) {
-  if (inputFilename.find(".gr.triangles") !=
-      inputFilename.size() - strlen(".gr.triangles")) {
+  if (inputFile.find(".gr.triangles") !=
+      inputFile.size() - strlen(".gr.triangles")) {
     // Not directly passed .gr.triangles file
-    std::string triangleFilename = inputFilename + ".triangles";
+    std::string triangleFilename = inputFile + ".triangles";
     std::ifstream triangleFile(triangleFilename.c_str());
     if (!triangleFile.good()) {
       // triangles doesn't already exist, create it
@@ -290,16 +290,18 @@ void readGraph(Graph& graph) {
       galois::gPrint("Done loading", triangleFilename, "\n");
     }
   } else {
-    galois::gPrint("Start loading", inputFilename, "\n");
-    galois::graphs::readGraph(graph, inputFilename);
-    // graph.allocateAndLoadGraph(inputFilename);
-    galois::gPrint("Done loading", inputFilename, "\n");
+    galois::gPrint("Start loading", inputFile, "\n");
+    galois::graphs::readGraph(graph, inputFile);
+    galois::gPrint("Done loading", inputFile, "\n");
   }
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
 
@@ -312,9 +314,8 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::StatTimer T;
-  T.start();
-  // case by case preAlloc to avoid allocating unnecessarily
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   switch (algo) {
   case nodeiteratorpre:
     nodeIteratingAlgoPre(graph);
@@ -323,8 +324,11 @@ int main(int argc, char** argv) {
   default:
     std::cerr << "Unknown algo: " << algo << "\n";
   }
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
+
+  totalTime.stop();
+
   return 0;
 }
