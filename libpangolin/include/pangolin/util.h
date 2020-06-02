@@ -7,7 +7,7 @@
 
 namespace util {
 
-void print_graph(Graph& graph) {
+void print_graph(PangolinGraph& graph) {
   for (GNode n : graph) {
     std::cout << "vertex " << n << ": label = " << graph.getData(n)
               << ": degree = " << graph.get_degree(n) << " edgelist = [ ";
@@ -17,7 +17,7 @@ void print_graph(Graph& graph) {
   }
 }
 
-void genGraph(MGraph& mg, Graph& g) {
+void genGraph(MGraph& mg, PangolinGraph& g) {
   g.allocateFrom(mg.num_vertices(), mg.num_edges());
   g.constructNodes();
   for (size_t i = 0; i < mg.num_vertices(); i++) {
@@ -31,7 +31,7 @@ void genGraph(MGraph& mg, Graph& g) {
   }
 }
 // relabel vertices by descending degree order (do not apply to weighted graphs)
-void DegreeRanking(Graph& og, Graph& g) {
+void DegreeRanking(PangolinGraph& og, PangolinGraph& g) {
   std::cout << " Relabeling vertices by descending degree order\n";
   std::vector<IndexT> old_degrees(og.size(), 0);
   galois::do_all(
@@ -76,7 +76,7 @@ void DegreeRanking(Graph& og, Graph& g) {
   g.sortAllEdgesByDst();
 }
 
-unsigned orientation(Graph& og, Graph& g) {
+unsigned orientation(PangolinGraph& og, PangolinGraph& g) {
   galois::StatTimer Tdag("DAG");
   Tdag.start();
   std::cout << "Orientation enabled, using DAG\n";
@@ -140,8 +140,8 @@ unsigned orientation(Graph& og, Graph& g) {
 
 // relabel is needed when we use DAG as input graph, and it is disabled when we
 // use symmetrized graph
-unsigned read_graph(Graph& graph, std::string filetype, std::string filename,
-                    bool need_dag = false) {
+unsigned read_graph(PangolinGraph& graph, std::string filetype,
+                    std::string filename, bool need_dag = false) {
   MGraph mgraph(need_dag);
   unsigned max_degree = 0;
   if (filetype == "txt") {
@@ -159,7 +159,7 @@ unsigned read_graph(Graph& graph, std::string filetype, std::string filename,
   } else if (filetype == "gr") {
     printf("Reading .gr file: %s\n", filename.c_str());
     if (need_dag) {
-      Graph g_temp;
+      PangolinGraph g_temp;
       galois::graphs::readGraph(g_temp, filename);
       max_degree = orientation(g_temp, graph);
     } else {

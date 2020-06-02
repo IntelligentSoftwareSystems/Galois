@@ -13,8 +13,8 @@ public:
     return pos == n - 1;
   }
   // toAdd (only add vertex connected to all the vertices in the embedding)
-  static bool toAdd(unsigned n, Graph& g, const BaseEmbedding& emb, unsigned,
-                    VertexId dst) {
+  static bool toAdd(unsigned n, PangolinGraph& g, const BaseEmbedding& emb,
+                    unsigned, VertexId dst) {
     return is_all_connected_dag(g, dst, emb, n - 1);
   }
 };

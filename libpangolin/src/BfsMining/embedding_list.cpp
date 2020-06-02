@@ -1,7 +1,7 @@
 #include "pangolin/BfsMining/embedding_list.h"
 
 template <typename ElementType, typename EmbeddingType>
-void EmbeddingList<ElementType, EmbeddingType>::init(Graph& graph,
+void EmbeddingList<ElementType, EmbeddingType>::init(PangolinGraph& graph,
                                                      unsigned max_size,
                                                      bool is_dag) {
   last_level = 1;
