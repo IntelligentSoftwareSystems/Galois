@@ -22,14 +22,7 @@ namespace deepgalois {
 // layer 1: features N x D, weights D x 16, out N x 16 (hidden1=16)
 // layer 2: features N x 16, weights 16 x E, out N x E
 class Net {
-#ifdef GALOIS_ENABLE_GPU
-  unsigned myID = 0;
-#else
-  unsigned myID = galois::runtime::getSystemNetworkInterface().ID;
-#endif
-  std::string header    = "[" + std::to_string(myID) + "] ";
-  std::string seperator = "\n";
-
+  std::string header;
   bool is_single_class;          // single-class (one-hot) or multi-class label
   bool has_l2norm;               // whether the net contains an l2_norm layer
   bool has_dense;                // whether the net contains an dense layer

@@ -18,14 +18,12 @@ Net::Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
       h1(hidden1), learning_rate(lr), dropout_rate(dropout), weight_decay(wd),
       val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
     // init some identifiers for this host
-#ifndef GALOIS_ENABLE_GPU
-  this->myID = galois::runtime::getSystemNetworkInterface().ID;
+  unsigned myID = 0;
+#ifdef GALOIS_ENABLE_DIST
+  myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
-  this->header    = "[" + std::to_string(myID) + "] ";
-  this->seperator = " ";
-
+  this->header = "[" + std::to_string(myID) + "] ";
   assert(n_conv > 0);
-
   this->num_layers = num_conv_layers + 1;
 
   // additional layers to add
@@ -87,6 +85,7 @@ Net::Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
+  std::string separator = "\n";
   double total_train_time = 0.0;
   int num_subg_remain     = 0;
 
@@ -102,7 +101,7 @@ void Net::train(optimizer* opt, bool need_validate) {
         distContext->getGraphPointer());
   }
 
-  //galois::gPrint(header, "Start training...\n");
+  galois::gPrint(header, "Start training...\n");
 
   Timer t_epoch;
 
@@ -189,7 +188,7 @@ void Net::train(optimizer* opt, bool need_validate) {
 #ifdef GALOIS_ENABLE_GPU
     std::cout << header << "Epoch " << std::setw(3) << curEpoch << " ";
 #else
-    galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, "\n");
+    galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, separator);
 #endif
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
@@ -220,7 +219,7 @@ void Net::train(optimizer* opt, bool need_validate) {
       << train_loss << " train_acc " << train_acc << " ";
 #else
     galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
-        train_loss, " train_acc ", train_acc, "\n");
+        train_loss, " train_acc ", train_acc, separator);
 #endif
     t_epoch.Stop();
 
@@ -239,7 +238,7 @@ void Net::train(optimizer* opt, bool need_validate) {
         << " val_time " << val_time << ")\n";
 #else
       galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
-          val_loss, " val_acc ", val_acc, "\n");
+          val_loss, " val_acc ", val_acc, separator);
       galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
           epoch_time + val_time, " ms (train_time ", epoch_time,
           " val_time ", val_time, ")\n");
