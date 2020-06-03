@@ -55,7 +55,10 @@ public:
   AppMiner(unsigned ms, int nt)
       : VertexMiner<SimpleElement, BaseEmbedding, MyAPI, false, true, false,
                     true>(ms, nt, nblocks) {
-    assert(ms > 2);
+    if (ms <= 2) {
+      printf("ERROR: command line argument k must be 3 or greater\n");
+      exit(1);
+    }
   }
   ~AppMiner() {}
   void print_output() {
