@@ -25,7 +25,10 @@ public:
   AppMiner(unsigned ms, int nt)
       : VertexMiner<SimpleElement, VertexEmbedding, MyAPI, false, false, true>(
             ms, nt, nblocks) {
-    assert(ms > 2);
+    if (ms <= 2) {
+      printf("ERROR: command line argument k must be 3 or greater\n");
+      exit(1);
+    }
     set_num_patterns(num_patterns[k - 3]);
   }
   ~AppMiner() {}
