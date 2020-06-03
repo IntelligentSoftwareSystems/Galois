@@ -47,7 +47,7 @@ void LonestarStart(int argc, char** argv) {
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, const char* app, const char* desc,
-                   const char* url, const char* input) {
+                   const char* url, llvm::cl::opt<std::string>* input) {
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads);
@@ -81,7 +81,7 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc,
   galois::runtime::reportParam("(NULL)", "Threads", numThreads);
   galois::runtime::reportParam("(NULL)", "Hosts", 1);
   if (input) {
-    galois::runtime::reportParam("(NULL)", "Input", input);
+    galois::runtime::reportParam("(NULL)", "Input", input->getValue());
   }
 
   char name[256];

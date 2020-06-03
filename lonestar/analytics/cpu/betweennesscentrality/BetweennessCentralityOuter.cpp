@@ -285,7 +285,7 @@ struct HasOut : public std::unary_function<GNode, bool> {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys Gal;
-  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
 
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();

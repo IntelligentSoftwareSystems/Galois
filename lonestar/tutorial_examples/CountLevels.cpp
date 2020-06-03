@@ -120,7 +120,7 @@ void bfsSerial(Graph& graph, GNode source) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, nullptr, inputFile.c_str());
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
 
   galois::StatTimer OT("OverheadTime");
   OT.start();

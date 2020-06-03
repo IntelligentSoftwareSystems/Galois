@@ -31,6 +31,6 @@ extern llvm::cl::opt<std::string> statFile;
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, const char* app, const char* desc,
-                   const char* url, const char* input);
+                   const char* url, llvm::cl::opt<std::string>* input);
 void LonestarStart(int argc, char** argv);
 #endif

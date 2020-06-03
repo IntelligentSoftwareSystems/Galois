@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 
   // shared-memory system object initializes global variables for galois
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url, inputFile.c_str());
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
 
   int nThreads         = numThreads;
   std::string path     = inputFile;
