@@ -58,7 +58,7 @@ void triangleFormatWriter(const std::string& filename, Graph& graph) {
   // First elements related to nodes (points)
   counter = 0;
 
-  // Then elements related to eles (interior, edges, and triangles)
+  // Then elements related to eles (edges and triangles)
   for (const auto& conec : conecVector) {
     eleFile << counter++;
 
@@ -81,6 +81,7 @@ void triangleFormatWriter(const std::string& filename, Graph& graph) {
 
   polyFile << nodeVector.size() << " 2 1 0" << std::endl;
 
+  //.poly file
   // Write nodes
   counter = 0;
   for (const auto node : nodeVector) {
@@ -92,14 +93,13 @@ void triangleFormatWriter(const std::string& filename, Graph& graph) {
   polyFile << segmVector.size() << " 1" << std::endl;
   for (const auto& segm : segmVector) {
     polyFile << counter++ << " " << segm.points[0] << " " << segm.points[1]
-             << (segm.border ? 1 : 0) << std::endl;
+             << " " << (segm.border ? 1 : 0) << std::endl;
   }
 
   polyFile << "0" << std::endl;
 
   polyFile.close();
 }
-
 void trProcessGraph(Graph& graph, std::vector<TriNodeInfo>& nodeVector,
                     std::vector<TriSegmInfo>& segmVector,
                     std::vector<TriConecInfo>& conecVector) {
@@ -133,11 +133,11 @@ void trProcessGraph(Graph& graph, std::vector<TriNodeInfo>& nodeVector,
     ++nodeCounter;
 
     // Get the three mesh node Ids
-
     const auto intNodes = connManager.getNeighbours(graphNode);
     const auto intNodesID =
         std::vector<size_t>{nodeMap.at(intNodes[0]), nodeMap.at(intNodes[1]),
                             nodeMap.at(intNodes[2])};
+    changeOrientationIfRequired(intNodesID, nodeVector);
 
     // Now we generate the mesh triangle
     conecVector.push_back(TriConecInfo{intNodesID, 7});
@@ -162,5 +162,20 @@ void trProcessGraph(Graph& graph, std::vector<TriNodeInfo>& nodeVector,
             connManager.getGraph().getEdgeData(graphEdge.get()).isBorder()});
       }
     }
+  }
+}
+
+void changeOrientationIfRequired(std::vector<unsigned long> element,
+                                 std::vector<TriNodeInfo> nodeVector) {
+  if (greater(((nodeVector[element[1]].coods.getX() -
+                nodeVector[element[0]].coods.getX()) *
+               (nodeVector[element[2]].coods.getY() -
+                nodeVector[element[0]].coods.getY())) -
+                  ((nodeVector[element[1]].coods.getY() -
+                    nodeVector[element[0]].coods.getY()) *
+                   (nodeVector[element[2]].coods.getX() -
+                    nodeVector[element[0]].coods.getX())),
+              0.)) {
+    std::iter_swap(element.begin() + 1, element.begin() + 2);
   }
 }
