@@ -766,7 +766,7 @@ int main(int argc, char** argv) {
 
   if (output) {
     std::vector<float> results = makeResults(h_graph);
-    auto globalIDs = h_graph->getMasterGlobalIDs();
+    auto globalIDs             = h_graph->getMasterGlobalIDs();
     assert(results.size() == globalIDs.size());
 
     writeOutput(outputLocation, "betweenness_centrality", results.data(),

@@ -515,10 +515,11 @@ int main(int argc, char** argv) {
 
   if (output) {
     std::vector<uint8_t> results = makeResults(h_graph);
-    auto globalIDs = h_graph->getMasterGlobalIDs();
+    auto globalIDs               = h_graph->getMasterGlobalIDs();
     assert(results.size() == globalIDs.size());
 
-    writeOutput(outputLocation, "in_kcore", results.data(), results.size(), globalIDs.data());
+    writeOutput(outputLocation, "in_kcore", results.data(), results.size(),
+                globalIDs.data());
   }
 
   return 0;
