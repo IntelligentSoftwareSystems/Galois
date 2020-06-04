@@ -51,7 +51,7 @@ static const char* desc =
 static const char* url = "delaunay_triangulation";
 
 static cll::opt<std::string>
-    inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string>
     doWriteMesh("writemesh",
                 cll::desc("Write the mesh out to files with basename"),
@@ -519,7 +519,10 @@ static void writeMesh(const std::string& filename, Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!meshGraph) {
     GALOIS_DIE("This application requires a mesh graph input;"
@@ -532,14 +535,14 @@ int main(int argc, char** argv) {
   basePointBag basePoints;
   ptrPointBag ptrPoints;
 
-  ReadInput(graph, tree, basePoints, ptrPoints)(inputname);
+  ReadInput(graph, tree, basePoints, ptrPoints)(inputFile);
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   galois::runtime::profileVtune(
       [&]() { Process(graph, tree, ptrPoints).generateMesh(); },
       "MeshGeneration");
-  T.stop();
+  execTime.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
   galois::reportPageAlloc("MeminfoPost");
@@ -559,9 +562,11 @@ int main(int argc, char** argv) {
 
     PointList points;
     // Reordering messes up connection between id and place in pointlist
-    ReadPoints(points, tree).from(inputname);
+    ReadPoints(points, tree).from(inputFile);
     writePoints(base.append(".node"), points);
   }
+
+  totalTime.stop();
 
   return 0;
 }

@@ -17,39 +17,19 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "Lonestar/BoilerPlate.h"
-
 #include <sstream>
+#include "galois/Galois.h"
+#include "galois/Version.h"
+#include "llvm/Support/CommandLine.h"
 
-//! standard global options to the benchmarks
-llvm::cl::opt<bool>
-    skipVerify("noverify",
-               llvm::cl::desc("Skip verification step (default value false)"),
-               llvm::cl::init(false));
 llvm::cl::opt<int>
     numThreads("t", llvm::cl::desc("Number of threads (default value 1)"),
                llvm::cl::init(1));
-llvm::cl::opt<std::string> statFile(
-    "statFile",
-    llvm::cl::desc("ouput file to print stats to (default value empty)"),
-    llvm::cl::init(""));
-
-//! Flag that forces user to be aware that they should be passing in a
-//! symmetric graph.
-llvm::cl::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   llvm::cl::desc("Specify that the input graph is symmetric"),
-                   llvm::cl::init(false));
 
 static void LonestarPrintVersion(llvm::raw_ostream& out) {
   out << "LoneStar Benchmark Suite v" << galois::getVersion() << " ("
       << galois::getRevision() << ")\n";
   out.flush();
-}
-
-//! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv) {
-  LonestarStart(argc, argv, nullptr, nullptr, nullptr, nullptr);
 }
 
 //! initialize lonestar benchmark
@@ -59,29 +39,24 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads);
 
-  galois::runtime::setStatFile(statFile);
-
   LonestarPrintVersion(llvm::outs());
   llvm::outs() << "Copyright (C) " << galois::getCopyrightYear()
                << " The University of Texas at Austin\n";
   llvm::outs() << "http://iss.ices.utexas.edu/galois/\n\n";
   llvm::outs() << "application: " << (app ? app : "unspecified") << "\n";
-  if (desc) {
+  if (desc)
     llvm::outs() << desc << "\n";
-  }
-  if (url) {
+  if (url)
     llvm::outs() << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
                  << url << "\n";
-  }
   llvm::outs() << "\n";
   llvm::outs().flush();
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
     cmdout << argv[i];
-    if (i != argc - 1) {
+    if (i != argc - 1)
       cmdout << " ";
-    }
   }
 
   galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());

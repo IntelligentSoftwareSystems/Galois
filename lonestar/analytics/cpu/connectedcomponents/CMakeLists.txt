@@ -3,4 +3,4 @@ add_dependencies(apps connectedcomponents)
 target_link_libraries(connectedcomponents PRIVATE Galois::shmem lonestar)
 install(TARGETS connectedcomponents DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
-add_test_scale(small connectedcomponents -symmetricGraph "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")
+add_test_scale(small connectedcomponents "${BASEINPUT}/scalefree/symmetric/rmat10.sgr" "-symmetricGraph")

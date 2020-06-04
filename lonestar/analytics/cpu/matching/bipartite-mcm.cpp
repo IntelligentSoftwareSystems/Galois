@@ -51,6 +51,8 @@ enum ExecutionType { serial, parallel };
 
 enum InputType { generated, fromFile };
 
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Optional);
 static cll::opt<MatchingAlgo>
     algo(cll::desc("Choose an algorithm:"),
          cll::values(clEnumVal(pfpAlgo, "Preflow-push"),
@@ -77,8 +79,6 @@ static cll::opt<int> numGroups("numGroups",
                                cll::init(10));
 static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"),
                           cll::init(0));
-static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"),
-                                           cll::init(""));
 static cll::opt<bool> runIteratively(
     "runIteratively",
     cll::desc("After finding matching, removed matched edges and repeat"),
@@ -1125,7 +1125,7 @@ void start(int N, int numEdges, int numGroups) {
     generateRandomInput(N, N, numEdges, numGroups, seed, g);
     break;
   case fromFile:
-    readInput(inputFilename, g);
+    readInput(inputFile, g);
     break;
   default:
     GALOIS_DIE("unknown input type");
@@ -1144,12 +1144,12 @@ void start(int N, int numEdges, int numGroups) {
 
   std::cout << "Starting " << algo.name() << "\n";
 
-  galois::StatTimer t;
+  galois::StatTimer execTime("Timer_0");
 
   while (true) {
-    t.start();
+    execTime.start();
     algo(g);
-    t.stop();
+    execTime.stop();
 
     if (!skipVerify) {
       typename GraphTypes<G>::Matching matching;
@@ -1195,7 +1195,10 @@ void start() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!symmetricGraph) {
     GALOIS_DIE("This application requires a symmetric graph input;"
@@ -1213,6 +1216,8 @@ int main(int argc, char** argv) {
   default:
     GALOIS_DIE("unknown execution type");
   }
+
+  totalTime.stop();
 
   return 0;
 }

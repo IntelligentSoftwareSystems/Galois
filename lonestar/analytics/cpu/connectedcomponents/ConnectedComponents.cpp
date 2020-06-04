@@ -19,17 +19,18 @@
 
 #include "galois/Galois.h"
 #include "galois/AtomicHelpers.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/OCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "galois/ParallelSTL.h"
-#include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
 #include "galois/runtime/Profile.h"
+#include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <utility>
 #include <vector>
@@ -41,12 +42,8 @@
 
 const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
-const char* url  = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"),
-                  cll::Required);
 
 enum Algo {
   serial,
@@ -61,6 +58,8 @@ enum Algo {
   edgetiledafforest,
 };
 
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -161,7 +160,7 @@ struct SerialAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -200,7 +199,7 @@ struct LabelPropAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -246,7 +245,7 @@ struct SynchronousAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   struct Edge {
@@ -346,7 +345,7 @@ struct AsyncAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -391,7 +390,7 @@ struct EdgeAsyncAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -454,7 +453,7 @@ struct BlockedAsyncAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   //! Add the next edge between components to the worklist
@@ -528,7 +527,7 @@ struct EdgeTiledAsyncAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   struct EdgeTile {
@@ -689,7 +688,7 @@ struct AfforestAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -807,7 +806,7 @@ struct EdgeAfforestAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -947,7 +946,7 @@ struct EdgeTiledAfforestAlgo {
 
   template <typename G>
   void readGraph(G& graph) {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
   }
 
   void operator()(Graph& graph) {
@@ -1188,10 +1187,10 @@ void run() {
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   algo(graph);
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -1206,16 +1205,17 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!symmetricGraph) {
     GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
                " to indicate the input is a symmetric graph.");
   }
-
-  galois::StatTimer T("TotalTime");
-  T.start();
+  
   switch (algo) {
   case Algo::async:
     run<AsyncAlgo>();
@@ -1252,7 +1252,8 @@ int main(int argc, char** argv) {
     std::cerr << "Unknown algorithm\n";
     abort();
   }
-  T.stop();
+
+  totalTime.stop();
 
   return 0;
 }

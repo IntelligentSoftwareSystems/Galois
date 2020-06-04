@@ -6,6 +6,9 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarMineStart(argc, argv, name, desc, url);
 
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
   AppMiner miner(k, numThreads);
   galois::StatTimer Tinitial("GraphReadingTime");
   Tinitial.start();
@@ -19,17 +22,20 @@ int main(int argc, char** argv) {
     miner.initialize(pattern_filename);
     Tinitemb.stop();
 
-    galois::StatTimer Tcomp("Compute");
-    Tcomp.start();
+    galois::StatTimer execTime("Timer_0");
+    execTime.start();
 #ifdef TRIANGLE
     miner.tc_solver();
 #else
     miner.solver();
 #endif // TRIANGLE
-    Tcomp.stop();
+    execTime.stop();
     miner.print_output();
     miner.clean();
   }
   std::cout << "\n\t" << rm.get_peak_memory() << "\n\n";
+
+  totalTime.stop();
+
   return 0;
 }

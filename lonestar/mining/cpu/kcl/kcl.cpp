@@ -3,7 +3,7 @@
 
 const char* name = "Kcl";
 const char* desc = "Counts the K-Cliques in a graph using BFS extension";
-const char* url  = 0;
+const char* url  = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {
@@ -13,8 +13,8 @@ public:
     return pos == n - 1;
   }
   // toAdd (only add vertex connected to all the vertices in the embedding)
-  static bool toAdd(unsigned n, Graph& g, const BaseEmbedding& emb, unsigned,
-                    VertexId dst) {
+  static bool toAdd(unsigned n, PangolinGraph& g, const BaseEmbedding& emb,
+                    unsigned, VertexId dst) {
     return is_all_connected_dag(g, dst, emb, n - 1);
   }
 };

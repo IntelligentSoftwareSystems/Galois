@@ -62,7 +62,7 @@ static cll::opt<bool>
                     cll::desc("Don't reorder points to improve locality"),
                     cll::init(false));
 static cll::opt<std::string>
-    inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo { nondet, detBase, detPrefix, detDisjoint };
 
@@ -720,7 +720,10 @@ void deleteRounds(Rounds& rounds) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!meshGraph) {
     GALOIS_DIE("This application requires a mesh graph input;"
@@ -739,7 +742,7 @@ int main(int argc, char** argv) {
   Rounds rounds;
 
   bool writepoints = doWritePoints.size() > 0;
-  ReadInput(graph, basePoints, rounds)(inputname, !writepoints);
+  ReadInput(graph, basePoints, rounds)(inputFile, !writepoints);
   if (writepoints) {
     std::cout << "Writing " << doWritePoints << "\n";
     PointList points;
@@ -769,10 +772,10 @@ int main(int argc, char** argv) {
   }
   galois::gInfo("Algorithm ", name);
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   run(rounds, graph);
-  T.stop();
+  execTime.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
   galois::reportPageAlloc("MeminfoPost");
@@ -792,11 +795,13 @@ int main(int argc, char** argv) {
 
     PointList points;
     // Reordering messes up connection between id and place in pointlist
-    ReadPoints(points).from(inputname);
+    ReadPoints(points).from(inputFile);
     writePoints(base.append(".node"), points);
   }
 
   deleteRounds(rounds);
+
+  totalTime.stop();
 
   return 0;
 }

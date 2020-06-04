@@ -21,14 +21,12 @@
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
-
 #include "Lonestar/BFS_SSSP.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 #include <deque>
@@ -45,8 +43,7 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
@@ -85,7 +82,7 @@ using Graph =
 using GNode = Graph::GraphNode;
 
 constexpr static const bool TRACK_WORK          = false;
-constexpr static const unsigned CHUNK_SIZE      = 256u;
+constexpr static const unsigned CHUNK_SIZE      = 256U;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
 
 using BFS = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
@@ -256,11 +253,11 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   Loop loop;
 
-  Cont* curr = new Cont();
-  Cont* next = new Cont();
+  auto curr = std::make_unique<Cont>();
+  auto next = std::make_unique<Cont>();
 
-  Dist nextLevel              = 0u;
-  graph.getData(source, flag) = 0u;
+  Dist nextLevel              = 0U;
+  graph.getData(source, flag) = 0U;
 
   if (CONCURRENT) {
     pushWrap(*next, source, "parallel");
@@ -280,9 +277,7 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         galois::iterate(*curr),
         [&](const T& item) {
           for (auto e : edgeRange(item)) {
-            auto dst = graph.getEdgeDst(e);
-            // if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " <<
-            // dst << " visited"<<std::endl;
+            auto dst      = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
             if (dstData == BFS::DIST_INFINITY) {
@@ -294,9 +289,6 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
         galois::loopname("Sync"));
   }
-
-  delete curr;
-  delete next;
 }
 
 template <bool CONCURRENT>
@@ -320,26 +312,29 @@ void runAlgo(Graph& graph, const GNode& source) {
                                 OutEdgeRangeFn{graph});
     break;
   default:
-    std::cerr << "ERROR: unkown algo type" << std::endl;
+    std::cerr << "ERROR: unkown algo type\n";
   }
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
-  std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
               << " or failed to set source: " << startNode << "\n";
-    assert(0);
     abort();
   }
 
@@ -351,8 +346,6 @@ int main(int argc, char** argv) {
   report = *it;
 
   size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
   galois::preAlloc(8 * numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
 
@@ -363,23 +356,20 @@ int main(int argc, char** argv) {
   graph.getData(source) = 0;
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
-            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
-            << std::endl;
+            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
-  galois::StatTimer Tmain;
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   if (execution == SERIAL) {
     runAlgo<false>(graph, source);
   } else if (execution == PARALLEL) {
     runAlgo<true>(graph, source);
   } else {
-    std::cerr << "ERROR: unknown type of execution passed to -exec"
-              << std::endl;
-    std::abort();
+    std::cerr << "ERROR: unknown type of execution passed to -exec\n";
   }
 
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -422,6 +412,8 @@ int main(int argc, char** argv) {
       GALOIS_DIE("verification failed");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }

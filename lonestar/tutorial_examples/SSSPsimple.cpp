@@ -36,8 +36,8 @@ unsigned stepShift = 14;
 Graph graph;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 template <typename C>
 void relax_edge(unsigned src_data, Graph::edge_iterator ii, C& ctx) {
@@ -55,10 +55,10 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii, C& ctx) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, 0, 0, 0);
+  LonestarStart(argc, argv);
 
   //! [ReadGraph]
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
   //! [ReadGraph]
 
   galois::for_each(galois::iterate(graph),

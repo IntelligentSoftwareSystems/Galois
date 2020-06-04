@@ -4,7 +4,7 @@
 const char* name = "Sgl";
 const char* desc = "Listing edge-induced subgraphs of a given pattern in a "
                    "graph using BFS extension";
-const char* url = 0;
+const char* url = nullptr;
 
 #define CYCLE
 #ifdef CYCLE
@@ -16,9 +16,9 @@ uint32_t automorph_group_id[4] = {0, 0, 1, 1}; // diamond
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {
 public:
-  static inline bool toAddOrdered(unsigned n, Graph& g,
+  static inline bool toAddOrdered(unsigned n, PangolinGraph& g,
                                   const BaseEmbedding& emb, unsigned pos,
-                                  VertexId dst, Graph& pattern) {
+                                  VertexId dst, PangolinGraph& pattern) {
     // std::cout << "\t emb: " << emb << ", dst=" << dst << ", pos=" << pos <<
     // "\n";
     if (!fv && dst <= emb.get_vertex(0))

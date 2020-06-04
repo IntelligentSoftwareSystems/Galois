@@ -19,13 +19,13 @@
 
 #include "galois/Galois.h"
 #include "galois/gstl.h"
-#include "galois/Reduction.h"
 #include "galois/AtomicHelpers.h"
+#include "galois/Reduction.h"
 #include "galois/graphs/LCGraph.h"
 #include "Lonestar/BoilerPlate.h"
+
 #include "llvm/Support/CommandLine.h"
 
-constexpr static const char* const url         = 0;
 constexpr static const char* const REGION_NAME = "k-core";
 constexpr static const char* const name        = "k-core";
 constexpr static const char* const desc        = "Finds the k-core of a graph, "
@@ -40,10 +40,8 @@ namespace cll = llvm::cl;
 
 enum Algo { Async = 0, Sync };
 
-//! Input file: should be symmetric graph.
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"),
-                  cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 //! Choose algorithm: worklist vs. sync.
 static cll::opt<Algo> algo("algo",
@@ -224,7 +222,10 @@ void kCoreSanity(Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!symmetricGraph) {
     GALOIS_DIE("This application requires a symmetric graph input;"
@@ -239,22 +240,19 @@ int main(int argc, char** argv) {
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize", CHUNK_SIZE);
   galois::reportPageAlloc("MemAllocPre");
 
-  galois::StatTimer totalTimer("TotalTime", REGION_NAME);
-  totalTimer.start();
-
   //! Read graph from disk.
   galois::StatTimer graphReadingTimer("GraphConstructTime", REGION_NAME);
   graphReadingTimer.start();
   Graph graph;
-  galois::graphs::readGraph(graph, inputFilename);
+  galois::graphs::readGraph(graph, inputFile);
   graphReadingTimer.stop();
 
   //! Preallocate pages in memory so allocation doesn't occur during compute.
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
   galois::preAlloc(
-      std::max((size_t)galois::getActiveThreads() * (graph.size() / 1000000),
-               std::max(10u, galois::getActiveThreads()) * (size_t)10));
+      std::max(size_t{galois::getActiveThreads()} * (graph.size() / 1000000),
+               std::max(10U, galois::getActiveThreads()) * size_t{10}));
   preallocTime.stop();
   galois::reportPageAlloc("MemAllocMid");
 
@@ -262,9 +260,9 @@ int main(int argc, char** argv) {
   degreeCounting(graph);
 
   //! Begins main computation.
-  galois::StatTimer runtimeTimer;
+  galois::StatTimer execTime("Timer_0");
 
-  runtimeTimer.start();
+  execTime.start();
 
   if (algo == Async) {
     galois::gInfo("Running asynchronous k-core with k-core number ",
@@ -283,15 +281,16 @@ int main(int argc, char** argv) {
     GALOIS_DIE("invalid specification of k-core algorithm");
   }
 
-  runtimeTimer.stop();
+  execTime.stop();
 
-  totalTimer.stop();
   galois::reportPageAlloc("MemAllocPost");
 
   //! Sanity check.
   if (!skipVerify) {
     kCoreSanity(graph);
   }
+
+  totalTime.stop();
 
   return 0;
 }

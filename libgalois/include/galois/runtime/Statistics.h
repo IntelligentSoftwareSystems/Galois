@@ -422,7 +422,7 @@ private:
         const auto& s = this->stat(i);
         out << StatTotal::str(s.totalTy()) << SEP << s.total();
 
-        out << std::endl;
+        out << "\n";
 
         if (StatManager::printingThreadVals()) {
 
@@ -436,7 +436,7 @@ private:
             sep = TSTAT_SEP;
           }
 
-          out << std::endl;
+          out << "\n";
         }
       }
     }

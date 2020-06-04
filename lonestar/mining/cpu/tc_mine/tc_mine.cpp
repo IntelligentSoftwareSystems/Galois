@@ -5,7 +5,7 @@
 const char* name = "TC";
 const char* desc =
     "Counts the triangles in a graph (inputs do NOT need to be symmetrized)";
-const char* url = 0;
+const char* url = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {
@@ -15,7 +15,7 @@ public:
     return pos == n - 1;
   }
   // toAdd (only add vertex connected to all the vertices in the embedding)
-  static bool toAdd(unsigned, Graph&, const BaseEmbedding&, unsigned,
+  static bool toAdd(unsigned, PangolinGraph&, const BaseEmbedding&, unsigned,
                     VertexId) {
     return true;
   }

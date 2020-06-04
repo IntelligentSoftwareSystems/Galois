@@ -18,16 +18,16 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
 #include "galois/runtime/Profile.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <atomic>
 #include <utility>
@@ -397,20 +397,19 @@ void run() {
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::StatTimer T;
-
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   galois::runtime::profileVtune([&](void) { algo(); }, "boruvka");
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
   auto get_weight = [](const Edge& e) { return *e.weight; };
 
   auto w = galois::ParallelSTL::map_reduce(
-      algo.mst.begin(), algo.mst.end(), get_weight, std::plus<size_t>(), 0ul);
+      algo.mst.begin(), algo.mst.end(), get_weight, std::plus<size_t>(), 0UL);
 
-  std::cout << "MST weight: " << w << std::endl;
+  std::cout << "MST weight: " << w << "\n";
 
   if (!skipVerify && !algo.verify()) {
     GALOIS_DIE("verification failed");
@@ -419,7 +418,10 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFilename);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   switch (algo) {
   case parallel:
@@ -431,6 +433,8 @@ int main(int argc, char** argv) {
   default:
     std::cerr << "Unknown algo: " << algo << "\n";
   }
+
+  totalTime.stop();
 
   return 0;
 }
