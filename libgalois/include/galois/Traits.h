@@ -313,10 +313,6 @@ struct det_parallel_break : public trait_has_value<T>, det_parallel_break_tag {
  *
  * The function should have the signature <code>uintptr_t (A)</code> where
  * A is the type of active elements.
- *
- * An example of use:
- *
- * \snippet test/deterministic.cpp Id
  */
 struct det_id_tag {};
 template <typename T>
@@ -329,10 +325,6 @@ struct det_id : public trait_has_value<T>, det_id_tag {
  * Indicates the operator has a type that encapsulates state that is passed
  * between the suspension and resumpsion of an operator during deterministic
  * scheduling.
- *
- * An example of use:
- *
- * \snippet test/deterministic.cpp Local state
  */
 struct local_state_tag {};
 template <typename T>

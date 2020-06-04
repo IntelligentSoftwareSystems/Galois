@@ -191,6 +191,8 @@ public:
    * Constructor.
    *
    * @param tracker memory usage tracker
+   * @param sends
+   * @param recvs
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */

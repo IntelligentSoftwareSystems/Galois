@@ -51,6 +51,7 @@ enum CUSP_GRAPH_TYPE {
  * @param transposeGraphFile Transpose graph of graphFile in Galois binary
  * CSC format (i.e. give it the transpose version of graphFile). Ignore
  * this argument if the graph is symmetric.
+ * @param masterBlockFile
  * @param cuspAsync Toggles asynchronous master assignment phase during
  * partitioning
  * @param cuspStateRounds Toggles number of rounds used to synchronize
