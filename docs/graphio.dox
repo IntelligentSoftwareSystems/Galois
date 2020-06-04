@@ -34,11 +34,6 @@ Use galois::graphs::FileGraph::toFile to write a galois::graphs::FileGraph to a 
 <li> Call galois::graphs::FileGraphWriter::finish to get a pointer which points to the memory location where the edge data can be saved. Copy the edge data array to the space pointed by the pointer.
 </ol>
 
-The code snippet below shows an example of writing to a galois::graphs::FileGraph from a galois::graphs::MorphGraph using a galois::graphs::FileGraphWriter.
-
-@snippet lonestar/surveypropagation/SurveyPropagation.cpp write to a FileGraph
-
-
 @section garph_utility Utility Tools for Graphs
 
 @subsection graphconvert Tools to Convert Graphs Among Different Formats

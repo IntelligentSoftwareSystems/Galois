@@ -120,6 +120,7 @@ void computeOutDeg(Graph& graph) {
  * If the residual is smaller than the tolerance, that is not reflected to
  * the next pagerank.
  */
+//! [scalarreduction]
 void computePRResidual(Graph& graph, DeltaArray& delta,
                        ResidualArray& residual) {
   unsigned int iterations = 0;
@@ -166,13 +167,13 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
 #if DEBUG
     std::cout << "iteration: " << iterations << "\n";
 #endif
-
     iterations++;
     if (iterations >= maxIterations || !accum.reduce()) {
       break;
     }
     accum.reset();
   } ///< End while(true).
+    //! [scalarreduction]
 
   if (iterations >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iterations
@@ -314,6 +315,7 @@ int main(int argc, char** argv) {
   minRank.reset();
   distanceSum.reset();
 
+  //! [example of no_stats]
   galois::do_all(
       galois::iterate(transposeGraph),
       [&](uint64_t i) {
@@ -324,6 +326,7 @@ int main(int argc, char** argv) {
         distanceSum += rank;
       },
       galois::loopname("Sanity check"), galois::no_stats());
+  //! [example of no_stats]
 
   PRTy rMaxRank = maxRank.reduce();
   PRTy rMinRank = minRank.reduce();
