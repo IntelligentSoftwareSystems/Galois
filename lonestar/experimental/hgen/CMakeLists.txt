@@ -1,8 +1,0 @@
-add_subdirectory(pr-pull)
-add_subdirectory(pr-push)
-add_subdirectory(sssp-pull)
-add_subdirectory(sssp-push)
-add_subdirectory(cc-pull)
-add_subdirectory(cc-push)
-add_subdirectory(bfs-pull)
-add_subdirectory(bfs-push)
