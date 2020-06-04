@@ -23,8 +23,7 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
 set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
-set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
-set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
+set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Comma-separated list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7,6.1"
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -203,6 +202,7 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
 endif()
+string(COMPARE NOTEQUAL "${GALOIS_CUDA_CAPABILITY}" "" GALOIS_ENABLE_GPU)
 if (GALOIS_ENABLE_GPU)
   enable_language(CUDA)
   string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
