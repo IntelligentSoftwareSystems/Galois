@@ -17,7 +17,7 @@
 #include "galois/LargeArray.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/BoilerPlate.h"
+#include "BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
 
 #include "DataType.h"
@@ -42,8 +42,8 @@ static const char* desc =
 static const char* url = "SPRoute";
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 static cll::opt<std::string> outfile("o", cll::desc("output file (optional)"),
                                      cll::init(""));
@@ -86,7 +86,8 @@ int main(int argc, char** argv) {
   }*/
 
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
   galois::preAlloc(numThreads * 2);
 
   if (outfile != "") {
@@ -138,8 +139,8 @@ int main(int argc, char** argv) {
 
   if (1) {
     t1 = clock();
-    printf("\nReading %s ...\n", filename.c_str());
-    readFile(filename.c_str());
+    printf("\nReading %s ...\n", inputFile.c_str());
+    readFile(inputFile.c_str());
     printf("\nReading Lookup Table ...\n");
     readLUT(fluteDir.c_str());
     printf("\nDone reading table\n\n");

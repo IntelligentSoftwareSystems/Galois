@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef _SGD_H_
-#define _SGD_H_
+#ifndef LONESTAR_MATRIXCOMPLETION_H
+#define LONESTAR_MATRIXCOMPLETION_H
 
 #include <cassert>
 #include <galois/gstl.h>
@@ -38,8 +38,6 @@ static const int LATENT_VECTOR_SIZE = 20; // Purdue, CSGD: 100; Intel: 20
 enum OutputType { binary, ascii };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /*
  * (Purdue, Neflix): 0.012, (Purdue, Yahoo Music): 0.00075, (Purdue, HugeWiki):

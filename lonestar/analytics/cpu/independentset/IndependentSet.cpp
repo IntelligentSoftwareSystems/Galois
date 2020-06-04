@@ -18,11 +18,11 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -44,9 +44,9 @@ const char* url = "independent_set";
 enum Algo { serial, pull, nondet, detBase, prio, edgetiledprio };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input graph (symmetric)>"),
-                                      cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -63,6 +63,11 @@ static cll::opt<Algo> algo(
             "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")),
     cll::init(prio));
 
+static cll::opt<bool>
+    symmetricGraph("symmetricGraph",
+                   cll::desc("Set this flag if graph is symmetric"),
+                   cll::init(false));
+
 enum MatchFlag : char { UNMATCHED, OTHER_MATCHED, MATCHED };
 
 struct Node {
@@ -72,7 +77,7 @@ struct Node {
 
 struct prioNode {
   unsigned char flag; // 1 bit matched,6 bits prio, 1 bit undecided
-  prioNode() : flag((unsigned char)0x01) {}
+  prioNode() : flag((unsigned char){0x01}) {}
 };
 
 struct SerialAlgo {
@@ -182,7 +187,6 @@ struct DefaultAlgo {
 
     using BSWL = galois::worklists::BulkSynchronous<
         typename galois::worklists::PerSocketChunkFIFO<64>>;
-    // typedef galois::worklists::PerSocketChunkFIFO<256> WL;
 
     switch (algo) {
     case nondet:
@@ -491,7 +495,7 @@ struct EdgeTiledPrioAlgo {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
-            if ((nodedata.flag & (unsigned char)1)) { // is undecided
+            if ((nodedata.flag & (unsigned char){1})) { // is undecided
 
               for (auto edge = tile.beg; edge != tile.end; ++edge) {
                 GNode dst = graph.getEdgeDst(edge);
@@ -500,8 +504,8 @@ struct EdgeTiledPrioAlgo {
                     graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
                 if (other.flag ==
-                    (unsigned char)0xfe) { // permanent matched, highest prio
-                  nodedata.flag = (unsigned char)0x00;
+                    (unsigned char){0xfe}) { // permanent matched, highest prio
+                  nodedata.flag = (unsigned char){0x00};
                   return;
                 }
 
@@ -511,7 +515,7 @@ struct EdgeTiledPrioAlgo {
                   if (src > dst)
                     continue;
                   else if (src == dst) {
-                    nodedata.flag = (unsigned char)0x00; // other_matched
+                    nodedata.flag = (unsigned char){0x00}; // other_matched
                     tile.flag     = false;
                     return;
                   } else {
@@ -537,10 +541,10 @@ struct EdgeTiledPrioAlgo {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
-            if ((nodedata.flag & (unsigned char)1) &&
+            if ((nodedata.flag & (unsigned char){1}) &&
                 tile.flag == false) { // undecided and temporary no
               nodedata.flag &=
-                  (unsigned char)0xfd; // 0x1111 1101, not temporary yes
+                  (unsigned char){0xfd}; // 0x1111 1101, not temporary yes
             }
           },
           galois::loopname("match_reduce"), galois::steal());
@@ -550,10 +554,11 @@ struct EdgeTiledPrioAlgo {
           [&](const GNode& src) {
             prioNode& nodedata =
                 graph.getData(src, galois::MethodFlag::UNPROTECTED);
-            if ((nodedata.flag & (unsigned char)0x01) != 0) {   // undecided
-              if ((nodedata.flag & (unsigned char)0x02) != 0) { // temporary yes
+            if ((nodedata.flag & (unsigned char){0x01}) != 0) { // undecided
+              if ((nodedata.flag & (unsigned char){0x02}) !=
+                  0) { // temporary yes
                 nodedata.flag =
-                    (unsigned char)0xfe; // 0x1111 1110, permanent yes
+                    (unsigned char){0xfe}; // 0x1111 1110, permanent yes
                 for (auto edge :
                      graph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
                   GNode dst = graph.getEdgeDst(edge);
@@ -561,11 +566,11 @@ struct EdgeTiledPrioAlgo {
                   prioNode& other =
                       graph.getData(dst, galois::MethodFlag::UNPROTECTED);
                   other.flag =
-                      (unsigned char)0x00; // OTHER_MATCHED, permanent no
+                      (unsigned char){0x00}; // OTHER_MATCHED, permanent no
                 }
               } else
                 nodedata.flag |=
-                    (unsigned char)0x03; // 0x0000 0011, temp yes, undecided
+                    (unsigned char){0x03}; // 0x0000 0011, temp yes, undecided
             }
           },
           galois::loopname("match_update"), galois::steal());
@@ -639,13 +644,13 @@ bool verify(Graph& graph, Algo&) {
         [&](const GNode& src) {
           prioNode& nodedata =
               graph.getData(src, galois::MethodFlag::UNPROTECTED);
-          if (nodedata.flag == (unsigned char)0xfe) {
+          if (nodedata.flag == (unsigned char){0xfe}) {
             nodedata.flag = MATCHED;
-          } else if (nodedata.flag == (unsigned char)0x00) {
+          } else if (nodedata.flag == (unsigned char){0x00}) {
             nodedata.flag = OTHER_MATCHED;
           } else
             std::cout << "error in verify_change! Some nodes are not decided."
-                      << std::endl;
+                      << "\n";
         },
         galois::loopname("verify_change"));
   }
@@ -661,7 +666,7 @@ void run() {
 
   Algo algo;
   Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
 
   // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads /
   // 8) / galois::runtime::MM::hugePageSize); Tighter upper bound
@@ -675,11 +680,12 @@ void run() {
   }
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::StatTimer T;
+  galois::StatTimer execTime("Timer_0");
 
-  T.start();
+  execTime.start();
   algo(graph);
-  T.stop();
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify(graph, algo)) {
@@ -696,7 +702,16 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("independent set requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph");
+  }
 
   switch (algo) {
   case serial:
@@ -721,5 +736,8 @@ int main(int argc, char** argv) {
     std::cerr << "Unknown algorithm" << algo << "\n";
     abort();
   }
+
+  totalTime.stop();
+
   return 0;
 }

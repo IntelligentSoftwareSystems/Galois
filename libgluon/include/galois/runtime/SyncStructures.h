@@ -1890,7 +1890,7 @@ public:
                                                                                \
     static void setVal(uint32_t GALOIS_UNUSED(node_id),                        \
                        struct NodeData& GALOIS_UNUSED(node), ValTy y) {        \
-      GALOIS_DIE("Execution shouldn't get here; needs index arg\n");           \
+      GALOIS_DIE("execution shouldn't get here; needs index arg");             \
     }                                                                          \
                                                                                \
     static bool setVal_batch(unsigned uint8_t*, DataCommMode) {                \

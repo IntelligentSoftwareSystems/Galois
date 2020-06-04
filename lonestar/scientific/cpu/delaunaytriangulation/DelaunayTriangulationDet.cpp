@@ -62,7 +62,7 @@ static cll::opt<bool>
                     cll::desc("Don't reorder points to improve locality"),
                     cll::init(false));
 static cll::opt<std::string>
-    inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo { nondet, detBase, detPrefix, detDisjoint };
 
@@ -166,7 +166,7 @@ public:
   void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
     if (!scanner.good()) {
-      GALOIS_DIE("Could not open file: ", name);
+      GALOIS_DIE("could not open file: ", name);
     }
     if (name.find(".node") == name.size() - 5) {
       fromTriangle(scanner);
@@ -178,7 +178,7 @@ public:
     if (points.size())
       addBoundaryPoints();
     else {
-      GALOIS_DIE("No points found in file: ", name);
+      GALOIS_DIE("no points found in file: ", name);
     }
   }
 };
@@ -700,7 +700,7 @@ static void run(Rounds& rounds, Graph& graph) {
       dt.generateMesh<detDisjoint, DWL>(pptrs);
       break;
     default:
-      GALOIS_DIE("Unknown algorithm: ", detAlgo);
+      GALOIS_DIE("unknown algorithm: ", detAlgo);
     }
 
     PT.stop();
@@ -714,7 +714,10 @@ void deleteRounds(Rounds& rounds) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
 
@@ -727,7 +730,7 @@ int main(int argc, char** argv) {
   Rounds rounds;
 
   bool writepoints = doWritePoints.size() > 0;
-  ReadInput(graph, basePoints, rounds)(inputname, !writepoints);
+  ReadInput(graph, basePoints, rounds)(inputFile, !writepoints);
   if (writepoints) {
     std::cout << "Writing " << doWritePoints << "\n";
     PointList points;
@@ -757,10 +760,10 @@ int main(int argc, char** argv) {
   }
   galois::gInfo("Algorithm ", name);
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   run(rounds, graph);
-  T.stop();
+  execTime.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
   galois::reportPageAlloc("MeminfoPost");
@@ -768,7 +771,7 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     Verifier verifier;
     if (!verifier.verify(&graph)) {
-      GALOIS_DIE("Triangulation failed");
+      GALOIS_DIE("triangulation failed");
     }
     std::cout << "Triangulation OK\n";
   }
@@ -780,11 +783,13 @@ int main(int argc, char** argv) {
 
     PointList points;
     // Reordering messes up connection between id and place in pointlist
-    ReadPoints(points).from(inputname);
+    ReadPoints(points).from(inputFile);
     writePoints(base.append(".node"), points);
   }
 
   deleteRounds(rounds);
+
+  totalTime.stop();
 
   return 0;
 }

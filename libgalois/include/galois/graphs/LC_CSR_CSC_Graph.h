@@ -18,12 +18,12 @@
  */
 
 /**
- * @file B_LC_CSR_Graph.h
+ * @file LC_CSR_CSC_Graph.h
  *
  * Contains the implementation of a bidirectional LC_CS_Graph.
  */
-#ifndef GALOIS_GRAPHS_B_LC_CSR_GRAPH_H
-#define GALOIS_GRAPHS_B_LC_CSR_GRAPH_H
+#ifndef GALOIS_GRAPHS_LC_CSR_CSC_GRAPH_H
+#define GALOIS_GRAPHS_LC_CSR_CSC_GRAPH_H
 
 #include "galois/config.h"
 
@@ -51,7 +51,7 @@ namespace graphs {
 template <typename NodeTy, typename EdgeTy, bool EdgeDataByValue = false,
           bool HasNoLockable = false, bool UseNumaAlloc = false,
           bool HasOutOfLineLockable = false, typename FileEdgeTy = EdgeTy>
-class B_LC_CSR_Graph
+class LC_CSR_CSC_Graph
     : public LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
                           HasOutOfLineLockable, FileEdgeTy> {
   // typedef to make it easier to read
@@ -60,8 +60,8 @@ class B_LC_CSR_Graph
                                  HasOutOfLineLockable, FileEdgeTy>;
   //! Typedef referring to this class itself
   using ThisGraph =
-      B_LC_CSR_Graph<NodeTy, EdgeTy, EdgeDataByValue, HasNoLockable,
-                     UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy>;
+      LC_CSR_CSC_Graph<NodeTy, EdgeTy, EdgeDataByValue, HasNoLockable,
+                       UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy>;
 
 public:
   //! Graph node typedef
@@ -213,11 +213,11 @@ protected:
 
 public:
   //! default constructor
-  B_LC_CSR_Graph() = default;
+  LC_CSR_CSC_Graph() = default;
   //! default move constructor
-  B_LC_CSR_Graph(B_LC_CSR_Graph&& rhs) = default;
+  LC_CSR_CSC_Graph(LC_CSR_CSC_Graph&& rhs) = default;
   //! default = operator
-  B_LC_CSR_Graph& operator=(B_LC_CSR_Graph&&) = default;
+  LC_CSR_CSC_Graph& operator=(LC_CSR_CSC_Graph&&) = default;
 
   /////////////////////////////////////////////////////////////////////////////
   // Construction functions

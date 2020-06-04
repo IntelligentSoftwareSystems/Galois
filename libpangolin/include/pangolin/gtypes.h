@@ -31,6 +31,21 @@ typedef galois::gstl::Vector<IntSet> IntSets;
 // typedef std::set<int> IntSet;
 // typedef std::vector<IntSet> IntSets;
 
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
-    true>::type ::with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
+class PangolinGraph
+    : public galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
+          true>::type ::with_no_lockable<true>::type {
+public:
+  uint32_t* degrees;
+  void degree_counting() {
+    degrees = new uint32_t[numNodes];
+    galois::do_all(
+        galois::iterate(begin(), end()),
+        [&](auto v) {
+          degrees[v] = std::distance(this->edge_begin(v), this->edge_end(v));
+        },
+        galois::loopname("DegreeCounting"));
+  }
+  uint32_t get_degree(uint32_t n) { return degrees[n]; }
+};
+
+typedef PangolinGraph::GraphNode GNode;

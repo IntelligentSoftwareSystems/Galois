@@ -138,6 +138,6 @@ NetworkInterface& galois::runtime::getSystemNetworkInterface() {
 
 void galois::runtime::internal::destroySystemNetworkInterface() {
   // get net interface, then delete it
-  NetworkInterface& netInterface = makeNetworkBuffered();
+  NetworkInterface& netInterface = getSystemNetworkInterface();
   delete &netInterface;
 }

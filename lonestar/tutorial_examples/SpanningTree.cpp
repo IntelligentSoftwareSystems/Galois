@@ -36,7 +36,6 @@ namespace cll = llvm::cl;
 
 const char* name = "Spanning Tree Algorithm";
 const char* desc = "Computes the spanning forest of a graph";
-const char* url  = NULL;
 
 enum Algo { demo, asynchronous, blockedasync };
 
@@ -101,7 +100,7 @@ auto specialized_process(Graph& graph, galois::InsertBag<Edge>& mst)
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, nullptr);
 
   Graph graph;
 

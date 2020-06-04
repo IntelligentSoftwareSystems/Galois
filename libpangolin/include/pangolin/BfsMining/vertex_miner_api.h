@@ -11,22 +11,22 @@ public:
     return true;
   }
   // toAdd (only add non-automorphisms)
-  static inline bool toAdd(unsigned n, Graph& g, const EmbeddingTy& emb,
+  static inline bool toAdd(unsigned n, PangolinGraph& g, const EmbeddingTy& emb,
                            unsigned pos, VertexId dst) {
     return !is_vertex_automorphism(n, g, emb, pos, dst);
   }
-  static inline bool toAddOrdered(unsigned, Graph&, const EmbeddingTy&,
-                                  unsigned, VertexId, Graph&) {
+  static inline bool toAddOrdered(unsigned, PangolinGraph&, const EmbeddingTy&,
+                                  unsigned, VertexId, PangolinGraph&) {
     return true;
   }
   // given an embedding, return its pattern id (hash value)
-  static inline unsigned getPattern(unsigned, Graph&, unsigned, VertexId,
-                                    const EmbeddingTy&, unsigned) {
+  static inline unsigned getPattern(unsigned, PangolinGraph&, unsigned,
+                                    VertexId, const EmbeddingTy&, unsigned) {
     return 0;
   }
 
 protected:
-  static inline bool is_vertex_automorphism(unsigned n, Graph& g,
+  static inline bool is_vertex_automorphism(unsigned n, PangolinGraph& g,
                                             const EmbeddingTy& emb,
                                             unsigned idx, VertexId dst) {
     // unsigned n = emb.size();
@@ -49,10 +49,10 @@ protected:
         return true;
     return false;
   }
-  static inline bool is_all_connected_dag(Graph& g, unsigned dst,
+  static inline bool is_all_connected_dag(PangolinGraph& g, unsigned dst,
                                           const EmbeddingTy& emb, unsigned end,
                                           unsigned start = 0) {
-    assert(start >= 0 && end > 0);
+    assert(end > 0);
     bool all_connected = true;
     for (unsigned i = start; i < end; ++i) {
       unsigned from = emb.get_vertex(i);
@@ -63,7 +63,7 @@ protected:
     }
     return all_connected;
   }
-  static inline bool is_connected(Graph& g, unsigned a, unsigned b) {
+  static inline bool is_connected(PangolinGraph& g, unsigned a, unsigned b) {
     if (g.get_degree(a) == 0 || g.get_degree(b) == 0)
       return false;
     unsigned key    = a;
@@ -76,16 +76,17 @@ protected:
     auto end   = g.edge_end(search);
     return binary_search(g, key, begin, end);
   }
-  static inline int is_connected_dag(Graph& g, unsigned key, unsigned search) {
+  static inline int is_connected_dag(PangolinGraph& g, unsigned key,
+                                     unsigned search) {
     if (g.get_degree(search) == 0)
       return false;
     auto begin = g.edge_begin(search);
     auto end   = g.edge_end(search);
     return binary_search(g, key, begin, end);
   }
-  static inline bool binary_search(Graph& g, unsigned key,
-                                   Graph::edge_iterator begin,
-                                   Graph::edge_iterator end) {
+  static inline bool binary_search(PangolinGraph& g, unsigned key,
+                                   PangolinGraph::edge_iterator begin,
+                                   PangolinGraph::edge_iterator end) {
     auto l = begin;
     auto r = end - 1;
     while (r >= l) {
@@ -100,7 +101,7 @@ protected:
     }
     return false;
   }
-  static inline unsigned find_motif_pattern_id(unsigned n, Graph& g,
+  static inline unsigned find_motif_pattern_id(unsigned n, PangolinGraph& g,
                                                unsigned idx, VertexId dst,
                                                const EmbeddingTy& emb,
                                                BYTE* pre_pid,

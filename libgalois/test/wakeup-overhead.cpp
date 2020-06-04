@@ -92,7 +92,7 @@ std::atomic<int> EXIT;
 
 int main(int argc, char* argv[]) {
   galois::SharedMemSys Galois_runtime;
-  LonestarStart(argc, argv, 0, 0, 0);
+  LonestarStart(argc, argv);
 
   galois::setActiveThreads(threads);
 

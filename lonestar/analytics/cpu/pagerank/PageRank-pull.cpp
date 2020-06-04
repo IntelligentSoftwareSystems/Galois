@@ -175,8 +175,8 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
   } ///< End while(true).
 
   if (iterations >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iterations << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iterations
+              << " iterations\n";
   }
 }
 
@@ -236,18 +236,19 @@ void computePRTopological(Graph& graph) {
   } ///< End while(true).
 
   if (iteration >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iteration << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iteration
+              << " iterations\n";
   }
 }
 
 void prTopological(Graph& graph) {
   initNodeDataTopological(graph);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRTopological(graph);
-  prTimer.stop();
+  execTime.stop();
 }
 
 void prResidual(Graph& graph) {
@@ -258,27 +259,28 @@ void prResidual(Graph& graph) {
 
   initNodeDataResidual(graph, delta, residual);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRResidual(graph, delta, residual);
-  prTimer.stop();
+  execTime.stop();
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
 
-  galois::StatTimer overheadTime("OverheadTime");
-  overheadTime.start();
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph transposeGraph;
   std::cout << "WARNING: pull style algorithms work on the transpose of the "
                "actual graph\n"
-            << "WARNING: this program assumes that " << filename
+            << "WARNING: this program assumes that " << inputFile
             << " contains transposed representation\n\n"
-            << "Reading graph: " << filename << std::endl;
+            << "Reading graph: " << inputFile << "\n";
 
-  galois::graphs::readGraph(transposeGraph, filename);
+  galois::graphs::readGraph(transposeGraph, inputFile);
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
@@ -288,21 +290,18 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
-  case Topo: {
+  case Topo:
     std::cout << "Running Pull Topological version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prTopological(transposeGraph);
     break;
-  }
-  case Residual: {
+  case Residual:
     std::cout << "Running Pull Residual version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prResidual(transposeGraph);
     break;
-  }
-  default: {
+  default:
     std::abort();
-  }
   }
 
   galois::reportPageAlloc("MeminfoPost");
@@ -341,6 +340,7 @@ int main(int argc, char** argv) {
   printPageRank(transposeGraph);
 #endif
 
-  overheadTime.stop();
+  totalTime.stop();
+
   return 0;
 }

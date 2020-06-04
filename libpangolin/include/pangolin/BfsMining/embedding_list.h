@@ -11,7 +11,7 @@ class EmbeddingList {
 public:
   EmbeddingList() {}
   ~EmbeddingList() {}
-  void init(Graph& graph, unsigned max_size = 2, bool is_dag = false);
+  void init(PangolinGraph& graph, unsigned max_size = 2, bool is_dag = false);
   VertexId get_vid(unsigned level, size_t id) const {
     return vid_lists[level][id];
   }

@@ -210,7 +210,7 @@ public:
     return new pendingReq(rank, meta, phase, buf, inflightRecvs);
   }
 
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>>
+  virtual std::optional<std::pair<uint32_t, RecvBuffer>>
   recieveTagged(uint32_t tag,
                 std::unique_lock<galois::substrate::SimpleLock>* rlg,
                 int phase) {
@@ -224,19 +224,19 @@ public:
       // if (count ++ == 10000) {
       //  printf("[%d] WARNING possible lock out on RECV %d\n", ID, tag);
       // }
-      return optional_t<std::pair<uint32_t, RecvBuffer>>();
+      return std::optional<std::pair<uint32_t, RecvBuffer>>();
     }
 
     if (req->tag == tag) {
       vTy buf  = std::move(req->buf);
       int dest = req->dest;
       delete req;
-      return optional_t<std::pair<uint32_t, RecvBuffer>>(
+      return std::optional<std::pair<uint32_t, RecvBuffer>>(
           std::make_pair(dest, std::move(buf)));
     } else {
       printf("[%d] WARNING possible lock out, wrong tag %d/%d.\n", ID, req->tag,
              tag);
-      return optional_t<std::pair<uint32_t, RecvBuffer>>();
+      return std::optional<std::pair<uint32_t, RecvBuffer>>();
     }
   }
 
@@ -256,7 +256,9 @@ public:
       // galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
-    galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // if (inflightRecvs > 0) {
+    // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // }
     return (inflightRecvs > 0);
   }
 

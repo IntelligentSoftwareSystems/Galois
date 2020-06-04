@@ -49,7 +49,7 @@ void galois::runtime::reportRUsage(const std::string& id) {
   struct rusage usage_stats;
   int rusage_result = getrusage(RUSAGE_SELF, &usage_stats);
   if (rusage_result != 0) {
-    GALOIS_DIE("getrusage failed to execute cleanly");
+    GALOIS_DIE("getrusage failed: ", rusage_result);
   }
 
   // report stats using ID to identify them
@@ -89,10 +89,9 @@ void StatManager::printStats(std::ostream& out) {
 
 void StatManager::printHeader(std::ostream& out) const {
 
-  // out << "RUN_UUID" << SEP;
   out << "STAT_TYPE" << SEP << "REGION" << SEP << "CATEGORY" << SEP;
   out << "TOTAL_TYPE" << SEP << "TOTAL";
-  out << std::endl;
+  out << "\n";
 }
 
 StatManager::int_iterator StatManager::intBegin(void) const {

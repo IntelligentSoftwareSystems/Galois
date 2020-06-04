@@ -36,10 +36,9 @@ namespace cll = llvm::cl;
 
 static const char* name = "verify_ktruss";
 static const char* desc = "Verify for maximal k-truss";
-static const char* url  = nullptr;
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string> trussFile("trussFile",
                                        cll::desc("edgelist for the trusses"),
                                        cll::Required);
@@ -96,14 +95,14 @@ void readTruss(Graph& g) {
   while (edgelist >> n1 >> n2) {
     auto e = g.findEdgeSortedByDst(n1, n2);
     if (valid == g.getEdgeData(e)) {
-      std::cout << "ignoring duplicate edge" << n1 << ", " << n2 << std::endl;
+      std::cout << "ignoring duplicate edge" << n1 << ", " << n2 << "\n";
       continue;
     }
     g.getEdgeData(e) = valid;
 
     e = g.findEdgeSortedByDst(n2, n1);
     if (valid == g.getEdgeData(e)) {
-      std::cout << "duplicate edge (rev) " << n2 << ", " << n1 << std::endl;
+      std::cout << "duplicate edge (rev) " << n2 << ", " << n1 << "\n";
       continue;
     }
     g.getEdgeData(e) = valid;
@@ -113,32 +112,29 @@ void readTruss(Graph& g) {
     nodes.insert(n2);
   }
 
-  std::cout << "read " << nodes.size() << " unique nodes" << std::endl;
-  std::cout << "read " << edges << " unique edges" << std::endl;
+  std::cout << "read " << nodes.size() << " unique nodes\n";
+  std::cout << "read " << edges << " unique edges\n";
 
   if (ktrussEdges && edges != ktrussEdges) {
-    std::cerr << "edges read not equal to -trussEdges=" << ktrussEdges
-              << std::endl;
-    GALOIS_DIE("Verification error");
+    std::cerr << "edges read not equal to -trussEdges=" << ktrussEdges << "\n";
+    GALOIS_DIE("verification error");
   }
 
   if (ktrussNodes && nodes.size() != ktrussNodes) {
-    std::cerr << "nodes read not equal to -trussNodes=" << ktrussNodes
-              << std::endl;
-    GALOIS_DIE("Verification error");
+    std::cerr << "nodes read not equal to -trussNodes=" << ktrussNodes << "\n";
+    GALOIS_DIE("verification error");
   }
 }
 
 void printGraph(Graph& g) {
   for (auto n : g) {
-    std::cout << "node " << n << std::endl;
+    std::cout << "node " << n << "\n";
     for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n)
         continue;
       std::cout << "  edge to " << d
-                << ((g.getEdgeData(e) & removed) ? " removed" : "")
-                << std::endl;
+                << ((g.getEdgeData(e) & removed) ? " removed" : "") << "\n";
     }
   }
 }
@@ -205,30 +201,36 @@ bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (2 > trussNum) {
-    std::cerr << "trussNum >= 2" << std::endl;
+    std::cerr << "trussNum >= 2\n";
     return -1;
   }
 
-  std::cout << "Verifying maximal " << trussNum << "-truss" << std::endl;
-  std::cout << "Truss is computed for " << filename << " and stored in "
-            << trussFile << std::endl;
+  std::cout << "Verifying maximal " << trussNum << "-truss\n";
+  std::cout << "Truss is computed for " << inputFile << " and stored in "
+            << trussFile << "\n";
 
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  galois::graphs::readGraph(g, filename, true);
-  std::cout << "Read " << g.size() << " nodes" << std::endl;
+  galois::graphs::readGraph(g, inputFile, true);
+  std::cout << "Read " << g.size() << " nodes\n";
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   initialize(g);
   readTruss(g);
   //  printGraph(g);
 
   auto validNum = countValidNodesAndEdges(g);
-  std::cout << validNum.first << " valid nodes" << std::endl;
-  std::cout << validNum.second << " valid edges" << std::endl;
+  std::cout << validNum.first << " valid nodes\n";
+  std::cout << validNum.second << " valid edges\n";
 
   // every valid node should have at least trussNum-1 valid neighbors
   // so # valid edges >= smallest # directed edges among valid nodes
@@ -271,19 +273,22 @@ int main(int argc, char** argv) {
   auto numShouldBeValid =
       std::distance(shouldBeValid.begin(), shouldBeValid.end());
   if (!numShouldBeInvalid && !numShouldBeValid) {
-    std::cout << "Verification succeeded" << std::endl;
+    std::cout << "Verification succeeded\n";
   } else {
     for (auto e : shouldBeInvalid) {
-      std::cerr << "(" << e.first << ", " << e.second << ") should be invalid"
-                << std::endl;
+      std::cerr << "(" << e.first << ", " << e.second
+                << ") should be invalid\n";
     }
     for (auto e : shouldBeValid) {
-      std::cerr << "(" << e.first << ", " << e.second << ") should be valid"
-                << std::endl;
+      std::cerr << "(" << e.first << ", " << e.second << ") should be valid\n";
     }
-    std::cerr << "Verification failed!" << std::endl;
+    std::cerr << "Verification failed!\n";
     return 1;
   }
+
+  execTime.start();
+
+  totalTime.stop();
 
   return 0;
 }

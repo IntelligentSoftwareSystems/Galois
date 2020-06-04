@@ -48,13 +48,18 @@ static cll::opt<std::string>
 static cll::opt<bool>
     verify("v", llvm::cl::desc("do verification step (default value false)"),
            llvm::cl::init(false));
+#ifndef GALOIS_ENABLE_GPU
+static cll::opt<std::string>
+    statFile("statFile",
+             llvm::cl::desc("Optional output file to print stats to"));
+#endif
 
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
                        const char* url) {
-  // llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 #ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads);
+  galois::runtime::setStatFile(statFile);
 #endif
   std::cout << "Copyright (C) 2020 The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
@@ -74,5 +79,8 @@ void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
 #ifndef GALOIS_ENABLE_GPU
   galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
   galois::runtime::reportParam("(NULL)", "Threads", numThreads);
+  galois::runtime::reportParam("(NULL)", "Runs", num_trials);
+  galois::runtime::reportParam("(NULL)", "Input", filename);
+  galois::runtime::reportParam("(NULL)", "Hosts", 1);
 #endif
 }

@@ -197,7 +197,7 @@ static size_t rawBlockSize(size_t numNodes, size_t numEdges,
     bytes += sizeof(uint64_t) * numEdges;
     // no padding necessary in version 2 TODO verify this
   } else {
-    GALOIS_DIE("graph version not set", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 
   bytes += sizeofEdgeData * numEdges;
@@ -232,7 +232,7 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
   } else if (oGraphVersion == 2) {
     *fptr++ = convert_htole64(2);
   } else {
-    GALOIS_DIE("unknown file version to fromArrays", oGraphVersion);
+    GALOIS_DIE("unknown file version: ", oGraphVersion);
   }
   *fptr++ = convert_htole64(sizeof_edge_data);
   *fptr++ = convert_htole64(num_nodes);
@@ -414,7 +414,7 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
              edgeOffset * sizeof(uint64_t);
     outs = loadFromOffset(fd, offset, length, mappings);
   } else {
-    GALOIS_DIE("unknown file version at partFromFile", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 
   edgeData = 0;
@@ -558,7 +558,7 @@ uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
 
     return ~static_cast<uint64_t>(0);
   } else {
-    GALOIS_DIE("unknown file version at getEdgeIdx", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 }
 
@@ -625,7 +625,7 @@ void* FileGraph::raw_neighbor_begin(GraphNode N) {
   } else if (graphVersion == 2) {
     return &(((uint64_t*)outs)[*edge_begin(N)]);
   } else {
-    GALOIS_DIE("unknown file version at raw_neighbor_begin", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 
   return nullptr;
@@ -637,7 +637,7 @@ void* FileGraph::raw_neighbor_end(GraphNode N) {
   } else if (graphVersion == 2) {
     return &(((uint64_t*)outs)[*edge_end(N)]);
   } else {
-    GALOIS_DIE("unknown file version at raw_neighbor_end", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 
   return nullptr;
@@ -680,7 +680,7 @@ FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) {
     numBytesReadEdgeDst += 8;
     return convert_le64toh(((uint64_t*)outs)[*it]);
   } else {
-    GALOIS_DIE("unknown file version at getEdgeDst", graphVersion);
+    GALOIS_DIE("unknown file version: ", graphVersion);
   }
 
   return -1;

@@ -25,14 +25,13 @@
 
 static const char* name = "Count levels";
 static const char* desc = "Computes the number of degree levels";
-static const char* url  = 0;
 
 #define DEBUG false
 
 namespace cll = llvm::cl;
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<unsigned int> startNode("startNode",
                                         cll::desc("Node to start search from"),
                                         cll::init(0));
@@ -121,13 +120,13 @@ void bfsSerial(Graph& graph, GNode source) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
 
   galois::StatTimer OT("OverheadTime");
   OT.start();
 
   Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
 
