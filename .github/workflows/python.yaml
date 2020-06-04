@@ -24,7 +24,7 @@ jobs:
     - name: Cache conan packages
       uses: actions/cache@v1
       with:
-        key: ${{runner.os}}-conan-${{hashFiles('config/conanfile.txt')}}
+        key: ${{runner.os}}-conan-packaging-${{hashFiles('config/conanfile.txt')}}
         path: ~/.conan/data
     - name: Cache ccache objects
       uses: actions/cache@v1
