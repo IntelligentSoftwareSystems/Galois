@@ -14,7 +14,10 @@ class AppMiner : public EdgeMiner<LabeledElement, EdgeEmbedding, MyAPI, true> {
 public:
   AppMiner(unsigned ms, int nt)
       : EdgeMiner<LabeledElement, EdgeEmbedding, MyAPI, true>(ms, nt) {
-    assert(ms > 1);
+    if (ms <= 1) {
+      printf("ERROR: command line argument k must be 2 or greater\n");
+      exit(1);
+    }
     if (filetype == "gr") {
       printf("ERROR: gr file is not acceptable for FSM. Add -ft=adj and use "
              "adj file instead.\n");
