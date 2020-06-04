@@ -23,7 +23,12 @@ For distributed Galois, i.e. D-Galois:
 
 For distributed and heterogeneous Galois, i.e. D-IrGL:
 
-`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_ENABLE_GPU=1`
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_CUDA_CAPABILITY=<insert CUDA capability here>`
+
+The CUDA capability should be one that your GPU supports. For example, if I
+wanted to use a GTX 1080 and a K80, the command would look like this:
+
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_CUDA_CAPABILITY="3.7,6.1"`
 
 Note that heterogeneous Galois requires CUDA 8.0 and above and a compiler
 that is compatible with the CUDA version that you use.
@@ -140,8 +145,9 @@ Examples for Running Provided Apps
 
 To run 3 processes all on a single machine, use the following:
 `GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=3 ./bfs_push rmat15.gr -graphTranspose=rmat15.tgr -t=4 -num_nodes=1 -partition=oec`
-Note that `-num_nodes=1` is not correct if `ENABLE_GPU` is not set (it does not
-appear as an option in that case).
+Note that `-num_nodes=1` is not correct if heterogeneous execution is not
+enabled via specifying the CUDA capability (as it does not appear as an option if
+heterogeneous execution is not on).
 
 To run on 3 CPUs on h1, h2, and h3, use the following:
 `mpirun -n=3 -hosts=h1,h2,h3 ./cc_push rmat15.sgr -symmetricGraph -t=1 -num_nodes=1 -partition=iec`
