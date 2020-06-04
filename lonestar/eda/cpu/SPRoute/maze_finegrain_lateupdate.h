@@ -792,7 +792,7 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
                       galois::runtime::acquire(&data[grid],
                   galois::MethodFlag::WRITE);*/
 
-                  int preX, preY;
+                  int preX = curX, preY = curY;
                   if (curr_d1 != 0) {
                     if (HV[curY][curX]) {
                       preX = parentX1[curY][curX];
@@ -801,17 +801,14 @@ void mazeRouteMSMD_finegrain_lateupdate(int iter, int expand, float costHeight,
                       preX = parentX3[curY][curX];
                       preY = parentY3[curY][curX];
                     }
-                  } else {
-                    preX = curX;
-                    preY = curY;
                   }
                   // printf("pop curY: %d curX: %d d1: %f preX: %d preY: %d
                   // hyperH: %d hyperV: %d HV: %d return_dist: %f\n",
                   //    curY, curX, curr_d1, preX, preY, hyperH[curY][curX],
                   //    hyperV[curY][curX], HV[curY][curX], return_dist.load());
-                  float tmp, tmp_cost;
-                  int tmp_grid;
-                  int tmpX, tmpY;
+                  float tmp = 0.f, tmp_cost = 0.f;
+                  int tmp_grid = 0;
+                  int tmpX = 0, tmpY = 0;
                   bool tmpH = false;
                   bool tmpV = false;
 

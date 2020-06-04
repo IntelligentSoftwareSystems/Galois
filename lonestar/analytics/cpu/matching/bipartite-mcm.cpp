@@ -759,7 +759,7 @@ struct MatchingMF {
               unsigned newHeight =
                   g.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
               if (useCAS) {
-                unsigned oldHeight;
+                unsigned oldHeight = 0;
                 while (newHeight < (oldHeight = node.height)) {
                   if (__sync_bool_compare_and_swap(&node.height, oldHeight,
                                                    newHeight)) {
