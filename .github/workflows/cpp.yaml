@@ -80,7 +80,7 @@ jobs:
       matrix:
         os:
         - ubuntu-18.04
-        - macOS-latest
+        # - macOS-latest
         build_type:
         - Debug
         - Release
