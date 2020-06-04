@@ -20,15 +20,16 @@
 #ifndef _BCNODE_H_
 #define _BCNODE_H_
 
+#include "control.h"
+
+#include "galois/substrate/SimpleLock.h"
+#include "galois/gstl.h"
+
 #include <vector>
 #include <string>
 #include <sstream>
 #include <algorithm>
 #include <limits>
-
-#include "galois/substrate/SimpleLock.h"
-#include "llvm/ADT/SmallVector.h"
-#include "control.h"
 
 constexpr unsigned infinity = std::numeric_limits<unsigned>::max() / 2;
 

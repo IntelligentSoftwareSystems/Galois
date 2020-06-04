@@ -19,9 +19,9 @@
 
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include "llvm/Support/CommandLine.h"
-#include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 
@@ -33,9 +33,9 @@ static const char* desc = "Computes the betweenness centrality of all nodes in "
                           "a graph";
 static const char* url = "betweenness_centrality";
 
-static llvm::cl::opt<std::string> filename(llvm::cl::Positional,
-                                           llvm::cl::desc("<input file>"),
-                                           llvm::cl::Required);
+static llvm::cl::opt<std::string> inputFile(llvm::cl::Positional,
+                                            llvm::cl::desc("<input file>"),
+                                            llvm::cl::Required);
 static llvm::cl::opt<int> iterLimit("limit",
                                     llvm::cl::desc("Limit number of iterations "
                                                    "to value (0 is all nodes)"),
@@ -285,10 +285,13 @@ struct HasOut : public std::unary_function<GNode, bool> {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys Gal;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph g;
-  galois::graphs::readGraph(g, filename);
+  galois::graphs::readGraph(g, inputFile);
 
   BCOuter bcOuter(g);
 
@@ -321,12 +324,12 @@ int main(int argc, char** argv) {
                  " Iterations: ", iterations, "\n");
 
   // execute algorithm
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   bcOuter.run(v);
-  T.stop();
+  execTime.stop();
 
-  bcOuter.printBCValues(0, std::min(10ul, NumNodes), std::cout, 6);
+  bcOuter.printBCValues(0, std::min(10UL, NumNodes), std::cout, 6);
 
   if (printAll)
     bcOuter.printBCcertificate();
@@ -334,6 +337,8 @@ int main(int argc, char** argv) {
     bcOuter.verify();
 
   galois::reportPageAlloc("MeminfoPost");
+
+  totalTime.stop();
 
   return 0;
 }

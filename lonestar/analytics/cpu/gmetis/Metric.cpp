@@ -104,7 +104,7 @@ void printPartStats(std::vector<partInfo>& parts) {
     e.add(parts[x].partWeight);
   }
   std::cout << "target " << e.total() / e.count() << " var " << e.variance()
-            << " min " << e.min() << " max " << e.max() << std::endl;
+            << " min " << e.min() << " max " << e.max() << "\n";
 }
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {

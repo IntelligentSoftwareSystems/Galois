@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
 
   size_t sum = vecSumSerial(vec);
 
-  std::cout << "Array Sum = " << sum << std::endl;
+  std::cout << "Array Sum = " << sum << "\n";
 
   return 0;
 }

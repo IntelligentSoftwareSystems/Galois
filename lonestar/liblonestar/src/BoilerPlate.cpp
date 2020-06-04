@@ -41,8 +41,13 @@ static void LonestarPrintVersion(llvm::raw_ostream& out) {
 }
 
 //! initialize lonestar benchmark
+void LonestarStart(int argc, char** argv) {
+  LonestarStart(argc, argv, nullptr, nullptr, nullptr, nullptr);
+}
+
+//! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, const char* app, const char* desc,
-                   const char* url) {
+                   const char* url, llvm::cl::opt<std::string>* input) {
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads);
@@ -54,23 +59,30 @@ void LonestarStart(int argc, char** argv, const char* app, const char* desc,
                << " The University of Texas at Austin\n";
   llvm::outs() << "http://iss.ices.utexas.edu/galois/\n\n";
   llvm::outs() << "application: " << (app ? app : "unspecified") << "\n";
-  if (desc)
+  if (desc) {
     llvm::outs() << desc << "\n";
-  if (url)
+  }
+  if (url) {
     llvm::outs() << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
                  << url << "\n";
+  }
   llvm::outs() << "\n";
   llvm::outs().flush();
 
   std::ostringstream cmdout;
   for (int i = 0; i < argc; ++i) {
     cmdout << argv[i];
-    if (i != argc - 1)
+    if (i != argc - 1) {
       cmdout << " ";
+    }
   }
 
   galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
   galois::runtime::reportParam("(NULL)", "Threads", numThreads);
+  galois::runtime::reportParam("(NULL)", "Hosts", 1);
+  if (input) {
+    galois::runtime::reportParam("(NULL)", "Input", input->getValue());
+  }
 
   char name[256];
   gethostname(name, 256);

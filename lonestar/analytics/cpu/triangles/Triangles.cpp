@@ -18,15 +18,14 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
 #include "galois/Bag.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/ParallelSTL.h"
+#include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-
-#include "galois/runtime/Profile.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -38,14 +37,14 @@
 
 const char* name = "Triangles";
 const char* desc = "Counts the triangles in a graph";
-const char* url  = 0;
 
-constexpr static const unsigned CHUNK_SIZE = 64u;
+constexpr static const unsigned CHUNK_SIZE = 64U;
 enum Algo { nodeiterator, edgeiterator, orderedCount };
 
 namespace cll = llvm::cl;
+
 static cll::opt<std::string>
-    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
@@ -76,8 +75,13 @@ typedef Graph::GraphNode GNode;
  */
 template <typename Iterator, typename Compare>
 Iterator lowerBound(Iterator first, Iterator last, Compare comp) {
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
+
   Iterator it;
-  typename std::iterator_traits<Iterator>::difference_type count, half;
+  difference_type count;
+  difference_type half;
+
   count = std::distance(first, last);
   while (count > 0) {
     it   = first;
@@ -358,14 +362,14 @@ void edgeIteratingAlgo(Graph& graph) {
 void makeSortedGraph(Graph& graph) {
   // read original graph
   galois::graphs::FileGraph initial;
-  initial.fromFileInterleaved<void>(inputFilename);
+  initial.fromFileInterleaved<void>(inputFile);
 
   size_t numGraphNodes = initial.size();
   // create node -> degree pairs
   using DegreeNodePair = std::pair<uint64_t, uint32_t>;
   std::vector<DegreeNodePair> dnPairs(numGraphNodes);
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t nodeID) {
         size_t nodeDegree =
             std::distance(initial.edge_begin(nodeID), initial.edge_end(nodeID));
@@ -381,7 +385,7 @@ void makeSortedGraph(Graph& graph) {
   std::vector<uint32_t> oldToNewMapping(numGraphNodes);
   std::vector<uint64_t> inProgressPrefixSum(numGraphNodes);
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t index) {
         // save degree, which is pair.first
         inProgressPrefixSum[index] = dnPairs[index].first;
@@ -401,7 +405,7 @@ void makeSortedGraph(Graph& graph) {
   graph.constructNodes();
   // set edge endpoints using prefix sum
   galois::do_all(
-      galois::iterate((size_t)0, numGraphNodes),
+      galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t nodeIndex) {
         graph.fixEndEdge(nodeIndex, newPrefixSum[nodeIndex]);
       },
@@ -453,7 +457,7 @@ void readGraph(Graph& graph) {
     makeSortedGraph(graph);
     Trelabel.stop();
   } else {
-    galois::graphs::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFile);
     // algorithm correctness requires sorting edges by destination
     graph.sortAllEdgesByDst();
   }
@@ -461,22 +465,26 @@ void readGraph(Graph& graph) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
 
-  galois::StatTimer Tinitial("GraphReadingTime");
-  Tinitial.start();
+  galois::StatTimer initialTime("GraphReadingTime");
+  initialTime.start();
   readGraph(graph);
-  Tinitial.stop();
+  initialTime.stop();
 
   galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::gInfo("Starting triangle counting...");
-  galois::StatTimer T;
-  T.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   // case by case preAlloc to avoid allocating unnecessarily
   switch (algo) {
   case nodeiterator:
@@ -494,8 +502,11 @@ int main(int argc, char** argv) {
   default:
     std::cerr << "Unknown algo: " << algo << "\n";
   }
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
+
+  totalTime.stop();
+
   return 0;
 }

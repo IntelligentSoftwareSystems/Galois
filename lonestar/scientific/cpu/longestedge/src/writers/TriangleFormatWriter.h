@@ -30,4 +30,7 @@ void trProcessGraph(Graph& graph, std::vector<TriNodeInfo>& nodeVector,
                     std::vector<TriSegmInfo>& segmVector,
                     std::vector<TriConecInfo>& conecVector);
 
+void changeOrientationIfRequired(std::vector<unsigned long> element,
+                                 std::vector<TriNodeInfo> nodeVector);
+
 #endif // TRI_WRITER_H

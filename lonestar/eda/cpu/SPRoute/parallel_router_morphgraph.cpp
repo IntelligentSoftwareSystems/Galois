@@ -1139,7 +1139,7 @@ void reset_net(const Info info, nodeArray& nodelist, edgeArray& v_edge,
 
 int main(int argc, char* argv[]) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, argv[1]);
   /*if(argc != 2)
   {
       cout<<"usage: ./a.out [input]"<<endl;

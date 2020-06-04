@@ -24,8 +24,9 @@
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "galois/runtime/Statistics.h"
-#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 #include <deque>
@@ -46,10 +47,8 @@ static const char* desc =
     "Computes the maximal k-trusses for a given undirected graph";
 static const char* url = "k_truss";
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input graph (symmetric)>"),
-                                      cll::Required);
-
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int>
     trussNum("trussNum", cll::desc("report trussNum-trusses"), cll::Required);
 
@@ -68,11 +67,10 @@ static cll::opt<Algo> algo(
 
 //! Flag that forces user to be aware that they should be passing in a
 //! symmetric graph
-static cll::opt<bool> symmetricGraph(
-    "symmetricGraph",
-    cll::desc("Flag should be used to make user aware they should be passing a "
-              "symmetric graph to this program"),
-    cll::init(false));
+static cll::opt<bool>
+    symmetricGraph("symmetricGraph",
+                   cll::desc("Set this flag if graph is symmetric"),
+                   cll::init(false));
 
 //! Set LSB of an edge weight to indicate the removal of the edge.
 using Graph =
@@ -302,7 +300,7 @@ void reportKTruss(Graph& g) {
 
   std::ofstream of(outName);
   if (!of.is_open()) {
-    std::cerr << "Cannot open " << outName << " for output." << std::endl;
+    std::cerr << "Cannot open " << outName << " for output.\n";
     return;
   }
 
@@ -310,7 +308,7 @@ void reportKTruss(Graph& g) {
     for (auto e : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
       if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
-        of << n << " " << dst << " " << g.getEdgeData(e) << std::endl;
+        of << n << " " << dst << " " << g.getEdgeData(e) << "\n";
       }
     }
   }
@@ -620,12 +618,12 @@ void run() {
   Graph graph;
   Algo algo;
 
-  std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename, true);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  galois::graphs::readGraph(graph, inputFile, true);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
   std::cout << "Running " << algo.name() << " algorithm for maximal "
-            << trussNum << "-truss" << std::endl;
+            << trussNum << "-truss\n";
 
   size_t approxEdgeData = 4 * (graph.size() + graph.sizeEdges());
   galois::preAlloc(numThreads +
@@ -634,12 +632,10 @@ void run() {
 
   initialize(graph);
 
-  galois::StatTimer Tmain;
-  Tmain.start();
-
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   algo(graph, trussNum);
-
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
   reportKTruss(graph);
@@ -660,7 +656,10 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (!symmetricGraph) {
     GALOIS_DIE("k-truss requires a symmetric graph input;"
@@ -669,12 +668,10 @@ int main(int argc, char** argv) {
   }
 
   if (2 > trussNum) {
-    std::cerr << "trussNum >= 2" << std::endl;
+    std::cerr << "trussNum >= 2\n";
     return -1;
   }
 
-  galois::StatTimer T("TotalTime");
-  T.start();
   switch (algo) {
   case bspJacobi:
     run<BSPTrussJacobiAlgo>();
@@ -689,7 +686,8 @@ int main(int argc, char** argv) {
     std::cerr << "Unknown algorithm\n";
     abort();
   }
-  T.stop();
+
+  totalTime.stop();
 
   return 0;
 }

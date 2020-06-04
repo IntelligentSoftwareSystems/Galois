@@ -17,19 +17,18 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "Lonestar/BoilerPlate.h"
-
-#include "galois/graphs/BufferedGraph.h"
-#include "galois/graphs/LC_CSR_CSC_Graph.h"
-#include "galois/Bag.h"
-
 #include "BCNode.h"
 #include "BCEdge.h"
+
+#include "galois/Bag.h"
+#include "galois/graphs/BufferedGraph.h"
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <iomanip>
 
 // WARNING: optimal chunk size may differ depending on input graph
-constexpr static const unsigned CHUNK_SIZE = 64u;
+constexpr static const unsigned CHUNK_SIZE = 64U;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -37,11 +36,8 @@ constexpr static const unsigned CHUNK_SIZE = 64u;
 
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input graph in Galois bin "
-                                                "format>"),
-                                      cll::Required);
-
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                           cll::desc("Whitespace separated list "
                                                     "of sources in a file to "
@@ -409,7 +405,10 @@ static const char* desc = "Computes betwenness centrality in an unweighted "
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, NULL);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
@@ -425,7 +424,7 @@ int main(int argc, char** argv) {
   graphConstructTimer.start();
 
   galois::graphs::BufferedGraph<void> fileReader;
-  fileReader.loadGraph(filename);
+  fileReader.loadGraph(inputFile);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
   bcGraph.constructNodes();
 
@@ -458,10 +457,11 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MemAllocPre");
   galois::gInfo("Going to pre-allocate pages");
   galois::preAlloc(
-      std::min((uint64_t)(std::min(galois::getActiveThreads(), 100u) *
-                          std::max((nnodes / 4500000), (unsigned)5) *
-                          std::max((nedges / 30000000), (uint64_t)5) * 2.5),
-               (uint64_t)1500) +
+      std::min(static_cast<uint64_t>(
+                   std::min(galois::getActiveThreads(), 100U) *
+                   std::max((nnodes / 4500000), unsigned{5}) *
+                   std::max((nedges / 30000000), uint64_t{5}) * 2.5),
+               uint64_t{1500}) +
       5);
   galois::gInfo("Pre-allocation complete");
   galois::reportPageAlloc("MemAllocMid");
@@ -508,8 +508,8 @@ int main(int argc, char** argv) {
 
   galois::gInfo("Beginning execution");
 
-  galois::StatTimer executionTimer;
-  executionTimer.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   for (uint32_t i = 0; i < numOfSources; ++i) {
     uint32_t sourceToUse = i;
     if (sourceVector.size() != 0) {
@@ -546,7 +546,7 @@ int main(int argc, char** argv) {
     if (numOfOutSources != 0 && goodSource >= numOfOutSources)
       break;
   }
-  executionTimer.stop();
+  execTime.stop();
 
   galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
@@ -574,6 +574,8 @@ int main(int argc, char** argv) {
     }
     outfile.close();
   }
+
+  totalTime.stop();
 
   return 0;
 }

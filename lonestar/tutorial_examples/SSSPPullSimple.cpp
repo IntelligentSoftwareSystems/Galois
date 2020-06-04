@@ -41,7 +41,7 @@ static cll::opt<std::string> filename(cll::Positional,
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, 0, 0, 0);
+  LonestarStart(argc, argv);
 
   //! [ReadGraph]
   galois::graphs::readGraph(graph, filename);
