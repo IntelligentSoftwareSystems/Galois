@@ -436,7 +436,7 @@ struct PreflowPush {
             }
           } // end for
         },
-        galois::wl<WL>(), galois::no_conflicts(),
+        galois::wl<WL>(), galois::disable_conflict_detection(),
         galois::loopname("updateHeights"));
   }
 

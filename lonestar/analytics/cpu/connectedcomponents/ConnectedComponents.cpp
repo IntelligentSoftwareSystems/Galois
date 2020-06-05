@@ -223,7 +223,7 @@ struct LabelPropAlgo {
               }
             }
           },
-          galois::no_conflicts(), galois::steal(),
+          galois::disable_conflict_detection(), galois::steal(),
           galois::loopname("LabelPropAlgo"));
     } while (changed.reduce());
   }
@@ -888,7 +888,8 @@ struct EdgeAfforestAlgo {
             }
           }
         },
-        galois::no_conflicts(), galois::loopname("EdgeAfforest-LCS-Link"));
+        galois::disable_conflict_detection(),
+        galois::loopname("EdgeAfforest-LCS-Link"));
 
     galois::do_all(
         galois::iterate(graph),

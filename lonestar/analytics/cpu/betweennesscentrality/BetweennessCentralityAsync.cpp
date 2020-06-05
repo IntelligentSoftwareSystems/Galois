@@ -327,8 +327,8 @@ struct BetweenessCentralityAsync {
             }
           }
         },
-        galois::wl<OBIM>(FPWorkItemIndexer()), galois::no_conflicts(),
-        galois::loopname("ForwardPhase"));
+        galois::wl<OBIM>(FPWorkItemIndexer()),
+        galois::disable_conflict_detection(), galois::loopname("ForwardPhase"));
   }
 
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
@@ -380,7 +380,8 @@ struct BetweenessCentralityAsync {
             srcData.unlock();
           }
         },
-        galois::no_conflicts(), galois::loopname("BackwardPhase"));
+        galois::disable_conflict_detection(),
+        galois::loopname("BackwardPhase"));
   }
 
   void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {

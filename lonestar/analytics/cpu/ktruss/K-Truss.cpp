@@ -252,7 +252,7 @@ struct AsyncTrussTxAlgo {
     galois::for_each(galois::iterate(work),
                      PickUnsupportedEdges{g, k - 2, unsupported},
                      galois::loopname("PickUnsupportedEdges"),
-                     galois::no_conflicts(), galois::no_pushes(),
+                     galois::disable_conflict_detection(), galois::no_pushes(),
                      galois::per_iter_alloc());
 
     galois::for_each(galois::iterate(unsupported),

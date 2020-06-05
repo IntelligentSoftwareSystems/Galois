@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
       ,
       galois::loopname("sum_in_for_each_with_push_atomic") // options
       ,
-      galois::no_pushes(), galois::no_conflicts());
+      galois::no_pushes(), galois::disable_conflict_detection());
   //! [For each and do all without conflict detection]
 
   return 0;
