@@ -1215,7 +1215,7 @@ int main(int argc, char** argv) {
                " please use the -symmetricGraph flag "
                " to indicate the input is a symmetric graph.");
   }
-  
+
   switch (algo) {
   case Algo::async:
     run<AsyncAlgo>();
