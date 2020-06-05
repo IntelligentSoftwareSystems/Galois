@@ -105,7 +105,7 @@ static void marshalGPUGraph(
     *cuda_ctx = get_CUDA_context(my_host_id);
 
     if (!init_CUDA_context(*cuda_ctx, gpudevice)) {
-      GALOIS_DIE("Failed to initialize CUDA context");
+      GALOIS_DIE("failed to initialize CUDA context");
     }
 
     MarshalGraph m;
@@ -179,8 +179,9 @@ loadSymmetricDistGraph(std::vector<unsigned>& scaleFactor) {
   if (inputFileSymmetric) {
     loadedGraph = constructSymmetricGraph<NodeData, EdgeData>(scaleFactor);
   } else {
-    GALOIS_DIE("must use -symmetricGraph flag with a symmetric graph for "
-               "this benchmark");
+    GALOIS_DIE("application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph");
   }
 
   assert(loadedGraph != nullptr);

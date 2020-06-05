@@ -47,9 +47,8 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"),
                                             cll::init(1000));
-static cll::opt<unsigned long long>
-    src_node("startNode", // not uint64_t due to a bug in llvm cl
-             cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<uint64_t>
+    src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 
 enum Exec { Sync, Async };
 
@@ -84,11 +83,11 @@ galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
 struct InitializeGraph {
   const uint32_t& local_infinity;
-  cll::opt<unsigned long long>& local_src_node;
+  cll::opt<uint64_t>& local_src_node;
   Graph* graph;
 
-  InitializeGraph(cll::opt<unsigned long long>& _src_node,
-                  const uint32_t& _infinity, Graph* _graph)
+  InitializeGraph(cll::opt<uint64_t>& _src_node, const uint32_t& _infinity,
+                  Graph* _graph)
       : local_infinity(_infinity), local_src_node(_src_node), graph(_graph) {}
 
   void static go(Graph& _graph) {
@@ -164,7 +163,7 @@ struct SSSP {
 
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
-          (unsigned long)dga.read_local());
+          dga.read_local());
 
       ++_num_iterations;
     } while ((async || (_num_iterations < maxIterations)) &&
@@ -174,7 +173,7 @@ struct SSSP {
       galois::runtime::reportStat_Single(
           REGION_NAME,
           "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
-          (unsigned long)_num_iterations);
+          _num_iterations);
     }
   }
 
@@ -323,10 +322,8 @@ int main(int argc, char** argv) {
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
-                                 (unsigned int){maxIterations});
-    galois::runtime::reportParam(REGION_NAME, "Source Node ID",
-                                 uint64_t{src_node});
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", maxIterations);
+    galois::runtime::reportParam(REGION_NAME, "Source Node ID", src_node);
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);

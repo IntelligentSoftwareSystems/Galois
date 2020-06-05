@@ -148,14 +148,14 @@ private:
                           &status);
       handleError(rv);
       if (flag) {
-        ++inflightRecvs;
-        int nbytes;
-        rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
-        handleError(rv);
 #ifdef GALOIS_USE_BARE_MPI
         assert(status.MPI_TAG <= 32767);
         if (status.MPI_TAG != 32767) {
 #endif
+          ++inflightRecvs;
+          int nbytes;
+          rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
+          handleError(rv);
           inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
           auto& m = inflight.back();
           memUsageTracker.incrementMemUsage(m.data.size());

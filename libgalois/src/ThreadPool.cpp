@@ -38,7 +38,7 @@ using galois::substrate::ThreadPool;
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
 ThreadPool::ThreadPool()
-    : mi(getHWTopo().first), reserved(0), masterFastmode(false),
+    : mi(getHWTopo().machineTopoInfo), reserved(0), masterFastmode(false),
       running(false) {
   signals.resize(mi.maxThreads);
   initThread(0);
@@ -117,7 +117,7 @@ static T* getNth(std::atomic<T*>& headptr, unsigned off) {
 
 void ThreadPool::initThread(unsigned tid) {
   signals[tid] = &my_box;
-  my_box.topo  = getHWTopo().second[tid];
+  my_box.topo  = getHWTopo().threadTopoInfo[tid];
   // Initialize
   substrate::initPTS(mi.maxThreads);
 

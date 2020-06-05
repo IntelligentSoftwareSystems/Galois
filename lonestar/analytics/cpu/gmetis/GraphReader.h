@@ -106,7 +106,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename,
                bool weighted = false, bool directed = true) {
   InputGraph inputGraph;
   galois::graphs::readGraph(inputGraph, filename);
-  cout << "start to transfer data to GGraph" << endl;
+  cout << "start to transfer data to GGraph\n";
   int id = 0;
   for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end();
        ii != ee; ++ii) {
@@ -133,37 +133,20 @@ void readGraph(MetisGraph* metisGraph, const char* filename,
                        parallelMakeNodes(graph, gnodes, &inputGraph, pnumNodes),
                        "NodesLoad");
   t.stop();
-  cout << t.get() << " ms " << endl;
+  cout << t.get() << " ms\n";
   t.start();
   galois::for_each<WL>(
       inputGraph.begin(), inputGraph.end(),
       parallelMakeEdges(graph, gnodes, &inputGraph, pnumEdges, weighted, true),
       "EdgesLoad");
   t.stop();
-  cout << t.get() << " ms " << endl;
-
-  /*
-
-    galois::Timer t;
-    t.start();
-    galois::for_each<WL>(inputGraph,parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
-    t.stop();
-    cout<<t.get()<<" ms "<<endl;
-    t.start();
-    galois::for_each<WL>(inputGraph,parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
-    t.stop();
-    cout<<t.get()<<" ms "<<endl;
-
-  */
+  cout << t.get() << " ms\n";
 
   int numNodes = pnumNodes.reduce();
   int numEdges = pnumEdges.reduce();
 
-  // metisGraph->setNumNodes(numNodes);
-  // metisGraph->setNumEdges(numEdges/2);
-
   cout << "Done Reading Graph ";
-  cout << "numNodes: " << numNodes << "|numEdges: " << numEdges / 2 << endl;
+  cout << "numNodes: " << numNodes << "|numEdges: " << numEdges / 2 << "\n";
 }
 
 #endif /* GRAPHREADER_H_ */

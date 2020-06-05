@@ -145,10 +145,9 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
     }
 
     galois::runtime::reportParam("DistBench", "CommandLine", cmdout.str());
-    galois::runtime::reportParam("DistBench", "Threads",
-                                 (unsigned long)numThreads);
-    galois::runtime::reportParam("DistBench", "Hosts", (unsigned long)net.Num);
-    galois::runtime::reportParam("DistBench", "Runs", (unsigned long)numRuns);
+    galois::runtime::reportParam("DistBench", "Threads", numThreads);
+    galois::runtime::reportParam("DistBench", "Hosts", net.Num);
+    galois::runtime::reportParam("DistBench", "Runs", numRuns);
     galois::runtime::reportParam("DistBench", "Run_UUID",
                                  galois::runtime::getRandUUID());
     galois::runtime::reportParam("DistBench", "Input", inputFile);

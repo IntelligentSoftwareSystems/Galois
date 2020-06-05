@@ -75,7 +75,7 @@ Here are the dependencies for the optional features:
 - Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
-- CUDA (>= 8.0) if you want to build distributed heterogeneous applications
+- CUDA (>= 8.0) if you want to build GPU or distributed heterogeneous applications
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
@@ -182,10 +182,16 @@ time of various sections, parallel loop iterations and memory usage, etc. These
 stats are in CSV format and can be redirected to a file using `-statFile` option.
 Please refer to the manual for details on stats. 
 
+Running LonestarGPU applications
+--------------------------
+
+Please refer to `lonestar/analytics/gpu/README.md` and `lonestar/scientific/gpu/README.md` for more details on
+compiling and running LonestarGPU applications.
+
 Running Distributed Galois
 --------------------------
 
-Please refer to `lonestardist/README.md` for more details on
+Please refer to `lonestar/analytics/distributed/README.md` for more details on
 running distributed benchmarks.
 
 Documentation

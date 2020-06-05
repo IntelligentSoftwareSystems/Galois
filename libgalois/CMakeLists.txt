@@ -7,47 +7,47 @@ configure_file(src/Version.cpp.in Version.cpp @ONLY)
 configure_file(include/galois/config.h.in include/galois/config.h)
 
 set(sources
-        src/SharedMemSys.cpp
-        src/Context.cpp
-        src/PreAlloc.cpp
-        src/Support.cpp
-        src/Threads.cpp
-        src/Timer.cpp
-        src/Mem.cpp
-        src/PagePool.cpp
-        src/Deterministic.cpp
-        src/Substrate.cpp
         "${CMAKE_CURRENT_BINARY_DIR}/Version.cpp"
-        src/PagePool.cpp
-        src/Statistics.cpp
-        src/Barrier.cpp
         src/Barrier_Counting.cpp
+        src/Barrier.cpp
         src/Barrier_Dissemination.cpp 
         src/Barrier_MCS.cpp
-        src/Barrier_Topo.cpp 
         src/Barrier_Pthread.cpp
         src/Barrier_Simple.cpp
-        src/gIO.cpp
-        src/ThreadPool.cpp
-        src/SimpleLock.cpp
-        src/PtrLock.cpp
-        src/Profile.cpp
-        src/EnvCheck.cpp
-        src/PerThreadStorage.cpp
-        src/Termination.cpp
-        src/NumaMem.cpp
-        src/PageAlloc.cpp
-        src/SharedMem.cpp
-        src/FileGraph.cpp
-        src/FileGraphParallel.cpp
-        src/OCFileGraph.cpp
-        src/GraphHelpers.cpp
-        src/ParaMeter.cpp
+        src/Barrier_Topo.cpp
+        src/Context.cpp
+        src/Deterministic.cpp
         src/DynamicBitset.cpp
-        src/Tracer.cpp
+        src/EnvCheck.cpp
+        src/FileGraph.cpp
         src/FileView.cpp
+        src/FileGraphParallel.cpp
+        src/gIO.cpp
+        src/GraphHelpers.cpp
+        src/HWTopo.cpp
+        src/Mem.cpp
+        src/NumaMem.cpp
+        src/OCFileGraph.cpp
         src/OutIndexView.cpp
+        src/PageAlloc.cpp
+        src/PagePool.cpp
+        src/ParaMeter.cpp
+        src/PerThreadStorage.cpp
+        src/PreAlloc.cpp
+        src/Profile.cpp
+        src/PtrLock.cpp
+        src/SharedMem.cpp
+        src/SharedMemSys.cpp
+        src/SimpleLock.cpp
+        src/Statistics.cpp
+        src/Substrate.cpp
+        src/Support.cpp
+        src/Termination.cpp
+        src/ThreadPool.cpp
+        src/Threads.cpp
         src/ThreadTimer.cpp
+        src/Timer.cpp
+        src/Tracer.cpp
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

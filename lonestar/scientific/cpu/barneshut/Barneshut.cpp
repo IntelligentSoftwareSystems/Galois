@@ -563,7 +563,10 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, nullptr);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   std::cout << config << "\n";
   std::cout << nbodies << " bodies, " << ntimesteps << " time steps\n";
@@ -572,8 +575,12 @@ int main(int argc, char** argv) {
   BodyPtrs pBodies;
   generateInput(bodies, pBodies, nbodies, seed);
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   run(bodies, pBodies, nbodies);
-  T.stop();
+  execTime.stop();
+
+  totalTime.stop();
+
+  return 0;
 }

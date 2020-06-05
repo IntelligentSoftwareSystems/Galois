@@ -32,19 +32,24 @@
 #include "galois/runtime/Context.h"
 #include "galois/substrate/PerThreadStorage.h"
 
-namespace galois {
-namespace graphs {
+// Forward declarations
+
+namespace galois::graphs {
 
 struct read_default_graph_tag {};
 struct read_with_aux_graph_tag {};
 struct read_lc_inout_graph_tag {};
 struct read_with_aux_first_graph_tag {};
 
-namespace internal {
+} // namespace galois::graphs
+
+namespace galois::graphs::internal {
 
 template <typename, typename, typename, typename, typename>
 struct EdgeSortReference;
-}
+} // namespace galois::graphs::internal
+
+namespace galois::graphs {
 
 //! Proxy object for internal EdgeSortReference
 template <typename GraphNode, typename EdgeTy>
@@ -68,7 +73,9 @@ public:
   }
 };
 
-namespace internal {
+} // namespace galois::graphs
+
+namespace galois::graphs::internal {
 
 template <bool Enable>
 class LocalIteratorFeature {
@@ -270,21 +277,6 @@ public:
   NodeInfoBase(Args&&... args) : data(std::forward<Args>(args)...) {}
 
   typename NodeInfoBase::reference getData() { return data; }
-  /*
-   * To support boost serialization
-   * IMPORTANT: This is temp fix for benchmarks using non-trivial structures in
-   * the nodeData (Eg. SGD)
-   */
-  // friend class boost::serialization::access;
-  // template <typename Archive>
-  // void save(Archive &ar, const unsigned int version) const {
-  // ar << data;
-  //}
-  // template <typename Archive>
-  // void load(Archive &ar, const unsigned int version) {
-  // ar >> data ;
-  //}
-  // BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 template <bool HasLockable>
@@ -422,8 +414,6 @@ void swap(EdgeSortReference<A, B, C, D, E> a,
   b       = aa;
 }
 
-} // namespace internal
-} // namespace graphs
-} // namespace galois
+} // namespace galois::graphs::internal
 
 #endif

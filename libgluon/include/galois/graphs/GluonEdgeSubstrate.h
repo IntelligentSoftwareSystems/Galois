@@ -49,7 +49,7 @@ extern DataCommMode enforcedDataMode;
 
 #ifdef GALOIS_USE_BARE_MPI
 //! bare_mpi type to use; see options in runtime/BareMPI.h
-BareMPI bare_mpi = BareMPI::noBareMPI;
+extern BareMPI bare_mpi;
 #endif
 
 namespace galois {
@@ -100,7 +100,7 @@ private:
   galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
-  void reset_bitset(SyncType, void (*bitset_reset_range)(size_t, size_t)) {
+  void reset_bitset(void (*bitset_reset_range)(size_t, size_t)) {
     if (userGraph.sizeEdges() > 0) {
       bitset_reset_range(0, userGraph.sizeEdges() - 1);
     }
@@ -310,11 +310,11 @@ private:
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
     if ((unsigned)taskRank != id)
-      GALOIS_DIE("Mismatch in MPI rank");
+      GALOIS_DIE("mismatch in MPI rank");
     int numTasks;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     if ((unsigned)numTasks != numHosts)
-      GALOIS_DIE("Mismatch in MPI rank");
+      GALOIS_DIE("mismatch in MPI rank");
 #endif
     // group setup
     MPI_Group world_group;
@@ -336,7 +336,7 @@ private:
         break;
       case noBareMPI:
       default:
-        GALOIS_DIE("Unsupported bare MPI");
+        GALOIS_DIE("unsupported bare MPI");
       }
     }
 #endif
@@ -593,8 +593,7 @@ private:
   template <SyncType syncType>
   void convertGIDToLID(const std::string& loopName,
                        galois::PODResizeableArray<unsigned int>& offsets) {
-    galois::gWarn("WARNING: convert GID to LID used in sync call (not "
-                  "optimized)");
+    galois::gWarn("convert GID to LID used in sync call (not optimized)");
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string doall_str(syncTypeStr + "_GID2LID_" +
                           get_run_identifier(loopName));
@@ -1157,19 +1156,6 @@ private:
       if (async) {
         FnTy::reduce(lid, userGraph.getEdgeData(lid), val);
       } else {
-        // uint64_t edgeSource =
-        // userGraph.getGID(userGraph.findSourceFromEdge(lid)); if (val !=
-        // userGraph.getHostID(edgeSource)) {
-        //  GALOIS_DIE(galois::runtime::getSystemNetworkInterface().ID, " ",
-        //  edgeSource, " ", val, " ", userGraph.getHostID(edgeSource));
-
-        //  assert(val == userGraph.getHostID(edgeSource));
-        //}
-
-        // galois::gPrint("[", galois::runtime::getSystemNetworkInterface().ID ,
-        //               "] broadcast, val is ", val, " edge srouce ",
-        //               userGraph.getGID(userGraph.findSourceFromEdge(lid)),
-        //               "\n");
         FnTy::setVal(lid, userGraph.getEdgeData(lid), val);
         assert(FnTy::extract(lid, userGraph.getEdgeData(lid)) == val);
       }
@@ -1654,7 +1640,7 @@ private:
     }
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
   }
 
@@ -1694,7 +1680,7 @@ private:
     net.decrementMemUsage(send_buffers_size);
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
   }
 #endif
@@ -1744,7 +1730,7 @@ private:
     }
 
     if (BitsetFnTy::is_valid() && syncType == syncBroadcast) {
-      reset_bitset(syncType, &BitsetFnTy::reset_range);
+      reset_bitset(&BitsetFnTy::reset_range);
     }
 
     galois::runtime::reportStat_Tsum(RNAME, statNumMessages_str, numMessages);
@@ -2201,7 +2187,7 @@ private:
       syncOnesidedMPI<syncReduce, ReduceFnTy, BitsetFnTy>(loopName);
       break;
     default:
-      GALOIS_DIE("Unsupported bare MPI");
+      GALOIS_DIE("unsupported bare MPI");
     }
 #endif
 
@@ -2248,7 +2234,7 @@ private:
                                                                 use_bitset);
       break;
     default:
-      GALOIS_DIE("Unsupported bare MPI");
+      GALOIS_DIE("unsupported bare MPI");
     }
 #endif
 
