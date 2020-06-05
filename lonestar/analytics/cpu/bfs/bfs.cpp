@@ -52,6 +52,7 @@ static cll::opt<unsigned int>
     reportNode("reportNode",
                cll::desc("Node to report distance to (default value 1)"),
                cll::init(1));
+
 // static cll::opt<unsigned int> stepShiftw("delta",
 // cll::desc("Shift value for the deltastep"),
 // cll::init(10));

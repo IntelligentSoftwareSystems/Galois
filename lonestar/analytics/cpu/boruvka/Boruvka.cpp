@@ -43,11 +43,7 @@ static const char* url  = "mst";
 enum Algo { parallel, exp_parallel };
 
 static cll::opt<std::string>
-    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Graph already symmetric (default value false)"),
-                   cll::init(false));
+    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value parallel):"),
          cll::values(clEnumVal(parallel, "Parallel")), cll::init(parallel));
@@ -362,7 +358,7 @@ struct ParallelAlgo {
     galois::graphs::FileGraph origGraph;
     galois::graphs::FileGraph symGraph;
 
-    origGraph.fromFileInterleaved<EdgeData>(inputFile);
+    origGraph.fromFileInterleaved<EdgeData>(inputFilename);
     if (!symmetricGraph)
       galois::graphs::makeSymmetric<EdgeData>(origGraph, symGraph);
     else
@@ -422,7 +418,7 @@ void run() {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url, &inputFile);
+  LonestarStart(argc, argv, name, desc, url, &inputFilename);
 
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();

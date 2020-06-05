@@ -88,11 +88,6 @@ static cll::opt<std::string>
     permutationFilename("outputNodePermutation",
                         cll::desc("[output node permutation file]"),
                         cll::init(""));
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Set this flag if graph is symmetric"),
-                   cll::init(false));
-
 #ifndef NDEBUG
 enum OutputEdgeType { void_, int32_, int64_ };
 static cll::opt<unsigned int>
@@ -1216,9 +1211,9 @@ int main(int argc, char** argv) {
   totalTime.start();
 
   if (!symmetricGraph) {
-    GALOIS_DIE("connected components requires a symmetric graph input;"
+    GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
-               " to indicate the input is a symmetric graph");
+               " to indicate the input is a symmetric graph.");
   }
 
   switch (algo) {

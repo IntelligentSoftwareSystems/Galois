@@ -54,13 +54,6 @@ static cll::opt<Algo> algo("algo",
 static cll::opt<unsigned int> k_core_num("kcore", cll::desc("k-core value"),
                                          cll::Required);
 
-//! Flag that forces user to be aware that they should be passing in a
-//! symmetric graph.
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Set this flag if graph is symmetric"),
-                   cll::init(false));
-
 /*******************************************************************************
  * Graph structure declarations + other inits
  ******************************************************************************/
@@ -235,9 +228,9 @@ int main(int argc, char** argv) {
   totalTime.start();
 
   if (!symmetricGraph) {
-    GALOIS_DIE("kcore requires a symmetric graph input;"
+    GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
-               " to indicate the input is a symmetric graph");
+               " to indicate the input is a symmetric graph.");
   }
 
   //! Some initial stat reporting.
