@@ -145,18 +145,28 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
-  std::string timer_str("SortEdgesGPU");
-  galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
-  edgeSortTime.start();
-  sortEdgesByDestination_cuda(cuda_ctx);
-  edgeSortTime.stop();
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
-  galois::StatTimer edgeSortTime("SortEdgesCPU", REGION_NAME);
-  edgeSortTime.start();
-  hg->sortEdgesByDestination();
-  edgeSortTime.stop();
 #endif
+
+  if (personality == GPU_CUDA) {
+#ifdef GALOIS_ENABLE_GPU
+    std::string timer_str("SortEdgesGPU");
+    galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
+    edgeSortTime.start();
+    printf("start \n");
+    sortEdgesByDestination_cuda(cuda_ctx);
+    printf("end\n");
+    edgeSortTime.stop();
+#else
+    abort();
+#endif
+  } else if (personality == CPU) {
+    galois::StatTimer edgeSortTime("SortEdgesCPU", REGION_NAME);
+    edgeSortTime.start();
+    hg->sortEdgesByDestination();
+    edgeSortTime.stop();
+  }
   ///! accumulators for use in operators
   galois::DGAccumulator<uint64_t> DGAccumulator_numTriangles;
 
