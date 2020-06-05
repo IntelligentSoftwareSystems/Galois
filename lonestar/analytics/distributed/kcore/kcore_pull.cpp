@@ -396,8 +396,8 @@ struct KCoreSanityCheck {
 /* Make results */
 /******************************************************************************/
 
-std::vector<uint8_t> makeResultsCPU(Graph* hg) {
-  std::vector<uint8_t> values;
+std::vector<unsigned> makeResultsCPU(Graph* hg) {
+  std::vector<unsigned> values;
 
   values.reserve(hg->numMasters());
   for (auto node : hg->masterNodesRange()) {
@@ -408,8 +408,8 @@ std::vector<uint8_t> makeResultsCPU(Graph* hg) {
 }
 
 #ifdef GALOIS_ENABLE_GPU
-std::vector<uint8_t> makeResultsGPU(Graph* hg) {
-  std::vector<uint8_t> values;
+std::vector<unsigned> makeResultsGPU(Graph* hg) {
+  std::vector<unsigned> values;
 
   values.reserve(hg->numMasters());
   for (auto node : hg->masterNodesRange()) {
@@ -419,10 +419,10 @@ std::vector<uint8_t> makeResultsGPU(Graph* hg) {
   return values;
 }
 #else
-std::vector<uint8_t> makeResultsGPU(Graph* /*unused*/) { abort(); }
+std::vector<unsigned> makeResultsGPU(Graph* /*unused*/) { abort(); }
 #endif
 
-std::vector<uint8_t> makeResults(Graph* hg) {
+std::vector<unsigned> makeResults(Graph* hg) {
   switch (personality) {
   case CPU:
     return makeResultsCPU(hg);
@@ -514,8 +514,8 @@ int main(int argc, char** argv) {
   StatTimer_total.stop();
 
   if (output) {
-    std::vector<uint8_t> results = makeResults(h_graph);
-    auto globalIDs               = h_graph->getMasterGlobalIDs();
+    std::vector<unsigned> results = makeResults(h_graph);
+    auto globalIDs                = h_graph->getMasterGlobalIDs();
     assert(results.size() == globalIDs.size());
 
     writeOutput(outputLocation, "in_kcore", results.data(), results.size(),
