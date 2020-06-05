@@ -1,7 +1,0 @@
-if(USE_EXP)
-  include_directories(${CMAKE_SOURCE_DIR}/apps/sssp .)
-endif()
-app(delta-stepping DeltaStepping.cpp)
-app(boost-delta-stepping BoostDeltaStepping.cpp)
-app(partitioned-ssssp PartitionedSSSP.cpp)
-app(fifo-sssp FifoSSSP.cpp)
