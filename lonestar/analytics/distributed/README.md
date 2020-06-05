@@ -23,7 +23,12 @@ For distributed Galois, i.e. D-Galois:
 
 For distributed and heterogeneous Galois, i.e. D-IrGL:
 
-`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_ENABLE_GPU=1`
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_CUDA_CAPABILITY=<insert CUDA capability here>`
+
+The CUDA capability should be one that your GPU supports. For example, if you
+wanted to use a GTX 1080 and a K80, the command would look like this:
+
+`cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_DIST=1 -DGALOIS_CUDA_CAPABILITY="3.7;6.1"`
 
 Note that heterogeneous Galois requires CUDA 8.0 and above and a compiler
 that is compatible with the CUDA version that you use.
@@ -125,9 +130,9 @@ but you still would only have 2 machines. Therefore, you would use
 `-pset=<string>`
 
 Specifies the architecture to run on on a single machine using "c" (CPUs) and
-"g" (GPUs). For example, if I have 2 machines with 8 GPUs each,
-but I want to run with 3 GPUs on each machine, I would use `-pset="ggg"`.
-Therefore, combined with `-num_nodes=2`, I would have a total of 6 units of
+"g" (GPUs). For example, if you have 2 machines with 8 GPUs each,
+but you want to run with 3 GPUs on each machine, you would use `-pset="ggg"`.
+Therefore, combined with `-num_nodes=2`, you would have a total of 6 units of
 execution: 3 GPUs on 2 machines for a total of 6. This creates a total of
 6 processes across the 2 machines (1 for each GPU).
 
@@ -140,8 +145,12 @@ Examples for Running Provided Apps
 
 To run 3 processes all on a single machine, use the following:
 `GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=3 ./bfs_push rmat15.gr -graphTranspose=rmat15.tgr -t=4 -num_nodes=1 -partition=oec`
-Note that `-num_nodes=1` is not correct if `ENABLE_GPU` is not set (it does not
-appear as an option in that case).
+Note: when heterogeneous execution is not enabled via `GALOIS_CUDA_CAPABILITY`,
+`-num_nodes=1` is invalid and will not appear as an option.
+
+is not correct if heterogeneous execution is not
+enabled via specifying the CUDA capability (as it does not appear as an option if
+heterogeneous execution is not on).
 
 To run on 3 CPUs on h1, h2, and h3, use the following:
 `mpirun -n=3 -hosts=h1,h2,h3 ./cc_push rmat15.sgr -symmetricGraph -t=1 -num_nodes=1 -partition=iec`

@@ -311,8 +311,7 @@ private:
    */
   void computeMastersBalancedNodesAndEdges(
       const galois::OutIndexView& g, const std::vector<unsigned>& scalefactor,
-      uint32_t nodeWeight, uint32_t edgeWeight,
-      unsigned GALOIS_UNUSED(DecomposeFactor) = 1) {
+      uint32_t nodeWeight, uint32_t edgeWeight, unsigned) {
     if (nodeWeight == 0) {
       nodeWeight = g.num_edges() / g.num_nodes(); // average degree
     }
@@ -353,10 +352,13 @@ protected:
    * Wrapper call that will call into more specific compute masters
    * functions that compute masters based on nodes, edges, or both.
    *
+   * @param masters_distribution method of masters distribution to use
    * @param g The offline graph which has loaded the graph you want
    * to get the masters for
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
+   * @param nodeWeight weight to give nodes when computing balance
+   * @param edgeWeight weight to give edges when computing balance
    * @param DecomposeFactor Specifies how decomposed the blocking
    * of nodes should be. For example, a factor of 2 will make 2 blocks
    * out of 1 block had the decompose factor been set to 1.
@@ -705,6 +707,24 @@ public:
     return specificRanges[2];
   }
 
+  /**
+   * Returns a vector object that contains the global IDs (in order) of
+   * the master nodes in this graph.
+   *
+   * @returns A vector object that contains the global IDs (in order) of
+   * the master nodes in this graph
+   */
+  std::vector<uint64_t> getMasterGlobalIDs() {
+    std::vector<uint64_t> IDs;
+
+    IDs.reserve(numMasters());
+    for (auto node : masterNodesRange()) {
+      IDs.push_back(getGID(node));
+    }
+
+    return IDs;
+  }
+
 protected:
   /**
    * Uses a pre-computed prefix sum to determine division of nodes among
@@ -812,22 +832,16 @@ public:
   /**
    * Write the local LC_CSR graph to the file on a disk.
    *
-   * @param localGraphFileName file name to write local graph to.
    * @todo revive this
    */
-  void save_local_graph_to_file(
-      std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
-    GALOIS_DIE("not implemented");
-  }
+  void save_local_graph_to_file(std::string) { GALOIS_DIE("not implemented"); }
 
   /**
    * Read the local LC_CSR graph from the file on a disk.
    *
-   * @param localGraphFileName file name to read local graph from.
    * @todo revive this
    */
-  void read_local_graph_from_file(
-      std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
+  void read_local_graph_from_file(std::string) {
     GALOIS_DIE("not implemented");
   }
 

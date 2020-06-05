@@ -18,7 +18,7 @@
  */
 
 /**
- * @file Extra_dist_traits.h
+ * @file ExtraTraits.h
  *
  * Defines particular traits used by the distributed runtime.
  */

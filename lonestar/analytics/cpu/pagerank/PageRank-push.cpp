@@ -95,8 +95,9 @@ void asyncPageRank(Graph& graph) {
           }
         }
       },
-      galois::loopname("PushResidualAsync"), galois::no_conflicts(),
-      galois::no_stats(), galois::wl<WL>());
+      galois::loopname("PushResidualAsync"),
+      galois::disable_conflict_detection(), galois::no_stats(),
+      galois::wl<WL>());
 }
 
 void syncPageRank(Graph& graph) {

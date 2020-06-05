@@ -9,7 +9,7 @@
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<filename: unsymmetrized graph>"),
+    filename(cll::Positional, cll::desc("<filename: symmetrized graph>"),
              cll::Required);
 static cll::opt<std::string>
     filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"), cll::init("gr"));
@@ -21,7 +21,7 @@ static cll::opt<unsigned>
             cll::init(1));
 static cll::opt<std::string>
     pattern_filename("p",
-                     cll::desc("<pattern graph filename: unsymmetrized graph>"),
+                     cll::desc("<pattern graph filename: symmetrized graph>"),
                      cll::init(""));
 static cll::opt<std::string>
     morder_filename("mo", cll::desc("<filename: pre-defined matching order>"),
@@ -48,6 +48,18 @@ static cll::opt<std::string>
 static cll::opt<bool>
     verify("v", llvm::cl::desc("do verification step (default value false)"),
            llvm::cl::init(false));
+
+static cll::opt<bool>
+    simpleGraph("simpleGraph",
+                cll::desc("Specify that the input graph is "
+                          "simple (has no multiple edges or self-loops)"),
+                cll::init(false));
+
+cll::opt<bool>
+    symmetricGraph("symmetricGraph",
+                   cll::desc("Specify that the input graph is symmetric"),
+                   cll::init(false));
+
 #ifndef GALOIS_ENABLE_GPU
 static cll::opt<std::string>
     statFile("statFile",
@@ -57,6 +69,14 @@ static cll::opt<std::string>
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
                        const char* url) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
+
+  if (!simpleGraph || !symmetricGraph) {
+    GALOIS_DIE("This application requires a symmetric simple graph input "
+               " which is symmetric and has no multiple edges or self-loops;"
+               " please use both -symmetricGraph and -simpleGraph flag "
+               " to indicate the input is a symmetric simple graph");
+  }
+
 #ifndef GALOIS_ENABLE_GPU
   numThreads = galois::setActiveThreads(numThreads);
   galois::runtime::setStatFile(statFile);

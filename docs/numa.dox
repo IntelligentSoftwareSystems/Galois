@@ -67,7 +67,7 @@ The following code snippet shows the template argument for LC_CSR_Graph from LC_
 
 The NUMA allocation can also be specified using the following pattern (taken from SSSP.cpp) without using the template parameter UseNumaAlloc.
 
-@snippet SSSP.cpp withnumaalloc
+@snippet lonestar/analytics/cpu/sssp/SSSP.cpp withnumaalloc
 
 Note that if the numaMap parameter in galois::graphs::FileGraph::partFromFile is true, then Interleaved NUMA allocation is used.
 

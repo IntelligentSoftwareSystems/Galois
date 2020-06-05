@@ -118,7 +118,7 @@ As of this writing, C++ exceptions must not be thrown from an operator into the 
  - {@link galois::more_stats}: Collect even more detailed performance statistics as the loop runs.
  - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
  - {@link galois::no_pushes}: Disable pushing new work via the user context.
- - {@link galois::no_conflicts}: Disable conflict detection in the Galois runtime.
+ - {@link galois::disable_conflict_detection}: Disable conflict detection in the Galois runtime.
  - {@link galois::wl}: Use the scheduling policy supplied in this argument to prioritize work items. The default one is galois::defaultWL, which expands to galois::worklists::PerSocketChunkFIFO<32> as of this writing. See @ref scheduler for details.
  - {@link galois::per_iter_alloc}: Use per-iteration allocator for loop iterations. See @ref mem_allocator for details.
 

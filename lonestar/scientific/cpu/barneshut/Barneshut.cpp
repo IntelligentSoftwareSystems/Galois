@@ -523,8 +523,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     galois::for_each(
         galois::iterate(pBodies),
         [&](Body* b, auto& cnx) { cf.computeForce(b, cnx); },
-        galois::loopname("compute"), galois::wl<WLL>(), galois::no_conflicts(),
-        galois::no_pushes(), galois::per_iter_alloc());
+        galois::loopname("compute"), galois::wl<WLL>(),
+        galois::disable_conflict_detection(), galois::no_pushes(),
+        galois::per_iter_alloc());
     T_compute.stop();
 
     if (!skipVerify) {

@@ -133,7 +133,7 @@ void galois::runtime::reportPageAlloc(const char* category) {
       std::make_tuple());
 }
 
-void galois::runtime::reportNumaAlloc(const char* GALOIS_UNUSED(category)) {
+void galois::runtime::reportNumaAlloc(const char*) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
   int nodes = substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {

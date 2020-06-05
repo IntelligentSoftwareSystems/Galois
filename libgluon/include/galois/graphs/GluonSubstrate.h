@@ -411,9 +411,14 @@ public:
   /**
    * Constructor for GluonSubstrate. Initializes metadata fields.
    *
+   * @param _userGraph graph to build substrate on
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    * @param _transposed True if the graph is transposed
+   * @param _cartesianGrid cartesian grid for sync
+   * @param _partitionAgnostic determines if sync should be partition agnostic
+   * or not
+   * @param _enforcedDataMode Forced data comm mode for sync
    */
   GluonSubstrate(
       GraphTy& _userGraph, unsigned host, unsigned numHosts, bool _transposed,

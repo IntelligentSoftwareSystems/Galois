@@ -157,7 +157,7 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
         }
       },
       galois::wl<OBIMTy>(UpdateRequestIndexer{stepShift}),
-      galois::no_conflicts(), galois::loopname("SSSP"));
+      galois::disable_conflict_detection(), galois::loopname("SSSP"));
 
   if (TRACK_WORK) {
     //! [report self-defined stats]

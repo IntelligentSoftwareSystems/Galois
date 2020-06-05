@@ -206,11 +206,12 @@ class ParaMeterExecutor {
   using WorkListTy = typename GenericWL::template retype<T>;
   using dbg        = galois::debug<1>;
 
-  constexpr static bool needsStats  = !has_trait<no_stats_tag, ArgsTy>();
-  constexpr static bool needsPush   = !has_trait<no_pushes_tag, ArgsTy>();
-  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
-  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
-  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
+  constexpr static bool needsStats = !has_trait<no_stats_tag, ArgsTy>();
+  constexpr static bool needsPush  = !has_trait<no_pushes_tag, ArgsTy>();
+  constexpr static bool needsAborts =
+      !has_trait<disable_conflict_detection_tag, ArgsTy>();
+  constexpr static bool needsPia   = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
 
   struct IterationContext {
     T item;

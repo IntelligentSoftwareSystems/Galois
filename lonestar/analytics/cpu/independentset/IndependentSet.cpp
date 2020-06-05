@@ -63,11 +63,6 @@ static cll::opt<Algo> algo(
             "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm")),
     cll::init(prio));
 
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Set this flag if graph is symmetric"),
-                   cll::init(false));
-
 enum MatchFlag : char { UNMATCHED, OTHER_MATCHED, MATCHED };
 
 struct Node {
@@ -711,6 +706,12 @@ int main(int argc, char** argv) {
     GALOIS_DIE("independent set requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
                " to indicate the input is a symmetric graph");
+  }
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("This application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph.");
   }
 
   switch (algo) {

@@ -179,9 +179,9 @@ loadSymmetricDistGraph(std::vector<unsigned>& scaleFactor) {
   if (inputFileSymmetric) {
     loadedGraph = constructSymmetricGraph<NodeData, EdgeData>(scaleFactor);
   } else {
-    GALOIS_DIE("application requires a symmetric graph input;"
+    GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
-               " to indicate the input is a symmetric graph");
+               " to indicate the input is a symmetric graph.");
   }
 
   assert(loadedGraph != nullptr);

@@ -87,6 +87,13 @@ static cll::opt<double> imbalance(
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
     cll::init(0.01));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! hMetis graph.
+static cll::opt<bool>
+    hMetisGraph("hMetisGraph",
+                cll::desc("Specify that the input graph is a hMetis"),
+                cll::init(false));
+
 // const double COARSEN_FRACTION = 0.9;
 
 /*int cutsize(GGraph& g) {
@@ -214,6 +221,12 @@ int main(int argc, char** argv) {
 
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
+
+  if (!hMetisGraph) {
+    GALOIS_DIE("This application requires a hMetis graph input;"
+               " please use the -hMetisGraph flag "
+               " to indicate the input is a hMetisGraph graph.");
+  }
 
   // srand(-1);
   MetisGraph metisGraph;

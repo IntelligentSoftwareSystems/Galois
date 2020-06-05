@@ -548,6 +548,7 @@ uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
+
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // Total timer
@@ -738,9 +739,11 @@ int main(int argc, char** argv) {
 
   if (output) {
     std::vector<float> results = makeResults(hg);
+    auto globalIDs             = hg->getMasterGlobalIDs();
+    assert(results.size() == globalIDs.size());
 
     writeOutput(outputLocation, "betweenness_centrality", results.data(),
-                results.size());
+                results.size(), globalIDs.data());
   }
 
   return 0;

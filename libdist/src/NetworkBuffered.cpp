@@ -299,7 +299,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 #endif
     }
 
-    std::pair<uint32_t, vTy> assemble(std::atomic<size_t>& inflightSends) {
+    std::pair<uint32_t, vTy>
+    assemble(std::atomic<size_t>& GALOIS_UNUSED(inflightSends)) {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
         return std::make_pair(~0, vTy());

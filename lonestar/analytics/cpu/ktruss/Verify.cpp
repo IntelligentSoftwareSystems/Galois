@@ -206,6 +206,12 @@ int main(int argc, char** argv) {
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
+  if (!symmetricGraph) {
+    GALOIS_DIE("This application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph.");
+  }
+
   if (2 > trussNum) {
     std::cerr << "trussNum >= 2\n";
     return -1;

@@ -26,7 +26,9 @@
 
 #pragma once
 #ifdef GALOIS_USE_LCI
+GALOIS_IGNORE_UNUSED_PARAMETERS
 #include "lc.h"
+GALOIS_END_IGNORE_UNUSED_PARAMETERS
 
 extern lc_ep lc_col_ep;
 extern lc_ep lc_p2p_ep[3];

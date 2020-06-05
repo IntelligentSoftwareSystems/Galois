@@ -7,5 +7,5 @@ if(CMAKE_COMPILER_IS_GNUCC)
   target_compile_options(delaunayrefinement PRIVATE -ffast-math)
 endif()
 
-add_test_scale(small1 delaunayrefinement "${BASEINPUT}/reference/meshes/r10k.1")
-add_test_scale(small2 delaunayrefinement "${BASEINPUT}/meshes/250k.2" NOT_QUICK)
+add_test_scale(small1 delaunayrefinement -meshGraph "${BASEINPUT}/reference/meshes/r10k.1")
+add_test_scale(small2 delaunayrefinement -meshGraph "${BASEINPUT}/meshes/250k.2" NOT_QUICK)
