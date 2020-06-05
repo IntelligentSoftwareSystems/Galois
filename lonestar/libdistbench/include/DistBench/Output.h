@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include "galois/gIO.h"
 
 std::string makeOutputFilename(const std::string& outputDir);
 
@@ -16,6 +17,8 @@ void writeOutput(const std::string& outputDir, const std::string& /*fieldName*/,
   for (size_t i = 0; i < length; i++) {
     outputFile << *(IDs++) << " " << *(values++) << "\n";
   }
+
+  galois::gPrint("Output written to: ", filename, "\n");
 }
 
 #endif
