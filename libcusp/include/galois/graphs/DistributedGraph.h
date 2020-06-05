@@ -714,10 +714,10 @@ public:
   }
 
   /**
-   * Returns a vector object that contains the global IDs (in order) of 
+   * Returns a vector object that contains the global IDs (in order) of
    * the master nodes in this graph.
    *
-   * @returns A vector object that contains the global IDs (in order) of 
+   * @returns A vector object that contains the global IDs (in order) of
    * the master nodes in this graph
    */
   std::vector<uint64_t> getMasterGlobalIDs() {
