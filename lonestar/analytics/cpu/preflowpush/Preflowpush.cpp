@@ -419,7 +419,7 @@ struct PreflowPush {
                       .height +
                   1;
               if (useCAS) {
-                int oldHeight;
+                int oldHeight = 0;
                 while (newHeight < (oldHeight = node.height)) {
                   if (__sync_bool_compare_and_swap(&node.height, oldHeight,
                                                    newHeight)) {
