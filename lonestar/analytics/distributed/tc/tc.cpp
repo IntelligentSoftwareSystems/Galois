@@ -154,9 +154,7 @@ int main(int argc, char** argv) {
     std::string timer_str("SortEdgesGPU");
     galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
     edgeSortTime.start();
-    printf("start \n");
     sortEdgesByDestination_cuda(cuda_ctx);
-    printf("end\n");
     edgeSortTime.stop();
 #else
     abort();
