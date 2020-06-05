@@ -231,7 +231,8 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
           }
         }
       },
-      galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+      galois::wl<WL>(), galois::loopname("runBFS"),
+      galois::disable_conflict_detection());
 
   if (TRACK_WORK) {
     galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());

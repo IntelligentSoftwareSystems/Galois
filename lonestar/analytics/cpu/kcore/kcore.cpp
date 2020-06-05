@@ -185,7 +185,7 @@ void asyncCascadeKCore(Graph& graph,
           }
         }
       },
-      galois::no_conflicts(), galois::chunk_size<CHUNK_SIZE>(),
+      galois::disable_conflict_detection(), galois::chunk_size<CHUNK_SIZE>(),
       galois::loopname("AsyncCascadeDeadNodes"));
 }
 

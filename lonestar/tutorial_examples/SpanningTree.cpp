@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
           [&](const BlockedWorkItem& i, auto& ctx) {
             specialized_process<true, 0>(graph, mst)(i.src, i.start, ctx);
           },
-          galois::loopname("Merge"), galois::no_conflicts(),
+          galois::loopname("Merge"), galois::disable_conflict_detection(),
           galois::wl<galois::worklists::PerSocketChunkFIFO<128>>());
       //! Normalize component by doing find with path compression
       galois::do_all(galois::iterate(graph), Normalize,

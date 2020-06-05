@@ -747,7 +747,8 @@ public:
                 ctx.push(this->ocd.getFinalRepresentative(*dst));
             }
           },
-          galois::loopname("PointsToMainUpdateLoop"), galois::no_conflicts(),
+          galois::loopname("PointsToMainUpdateLoop"),
+          galois::disable_conflict_detection(),
           galois::wl<galois::worklists::PerSocketChunkFIFO<8>>());
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());

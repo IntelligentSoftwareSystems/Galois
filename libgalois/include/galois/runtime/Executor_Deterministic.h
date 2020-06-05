@@ -460,9 +460,10 @@ struct OptionsCommon {
 
   constexpr static bool needStats = galois::internal::NeedStats<ArgsTy>::value;
   constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
-  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
-  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
-  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
+  constexpr static bool needsAborts =
+      !has_trait<disable_conflict_detection_tag, ArgsTy>();
+  constexpr static bool needsPia   = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
 
   constexpr static bool hasBreak = has_trait<det_parallel_break_tag, ArgsTy>();
   constexpr static bool hasId    = has_trait<det_id_tag, ArgsTy>();
