@@ -26,14 +26,6 @@ endfunction(add_test_scale)
 if(GALOIS_ENABLE_DIST)
   add_subdirectory(libdistbench)
 
-  if(EXISTS /net/ohm/export/iss/dist-outputs)
-    set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
-  elseif(EXISTS /net/ohm/export/cdgc/dist-outputs)
-    set(BASEOUTPUT /net/ohm/export/cdgc/dist-outputs)
-  elseif(EXISTS /workspace/dist-outputs)
-    set(BASEOUTPUT /workspace/dist-outputs)
-  endif()
-
   if(GALOIS_ENABLE_GPU)
     # turn on cuda for distbench as well
     target_compile_definitions(distbench PRIVATE GALOIS_ENABLE_GPU=1)
@@ -82,6 +74,7 @@ if(GALOIS_ENABLE_DIST)
 
   set(RESULT_CHECKER ${PROJECT_SOURCE_DIR}/scripts/result_checker.py)
   cmake_host_system_information(RESULT HOSTNAME QUERY HOSTNAME)
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/output")
 
   function(add_test_dist_and_verify app input type part N np)
     set(options GPU NOT_QUICK)
@@ -96,8 +89,8 @@ if(GALOIS_ENABLE_DIST)
 
     set(suffix "-${app}-${type}-${input}-${part}-${np}")
     if (EXISTS ${output})
-      add_test(run${suffix} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -verify)
-      add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${output} output_${HOSTNAME}_*.log)
+      add_test(run${suffix} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part} -output -outputLocation=${CMAKE_BINARY_DIR}/output)
+      add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${output} ${CMAKE_BINARY_DIR}/output/*)
     else()
       add_test(run-${app}-${type}-${input}-${part}-${np} mpiexec --bind-to none -n ${np} ./${app} ${X_UNPARSED_ARGUMENTS} -t=${t} -partition=${part})
     endif()
