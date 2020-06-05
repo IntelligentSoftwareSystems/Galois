@@ -23,7 +23,7 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
 set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
-set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Comma-separated list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7,6.1"
+set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Semi-colon list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7;6.1"
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -210,7 +210,6 @@ string(COMPARE NOTEQUAL "${GALOIS_CUDA_CAPABILITY}" "" GALOIS_ENABLE_GPU)
 if (GALOIS_ENABLE_GPU)
   enable_language(CUDA)
   string(REPLACE "." "" GENCODES ${GALOIS_CUDA_CAPABILITY})
-  string(REPLACE "," ";" GENCODES ${GENCODES})
   foreach(GENCODE ${GENCODES})
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
