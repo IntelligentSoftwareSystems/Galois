@@ -8,9 +8,6 @@
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test 
 sudo apt update
 sudo apt install gcc-9 g++-9
-# make gcc-9 the default
-sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-9 90
-sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-9 90
 
 # installing up-to-date cmake https://apt.kitware.com/
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null \
@@ -19,6 +16,8 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null \
 sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
 sudo apt-get update
 sudo apt upgrade cmake
+# alternatively:
+#   pip install cmake
 
 # installing arrow and parquet
 curl -fL --output /tmp/arrow-keyring.deb \
@@ -32,8 +31,6 @@ curl -fL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt update
 apt install -yq clang-10 clang++-10 clang-format-10 clang-tidy-10 llvm-10-dev
 
-# make llvm 10 the default
-sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
-sudo update-alternatives --verbose --install /usr/bin/clang clang /usr/bin/clang-10 90
+# make clang-{tidy,format}-10 the default
 sudo update-alternatives --verbose --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 90
 sudo update-alternatives --verbose --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 90

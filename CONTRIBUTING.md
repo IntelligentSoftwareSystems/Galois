@@ -29,9 +29,12 @@ conan remote add kmaragon https://api.bintray.com/conan/kmaragon/conan
 mkdir build
 cd build
 conan install ../config --build=missing
-cmake -DCMAKE_TOOLCHAIN_FILE=conan_paths.cmake ..
+cmake -DCMAKE_TOOLCHAIN_FILE=conan_paths.cmake -DCMAKE_CXX_COMPILER=gcc-9 ..
 make
 ```
+
+Note: Katana builds with a variety of compilers as long as they support the
+C++17 standard. See README.md for specific tested versions.
 
 ## Specifying and Resolving C++ Dependencies
 
@@ -43,20 +46,13 @@ CMake option `CMAKE_PREFIX_PATH`, as in:
 
 ```shell
 cmake -DCMAKE_TOOLCHAIN_FILE=conan_paths.cmake \
+  -DCMAKE_CXX_COMPILER=gcc-9 \
   -DCMAKE_PREFIX_PATH=<path/to/cmakefiles/for/library>;<another/path> ..
 ```
 
 As a sidenote, CMake toolchain file is simply a method for initially defining
 `CMAKE_PREFIX_PATH` and other CMake options. You can verify this by looking at
 the contents of `conan_paths.cmake`.
-
-If you need to use a specific compiler, you can set the `CMAKE_CXX_COMPILER`
-and `CMAKE_C_COMPILER` options:
-
-```shell
-cmake -DCMAKE_TOOLCHAIN_FILE=conan_paths.cmake \
-  -DCMAKE_CXX_COMPILER=<path/to/compiler> ..
-```
 
 A common issue is that you have multiple versions of the same dependency,
 located in different directories, and CMake picks the wrong version.
