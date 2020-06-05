@@ -179,14 +179,18 @@ include(CheckEndian)
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
-  message(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}")
-elseif(EXISTS /net/ohm/export/iss/inputs)
+  set(BASEOUTPUT "${GRAPH_LOCATION}")
+  message(STATUS "Using graph input and output location ${GRAPH_LOCATION}")
+elseif(EXISTS /net/ohm/export/iss)
   set(BASEINPUT /net/ohm/export/iss/inputs)
-  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
+  MESSAGE(STATUS "Using graph input location /net/ohm/export/iss/inputs")
+  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
+  MESSAGE(STATUS "Using graph output location /net/ohm/export/iss/dist-outputs")
 else()
   set(BASEINPUT "${PROJECT_BINARY_DIR}/inputs")
-  message(STATUS "Use 'make input' to download inputs in the build directory")
+  set(BASEOUTPUT "${PROJECT_BINARY_DIR}/inputs")
+  message(STATUS "Use 'make input' to download inputs and outputs in the build directory")
 endif()
 
 ###### Source finding ######

@@ -26,14 +26,6 @@ endfunction(add_test_scale)
 if(GALOIS_ENABLE_DIST)
   add_subdirectory(libdistbench)
 
-  if(EXISTS /net/ohm/export/iss/dist-outputs)
-    set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
-  elseif(EXISTS /net/ohm/export/cdgc/dist-outputs)
-    set(BASEOUTPUT /net/ohm/export/cdgc/dist-outputs)
-  elseif(EXISTS /workspace/dist-outputs)
-    set(BASEOUTPUT /workspace/dist-outputs)
-  endif()
-
   if(GALOIS_ENABLE_GPU)
     # turn on cuda for distbench as well
     target_compile_definitions(distbench PRIVATE GALOIS_ENABLE_GPU=1)
