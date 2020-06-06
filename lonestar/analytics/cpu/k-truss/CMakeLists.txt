@@ -1,0 +1,10 @@
+add_executable(k-truss-cpu K-Truss.cpp)
+add_dependencies(apps k-truss-cpu)
+target_link_libraries(k-truss-cpu PRIVATE Galois::shmem lonestar)
+install(TARGETS k-truss-cpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
+add_executable(verify-k-truss Verify.cpp)
+add_dependencies(apps verify-k-truss)
+target_link_libraries(verify-k-truss PRIVATE Galois::shmem lonestar)
+install(TARGETS verify-k-truss DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small k-truss-cpu -trussNum=4 -symmetricGraph "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")

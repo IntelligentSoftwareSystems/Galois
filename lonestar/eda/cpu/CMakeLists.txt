@@ -1,2 +1,2 @@
-add_subdirectory(aigRewriting)
-add_subdirectory(SPRoute)
+add_subdirectory(aig-rewriting)
+add_subdirectory(sproute)

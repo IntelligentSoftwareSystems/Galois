@@ -1,1 +1,1 @@
-app_gpu(sssp)
+app_analy_gpu(sssp sssp)

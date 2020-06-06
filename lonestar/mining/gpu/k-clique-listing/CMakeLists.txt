@@ -1,0 +1,7 @@
+add_executable(k-clique-listing-gpu kcl_gpu.cpp kcl.cu)
+add_dependencies(apps k-clique-listing-gpu)
+target_link_libraries(k-clique-listing-gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
+target_compile_definitions(k-clique-listing-gpu PRIVATE GALOIS_ENABLE_GPU=1)
+set_property(TARGET k-clique-listing-gpu PROPERTY CUDA_STANDARD 14)
+install(TARGETS k-clique-listing-gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_mine(small1 k-clique-listing-gpu -symmetricGraph -simpleGraph "${BASEINPUT}/Mining/citeseer.csgr")

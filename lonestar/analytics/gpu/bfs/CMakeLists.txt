@@ -1,1 +1,1 @@
-app_gpu(bfs)
+app_analy_gpu(bfs bfs)
