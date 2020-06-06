@@ -12,3 +12,5 @@ add_executable(verifyKTruss Verify.cpp)
 add_dependencies(apps verifyKTruss)
 target_link_libraries(verifyKTruss PRIVATE Galois::shmem lonestar)
 install(TARGETS verifyKTruss DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+
+add_test_scale(small ktruss -trussNum=4 -symmetricGraph "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")

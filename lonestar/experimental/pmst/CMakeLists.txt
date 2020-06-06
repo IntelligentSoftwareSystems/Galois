@@ -1,1 +1,0 @@
-app(pmst REQUIRES TBB_FOUND)

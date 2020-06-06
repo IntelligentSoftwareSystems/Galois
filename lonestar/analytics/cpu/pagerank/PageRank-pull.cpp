@@ -36,6 +36,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                                        clEnumVal(Residual, "Residual")),
                            cll::init(Residual));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! transposed graph.
+static cll::opt<bool>
+    transposedGraph("transposedGraph",
+                    cll::desc("Specify that the input graph is transposed"),
+                    cll::init(false));
+
 constexpr static const unsigned CHUNK_SIZE = 32;
 
 struct LNode {
@@ -120,6 +127,7 @@ void computeOutDeg(Graph& graph) {
  * If the residual is smaller than the tolerance, that is not reflected to
  * the next pagerank.
  */
+//! [scalarreduction]
 void computePRResidual(Graph& graph, DeltaArray& delta,
                        ResidualArray& residual) {
   unsigned int iterations = 0;
@@ -166,13 +174,13 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
 #if DEBUG
     std::cout << "iteration: " << iterations << "\n";
 #endif
-
     iterations++;
     if (iterations >= maxIterations || !accum.reduce()) {
       break;
     }
     accum.reset();
   } ///< End while(true).
+    //! [scalarreduction]
 
   if (iterations >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iterations
@@ -270,6 +278,11 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url, &inputFile);
 
+  if (!transposedGraph) {
+    GALOIS_DIE("This application requires a transposed graph input;"
+               " please use the -transposedGraph flag "
+               " to indicate the input is a transposed graph.");
+  }
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
@@ -314,6 +327,7 @@ int main(int argc, char** argv) {
   minRank.reset();
   distanceSum.reset();
 
+  //! [example of no_stats]
   galois::do_all(
       galois::iterate(transposeGraph),
       [&](uint64_t i) {
@@ -324,6 +338,7 @@ int main(int argc, char** argv) {
         distanceSum += rank;
       },
       galois::loopname("Sanity check"), galois::no_stats());
+  //! [example of no_stats]
 
   PRTy rMaxRank = maxRank.reduce();
   PRTy rMinRank = minRank.reduce();

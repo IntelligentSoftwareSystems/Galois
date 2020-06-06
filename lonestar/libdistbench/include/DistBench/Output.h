@@ -12,7 +12,8 @@ void writeOutput(const std::string& outputDir, arrow::Table& table);
 
 template <typename T>
 void writeOutput(const std::string& outputDir, const std::string& fieldName,
-                 T* values, size_t length) {
+                 T* values, size_t length, uint64_t* /*IDs*/) {
+  // TODO(ddn): support IDs or error out if not contiguous
   using ArrowType = typename arrow::CTypeTraits<T>::ArrowType;
 
   arrow::NumericBuilder<ArrowType> builder;

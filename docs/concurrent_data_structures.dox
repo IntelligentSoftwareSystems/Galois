@@ -45,7 +45,7 @@ See galois::graphs::LC_CSR_Graph for more details on which template parameters a
 
 These member type definitions can be chained together to get a graph type with multiple options specified. Below is an example of defining an LC_CSR_Graph with node data of type std::atomic<uint32_t>, edge data of type uint32_t, node locks removed and NUMA-aware allocation enabled:
 
-@snippet lonestar/sssp/SSSP.cpp withnumaalloc
+@snippet lonestar/analytics/cpu/sssp/SSSP.cpp withnumaalloc
 
 @subsubsection lc_graph_api APIs
 
@@ -190,15 +190,15 @@ galois::InsertBag expects a template parameter, T, for the type of elements that
 
 An example of defining a galois::InsertBag follows:
 
-@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag
+@snippet lonestar/scientific/cpu/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag
 
 galois::InsertBag::emplace is used to insert elements, which are constructed in-place in the bag using an appropriate constructor for the element. galois::InsertBag::push and galois::InsertBag::push_back are shortcuts of galois::InsertBag::emplace. An example of inserting elements into a galois::InsertBag follows:
 
-@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag
+@snippet lonestar/scientific/cpu/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag
 
 Accessing the elements is only allowed in serial. galois::InsertBag::begin and galois::InsertBag::end are used to access the elements. galois::InsertBag::empty is used to check if the bag is empty. An example of accessing elements inside a galois::InsertBag follows. Note that this example is written in C++11 to avoid mentioning galois::InsertBag::begin and galois::InsertBag::end explicitly.
 
-@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
+@snippet lonestar/scientific/cpu/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
 
 <br>
 

@@ -1,5 +1,0 @@
-find_package(GMP)
-include_directories(${GMP_INCLUDE_DIRS})
-link_libraries(${GMP_LIBRARIES} ${GMPXX_LIBRARIES})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
-app(buchberger Buchberger.cpp)

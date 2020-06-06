@@ -37,8 +37,8 @@ cdef extern from "galois/Galois.h" namespace "galois" nogil:
     cppclass steal:
         steal()
 
-    cppclass no_conflicts:
-        no_conflicts()
+    cppclass disable_conflict_detection:
+        disable_conflict_detection()
 
     cppclass GReduceMax[T]:
         pass

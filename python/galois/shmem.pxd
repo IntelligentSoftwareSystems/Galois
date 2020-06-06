@@ -1,5 +1,5 @@
 from cython.operator cimport preincrement, dereference as deref
-from libgalois.Galois cimport UserContext, iterate, for_each, setActiveThreads, SharedMemSys, loopname, no_conflicts, no_pushes, gPrint, do_all, GReduceMax, InsertBag, steal
+from libgalois.Galois cimport UserContext, iterate, for_each, setActiveThreads, SharedMemSys, loopname, disable_conflict_detection, no_pushes, gPrint, do_all, GReduceMax, InsertBag, steal
 from libgalois.Galois cimport LargeArray, MethodFlag, FLAG_UNPROTECTED
 from libgalois.graphs.Graph cimport dummy_true, dummy_false, MorphGraph, LC_CSR_Graph
 from libgalois.graphs.ReadGraph cimport readGraph

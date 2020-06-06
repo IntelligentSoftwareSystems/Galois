@@ -98,7 +98,7 @@ unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num,
   t.start();
   for (unsigned x = 0; x < iter; ++x)
     galois::for_each(galois::iterate(V.begin(), V.begin() + num), emp(),
-                     galois::no_pushes(), galois::no_conflicts(),
+                     galois::no_pushes(), galois::disable_conflict_detection(),
                      galois::wl<galois::worklists::StableIterator<>>());
   t.stop();
   return t.get();

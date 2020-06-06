@@ -374,8 +374,11 @@ int main(int argc, char** argv) {
 
   if (output) {
     std::vector<uint32_t> results = makeResults(hg);
+    auto globalIDs                = hg->getMasterGlobalIDs();
+    assert(results.size() == globalIDs.size());
 
-    writeOutput(outputLocation, "level", results.data(), results.size());
+    writeOutput(outputLocation, "level", results.data(), results.size(),
+                globalIDs.data());
   }
 
   return 0;

@@ -75,7 +75,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred) {
   HelperTy helper(accum, pred);
   for_each(galois::iterate(make_no_deref_iterator(first),
                            make_no_deref_iterator(last)),
-           helper, galois::no_conflicts(), galois::no_pushes(),
+           helper, galois::disable_conflict_detection(), galois::no_pushes(),
            galois::parallel_break(), galois::wl<WL>());
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
@@ -252,7 +252,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   typedef galois::worklists::PerSocketChunkFIFO<1> WL;
 
   for_each(galois::iterate({std::make_pair(first, last)}),
-           sort_helper<Compare>(comp), galois::no_conflicts(),
+           sort_helper<Compare>(comp), galois::disable_conflict_detection(),
            galois::wl<WL>());
 }
 

@@ -141,7 +141,7 @@ galois::for_each expects the following inputs:
   <ul>
   <li> galois::loopname to turn on the collection of statistics associated with the for_each loop, e.g. execution time in milliseconds; number of iterations executed, pushed, aborted and committed; etc.
   <li> galois::no_pushes when no new work items will be generated.
-  <li> galois::no_conflicts to turn off conflict detection.
+  <li> galois::disable_conflict_detection to turn off conflict detection.
   <li> galois::wl to specify the schedule to use.
   </ul>
 </ol>

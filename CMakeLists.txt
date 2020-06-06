@@ -23,8 +23,7 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
 set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
-set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
-set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
+set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Semi-colon list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7;6.1"
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -187,14 +186,18 @@ include(CheckEndian)
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
-  message(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}")
-elseif(EXISTS /net/ohm/export/iss/inputs)
+  set(BASEOUTPUT "${GRAPH_LOCATION}")
+  message(STATUS "Using graph input and output location ${GRAPH_LOCATION}")
+elseif(EXISTS /net/ohm/export/iss)
   set(BASEINPUT /net/ohm/export/iss/inputs)
-  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
+  MESSAGE(STATUS "Using graph input location /net/ohm/export/iss/inputs")
+  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
+  MESSAGE(STATUS "Using graph output location /net/ohm/export/iss/dist-outputs")
 else()
   set(BASEINPUT "${PROJECT_BINARY_DIR}/inputs")
-  message(STATUS "Use 'make input' to download inputs in the build directory")
+  set(BASEOUTPUT "${PROJECT_BINARY_DIR}/inputs")
+  message(STATUS "Use 'make input' to download inputs and outputs in the build directory")
 endif()
 
 ###### Source finding ######
@@ -211,11 +214,11 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
 endif()
+string(COMPARE NOTEQUAL "${GALOIS_CUDA_CAPABILITY}" "" GALOIS_ENABLE_GPU)
 if (GALOIS_ENABLE_GPU)
   enable_language(CUDA)
-  string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
-  string(REPLACE "," ";" GENCODES ${GENCODES})
-  foreach(GENCODE ${GENCODES})
+  foreach(GENCODE ${GALOIS_CUDA_CAPABILITY})
+    string(REPLACE "." "" GENCODE ${GENCODE})
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
 
@@ -239,7 +242,7 @@ endif(USE_EXP)
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
   #TODO: double check the list of directories here
-  set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libcusp\" \"${CMAKE_CURRENT_SOURCE_DIR}/libdist\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgluon")
+  set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libcusp\" \"${CMAKE_CURRENT_SOURCE_DIR}/libdist\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgluon")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}

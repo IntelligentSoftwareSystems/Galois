@@ -65,13 +65,6 @@ static cll::opt<Algo> algo(
                    "Compute k-1 core and then k-truss")),
     cll::init(Algo::bsp));
 
-//! Flag that forces user to be aware that they should be passing in a
-//! symmetric graph
-static cll::opt<bool>
-    symmetricGraph("symmetricGraph",
-                   cll::desc("Set this flag if graph is symmetric"),
-                   cll::init(false));
-
 //! Set LSB of an edge weight to indicate the removal of the edge.
 using Graph =
     galois::graphs::LC_CSR_Graph<void, uint32_t>::template with_numa_alloc<
@@ -259,7 +252,7 @@ struct AsyncTrussTxAlgo {
     galois::for_each(galois::iterate(work),
                      PickUnsupportedEdges{g, k - 2, unsupported},
                      galois::loopname("PickUnsupportedEdges"),
-                     galois::no_conflicts(), galois::no_pushes(),
+                     galois::disable_conflict_detection(), galois::no_pushes(),
                      galois::per_iter_alloc());
 
     galois::for_each(galois::iterate(unsupported),
@@ -662,9 +655,9 @@ int main(int argc, char** argv) {
   totalTime.start();
 
   if (!symmetricGraph) {
-    GALOIS_DIE("k-truss requires a symmetric graph input;"
+    GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
-               " to indicate the input is a symmetric graph");
+               " to indicate the input is a symmetric graph.");
   }
 
   if (2 > trussNum) {

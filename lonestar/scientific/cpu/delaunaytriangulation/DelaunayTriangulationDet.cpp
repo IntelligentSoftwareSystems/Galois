@@ -74,6 +74,12 @@ static cll::opt<DetAlgo>
                         clEnumVal(detDisjoint, "Disjoint execution")),
             cll::init(nondet));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! mesh graph.
+static cll::opt<bool>
+    meshGraph("meshGraph", cll::desc("Specify that the input graph is a mesh"),
+              cll::init(false));
+
 struct GetPointer : public std::unary_function<Point&, Point*> {
   Point* operator()(Point& p) const { return &p; }
 };
@@ -718,6 +724,12 @@ int main(int argc, char** argv) {
 
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
+
+  if (!meshGraph) {
+    GALOIS_DIE("This application requires a mesh graph input;"
+               " please use the -meshGraph flag "
+               " to indicate the input is a mesh graph.");
+  }
 
   Graph graph;
 

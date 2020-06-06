@@ -352,8 +352,11 @@ public:
   /**
    * Constructor for GluonEdgeSubstrate. Initializes metadata fields.
    *
+   * @param _userGraph Graph to build substrate on
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
+   * @param doNothing
+   * @param _substrateDataMode
    */
   GluonEdgeSubstrate(GraphTy& _userGraph, unsigned host, unsigned numHosts,
                      bool doNothing                  = false,

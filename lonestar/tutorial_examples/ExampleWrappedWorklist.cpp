@@ -48,7 +48,7 @@ public:
             this->enqueue(item + item);
           }
         },
-        galois::loopname("execute"), galois::no_conflicts());
+        galois::loopname("execute"), galois::disable_conflict_detection());
 
     inParallelPhase = false;
     reset();

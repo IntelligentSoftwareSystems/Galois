@@ -24,11 +24,11 @@ Dynamical thread-local allocation/de-allocation can be very useful for parallel 
 shows the API for per-thread storage.
 
 The code snippet below shows the declaration for per-thread storage:
-@snippet lonestar/gmetis/Refine.cpp Example Per-Thread-Storage Declaration
+@snippet lonestar/analytics/cpu/gmetis/Refine.cpp Example Per-Thread-Storage Declaration
 
 The code snippet below shows the usage of per-thread storage inside an operator for \a galois::for_each:
 
-@snippet lonestar/gmetis/Refine.cpp Example Per-Thread-Storage Usage 
+@snippet lonestar/analytics/cpu/gmetis/Refine.cpp Example Per-Thread-Storage Usage 
 
 As it can be seen above that unlike C++ \a Thread_local, galois::substrate::PerThreadStorage variables can be dynamically allocated/de-allocated or resized. A thread can get its own thread-local copy of per-thread storage by calling galois::substrate::PerThreadStorage::getLocal.
 

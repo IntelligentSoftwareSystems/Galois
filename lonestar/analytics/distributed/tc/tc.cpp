@@ -44,6 +44,8 @@ enum { CPU, GPU_CUDA };
 int personality = CPU;
 #endif
 
+namespace cll = llvm::cl;
+
 constexpr static const char* const REGION_NAME = "TC";
 
 /*******************************************************************************
@@ -136,6 +138,12 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
+  if (!inputFileSymmetric) {
+    GALOIS_DIE("This application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph.");
+  }
+
   const auto& net = galois::runtime::getSystemNetworkInterface();
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
@@ -145,18 +153,26 @@ int main(int argc, char** argv) {
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);
-  std::string timer_str("SortEdgesGPU");
-  galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
-  edgeSortTime.start();
-  sortEdgesByDestination_cuda(cuda_ctx);
-  edgeSortTime.stop();
 #else
   std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
-  galois::StatTimer edgeSortTime("SortEdgesCPU", REGION_NAME);
-  edgeSortTime.start();
-  hg->sortEdgesByDestination();
-  edgeSortTime.stop();
 #endif
+
+  if (personality == GPU_CUDA) {
+#ifdef GALOIS_ENABLE_GPU
+    std::string timer_str("SortEdgesGPU");
+    galois::StatTimer edgeSortTime("SortEdgesGPU", REGION_NAME);
+    edgeSortTime.start();
+    sortEdgesByDestination_cuda(cuda_ctx);
+    edgeSortTime.stop();
+#else
+    abort();
+#endif
+  } else if (personality == CPU) {
+    galois::StatTimer edgeSortTime("SortEdgesCPU", REGION_NAME);
+    edgeSortTime.start();
+    hg->sortEdgesByDestination();
+    edgeSortTime.stop();
+  }
   ///! accumulators for use in operators
   galois::DGAccumulator<uint64_t> DGAccumulator_numTriangles;
 
