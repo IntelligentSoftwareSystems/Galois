@@ -1,1 +1,1 @@
-app_dist(partition NO_GPU)
+app_dist(partition partition NO_GPU)
