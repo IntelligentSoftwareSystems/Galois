@@ -235,8 +235,10 @@ public:
    * @param num Amount of data to get from deserialize buffer
    */
   void extract(uint8_t* dst, size_t num) {
-    memcpy(dst, &bufdata[offset], num);
-    offset += num;
+    if (num > 0) {
+      memcpy(dst, &bufdata[offset], num);
+      offset += num;
+    }
   }
 
   //! Get the underlying vector storing the data of the deserialize
