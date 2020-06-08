@@ -36,10 +36,11 @@ static const char* url = "betweenness_centrality";
 static llvm::cl::opt<std::string> inputFile(llvm::cl::Positional,
                                             llvm::cl::desc("<input file>"),
                                             llvm::cl::Required);
-static llvm::cl::opt<int> iterLimit("limit",
-                                    llvm::cl::desc("Limit number of iterations "
-                                                   "to value (0 is all nodes)"),
-                                    llvm::cl::init(0));
+static llvm::cl::opt<unsigned int>
+    iterLimit("numOfOutSources",
+              llvm::cl::desc("Number of sources WITH EDGES "
+                             " to compute BC on (default is all)"),
+              llvm::cl::init(0));
 static llvm::cl::opt<unsigned int> startNode("startNode",
                                              llvm::cl::desc("Node to start "
                                                             "search from"),
