@@ -1,5 +1,8 @@
+Pagerank
+================================================================================
+
 DESCRIPTION 
-===========
+--------------------------------------------------------------------------------
 
 We implement both pull and push-style PageRank algorithms. The push-style
 algorithms are based on the computations (Algorithm 4) described in the 
@@ -14,37 +17,33 @@ since there are no atomic operations. The residual version performs and scales
 the best. It does less work and uses separate arrays for storing delta and 
 residual information to improve locality and use of memory bandwidth.
 
-
 INPUT
-===========
+--------------------------------------------------------------------------------
 
-For the push variant, input is a graph in Galois .gr format (see top-level 
-README for the project). Note that the pull variants expect a transpose graph. 
-For the pull variant, input is a graph is Galois .tgr format. 
-
+The push variant takes in Galois .gr format.
+The pull variant takes in transposed Galois .gr graphs.
+You must specify the -transposedGraph flag when running the pull variant.
 
 BUILD
-===========
+--------------------------------------------------------------------------------
 
 1. Run `cmake` at the BUILD directory (refer to top-level README for instructions).
 
-2. Run `cd <BUILD>/lonestar/pagerank; make -j` 
-
+2. Run `cd <BUILD>/lonestar/analytics/cpu/pagerank; make -j` 
 
 RUN
-===========
+--------------------------------------------------------------------------------
 
 The following are a few examples of invoking PageRank.
 
-* `$ ./pagerank-pull <path-transpose-graph> -tolerance=0.001`
+* `$ ./pagerank-pull-cpu <path-transpose-graph> -tolerance=0.001 -transposedGraph`
 
-* `$ ./pagerank-pull <path-transpose-graph> -t=20 -tolerance=0.001 -algo=Residual`
+* `$ ./pagerank-pull-cpu <path-transpose-graph> -t=20 -tolerance=0.001 -algo=Residual -transposedGraph`
 
-* `$ ./pagerank-push <path-graph> -t=40 -tolerance=0.001 -algo=Async`
+* `$ ./pagerank-push-cpu <path-graph> -t=40 -tolerance=0.001 -algo=Async`
 
-
-TUNING PERFORMANCE  
-===========
+PERFORMANCE  
+--------------------------------------------------------------------------------
 
 The performance of the push and the pull versions depend on an optimal choice 
 of the the compile time constant, CHUNK_SIZE. For the pull version, CHUNK_SIZE 
