@@ -52,15 +52,15 @@ unsigned CSRGraph::allocOnDevice(bool no_edge_data) {
 
   assert(edge_dst == NULL); // make sure not already allocated
 
-  check_cuda(cudaMalloc((void **) &edge_dst, nedges * sizeof(index_type)));
+  if (nedges > 0) check_cuda(cudaMalloc((void **) &edge_dst, nedges * sizeof(index_type)));
   check_cuda(cudaMalloc((void **) &row_start, (nnodes+1) * sizeof(index_type)));
 
   if (!no_edge_data) check_cuda(cudaMalloc((void **) &edge_data, nedges * sizeof(edge_data_type)));
-  check_cuda(cudaMalloc((void **) &node_data, nnodes * sizeof(node_data_type)));
+  if (nnodes > 0) check_cuda(cudaMalloc((void **) &node_data, nnodes * sizeof(node_data_type)));
 
   device_graph = true;
 
-  assert(edge_dst && (no_edge_data || edge_data) && row_start && node_data);
+  assert(((nedges == 0) || edge_dst) && (no_edge_data || edge_data) && row_start && ((nnodes == 0) || node_data));
   return true;
 }
 
