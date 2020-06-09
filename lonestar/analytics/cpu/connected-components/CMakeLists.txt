@@ -1,0 +1,5 @@
+add_executable(connected-components-cpu ConnectedComponents.cpp)
+add_dependencies(apps connected-components-cpu)
+target_link_libraries(connected-components-cpu PRIVATE Galois::shmem lonestar)
+install(TARGETS connected-components-cpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small connected-components-cpu "${BASEINPUT}/scalefree/symmetric/rmat10.sgr" "-symmetricGraph")

@@ -1,23 +1,19 @@
-function(app_gpu name)
+function(app_scientific_gpu name target_name)
   set(options NO_GPU)
   set(one_value_args)
   set(multi_value_args)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  add_executable(${name}_gpu ${name}.cu)
-  install(TARGETS ${name}_gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" EXCLUDE_FROM_ALL)
-
+  string(CONCAT target_name ${target_name} "-gpu")
+  add_executable(${target_name} ${name}.cu)
+  install(TARGETS ${target_name} DESTINATION "${CMAKE_INSTALL_BINDIR}" EXCLUDE_FROM_ALL)
   if(GALOIS_ENABLE_GPU AND NOT ${X_NO_GPU})
-
-    #target_compile_options(${name}_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-dc>)
-    target_compile_options(${name}_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-w>)
-
-    target_link_libraries(${name}_gpu Galois::gpu)
-    set_property(TARGET ${name}_gpu PROPERTY CUDA_STANDARD 14)
-    set_property(TARGET ${name}_gpu PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+    target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-w>)
+    target_link_libraries(${target_name} Galois::gpu)
+    set_property(TARGET ${target_name} PROPERTY CUDA_STANDARD 14)
+    set_property(TARGET ${target_name} PROPERTY CUDA_SEPARABLE_COMPILATION ON)
   endif()
 endfunction()
 
-add_subdirectory(bh)
-add_subdirectory(dmr)
+add_subdirectory(barneshut)
+add_subdirectory(delaunayrefinement)
 

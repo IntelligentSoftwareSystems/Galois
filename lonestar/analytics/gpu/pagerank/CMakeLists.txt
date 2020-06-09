@@ -1,1 +1,1 @@
-app_gpu(pagerank)
+app_analy_gpu(pagerank pagerank)
