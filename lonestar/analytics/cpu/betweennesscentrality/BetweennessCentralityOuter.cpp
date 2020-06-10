@@ -36,6 +36,11 @@ static const char* url = "betweenness_centrality";
 static llvm::cl::opt<std::string> inputFile(llvm::cl::Positional,
                                             llvm::cl::desc("<input file>"),
                                             llvm::cl::Required);
+static llvm::cl::opt<unsigned int> numOfSources(
+    "numOfSources",
+    llvm::cl::desc("Number of sources to compute BC on (default "
+                   "is all); takes precedence over numOfOutSources"),
+    llvm::cl::init(0));
 static llvm::cl::opt<unsigned int>
     iterLimit("numOfOutSources",
               llvm::cl::desc("Number of sources WITH EDGES "
@@ -78,6 +83,84 @@ public:
    */
   ~BCOuter(void) { DeleteLocal(); }
 
+  //! Function that does BC for a single souce; called by a thread
+  void doBC(const GNode curSource) {
+    galois::gdeque<GNode> SQ;
+
+    double* sigma               = *perThreadSigma.getLocal();
+    int* d                      = *perThreadD.getLocal();
+    double* delta               = *perThreadDelta.getLocal();
+    galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+
+    sigma[curSource] = 1;
+    d[curSource]     = 1;
+
+    SQ.push_back(curSource);
+
+    // Do bfs while computing number of shortest paths (saved into sigma)
+    // and successors of nodes;
+    // Note this bfs makes it so source has distance of 1 instead of 0
+    for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
+      int src = *qq;
+
+      for (auto edge : G->edges(src, galois::MethodFlag::UNPROTECTED)) {
+        int dest = G->getEdgeDst(edge);
+
+        if (!d[dest]) {
+          SQ.push_back(dest);
+          d[dest] = d[src] + 1;
+        }
+
+        if (d[dest] == d[src] + 1) {
+          sigma[dest] = sigma[dest] + sigma[src];
+          succ[src].push_back(dest);
+        }
+      }
+    }
+
+    // Back-propogate the dependency values (delta) along the BFS DAG
+    // ignore the source (hence SQ.size > 1 and not SQ.empty)
+    while (SQ.size() > 1) {
+      int leaf = SQ.back();
+      SQ.pop_back();
+
+      double sigma_leaf = sigma[leaf]; // has finalized short path value
+      double delta_leaf = delta[leaf];
+      auto& succ_list   = succ[leaf];
+
+      for (auto succ = succ_list.begin(), succ_end = succ_list.end();
+           succ != succ_end; ++succ) {
+        delta_leaf += (sigma_leaf / sigma[*succ]) * (1.0 + delta[*succ]);
+      }
+      delta[leaf] = delta_leaf;
+    }
+
+    // save result of this source's BC, reset all local values for next
+    // source
+    double* Vec = *CB.getLocal();
+    for (int i = 0; i < NumNodes; ++i) {
+      Vec[i] += delta[i];
+      delta[i] = 0;
+      sigma[i] = 0;
+      d[i]     = 0;
+      succ[i].clear();
+    }
+  }
+
+  /**
+   * Runs betweeness-centrality proper. Instead of a vector of sources,
+   * it will operate on the first numSources sources.
+   *
+   * @param numSources Num sources to get BC contribution for
+   */
+  void runAll(unsigned numSources) {
+    // Each thread works on an individual source node
+    galois::do_all(
+        galois::iterate(0u, numSources),
+        [&](const GNode& curSource) { doBC(curSource); }, galois::steal(),
+        galois::loopname("Main"));
+  }
+
   /**
    * Runs betweeness-centrality proper.
    *
@@ -91,69 +174,7 @@ public:
   void run(const Cont& v) {
     // Each thread works on an individual source node
     galois::do_all(
-        galois::iterate(v),
-        [&](const GNode& curSource) {
-          galois::gdeque<GNode> SQ;
-
-          double* sigma               = *perThreadSigma.getLocal();
-          int* d                      = *perThreadD.getLocal();
-          double* delta               = *perThreadDelta.getLocal();
-          galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
-
-          sigma[curSource] = 1;
-          d[curSource]     = 1;
-
-          SQ.push_back(curSource);
-
-          // Do bfs while computing number of shortest paths (saved into sigma)
-          // and successors of nodes;
-          // Note this bfs makes it so source has distance of 1 instead of 0
-          for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
-            int src = *qq;
-
-            for (auto edge : G->edges(src, galois::MethodFlag::UNPROTECTED)) {
-              int dest = G->getEdgeDst(edge);
-
-              if (!d[dest]) {
-                SQ.push_back(dest);
-                d[dest] = d[src] + 1;
-              }
-
-              if (d[dest] == d[src] + 1) {
-                sigma[dest] = sigma[dest] + sigma[src];
-                succ[src].push_back(dest);
-              }
-            }
-          }
-
-          // Back-propogate the dependency values (delta) along the BFS DAG
-          // ignore the source (hence SQ.size > 1 and not SQ.empty)
-          while (SQ.size() > 1) {
-            int leaf = SQ.back();
-            SQ.pop_back();
-
-            double sigma_leaf = sigma[leaf]; // has finalized short path value
-            double delta_leaf = delta[leaf];
-            auto& succ_list   = succ[leaf];
-
-            for (auto succ = succ_list.begin(), succ_end = succ_list.end();
-                 succ != succ_end; ++succ) {
-              delta_leaf += (sigma_leaf / sigma[*succ]) * (1.0 + delta[*succ]);
-            }
-            delta[leaf] = delta_leaf;
-          }
-
-          // save result of this source's BC, reset all local values for next
-          // source
-          double* Vec = *CB.getLocal();
-          for (int i = 0; i < NumNodes; ++i) {
-            Vec[i] += delta[i];
-            delta[i] = 0;
-            sigma[i] = 0;
-            d[i]     = 0;
-            succ[i].clear();
-          }
-        },
+        galois::iterate(v), [&](const GNode& curSource) { doBC(curSource); },
         galois::steal(), galois::loopname("Main"));
   }
 
@@ -303,31 +324,38 @@ int main(int argc, char** argv) {
   galois::preAlloc(galois::getActiveThreads() * NumNodes / 1650);
   galois::reportPageAlloc("MeminfoMid");
 
+  // vector of sources to process; initialized if doing outSources
+  std::vector<GNode> v;
   // preprocessing: find the nodes with out edges we will process and skip
-  // over nodes with no out edges
+  // over nodes with no out edges; only done if numOfSources isn't specified
+  if (numOfSources == 0) {
+    // find first node with out edges
+    boost::filter_iterator<HasOut, Graph::iterator> begin =
+        boost::make_filter_iterator(HasOut(&g), g.begin(), g.end());
+    boost::filter_iterator<HasOut, Graph::iterator> end =
+        boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
+    // adjustedEnd = last node we will process based on how many iterations
+    // (i.e. sources) we want to do
+    boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd =
+        iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
-  // find first node with out edges
-  boost::filter_iterator<HasOut, Graph::iterator> begin =
-      boost::make_filter_iterator(HasOut(&g), g.begin(), g.end());
-  boost::filter_iterator<HasOut, Graph::iterator> end =
-      boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
-  // adjustedEnd = last node we will process based on how many iterations
-  // (i.e. sources) we want to do
-  boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd =
-      iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
-
-  size_t iterations = std::distance(begin, adjustedEnd);
-
-  // vector of nodes we want to process
-  std::vector<GNode> v(begin, adjustedEnd);
-
-  galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
-                 " Iterations: ", iterations, "\n");
+    size_t iterations = std::distance(begin, adjustedEnd);
+    galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
+                   " Iterations: ", iterations, "\n");
+    // vector of nodes we want to process
+    v.insert(v.end(), begin, adjustedEnd);
+  }
 
   // execute algorithm
   galois::StatTimer execTime("Timer_0");
   execTime.start();
-  bcOuter.run(v);
+  // either run a contiguous chunk of sources from beginning or run using
+  // sources with outgoing edges only
+  if (numOfSources > 0) {
+    bcOuter.runAll(numOfSources);
+  } else {
+    bcOuter.run(v);
+  }
   execTime.stop();
 
   bcOuter.printBCValues(0, std::min(10UL, NumNodes), std::cout, 6);
