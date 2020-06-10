@@ -22,16 +22,24 @@ The analytics applications are located in the ${GALOIS\_ROOT}/lonestar/analytics
 
 # Compiling LonestarGPU Through CMake 
 
-The dependencies for LonestarGPU suite are the same as shared-memory. Note that  LonestarGPU requires CUDA 8.0 and above. 
+The dependencies for LonestarGPU suite are the same as shared-memory. Note that  LonestarGPU requires CUDA 8.0 and above.
 
-To build the LonestarGPU suite, first, create a build directory and run CMake with DGALOIS\_ENABLE\_GPU flag in the build directory, as shown below.
+Note that distributed Galois requires the cub and moderngpu git submodules, which can be cloned using the followed commands.
+
+```Shell
+cd $GALOIS_ROOT
+git submodule init
+git submodule update --remote
+```
+These modules will be installed in the ${GALOIS\_ROOT}/external directory
+
+To build the LonestarGPU suite, first, create a build directory and run CMake with -DGALOIS\_CUDA\_CAPABILITY=\<insert CUDA capability here\> flag in the build directory. The CUDA capability should be one that your GPU supports. For example, if you wanted to build for a GTX 1080 and a K80, the commands would look like this:
 
 ```Shell
 cd ${GALOIS_ROOT}
 mkdir build
 cd build
-cmake ${GALOIS_ROOT} -DGALOIS_ENABLE_GPU=1
-```
+cmake ${GALOIS_ROOT} -DGALOIS_CUDA_CAPABILITY="3.7;6.1"
 
 After compiling through CMake, the system will create the 'lonestar/analytics/gpu' and 'lonestar/scientific/gpu' 
 directories in ${GALOIS\_ROOT}/build directory. 
