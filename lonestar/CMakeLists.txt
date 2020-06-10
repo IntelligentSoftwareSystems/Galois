@@ -39,6 +39,30 @@ function(app_analy_gpu name target_name)
   endif()
 endfunction()
 
+function(add_test_gpu app input output baseoutputext)
+  set(options NOT_QUICK)
+  set(one_value_args)
+  set(multi_value_args REQUIRES COMMAND_PREFIX)
+  set(RESULT_CHECKER ${PROJECT_SOURCE_DIR}/scripts/result_checker.py)
+  set(suffix "-${app}-${input}")
+  set(format "-${app}-format-output")
+  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+  string(REPLACE "_" ";" app_list ${app})
+  list(GET app_list 0 app_id)
+  set(baseoutput ${BASEOUTPUT}/${input}.${baseoutputext})
+
+  set(name run-${app}-${input})
+  if (EXISTS ${baseoutput})
+     add_test(NAME ${name} COMMAND ${app}-gpu ${X_UNPARSED_ARGUMENTS})
+     add_test(NAME ${format} COMMAND sed -i s/INF/1073741823/g ${output})
+     add_test(verify${suffix} python ${RESULT_CHECKER} -t=0.01 -sort=1 -delete=1 ${baseoutput} ${output})
+  else()
+     add_test(NAME ${name} COMMAND ${app}-gpu ${X_UNPARSED_ARGUMENTS})
+  endif()
+endfunction(add_test_gpu)
+
+
 if(GALOIS_ENABLE_DIST)
   add_subdirectory(libdistbench)
 
