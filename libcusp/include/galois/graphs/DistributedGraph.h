@@ -530,6 +530,7 @@ public:
 
   std::vector<std::vector<size_t>>& getMirrorNodes() { return mirrorNodes; }
 
+  virtual ~DistGraph() {}
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
   virtual unsigned getHostID(uint64_t) const = 0;

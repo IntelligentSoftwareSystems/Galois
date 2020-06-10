@@ -746,5 +746,6 @@ int main(int argc, char** argv) {
                 results.size(), globalIDs.data());
   }
 
+  delete hg;
   return 0;
 }
