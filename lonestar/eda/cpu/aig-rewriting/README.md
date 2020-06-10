@@ -20,7 +20,7 @@ BUILD
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>; make aigRewritng -j`
+2. Run `cd <BUILD>/lonestar/eda/cpu/aig-rewriting; make -j aig-rewriting-cpu`
 
 
 RUN
@@ -28,8 +28,8 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./aigRewriting <path-AIG> -t 14`
--`$ ./aigRewriting <path-AIG> -t 28 -v`
+-`$ ./aig-rewriting-cpu <path-AIG> -t 14`
+-`$ ./aig-rewriting-cpu <path-AIG> -t 28 -v`
 
 
 PERFORMANCE  

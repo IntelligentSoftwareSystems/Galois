@@ -1,7 +1,7 @@
 DESCRIPTION 
 ===========
 
-This program performs global routing on a circuit. Please find our ICCAD 2019 paper "SPRoute: A Scalable Parallel Negotiation-based Global Router" for details.
+This program performs global routing on a circuit. Please find our ICCAD 2019 paper "He, Jiayuan, et al. "SPRoute: A Scalable Parallel Negotiation-based Global Router." 2019 IEEE/ACM International Conference on Computer-Aided Design (ICCAD). IEEE, 2019." for details.
 
 SPRoute is based on FastRoute 4.1 and consists of four stages: tree decomposition, pattern routing, maze routing and layer assignment. SRoute parallelizes the most time-consuming maze routing stage in a novel hybrid parallel scheme which combines net-level parallelism and fine-grain parallelism. 
 
@@ -17,7 +17,7 @@ BUILD
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/lonestar/eda/cpu/SPRoute; make -j`
+2. Run `cd <BUILD>/lonestar/eda/cpu/sproute; make -j sproute-cpu`
 
 
 RUN
@@ -25,7 +25,7 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./bfs <path-to-circuit> --flute <path-to-flute-directory> -t 40
+-`$ ./sproute-cpu -ISPD2008Graph <path-to-circuit> --flute <path-to-flute-directory> -t 40`
 
 
 
