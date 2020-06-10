@@ -495,9 +495,9 @@ __global__ void gg_main_pipe_4_gpu(CSRGraphTy gg, PipeContextT<Worklist2> pipe, 
     HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
-    p_jump_roots <<<blocks, threads>>>(gg, pipe.in_wl(), pipe.out_wl(), _rv);
-    cudaDeviceSynchronize();
-    cudaDeviceSynchronize();
+    //p_jump_roots <<<blocks, threads>>>(gg, pipe.in_wl(), pipe.out_wl(), _rv);
+    //cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     loopc = *retval > 0;
   }
   while (loopc);
@@ -570,9 +570,9 @@ __global__ void gg_main_pipe_3_gpu(CSRGraphTy gg, dim3 blocks, dim3 threads, int
     HGAccumulator<int> _rv;
     *retval = 0;
     _rv.rv = retval;
-    p_jump <<<blocks, threads>>>(gg, _rv);
-    cudaDeviceSynchronize();
-    cudaDeviceSynchronize();
+    //p_jump <<<blocks, threads>>>(gg, _rv);
+    //cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     loopc = *retval > 0;
   }
   while (loopc);

@@ -386,18 +386,18 @@ __global__ void gg_main_pipe_1_gpu(CSRGraph gg, gint_p glevel, int curdelta, int
   {
     while (pipe.in_wl().nitems())
     {
-      sssp_kernel <<<blocks, __tb_sssp_kernel>>>(gg, curdelta, enable_lb, pipe.in_wl(), pipe.out_wl(), pipe.re_wl());
-      cudaDeviceSynchronize();
+      //sssp_kernel <<<blocks, __tb_sssp_kernel>>>(gg, curdelta, enable_lb, pipe.in_wl(), pipe.out_wl(), pipe.re_wl());
+      //cudaDeviceSynchronize();
       pipe.in_wl().swap_slots();
-      cudaDeviceSynchronize();
+      //cudaDeviceSynchronize();
       pipe.retry2();
     }
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     pipe.advance2();
-    remove_dups <<<remove_dups_blocks, __tb_remove_dups>>>(glevel, pipe.in_wl(), pipe.out_wl(), remove_dups_barrier);
-    cudaDeviceSynchronize();
+    //remove_dups <<<remove_dups_blocks, __tb_remove_dups>>>(glevel, pipe.in_wl(), pipe.out_wl(), remove_dups_barrier);
+    //cudaDeviceSynchronize();
     pipe.in_wl().swap_slots();
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     pipe.advance2();
     i++;
     curdelta += DELTA;

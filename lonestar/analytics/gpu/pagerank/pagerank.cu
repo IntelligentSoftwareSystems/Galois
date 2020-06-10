@@ -296,17 +296,17 @@ __global__ void gg_main_pipe_1_gpu(gfloat_p p2, gfloat_p p0, gfloat_p rp, int it
 
   iter = *cl_iter;
   {
-    init_2 <<<blocks, threads>>>(gg, rp, pipe.in_wl(), pipe.out_wl());
-    cudaDeviceSynchronize();
+    //init_2 <<<blocks, threads>>>(gg, rp, pipe.in_wl(), pipe.out_wl());
+    //cudaDeviceSynchronize();
     pipe.in_wl().swap_slots();
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     pipe.advance2();
     while (pipe.in_wl().nitems())
     {
-      pagerank_main <<<blocks, __tb_pagerank_main>>>(gg, p0, rp, p2, enable_lb, pipe.in_wl(), pipe.out_wl());
-      cudaDeviceSynchronize();
+      //pagerank_main <<<blocks, __tb_pagerank_main>>>(gg, p0, rp, p2, enable_lb, pipe.in_wl(), pipe.out_wl());
+      //cudaDeviceSynchronize();
       pipe.in_wl().swap_slots();
-      cudaDeviceSynchronize();
+      //cudaDeviceSynchronize();
       pipe.advance2();
       iter++;
       if (iter >= MAX_ITERATIONS)

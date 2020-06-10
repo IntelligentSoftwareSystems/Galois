@@ -330,10 +330,10 @@ __global__ void gg_main_pipe_1_gpu(CSRGraph gg, int LEVEL, PipeContextT<Worklist
   LEVEL = *cl_LEVEL;
   while (pipe.in_wl().nitems())
   {
-    bfs_kernel <<<blocks, __tb_bfs_kernel>>>(gg, LEVEL, enable_lb, pipe.in_wl(), pipe.out_wl());
-    cudaDeviceSynchronize();
+    //bfs_kernel <<<blocks, __tb_bfs_kernel>>>(gg, LEVEL, enable_lb, pipe.in_wl(), pipe.out_wl());
+    //cudaDeviceSynchronize();
     pipe.in_wl().swap_slots();
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     pipe.advance2();
     LEVEL++;
   }
