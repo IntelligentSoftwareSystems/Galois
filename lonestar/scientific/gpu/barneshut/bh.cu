@@ -573,7 +573,7 @@ void ForceCalculationKernel(int nnodesd, int nbodiesd, volatile int * __restrict
             dy = posyd[n] - py;
             dz = poszd[n] - pz;
             tmp = dx*dx + (dy*dy + (dz*dz + epssqd));  // compute distance squared (plus softening)
-            if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            if ((n < nbodiesd) || __all_sync(0xffffffff, tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
               tmp = rsqrtf(tmp);  // compute distance
               tmp = massd[n] * tmp * tmp * tmp;
               ax += dx * tmp;
