@@ -31,7 +31,7 @@ cd $GALOIS_ROOT
 git submodule init
 git submodule update --remote
 ```
-These modules will be installed in the ${GALOIS\_ROOT}/external directory
+These modules will be available in the ${GALOIS\_ROOT}/external directory
 
 To build the LonestarGPU suite, first, create a build directory and run CMake with -DGALOIS\_CUDA\_CAPABILITY=\<insert CUDA capability here\> flag in the build directory. The CUDA capability should be one that your GPU supports. For example, if you wanted to build for a GTX 1080 and a K80, the commands would look like this:
 

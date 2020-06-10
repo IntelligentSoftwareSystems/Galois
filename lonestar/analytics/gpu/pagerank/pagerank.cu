@@ -290,36 +290,6 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu
     *cl_iter = iter;
   }
 }
-__global__ void gg_main_pipe_1_gpu(gfloat_p p2, gfloat_p p0, gfloat_p rp, int iter, CSRGraph gg, CSRGraph hg, int MAX_ITERATIONS, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* cl_iter, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-
-  iter = *cl_iter;
-  {
-    //init_2 <<<blocks, threads>>>(gg, rp, pipe.in_wl(), pipe.out_wl());
-    //cudaDeviceSynchronize();
-    pipe.in_wl().swap_slots();
-    //cudaDeviceSynchronize();
-    pipe.advance2();
-    while (pipe.in_wl().nitems())
-    {
-      //pagerank_main <<<blocks, __tb_pagerank_main>>>(gg, p0, rp, p2, enable_lb, pipe.in_wl(), pipe.out_wl());
-      //cudaDeviceSynchronize();
-      pipe.in_wl().swap_slots();
-      //cudaDeviceSynchronize();
-      pipe.advance2();
-      iter++;
-      if (iter >= MAX_ITERATIONS)
-      {
-        break;
-      }
-    }
-  }
-  if (tid == 0)
-  {
-    *cl_iter = iter;
-  }
-}
 void gg_main_pipe_1_wrapper(gfloat_p p2, gfloat_p p0, gfloat_p rp, int& iter, CSRGraph& gg, CSRGraph& hg, int MAX_ITERATIONS, PipeContextT<Worklist2>& pipe, dim3& blocks, dim3& threads)
 {
   static GlobalBarrierLifetime gg_main_pipe_1_gpu_gb_barrier;
@@ -338,7 +308,6 @@ void gg_main_pipe_1_wrapper(gfloat_p p2, gfloat_p p0, gfloat_p rp, int& iter, CS
     check_cuda(cudaMalloc(&cl_iter, sizeof(int) * 1));
     check_cuda(cudaMemcpy(cl_iter, &iter, sizeof(int) * 1, cudaMemcpyHostToDevice));
 
-    // gg_main_pipe_1_gpu<<<1,1>>>(p2,p0,rp,iter,gg,hg,MAX_ITERATIONS,pipe,blocks,threads,cl_iter, enable_lb);
     gg_main_pipe_1_gpu_gb<<<gg_main_pipe_1_gpu_gb_blocks, __tb_gg_main_pipe_1_gpu_gb>>>(p2,p0,rp,iter,gg,hg,MAX_ITERATIONS,pipe,cl_iter, enable_lb, gg_main_pipe_1_gpu_gb_barrier);
     check_cuda(cudaMemcpy(&iter, cl_iter, sizeof(int) * 1, cudaMemcpyDeviceToHost));
     check_cuda(cudaFree(cl_iter));

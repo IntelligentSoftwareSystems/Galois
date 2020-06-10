@@ -376,38 +376,6 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu
     *cl_i = i;
   }
 }
-__global__ void gg_main_pipe_1_gpu(CSRGraph gg, gint_p glevel, int curdelta, int i, int DELTA, GlobalBarrier remove_dups_barrier, int remove_dups_blocks, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* cl_curdelta, int* cl_i, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-
-  curdelta = *cl_curdelta;
-  i = *cl_i;
-  while (pipe.in_wl().nitems())
-  {
-    while (pipe.in_wl().nitems())
-    {
-      //sssp_kernel <<<blocks, __tb_sssp_kernel>>>(gg, curdelta, enable_lb, pipe.in_wl(), pipe.out_wl(), pipe.re_wl());
-      //cudaDeviceSynchronize();
-      pipe.in_wl().swap_slots();
-      //cudaDeviceSynchronize();
-      pipe.retry2();
-    }
-    //cudaDeviceSynchronize();
-    pipe.advance2();
-    //remove_dups <<<remove_dups_blocks, __tb_remove_dups>>>(glevel, pipe.in_wl(), pipe.out_wl(), remove_dups_barrier);
-    //cudaDeviceSynchronize();
-    pipe.in_wl().swap_slots();
-    //cudaDeviceSynchronize();
-    pipe.advance2();
-    i++;
-    curdelta += DELTA;
-  }
-  if (tid == 0)
-  {
-    *cl_curdelta = curdelta;
-    *cl_i = i;
-  }
-}
 void gg_main_pipe_1_wrapper(CSRGraph& gg, gint_p glevel, int& curdelta, int& i, int DELTA, GlobalBarrier& remove_dups_barrier, int remove_dups_blocks, PipeContextT<Worklist2>& pipe, dim3& blocks, dim3& threads)
 {
   static GlobalBarrierLifetime gg_main_pipe_1_gpu_gb_barrier;
@@ -429,7 +397,6 @@ void gg_main_pipe_1_wrapper(CSRGraph& gg, gint_p glevel, int& curdelta, int& i, 
     check_cuda(cudaMemcpy(cl_curdelta, &curdelta, sizeof(int) * 1, cudaMemcpyHostToDevice));
     check_cuda(cudaMemcpy(cl_i, &i, sizeof(int) * 1, cudaMemcpyHostToDevice));
 
-    // gg_main_pipe_1_gpu<<<1,1>>>(gg,glevel,curdelta,i,DELTA,remove_dups_barrier,remove_dups_blocks,pipe,blocks,threads,cl_curdelta,cl_i, enable_lb);
     gg_main_pipe_1_gpu_gb<<<gg_main_pipe_1_gpu_gb_blocks, __tb_gg_main_pipe_1_gpu_gb>>>(gg,glevel,curdelta,i,DELTA,remove_dups_barrier,remove_dups_blocks,pipe,cl_curdelta,cl_i, enable_lb, gg_main_pipe_1_gpu_gb_barrier);
     check_cuda(cudaMemcpy(&curdelta, cl_curdelta, sizeof(int) * 1, cudaMemcpyDeviceToHost));
     check_cuda(cudaMemcpy(&i, cl_i, sizeof(int) * 1, cudaMemcpyDeviceToHost));
