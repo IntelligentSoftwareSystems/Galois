@@ -14,6 +14,9 @@ supports online cycle detection.
 Performance is achieved by using a sparse bit vector to represent both
 edges and points-to information.
 
+INPUT
+--------------------------------------------------------------------------------
+
 The input is a constraint file in the following format:
 
 ```
@@ -50,30 +53,30 @@ BUILD
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/lonestar/betweennesscentrality; make -j pta`
+2. Run `cd <BUILD>/lonestar/analytics/cpu/pointstoanalysis; make -j`
 
 RUN
 --------------------------------------------------------------------------------
 
 Run serial points-to analysis with the following command:
-`./pta <constraint file> -serial`
+`./pointstoanalysis-cpu <constraint file> -serial`
 
 Run serial points-to analysis with online cycle detection with the following 
 command:
-`./pta <constraint file> -serial -ocd`
+`./pointstoanalysis-cpu <constraint file> -serial -ocd`
 
 Run serial points-to analysis that reprocesses load/store constraints after
 N constraints with the following command:
-`./pta <constraint file> -serial -lsThreshold=N`
+`./pointstoanalysis-cpu <constraint file> -serial -lsThreshold=N`
 
 Run the parallel version of points-to analysis with the following command:
-`./pta <constraint file> -t=<num threads>`
+`./pointstoanalysis-cpu <constraint file> -t=<num threads>`
 
 Run the parallel version of points-to analysis and print the results with
 the following command (the serial version also supports printAnswer):
-`./pta <constraint file> -t=<num threads> -printAnswer`
+`./pointstoanalysis-cpu <constraint file> -t=<num threads> -printAnswer`
 
-TUNING PERFORMANCE  
+PERFORMANCE  
 --------------------------------------------------------------------------------
 
 Online cycle detection in the serial version may or may not help depending on the

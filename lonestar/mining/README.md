@@ -19,13 +19,22 @@ canonical labeling tool for large and sparse graphs. In Proceedings
 of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 
 BUILD
-===========
+================================================================================
 
 Pangolin built by default. To enable GPU mining, you can give the
 `-DGALOIS_ENABLE_GPU=ON` setting to `cmake`.
 
+Note that heterogeneous Galois requires the cub git submodules, which can be cloned using the followed commands.
+
+```Shell
+cd $GALOIS_ROOT
+git submodule init
+git submodule update --remote
+```
+These modules will be cloned in the ${GALOIS\_ROOT}/external directory
+
 INPUT
-===========
+================================================================================
 
 We support four input graph format: **gr**, **txt**, **adj**, **mtx**.
 For unlabeled graphs, we use the gr graph format, same as other Galois benchmarks.
@@ -47,7 +56,7 @@ Vertex ids are expected to be sequential integers between 0 and (total number of
 For testing, we have prepared a test graph **citeseer** in `$SRC_DIR/lonestarmine/test_data`.
 
 RUN
-===========
+================================================================================
 
 The following are a few example command lines.
 
@@ -57,12 +66,12 @@ The following are a few example command lines.
 - `$ ./fsm $SRC_DIR/lonestarmine/test_data/citeseer.sadj -ft adj -k=2 -ms=300 -t 28`
 
 PERFORMANCE
-===========
+================================================================================
 
 Please see details in the paper.
 
 CITATION
-==========
+================================================================================
 
 Please cite the following paper if you use Pangolin:
 
