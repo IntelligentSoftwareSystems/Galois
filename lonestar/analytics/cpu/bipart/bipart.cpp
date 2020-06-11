@@ -95,9 +95,8 @@ static cll::opt<bool>
                 cll::init(false));
 
 static cll::opt<bool>
-		output("output",
-						cll::desc("Specify if partitions need to be written"),
-						cll::init(false));
+    output("output", cll::desc("Specify if partitions need to be written"),
+           cll::init(false));
 
 // const double COARSEN_FRACTION = 0.9;
 
@@ -453,24 +452,24 @@ int main(int argc, char** argv) {
 
   totalTime.stop();
 
-	if (output) {
+  if (output) {
 
-		std::cout <<"hedgs: " << graph.hedges << "\n";
-		std::cout << "size: " << graph.size() << "\n";
-		std::vector<uint32_t> parts(graph.size()-graph.hedges);
-		std::vector<uint64_t> IDs(graph.size()-graph.hedges);
+    std::cout << "hedgs: " << graph.hedges << "\n";
+    std::cout << "size: " << graph.size() << "\n";
+    std::vector<uint32_t> parts(graph.size() - graph.hedges);
+    std::vector<uint64_t> IDs(graph.size() - graph.hedges);
 
-		for(GNode n=graph.hedges; n<graph.size(); n++){	
-			parts[n-graph.hedges] = graph.getData(n).getPart();
-			IDs[n-graph.hedges] = n-graph.hedges+1;
-		}
+    for (GNode n = graph.hedges; n < graph.size(); n++) {
+      parts[n - graph.hedges] = graph.getData(n).getPart();
+      IDs[n - graph.hedges]   = n - graph.hedges + 1;
+    }
 
-		std::ofstream outputFile(outfile.c_str());
+    std::ofstream outputFile(outfile.c_str());
 
-		for(size_t i=0;i<parts.size();i++)
-			outputFile << IDs[i] << " " << parts[i] << "\n";
+    for (size_t i = 0; i < parts.size(); i++)
+      outputFile << IDs[i] << " " << parts[i] << "\n";
 
-		outputFile.close();		
-	}
+    outputFile.close();
+  }
   return 0;
 }
