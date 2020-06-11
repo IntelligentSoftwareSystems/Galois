@@ -22,6 +22,10 @@ install(
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
 
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/moderngpu")
+  message(FATAL_ERROR "Cannot find the moderngpu Git submodule. Please run `git submodule update --init --recursive`")
+endif()
+
 target_include_directories(galois_gpu PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/moderngpu/src>
   $<INSTALL_INTERFACE:include/galois/gpu/moderngpu/src>
@@ -31,6 +35,10 @@ install(
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/moderngpu"
   COMPONENT dev
 )
+
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/cub")
+  message(FATAL_ERROR "Cannot find the cub Git submodule. Please run `git submodule update --init --recursive`")
+endif()
 
 target_include_directories(galois_gpu PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/cub>
