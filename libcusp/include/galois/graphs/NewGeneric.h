@@ -48,7 +48,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME          = "dGraph_Generic";
-  Partitioner* graphPartitioner;
+  std::unique_ptr<Partitioner> graphPartitioner;
 
   //! How many rounds to sync state during edge assignment phase
   uint32_t _edgeStateRounds;
@@ -186,9 +186,9 @@ public:
       base_DistGraph::readersFromFile(g, masterBlockFile);
     }
 
-    graphPartitioner =
-        new Partitioner(host, _numHosts, base_DistGraph::numGlobalNodes,
-                        base_DistGraph::numGlobalEdges);
+    graphPartitioner = std::make_unique<Partitioner>(
+        host, _numHosts, base_DistGraph::numGlobalNodes,
+        base_DistGraph::numGlobalEdges);
     // TODO abstract this away somehow
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
@@ -361,11 +361,6 @@ public:
                                          (uint32_t)stateRounds);
     }
   }
-
-  /**
-   * Free the graph partitioner
-   */
-  ~NewDistGraphGeneric() { delete graphPartitioner; }
 
 private:
   galois::runtime::SpecificRange<boost::counting_iterator<size_t>>

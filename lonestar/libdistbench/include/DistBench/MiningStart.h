@@ -118,19 +118,25 @@ static void marshalGPUGraph(
 }
 #endif
 
+template <typename NodeData, typename EdgeData>
+using MiningGraphPtr = std::unique_ptr<
+    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>;
+template <typename NodeData, typename EdgeData>
+using MiningSubstratePtr = std::unique_ptr<galois::graphs::GluonEdgeSubstrate<
+    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>>;
+
 /**
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-static galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>*
-loadDGraph(bool loadProxyEdges) {
+static MiningGraphPtr<NodeData, EdgeData> loadDGraph(bool loadProxyEdges) {
   using Graph =
       galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>;
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
 
   dGraphTimer.start();
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  auto* loadedGraph =
-      new Graph(inputFile, net.ID, net.Num, loadProxyEdges, loadProxyEdges);
+  MiningGraphPtr<NodeData, EdgeData> loadedGraph = std::make_unique<Graph>(
+      inputFile, net.ID, net.Num, loadProxyEdges, loadProxyEdges);
   assert(loadedGraph != nullptr);
   dGraphTimer.stop();
 
@@ -152,9 +158,8 @@ loadDGraph(bool loadProxyEdges) {
  * @returns Pointer to the loaded graph and Gluon substrate
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-std::pair<galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>*,
-          galois::graphs::GluonEdgeSubstrate<galois::graphs::MiningGraph<
-              NodeData, EdgeData, MiningPolicyDegrees>>*>
+std::pair<MiningGraphPtr<NodeData, EdgeData>,
+          MiningSubstratePtr<NodeData, EdgeData>>
 #ifdef GALOIS_ENABLE_GPU
 distGraphInitialization(struct CUDA_Context** cuda_ctx,
 #else
@@ -168,8 +173,8 @@ distGraphInitialization(
 
   initTimer.start();
   std::vector<unsigned> scaleFactor;
-  Graph* g;
-  Substrate* s;
+  MiningGraphPtr<NodeData, EdgeData> g;
+  MiningSubstratePtr<NodeData, EdgeData> s;
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
@@ -180,7 +185,8 @@ distGraphInitialization(
   const auto& net = galois::runtime::getSystemNetworkInterface();
   // if you want to load proxy edges (true), then do nothing should be false
   // hence the use of ! to negate
-  s = new Substrate(*g, net.ID, net.Num, !loadProxyEdges, commMetadata);
+  s = std::make_unique<Substrate>(*g, net.ID, net.Num, !loadProxyEdges,
+                                  commMetadata);
 
 // marshal graph to GPU as necessary
 #ifdef GALOIS_ENABLE_GPU
@@ -192,7 +198,7 @@ distGraphInitialization(
 
   initTimer.stop();
 
-  return std::make_pair(g, s);
+  return std::make_pair(std::move(g), std::move(s));
 }
 
 #endif

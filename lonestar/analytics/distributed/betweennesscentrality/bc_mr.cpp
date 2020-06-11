@@ -99,7 +99,7 @@ using GNode = typename Graph::GraphNode;
 galois::DynamicBitSet bitset_minDistances;
 galois::DynamicBitSet bitset_dependency;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 // moved here for access to ShortPathType, NodeData, DynamicBitSets
 #include "mrbc_sync.hh"
@@ -523,7 +523,7 @@ void Sanity(Graph& graph) {
 /* Make results */
 /******************************************************************************/
 
-std::vector<float> makeResults(Graph* hg) {
+std::vector<float> makeResults(std::unique_ptr<Graph>& hg) {
   std::vector<float> values;
 
   values.reserve(hg->numMasters());
@@ -556,7 +556,7 @@ int main(int argc, char** argv) {
   StatTimer_total.start();
 
   galois::gPrint("[", net.ID, "] InitializeGraph\n");
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
   // false = iterate over in edges
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void, false>();
@@ -746,6 +746,5 @@ int main(int argc, char** argv) {
                 results.size(), globalIDs.data());
   }
 
-  delete hg;
   return 0;
 }

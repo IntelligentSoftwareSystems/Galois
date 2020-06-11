@@ -117,6 +117,15 @@ static void marshalGPUGraph(
 }
 #endif
 
+template <typename NodeData, typename EdgeData>
+using DistGraphPtr =
+    std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
+template <typename Graph>
+using SubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<Graph>>;
+template <typename NodeData, typename EdgeData>
+using DistSubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<
+    galois::graphs::DistGraph<NodeData, EdgeData>>>;
+
 /**
  * Loads a graph into memory. Details/partitioning will be handled in the
  * construct graph call.
@@ -134,13 +143,12 @@ static void marshalGPUGraph(
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-static galois::graphs::DistGraph<NodeData, EdgeData>*
+static DistGraphPtr<NodeData, EdgeData>
 loadDistGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
-  galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
-  loadedGraph =
+  DistGraphPtr<NodeData, EdgeData> loadedGraph =
       constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   assert(loadedGraph != nullptr);
 
@@ -168,12 +176,12 @@ loadDistGraph(std::vector<unsigned>& scaleFactor) {
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-static galois::graphs::DistGraph<NodeData, EdgeData>*
+static DistGraphPtr<NodeData, EdgeData>
 loadSymmetricDistGraph(std::vector<unsigned>& scaleFactor) {
   galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
-  galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
+  DistGraphPtr<NodeData, EdgeData> loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
   if (inputFileSymmetric) {
@@ -211,9 +219,8 @@ loadSymmetricDistGraph(std::vector<unsigned>& scaleFactor) {
  * @returns Pointer to the loaded graph and Gluon substrate
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
-          galois::graphs::GluonSubstrate<
-              galois::graphs::DistGraph<NodeData, EdgeData>>*>
+std::pair<DistGraphPtr<NodeData, EdgeData>,
+          DistSubstratePtr<NodeData, EdgeData>>
 #ifdef GALOIS_ENABLE_GPU
 distGraphInitialization(struct CUDA_Context** cuda_ctx) {
 #else
@@ -222,8 +229,8 @@ distGraphInitialization() {
   using Graph     = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
-  Graph* g;
-  Substrate* s;
+  DistGraphPtr<NodeData, EdgeData> g;
+  DistSubstratePtr<NodeData, EdgeData> s;
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
@@ -231,15 +238,16 @@ distGraphInitialization() {
   g = loadDistGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
-                    partitionAgnostic, commMetadata);
+  s = std::make_unique<Substrate>(*g, net.ID, net.Num, g->isTransposed(),
+                                  g->cartesianGrid(), partitionAgnostic,
+                                  commMetadata);
 
 // marshal graph to GPU as necessary
 #ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 
-  return std::make_pair(g, s);
+  return std::make_pair(std::move(g), std::move(s));
 }
 
 /**
@@ -256,9 +264,8 @@ distGraphInitialization() {
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-std::pair<galois::graphs::DistGraph<NodeData, EdgeData>*,
-          galois::graphs::GluonSubstrate<
-              galois::graphs::DistGraph<NodeData, EdgeData>>*>
+std::pair<DistGraphPtr<NodeData, EdgeData>,
+          DistSubstratePtr<NodeData, EdgeData>>
 #ifdef GALOIS_ENABLE_GPU
 symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx) {
 #else
@@ -267,8 +274,8 @@ symmetricDistGraphInitialization() {
   using Graph     = galois::graphs::DistGraph<NodeData, EdgeData>;
   using Substrate = galois::graphs::GluonSubstrate<Graph>;
   std::vector<unsigned> scaleFactor;
-  Graph* g;
-  Substrate* s;
+  DistGraphPtr<NodeData, EdgeData> g;
+  DistSubstratePtr<NodeData, EdgeData> s;
 
 #ifdef GALOIS_ENABLE_GPU
   internal::heteroSetup(scaleFactor);
@@ -276,15 +283,16 @@ symmetricDistGraphInitialization() {
   g = loadSymmetricDistGraph<NodeData, EdgeData>(scaleFactor);
   // load substrate
   const auto& net = galois::runtime::getSystemNetworkInterface();
-  s = new Substrate(*g, net.ID, net.Num, g->isTransposed(), g->cartesianGrid(),
-                    partitionAgnostic, commMetadata);
+  s = std::make_unique<Substrate>(*g, net.ID, net.Num, g->isTransposed(),
+                                  g->cartesianGrid(), partitionAgnostic,
+                                  commMetadata);
 
 // marshal graph to GPU as necessary
 #ifdef GALOIS_ENABLE_GPU
   marshalGPUGraph(s, cuda_ctx);
 #endif
 
-  return std::make_pair(g, s);
+  return std::make_pair(std::move(g), std::move(s));
 }
 
 #endif

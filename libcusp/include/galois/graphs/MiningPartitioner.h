@@ -47,7 +47,7 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME          = "dGraph_Mining";
-  Partitioner* graphPartitioner;
+  std::unique_ptr<Partitioner> graphPartitioner;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
     assert(isLocal(gid));
@@ -213,9 +213,9 @@ public:
       ndegrees = getNodeDegrees(filename, base_DistGraph::numGlobalNodes);
     }
 
-    graphPartitioner =
-        new Partitioner(host, _numHosts, base_DistGraph::numGlobalNodes,
-                        base_DistGraph::numGlobalEdges, ndegrees);
+    graphPartitioner = std::make_unique<Partitioner>(
+        host, _numHosts, base_DistGraph::numGlobalNodes,
+        base_DistGraph::numGlobalEdges, ndegrees);
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -391,11 +391,6 @@ public:
           (totalEdgeProxies) / (double)globalKeptEdges);
     }
   }
-
-  /**
-   * Free the graph partitioner
-   */
-  ~MiningGraph() { delete graphPartitioner; }
 
 private:
   galois::DynamicBitSet
