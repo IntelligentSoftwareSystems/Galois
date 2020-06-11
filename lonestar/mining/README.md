@@ -2,11 +2,9 @@ Overview of Graph Pattern Mining (GPM) in Galois
 ================================================================================
 
 This directory contains benchmarks that run using the Pangolin framework [1]
-for efficient and flexible graph mining.  It uses the bliss library [2][3] for
-graph isomorphism check.  The license for this library is in the bliss
-directory: note that **it does not use the same license as the rest of
-Galois**.  To run Pangolin applications, please go to ../lonestarmine/README.md
-for more details.
+for efficient and flexible graph mining. It uses the bliss [2][3] library v0.73
+for graph isomorphism test. The license for this library is in the bliss
+directory: note that **it does not use the same license as the rest of Galois**.  
 
 [1] Xuhao Chen, Roshan Dathathri, Gurbinder Gill, Keshav Pingali, 
 Pangolin: An Efficient and Flexible Graph Pattern Mining System on CPU and GPU, VLDB 2020
@@ -18,7 +16,7 @@ labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
 canonical labeling tool for large and sparse graphs. In Proceedings 
 of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 
-BUILD
+Compiling Provided Apps
 ================================================================================
 
 Pangolin built by default. To enable GPU mining, you can give the
@@ -55,7 +53,7 @@ We currently do not support graphs label on edges.
 Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
 For testing, we have prepared a test graph **citeseer** in `$SRC_DIR/lonestarmine/test_data`.
 
-RUN
+Running Provided Apps
 ================================================================================
 
 The following are a few example command lines.
