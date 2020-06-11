@@ -9,28 +9,31 @@ centrality source. Each thread will work on the betweenness centrality
 computation of it own individual source and find the BC contributions of that
 source to the rest of the graph.
 
-Pass in a regular .gr graph.
+INPUT
+--------------------------------------------------------------------------------
+
+This application takes in Galois .gr graphs.
 
 BUILD
 --------------------------------------------------------------------------------
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/lonestar/betweennesscentrality; make -j betweennesscentrality-outer`
+2. Run `cd <BUILD>/lonestar/analytics/cpu/betweennesscentrality; make -j`
 
 RUN
 --------------------------------------------------------------------------------
 
 To run all sources, use the following:
-`./betweennesscentrality-outer <input-graph> -t=<num-threads>
+`./betweennesscentrality-outer-cpu <input-graph> -t=<num-threads>`
 
 To run starting from a particular source, use the following:
-`./betweennesscentrality-outer <input-graph> -t=<num-threads> -startNode=<node to begin>`
+`./betweennesscentrality-outer-cpu <input-graph> -t=<num-threads> -startNode=<node to begin>`
 
 To run only on N nodes (that have outgoing edges), use the following:
-`./betweennesscentrality-outer <input-graph> -t=<num-threads> -limit=N`
+`./betweennesscentrality-outer-cpu <input-graph> -t=<num-threads> -limit=N`
 
-TUNING PERFORMANCE  
+PERFORMANCE  
 --------------------------------------------------------------------------------
 
 If each source's BC calculation takes roughly the same amount of time, then
@@ -59,32 +62,25 @@ Pass in a regular .gr graph.
 For more details on the algorithm, see paper here:
 https://dl.acm.org/citation.cfm?id=2442521
 
-BUILD
---------------------------------------------------------------------------------
-
-1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
-
-2. Run `cd <BUILD>/lonestar/betweennesscentrality; make -j bc-async`
-
 RUN
 --------------------------------------------------------------------------------
 
 To run all sources, use the following:
-`./bc-async <input-graph> -t=<num-threads>`
+`./betweennesscentrality-async-cpu <input-graph> -t=<num-threads>`
 
 To run with a specific number of sources N (starting from the beginning), use
 the following:
-`./bc-async <input-graph> -t=<num-threads> -numOfSources=N`
+`./betweennesscentrality-async-cpu <input-graph> -t=<num-threads> -numOfSources=N`
 
 To run with a specific number of sources N (starting from the beginning) **with
 outgoing edges**, use the following:
-`./bc-async <input-graph> -t=<num-threads> -numOfOutSources=N`
+`./betweennesscentrality-async-cpu <input-graph> -t=<num-threads> -numOfOutSources=N`
 
 To run with a specific set of sources, put the sources in a file with
 the source ids separated with a line and use the following:
-`./bc-async <input-graph> -t=<num-threads> -sourcesToUse=<path-to-file>`
+`./betweennesscentrality-async-cpu <input-graph> -t=<num-threads> -sourcesToUse=<path-to-file>`
 
-TUNING PERFORMANCE  
+PERFORMANCE  
 --------------------------------------------------------------------------------
 
 Good scaling and performance is very dependent on the chunk size parameter

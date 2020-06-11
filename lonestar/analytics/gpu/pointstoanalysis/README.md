@@ -1,12 +1,27 @@
-## DESCRIPTION
+Points To Analysis
+================================================================================
 
-Given a set of points-to constraints, the problem is to compute the points-to information for each pointer, in a flow-insensitive context-insensitive manner.
+DESCRIPTION
+--------------------------------------------------------------------------------
 
-## COMPILE 
+Given a set of points-to constraints, the problem is to compute the points-to
+information for each pointer, in a flow-insensitive context-insensitive manner.
 
-Run make in the root directory or source file (e.g. apps/pta)
+INPUT
+--------------------------------------------------------------------------------
 
-## RUN
+This application takes in Galois .gr graphs representing constraints.
 
-Execute as:  ./pta NODES-FILE CONSTRAINTS-FILE HCD-TABLE SOLUTION-FILE [TRANSFER, VERIFY]
+BUILD
+--------------------------------------------------------------------------------
 
+1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
+
+2. Run `cd <BUILD>/lonestar/analytics/gpu/pointstoanalysis; make -j`
+
+RUN
+--------------------------------------------------------------------------------
+
+To run default algorithm, use the following:
+
+-`$ ./pta <nodes-file> <constraints-file> <hcd-table solution-file> [TRANSFER, VERIFY]

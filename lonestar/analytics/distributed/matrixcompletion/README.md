@@ -1,4 +1,4 @@
-Stochastic Gradient Descent
+Matrix Completion
 ================================================================================
 
 DESCRIPTION 
@@ -21,21 +21,26 @@ BUILD
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/dist-apps/; make -j sgd
+2. Run `cd <BUILD>/lonestar/analytics/distributed/matrixcompletion; make -j
 
 RUN
 --------------------------------------------------------------------------------
 
 To run for a max of 10 iterations, do the following
-`./sgd <bipartite-input-graph> -t=<num-threads> -maxIterations=10`
+`./matrixcompletion-dist <bipartite-input-graph> -t=<num-threads> -maxIterations=10`
 
 To run on 3 hosts h1, h2, and h3 with changes to the learning parameters, use the following:
-`mpirun -n=3 -hosts=h1,h2,h3 ./sgd <bipartite-input-graph> -t=<num-threads> -DECAY_RATE=0.5 -LAMBDA=0.001 -LEARNING_RATE=0.001`
+`mpirun -n=3 -hosts=h1,h2,h3 ./matrixcompletion-dist <bipartite-input-graph> -t=<num-threads> -DECAY_RATE=0.5 -LAMBDA=0.001 -LEARNING_RATE=0.001`
 
 PERFORMANCE  
 --------------------------------------------------------------------------------
 
-Convergence/time to convergence may be affected by the different learning 
-parameters (e.g. decay rate, lambda, learning rate). They may need tuning for
-best performance. The best parameters are input dependent.
+* Convergence/time to convergence may be affected by the different learning 
+  parameters (e.g. decay rate, lambda, learning rate). They may need tuning for
+  best performance. The best parameters are input dependent.
 
+* For 16 or less hosts/GPUs, for performance, we recommend using an
+  **edge-cut** partitioning policy (OEC or IEC).
+
+* For 32 or more hosts/GPUs, for performance, we recommend using the
+  **Cartesian vertex-cut** partitioning policy (CVC).
