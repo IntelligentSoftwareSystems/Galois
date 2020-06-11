@@ -168,6 +168,7 @@ void gg_main_pipe_1(CSRGraphTy& gg, int& STEPS, Shared<unsigned int>& prio, Pipe
     }
   }
 }
+/*
 __global__ void gg_main_pipe_1_gpu(CSRGraphTy gg, int STEPS, unsigned int* prio, PipeContextT<WorklistT> pipe, dim3 blocks, dim3 threads, int* cl_STEPS)
 {
   unsigned tid = TID_1D;
@@ -196,14 +197,12 @@ __global__ void gg_main_pipe_1_gpu(CSRGraphTy gg, int STEPS, unsigned int* prio,
     *cl_STEPS = STEPS;
   }
 }
+*/
 void gg_main_pipe_1_wrapper(CSRGraphTy& gg, int& STEPS, Shared<unsigned int>& prio, PipeContextT<WorklistT>& pipe, dim3& blocks, dim3& threads)
 {
-  if (false)
-  {
+#if 1
     gg_main_pipe_1(gg,STEPS,prio,pipe,blocks,threads);
-  }
-  else
-  {
+#else
     int* cl_STEPS;
     check_cuda(cudaMalloc(&cl_STEPS, sizeof(int) * 1));
     check_cuda(cudaMemcpy(cl_STEPS, &STEPS, sizeof(int) * 1, cudaMemcpyHostToDevice));
@@ -212,7 +211,7 @@ void gg_main_pipe_1_wrapper(CSRGraphTy& gg, int& STEPS, Shared<unsigned int>& pr
     // gg_main_pipe_1_gpu_gb<<<gg_main_pipe_1_gpu_gb_blocks, __tb_gg_main_pipe_1_gpu_gb>>>(gg,STEPS,prio.gpu_wr_ptr(),pipe,cl_STEPS, gg_main_pipe_1_gpu_gb_barrier);
     check_cuda(cudaMemcpy(&STEPS, cl_STEPS, sizeof(int) * 1, cudaMemcpyDeviceToHost));
     check_cuda(cudaFree(cl_STEPS));
-  }
+#endif
 }
 void gg_main(CSRGraphTy& hg, CSRGraphTy& gg)
 {
