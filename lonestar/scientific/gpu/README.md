@@ -1,39 +1,36 @@
-# LonestarGPU Benchmark Suite
+Overview of LonestarGPU Scientific Benchmark Suite
+================================================================================
 
 The LonestarGPU suite contains CUDA implementations of several
-irregular algorithms that exhibit amorphous data parallelism. Currently, LonestarGPU suite contains the following analytics and scientific applications, which can be executed on a single-GPU.
-
-### Analytics Applications
-* Breadth-First Search 
-* Connected Components
-* Maximal Independent Set
-* Minimum Spanning Tree
-* Pagerank
-* Points-to Analysis
-* Single-Source Shortest Paths
-* Stochastic Gradient Descent
-* Triangle Counting
+irregular algorithms that exhibit amorphous data parallelism. Currently,
+the LonestarGPU suite contains the following scientific applications,
+which can be executed on a single-GPU.
 
 ### Scientific Applications
-* Barnes-Hut N-body Simulation
-* Delaunay Mesh Refinement
+  * Barnes-Hut N-body Simulation
+  * Delaunay Mesh Refinement
 
-The analytics applications are located in the ${GALOIS\_ROOT}/lonestar/analytics/gpu directory. Whereas the scientific applications are located in the ${GALOIS\_ROOT}/lonestar/scientific/gpu directory
+Compiling LonestarGPU Through CMake 
+================================================================================
 
-# Compiling LonestarGPU Through CMake 
+The dependencies for LonestarGPU suite are the same as shared-memory.
+Note that  LonestarGPU requires CUDA 8.0 and above.
 
-The dependencies for LonestarGPU suite are the same as shared-memory. Note that  LonestarGPU requires CUDA 8.0 and above.
-
-Note that distributed Galois requires the cub and moderngpu git submodules, which can be cloned using the followed commands.
+Note that heterogeneous Galois requires the cub and moderngpu git submodules,
+which can be cloned using the followed commands.
 
 ```Shell
 cd $GALOIS_ROOT
 git submodule init
-git submodule update --remote
+git submodule update 
 ```
 These modules will be available in the ${GALOIS\_ROOT}/external directory
 
-To build the LonestarGPU suite, first, create a build directory and run CMake with -DGALOIS\_CUDA\_CAPABILITY=\<insert CUDA capability here\> flag in the build directory. The CUDA capability should be one that your GPU supports. For example, if you wanted to build for a GTX 1080 and a K80, the commands would look like this:
+To build the LonestarGPU suite, first, create a build directory and
+run CMake with -DGALOIS\_CUDA\_CAPABILITY=\<insert CUDA capability here\>
+flag in the build directory. The CUDA capability should be one that your
+GPU supports. For example, if you wanted to build for a GTX 1080 and a K80,
+the commands would look like this:
 
 ```Shell
 cd ${GALOIS_ROOT}
@@ -41,28 +38,33 @@ mkdir build
 cd build
 cmake ${GALOIS_ROOT} -DGALOIS_CUDA_CAPABILITY="3.7;6.1"
 
-After compiling through CMake, the system will create the 'lonestar/analytics/gpu' and 'lonestar/scientific/gpu' 
-directories in ${GALOIS\_ROOT}/build directory. 
+After compiling through CMake, the system will create the 'lonestar/analytics/gpu'
+and 'lonestar/scientific/gpu' directories in ${GALOIS\_ROOT}/build directory. 
 
-# Compiling Scientific Applications
+Compiling Scientific Applications
+================================================================================
 
 Once CMake is completed,  compile the provided scientific apps by executing the 
 following command in the ${GALOIS\_ROOT}/build/lonestar/scientific/gpu directory.
 
 `make -j`
 
-You can compile a specific app by executing the following commands (shown for barneshut).
+You can compile a specific app by executing the following commands
+(shown for barneshut).
 
 ```Shell
 `cd barneshut`
 `make -j`
 ```
 
-# Running Scientific Applications
+Running Scientific Applications
+================================================================================
 
-To run a specific app, follow the instructions given in the README.md in the particular app directory. 
+To run a specific app, follow the instructions given in the README.md
+in the particular app directory. 
 
-# Documentation
+Documentation
+================================================================================
 
 Further documentation is available at
 [http://iss.ices.utexas.edu/?p=projects/galois/lonestargpu](http://iss.ices.utexas.edu/?p=projects/galois/lonestargpu)
