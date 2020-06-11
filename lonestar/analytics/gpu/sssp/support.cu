@@ -42,9 +42,11 @@ void output(CSRGraphTy &g, const char *output_file) {
   else
     f = fopen(output_file, "w");
     
+  const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;    
   for(int i = 0; i < g.nnodes; i++) {
     if(g.node_data[i] == INF) {
-      check_fprintf(f, "%d INF\n", i);
+      //formatting the output to be compatible with the distributed bfs ouput 
+      check_fprintf(f, "%d %d\n", i, infinity);
     } else {
       check_fprintf(f, "%d %d\n", i, g.node_data[i]);
     }

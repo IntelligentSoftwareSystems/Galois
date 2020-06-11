@@ -485,27 +485,6 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_4_gpu_gb) gg_main_pipe_4_gpu
     pipe.save();
   }
 }
-__global__ void gg_main_pipe_4_gpu(CSRGraphTy gg, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* retval)
-{
-  unsigned tid = TID_1D;
-
-  bool loopc = false;
-  do
-  {
-    HGAccumulator<int> _rv;
-    *retval = 0;
-    _rv.rv = retval;
-    p_jump_roots <<<blocks, threads>>>(gg, pipe.in_wl(), pipe.out_wl(), _rv);
-    cudaDeviceSynchronize();
-    cudaDeviceSynchronize();
-    loopc = *retval > 0;
-  }
-  while (loopc);
-  if (tid == 0)
-  {
-    pipe.save();
-  }
-}
 void gg_main_pipe_4_wrapper(CSRGraphTy& gg, PipeContextT<Worklist2>& pipe, dim3& blocks, dim3& threads)
 {
   static GlobalBarrierLifetime gg_main_pipe_4_gpu_gb_barrier;
@@ -523,7 +502,6 @@ void gg_main_pipe_4_wrapper(CSRGraphTy& gg, PipeContextT<Worklist2>& pipe, dim3&
   {
     pipe.prep();
 
-    // gg_main_pipe_4_gpu<<<1,1>>>(gg,pipe,blocks,threads,retval.gpu_wr_ptr(), enable_lb);
     gg_main_pipe_4_gpu_gb<<<gg_main_pipe_4_gpu_gb_blocks, __tb_gg_main_pipe_4_gpu_gb>>>(gg,pipe,retval.gpu_wr_ptr(), enable_lb, gg_main_pipe_4_gpu_gb_barrier);
     pipe.restore();
   }
@@ -561,22 +539,6 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_3_gpu_gb) gg_main_pipe_3_gpu
   while (loopc);
   gb.Sync();
 }
-__global__ void gg_main_pipe_3_gpu(CSRGraphTy gg, dim3 blocks, dim3 threads, int* retval)
-{
-
-  bool loopc = false;
-  do
-  {
-    HGAccumulator<int> _rv;
-    *retval = 0;
-    _rv.rv = retval;
-    p_jump <<<blocks, threads>>>(gg, _rv);
-    cudaDeviceSynchronize();
-    cudaDeviceSynchronize();
-    loopc = *retval > 0;
-  }
-  while (loopc);
-}
 void gg_main_pipe_3_wrapper(CSRGraphTy& gg, dim3& blocks, dim3& threads)
 {
   static GlobalBarrierLifetime gg_main_pipe_3_gpu_gb_barrier;
@@ -593,7 +555,6 @@ void gg_main_pipe_3_wrapper(CSRGraphTy& gg, dim3& blocks, dim3& threads)
   else
   {
 
-    // gg_main_pipe_3_gpu<<<1,1>>>(gg,blocks,threads,retval.gpu_wr_ptr(), enable_lb);
     gg_main_pipe_3_gpu_gb<<<gg_main_pipe_3_gpu_gb_blocks, __tb_gg_main_pipe_3_gpu_gb>>>(gg,retval.gpu_wr_ptr(), enable_lb, gg_main_pipe_3_gpu_gb_barrier);
   }
 }
