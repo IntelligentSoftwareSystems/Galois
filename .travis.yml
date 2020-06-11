@@ -244,7 +244,7 @@ before_script:
 script:
   - make -C build input
   - cmake --build build --parallel 2 || exit 1
-  - (cd build && ctest -V --parallel 2 --label-regex quick) || exit 1
+  - (cd build && ctest --output-on-failure --parallel 2 --label-regex quick) || exit 1
 
 notifications:
   email: false

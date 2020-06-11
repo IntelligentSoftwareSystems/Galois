@@ -76,7 +76,7 @@ jobs:
           # Run tests as non-root otherwise MPI will complain
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Debian":
     docker:
       - image: debian:10
@@ -110,7 +110,7 @@ jobs:
           # Run tests as non-root otherwise MPI will complain
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -145,7 +145,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Ubuntu-18.04-cuda10.1-build-only":
     docker:
       - image: nvidia/cuda:10.1-devel-ubuntu18.04
@@ -246,7 +246,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "CentOS-8-clang":
     docker:
       - image: centos:8
@@ -288,7 +288,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Arch":
     docker:
       - image: archlinux/base
@@ -320,7 +320,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Alpine":
     docker:
       - image: alpine:latest
@@ -353,7 +353,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Fedora-gcc":
     docker:
       - image: fedora:latest
@@ -387,7 +387,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
   "Fedora-clang":
     docker:
       - image: fedora:latest
@@ -426,7 +426,7 @@ jobs:
           cmake --build /tmp/build --parallel 2
           (cd /tmp/build \
             && chown -R runner . \
-            && su runner -c "ctest -V --label-regex quick --parallel 2")
+            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
  
 workflows:
   version: 2
