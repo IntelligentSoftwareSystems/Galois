@@ -862,6 +862,7 @@ int main(int argc, char *argv[])
     // generate input
 
     drndset(7);
+    printf("Generating Input: \n");
     rsc = (3 * 3.1415926535897932384626433832795) / 16;
     vsc = sqrt(1.0 / rsc);
     for (i = 0; i < nbodies; i++) {
