@@ -323,25 +323,6 @@ __global__ void __launch_bounds__(__tb_gg_main_pipe_1_gpu_gb) gg_main_pipe_1_gpu
     *cl_LEVEL = LEVEL;
   }
 }
-__global__ void gg_main_pipe_1_gpu(CSRGraph gg, int LEVEL, PipeContextT<Worklist2> pipe, dim3 blocks, dim3 threads, int* cl_LEVEL, bool enable_lb)
-{
-  unsigned tid = TID_1D;
-
-  LEVEL = *cl_LEVEL;
-  while (pipe.in_wl().nitems())
-  {
-    bfs_kernel <<<blocks, __tb_bfs_kernel>>>(gg, LEVEL, enable_lb, pipe.in_wl(), pipe.out_wl());
-    cudaDeviceSynchronize();
-    pipe.in_wl().swap_slots();
-    cudaDeviceSynchronize();
-    pipe.advance2();
-    LEVEL++;
-  }
-  if (tid == 0)
-  {
-    *cl_LEVEL = LEVEL;
-  }
-}
 void gg_main_pipe_1_wrapper(CSRGraph& gg, int& LEVEL, PipeContextT<Worklist2>& pipe, dim3& blocks, dim3& threads)
 {
   static GlobalBarrierLifetime gg_main_pipe_1_gpu_gb_barrier;
@@ -360,7 +341,6 @@ void gg_main_pipe_1_wrapper(CSRGraph& gg, int& LEVEL, PipeContextT<Worklist2>& p
     check_cuda(cudaMalloc(&cl_LEVEL, sizeof(int) * 1));
     check_cuda(cudaMemcpy(cl_LEVEL, &LEVEL, sizeof(int) * 1, cudaMemcpyHostToDevice));
 
-    // gg_main_pipe_1_gpu<<<1,1>>>(gg,LEVEL,pipe,blocks,threads,cl_LEVEL, enable_lb);
     gg_main_pipe_1_gpu_gb<<<gg_main_pipe_1_gpu_gb_blocks, __tb_gg_main_pipe_1_gpu_gb>>>(gg,LEVEL,pipe,cl_LEVEL, enable_lb, gg_main_pipe_1_gpu_gb_barrier);
     check_cuda(cudaMemcpy(&LEVEL, cl_LEVEL, sizeof(int) * 1, cudaMemcpyDeviceToHost));
     check_cuda(cudaFree(cl_LEVEL));
