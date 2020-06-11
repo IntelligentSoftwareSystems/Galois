@@ -5,7 +5,7 @@
 #include "cub/util_allocator.cuh"
 #include "thread_work.h"
 
-mgpu::standard_context_t context;
+//mgpu::standard_context_t context;
 
 void kernel_sizing(CSRGraphTex &, dim3 &, dim3 &);
 #define TB_SIZE 256
@@ -214,6 +214,7 @@ void gg_main(CSRGraphTex& hg, CSRGraphTex& gg)
   unsigned long int rweight = 0;
   size_t nmstedges ;
   nmstedges = ew.nitems();
+  mgpu::standard_context_t context;
   mgpu::reduce(ew.list.gpu_rd_ptr(), nmstedges, &rweight, mgpu::plus_t<long unsigned int>(), context);
   printf("number of iterations: %d\n", level);
   printf("final mstwt: %llu\n", rweight);

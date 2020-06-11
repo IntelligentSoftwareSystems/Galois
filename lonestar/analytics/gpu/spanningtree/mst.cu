@@ -22,8 +22,11 @@
 #include "cub/cub.cuh"
 #include "cub/util_allocator.cuh"
 #include "thread_work.h"
+//#include <thrust/reduce.h>
+//#include <thrust/extrema.h>
+//#include <thrust/execution_policy.h>
 
-mgpu::standard_context_t context;
+//mgpu::standard_context_t context;
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
@@ -270,8 +273,14 @@ void gg_main(CSRGraph& hg, CSRGraph& gg)
   size_t nmstedges ;
   // FP: "24 -> 25;
   nmstedges = ew.nitems();
-  mgpu::reduce(ew.list.gpu_rd_ptr(), nmstedges, &rweight, mgpu::plus_t<long unsigned int>(), context);
-  // FP: "25 -> 26;
+  printf("nmstedges = %d\n", nmstedges);
+  //mgpu::standard_context_t context;
+  //mgpu::reduce(ew.list.gpu_rd_ptr(), nmstedges, &rweight, mgpu::plus_t<long unsigned int>(), context);
+  //rweight = thrust::reduce(thrust::device, ew.list.gpu_rd_ptr(), ew.list.gpu_rd_ptr() + nmstedges, 0, thrust::plus<long unsigned int>());
+  int *h_list = (int *)malloc(nmstedges*sizeof(int));
+  check_cuda(cudaMemcpy(h_list, ew.list.gpu_rd_ptr(), nmstedges * sizeof(int), cudaMemcpyDeviceToHost));
+  for (size_t i = 0; i < nmstedges; i ++) rweight += h_list[i];
+ 
   printf("final mstwt: %llu\n", rweight);
   printf("total edges: %llu, total components: %llu\n", nmstedges, cs.numberOfComponentsHost());
   // FP: "26 -> 27;
