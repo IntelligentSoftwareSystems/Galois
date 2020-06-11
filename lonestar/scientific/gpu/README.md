@@ -29,7 +29,7 @@ Note that distributed Galois requires the cub and moderngpu git submodules, whic
 ```Shell
 cd $GALOIS_ROOT
 git submodule init
-git submodule update --remote
+git submodule update 
 ```
 These modules will be available in the ${GALOIS\_ROOT}/external directory
 
