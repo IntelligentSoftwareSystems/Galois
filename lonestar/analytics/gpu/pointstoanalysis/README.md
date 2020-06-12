@@ -24,4 +24,6 @@ RUN
 
 To run default algorithm, use the following:
 
--`$ ./pta <nodes-file> <constraints-file> <hcd-table solution-file> [TRANSFER, VERIFY]
+-`$ ./pta <nodes-file> <constraints-file> <hcd-table> <solution-file> [TRANSFER, VERIFY]`
+-`$ ./pta tshark_nodes.txt tshark_constraints_after_hcd.txt tshark_hcd.txt tshark_correct_soln_001.txt`
+
