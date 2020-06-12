@@ -1,11 +1,12 @@
 Overview of Graph Pattern Mining (GPM) in Galois
 ================================================================================
 
-This directory contains benchmarks that run using the Pangolin framework [1]
-for efficient and flexible graph mining.  It uses the bliss library [2][3] for
-graph isomorphism check.  The license for this library is in the bliss
-directory: note that **it does not use the same license as the rest of
-Galois**.
+This is the Pangolin framework [1] for efficient and flexible graph mining. 
+It uses the bliss library [2][3] for graph isomorphism check. 
+The license for this library is in the bliss directory: 
+note that **it does not use the same license as the rest of Galois**.
+To run Pangolin applications, please go to ../lonestarmine/README.md
+for more details.
 
 [1] Xuhao Chen, Roshan Dathathri, Gurbinder Gill, Keshav Pingali, 
 Pangolin: An Efficient and Flexible Graph Pattern Mining System on CPU and GPU, VLDB 2020
@@ -17,23 +18,8 @@ labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
 canonical labeling tool for large and sparse graphs. In Proceedings 
 of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 
-BUILD
-================================================================================
-
-Pangolin built by default. To enable GPU mining, you can give the
-`-DGALOIS_ENABLE_GPU=ON` setting to `cmake`.
-
-Note that heterogeneous Galois requires the cub git submodules, which can be cloned using the followed commands.
-
-```Shell
-cd $GALOIS_ROOT
-git submodule init
-git submodule update --remote
-```
-These modules will be cloned in the ${GALOIS\_ROOT}/external directory
-
 INPUT
-================================================================================
+===========
 
 We support four input graph format: **gr**, **txt**, **adj**, **mtx**.
 For unlabeled graphs, we use the gr graph format, same as other Galois benchmarks.
@@ -50,28 +36,41 @@ The **adj** format takes as input graphs with the following formats (vertex labe
 ```
 
 We currently do not support graphs label on edges.
-
 Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
-For testing, we have prepared a test graph **citeseer**. After running make input,
-the needed input files can be build in "$BUILD_DIR/inputs/Mining".
+For testing, we have prepared a test graph **citeseer** in $GALOIS_HOME/lonestarmine/test_data.
+
+BUILD
+===========
+
+1. Run cmake at BUILD directory: 
+
+`cd build; cmake -DUSE_PANGOLIN=1 ../`
+
+To enable GPU mining, use: 
+
+`cmake -DUSE_PANGOLIN=1 -DUSE_GPU=1 ../`
+
+2. Run make:
+
+`cd <BUILD>/lonestar/experimental/fsm; make -j`
 
 RUN
-================================================================================
+===========
 
 The following are a few example command lines.
 
-- `$ ./triangle-counting-mining-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -t 28`
-- `$ ./k-clique-listing-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -k=3 -t 28`
-- `$ ./motif-counting-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -k=3 -t 56`
-- `$ ./frequent-subgraph-mining-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.sadj -ft adj -k=2 -ms=300 -t 28`
+- `$ ./tc_mine gr $GALOIS_HOME/lonestarmine/test_data/citeseer.csgr -t 28`
+- `$ ./kcl gr $GALOIS_HOME/lonestarmine/test_data/citeseer.csgr -k=3 -t 28`
+- `$ ./motif gr $GALOIS_HOME/lonestarmine/test_data/citeseer.csgr -k=3 -t 56`
+- `$ ./fsm adj $GALOIS_HOME/lonestarmine/test_data/citeseer.sadj -k=2 -ms=300 -t 28`
 
 PERFORMANCE
-================================================================================
+===========
 
 Please see details in the paper.
 
 CITATION
-================================================================================
+==========
 
 Please cite the following paper if you use Pangolin:
 
@@ -90,3 +89,4 @@ Please cite the following paper if you use Pangolin:
 	publisher = {VLDB Endowment},
 }
 ```
+

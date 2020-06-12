@@ -88,8 +88,10 @@ if (GALOIS_USE_SANITIZE_COVERAGE)
 endif()
 
 if (GALOIS_USE_SANITIZER MATCHES ".*Undefined.*")
-  set(BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/config/sanitizers/ubsan_blacklist.txt")
-  if (EXISTS "${BLACKLIST_FILE}")
+  set(BLACKLIST_CONFIGURE_FILE "${PROJECT_SOURCE_DIR}/config/sanitizers/ubsan_blacklist.txt.in")
+  if (EXISTS "${BLACKLIST_CONFIGURE_FILE}")
+    set(BLACKLIST_FILE "${PROJECT_BINARY_DIR}/config/sanitizers/ubsan_blacklist.txt")
+    configure_file("${BLACKLIST_CONFIGURE_FILE}" "${BLACKLIST_FILE}")
     append("-fsanitize-blacklist=${BLACKLIST_FILE}"
            CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
   endif()
