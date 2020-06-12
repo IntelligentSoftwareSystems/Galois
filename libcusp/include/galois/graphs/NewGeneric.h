@@ -56,7 +56,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   std::vector<uint64_t> old_hostLoads;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(this->isLocal(gid));
+    assert(base_DistGraph::isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -80,17 +80,17 @@ public:
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
 private:
-  virtual unsigned get_host_id_impl(uint64_t gid) const {
+  virtual unsigned getHostIDImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->retrieveMaster(gid);
   }
 
-  virtual bool is_owned_impl(uint64_t gid) const {
+  virtual bool isOwnedImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
   }
 
-  virtual bool is_local_impl(uint64_t gid) const {
+  virtual bool isLocalImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (base_DistGraph::globalToLocalMap.find(gid) !=
             base_DistGraph::globalToLocalMap.end());
@@ -100,10 +100,10 @@ private:
   // TODO make it so user doens't have to specify; can be done by tracking
   // if an outgoing mirror is marked as having an incoming edge on any
   // host
-  virtual bool is_vertex_cut_impl() const {
+  virtual bool isVertexCutImpl() const {
     return graphPartitioner->isVertexCut();
   }
-  virtual std::pair<unsigned, unsigned> cartesian_grid_impl() const {
+  virtual std::pair<unsigned, unsigned> cartesianGridImpl() const {
     return graphPartitioner->cartesianGrid();
   }
 
@@ -2654,7 +2654,7 @@ private:
           [&](uint64_t src) {
             uint32_t lsrc    = 0;
             uint64_t curEdge = 0;
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               lsrc = this->G2L(src);
               curEdge =
                   *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
@@ -2685,7 +2685,7 @@ private:
 
               if (hostBelongs == id) {
                 // edge belongs here, construct on self
-                assert(this->isLocal(src));
+                assert(base_DistGraph::isLocal(src));
                 uint32_t ldst = this->G2L(gdst);
                 graph.constructEdge(curEdge++, ldst, gdata);
                 // TODO
@@ -2698,7 +2698,7 @@ private:
             }
 
             // make sure all edges accounted for if local
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               assert(curEdge == (*graph.edge_end(lsrc)));
             }
 
@@ -2807,7 +2807,7 @@ private:
           [&](uint64_t src) {
             uint32_t lsrc    = 0;
             uint64_t curEdge = 0;
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               lsrc = this->G2L(src);
               curEdge =
                   *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
@@ -2833,7 +2833,7 @@ private:
 
               if (hostBelongs == id) {
                 // edge belongs here, construct on self
-                assert(this->isLocal(src));
+                assert(base_DistGraph::isLocal(src));
                 uint32_t ldst = this->G2L(gdst);
                 graph.constructEdge(curEdge++, ldst);
                 // TODO
@@ -2845,7 +2845,7 @@ private:
             }
 
             // make sure all edges accounted for if local
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               assert(curEdge == (*graph.edge_end(lsrc)));
             }
 
@@ -2925,7 +2925,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(this->isLocal(n));
+        assert(base_DistGraph::isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);

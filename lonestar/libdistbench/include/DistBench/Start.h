@@ -75,6 +75,13 @@ extern cll::opt<std::string> personality_set;
 void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
+template <typename NodeData, typename EdgeData>
+using DistGraphPtr =
+    std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
+template <typename NodeData, typename EdgeData>
+using DistSubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<
+    galois::graphs::DistGraph<NodeData, EdgeData>>>;
+
 #ifdef GALOIS_ENABLE_GPU
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
@@ -90,10 +97,9 @@ void heteroSetup(std::vector<unsigned>& scaleFactor);
  * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
-static void marshalGPUGraph(
-    galois::graphs::GluonSubstrate<
-        galois::graphs::DistGraph<NodeData, EdgeData>>* gluonSubstrate,
-    struct CUDA_Context** cuda_ctx) {
+static void
+marshalGPUGraph(DistSubstratePtr<NodeData, EdgeData>& gluonSubstrate,
+                struct CUDA_Context** cuda_ctx) {
   auto& net                 = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
 
@@ -116,13 +122,6 @@ static void marshalGPUGraph(
   marshalTimer.stop();
 }
 #endif
-
-template <typename NodeData, typename EdgeData>
-using DistGraphPtr =
-    std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
-template <typename NodeData, typename EdgeData>
-using DistSubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<
-    galois::graphs::DistGraph<NodeData, EdgeData>>>;
 
 /**
  * Loads a graph into memory. Details/partitioning will be handled in the

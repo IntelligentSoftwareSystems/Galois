@@ -77,6 +77,13 @@ extern cll::opt<std::string> personality_set;
 void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
+template <typename NodeData, typename EdgeData>
+using MiningGraphPtr = std::unique_ptr<
+    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>;
+template <typename NodeData, typename EdgeData>
+using MiningSubstratePtr = std::unique_ptr<galois::graphs::GluonEdgeSubstrate<
+    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>>;
+
 #ifdef GALOIS_ENABLE_GPU
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
@@ -92,10 +99,9 @@ void heteroSetup(std::vector<unsigned>& scaleFactor);
  * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
-static void marshalGPUGraph(
-    galois::graphs::GluonEdgeSubstrate<galois::graphs::MiningGraph<
-        NodeData, EdgeData, MiningPolicyDegrees>>* GluonEdgeSubstrate,
-    struct CUDA_Context** cuda_ctx, bool LoadProxyEdges = true) {
+static void
+marshalGPUGraph(MiningSubstratePtr<NodeData, EdgeData>& GluonEdgeSubstrate,
+                struct CUDA_Context** cuda_ctx, bool LoadProxyEdges = true) {
   auto& net                 = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
 
@@ -117,13 +123,6 @@ static void marshalGPUGraph(
   marshalTimer.stop();
 }
 #endif
-
-template <typename NodeData, typename EdgeData>
-using MiningGraphPtr = std::unique_ptr<
-    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>;
-template <typename NodeData, typename EdgeData>
-using MiningSubstratePtr = std::unique_ptr<galois::graphs::GluonEdgeSubstrate<
-    galois::graphs::MiningGraph<NodeData, EdgeData, MiningPolicyDegrees>>>;
 
 /**
  */
