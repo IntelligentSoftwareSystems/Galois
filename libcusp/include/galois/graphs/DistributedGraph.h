@@ -530,26 +530,38 @@ public:
 
   std::vector<std::vector<size_t>>& getMirrorNodes() { return mirrorNodes; }
 
+private:
+  virtual unsigned get_host_id_impl(uint64_t) const = 0;
+  virtual bool is_owned_impl(uint64_t) const        = 0;
+  virtual bool is_local_impl(uint64_t) const        = 0;
+  virtual bool is_vertex_cut_impl() const           = 0;
+  virtual std::pair<unsigned, unsigned> cartesian_grid_impl() const {
+    return std::make_pair(0u, 0u);
+  }
+
+public:
   virtual ~DistGraph() {}
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
-  virtual unsigned getHostID(uint64_t) const = 0;
+  inline unsigned getHostID(uint64_t gid) const {
+    return get_host_id_impl(gid);
+  }
   //! Determine if a node has a master on this host.
   //! @returns True if passed in global id has a master on this host
-  virtual bool isOwned(uint64_t) const = 0;
+  inline bool isOwned(uint64_t gid) const { return is_owned_impl(gid); }
   //! Determine if a node has a proxy on this host
   //! @returns True if passed in global id has a proxy on this host
-  virtual bool isLocal(uint64_t) const = 0;
+  inline bool isLocal(uint64_t gid) const { return is_local_impl(gid); }
   /**
    * Returns true if current partition is a vertex cut
    * @returns true if partition being stored in this graph is a vertex cut
    */
-  virtual bool is_vertex_cut() const = 0;
+  inline bool is_vertex_cut() const { return is_vertex_cut_impl(); }
   /**
    * Returns Cartesian split (if it exists, else returns pair of 0s
    */
-  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
-    return std::make_pair(0u, 0u);
+  inline std::pair<unsigned, unsigned> cartesianGrid() const {
+    return cartesian_grid_impl();
   }
 
   bool isTransposed() { return transposed; }

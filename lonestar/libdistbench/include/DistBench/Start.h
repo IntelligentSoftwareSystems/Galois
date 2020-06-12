@@ -120,8 +120,6 @@ static void marshalGPUGraph(
 template <typename NodeData, typename EdgeData>
 using DistGraphPtr =
     std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
-template <typename Graph>
-using SubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<Graph>>;
 template <typename NodeData, typename EdgeData>
 using DistSubstratePtr = std::unique_ptr<galois::graphs::GluonSubstrate<
     galois::graphs::DistGraph<NodeData, EdgeData>>>;

@@ -56,7 +56,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   std::vector<uint64_t> old_hostLoads;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
+    assert(this->isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -79,17 +79,18 @@ public:
   //! typedef for base DistGraph class
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
-  virtual unsigned getHostID(uint64_t gid) const {
+private:
+  virtual unsigned get_host_id_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->retrieveMaster(gid);
   }
 
-  virtual bool isOwned(uint64_t gid) const {
+  virtual bool is_owned_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
   }
 
-  virtual bool isLocal(uint64_t gid) const {
+  virtual bool is_local_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (base_DistGraph::globalToLocalMap.find(gid) !=
             base_DistGraph::globalToLocalMap.end());
@@ -99,11 +100,14 @@ public:
   // TODO make it so user doens't have to specify; can be done by tracking
   // if an outgoing mirror is marked as having an incoming edge on any
   // host
-  virtual bool is_vertex_cut() const { return graphPartitioner->isVertexCut(); }
-  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
+  virtual bool is_vertex_cut_impl() const {
+    return graphPartitioner->isVertexCut();
+  }
+  virtual std::pair<unsigned, unsigned> cartesian_grid_impl() const {
     return graphPartitioner->cartesianGrid();
   }
 
+public:
   /**
    * Reset load balance on host reducibles.
    */
@@ -2921,7 +2925,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
+        assert(this->isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);

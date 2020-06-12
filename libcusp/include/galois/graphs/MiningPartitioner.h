@@ -50,7 +50,7 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
   std::unique_ptr<Partitioner> graphPartitioner;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
+    assert(this->isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -162,22 +162,24 @@ public:
     return -1;
   }
 
-  virtual unsigned getHostID(uint64_t gid) const {
+private:
+  virtual unsigned get_host_id_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->retrieveMaster(gid);
   }
 
-  virtual bool isOwned(uint64_t gid) const {
+  virtual bool is_owned_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
   }
 
-  virtual bool isLocal(uint64_t gid) const {
+  virtual bool is_local_impl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (base_DistGraph::globalToLocalMap.find(gid) !=
             base_DistGraph::globalToLocalMap.end());
   }
 
+public:
   /**
    * Constructor
    */
@@ -1111,7 +1113,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
+        assert(this->isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
@@ -1149,7 +1151,8 @@ private:
     }
   }
 
-  virtual bool is_vertex_cut() const { return false; }
+private:
+  virtual bool is_vertex_cut_impl() const { return false; }
 };
 
 // make GRNAME visible to public
