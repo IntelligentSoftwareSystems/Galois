@@ -26,3 +26,9 @@ RUN
 The following is an example command line.
 
 -`$ ./k-clique-listing-cpu -symmetricGraph -simpleGraph <path-to-graph> -k=3 -t 40`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.
+

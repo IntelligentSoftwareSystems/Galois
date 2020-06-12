@@ -33,3 +33,9 @@ RUN
 The following is an example command line.
 
 -`$ ./motif-counting-cpu -symmetricGraph -simpleGraph <path-to-graph> -k=3 -t 28`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.
+

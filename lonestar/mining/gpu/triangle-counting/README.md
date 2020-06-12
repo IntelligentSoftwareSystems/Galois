@@ -26,3 +26,8 @@ RUN
 The following is an example command line.
 
 -`$ ./triangle-counting-gpu -symmetricGraph -simpleGraph <path-to-graph> -k=3 -t 40`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.

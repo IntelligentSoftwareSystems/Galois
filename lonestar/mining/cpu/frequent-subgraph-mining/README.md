@@ -49,3 +49,9 @@ RUN
 The following is an example command line.
 
 -`$ ./frequent-subgraph-mining-cpu <path-to-graph> -symmetricGraph -simpleGraph -k=3 -minsup=300 -t 40`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.
+
