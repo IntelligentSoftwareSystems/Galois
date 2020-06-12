@@ -27,7 +27,7 @@ public:
   unsigned read_graph(std::string filetype, std::string filename) {
     max_degree = util::read_graph(graph, filetype, filename, enable_dag);
     graph.degree_counting();
-    degrees = graph.degrees;
+    degrees = graph.degrees.data();
     std::cout << "Input graph: num_vertices " << graph.size() << " num_edges "
               << graph.sizeEdges() << "\n";
     // util::print_graph(graph);
