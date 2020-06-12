@@ -51,17 +51,18 @@ The **adj** format takes as input graphs with the following formats (vertex labe
 We currently do not support graphs label on edges.
 
 Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
-For testing, we have prepared a test graph **citeseer** in `$SRC_DIR/lonestarmine/test_data`.
+For testing, we have prepared a test graph **citeseer**. After running make input,
+the needed input files can be build in "$BUILD_DIR/inputs/Mining".
 
 Running Provided Apps
 ================================================================================
 
 The following are a few example command lines.
 
-- `$ ./tc_mine $SRC_DIR/lonestarmine/test_data/citeseer.csgr -t 28`
-- `$ ./kcl $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 28`
-- `$ ./motif $SRC_DIR/lonestarmine/test_data/citeseer.csgr -k=3 -t 56`
-- `$ ./fsm $SRC_DIR/lonestarmine/test_data/citeseer.sadj -ft adj -k=2 -ms=300 -t 28`
+- `$ ./triangle-counting-mining-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -t 28`
+- `$ ./k-clique-listing-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -k=3 -t 28`
+- `$ ./motif-counting-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.csgr -k=3 -t 56`
+- `$ ./frequent-subgraph-mining-cpu -symmetricGraph -simpleGraph $BUILD_DIR/inputs/Mining/citeseer.sadj -ft adj -k=2 -ms=300 -t 28`
 
 PERFORMANCE
 ================================================================================
