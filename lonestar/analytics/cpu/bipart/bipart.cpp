@@ -66,7 +66,7 @@ static cll::opt<bool>
     verbose("verbose",
             cll::desc("verbose output (debugging mode, takes extra time)"),
             cll::init(false));
-static cll::opt<std::string> outfile("output",
+static cll::opt<std::string> outfile("outputFile",
                                      cll::desc("output partition file name"));
 static cll::opt<std::string>
     orderedfile("ordered", cll::desc("output ordered graph file name"));
@@ -93,6 +93,10 @@ static cll::opt<bool>
     hMetisGraph("hMetisGraph",
                 cll::desc("Specify that the input graph is a hMetis"),
                 cll::init(false));
+
+static cll::opt<bool>
+    output("output", cll::desc("Specify if partitions need to be written"),
+           cll::init(false));
 
 // const double COARSEN_FRACTION = 0.9;
 
@@ -448,5 +452,24 @@ int main(int argc, char** argv) {
 
   totalTime.stop();
 
+  if (output) {
+
+    std::cout << "hedgs: " << graph.hedges << "\n";
+    std::cout << "size: " << graph.size() << "\n";
+    std::vector<uint32_t> parts(graph.size() - graph.hedges);
+    std::vector<uint64_t> IDs(graph.size() - graph.hedges);
+
+    for (GNode n = graph.hedges; n < graph.size(); n++) {
+      parts[n - graph.hedges] = graph.getData(n).getPart();
+      IDs[n - graph.hedges]   = n - graph.hedges + 1;
+    }
+
+    std::ofstream outputFile(outfile.c_str());
+
+    for (size_t i = 0; i < parts.size(); i++)
+      outputFile << IDs[i] << " " << parts[i] << "\n";
+
+    outputFile.close();
+  }
   return 0;
 }
