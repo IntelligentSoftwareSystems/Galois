@@ -49,7 +49,7 @@ PERFORMANCE
 
 The performance analysis of distributed triangle counting can be found at [1]. The key observations from our study are as follows.
 
-* On a single GPU, we do not partition the graph, so application performance better due to the computation phase on the GPU.
+* On a single GPU, we do not partition the graph, so application performance is better due to the computation phase on the GPU.
 
 * For distributed multi-GPUs,  we observe that application scales. With the increase in the number of GPUs,  the time taken to compute the number of triangles decreases since our algorithm is free from the synchronization except for the final aggregation.
 
