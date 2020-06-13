@@ -35,9 +35,9 @@ class PangolinGraph
     : public galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
           true>::type ::with_no_lockable<true>::type {
 public:
-  uint32_t* degrees;
+  galois::gstl::Vector<uint32_t> degrees;
   void degree_counting() {
-    degrees = new uint32_t[numNodes];
+    degrees.resize(numNodes);
     galois::do_all(
         galois::iterate(begin(), end()),
         [&](auto v) {

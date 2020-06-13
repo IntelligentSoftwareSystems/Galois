@@ -16,7 +16,6 @@
 #include "bmk2.h"
 #include <moderngpu/kernel_mergesort.hxx>
 
-extern mgpu::standard_context_t context;
 struct AppendOnlyList {
   int* dl;
   int *dindex, index;
@@ -44,6 +43,7 @@ struct AppendOnlyList {
   }
 
   void sort() {
+    mgpu::standard_context_t context;
     mergesort(list.gpu_wr_ptr(), nitems(), mgpu::less_t<int>(), context);
   }
 

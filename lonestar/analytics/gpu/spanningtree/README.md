@@ -26,3 +26,4 @@ RUN
 To run default algorithm, use the following:
 
 -`$ ./maximal-independent-gpu -o=<output-file> <input-graph> -symmetricGraph`
+-`$ ./maximal-independent-gpu -o=rmat15.out rmat15.sgr -symmetricGraph`

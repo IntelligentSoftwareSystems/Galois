@@ -23,8 +23,6 @@
 #include "cub/util_allocator.cuh"
 #include "thread_work.h"
 
-mgpu::standard_context_t context;
-
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
@@ -261,18 +259,16 @@ void gg_main(CSRGraph& hg, CSRGraph& gg)
           break;
         }
       }
-      // FP: "23 -> 24;
     }
   }
   pipe.free();
-  // FP: "11 -> 12;
   unsigned long int rweight = 0;
   size_t nmstedges ;
-  // FP: "24 -> 25;
   nmstedges = ew.nitems();
-  mgpu::reduce(ew.list.gpu_rd_ptr(), nmstedges, &rweight, mgpu::plus_t<long unsigned int>(), context);
-  // FP: "25 -> 26;
+  printf("nmstedges = %d\n", nmstedges);
+  int *h_list = (int *)malloc(nmstedges*sizeof(int));
+  check_cuda(cudaMemcpy(h_list, ew.list.gpu_rd_ptr(), nmstedges * sizeof(int), cudaMemcpyDeviceToHost));
+  for (size_t i = 0; i < nmstedges; i ++) rweight += h_list[i];
   printf("final mstwt: %llu\n", rweight);
   printf("total edges: %llu, total components: %llu\n", nmstedges, cs.numberOfComponentsHost());
-  // FP: "26 -> 27;
 }

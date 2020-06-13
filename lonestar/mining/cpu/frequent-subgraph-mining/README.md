@@ -16,12 +16,12 @@ of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 INPUT
 --------------------------------------------------------------------------------
 
-We support the following four input graph formats: **gr**, **txt**, **adj**, **mtx**.
+We support the following input graph formats: **txt**, **adj**.
 
-We mostly use **adj** format as also used by Arabesque and RStream.
+We mostly use **adj** format as it is also used by Arabesque and RStream.
 The **adj** format takes as input graphs with the following formats:
 
-* **Graphs label on vertex(default)**
+* **Labels on vertices (default)**
 ```
 # <num vertices> <num edges>
 <vertex id> <vertex label> [<neighbour id1> <neighbour id2> ... <neighbour id n>]
@@ -32,7 +32,7 @@ The **adj** format takes as input graphs with the following formats:
 We currently do not support graph labels on edges.
 Vertex ids are expected to be sequential integers from 0 to (total number of vertices - 1).
 
-This application takes in symmetric and simple Galois .gr graphs.
+This application takes in symmetric and simple graphs.
 You must specify both the -symmetricGraph and the -simpleGraph flags when
 running this benchmark.
 
@@ -49,3 +49,9 @@ RUN
 The following is an example command line.
 
 -`$ ./frequent-subgraph-mining-cpu <path-to-graph> -symmetricGraph -simpleGraph -k=3 -minsup=300 -t 40`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.
+

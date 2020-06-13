@@ -5,8 +5,6 @@
 #include "cub/util_allocator.cuh"
 #include "thread_work.h"
 
-mgpu::standard_context_t context;
-
 void kernel_sizing(CSRGraphTex &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=texture $ cuda.use_worklist_slots=True $ cuda.worklist_type=texture";
@@ -214,6 +212,7 @@ void gg_main(CSRGraphTex& hg, CSRGraphTex& gg)
   unsigned long int rweight = 0;
   size_t nmstedges ;
   nmstedges = ew.nitems();
+  mgpu::standard_context_t context;
   mgpu::reduce(ew.list.gpu_rd_ptr(), nmstedges, &rweight, mgpu::plus_t<long unsigned int>(), context);
   printf("number of iterations: %d\n", level);
   printf("final mstwt: %llu\n", rweight);

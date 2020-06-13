@@ -31,3 +31,4 @@ RUN
 To run default algorithm, use the following:
 
 -`$ ./matrixcompletion <input-graph>`
+-`$ ./matrixcompletion Epinions_dataset.gr`
