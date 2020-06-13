@@ -16,12 +16,12 @@ of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 INPUT
 --------------------------------------------------------------------------------
 
-We support the following input graph formats: **txt**, **adj**, **mtx**.
+We support the following input graph formats: **txt**, **adj**.
 
 We mostly use **adj** format as also used by Arabesque and RStream.
 The **adj** format takes as input graphs with the following formats:
 
-* **Graph labels on vertices (default)**
+* **Labels on vertices (default)**
 ```
 # <num vertices> <num edges>
 <vertex id> <vertex label> [<neighbour id1> <neighbour id2> ... <neighbour id n>]
