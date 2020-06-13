@@ -80,7 +80,7 @@ typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 typedef GNode WorkItem;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 #include "pagerank_push_sync.hh"
 
@@ -433,7 +433,7 @@ struct PageRankSanity {
 /* Make results */
 /******************************************************************************/
 
-std::vector<float> makeResultsCPU(Graph* hg) {
+std::vector<float> makeResultsCPU(std::unique_ptr<Graph>& hg) {
   std::vector<float> values;
 
   values.reserve(hg->numMasters());
@@ -445,7 +445,7 @@ std::vector<float> makeResultsCPU(Graph* hg) {
 }
 
 #ifdef GALOIS_ENABLE_GPU
-std::vector<float> makeResultsGPU(Graph* hg) {
+std::vector<float> makeResultsGPU(std::unique_ptr<Graph>& hg) {
   std::vector<float> values;
 
   values.reserve(hg->numMasters());
@@ -456,10 +456,12 @@ std::vector<float> makeResultsGPU(Graph* hg) {
   return values;
 }
 #else
-std::vector<float> makeResultsGPU(Graph* /*unused*/) { abort(); }
+std::vector<float> makeResultsGPU(std::unique_ptr<Graph>& /*unused*/) {
+  abort();
+}
 #endif
 
-std::vector<float> makeResults(Graph* hg) {
+std::vector<float> makeResults(std::unique_ptr<Graph>& hg) {
   switch (personality) {
   case CPU:
     return makeResultsCPU(hg);
@@ -496,7 +498,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx);

@@ -33,6 +33,15 @@ wanted to use a GTX 1080 and a K80, the command would look like this:
 Note that heterogeneous Galois requires CUDA 8.0 and above and a compiler
 that is compatible with the CUDA version that you use.
 
+Note that heterogeneous Galois requires the cub and moderngpu git submodules, which can be cloned using the followed commands.
+
+```Shell
+cd $GALOIS_ROOT
+git submodule init
+git submodule update 
+```
+These modules will be cloned in the ${GALOIS\_ROOT}/external directory
+
 Compiling with distributed Galois will add the `distributed` directory under
 `lonestar/analytics` to the build folder.
 

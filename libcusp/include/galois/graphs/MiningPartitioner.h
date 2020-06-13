@@ -47,10 +47,10 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME          = "dGraph_Mining";
-  Partitioner* graphPartitioner;
+  std::unique_ptr<Partitioner> graphPartitioner;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
+    assert(base_DistGraph::isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -130,6 +130,24 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
     return nodeDegrees;
   }
 
+  virtual unsigned getHostIDImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return graphPartitioner->retrieveMaster(gid);
+  }
+
+  virtual bool isOwnedImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
+  }
+
+  virtual bool isLocalImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return (base_DistGraph::globalToLocalMap.find(gid) !=
+            base_DistGraph::globalToLocalMap.end());
+  }
+
+  virtual bool isVertexCutImpl() const { return false; }
+
 public:
   //! typedef for base DistGraph class
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
@@ -160,22 +178,6 @@ public:
       }
     }
     return -1;
-  }
-
-  virtual unsigned getHostID(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return graphPartitioner->retrieveMaster(gid);
-  }
-
-  virtual bool isOwned(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
-  }
-
-  virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return (base_DistGraph::globalToLocalMap.find(gid) !=
-            base_DistGraph::globalToLocalMap.end());
   }
 
   /**
@@ -213,9 +215,9 @@ public:
       ndegrees = getNodeDegrees(filename, base_DistGraph::numGlobalNodes);
     }
 
-    graphPartitioner =
-        new Partitioner(host, _numHosts, base_DistGraph::numGlobalNodes,
-                        base_DistGraph::numGlobalEdges, ndegrees);
+    graphPartitioner = std::make_unique<Partitioner>(
+        host, _numHosts, base_DistGraph::numGlobalNodes,
+        base_DistGraph::numGlobalEdges, ndegrees);
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -391,11 +393,6 @@ public:
           (totalEdgeProxies) / (double)globalKeptEdges);
     }
   }
-
-  /**
-   * Free the graph partitioner
-   */
-  ~MiningGraph() { delete graphPartitioner; }
 
 private:
   galois::DynamicBitSet
@@ -1003,7 +1000,7 @@ private:
         [&](uint64_t src) {
           uint32_t lsrc    = 0;
           uint64_t curEdge = 0;
-          if (this->isLocal(src)) {
+          if (base_DistGraph::isLocal(src)) {
             lsrc    = this->G2L(src);
             curEdge = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
@@ -1020,7 +1017,7 @@ private:
             uint32_t gdst = bufGraph.edgeDestination(*ee);
             // make sure this edge is going to be kept and not dropped
             if (graphPartitioner->keepEdge(src, gdst)) {
-              assert(this->isLocal(src));
+              assert(base_DistGraph::isLocal(src));
               uint32_t ldst = this->G2L(gdst);
               graph.constructEdge(curEdge++, ldst);
 
@@ -1040,7 +1037,7 @@ private:
           }
 
           // make sure all edges accounted for if local
-          if (this->isLocal(src)) {
+          if (base_DistGraph::isLocal(src)) {
             assert(curEdge == (*graph.edge_end(lsrc)));
           }
 
@@ -1116,7 +1113,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
+        assert(base_DistGraph::isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
@@ -1153,8 +1150,6 @@ private:
       graph.constructEdge(cur++, ldst);
     }
   }
-
-  virtual bool is_vertex_cut() const { return false; }
 };
 
 // make GRNAME visible to public

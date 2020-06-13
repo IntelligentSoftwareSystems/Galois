@@ -78,7 +78,7 @@ struct NodeData {
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
 typedef typename Graph::GraphNode GNode;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 #include "sgd_sync.hh"
 // TODO: Set seed
@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, double>(&cuda_ctx);

@@ -68,6 +68,29 @@ private:
 
   using GraphTy = galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>;
 
+  // vector for determining range objects for master nodes + nodes
+  // with edges (which includes masters)
+  //! represents split of all nodes among threads to balance edges
+  std::vector<uint32_t> allNodesRanges;
+  //! represents split of master nodes among threads to balance edges
+  std::vector<uint32_t> masterRanges;
+  //! represents split of nodes with edges (includes masters) among threads to
+  //! balance edges
+  std::vector<uint32_t> withEdgeRanges;
+  //! represents split of all nodes among threads to balance in-edges
+  std::vector<uint32_t> allNodesRangesIn;
+  //! represents split of master nodes among threads to balance in-edges
+  std::vector<uint32_t> masterRangesIn;
+
+  using NodeRangeType =
+      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
+
+  //! Vector of ranges that stores the 3 different range objects that a user is
+  //! able to access
+  std::vector<NodeRangeType> specificRanges;
+  //! Like specificRanges, but for in edges
+  std::vector<NodeRangeType> specificRangesIn;
+
 protected:
   //! The internal graph used by DistGraph to represent the graph
   GraphTy graph;
@@ -104,31 +127,6 @@ protected:
   //! LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
-private:
-  // vector for determining range objects for master nodes + nodes
-  // with edges (which includes masters)
-  //! represents split of all nodes among threads to balance edges
-  std::vector<uint32_t> allNodesRanges;
-  //! represents split of master nodes among threads to balance edges
-  std::vector<uint32_t> masterRanges;
-  //! represents split of nodes with edges (includes masters) among threads to
-  //! balance edges
-  std::vector<uint32_t> withEdgeRanges;
-  //! represents split of all nodes among threads to balance in-edges
-  std::vector<uint32_t> allNodesRangesIn;
-  //! represents split of master nodes among threads to balance in-edges
-  std::vector<uint32_t> masterRangesIn;
-
-  using NodeRangeType =
-      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
-
-  //! Vector of ranges that stores the 3 different range objects that a user is
-  //! able to access
-  std::vector<NodeRangeType> specificRanges;
-  //! Like specificRanges, but for in edges
-  std::vector<NodeRangeType> specificRangesIn;
-
-protected:
   //! Increments evilPhase, a phase counter used by communication.
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
@@ -530,25 +528,36 @@ public:
 
   std::vector<std::vector<size_t>>& getMirrorNodes() { return mirrorNodes; }
 
+private:
+  virtual unsigned getHostIDImpl(uint64_t) const = 0;
+  virtual bool isOwnedImpl(uint64_t) const       = 0;
+  virtual bool isLocalImpl(uint64_t) const       = 0;
+  virtual bool isVertexCutImpl() const           = 0;
+  virtual std::pair<unsigned, unsigned> cartesianGridImpl() const {
+    return std::make_pair(0u, 0u);
+  }
+
+public:
+  virtual ~DistGraph() {}
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
-  virtual unsigned getHostID(uint64_t) const = 0;
+  inline unsigned getHostID(uint64_t gid) const { return getHostIDImpl(gid); }
   //! Determine if a node has a master on this host.
   //! @returns True if passed in global id has a master on this host
-  virtual bool isOwned(uint64_t) const = 0;
+  inline bool isOwned(uint64_t gid) const { return isOwnedImpl(gid); }
   //! Determine if a node has a proxy on this host
   //! @returns True if passed in global id has a proxy on this host
-  virtual bool isLocal(uint64_t) const = 0;
+  inline bool isLocal(uint64_t gid) const { return isLocalImpl(gid); }
   /**
    * Returns true if current partition is a vertex cut
    * @returns true if partition being stored in this graph is a vertex cut
    */
-  virtual bool is_vertex_cut() const = 0;
+  inline bool is_vertex_cut() const { return isVertexCutImpl(); }
   /**
    * Returns Cartesian split (if it exists, else returns pair of 0s
    */
-  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
-    return std::make_pair(0u, 0u);
+  inline std::pair<unsigned, unsigned> cartesianGrid() const {
+    return cartesianGridImpl();
   }
 
   bool isTransposed() { return transposed; }

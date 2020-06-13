@@ -1,5 +1,8 @@
+Frequent Subgraph Mining
+================================================================================
+
 DESCRIPTION 
-===========
+--------------------------------------------------------------------------------
 
 This application does frequent subgraph mining in a graph using BFS 
 expansion. It uses the bliss library [1][2] for graph isomorphism check.
@@ -11,9 +14,9 @@ canonical labeling tool for large and sparse graphs. In Proceedings
 of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 
 INPUT
-===========
+--------------------------------------------------------------------------------
 
-We support four input graph format: **gr**, **txt**, **adj**, **mtx**.
+We support the following four input graph formats: **gr**, **txt**, **adj**, **mtx**.
 
 We mostly use **adj** format as also used by Arabesque and RStream.
 The **adj** format takes as input graphs with the following formats:
@@ -26,26 +29,23 @@ The **adj** format takes as input graphs with the following formats:
 ...
 ```
 
-We currently do not support graphs label on edges
+We currently do not support graph labels on edges.
+Vertex ids are expected to be sequential integers from 0 to (total number of vertices - 1).
 
-Vertex ids are expected to be sequential integers between 0 and (total number of vertices - 1).
+This application takes in symmetric and simple Galois .gr graphs.
+You must specify both the -symmetricGraph and the -simpleGraph flags when
+running this benchmark.
 
 BUILD
-===========
+--------------------------------------------------------------------------------
 
-1. Run cmake at BUILD directory `cd build; cmake -DUSE_EXP=1 ../`
+1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/lonestar/experimental/fsm; make -j`
+2. Run `cd <BUILD>/lonestar/mining/gpu/frequent-subgraph-mining; make -j`
 
 RUN
-===========
+--------------------------------------------------------------------------------
 
-The following are a few example command lines.
+The following is an example command line.
 
--`$ ./fsm <path-to-graph> -k=3 -minsup=300 -t 40`
-
-PERFORMANCE
-===========
-- I
-- I
-- I
+-`$ ./frequent-subgraph-mining-gpu -symmetricGraph -simpleGraph <path-to-graph> -k=3 -minsup=300 -t 40`
