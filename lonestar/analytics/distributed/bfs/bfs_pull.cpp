@@ -75,7 +75,7 @@ typedef typename Graph::GraphNode GNode;
 
 galois::DynamicBitSet bitset_dist_current;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 #include "bfs_pull_sync.hh"
 
@@ -259,7 +259,7 @@ struct BFSSanityCheck {
 /* Make results */
 /******************************************************************************/
 
-std::vector<uint32_t> makeResultsCPU(Graph* hg) {
+std::vector<uint32_t> makeResultsCPU(std::unique_ptr<Graph>& hg) {
   std::vector<uint32_t> values;
 
   values.reserve(hg->numMasters());
@@ -271,7 +271,7 @@ std::vector<uint32_t> makeResultsCPU(Graph* hg) {
 }
 
 #ifdef GALOIS_ENABLE_GPU
-std::vector<uint32_t> makeResultsGPU(Graph* hg) {
+std::vector<uint32_t> makeResultsGPU(std::unique_ptr<Graph>& hg) {
   std::vector<uint32_t> values;
 
   values.reserve(hg->numMasters());
@@ -282,10 +282,12 @@ std::vector<uint32_t> makeResultsGPU(Graph* hg) {
   return values;
 }
 #else
-std::vector<uint32_t> makeResultsGPU(Graph* /*unused*/) { abort(); }
+std::vector<uint32_t> makeResultsGPU(std::unique_ptr<Graph>& /*unused*/) {
+  abort();
+}
 #endif
 
-std::vector<uint32_t> makeResults(Graph* hg) {
+std::vector<uint32_t> makeResults(std::unique_ptr<Graph>& hg) {
   switch (personality) {
   case CPU:
     return makeResultsCPU(hg);
@@ -317,7 +319,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void, false>(&cuda_ctx);

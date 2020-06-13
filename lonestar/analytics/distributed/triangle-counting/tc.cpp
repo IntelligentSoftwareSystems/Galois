@@ -59,7 +59,7 @@ struct NodeData {
 typedef galois::graphs::MiningGraph<NodeData, void, MiningPolicyDegrees> Graph;
 typedef typename Graph::GraphNode GNode;
 
-galois::graphs::GluonEdgeSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonEdgeSubstrate<Graph>> syncSubstrate;
 
 template <bool async>
 struct TC {
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void>(&cuda_ctx, false);

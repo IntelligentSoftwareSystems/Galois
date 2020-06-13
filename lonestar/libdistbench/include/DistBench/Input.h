@@ -116,6 +116,10 @@ extern cll::opt<std::string> mastersFile;
  * Graph-loading functions
  ******************************************************************************/
 
+template <typename NodeData, typename EdgeData>
+using DistGraphPtr =
+    std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
+
 /**
  * Loads a symmetric graph file (i.e. directed graph with edges in both
  * directions)
@@ -127,7 +131,7 @@ extern cll::opt<std::string> mastersFile;
  * loaded based on command line arguments
  */
 template <typename NodeData, typename EdgeData>
-galois::graphs::DistGraph<NodeData, EdgeData>*
+DistGraphPtr<NodeData, EdgeData>
 constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
   if (!inputFileSymmetric) {
     GALOIS_DIE("application requires a symmetric graph input;"
@@ -175,7 +179,7 @@ constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
         inputFileTranspose);
   default:
     GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
-    return nullptr;
+    return DistGraphPtr<NodeData, EdgeData>(nullptr);
   }
 }
 
@@ -194,7 +198,7 @@ constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
  */
 template <typename NodeData, typename EdgeData, bool iterateOut = true,
           typename std::enable_if<iterateOut>::type* = nullptr>
-galois::graphs::DistGraph<NodeData, EdgeData>*
+DistGraphPtr<NodeData, EdgeData>
 constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
   // 1 host = no concept of cut; just load from edgeCut, no transpose
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -287,7 +291,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
 
   default:
     GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
-    return nullptr;
+    return DistGraphPtr<NodeData, EdgeData>(nullptr);
   }
 }
 
@@ -307,8 +311,7 @@ constructGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
  */
 template <typename NodeData, typename EdgeData, bool iterateOut = true,
           typename std::enable_if<!iterateOut>::type* = nullptr>
-galois::graphs::DistGraph<NodeData, EdgeData>*
-constructGraph(std::vector<unsigned>&) {
+DistGraphPtr<NodeData, EdgeData> constructGraph(std::vector<unsigned>&) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // 1 host = no concept of cut; just load from edgeCut
@@ -407,7 +410,7 @@ constructGraph(std::vector<unsigned>&) {
 
   default:
     GALOIS_DIE("partition scheme specified is invalid: ", partitionScheme);
-    return nullptr;
+    return DistGraphPtr<NodeData, EdgeData>(nullptr);
   }
 }
 
