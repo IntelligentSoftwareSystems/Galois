@@ -194,6 +194,7 @@ add_custom_target(apps)
 
 # Core libraries (lib)
 add_subdirectory(libgalois)
+add_subdirectory(libpygalois)
 if (GALOIS_ENABLE_DIST)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
