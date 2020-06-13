@@ -34,7 +34,6 @@
 
 using namespace thrust;
 
-#if (__CUDACC_VER_MAJOR__ >= 9 && defined(__CUDA_ARCH__) &&  __CUDA_ARCH__ >= 300) 
 #define BALLOT_INST(x) {      \
   __ballot_sync(0xffffffff,x) \
 }
@@ -46,19 +45,6 @@ using namespace thrust;
 #define ANY_INST(x) {         \
   __any_sync(0xffffffff,x)    \
 }
-#else
-#define BALLOT_INST(x) {      \
-  __ballot(x)                 \
-}
-
-#define ALL_INST(x) {         \
-  __all(x)                    \
-}
-
-#define ANY_INST(x) {         \
-  __any(x)                    \
-}
-#endif
 
 __constant__ uint __storeStart__;
 __constant__ uint __loadInvStart__;
