@@ -80,7 +80,7 @@ typedef typename Graph::GraphNode GNode;
 
 galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
-#include "sgd_sync.hh"
+#include "matrixCompletion_sync.hh"
 // TODO: Set seed
 static double genRand() {
   // generate a random double in (-1,1)
