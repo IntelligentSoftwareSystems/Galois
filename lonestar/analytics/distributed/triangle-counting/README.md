@@ -42,3 +42,15 @@ To run on 6 GPUs on 2 machines h1 and h2 with 3 GPUs each, use the following:
 
 To run on 4 GPUs and 2 CPUs on 2 machines h1 and h2 with 2 GPUs and 1 CPU each, use the following:
 `mpirun -n=6 -hosts=h1,h2 ./triangle-counting-dist <symmetric-input-graph> -symmetricGraph -pset=ggc -num_nodes=2`
+
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+The performance analysis of distributed triangle counting can be found at [1]. The key observations from our study are as follows.
+
+* On a single GPU, we do not partition the graph, so application performance better due to the computation phase on the GPU.
+
+* For distributed multi-GPUs,  we observe that application scales. With the increase in the number of GPUs,  the time taken to compute the number of triangles decreases since our algorithm is free from the synchronization except for the final aggregation.
+
+[1] Loc Hoang, Vishwesh Jatala, Xuhao Chen, Udit Agarwal, Roshan Dathathri, Gurbinder Gill, and Keshav Pingali, [DistTC: High Performance Distributed Triangle Counting. In 2019 IEEE High Performance Extreme Computing Conference](https://ieeexplore.ieee.org/document/8916438), HPEC 2019. IEEE, 2019.
