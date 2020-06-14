@@ -36,17 +36,24 @@
 namespace algorithm {
 
 CutPool::CutPool(long int initialSize, int k, bool compTruth) {
-  this->blockSize = initialSize;
-  this->k         = k;
+  this->blockSize              = initialSize;
+  this->k                      = k;
+  std::size_t initialEntrySize = sizeof(Cut) + (k * sizeof(int));
   if (compTruth) {
-    this->entrySize = sizeof(Cut) + (k * sizeof(int)) +
-                      (Functional32::wordNum(k) * sizeof(unsigned int));
-  } else {
-    this->entrySize = sizeof(Cut) + (k * sizeof(int));
+    initialEntrySize += (Functional32::wordNum(k) * sizeof(unsigned int));
   }
-  this->entriesUsed  = 0;
-  this->entriesAlloc = 0;
-  this->entriesFree  = nullptr;
+  // We need to pad the allocation to make sure alignment constraints
+  // are still followed, however the computation used to do that
+  // assumes the conditions in this assertion.
+  static_assert(alignof(Cut) >= alignof(int) &&
+                alignof(Cut) >= alignof(unsigned));
+  constexpr std::size_t alignment = alignof(Cut);
+  std::size_t remainder           = initialEntrySize % alignment;
+  std::size_t padding             = remainder ? (alignment - remainder) : 0;
+  this->entrySize                 = initialEntrySize + padding;
+  this->entriesUsed               = 0;
+  this->entriesAlloc              = 0;
+  this->entriesFree               = nullptr;
 }
 
 CutPool::~CutPool() {
