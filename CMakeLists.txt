@@ -44,14 +44,13 @@ set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of ex
 set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
+set(GALOIS_NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
 
-set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
-
-if(NOT NUM_TEST_THREADS)
-  cmake_host_system_information(RESULT NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
+if(NOT GALOIS_NUM_TEST_THREADS)
+  cmake_host_system_information(RESULT GALOIS_NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
 endif()
-if(NUM_TEST_THREADS LESS_EQUAL 0)
-  set(NUM_TEST_THREADS 1)
+if(GALOIS_NUM_TEST_THREADS LESS_EQUAL 0)
+  set(GALOIS_NUM_TEST_THREADS 1)
 endif()
 
 ###### Configure (users don't need to go beyond here) ######
