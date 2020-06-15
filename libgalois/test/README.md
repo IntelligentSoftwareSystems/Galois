@@ -6,7 +6,7 @@ make input
 ```
 
 If you want to point the tests to an existing set of sample graphs, you
-can use the `cmake -DGRAPH_LOCATION=...`.
+can use the `cmake -DGALOIS_GRAPH_LOCATION=...`.
 
 # Common ctest commands
 

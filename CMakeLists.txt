@@ -29,7 +29,7 @@ set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(GALOIS_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(GALOIS_GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
@@ -172,10 +172,10 @@ include(CheckEndian)
 
 ###### Test Inputs ######
 
-if(GRAPH_LOCATION)
-  set(BASEINPUT "${GRAPH_LOCATION}")
-  set(BASEOUTPUT "${GRAPH_LOCATION}")
-  message(STATUS "Using graph input and output location ${GRAPH_LOCATION}")
+if(GALOIS_GRAPH_LOCATION)
+  set(BASEINPUT "${GALOIS_GRAPH_LOCATION}")
+  set(BASEOUTPUT "${GALOIS_GRAPH_LOCATION}")
+  message(STATUS "Using graph input and output location ${GALOIS_GRAPH_LOCATION}")
 elseif(EXISTS /net/ohm/export/iss)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph input location /net/ohm/export/iss/inputs")
