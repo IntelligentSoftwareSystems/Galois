@@ -59,9 +59,7 @@ enum GlobalPos { GLOBAL_BEGIN, GLOBAL_END };
 #ifdef ADAPTOR_BASED_OUTER_ITER
 
 template <typename PerThrdCont>
-struct WLindexer
-    : public std::unary_function<unsigned,
-                                 typename PerThrdCont::container_type&> {
+struct WLindexer {
   typedef typename PerThrdCont::container_type Ret_ty;
 
   PerThrdCont* wl;

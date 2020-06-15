@@ -392,7 +392,7 @@ struct DNewItem {
 
   bool operator!=(const DNewItem<T>& o) const { return !(*this == o); }
 
-  struct GetValue : public std::unary_function<DNewItem<T>, const T&> {
+  struct GetValue {
     const T& operator()(const DNewItem<T>& x) const { return x.val; }
   };
 };
@@ -965,7 +965,7 @@ class NewWorkManager : public IdManager<OptionsTy> {
   typedef FIFO<1024, Item> ReserveTy;
   typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize, NewItem> NewWork;
 
-  struct GetNewItem : public std::unary_function<int, NewItemsTy&> {
+  struct GetNewItem {
     NewWorkManager* self;
     GetNewItem(NewWorkManager* s = 0) : self(s) {}
     NewItemsTy& operator()(int i) const {

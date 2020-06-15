@@ -57,7 +57,7 @@ class PQuadTree {
     double best;
   };
 
-  struct DerefPointer : public std::unary_function<Point*, Point> {
+  struct DerefPointer {
     Point operator()(Point* p) const { return *p; }
   };
 
@@ -140,7 +140,7 @@ class PQuadTree {
     }
   };
 
-  struct Split : public std::unary_function<Point*, bool> {
+  struct Split {
     int index;
     TupleDataTy pivot;
     Split(int i, TupleDataTy p) : index(i), pivot(p) {}
@@ -382,7 +382,7 @@ class SQuadTree {
     double best;
   };
 
-  struct DerefPointer : public std::unary_function<Point*, Point> {
+  struct DerefPointer {
     Point operator()(Point* p) const { return *p; }
   };
 

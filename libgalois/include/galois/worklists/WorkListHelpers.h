@@ -175,7 +175,7 @@ public:
 };
 
 template <typename T>
-struct DummyIndexer : public std::unary_function<const T&, unsigned> {
+struct DummyIndexer {
   unsigned operator()(const T&) { return 0; }
 };
 

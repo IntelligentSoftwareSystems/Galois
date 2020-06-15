@@ -296,7 +296,7 @@ private:
 /**
  * Functor that indicates if a node contains outgoing edges
  */
-struct HasOut : public std::unary_function<GNode, bool> {
+struct HasOut {
   Graph* graph;
   HasOut(Graph* g) : graph(g) {}
 

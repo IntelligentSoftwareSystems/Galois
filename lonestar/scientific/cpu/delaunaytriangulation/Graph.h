@@ -54,7 +54,7 @@ struct Searcher : private boost::noncopyable {
   Searcher(Graph& g, const Alloc& a = allocator_type())
       : graph(g), matches(a), inside(a), alloc(a) {}
 
-  struct DetLess : public std::binary_function<GNode, GNode, bool> {
+  struct DetLess {
     Graph& g;
     DetLess(Graph& x) : g(x) {}
     bool operator()(GNode a, GNode b) const {

@@ -60,11 +60,11 @@ public:
   using GraphNode = uint64_t;
 
 private:
-  struct Convert32 : public std::unary_function<uint32_t, uint32_t> {
+  struct Convert32 {
     uint32_t operator()(uint32_t x) const { return convert_le32toh(x); }
   };
 
-  struct Convert64 : public std::unary_function<uint64_t, uint64_t> {
+  struct Convert64 {
     uint64_t operator()(uint64_t x) const { return convert_le64toh(x); }
   };
 

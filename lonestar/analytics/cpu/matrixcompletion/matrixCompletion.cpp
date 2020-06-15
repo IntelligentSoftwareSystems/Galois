@@ -384,7 +384,7 @@ struct SGDBlockJumpAlgo {
     size_t maxUpdates;
     galois::GAccumulator<double>* errorAccum;
 
-    struct GetDst : public std::unary_function<Graph::edge_iterator, GNode> {
+    struct GetDst {
       Graph* g;
       GetDst() {}
       GetDst(Graph* _g) : g(_g) {}

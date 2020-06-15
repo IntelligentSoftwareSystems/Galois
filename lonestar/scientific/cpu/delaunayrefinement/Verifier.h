@@ -28,7 +28,7 @@
 #include <iostream>
 
 class Verifier {
-  struct inconsistent : public std::unary_function<GNode, bool> {
+  struct inconsistent {
     Graph& graph;
     inconsistent(Graph& g) : graph(g) {}
 
@@ -56,7 +56,7 @@ class Verifier {
     }
   };
 
-  struct not_delaunay : public std::unary_function<GNode, bool> {
+  struct not_delaunay {
     Graph& graph;
     not_delaunay(Graph& g) : graph(g) {}
 

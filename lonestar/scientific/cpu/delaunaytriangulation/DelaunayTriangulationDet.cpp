@@ -80,7 +80,7 @@ static cll::opt<bool>
     meshGraph("meshGraph", cll::desc("Specify that the input graph is a mesh"),
               cll::init(false));
 
-struct GetPointer : public std::unary_function<Point&, Point*> {
+struct GetPointer {
   Point* operator()(Point& p) const { return &p; }
 };
 

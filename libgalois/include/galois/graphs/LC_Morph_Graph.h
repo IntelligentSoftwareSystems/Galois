@@ -178,7 +178,7 @@ protected:
   }; // end NodeInfo
 
   //! Functor that returns pointers to NodeInfo objects given references
-  struct makeGraphNode : public std::unary_function<NodeInfo&, NodeInfo*> {
+  struct makeGraphNode {
     //! Returns a pointer to the NodeInfo reference passed into this functor
     NodeInfo* operator()(NodeInfo& data) const { return &data; }
   };
