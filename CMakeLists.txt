@@ -28,7 +28,7 @@ set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
-set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
+set(GALOIS_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
@@ -154,7 +154,7 @@ find_package(Threads REQUIRED)
 include(CheckMmap)
 
 include(CheckHugePages)
-if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
+if(NOT HAVE_HUGEPAGES AND GALOIS_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
