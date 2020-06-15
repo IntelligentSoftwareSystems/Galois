@@ -41,7 +41,7 @@ set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 ###### Developer features ######
 set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
-set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(GALOIS_NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(GALOIS_NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")

@@ -197,7 +197,7 @@ if(GALOIS_ENABLE_DIST)
     set(multi_value_args)
     cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
-    set(num_gpus ${NUM_TEST_GPUS})
+    set(num_gpus ${GALOIS_NUM_TEST_GPUS})
     if (${X_NO_GPU})
       set(num_gpus 0)
     endif()
