@@ -45,11 +45,6 @@ set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single mach
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 
-# Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
-set(USE_EXP OFF CACHE BOOL "Use experimental features")
-set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
-set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
-
 set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
 
 if(NOT NUM_TEST_THREADS)
