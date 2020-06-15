@@ -570,42 +570,39 @@ make_two_level_end(Outer beg, Outer end, InnerBegFn innerBegFn,
 
 namespace internal {
 template <typename C>
-struct GetBegin : public std::unary_function<C&, typename C::iterator> {
+struct GetBegin {
   inline typename C::iterator operator()(C& c) const { return c.begin(); }
 };
 
 template <typename C>
-struct GetEnd : public std::unary_function<C&, typename C::iterator> {
+struct GetEnd {
   inline typename C::iterator operator()(C& c) const { return c.end(); }
 };
 
 // TODO: update to c++11 names
 template <typename C>
-struct GetCbegin
-    : public std::unary_function<const C&, typename C::const_iterator> {
+struct GetCbegin {
   inline typename C::const_iterator operator()(const C& c) const {
     return c.begin();
   }
 };
 
 template <typename C>
-struct GetCend
-    : public std::unary_function<const C&, typename C::const_iterator> {
+struct GetCend {
   inline typename C::const_iterator operator()(const C& c) const {
     return c.end();
   }
 };
 
 template <typename C>
-struct GetRbegin
-    : public std::unary_function<C&, typename C::reverse_iterator> {
+struct GetRbegin {
   inline typename C::reverse_iterator operator()(C& c) const {
     return c.rbegin();
   }
 };
 
 template <typename C>
-struct GetRend : public std::unary_function<C&, typename C::reverse_iterator> {
+struct GetRend {
   inline typename C::reverse_iterator operator()(C& c) const {
     return c.rend();
   }
@@ -613,16 +610,14 @@ struct GetRend : public std::unary_function<C&, typename C::reverse_iterator> {
 
 // TODO: update to c++11 names
 template <typename C>
-struct GetCRbegin
-    : public std::unary_function<const C&, typename C::const_reverse_iterator> {
+struct GetCRbegin {
   inline typename C::const_reverse_iterator operator()(const C& c) const {
     return c.rbegin();
   }
 };
 
 template <typename C>
-struct GetCRend
-    : public std::unary_function<const C&, typename C::const_reverse_iterator> {
+struct GetCRend {
   inline typename C::const_reverse_iterator operator()(const C& c) const {
     return c.rend();
   }

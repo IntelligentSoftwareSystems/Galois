@@ -98,7 +98,7 @@ struct sort_helper {
 
   //! Not equal in terms of less-than
   template <class value_type>
-  struct neq_to : public std::binary_function<value_type, value_type, bool> {
+  struct neq_to {
     Compare comp;
     neq_to(Compare c) : comp(c) {}
     bool operator()(const value_type& a, const value_type& b) const {

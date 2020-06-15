@@ -140,8 +140,7 @@ struct GreaterThanOrEqual {
 };
 
 template <typename G>
-struct DegreeLess : public std::binary_function<typename G::GraphNode,
-                                                typename G::GraphNode, bool> {
+struct DegreeLess {
   typedef typename G::GraphNode N;
   G* g;
   DegreeLess(G& g) : g(&g) {}
@@ -152,9 +151,7 @@ struct DegreeLess : public std::binary_function<typename G::GraphNode,
   }
 };
 template <typename G>
-struct DegreeGreater
-    : public std::binary_function<typename G::GraphNode, typename G::GraphNode,
-                                  bool> {
+struct DegreeGreater {
   typedef typename G::GraphNode N;
   G* g;
   DegreeGreater(G& g) : g(&g) {}
@@ -165,8 +162,7 @@ struct DegreeGreater
   }
 };
 template <typename G>
-struct GetDegree
-    : public std::unary_function<typename G::GraphNode, ptrdiff_t> {
+struct GetDegree {
   typedef typename G::GraphNode N;
   G* g;
   GetDegree(G& g) : g(&g) {}

@@ -221,7 +221,7 @@ void createCoarseEdges(MetisGraph* graph) {
       galois::steal(), galois::loopname("popedge"));
 }
 
-struct HighDegreeIndexer : public std::unary_function<GNode, unsigned int> {
+struct HighDegreeIndexer {
   static GGraph* indexgraph;
   unsigned int operator()(const GNode& val) const {
     return indexgraph->getData(val, galois::MethodFlag::UNPROTECTED)
@@ -237,7 +237,7 @@ struct HighDegreeIndexer : public std::unary_function<GNode, unsigned int> {
 };
 GGraph* HighDegreeIndexer::indexgraph = 0;
 
-struct LowDegreeIndexer : public std::unary_function<GNode, unsigned int> {
+struct LowDegreeIndexer {
   unsigned int operator()(const GNode& val) const {
     unsigned x = std::distance(HighDegreeIndexer::indexgraph->edge_begin(
                                    val, galois::MethodFlag::UNPROTECTED),
@@ -250,7 +250,7 @@ struct LowDegreeIndexer : public std::unary_function<GNode, unsigned int> {
   }
 };
 
-struct WeightIndexer : public std::unary_function<GNode, int> {
+struct WeightIndexer {
   int operator()(const GNode& val) const {
     return HighDegreeIndexer::indexgraph
         ->getData(val, galois::MethodFlag::UNPROTECTED)
