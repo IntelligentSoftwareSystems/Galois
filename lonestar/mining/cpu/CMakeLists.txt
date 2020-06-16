@@ -5,7 +5,7 @@ function(add_test_mine type app)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   set(threads)
-  set(thr "${NUM_TEST_THREADS}")
+  set(thr "${GALOIS_NUM_TEST_THREADS}")
   while (${thr} GREATER 1)
     list(APPEND threads ${thr})
     math(EXPR thr "${thr} / 2")

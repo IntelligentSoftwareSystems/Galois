@@ -28,8 +28,8 @@ set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
-set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(GALOIS_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
+set(GALOIS_GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
@@ -41,22 +41,16 @@ set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 ###### Developer features ######
 set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
-set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(GALOIS_NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
+set(GALOIS_NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
 
-# Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
-set(USE_EXP OFF CACHE BOOL "Use experimental features")
-set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
-set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
-
-set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
-
-if(NOT NUM_TEST_THREADS)
-  cmake_host_system_information(RESULT NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
+if(NOT GALOIS_NUM_TEST_THREADS)
+  cmake_host_system_information(RESULT GALOIS_NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
 endif()
-if(NUM_TEST_THREADS LESS_EQUAL 0)
-  set(NUM_TEST_THREADS 1)
+if(GALOIS_NUM_TEST_THREADS LESS_EQUAL 0)
+  set(GALOIS_NUM_TEST_THREADS 1)
 endif()
 
 ###### Configure (users don't need to go beyond here) ######
@@ -154,7 +148,7 @@ find_package(Threads REQUIRED)
 include(CheckMmap)
 
 include(CheckHugePages)
-if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
+if(NOT HAVE_HUGEPAGES AND GALOIS_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
@@ -178,10 +172,10 @@ include(CheckEndian)
 
 ###### Test Inputs ######
 
-if(GRAPH_LOCATION)
-  set(BASEINPUT "${GRAPH_LOCATION}")
-  set(BASEOUTPUT "${GRAPH_LOCATION}")
-  message(STATUS "Using graph input and output location ${GRAPH_LOCATION}")
+if(GALOIS_GRAPH_LOCATION)
+  set(BASEINPUT "${GALOIS_GRAPH_LOCATION}")
+  set(BASEOUTPUT "${GALOIS_GRAPH_LOCATION}")
+  message(STATUS "Using graph input and output location ${GALOIS_GRAPH_LOCATION}")
 elseif(EXISTS /net/ohm/export/iss)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph input location /net/ohm/export/iss/inputs")

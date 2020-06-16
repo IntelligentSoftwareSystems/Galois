@@ -5,7 +5,7 @@ function(add_test_scale type app)
   cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   set(threads)
-  set(thr "${NUM_TEST_THREADS}")
+  set(thr "${GALOIS_NUM_TEST_THREADS}")
   while (${thr} GREATER 1)
     list(APPEND threads ${thr})
     math(EXPR thr "${thr} / 2")
@@ -197,12 +197,12 @@ if(GALOIS_ENABLE_DIST)
     set(multi_value_args)
     cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
-    set(num_gpus ${NUM_TEST_GPUS})
+    set(num_gpus ${GALOIS_NUM_TEST_GPUS})
     if (${X_NO_GPU})
       set(num_gpus 0)
     endif()
 
-    set(num_threads ${NUM_TEST_THREADS})
+    set(num_threads ${GALOIS_NUM_TEST_THREADS})
 
     foreach (part oec iec cvc cvc-iec hovc hivc)
       if (NOT ${X_NO_ASYNC})
