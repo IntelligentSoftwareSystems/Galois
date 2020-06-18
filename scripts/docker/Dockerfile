@@ -21,6 +21,7 @@ RUN apt-get install -qy \
       gcc-9 \
       git \
       gosu \
+      libfmt-dev \
       libopenmpi-dev \
       llvm-10-dev \
       python3-pip \
