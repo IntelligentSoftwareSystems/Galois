@@ -59,11 +59,12 @@ using ResidualArray = galois::LargeArray<PRTy>;
 
 //! Initialize nodes for the topological algorithm.
 void initNodeDataTopological(Graph& g) {
+  PRTy init_value = 1.0f / g.size();
   galois::do_all(
       galois::iterate(g),
       [&](const GNode& n) {
         auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
-        sdata.value = INIT_RESIDUAL;
+        sdata.value = init_value;
         sdata.nout  = 0;
       },
       galois::no_stats(), galois::loopname("initNodeData"));
@@ -194,8 +195,9 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
  */
 void computePRTopological(Graph& graph) {
   unsigned int iteration = 0;
-  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> accum;
 
+  float base_score = (1.0f - ALPHA) / graph.size();
   while (true) {
     galois::do_all(
         galois::iterate(graph),
@@ -217,32 +219,31 @@ void computePRTopological(Graph& graph) {
 
           //! New value of pagerank after computing contributions from
           //! incoming edges in the original graph.
-          float value = sum * ALPHA + (1.0 - ALPHA);
+          float value = sum * ALPHA + base_score;
           //! Find the delta in new and old pagerank values.
           float diff = std::fabs(value - sdata.value);
 
           //! Do not update pagerank before the diff is computed since
           //! there is a data dependence on the pagerank value.
           sdata.value = value;
-          max_delta.update(diff);
+          accum += diff;
         },
         galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
         galois::loopname("PageRank"));
-
-    float delta = max_delta.reduce();
 
 #if DEBUG
     std::cout << "iteration: " << iteration << " max delta: " << delta << "\n";
 #endif
 
     iteration += 1;
-    if (delta <= tolerance || iteration >= maxIterations) {
+    if (accum.reduce() <= tolerance || iteration >= maxIterations) {
       break;
     }
-    max_delta.reset();
+    accum.reset();
 
   } ///< End while(true).
 
+  galois::runtime::reportStat_Single("PageRank", "Rounds", iteration);
   if (iteration >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iteration
               << " iterations\n";
