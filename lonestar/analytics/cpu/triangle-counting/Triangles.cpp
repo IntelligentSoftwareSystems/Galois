@@ -23,6 +23,7 @@
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
+#include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -356,9 +357,15 @@ void edgeIteratingAlgo(Graph& graph) {
 
 //! Sorts read graph by degree (high degree nodes are reindexed to beginning)
 void makeSortedGraph(Graph& graph) {
+  galois::StatTimer readTimer("ReadGraphTimer");
+  readTimer.start();
   // read original graph
-  galois::graphs::FileGraph initial;
-  initial.fromFileInterleaved<void>(inputFile);
+  galois::graphs::BufferedGraph<void> initial;
+  initial.loadGraph(inputFile);
+  readTimer.stop();
+
+  galois::StatTimer Trelabel("GraphRelabelTimer");
+  Trelabel.start();
 
   size_t numGraphNodes = initial.size();
   // create node -> degree pairs
@@ -368,14 +375,17 @@ void makeSortedGraph(Graph& graph) {
       galois::iterate(size_t{0}, numGraphNodes),
       [&](size_t nodeID) {
         size_t nodeDegree =
-            std::distance(initial.edge_begin(nodeID), initial.edge_end(nodeID));
+            std::distance(initial.edgeBegin(nodeID), initial.edgeEnd(nodeID));
         dnPairs[nodeID] = DegreeNodePair(nodeDegree, nodeID);
       },
       galois::loopname("CreateDegreeNodeVector"));
 
+  galois::StatTimer degSortTimer("DegreeSortTimer");
+  degSortTimer.start();
   // sort by degree (first item)
   galois::ParallelSTL::sort(dnPairs.begin(), dnPairs.end(),
                             std::greater<DegreeNodePair>());
+  degSortTimer.stop();
 
   // create mapping, get degrees out to another vector to get prefix sum
   std::vector<uint32_t> oldToNewMapping(numGraphNodes);
@@ -410,7 +420,7 @@ void makeSortedGraph(Graph& graph) {
   // construct edges by looping through filegraph and saving to correct
   // locations
   galois::do_all(
-      galois::iterate(initial.begin(), initial.end()),
+      galois::iterate(0u, initial.size()),
       [&](uint32_t oldNodeID) {
         uint32_t newIndex = oldToNewMapping[oldNodeID];
 
@@ -423,10 +433,10 @@ void makeSortedGraph(Graph& graph) {
         }
 
         // construct the graph, reindexing as it goes along
-        for (auto e = initial.edge_begin(oldNodeID);
-             e < initial.edge_end(oldNodeID); e++) {
+        for (auto e = initial.edgeBegin(oldNodeID);
+             e < initial.edgeEnd(oldNodeID); e++) {
           // get destination, reindex
-          uint32_t oldEdgeDst       = initial.getEdgeDst(e);
+          uint32_t oldEdgeDst       = initial.edgeDestination(*e);
           uint32_t reindexedEdgeDst = oldToNewMapping[oldEdgeDst];
 
           // construct edge
@@ -439,19 +449,22 @@ void makeSortedGraph(Graph& graph) {
       },
       galois::steal(), galois::loopname("ReindexingGraph"));
 
+  galois::StatTimer edgeSortTimer("EdgeSortTimer");
+  edgeSortTimer.start();
   // sort by destinations
   graph.sortAllEdgesByDst();
+  edgeSortTimer.stop();
+
   // initialize local ranges
   graph.initializeLocalRanges();
+
+  Trelabel.stop();
 }
 
 void readGraph(Graph& graph) {
   if (relabel) {
     galois::gInfo("Relabeling and sorting graph...");
-    galois::StatTimer Trelabel("GraphRelabelTimer");
-    Trelabel.start();
     makeSortedGraph(graph);
-    Trelabel.stop();
   } else {
     galois::graphs::readGraph(graph, inputFile);
     // algorithm correctness requires sorting edges by destination
