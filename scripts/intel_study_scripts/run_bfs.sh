@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "USAGE: ./run_pr.sh config1 2\n"
+echo -e "USAGE: ./run_bfs.sh config1 2\n"
 appname=bfs
 
 if [ -z ${GALOIS_BUILD} ];
@@ -44,48 +44,98 @@ else
 
 fi
 
-extension=sgr
-exec=bfsDO
-for run in $(seq 1 ${numRuns})
-do
-       for input in "kron" "road" "urand"
-       do
-           echo "Running on ${input}"
-              if [ ${input} == "road" ];
-                 then algo="Async"
-                 else algo="SyncDO"
-                 fi
-                 echo "Logs will be available in ${execDir}/logs/${input}"
-                 if [ ! -d "${execDir}/logs/${input}" ];
-                  then
-                    mkdir -p ${execDir}/logs/${input}
-                 fi
-               while read p; do
-                 source_node=$((${p} - 1))
-                 filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
-                 statfile="${filename}.stats"
-                 ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-               done < $inputDir/sources/GAP-${input}_sources.mtx
-       done
-done
-
-extension=gr
+exec=bfs-directionopt-cpu
 algo="SyncDO"
-for run in $(seq 1 ${numRuns})
-do
-       for input in "web" "twitter"
-       do
-        echo "Running on ${input}"
-        echo "Logs will be available in ${execDir}/logs/${input}"
-        if [ ! -d "${execDir}/logs/${input}" ];
-        then
-           mkdir -p ${execDir}/logs/${input}
-        fi
-        while read p; do
-          source_node=$((${p} - 1))
-          filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
-          statfile="${filename}.stats"
-          ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-          done < $inputDir/sources/GAP-${input}_sources.mtx
-        done
-done
+if [ ${configType} == "config1" ];
+then
+  ##NOTE: Using sgr for undirected graphs
+  extension=sgr
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+
+  ##NOTE: Using gr for directed graphs
+  extension=gr
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+fi
+
+exec=bfs-directionopt-cpu
+if [ ${configType} == "config2" ];
+then
+  extension=sgr
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand"
+    do
+      echo "Running on ${input}"
+      if [ ${input} == "road" ];
+      then algo="Async"
+      else algo="SyncDO"
+      fi
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+
+  extension=gr
+  algo="SyncDO"
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -algo=${algo} $inputDir/GAP-${input}.${extension} -t ${Threads} -preAlloc=1200  -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+fi

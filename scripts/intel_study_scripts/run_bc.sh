@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "USAGE: ./run_pr.sh config1 2\n"
+echo -e "USAGE: ./run_bc.sh config1 2\n"
 appname=betweennesscentrality
 
 if [ -z ${GALOIS_BUILD} ];
@@ -44,55 +44,109 @@ else
 
 fi
 
-extension=sgr
-for run in $(seq 1 ${numRuns})
-do
-       for input in "kron" "road" "urand"
-       do
-           echo "Running on ${input}"
-           if [ ${input} == "road" ];
-           then
-             exec="bc-async"
-           else exec="bc-level"
-           fi
-           echo "Logs will be available in ${execDir}/logs/${input}"
-           if [ ! -d "${execDir}/logs/${input}" ];
-            then
-              mkdir -p ${execDir}/logs/${input}
-           fi
-           for count in {0..15}
-           do
-             filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
-             statfile="${filename}.stats"
-             if [ ${input} == "road" ];
-             then
-               args=" -numOfSources=4 -numOfOutSources=4 -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
-             else
-               args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
-             fi
-             ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-           done 
-         done
-done
-
-extension=gr
-exec="bc-level"
-for run in $(seq 1 ${numRuns})
-do
-  for input in "web" "twitter"
+if [ ${configType} == "config1" ];
+then
+  #NOTE: Using sgr for undirected graphs
+  extension=sgr
+  exec="betweennesscentrality-level-cpu"
+  for run in $(seq 1 ${numRuns})
   do
-    echo "Running on ${input}"
-    echo "Logs will be available in ${execDir}/logs/${input}"
-    if [ ! -d "${execDir}/logs/${input}" ];
-    then
-      mkdir -p ${execDir}/logs/${input}
-    fi
-    for count in {0..15}
+    for input in "kron" "road" "urand"
     do
-      filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
-      statfile="${filename}.stats"
-      args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
-      ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      for count in {0..15}
+      do
+        filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+        ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done
     done
   done
-done
+
+  #NOTE: Using gr for directed graphs
+  extension=gr
+  exec="betweennesscentrality-level-cpu"
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      for count in {0..15}
+      do
+        filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+        ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done
+    done
+  done
+fi
+
+if [ ${configType} == "config2" ];
+then
+  #NOTE: Using sgr for undirected graphs
+  extension=sgr
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand"
+    do
+      echo "Running on ${input}"
+      if [ ${input} == "road" ];
+      then
+        exec="betweennesscentrality-async-cpu"
+      else exec="betweennesscentrality-level-cpu"
+      fi
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      for count in {0..15}
+      do
+        filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        if [ ${input} == "road" ];
+        then
+          args=" -numOfSources=4 -numOfOutSources=4 -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+        else
+          args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+        fi
+        ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done
+    done
+  done
+
+  #NOTE: Using gr for directed graphs
+  extension=gr
+  exec="betweennesscentrality-level-cpu"
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      for count in {0..15}
+      do
+        filename="${appname}_${input}_file_${count}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        args=" -numOfSources=4  -sourcesToUse="$inputDir/sources/GAP-${input}-bc/GAP-${input}_sources_${count}.txt" "
+        ${execDir}/${exec} $inputDir/GAP-${input}.${extension} -t ${Threads} ${args}  -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done
+    done
+  done
+fi

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "USAGE: ./run_pr.sh config1 2\n"
+echo -e "USAGE: ./run_sssp.sh config1 2\n"
 appname=sssp
 
 if [ -z ${GALOIS_BUILD} ];
@@ -44,52 +44,112 @@ else
 
 fi
 
-extension=sgr
-for run in $(seq 1 ${numRuns})
-do
-       for input in "kron" "road" "urand"
-       do
-        echo "Running on ${input}"
-        if [ ${input} == "road" ];
-           then
-             algo="deltaStep"
-             delta=15
-           else
-             algo="deltaStepBarrier"
-             delta=1
-           fi
-           echo "Logs will be available in ${execDir}/logs/${input}"
-           if [ ! -d "${execDir}/logs/${input}" ];
-            then
-              mkdir -p ${execDir}/logs/${input}
-           fi
-         while read p; do
-           source_node=$((${p} - 1))
-           filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
-           statfile="${filename}.stats"
-           ${execDir}/${appname} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-               done < $inputDir/sources/GAP-${input}_sources.mtx
-       done
-done
+exec=sssp-cpu
+if [ ${configType} == "config1" ];
+then
+  #NOTE: Using sgr for undirected graphs
+  extension=sgr
+  algo="deltaStep"
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand"
+    do
+      echo "Running on ${input}"
+      if [ ${input} == "road" ];
+      then
+        delta=15
+      else
+        delta=1
+      fi
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
 
-extension=gr
-algo="deltaStepBarrier"
-delta=1
-for run in $(seq 1 ${numRuns})
-do
-       for input in "web" "twitter"
-       do
-        echo "Running on ${input}"
-        echo "Logs will be available in ${execDir}/logs/${input}"
-        if [ ! -d "${execDir}/logs/${input}" ];
-        then
-           mkdir -p ${execDir}/logs/${input}
-        fi
-        while read p; do
-          source_node=$((${p} - 1))
-          filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
-          statfile="${filename}.stats"
-          ${execDir}/${appname} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
-          done < $inputDir/sources/GAP-${input}_sources.mtx
-        done
-done
+  #NOTE: Using gr for directed graphs
+  extension=gr
+  algo="deltaStep"
+  delta=1
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+fi
+
+if [ ${configType} == "config2" ];
+then
+  #NOTE: Using sgr for undirected graphs
+  extension=sgr
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand"
+    do
+      echo "Running on ${input}"
+      if [ ${input} == "road" ];
+      then
+        delta=15
+        algo="deltaStep"
+      else
+        delta=1
+        algo="deltaStepBarrier"
+      fi
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+
+  #NOTE: Using gr for directed graphs
+  extension=gr
+  algo="deltaStepBarrier"
+  delta=1
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "web" "twitter"
+    do
+      echo "Running on ${input}"
+      echo "Logs will be available in ${execDir}/logs/${input}"
+      if [ ! -d "${execDir}/logs/${input}" ];
+      then
+        mkdir -p ${execDir}/logs/${input}
+      fi
+      while read p; do
+        source_node=$((${p} - 1))
+        filename="${appname}_${input}_source_${source_node}_algo_${algo}_${configType}_Run${run}"
+        statfile="${filename}.stats"
+        ${execDir}/${exec} -t=${Threads} -delta=${delta} -algo=$algo $inputDir/GAP-${input}.${extension} -startNode=${source_node} -statFile=${execDir}/logs/${input}/${statfile} &> ${execDir}/logs/${input}/${filename}.out
+      done < $inputDir/sources/GAP-${input}_sources.mtx
+    done
+  done
+fi
