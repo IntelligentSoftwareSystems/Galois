@@ -585,7 +585,7 @@ public:
    * @param mflag access flag for node data
    * @returns A node data object
    */
-  inline NodeTy&
+  inline typename GraphTy::node_data_reference
   getData(GraphNode N,
           galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getData(N, mflag);
