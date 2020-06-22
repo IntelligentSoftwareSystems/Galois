@@ -45,8 +45,7 @@ else
 fi
 
 extension=sgr
-exec="pagerank-pull"
-algo="orderedCount"
+exec="pagerank-pull-cpu"
 echo "Logs will be available in ${execDir}/logs/${input}"
 if [ ! -d "${execDir}/logs/" ];
  then
@@ -56,7 +55,7 @@ fi
 algo="Topo"
 tol=1e-4
 maxIter=1000
-
+##NOTE: All graph are running same algorithm. Using sgr for undirected and tgr for directed graphs.
 extension=sgr
 for run in $(seq 1 ${numRuns})
 do
@@ -66,7 +65,6 @@ do
            filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
            statfile="${filename}.stats"
            ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -tolerance=${tol} -maxIterations=${maxIter} -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
-           #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
        done
 done
 
@@ -79,6 +77,5 @@ do
            filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
            statfile="${filename}.stats"
            ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension}  -tolerance=${tol} -maxIterations=${maxIter}  -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
-           #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
        done
 done
