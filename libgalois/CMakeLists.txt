@@ -84,6 +84,7 @@ if (SCHED_SETAFFINITY_FOUND)
   target_link_libraries(galois_shmem PRIVATE ${SCHED_SETAFFINITY_LIBRARIES})
 endif()
 
+target_link_libraries(galois_shmem INTERFACE pygalois)
 target_link_libraries(galois_shmem PRIVATE Threads::Threads)
 
 if (CMAKE_HAVE_PTHREAD_H)
