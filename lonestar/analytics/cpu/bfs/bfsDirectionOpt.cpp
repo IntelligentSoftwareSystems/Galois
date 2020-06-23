@@ -28,6 +28,7 @@
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/runtime/Profile.h"
 #include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Search.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -88,7 +89,7 @@ static cll::opt<unsigned int>
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { SyncDO = 0, Async };
+enum Algo { SyncDO = 0, Async, AutoAlgo };
 
 const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
 
@@ -100,8 +101,8 @@ static cll::opt<Exec> execution(
 
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
-         cll::init(SyncDO));
+         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"), clEnumVal(AutoAlgo, "Choose between SyncDO and Async automatically")),
+         cll::init(AutoAlgo));
 
 using Graph =
     // galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
@@ -387,6 +388,14 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
+  if (algo == AutoAlgo) {
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = SyncDO;
+    } else {
+      algo = Async;
+    }
+    galois::gInfo("Choosing ", algo, " algorithm");
+  }
 
   switch (algo) {
   case SyncDO:
