@@ -1,82 +1,36 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting
- * parallelism. The code is being released under the terms of the 3-Clause BSD
- * License (a copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
+#ifndef GALOIS_BC_OUTER
+#define GALOIS_BC_OUTER
 
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
 #include "Lonestar/BoilerPlate.h"
-
-#include "llvm/Support/CommandLine.h"
-
 #include <boost/iterator/filter_iterator.hpp>
 
 #include <iomanip>
 #include <fstream>
 
-static const char* name = "Betweenness Centrality";
-static const char* desc = "Computes the betweenness centrality of all nodes in "
-                          "a graph";
-static const char* url = "betweenness_centrality";
-
-static llvm::cl::opt<std::string> inputFile(llvm::cl::Positional,
-                                            llvm::cl::desc("<input file>"),
-                                            llvm::cl::Required);
-static llvm::cl::opt<unsigned int> numOfSources(
-    "numOfSources",
-    llvm::cl::desc("Number of sources to compute BC on (default "
-                   "is all); takes precedence over numOfOutSources"),
-    llvm::cl::init(0));
-static llvm::cl::opt<unsigned int>
-    iterLimit("numOfOutSources",
-              llvm::cl::desc("Number of sources WITH EDGES "
-                             " to compute BC on (default is all)"),
-              llvm::cl::init(0));
-static llvm::cl::opt<unsigned int> startNode("startNode",
-                                             llvm::cl::desc("Node to start "
-                                                            "search from"),
-                                             llvm::cl::init(0));
-static llvm::cl::opt<bool> forceVerify("forceVerify",
-                                       llvm::cl::desc("Abort if not verified; "
-                                                      "only makes sense for "
-                                                      "torus graphs"));
-static llvm::cl::opt<bool> printAll("printAll",
-                                    llvm::cl::desc("Print betweenness values "
-                                                   "for all nodes"));
-
-using Graph = galois::graphs::LC_CSR_Graph<void, void>::with_no_lockable<
+using OuterGraph = galois::graphs::LC_CSR_Graph<void, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type;
-using GNode = Graph::GraphNode;
+using OuterGNode = OuterGraph::GraphNode;
+
+////////////////////////////////////////////////////////////////////////////////
 
 class BCOuter {
-  Graph* G;
+  OuterGraph* G;
   int NumNodes;
 
   galois::substrate::PerThreadStorage<double*> CB; // betweeness measure
   galois::substrate::PerThreadStorage<double*> perThreadSigma;
   galois::substrate::PerThreadStorage<int*> perThreadD;
   galois::substrate::PerThreadStorage<double*> perThreadDelta;
-  galois::substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
+  galois::substrate::PerThreadStorage<galois::gdeque<OuterGNode>*>
+      perThreadSucc;
 
 public:
   /**
    * Constructor initializes thread local storage.
    */
-  BCOuter(Graph& g) : G(&g), NumNodes(g.size()) { InitializeLocal(); }
+  BCOuter(OuterGraph& g) : G(&g), NumNodes(g.size()) { InitializeLocal(); }
 
   /**
    * Constructor destroys thread local storage.
@@ -84,13 +38,13 @@ public:
   ~BCOuter(void) { DeleteLocal(); }
 
   //! Function that does BC for a single souce; called by a thread
-  void doBC(const GNode curSource) {
-    galois::gdeque<GNode> SQ;
+  void doBC(const OuterGNode curSource) {
+    galois::gdeque<OuterGNode> SQ;
 
-    double* sigma               = *perThreadSigma.getLocal();
-    int* d                      = *perThreadD.getLocal();
-    double* delta               = *perThreadDelta.getLocal();
-    galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+    double* sigma                    = *perThreadSigma.getLocal();
+    int* d                           = *perThreadD.getLocal();
+    double* delta                    = *perThreadDelta.getLocal();
+    galois::gdeque<OuterGNode>* succ = *perThreadSucc.getLocal();
 
     sigma[curSource] = 1;
     d[curSource]     = 1;
@@ -157,7 +111,7 @@ public:
     // Each thread works on an individual source node
     galois::do_all(
         galois::iterate(0u, numSources),
-        [&](const GNode& curSource) { doBC(curSource); }, galois::steal(),
+        [&](const OuterGNode& curSource) { doBC(curSource); }, galois::steal(),
         galois::loopname("Main"));
   }
 
@@ -174,8 +128,9 @@ public:
   void run(const Cont& v) {
     // Each thread works on an individual source node
     galois::do_all(
-        galois::iterate(v), [&](const GNode& curSource) { doBC(curSource); },
-        galois::steal(), galois::loopname("Main"));
+        galois::iterate(v),
+        [&](const OuterGNode& curSource) { doBC(curSource); }, galois::steal(),
+        galois::loopname("Main"));
   }
 
   /**
@@ -201,8 +156,6 @@ public:
         if ((bc - sampleBC) > 0.0001) {
           galois::gInfo("If torus graph, verification failed ",
                         (bc - sampleBC));
-          if (forceVerify)
-            abort();
           return;
         }
       }
@@ -243,6 +196,35 @@ public:
     printBCValues(0, NumNodes, outf, 9);
 
     outf.close();
+  }
+
+  //! sanity check of BC values
+  void outerSanity(OuterGraph& graph) {
+    galois::GReduceMax<float> accumMax;
+    galois::GReduceMin<float> accumMin;
+    galois::GAccumulator<float> accumSum;
+    accumMax.reset();
+    accumMin.reset();
+    accumSum.reset();
+
+    // get max, min, sum of BC values using accumulators and reducers
+    galois::do_all(
+        galois::iterate(graph),
+        [&](LevelGNode n) {
+          double bc = (*CB.getRemote(0))[n];
+
+          for (unsigned j = 1; j < galois::getActiveThreads(); ++j)
+            bc += (*CB.getRemote(j))[n];
+
+          accumMax.update(bc);
+          accumMin.update(bc);
+          accumSum += bc;
+        },
+        galois::no_stats(), galois::loopname("OuterSanity"));
+
+    galois::gPrint("Max BC is ", accumMax.reduce(), "\n");
+    galois::gPrint("Min BC is ", accumMin.reduce(), "\n");
+    galois::gPrint("BC sum is ", accumSum.reduce(), "\n");
   }
 
 private:
@@ -297,22 +279,18 @@ private:
  * Functor that indicates if a node contains outgoing edges
  */
 struct HasOut {
-  Graph* graph;
-  HasOut(Graph* g) : graph(g) {}
+  OuterGraph* graph;
+  HasOut(OuterGraph* g) : graph(g) {}
 
-  bool operator()(const GNode& n) const {
+  bool operator()(const OuterGNode& n) const {
     return graph->edge_begin(n) != graph->edge_end(n);
   }
 };
 
-int main(int argc, char** argv) {
-  galois::SharedMemSys Gal;
-  LonestarStart(argc, argv, name, desc, url, &inputFile);
+////////////////////////////////////////////////////////////////////////////////
 
-  galois::StatTimer totalTime("TimerTotal");
-  totalTime.start();
-
-  Graph g;
+void doOuterBC() {
+  OuterGraph g;
   galois::graphs::readGraph(g, inputFile);
 
   BCOuter bcOuter(g);
@@ -325,22 +303,22 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoMid");
 
   // vector of sources to process; initialized if doing outSources
-  std::vector<GNode> v;
+  std::vector<OuterGNode> v;
   // preprocessing: find the nodes with out edges we will process and skip
   // over nodes with no out edges; only done if numOfSources isn't specified
   if (numOfSources == 0) {
     // find first node with out edges
-    boost::filter_iterator<HasOut, Graph::iterator> begin =
+    boost::filter_iterator<HasOut, OuterGraph::iterator> begin =
         boost::make_filter_iterator(HasOut(&g), g.begin(), g.end());
-    boost::filter_iterator<HasOut, Graph::iterator> end =
+    boost::filter_iterator<HasOut, OuterGraph::iterator> end =
         boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
     // adjustedEnd = last node we will process based on how many iterations
     // (i.e. sources) we want to do
-    boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd =
+    boost::filter_iterator<HasOut, OuterGraph::iterator> adjustedEnd =
         iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
     size_t iterations = std::distance(begin, adjustedEnd);
-    galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
+    galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startSource,
                    " Iterations: ", iterations, "\n");
     // vector of nodes we want to process
     v.insert(v.end(), begin, adjustedEnd);
@@ -359,15 +337,13 @@ int main(int argc, char** argv) {
   execTime.stop();
 
   bcOuter.printBCValues(0, std::min(10UL, NumNodes), std::cout, 6);
-
-  if (printAll)
+  bcOuter.outerSanity(g);
+  if (output)
     bcOuter.printBCcertificate();
-  if (forceVerify || !skipVerify)
+
+  if (!skipVerify)
     bcOuter.verify();
 
   galois::reportPageAlloc("MeminfoPost");
-
-  totalTime.stop();
-
-  return 0;
 }
+#endif

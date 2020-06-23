@@ -1,77 +1,18 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting
- * parallelism. The code is being released under the terms of the 3-Clause BSD
- * License (a copy is located in LICENSE.txt at the top-level directory).
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- */
+#ifndef GALOIS_BC_ASYNC
+#define GALOIS_BC_ASYNC
 
 #include "BCNode.h"
 #include "BCEdge.h"
-
 #include "galois/Bag.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
-#include "Lonestar/BoilerPlate.h"
-
 #include <iomanip>
 
 // WARNING: optimal chunk size may differ depending on input graph
-constexpr static const unsigned CHUNK_SIZE = 64U;
-
-////////////////////////////////////////////////////////////////////////////////
-// Command line parameters
-////////////////////////////////////////////////////////////////////////////////
-
-namespace cll = llvm::cl;
-
-static cll::opt<std::string>
-    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> sourcesToUse("sourcesToUse",
-                                          cll::desc("Whitespace separated list "
-                                                    "of sources in a file to "
-                                                    "use in BC"),
-                                          cll::init(""));
-
-// @todo fix how this works
-// static cll::opt<unsigned int> startNode("startNode",
-//                                        cll::desc("Node to start search
-//                                        from"), cll::init(0));
-
-static cll::opt<unsigned int>
-    numOfSources("numOfSources",
-                 cll::desc("Number of sources to compute"
-                           " BC on"),
-                 cll::init(0));
-
-static cll::opt<unsigned int>
-    numOfOutSources("numOfOutSources",
-                    cll::desc("Number of sources WITH EDGES "
-                              " to compute BC on"),
-                    cll::init(0));
-
-static cll::opt<bool> generateCert("generateCertificate",
-                                   cll::desc("Prints certificate at end of "
-                                             "execution"),
-                                   cll::init(false));
-// TODO bring this back
-// static cll::opt<bool> useNodeBased("useNodeBased",
-//                                   cll::desc("Use node based execution"),
-//                                   cll::init(true));
-
+constexpr static const unsigned ASYNC_CHUNK_SIZE = 64U;
 using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
-using Graph = galois::graphs::LC_CSR_CSC_Graph<NodeType, BCEdge, false, true>;
+using AsyncGraph =
+    galois::graphs::LC_CSR_CSC_Graph<NodeType, BCEdge, false, true>;
 
 // Work items for the forward phase
 struct ForwardPhaseWorkItem {
@@ -90,7 +31,7 @@ struct FPWorkItemIndexer {
 
 // obim worklist type declaration
 namespace gwl = galois::worklists;
-using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
+using PSchunk = gwl::PerSocketChunkFIFO<ASYNC_CHUNK_SIZE>;
 using OBIM    = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, PSchunk>;
 
 template <typename T, bool enable>
@@ -113,9 +54,9 @@ struct Counter<T, false> {
 };
 
 struct BetweenessCentralityAsync {
-  Graph& graph;
+  AsyncGraph& graph;
 
-  BetweenessCentralityAsync(Graph& _graph) : graph(_graph) {}
+  BetweenessCentralityAsync(AsyncGraph& _graph) : graph(_graph) {}
 
   using SumCounter =
       Counter<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
@@ -400,26 +341,42 @@ struct BetweenessCentralityAsync {
   }
 };
 
-static const char* name = "Betweenness Centrality";
-static const char* desc = "Computes betwenness centrality in an unweighted "
-                          "graph";
+void AsyncSanity(AsyncGraph& graph) {
+  galois::GReduceMax<float> accumMax;
+  galois::GReduceMin<float> accumMin;
+  galois::GAccumulator<float> accumSum;
+  accumMax.reset();
+  accumMin.reset();
+  accumSum.reset();
 
-int main(int argc, char** argv) {
-  galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+  // get max, min, sum of BC values using accumulators and reducers
+  galois::do_all(
+      galois::iterate(graph),
+      [&](unsigned n) {
+        auto& nodeData = graph.getData(n);
+        accumMax.update(nodeData.bc);
+        accumMin.update(nodeData.bc);
+        accumSum += nodeData.bc;
+      },
+      galois::no_stats(), galois::loopname("AsyncSanity"));
 
-  galois::StatTimer totalTime("TimerTotal");
-  totalTime.start();
+  galois::gPrint("Max BC is ", accumMax.reduce(), "\n");
+  galois::gPrint("Min BC is ", accumMin.reduce(), "\n");
+  galois::gPrint("BC sum is ", accumSum.reduce(), "\n");
+}
+////////////////////////////////////////////////////////////////////////////////
 
+//! runs asynchronous BC
+void doAsyncBC() {
   if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
   } else {
     galois::gInfo("Running in serial mode");
   }
 
-  galois::gInfo("Constructing graph");
+  galois::gInfo("Constructing async BC graph");
   // create bidirectional graph
-  Graph bcGraph;
+  AsyncGraph bcGraph;
 
   galois::StatTimer graphConstructTimer("GRAPH_CONSTRUCT");
   graphConstructTimer.start();
@@ -450,10 +407,10 @@ int main(int argc, char** argv) {
   unsigned nnodes = bcGraph.size();
   uint64_t nedges = bcGraph.sizeEdges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
-  galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
+  galois::gInfo("Using OBIM chunk size: ", ASYNC_CHUNK_SIZE);
   galois::gInfo("Note that optimal chunk size may differ depending on input "
                 "graph");
-  galois::runtime::reportStat_Single("BCAsync", "ChunkSize", CHUNK_SIZE);
+  galois::runtime::reportStat_Single("BCAsync", "ChunkSize", ASYNC_CHUNK_SIZE);
 
   galois::reportPageAlloc("MemAllocPre");
   galois::gInfo("Going to pre-allocate pages");
@@ -492,7 +449,7 @@ int main(int argc, char** argv) {
   // with outgoing edges), we need to loop over the entire node set to look for
   // good sources to use
   uint32_t goodSource = 0;
-  if (numOfOutSources != 0) {
+  if (iterLimit != 0) {
     numOfSources = nnodes;
   }
 
@@ -544,7 +501,7 @@ int main(int argc, char** argv) {
     // break out once number of sources user specified to do (if any) has been
     // reached
     goodSource++;
-    if (numOfOutSources != 0 && goodSource >= numOfOutSources)
+    if (iterLimit != 0 && goodSource >= iterLimit)
       break;
   }
   execTime.stop();
@@ -552,6 +509,9 @@ int main(int argc, char** argv) {
   galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
   galois::reportPageAlloc("MemAllocPost");
+
+  // sanity
+  AsyncSanity(bcGraph);
 
   // prints out first 10 node BC values
   if (!skipVerify) {
@@ -562,7 +522,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (generateCert) {
+  if (output) {
     std::cerr << "Writting out bc values...\n";
     std::stringstream outfname;
     outfname << "certificate"
@@ -575,8 +535,5 @@ int main(int argc, char** argv) {
     }
     outfile.close();
   }
-
-  totalTime.stop();
-
-  return 0;
 }
+#endif
