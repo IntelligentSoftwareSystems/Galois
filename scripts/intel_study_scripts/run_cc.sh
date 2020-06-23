@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo -e "USAGE: ./run_cc.sh config1 2\n"
-appname="connectedcomponents"
+appname="connected-components"
 
 if [ -z ${GALOIS_BUILD} ];
 then
@@ -45,7 +45,7 @@ else
 fi
 
 extension=sgr
-exec="connectedcomponents"
+exec="connected-components-cpu"
 algo="Afforest"
 echo "Logs will be available in ${execDir}/logs/${input}"
 if [ ! -d "${execDir}/logs/" ];
@@ -53,17 +53,33 @@ if [ ! -d "${execDir}/logs/" ];
    mkdir -p ${execDir}/logs/
 fi
 
-for run in $(seq 1 ${numRuns})
-do
-       for input in "kron" "road" "urand" "web" "twitter"
-       do
-          echo "Running on ${input}"
-          if [ ${input} == "web" ];
-             then algo="EdgetiledAfforest"
-           fi
-           filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
-           statfile="${filename}.stats"
-           ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
-           #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
-       done
-done
+if [ ${configType} == "config1" ];
+then
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand" "web" "twitter"
+    do
+      echo "Running on ${input}"
+      filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
+      statfile="${filename}.stats"
+      ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
+    done
+  done
+fi
+
+if [ ${configType} == "config2" ];
+then
+  for run in $(seq 1 ${numRuns})
+  do
+    for input in "kron" "road" "urand" "web" "twitter"
+    do
+      echo "Running on ${input}"
+      if [ ${input} == "web" ];
+      then algo="EdgetiledAfforest"
+      fi
+      filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
+      statfile="${filename}.stats"
+      ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
+    done
+  done
+fi

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo -e "USAGE: ./run_tc.sh config1 2\n"
-appname="triangles"
+appname="triangle-counting"
 
 if [ -z ${GALOIS_BUILD} ];
 then
@@ -44,7 +44,7 @@ else
   Threads=64
 fi
 
-exec="triangles"
+exec="triangle-counting-cpu"
 algo="orderedCount"
 echo "Logs will be available in ${execDir}/logs/${input}"
 if [ ! -d "${execDir}/logs/" ];
@@ -65,7 +65,6 @@ do
            filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
            statfile="${filename}.stats"
            ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} --storeRelabeledGraph=false -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
-           #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
        done
 done
 extension=sgr
@@ -77,6 +76,5 @@ do
            filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
            statfile="${filename}.stats"
            ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} --relabel=false -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
-           #${execDir}/${exec} --help &> ${execDir}/logs/${filename}.out
        done
 done

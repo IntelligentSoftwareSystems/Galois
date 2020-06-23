@@ -71,6 +71,7 @@ int useGraphCxx11(std::string inputfile) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
   if (argc > 1) {
     useGraph(argv[1]);
     useGraphCxx11(argv[1]);

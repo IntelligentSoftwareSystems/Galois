@@ -12,7 +12,7 @@ matrix:
       before_script:
         - export CC=clang
         - export CXX=clang++
-        - brew install openmpi llvm
+        - brew install openmpi llvm fmt
         - mkdir build
         - export PATH=$PATH:/usr/local/opt/llvm/bin
         - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DGALOIS_ENABLE_DIST=ON || exit 1
@@ -35,6 +35,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - GCC_VER=8
       addons:
@@ -54,6 +55,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - GCC_VER=9
       addons:
@@ -73,6 +75,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - GCC_VER=10
       addons:
@@ -92,6 +95,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - GCC_VER=10
         - BUILD_TYPE=Debug
@@ -112,6 +116,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - CLANG_VER=7
       addons:
@@ -132,6 +137,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - CLANG_VER=8
       addons:
@@ -152,6 +158,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - CLANG_VER=9
       addons:
@@ -172,6 +179,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - CLANG_VER=10
       addons:
@@ -192,6 +200,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
     - env:
         - CLANG_VER=10
         - BUILD_TYPE=Debug
@@ -213,6 +222,7 @@ matrix:
             - libopenmpi-dev
             - llvm-7-dev
             - libz-dev
+            - libfmt-dev
 
 before_script:
   # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
