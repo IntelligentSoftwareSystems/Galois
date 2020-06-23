@@ -26,6 +26,7 @@
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
+#include "Lonestar/Search.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/transform_iterator.hpp>
@@ -462,7 +463,7 @@ void makeSortedGraph(Graph& graph) {
 }
 
 void readGraph(Graph& graph) {
-  if (relabel) {
+  if (relabel || isApproximateDegreeDistributionPowerLaw(graph)) {
     galois::gInfo("Relabeling and sorting graph...");
     makeSortedGraph(graph);
   } else {
