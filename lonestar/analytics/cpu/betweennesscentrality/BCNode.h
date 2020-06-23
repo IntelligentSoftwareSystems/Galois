@@ -31,8 +31,6 @@
 #include <algorithm>
 #include <limits>
 
-constexpr unsigned infinity = std::numeric_limits<unsigned>::max() / 2;
-
 template <bool UseMarking = false, bool Concurrent = true>
 struct BCNode {
   using LockType =
