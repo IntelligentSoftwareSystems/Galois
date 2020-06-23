@@ -26,6 +26,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Search.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -63,7 +64,8 @@ enum Algo {
   dijkstraTile,
   dijkstra,
   topo,
-  topoTile
+  topoTile,
+  AutoAlgo
 };
 
 const char* const ALGO_NAMES[] = {
@@ -80,8 +82,9 @@ static cll::opt<Algo>
                      clEnumVal(serDelta, "serDelta"),
                      clEnumVal(dijkstraTile, "dijkstraTile"),
                      clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
-                     clEnumVal(topoTile, "topoTile")),
-         cll::init(deltaTile));
+                     clEnumVal(topoTile, "topoTile"),
+                     clEnumVal(AutoAlgo, "choose between the algorithms automatically")),
+         cll::init(AutoAlgo));
 
 //! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
@@ -402,6 +405,15 @@ int main(int argc, char** argv) {
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
+  if (algo == AutoAlgo) {
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = deltaStep;
+    } else {
+      algo = deltaStepBarrier;
+    }
+    galois::gInfo("Choosing ", algo, " algorithm");
+  }
+
   switch (algo) {
   case deltaTile:
     deltaStepAlgo<SrcEdgeTile>(graph, source, SrcEdgeTilePushWrap{graph},
@@ -435,7 +447,6 @@ int main(int argc, char** argv) {
     break;
 
   case deltaStepBarrier:
-    std::cout << "Using OBIM with barrier\n";
     deltaStepAlgo<UpdateRequest, OBIM_Barrier>(graph, source, ReqPushWrap(),
                                                OutEdgeRangeFn{graph});
     break;
