@@ -10,10 +10,10 @@
 // (https://github.com/sbeamer/gapbs/blob/master/src/benchmark.h)
 template<typename Graph>
 class SourcePicker {
+  static const int64_t kRandSeed = 27491095;
   std::mt19937 rng;
   std::uniform_int_distribution<typename Graph::GraphNode> udist;
   const Graph &graph;
-  const int64_t kRandSeed = 27491095;
 
  public:
   explicit SourcePicker(const Graph &g)
