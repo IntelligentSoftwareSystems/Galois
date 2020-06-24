@@ -52,11 +52,7 @@ constexpr static const char* const REGION_NAME = "TC";
  * Graph structure declarations + other initialization
  ******************************************************************************/
 
-struct NodeData {
-  char dummy;
-};
-
-typedef galois::graphs::MiningGraph<NodeData, void, MiningPolicyDegrees> Graph;
+typedef galois::graphs::MiningGraph<void, void, MiningPolicyDegrees> Graph;
 typedef typename Graph::GraphNode GNode;
 
 std::unique_ptr<galois::graphs::GluonEdgeSubstrate<Graph>> syncSubstrate;
@@ -152,9 +148,9 @@ int main(int argc, char** argv) {
   std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
-      distGraphInitialization<NodeData, void>(&cuda_ctx, false);
+      distGraphInitialization<void, void>(&cuda_ctx, false);
 #else
-  std::tie(hg, syncSubstrate) = distGraphInitialization<NodeData, void>(false);
+  std::tie(hg, syncSubstrate) = distGraphInitialization<void, void>(false);
 #endif
 
   if (personality == GPU_CUDA) {
