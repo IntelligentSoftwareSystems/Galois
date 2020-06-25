@@ -61,12 +61,6 @@ static cll::opt<bool>
                       "choose automatically)"),
             cll::init(false));
 
-static cll::opt<bool> storeRelabeledGraph(
-    "storeRelabeledGraph",
-    cll::desc("Write the relabeled graph to disk for future use with "
-              ".gr.triangles extension (default value true)"),
-    cll::init(true));
-
 typedef galois::graphs::LC_CSR_Graph<void, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
 
