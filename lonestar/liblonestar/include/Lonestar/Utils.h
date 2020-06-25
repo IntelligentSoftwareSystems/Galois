@@ -5,9 +5,9 @@
 #include <vector>
 #include <algorithm>
 
-// Used to pick random non-zero degree starting points for search algorithms
-// This code has been copied from GAP benchmark suite 
-// (https://github.com/sbeamer/gapbs/blob/master/src/benchmark.h)
+//! Used to pick random non-zero degree starting points for search algorithms
+//! This code has been copied from GAP benchmark suite 
+//! (https://github.com/sbeamer/gapbs/blob/master/src/benchmark.h)
 template<typename Graph>
 class SourcePicker {
   static const int64_t kRandSeed = 27491095;
@@ -28,10 +28,10 @@ class SourcePicker {
   }
 };
 
-// Used to determine if a graph has power-law degree distribution or not
-// by sampling some of the vertices in the graph randomly
-// This code has been copied from GAP benchmark suite 
-// (https://github.com/sbeamer/gapbs/blob/master/src/tc.cc WorthRelabelling())
+//! Used to determine if a graph has power-law degree distribution or not
+//! by sampling some of the vertices in the graph randomly
+//! This code has been copied from GAP benchmark suite 
+//! (https://github.com/sbeamer/gapbs/blob/master/src/tc.cc WorthRelabelling())
 template<typename Graph>
 bool isApproximateDegreeDistributionPowerLaw(const Graph& graph) {
   uint32_t averageDegree = graph.sizeEdges() / graph.size();
