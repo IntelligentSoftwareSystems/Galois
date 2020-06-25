@@ -100,8 +100,8 @@ static cll::opt<Exec> execution(
     cll::init(PARALLEL));
 
 static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"), clEnumVal(AutoAlgo, "Choose between SyncDO and Async automatically")),
+    algo("algo", cll::desc("Choose an algorithm (default value Auto):"),
+         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"), clEnumVal(AutoAlgo, "Auto: choose between SyncDO and Async automatically")),
          cll::init(AutoAlgo));
 
 using Graph =
@@ -394,7 +394,7 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
     } else {
       algo = Async;
     }
-    galois::gInfo("Choosing ", algo, " algorithm");
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
   }
 
   switch (algo) {

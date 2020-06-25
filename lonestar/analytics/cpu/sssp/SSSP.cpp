@@ -74,7 +74,7 @@ const char* const ALGO_NAMES[] = {
     "dijkstra",     "topo",      "topoTile"};
 
 static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm:"),
+    algo("algo", cll::desc("Choose an algorithm (default value auto):"),
          cll::values(clEnumVal(deltaTile, "deltaTile"),
                      clEnumVal(deltaStep, "deltaStep"),
                      clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
@@ -83,7 +83,7 @@ static cll::opt<Algo>
                      clEnumVal(dijkstraTile, "dijkstraTile"),
                      clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
                      clEnumVal(topoTile, "topoTile"),
-                     clEnumVal(AutoAlgo, "choose between the algorithms automatically")),
+                     clEnumVal(AutoAlgo, "auto: choose among the algorithms automatically")),
          cll::init(AutoAlgo));
 
 //! [withnumaalloc]
@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
     } else {
       algo = deltaStepBarrier;
     }
-    galois::gInfo("Choosing ", algo, " algorithm");
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
   }
 
   switch (algo) {
