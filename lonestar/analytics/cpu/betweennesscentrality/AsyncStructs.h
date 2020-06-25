@@ -381,23 +381,22 @@ void doAsyncBC() {
   galois::StatTimer graphConstructTimer("GRAPH_CONSTRUCT");
   graphConstructTimer.start();
 
-  galois::graphs::BufferedGraph<void> fileReader;
-  fileReader.loadGraph(inputFile);
+  galois::graphs::FileGraph fileReader;
+  fileReader.fromFile(inputFile);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
   bcGraph.constructNodes();
 
-  galois::do_all(galois::iterate((uint32_t)0, fileReader.size()),
-                 [&](uint32_t i) {
-                   auto b = fileReader.edgeBegin(i);
-                   auto e = fileReader.edgeEnd(i);
+  galois::do_all(galois::iterate(fileReader), [&](uint32_t i) {
+    auto b = fileReader.edge_begin(i);
+    auto e = fileReader.edge_end(i);
 
-                   bcGraph.fixEndEdge(i, *e);
+    bcGraph.fixEndEdge(i, *e);
 
-                   while (b < e) {
-                     bcGraph.constructEdge(*b, fileReader.edgeDestination(*b));
-                     b++;
-                   }
-                 });
+    while (b < e) {
+      bcGraph.constructEdge(*b, fileReader.getEdgeDst(*b));
+      b++;
+    }
+  });
   bcGraph.constructIncomingEdges();
 
   graphConstructTimer.stop();
