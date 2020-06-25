@@ -57,7 +57,8 @@ static cll::opt<Algo> algo(
 
 static cll::opt<bool>
     relabel("relabel",
-            cll::desc("Relabel nodes of the graph (default value of false => choose automatically)"),
+            cll::desc("Relabel nodes of the graph (default value of false => "
+                      "choose automatically)"),
             cll::init(false));
 
 static cll::opt<bool> storeRelabeledGraph(

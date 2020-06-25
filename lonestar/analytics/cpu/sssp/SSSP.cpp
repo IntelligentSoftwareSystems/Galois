@@ -73,18 +73,19 @@ const char* const ALGO_NAMES[] = {
     "serDeltaTile", "serDelta",  "dijkstraTile",
     "dijkstra",     "topo",      "topoTile"};
 
-static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm (default value auto):"),
-         cll::values(clEnumVal(deltaTile, "deltaTile"),
-                     clEnumVal(deltaStep, "deltaStep"),
-                     clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
-                     clEnumVal(serDeltaTile, "serDeltaTile"),
-                     clEnumVal(serDelta, "serDelta"),
-                     clEnumVal(dijkstraTile, "dijkstraTile"),
-                     clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
-                     clEnumVal(topoTile, "topoTile"),
-                     clEnumVal(AutoAlgo, "auto: choose among the algorithms automatically")),
-         cll::init(AutoAlgo));
+static cll::opt<Algo> algo(
+    "algo", cll::desc("Choose an algorithm (default value auto):"),
+    cll::values(clEnumVal(deltaTile, "deltaTile"),
+                clEnumVal(deltaStep, "deltaStep"),
+                clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
+                clEnumVal(serDeltaTile, "serDeltaTile"),
+                clEnumVal(serDelta, "serDelta"),
+                clEnumVal(dijkstraTile, "dijkstraTile"),
+                clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
+                clEnumVal(topoTile, "topoTile"),
+                clEnumVal(AutoAlgo,
+                          "auto: choose among the algorithms automatically")),
+    cll::init(AutoAlgo));
 
 //! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::

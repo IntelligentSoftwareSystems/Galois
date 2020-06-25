@@ -101,7 +101,10 @@ static cll::opt<Exec> execution(
 
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm (default value Auto):"),
-         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"), clEnumVal(AutoAlgo, "Auto: choose between SyncDO and Async automatically")),
+         cll::values(
+             clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"),
+             clEnumVal(AutoAlgo,
+                       "Auto: choose between SyncDO and Async automatically")),
          cll::init(AutoAlgo));
 
 using Graph =
