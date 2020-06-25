@@ -458,7 +458,13 @@ void makeSortedGraph(Graph& graph) {
 }
 
 void readGraph(Graph& graph) {
-  if (relabel || isApproximateDegreeDistributionPowerLaw(graph)) {
+  if (!relabel) {
+    galois::graphs::FileGraph degreeGraph;
+    degreeGraph.fromFile(inputFile);
+    degreeGraph.initNodeDegrees();
+    relabel = isApproximateDegreeDistributionPowerLaw(degreeGraph);
+  }
+  if (relabel) {
     galois::gInfo("Relabeling and sorting graph...");
     makeSortedGraph(graph);
   } else {
