@@ -26,7 +26,7 @@
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
-#include "Lonestar/Search.h"
+#include "Lonestar/Utils.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/transform_iterator.hpp>

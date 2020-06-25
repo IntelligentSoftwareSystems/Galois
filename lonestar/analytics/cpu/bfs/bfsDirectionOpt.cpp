@@ -28,7 +28,7 @@
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/runtime/Profile.h"
 #include "Lonestar/BFS_SSSP.h"
-#include "Lonestar/Search.h"
+#include "Lonestar/Utils.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "llvm/Support/CommandLine.h"

@@ -26,7 +26,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
-#include "Lonestar/Search.h"
+#include "Lonestar/Utils.h"
 
 #include "llvm/Support/CommandLine.h"
 
