@@ -69,9 +69,9 @@ enum Algo {
 };
 
 const char* const ALGO_NAMES[] = {
-    "deltaTile",    "deltaStep", "deltaStepBarrier",
-    "serDeltaTile", "serDelta",  "dijkstraTile",
-    "dijkstra",     "topo",      "topoTile"};
+    "deltaTile", "deltaStep",    "deltaStepBarrier", "serDeltaTile",
+    "serDelta",  "dijkstraTile", "dijkstra",         "topo",
+    "topoTile",  "Auto"};
 
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value auto):"),

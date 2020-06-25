@@ -91,7 +91,7 @@ enum Exec { SERIAL, PARALLEL };
 
 enum Algo { SyncDO = 0, Async, AutoAlgo };
 
-const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
+const char* const ALGO_NAMES[] = {"SyncDO", "Async", "Auto"};
 
 static cll::opt<Exec> execution(
     "exec",
