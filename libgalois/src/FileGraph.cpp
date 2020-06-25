@@ -708,5 +708,30 @@ FileGraph::iterator FileGraph::end() const {
   return iterator(nodeOffset + numNodes);
 }
 
+void FileGraph::initNodeDegrees() {
+  if (!this->node_degrees.size()) {
+    // allocate memory
+    this->node_degrees.create(this->numNodes);
+    // loop over all nodes, calculate degrees
+    galois::do_all(
+        galois::iterate((uint64_t)0, this->numNodes),
+        [&](unsigned long n) {
+          // calculate and save degrees
+          if (n != 0) {
+            this->node_degrees.set(n, this->outIdx[n] - this->outIdx[n - 1]);
+          } else {
+            this->node_degrees.set(n, this->outIdx[0]);
+          }
+        },
+        galois::loopname("FileGraphInitNodeDegrees"), galois::no_stats());
+  }
+}
+
+uint64_t FileGraph::getDegree(uint32_t node_id) const {
+  // node_degrees array should be initialized
+  assert(this->node_degrees.size());
+  return this->node_degrees[node_id];
+}
+
 } // namespace graphs
 } // namespace galois

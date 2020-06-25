@@ -100,6 +100,11 @@ int main(int argc, char** argv) {
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
+  galois::graphs::FileGraph degreeGraph;
+  degreeGraph.fromFile(inputFile);
+  degreeGraph.initNodeDegrees();
+  // TODO choose an algorithm dynamically based on degrees
+
   switch (algo) {
   case Level:
     // see LevelStructs.h
