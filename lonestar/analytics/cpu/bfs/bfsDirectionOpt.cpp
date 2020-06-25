@@ -466,22 +466,22 @@ int main(int argc, char** argv) {
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
+  if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = SyncDO;
+    } else {
+      algo = Async;
+    }
+    autoAlgoTimer.stop();
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
+
   for (unsigned int run = 0; run < numRuns; ++run) {
     galois::gPrint("BFS::go run ", run, " called\n");
-    std::string timer_str("Timer_" + std::to_string(run));
+    std::string timer_str("Timer_Run" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), "BFS");
     StatTimer_main.start();
-
-    if (algo == AutoAlgo) {
-      autoAlgoTimer.start();
-      if (isApproximateDegreeDistributionPowerLaw(graph)) {
-        algo = SyncDO;
-      } else {
-        algo = Async;
-      }
-      autoAlgoTimer.stop();
-      galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
-    }
 
     if (execution == SERIAL) {
       runAlgo<false>(graph, source, run);
