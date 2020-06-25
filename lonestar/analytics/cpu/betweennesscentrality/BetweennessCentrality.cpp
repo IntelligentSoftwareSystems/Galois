@@ -19,12 +19,16 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
+#include "Lonestar/Utils.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
 constexpr static const char* const REGION_NAME = "BC";
 
-enum Algo { Level = 0, Async, Outer };
+enum Algo { Level = 0, Async, Outer, AutoAlgo };
+
+const char* const ALGO_NAMES[] = {"Level", "Async", "Outer", "Auto"};
+
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,11 +72,13 @@ static cll::opt<bool>
     output("output", cll::desc("Output BC (Level/Async) (default: false)"),
            cll::init(false));
 
-static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm (default value Level):"),
-         cll::values(clEnumVal(Level, "Level"), clEnumVal(Async, "Async"),
-                     clEnumVal(Outer, "Outer")),
-         cll::init(Level));
+static cll::opt<Algo> algo(
+    "algo", cll::desc("Choose an algorithm (default value AutoAlgo):"),
+    cll::values(clEnumVal(Level, "Level"), clEnumVal(Async, "Async"),
+                clEnumVal(Outer, "Outer"),
+                clEnumVal(AutoAlgo,
+                          "Auto: choose among the algorithms automatically")),
+    cll::init(AutoAlgo));
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -100,10 +106,17 @@ int main(int argc, char** argv) {
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
-  galois::graphs::FileGraph degreeGraph;
-  degreeGraph.fromFile(inputFile);
-  degreeGraph.initNodeDegrees();
-  // TODO choose an algorithm dynamically based on degrees
+  if (algo == AutoAlgo) {
+    galois::graphs::FileGraph degreeGraph;
+    degreeGraph.fromFile(inputFile);
+    degreeGraph.initNodeDegrees();
+    if (isApproximateDegreeDistributionPowerLaw(degreeGraph)) {
+      algo = Async;
+    } else {
+      algo = Level;
+    }
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
 
   switch (algo) {
   case Level:
