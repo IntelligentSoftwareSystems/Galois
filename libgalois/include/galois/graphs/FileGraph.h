@@ -98,6 +98,10 @@ private:
   //! adjustments to edge index when we load only part of a graph
   uint64_t edgeOffset;
 
+  //! If initialized, this array stores node degrees in memory for fast access
+  //! via the getDegree function
+  LargeArray<uint64_t> node_degrees;
+
   // graph reading speed variables
   galois::GAccumulator<uint64_t> numBytesReadIndex, numBytesReadEdgeDst,
       numBytesReadEdgeData;
@@ -440,6 +444,20 @@ public:
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
   }
+
+  //! Calculates node degrees and saves them to a class variable for
+  //! access by getDegree.
+  void initNodeDegrees();
+
+  /**
+   * Gets the degree of a particular node. Assumes that initNodeDegrees has
+   * been called to initialize the array of degrees; if not, it is very likely
+   * going to segfault as it will attempt to access uninitialized memory.
+   *
+   * @param node_id ID of a node to get the degree of.
+   * @returns Degree of a specified node
+   */
+  uint64_t getDegree(uint32_t node_id) const;
 
   /**
    * Gets the first node of the loaded graph.
