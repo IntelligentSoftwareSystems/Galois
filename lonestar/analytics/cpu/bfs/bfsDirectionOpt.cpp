@@ -391,15 +391,6 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
-  if (algo == AutoAlgo) {
-    if (isApproximateDegreeDistributionPowerLaw(graph)) {
-      algo = SyncDO;
-    } else {
-      algo = Async;
-    }
-    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
-  }
-
   switch (algo) {
   case SyncDO:
     syncDOAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
@@ -479,6 +470,15 @@ int main(int argc, char** argv) {
     std::string timer_str("Timer_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), "BFS");
     StatTimer_main.start();
+
+    if (algo == AutoAlgo) {
+      if (isApproximateDegreeDistributionPowerLaw(graph)) {
+        algo = SyncDO;
+      } else {
+        algo = Async;
+      }
+      galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+    }
 
     if (execution == SERIAL) {
       runAlgo<false>(graph, source, run);
