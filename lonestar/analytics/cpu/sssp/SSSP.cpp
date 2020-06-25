@@ -403,15 +403,18 @@ int main(int argc, char** argv) {
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
   if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
     if (isApproximateDegreeDistributionPowerLaw(graph)) {
       algo = deltaStep;
     } else {
       algo = deltaStepBarrier;
     }
+    autoAlgoTimer.stop();
     galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
   }
 

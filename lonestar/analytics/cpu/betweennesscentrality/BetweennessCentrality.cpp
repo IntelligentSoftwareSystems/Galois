@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
 
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
@@ -110,11 +111,13 @@ int main(int argc, char** argv) {
     galois::graphs::FileGraph degreeGraph;
     degreeGraph.fromFile(inputFile);
     degreeGraph.initNodeDegrees();
+    autoAlgoTimer.start();
     if (isApproximateDegreeDistributionPowerLaw(degreeGraph)) {
       algo = Async;
     } else {
       algo = Level;
     }
+    autoAlgoTimer.stop();
     galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
   }
 

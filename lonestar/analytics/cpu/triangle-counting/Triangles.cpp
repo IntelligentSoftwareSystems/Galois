@@ -458,11 +458,14 @@ void makeSortedGraph(Graph& graph) {
 }
 
 void readGraph(Graph& graph) {
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   if (!relabel) {
     galois::graphs::FileGraph degreeGraph;
     degreeGraph.fromFile(inputFile);
     degreeGraph.initNodeDegrees();
+    autoAlgoTimer.start();
     relabel = isApproximateDegreeDistributionPowerLaw(degreeGraph);
+    autoAlgoTimer.stop();
   }
   if (relabel) {
     galois::gInfo("Relabeling and sorting graph...");

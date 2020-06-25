@@ -462,6 +462,7 @@ int main(int argc, char** argv) {
 
   std::cout << " Execution started\n";
 
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
@@ -472,11 +473,13 @@ int main(int argc, char** argv) {
     StatTimer_main.start();
 
     if (algo == AutoAlgo) {
+      autoAlgoTimer.start();
       if (isApproximateDegreeDistributionPowerLaw(graph)) {
         algo = SyncDO;
       } else {
         algo = Async;
       }
+      autoAlgoTimer.stop();
       galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
     }
 
