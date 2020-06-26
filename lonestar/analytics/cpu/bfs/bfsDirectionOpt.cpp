@@ -28,6 +28,7 @@
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/runtime/Profile.h"
 #include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Utils.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -88,9 +89,9 @@ static cll::opt<unsigned int>
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { SyncDO = 0, Async };
+enum Algo { SyncDO = 0, Async, AutoAlgo };
 
-const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
+const char* const ALGO_NAMES[] = {"SyncDO", "Async", "Auto"};
 
 static cll::opt<Exec> execution(
     "exec",
@@ -99,9 +100,12 @@ static cll::opt<Exec> execution(
     cll::init(PARALLEL));
 
 static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
-         cll::init(SyncDO));
+    algo("algo", cll::desc("Choose an algorithm (default value Auto):"),
+         cll::values(
+             clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"),
+             clEnumVal(AutoAlgo,
+                       "Auto: choose between SyncDO and Async automatically")),
+         cll::init(AutoAlgo));
 
 using Graph =
     // galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
@@ -387,7 +391,6 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
-
   switch (algo) {
   case SyncDO:
     syncDOAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
@@ -459,12 +462,24 @@ int main(int argc, char** argv) {
 
   std::cout << " Execution started\n";
 
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
+  if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = SyncDO;
+    } else {
+      algo = Async;
+    }
+    autoAlgoTimer.stop();
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
+
   for (unsigned int run = 0; run < numRuns; ++run) {
     galois::gPrint("BFS::go run ", run, " called\n");
-    std::string timer_str("Timer_" + std::to_string(run));
+    std::string timer_str("Timer_Run" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), "BFS");
     StatTimer_main.start();
 

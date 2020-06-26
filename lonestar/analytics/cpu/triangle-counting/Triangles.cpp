@@ -26,6 +26,7 @@
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
+#include "Lonestar/Utils.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/transform_iterator.hpp>
@@ -56,14 +57,9 @@ static cll::opt<Algo> algo(
 
 static cll::opt<bool>
     relabel("relabel",
-            cll::desc("Relabel nodes of the graph (default value true)"),
-            cll::init(true));
-
-static cll::opt<bool> storeRelabeledGraph(
-    "storeRelabeledGraph",
-    cll::desc("Write the relabeled graph to disk for future use with "
-              ".gr.triangles extension (default value true)"),
-    cll::init(true));
+            cll::desc("Relabel nodes of the graph (default value of false => "
+                      "choose automatically)"),
+            cll::init(false));
 
 typedef galois::graphs::LC_CSR_Graph<void, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
@@ -462,6 +458,15 @@ void makeSortedGraph(Graph& graph) {
 }
 
 void readGraph(Graph& graph) {
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
+  if (!relabel) {
+    galois::graphs::FileGraph degreeGraph;
+    degreeGraph.fromFile(inputFile);
+    degreeGraph.initNodeDegrees();
+    autoAlgoTimer.start();
+    relabel = isApproximateDegreeDistributionPowerLaw(degreeGraph);
+    autoAlgoTimer.stop();
+  }
   if (relabel) {
     galois::gInfo("Relabeling and sorting graph...");
     makeSortedGraph(graph);

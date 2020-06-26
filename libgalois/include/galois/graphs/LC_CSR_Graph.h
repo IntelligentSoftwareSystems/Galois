@@ -439,6 +439,8 @@ public:
     return raw_end(N);
   }
 
+  uint64_t getDegree(GraphNode N) const { return (raw_end(N) - raw_begin(N)); }
+
   edge_iterator findEdge(GraphNode N1, GraphNode N2) {
     return std::find_if(edge_begin(N1), edge_end(N1),
                         [=](edge_iterator e) { return getEdgeDst(e) == N2; });

@@ -299,6 +299,10 @@ public:
     return in_raw_end(N);
   }
 
+  uint64_t getInDegree(GraphNode N) const {
+    return (in_raw_end(N) - in_raw_begin(N));
+  }
+
   /**
    * @param N node to get in edges for
    * @param mflag how safe the acquire should be

@@ -26,6 +26,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Utils.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -63,25 +64,28 @@ enum Algo {
   dijkstraTile,
   dijkstra,
   topo,
-  topoTile
+  topoTile,
+  AutoAlgo
 };
 
 const char* const ALGO_NAMES[] = {
-    "deltaTile",    "deltaStep", "deltaStepBarrier",
-    "serDeltaTile", "serDelta",  "dijkstraTile",
-    "dijkstra",     "topo",      "topoTile"};
+    "deltaTile", "deltaStep",    "deltaStepBarrier", "serDeltaTile",
+    "serDelta",  "dijkstraTile", "dijkstra",         "topo",
+    "topoTile",  "Auto"};
 
-static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm:"),
-         cll::values(clEnumVal(deltaTile, "deltaTile"),
-                     clEnumVal(deltaStep, "deltaStep"),
-                     clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
-                     clEnumVal(serDeltaTile, "serDeltaTile"),
-                     clEnumVal(serDelta, "serDelta"),
-                     clEnumVal(dijkstraTile, "dijkstraTile"),
-                     clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
-                     clEnumVal(topoTile, "topoTile")),
-         cll::init(deltaTile));
+static cll::opt<Algo> algo(
+    "algo", cll::desc("Choose an algorithm (default value auto):"),
+    cll::values(clEnumVal(deltaTile, "deltaTile"),
+                clEnumVal(deltaStep, "deltaStep"),
+                clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
+                clEnumVal(serDeltaTile, "serDeltaTile"),
+                clEnumVal(serDelta, "serDelta"),
+                clEnumVal(dijkstraTile, "dijkstraTile"),
+                clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
+                clEnumVal(topoTile, "topoTile"),
+                clEnumVal(AutoAlgo,
+                          "auto: choose among the algorithms automatically")),
+    cll::init(AutoAlgo));
 
 //! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
@@ -399,8 +403,20 @@ int main(int argc, char** argv) {
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
   galois::StatTimer execTime("Timer_0");
   execTime.start();
+
+  if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = deltaStep;
+    } else {
+      algo = deltaStepBarrier;
+    }
+    autoAlgoTimer.stop();
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
 
   switch (algo) {
   case deltaTile:
@@ -435,7 +451,6 @@ int main(int argc, char** argv) {
     break;
 
   case deltaStepBarrier:
-    std::cout << "Using OBIM with barrier\n";
     deltaStepAlgo<UpdateRequest, OBIM_Barrier>(graph, source, ReqPushWrap(),
                                                OutEdgeRangeFn{graph});
     break;
