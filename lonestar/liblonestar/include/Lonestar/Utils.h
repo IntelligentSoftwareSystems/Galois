@@ -10,7 +10,7 @@
 //! (https://github.com/sbeamer/gapbs/blob/master/src/benchmark.h)
 template <typename Graph>
 class SourcePicker {
-  static const int64_t kRandSeed = 27491095;
+  static const uint32_t kRandSeed;
   std::mt19937 rng;
   std::uniform_int_distribution<typename Graph::GraphNode> udist;
   const Graph& graph;
@@ -27,6 +27,8 @@ public:
     return source;
   }
 };
+template <typename Graph>
+const uint32_t SourcePicker<Graph>::kRandSeed = 27491095;
 
 //! Used to determine if a graph has power-law degree distribution or not
 //! by sampling some of the vertices in the graph randomly
