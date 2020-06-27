@@ -7,35 +7,34 @@ public:
   VertexMinerAPI() {}
   ~VertexMinerAPI() {}
   // toExtend
-  static inline bool toExtend(unsigned, const EmbeddingTy&, unsigned) {
+  static inline bool toExtend(unsigned, const EmbeddingTy &, unsigned) {
     return true;
   }
 
   // toAdd (only add non-automorphisms)
-  static inline bool toAdd(unsigned n, PangolinGraph& g, const EmbeddingTy& emb,
+  static inline bool toAdd(unsigned n, PangolinGraph &g, const EmbeddingTy &emb,
                            unsigned pos, VertexId dst) {
     return !is_vertex_automorphism(n, g, emb, pos, dst);
   }
 
-  static inline bool toAddOrdered(unsigned, PangolinGraph&, const EmbeddingTy&,
-                                  unsigned, VertexId, PangolinGraph&) {
+  static inline bool toAddOrdered(unsigned, PangolinGraph &,
+                                  const EmbeddingTy &, unsigned, VertexId,
+                                  PangolinGraph &) {
     return true;
   }
 
   // specify which vertex to extend when using matching order
-  static inline unsigned getExtendableVertex(unsigned n) {
-    return n-1;
-  }
+  static inline unsigned getExtendableVertex(unsigned n) { return n - 1; }
 
   // given an embedding, return its pattern id (hash value)
-  static inline unsigned getPattern(unsigned, PangolinGraph&, unsigned,
-                                    VertexId, const EmbeddingTy&, unsigned) {
+  static inline unsigned getPattern(unsigned, PangolinGraph &, unsigned,
+                                    VertexId, const EmbeddingTy &, unsigned) {
     return 0;
   }
 
 protected:
-  static inline bool is_vertex_automorphism(unsigned n, PangolinGraph& g,
-                                            const EmbeddingTy& emb,
+  static inline bool is_vertex_automorphism(unsigned n, PangolinGraph &g,
+                                            const EmbeddingTy &emb,
                                             unsigned idx, VertexId dst) {
     // unsigned n = emb.size();
     // the new vertex id should be larger than the first vertex id
@@ -57,8 +56,8 @@ protected:
         return true;
     return false;
   }
-  static inline bool is_all_connected_dag(PangolinGraph& g, unsigned dst,
-                                          const EmbeddingTy& emb, unsigned end,
+  static inline bool is_all_connected_dag(PangolinGraph &g, unsigned dst,
+                                          const EmbeddingTy &emb, unsigned end,
                                           unsigned start = 0) {
     assert(end > 0);
     bool all_connected = true;
@@ -71,34 +70,34 @@ protected:
     }
     return all_connected;
   }
-  static inline bool is_connected(PangolinGraph& g, unsigned a, unsigned b) {
+  static inline bool is_connected(PangolinGraph &g, unsigned a, unsigned b) {
     if (g.get_degree(a) == 0 || g.get_degree(b) == 0)
       return false;
-    unsigned key    = a;
+    unsigned key = a;
     unsigned search = b;
     if (g.get_degree(a) < g.get_degree(b)) {
-      key    = b;
+      key = b;
       search = a;
     }
     auto begin = g.edge_begin(search);
-    auto end   = g.edge_end(search);
+    auto end = g.edge_end(search);
     return binary_search(g, key, begin, end);
   }
-  static inline int is_connected_dag(PangolinGraph& g, unsigned key,
+  static inline int is_connected_dag(PangolinGraph &g, unsigned key,
                                      unsigned search) {
     if (g.get_degree(search) == 0)
       return false;
     auto begin = g.edge_begin(search);
-    auto end   = g.edge_end(search);
+    auto end = g.edge_end(search);
     return binary_search(g, key, begin, end);
   }
-  static inline bool binary_search(PangolinGraph& g, unsigned key,
+  static inline bool binary_search(PangolinGraph &g, unsigned key,
                                    PangolinGraph::edge_iterator begin,
                                    PangolinGraph::edge_iterator end) {
     auto l = begin;
     auto r = end - 1;
     while (r >= l) {
-      auto mid       = l + (r - l) / 2;
+      auto mid = l + (r - l) / 2;
       unsigned value = g.getEdgeDst(mid);
       if (value == key)
         return true;
@@ -109,10 +108,10 @@ protected:
     }
     return false;
   }
-  static inline unsigned find_motif_pattern_id(unsigned n, PangolinGraph& g,
+  static inline unsigned find_motif_pattern_id(unsigned n, PangolinGraph &g,
                                                unsigned idx, VertexId dst,
-                                               const EmbeddingTy& emb,
-                                               BYTE* pre_pid,
+                                               const EmbeddingTy &emb,
+                                               BYTE *pre_pid,
                                                unsigned pos = 0) {
     unsigned pid = 0;
     if (n == 2) { // count 3-motifs
@@ -125,7 +124,7 @@ protected:
       }
     } else if (n == 3) { // count 4-motifs
       unsigned num_edges = 1;
-      pid                = emb.get_pid();
+      pid = emb.get_pid();
       if (pid == 0) { // extending a triangle
         for (unsigned j = idx + 1; j < n; j++)
           if (is_connected(g, emb.get_vertex(j), dst))
@@ -142,7 +141,7 @@ protected:
           }
         }
         if (num_edges == 1) {
-          pid             = 0; // p0: 3-path
+          pid = 0; // p0: 3-path
           unsigned center = 1;
           if (use_wedge) {
             if (pre_pid[pos])
@@ -153,7 +152,7 @@ protected:
           if (idx == center)
             pid = 1; // p1: 3-star
         } else if (num_edges == 2) {
-          pid             = 2; // p2: 4-cycle
+          pid = 2; // p2: 4-cycle
           unsigned center = 1;
           if (use_wedge) {
             if (pre_pid[pos])

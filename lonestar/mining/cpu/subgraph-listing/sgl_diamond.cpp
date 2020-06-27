@@ -1,36 +1,43 @@
 #include "lonestarmine.h"
 #include "pangolin/BfsMining/vertex_miner.h"
 
-const char* name = "sgl";
-const char* desc = "listing edge-induced subgraphs of a given pattern in a graph using bfs extension";
-const char* url = nullptr;
+const char *name = "sgl";
+const char *desc = "listing edge-induced subgraphs of a given pattern in a "
+                   "graph using bfs extension";
+const char *url = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {
 public:
   // matching order of the pattern
   static inline unsigned getExtendableVertex(unsigned n) {
-    if (n == 3) return 1; // u3 extended from u1
-    return n-1; // u[i] extended from u[i-1]
+    if (n == 3)
+      return 1;   // u3 extended from u1
+    return n - 1; // u[i] extended from u[i-1]
   }
- 
-  static inline bool toAdd(unsigned n, PangolinGraph& g,
-                           const BaseEmbedding& emb, unsigned, VertexId dst) {
-    // std::cout << "\t emb: " << emb << ", dst=" << dst << ", pos=" << pos << "\n";
+
+  static inline bool toAdd(unsigned n, PangolinGraph &g,
+                           const BaseEmbedding &emb, unsigned, VertexId dst) {
+    // std::cout << "\t emb: " << emb << ", dst=" << dst << ", pos=" << pos <<
+    // "\n";
     // u3 > u2
     if (n == 3) {
-      if (dst <= emb.get_vertex(2)) return false;
+      if (dst <= emb.get_vertex(2))
+        return false;
     }
     // both u2 and u3 (extended from u1) connected to u0
-    if (!is_connected(g, dst, emb.get_vertex(0))) return false;
+    if (!is_connected(g, dst, emb.get_vertex(0)))
+      return false;
     return true;
   }
 };
 
-class AppMiner : public VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1> {
+class AppMiner
+    : public VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1> {
 public:
   AppMiner(unsigned ms, int nt)
-      : VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1>(ms, nt, nblocks) {
+      : VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1>(ms, nt,
+                                                                     nblocks) {
     assert(ms > 2);
   }
   ~AppMiner() {}
@@ -40,4 +47,3 @@ public:
 };
 
 #include "pangolin/BfsMining/engine.h"
-

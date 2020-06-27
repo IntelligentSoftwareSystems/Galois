@@ -53,8 +53,8 @@ public:
         exit(1);
       }
       // unsigned pid = this->read_pattern(pattern_filename);
-      //unsigned pid = this->read_pattern(pattern_filename, "gr", true);
-      //std::cout << "pattern id = " << pid << "\n";
+      // unsigned pid = this->read_pattern(pattern_filename, "gr", true);
+      // std::cout << "pattern id = " << pid << "\n";
       // set_input_pattern(pid);
     }
   }
@@ -69,59 +69,58 @@ public:
     auto cur_size = this->emb_list.size();
     size_t begin = 0, end = cur_size;
     if (level == 1) {
-      begin    = chunk_begin;
-      end      = chunk_end;
+      begin = chunk_begin;
+      end = chunk_end;
       cur_size = end - begin;
-      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      // std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
       //          << chunk_end << "\n";
     }
     // std::cout << "\t number of current embeddings in level " << level << ": "
     // << cur_size << "\n";
     UintList num_new_emb(cur_size); // TODO: for large graph, wo need UlongList
     // UlongList num_new_emb(cur_size);
-    galois::do_all(
-        galois::iterate(begin, end),
-        [&](const size_t& pos) {
-          unsigned n = level + 1;
-          StrQpMapFreq* qp_lmap;
-          if (!is_single)
-            if (n >= 4)
-              qp_lmap = qp_localmaps.getLocal();
-          EmbeddingTy emb(n);
-          get_embedding(level, pos, emb);
-          if (n < this->max_size - 1)
-            num_new_emb[pos - begin] = 0;
-          if (!is_single && n == 3 && this->max_size == 4)
-            emb.set_pid(this->emb_list.get_pid(pos));
-          for (unsigned i = 0; i < n; ++i) {
-            if (!API::toExtend(n, emb, i))
-              continue;
-            auto src = emb.get_vertex(i);
-            for (auto e : this->graph.edges(src)) {
-              GNode dst = this->graph.getEdgeDst(e);
-              if (API::toAdd(n, this->graph, emb, i, dst)) {
-                if (n < this->max_size - 1) {
-                  num_new_emb[pos - begin]++;
-                } else { // do reduction
-                  if (is_single)
-                    total_num += 1;
-                  else {
-                    // unsigned pid  = getPattern(n, i, dst, emb,
-                    // pos);
-                    if (n < 4) {
-                      unsigned pid =
-                          this->find_motif_pattern_id(n, i, dst, emb, pos);
-                      accumulators[pid] += 1;
-                    } else
-                      quick_reduce(n, i, dst, emb, qp_lmap);
-                  }
-                }
-              }
-            }
-          }
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("Extending-alloc"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     unsigned n = level + 1;
+                     StrQpMapFreq *qp_lmap;
+                     if (!is_single)
+                       if (n >= 4)
+                         qp_lmap = qp_localmaps.getLocal();
+                     EmbeddingTy emb(n);
+                     get_embedding(level, pos, emb);
+                     if (n < this->max_size - 1)
+                       num_new_emb[pos - begin] = 0;
+                     if (!is_single && n == 3 && this->max_size == 4)
+                       emb.set_pid(this->emb_list.get_pid(pos));
+                     for (unsigned i = 0; i < n; ++i) {
+                       if (!API::toExtend(n, emb, i))
+                         continue;
+                       auto src = emb.get_vertex(i);
+                       for (auto e : this->graph.edges(src)) {
+                         GNode dst = this->graph.getEdgeDst(e);
+                         if (API::toAdd(n, this->graph, emb, i, dst)) {
+                           if (n < this->max_size - 1) {
+                             num_new_emb[pos - begin]++;
+                           } else { // do reduction
+                             if (is_single)
+                               total_num += 1;
+                             else {
+                               // unsigned pid  = getPattern(n, i, dst, emb,
+                               // pos);
+                               if (n < 4) {
+                                 unsigned pid = this->find_motif_pattern_id(
+                                     n, i, dst, emb, pos);
+                                 accumulators[pid] += 1;
+                               } else
+                                 quick_reduce(n, i, dst, emb, qp_lmap);
+                             }
+                           }
+                         }
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-alloc"));
     if (level == this->max_size - 2)
       return;
     UlongList indices = parallel_prefix_sum<unsigned, Ulong>(num_new_emb);
@@ -132,32 +131,32 @@ public:
       is_wedge.resize(this->emb_list.size());
       std::fill(is_wedge.begin(), is_wedge.end(), 0);
     }
-    galois::do_all(
-        galois::iterate(begin, end),
-        [&](const size_t& pos) {
-          EmbeddingTy emb(level + 1);
-          get_embedding(level, pos, emb);
-          auto start = indices[pos - begin];
-          auto n     = emb.size();
-          for (unsigned i = 0; i < n; ++i) {
-            if (!API::toExtend(n, emb, i))
-              continue;
-            auto src = emb.get_vertex(i);
-            for (auto e : this->graph.edges(src)) {
-              GNode dst = this->graph.getEdgeDst(e);
-              if (API::toAdd(n, this->graph, emb, i, dst)) {
-                assert(start < indices.back());
-                if (!is_single && n == 2 && this->max_size == 4)
-                  this->emb_list.set_pid(start, this->find_motif_pattern_id(
-                                                    n, i, dst, emb, start));
-                this->emb_list.set_idx(level + 1, start, pos);
-                this->emb_list.set_vid(level + 1, start++, dst);
-              }
-            }
-          }
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("Extending-insert"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     EmbeddingTy emb(level + 1);
+                     get_embedding(level, pos, emb);
+                     auto start = indices[pos - begin];
+                     auto n = emb.size();
+                     for (unsigned i = 0; i < n; ++i) {
+                       if (!API::toExtend(n, emb, i))
+                         continue;
+                       auto src = emb.get_vertex(i);
+                       for (auto e : this->graph.edges(src)) {
+                         GNode dst = this->graph.getEdgeDst(e);
+                         if (API::toAdd(n, this->graph, emb, i, dst)) {
+                           assert(start < indices.back());
+                           if (!is_single && n == 2 && this->max_size == 4)
+                             this->emb_list.set_pid(start,
+                                                    this->find_motif_pattern_id(
+                                                        n, i, dst, emb, start));
+                           this->emb_list.set_idx(level + 1, start, pos);
+                           this->emb_list.set_vid(level + 1, start++, dst);
+                         }
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-insert"));
     indices.clear();
   }
 
@@ -167,21 +166,21 @@ public:
     auto cur_size = this->emb_list.size();
     size_t begin = 0, end = cur_size;
     if (level == 1) {
-      begin    = chunk_begin;
-      end      = chunk_end;
+      begin = chunk_begin;
+      end = chunk_end;
       cur_size = end - begin;
-      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      // std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
       //          << chunk_end << "\n";
     }
-    //std::cout << "\t number of current embeddings in level " << level << ": "
+    // std::cout << "\t number of current embeddings in level " << level << ": "
     //          << cur_size << "\n";
     UintList num_new_emb(cur_size);
     galois::do_all(
         galois::iterate(begin, end),
-        [&](const size_t& pos) {
+        [&](const size_t &pos) {
           EmbeddingTy emb(level + 1);
           get_embedding(level, pos, emb);
-          auto vid                 = this->emb_list.get_vid(level, pos);
+          auto vid = this->emb_list.get_vid(level, pos);
           num_new_emb[pos - begin] = 0;
           for (auto e : this->graph.edges(vid)) {
             GNode dst = this->graph.getEdgeDst(e);
@@ -204,10 +203,10 @@ public:
     this->emb_list.add_level(new_size);
     galois::do_all(
         galois::iterate(begin, end),
-        [&](const size_t& pos) {
+        [&](const size_t &pos) {
           EmbeddingTy emb(level + 1);
           get_embedding(level, pos, emb);
-          auto vid   = this->emb_list.get_vid(level, pos);
+          auto vid = this->emb_list.get_vid(level, pos);
           auto start = indices[pos - begin];
           for (auto e : this->graph.edges(vid)) {
             GNode dst = this->graph.getEdgeDst(e);
@@ -222,63 +221,73 @@ public:
     indices.clear();
   }
 
-  inline void extend_single_ordered(unsigned level, size_t chunk_begin, size_t chunk_end) {
+  inline void extend_single_ordered(unsigned level, size_t chunk_begin,
+                                    size_t chunk_end) {
     auto cur_size = this->emb_list.size();
     size_t begin = 0, end = cur_size;
     if (level == 1) {
-      begin    = chunk_begin;
-      end      = chunk_end;
+      begin = chunk_begin;
+      end = chunk_end;
       cur_size = end - begin;
-      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end " << chunk_end << "\n";
+      // std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end " <<
+      // chunk_end << "\n";
     }
-    //std::cout << "\t number of embeddings in level " << level << ": " << cur_size << "\n";
+    // std::cout << "\t number of embeddings in level " << level << ": " <<
+    // cur_size << "\n";
     UintList num_new_emb(cur_size);
 
-    galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
-      EmbeddingTy emb(level + 1);
-      get_embedding(level, pos, emb);
-      num_new_emb[pos - begin] = 0;
-      auto id = API::getExtendableVertex(level+1);
-      auto src = emb.get_vertex(id);
-      //std::cout << "current embedding: " << emb << "\n";
-      //std::cout << "extending vertex " << src << "\n";
-      for (auto e : this->graph.edges(src)) {
-        auto dst = this->graph.getEdgeDst(e);
-        if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
-          //std::cout << "new embedding added\n";
-          if (level < this->max_size - 2) {
-            num_new_emb[pos - begin]++;
-          } else {
-            total_num += 1;
-            //std::cout << "\t match found\n";
-          }
-        }
-      }
-    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-alloc"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     EmbeddingTy emb(level + 1);
+                     get_embedding(level, pos, emb);
+                     num_new_emb[pos - begin] = 0;
+                     auto id = API::getExtendableVertex(level + 1);
+                     auto src = emb.get_vertex(id);
+                     // std::cout << "current embedding: " << emb << "\n";
+                     // std::cout << "extending vertex " << src << "\n";
+                     for (auto e : this->graph.edges(src)) {
+                       auto dst = this->graph.getEdgeDst(e);
+                       if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
+                         // std::cout << "new embedding added\n";
+                         if (level < this->max_size - 2) {
+                           num_new_emb[pos - begin]++;
+                         } else {
+                           total_num += 1;
+                           // std::cout << "\t match found\n";
+                         }
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-alloc"));
 
-    if (level == this->max_size - 2) return;
+    if (level == this->max_size - 2)
+      return;
     UlongList indices = parallel_prefix_sum<unsigned, Ulong>(num_new_emb);
     num_new_emb.clear();
     Ulong new_size = indices.back();
-    //std::cout << "number of new embeddings: " << new_size << "\n";
+    // std::cout << "number of new embeddings: " << new_size << "\n";
     this->emb_list.add_level(new_size);
 
-    galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
-      EmbeddingTy emb(level + 1);
-      get_embedding(level, pos, emb);
-      auto start = indices[pos - begin];
-      auto id = API::getExtendableVertex(level+1);
-      auto src = emb.get_vertex(id);
-      //std::cout << "current embedding: " << emb << "\n";
-      //std::cout << "extending vertex " << src << "\n";
-      for (auto e : this->graph.edges(src)) {
-        auto dst = this->graph.getEdgeDst(e);
-        if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
-          this->emb_list.set_idx(level + 1, start, pos);
-          this->emb_list.set_vid(level + 1, start++, dst);
-        }
-      }
-    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-insert"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     EmbeddingTy emb(level + 1);
+                     get_embedding(level, pos, emb);
+                     auto start = indices[pos - begin];
+                     auto id = API::getExtendableVertex(level + 1);
+                     auto src = emb.get_vertex(id);
+                     // std::cout << "current embedding: " << emb << "\n";
+                     // std::cout << "extending vertex " << src << "\n";
+                     for (auto e : this->graph.edges(src)) {
+                       auto dst = this->graph.getEdgeDst(e);
+                       if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
+                         this->emb_list.set_idx(level + 1, start, pos);
+                         this->emb_list.set_vid(level + 1, start++, dst);
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-insert"));
     indices.clear();
   }
 
@@ -287,43 +296,43 @@ public:
     auto cur_size = this->emb_list.size();
     size_t begin = 0, end = cur_size;
     if (level == 1) {
-      begin    = chunk_begin;
-      end      = chunk_end;
+      begin = chunk_begin;
+      end = chunk_end;
       cur_size = end - begin;
-      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      // std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
       //          << chunk_end << "\n";
     }
-    //std::cout << "\t number of current embeddings in level " << level << ": "
+    // std::cout << "\t number of current embeddings in level " << level << ": "
     //          << cur_size << "\n";
     UintList num_new_emb(cur_size);
-    galois::do_all(
-        galois::iterate(begin, end),
-        [&](const size_t& pos) {
-          EmbeddingTy emb(level + 1);
-          get_embedding(level, pos, emb);
-          num_new_emb[pos - begin] = 0;
-          // std::cout << "current embedding: " << emb << "\n";
-          for (auto q_edge : this->pattern.edges(level + 1)) {
-            VertexId q_dst   = this->pattern.getEdgeDst(q_edge);
-            VertexId q_order = q_dst;
-            if (q_order < level + 1) {
-              VertexId d_vertex = emb.get_vertex(q_order);
-              for (auto d_edge : this->graph.edges(d_vertex)) {
-                GNode d_dst = this->graph.getEdgeDst(d_edge);
-                if (API::toAddOrdered(level + 1, this->graph, emb, q_order,
-                                      d_dst, this->pattern)) {
-                  if (level < this->max_size - 2)
-                    num_new_emb[pos - begin]++;
-                  else
-                    total_num += 1;
-                }
-              }
-              break;
-            }
-          }
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("Extending-alloc"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     EmbeddingTy emb(level + 1);
+                     get_embedding(level, pos, emb);
+                     num_new_emb[pos - begin] = 0;
+                     // std::cout << "current embedding: " << emb << "\n";
+                     for (auto q_edge : this->pattern.edges(level + 1)) {
+                       VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+                       VertexId q_order = q_dst;
+                       if (q_order < level + 1) {
+                         VertexId d_vertex = emb.get_vertex(q_order);
+                         for (auto d_edge : this->graph.edges(d_vertex)) {
+                           GNode d_dst = this->graph.getEdgeDst(d_edge);
+                           if (API::toAddOrdered(level + 1, this->graph, emb,
+                                                 q_order, d_dst,
+                                                 this->pattern)) {
+                             if (level < this->max_size - 2)
+                               num_new_emb[pos - begin]++;
+                             else
+                               total_num += 1;
+                           }
+                         }
+                         break;
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-alloc"));
 
     if (level == this->max_size - 2)
       return;
@@ -332,37 +341,37 @@ public:
     Ulong new_size = indices.back();
     std::cout << "\t number of new embeddings: " << new_size << "\n";
     this->emb_list.add_level(new_size);
-    galois::do_all(
-        galois::iterate(begin, end),
-        [&](const size_t& pos) {
-          EmbeddingTy emb(level + 1);
-          get_embedding(level, pos, emb);
-          auto start = indices[pos - begin];
-          for (auto q_edge : this->pattern.edges(level + 1)) {
-            VertexId q_dst   = this->pattern.getEdgeDst(q_edge);
-            VertexId q_order = q_dst;
-            if (q_order < level + 1) {
-              VertexId d_vertex = emb.get_vertex(q_order);
-              for (auto d_edge : this->graph.edges(d_vertex)) {
-                GNode d_dst = this->graph.getEdgeDst(d_edge);
-                if (API::toAddOrdered(level + 1, this->graph, emb, q_order,
-                                      d_dst, this->pattern)) {
-                  this->emb_list.set_idx(level + 1, start, pos);
-                  this->emb_list.set_vid(level + 1, start++, d_dst);
-                }
-              }
-              break;
-            }
-          }
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("Extending-insert"));
+    galois::do_all(galois::iterate(begin, end),
+                   [&](const size_t &pos) {
+                     EmbeddingTy emb(level + 1);
+                     get_embedding(level, pos, emb);
+                     auto start = indices[pos - begin];
+                     for (auto q_edge : this->pattern.edges(level + 1)) {
+                       VertexId q_dst = this->pattern.getEdgeDst(q_edge);
+                       VertexId q_order = q_dst;
+                       if (q_order < level + 1) {
+                         VertexId d_vertex = emb.get_vertex(q_order);
+                         for (auto d_edge : this->graph.edges(d_vertex)) {
+                           GNode d_dst = this->graph.getEdgeDst(d_edge);
+                           if (API::toAddOrdered(level + 1, this->graph, emb,
+                                                 q_order, d_dst,
+                                                 this->pattern)) {
+                             this->emb_list.set_idx(level + 1, start, pos);
+                             this->emb_list.set_vid(level + 1, start++, d_dst);
+                           }
+                         }
+                         break;
+                       }
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("Extending-insert"));
     indices.clear();
   }
 
   // quick pattern reduction
   inline void quick_reduce(unsigned n, unsigned i, VertexId dst,
-                           const EmbeddingTy& emb, StrQpMapFreq* qp_lmap) {
+                           const EmbeddingTy &emb, StrQpMapFreq *qp_lmap) {
     std::vector<bool> connected;
     this->get_connectivity(n, i, dst, emb, connected);
     StrQPattern qp(n + 1, connected);
@@ -376,18 +385,18 @@ public:
   inline void canonical_reduce() {
     for (auto i = 0; i < this->num_threads; i++)
       cg_localmaps.getLocal(i)->clear();
-    galois::do_all(
-        galois::iterate(qp_map),
-        [&](auto& element) {
-          StrCgMapFreq* cg_map = cg_localmaps.getLocal();
-          StrCPattern cg(element.first);
-          if (cg_map->find(cg) != cg_map->end())
-            (*cg_map)[cg] += element.second;
-          else
-            (*cg_map)[cg] = element.second;
-          cg.clean();
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("CanonicalReduce"));
+    galois::do_all(galois::iterate(qp_map),
+                   [&](auto &element) {
+                     StrCgMapFreq *cg_map = cg_localmaps.getLocal();
+                     StrCPattern cg(element.first);
+                     if (cg_map->find(cg) != cg_map->end())
+                       (*cg_map)[cg] += element.second;
+                     else
+                       (*cg_map)[cg] = element.second;
+                     cg.clean();
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(),
+                   galois::loopname("CanonicalReduce"));
     qp_map.clear();
   }
   inline void merge_qp_map() {
@@ -445,40 +454,38 @@ public:
     // std::cout << std::endl;
   }
   void tc_vertex_solver() { // vertex parallel
-    galois::do_all(
-        galois::iterate(this->graph.begin(), this->graph.end()),
-        [&](const GNode& src) {
-          for (auto e : this->graph.edges(src)) {
-            auto dst = this->graph.getEdgeDst(e);
-            total_num += this->intersect(src, dst);
-          }
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("TC"));
+    galois::do_all(galois::iterate(this->graph.begin(), this->graph.end()),
+                   [&](const GNode &src) {
+                     for (auto e : this->graph.edges(src)) {
+                       auto dst = this->graph.getEdgeDst(e);
+                       total_num += this->intersect(src, dst);
+                     }
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("TC"));
   }
 
   void tc_solver() { // edge parallel
-    galois::do_all(
-        galois::iterate((size_t)0, this->emb_list.size()),
-        [&](const size_t& id) {
-          auto src = this->emb_list.get_idx(1, id);
-          auto dst = this->emb_list.get_vid(1, id);
-          auto num = this->intersect_dag(src, dst);
-          total_num += num;
-        },
-        galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
-        galois::loopname("TC"));
+    galois::do_all(galois::iterate((size_t)0, this->emb_list.size()),
+                   [&](const size_t &id) {
+                     auto src = this->emb_list.get_idx(1, id);
+                     auto dst = this->emb_list.get_vid(1, id);
+                     auto num = this->intersect_dag(src, dst);
+                     total_num += num;
+                   },
+                   galois::chunk_size<CHUNK_SIZE>(), galois::steal(),
+                   galois::loopname("TC"));
   }
 
   void solver() {
     size_t num = this->emb_list.size();
     size_t chunk_length = (num - 1) / num_blocks + 1;
-    //std::cout << "number of single-edge embeddings: " << num << "\n";
+    // std::cout << "number of single-edge embeddings: " << num << "\n";
     for (size_t cid = 0; cid < num_blocks; cid++) {
       size_t chunk_begin = cid * chunk_length;
-      size_t chunk_end   = std::min((cid + 1) * chunk_length, num);
-      //size_t cur_size    = chunk_end - chunk_begin;
-      //std::cout << "Processing the " << cid << " chunk (" << cur_size
+      size_t chunk_end = std::min((cid + 1) * chunk_length, num);
+      // size_t cur_size    = chunk_end - chunk_begin;
+      // std::cout << "Processing the " << cid << " chunk (" << cur_size
       //          << " edges) of " << num_blocks << " blocks\n";
       unsigned level = 1;
       while (1) {
@@ -513,7 +520,7 @@ private:
   std::vector<BYTE> is_wedge;     // indicate a 3-vertex embedding is a wedge or
                                   // chain (v0-cntered or v1-centered)
 
-  inline void get_embedding(unsigned level, size_t pos, EmbeddingTy& emb) {
+  inline void get_embedding(unsigned level, size_t pos, EmbeddingTy &emb) {
     auto vid = this->emb_list.get_vid(level, pos);
     auto idx = this->emb_list.get_idx(level, pos);
     ElementTy ele(vid);
@@ -536,7 +543,7 @@ protected:
   EmbeddingListTy emb_list;
 
   inline unsigned find_motif_pattern_id(unsigned n, unsigned idx, VertexId dst,
-                                        const EmbeddingTy& emb,
+                                        const EmbeddingTy &emb,
                                         unsigned pos = 0) {
     unsigned pid = 0;
     if (n == 2) { // count 3-motifs
@@ -549,7 +556,7 @@ protected:
       }
     } else if (n == 3) { // count 4-motifs
       unsigned num_edges = 1;
-      pid                = emb.get_pid();
+      pid = emb.get_pid();
       if (pid == 0) { // extending a triangle
         for (unsigned j = idx + 1; j < n; j++)
           if (this->is_connected(emb.get_vertex(j), dst))
@@ -566,7 +573,7 @@ protected:
           }
         }
         if (num_edges == 1) {
-          pid             = 0; // p0: 3-path
+          pid = 0; // p0: 3-path
           unsigned center = 1;
           if (use_wedge) {
             if (is_wedge[pos])
@@ -578,7 +585,7 @@ protected:
           if (idx == center)
             pid = 1; // p1: 3-star
         } else if (num_edges == 2) {
-          pid             = 2; // p2: 4-cycle
+          pid = 2; // p2: 4-cycle
           unsigned center = 1;
           if (use_wedge) {
             if (is_wedge[pos])

@@ -16,7 +16,7 @@ public:
     // std::cout << "num_threads = " << nt << std::endl;
   }
   virtual ~Miner() {}
-  inline void insert(EmbeddingQueueTy& queue, bool debug = false);
+  inline void insert(EmbeddingQueueTy &queue, bool debug = false);
   inline unsigned intersect(unsigned a, unsigned b) {
     return intersect_merge(a, b);
   }
@@ -28,7 +28,8 @@ public:
     max_degree = util::read_graph(graph, filetype, filename, enable_dag);
     graph.degree_counting();
     degrees = graph.degrees.data();
-    //std::cout << "Input graph: num_vertices " << graph.size() << " num_edges "
+    // std::cout << "Input graph: num_vertices " << graph.size() << " num_edges
+    // "
     //          << graph.sizeEdges() << "\n";
     // util::print_graph(graph);
     // convert_to_gbbs(filename);
@@ -40,7 +41,7 @@ public:
     outfile.open(filename + ".gbbs");
     outfile << "AdjacencyGraph"
             << "\n";
-    auto m   = graph.size();
+    auto m = graph.size();
     auto nnz = graph.sizeEdges();
     outfile << m << "\n";
     outfile << nnz << "\n";
@@ -146,9 +147,9 @@ protected:
   unsigned max_size;
   int num_threads;
   unsigned max_degree;
-  uint32_t* degrees;
+  uint32_t *degrees;
 
-  inline bool is_automorphism_dag(unsigned n, const EmbeddingTy& emb,
+  inline bool is_automorphism_dag(unsigned n, const EmbeddingTy &emb,
                                   unsigned idx, VertexId dst) {
     // if (dst <= emb.get_vertex(0)) return true;
     for (unsigned i = 0; i < n; ++i)
@@ -161,7 +162,7 @@ protected:
     // true;
     return false;
   }
-  inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy& emb,
+  inline bool is_vertexInduced_automorphism(unsigned n, const EmbeddingTy &emb,
                                             unsigned idx, VertexId dst) {
     // unsigned n = emb.size();
     // the new vertex id should be larger than the first vertex id
@@ -183,7 +184,7 @@ protected:
         return true;
     return false;
   }
-  unsigned get_degree(PangolinGraph* g, VertexId vid) {
+  unsigned get_degree(PangolinGraph *g, VertexId vid) {
     return std::distance(g->edge_begin(vid), g->edge_end(vid));
   }
   inline unsigned intersect_merge(unsigned src, unsigned dst) {
@@ -204,17 +205,17 @@ protected:
   }
   inline unsigned intersect_dag_merge(unsigned p, unsigned q) {
     unsigned count = 0;
-    auto p_start   = graph.edge_begin(p);
-    auto p_end     = graph.edge_end(p);
-    auto q_start   = graph.edge_begin(q);
-    auto q_end     = graph.edge_end(q);
-    auto p_it      = p_start;
-    auto q_it      = q_start;
+    auto p_start = graph.edge_begin(p);
+    auto p_end = graph.edge_end(p);
+    auto q_start = graph.edge_begin(q);
+    auto q_end = graph.edge_end(q);
+    auto p_it = p_start;
+    auto q_it = q_start;
     int a;
     int b;
     while (p_it < p_end && q_it < q_end) {
-      a     = graph.getEdgeDst(p_it);
-      b     = graph.getEdgeDst(q_it);
+      a = graph.getEdgeDst(p_it);
+      b = graph.getEdgeDst(q_it);
       int d = a - b;
       if (d <= 0)
         p_it++;
@@ -228,7 +229,7 @@ protected:
   inline unsigned intersect_search(unsigned a, unsigned b) {
     if (degrees[a] == 0 || degrees[b] == 0)
       return 0;
-    unsigned count  = 0;
+    unsigned count = 0;
     unsigned lookup = a;
     unsigned search = b;
     if (degrees[a] > degrees[b]) {
@@ -236,7 +237,7 @@ protected:
       search = a;
     }
     auto begin = graph.edge_begin(search);
-    auto end   = graph.edge_end(search);
+    auto end = graph.edge_end(search);
     for (auto e : graph.edges(lookup)) {
       GNode key = graph.getEdgeDst(e);
       if (binary_search(key, begin, end))
@@ -245,8 +246,8 @@ protected:
     return count;
   }
   inline bool is_all_connected_except(unsigned dst, unsigned pos,
-                                      const EmbeddingTy& emb) {
-    unsigned n         = emb.size();
+                                      const EmbeddingTy &emb) {
+    unsigned n = emb.size();
     bool all_connected = true;
     for (unsigned i = 0; i < n; ++i) {
       if (i == pos)
@@ -260,8 +261,8 @@ protected:
     return all_connected;
   }
   inline bool is_all_connected_except_dag(unsigned dst, unsigned pos,
-                                          const EmbeddingTy& emb) {
-    unsigned n         = emb.size();
+                                          const EmbeddingTy &emb) {
+    unsigned n = emb.size();
     bool all_connected = true;
     for (unsigned i = 0; i < n; ++i) {
       if (i == pos)
@@ -274,7 +275,7 @@ protected:
     }
     return all_connected;
   }
-  inline bool is_all_connected(unsigned dst, const EmbeddingTy& emb,
+  inline bool is_all_connected(unsigned dst, const EmbeddingTy &emb,
                                unsigned end, unsigned start = 0) {
     assert(start >= 0 && end > 0);
     bool all_connected = true;
@@ -287,7 +288,7 @@ protected:
     }
     return all_connected;
   }
-  inline bool is_all_connected_dag(unsigned dst, const EmbeddingTy& emb,
+  inline bool is_all_connected_dag(unsigned dst, const EmbeddingTy &emb,
                                    unsigned end, unsigned start = 0) {
     assert(start >= 0 && end > 0);
     bool all_connected = true;
@@ -301,7 +302,7 @@ protected:
     return all_connected;
   }
   inline bool is_all_connected_dag(unsigned dst,
-                                   const std::vector<VertexId>& emb,
+                                   const std::vector<VertexId> &emb,
                                    unsigned end, unsigned start = 0) {
     assert(start >= 0 && end > 0);
     bool all_connected = true;
@@ -318,14 +319,14 @@ protected:
   inline bool is_connected(unsigned a, unsigned b) {
     if (degrees[a] == 0 || degrees[b] == 0)
       return false;
-    unsigned key    = a;
+    unsigned key = a;
     unsigned search = b;
     if (degrees[a] < degrees[b]) {
-      key    = b;
+      key = b;
       search = a;
     }
     auto begin = graph.edge_begin(search);
-    auto end   = graph.edge_end(search);
+    auto end = graph.edge_end(search);
     // return serial_search(key, begin, end);
     return binary_search(key, begin, end);
   }
@@ -333,7 +334,7 @@ protected:
     if (degrees[search] == 0)
       return false;
     auto begin = graph.edge_begin(search);
-    auto end   = graph.edge_end(search);
+    auto end = graph.edge_end(search);
     // return serial_search(key, begin, end);
     return binary_search(key, begin, end);
   }
@@ -353,7 +354,7 @@ protected:
     auto l = begin;
     auto r = end - 1;
     while (r >= l) {
-      auto mid       = l + (r - l) / 2;
+      auto mid = l + (r - l) / 2;
       unsigned value = graph.getEdgeDst(mid);
       if (value == key)
         return true;
@@ -371,7 +372,7 @@ protected:
     int l = 0;
     int r = length - 1;
     while (r >= l) {
-      int mid        = l + (r - l) / 2;
+      int mid = l + (r - l) / 2;
       unsigned value = graph.getEdgeDst(begin + mid);
       if (value == key)
         return mid;
@@ -382,8 +383,8 @@ protected:
     }
     return -1;
   }
-  inline void gen_adj_matrix(unsigned n, const std::vector<bool>& connected,
-                             Matrix& a) {
+  inline void gen_adj_matrix(unsigned n, const std::vector<bool> &connected,
+                             Matrix &a) {
     unsigned l = 0;
     for (unsigned i = 1; i < n; i++)
       for (unsigned j = 0; j < i; j++)
@@ -399,7 +400,7 @@ protected:
     return tr;
   }
   // matrix mutiplication, both a and b are n*n matrices
-  inline Matrix product(unsigned n, const Matrix& a, const Matrix& b) {
+  inline Matrix product(unsigned n, const Matrix &a, const Matrix &b) {
     Matrix c(n, std::vector<MatType>(n));
     for (unsigned i = 0; i < n; ++i) {
       for (unsigned j = 0; j < n; ++j) {
@@ -412,7 +413,7 @@ protected:
     return c;
   }
   // calculate the characteristic polynomial of a n*n matrix A
-  inline void char_polynomial(unsigned n, Matrix& A, std::vector<MatType>& c) {
+  inline void char_polynomial(unsigned n, Matrix &A, std::vector<MatType> &c) {
     // n is the size (num_vertices) of a graph
     // A is the adjacency matrix (n*n) of the graph
     Matrix C;
@@ -427,8 +428,8 @@ protected:
     }
   }
   inline void get_connectivity(unsigned n, unsigned idx, VertexId dst,
-                               const EmbeddingTy& emb,
-                               std::vector<bool>& connected) {
+                               const EmbeddingTy &emb,
+                               std::vector<bool> &connected) {
     connected.push_back(true); // 0 and 1 are connected
     for (unsigned i = 2; i < n; i++)
       for (unsigned j = 0; j < i; j++)
@@ -448,7 +449,7 @@ protected:
   // eigenvalue based approach to find the pattern id for a given embedding
   inline unsigned find_motif_pattern_id_eigen(unsigned n, unsigned idx,
                                               VertexId dst,
-                                              const EmbeddingTy& emb) {
+                                              const EmbeddingTy &emb) {
     std::vector<bool> connected;
     get_connectivity(n, idx, dst, emb, connected);
     Matrix A(n + 1, std::vector<MatType>(n + 1, 0));
