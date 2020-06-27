@@ -90,6 +90,8 @@ void Net::train(optimizer* opt, bool need_validate) {
   int num_subg_remain     = 0;
 
   if (subgraph_sample_size) {
+    galois::StatTimer construct_time("SubgraphAllocateTime");
+    construct_time.start();
     distContext->allocateSubgraphs(num_subgraphs, subgraph_sample_size);
     allocateSubgraphsMasks(num_subgraphs);
     std::cout << header
@@ -99,6 +101,7 @@ void Net::train(optimizer* opt, bool need_validate) {
       graphTopologyContext->getGraphPointer(); // gloabl graph in CPU mem
     sampler->initializeMaskedGraph(globalTrainCount, globalTrainMasks, gg,
         distContext->getGraphPointer());
+    construct_time.stop();
   }
 
   galois::gPrint(header, "Start training...\n");
@@ -113,12 +116,13 @@ void Net::train(optimizer* opt, bool need_validate) {
     // Sampling
     ////////////////////////////////////////////////////////////////////////////////
     if (subgraph_sample_size) {
+      galois::StatTimer sample_time("SubgraphSampleTime");
+      sample_time.start();
       if (num_subg_remain == 0) {
         std::cout << header << "Generating " << num_subgraphs
           << " subgraph(s)\n";
-        // TODO stat timer instead of this timer
-        Timer t_subgen;
-        t_subgen.Start();
+        galois::StatTimer t_subgen("SubgraphGenerateTime");
+        t_subgen.start();
 
         // generate subgraphs
         for (int sid = 0; sid < num_subgraphs; sid++) {
@@ -130,8 +134,7 @@ void Net::train(optimizer* opt, bool need_validate) {
               distContext->getSubgraphPointer(sid));
         }
         num_subg_remain = num_subgraphs;
-        t_subgen.Stop();
-        // std::cout << "Done, time: " << t_subgen.Millisecs() << "\n";
+        t_subgen.stop();
       }
       // count their degrees
       for (int i = 0; i < num_subgraphs; i++) {
@@ -181,6 +184,7 @@ void Net::train(optimizer* opt, bool need_validate) {
       //    galois::gPrint(i, " ", testing->getEdgeDst(j), "\n");
       //  }
       //}
+      sample_time.stop();
     } // end subgraph sample loop
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -267,8 +271,13 @@ void Net::train(optimizer* opt, bool need_validate) {
 
 // evaluate, i.e. inference or predict
 double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
+  // TODO get rid of this timer
   Timer t_eval;
   t_eval.Start();
+
+  galois::StatTimer eval_timer("EvaluateTime");
+  eval_timer.start();
+
   size_t gBegin = 0, gEnd = 0, gCount = 0;
   mask_t* gMasks = NULL;
 
@@ -345,6 +354,9 @@ double Net::evaluate(std::string type, acc_t& loss, acc_t& acc) {
         predictions, localLabels);
   }
 
+  eval_timer.stop();
+
+  // TODO replace with stat timer
   t_eval.Stop();
   return t_eval.Millisecs();
 }
@@ -442,6 +454,8 @@ void Net::append_conv_layer(size_t layer_id, bool act, bool norm, bool bias, boo
 //! forward propagation: [begin, end) is the range of samples used.
 //! calls "forward" on each layer and returns the loss of the final layer
 acc_t Net::fprop(size_t gBegin, size_t gEnd, size_t gCount, mask_t* gMasks) {
+  galois::StatTimer fprop_timer("ForwardPropTime");
+  fprop_timer.start();
   // set mask for the last layer; globals
   // TODO this should be distirbuted sample gBegin->end not global; fix later
   // seems to be unused in code right now anyways
@@ -458,14 +472,18 @@ acc_t Net::fprop(size_t gBegin, size_t gEnd, size_t gCount, mask_t* gMasks) {
   acc_t loss = layers[num_layers - 1]->get_prediction_loss();
   // Squared Norm Regularization to mitigate overfitting
   loss += weight_decay * layers[0]->get_weight_decay_loss();
+  fprop_timer.stop();
   return loss;
 }
 
 // back propagation
 void Net::bprop() {
+  galois::StatTimer bprop_timer("BackPropTime");
+  bprop_timer.start();
   for (size_t i = num_layers; i != 0; i--) {
     layers[i - 1]->backward();
   }
+  bprop_timer.stop();
 }
 
 // update trainable weights after back-propagation
