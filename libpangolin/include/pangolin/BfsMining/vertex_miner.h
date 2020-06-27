@@ -53,8 +53,8 @@ public:
         exit(1);
       }
       // unsigned pid = this->read_pattern(pattern_filename);
-      unsigned pid = this->read_pattern(pattern_filename, "gr", true);
-      std::cout << "pattern id = " << pid << "\n";
+      //unsigned pid = this->read_pattern(pattern_filename, "gr", true);
+      //std::cout << "pattern id = " << pid << "\n";
       // set_input_pattern(pid);
     }
   }
@@ -72,8 +72,8 @@ public:
       begin    = chunk_begin;
       end      = chunk_end;
       cur_size = end - begin;
-      std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
-                << chunk_end << "\n";
+      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      //          << chunk_end << "\n";
     }
     // std::cout << "\t number of current embeddings in level " << level << ": "
     // << cur_size << "\n";
@@ -170,11 +170,11 @@ public:
       begin    = chunk_begin;
       end      = chunk_end;
       cur_size = end - begin;
-      std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
-                << chunk_end << "\n";
+      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      //          << chunk_end << "\n";
     }
-    std::cout << "\t number of current embeddings in level " << level << ": "
-              << cur_size << "\n";
+    //std::cout << "\t number of current embeddings in level " << level << ": "
+    //          << cur_size << "\n";
     UintList num_new_emb(cur_size);
     galois::do_all(
         galois::iterate(begin, end),
@@ -222,6 +222,66 @@ public:
     indices.clear();
   }
 
+  inline void extend_single_ordered(unsigned level, size_t chunk_begin, size_t chunk_end) {
+    auto cur_size = this->emb_list.size();
+    size_t begin = 0, end = cur_size;
+    if (level == 1) {
+      begin    = chunk_begin;
+      end      = chunk_end;
+      cur_size = end - begin;
+      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end " << chunk_end << "\n";
+    }
+    //std::cout << "\t number of embeddings in level " << level << ": " << cur_size << "\n";
+    UintList num_new_emb(cur_size);
+
+    galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
+      EmbeddingTy emb(level + 1);
+      get_embedding(level, pos, emb);
+      num_new_emb[pos - begin] = 0;
+      auto id = API::getExtendableVertex(level+1);
+      auto src = emb.get_vertex(id);
+      //std::cout << "current embedding: " << emb << "\n";
+      //std::cout << "extending vertex " << src << "\n";
+      for (auto e : this->graph.edges(src)) {
+        auto dst = this->graph.getEdgeDst(e);
+        if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
+          //std::cout << "new embedding added\n";
+          if (level < this->max_size - 2) {
+            num_new_emb[pos - begin]++;
+          } else {
+            total_num += 1;
+            //std::cout << "\t match found\n";
+          }
+        }
+      }
+    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-alloc"));
+
+    if (level == this->max_size - 2) return;
+    UlongList indices = parallel_prefix_sum<unsigned, Ulong>(num_new_emb);
+    num_new_emb.clear();
+    Ulong new_size = indices.back();
+    //std::cout << "number of new embeddings: " << new_size << "\n";
+    this->emb_list.add_level(new_size);
+
+    galois::do_all(galois::iterate(begin, end), [&](const size_t& pos) {
+      EmbeddingTy emb(level + 1);
+      get_embedding(level, pos, emb);
+      auto start = indices[pos - begin];
+      auto id = API::getExtendableVertex(level+1);
+      auto src = emb.get_vertex(id);
+      //std::cout << "current embedding: " << emb << "\n";
+      //std::cout << "extending vertex " << src << "\n";
+      for (auto e : this->graph.edges(src)) {
+        auto dst = this->graph.getEdgeDst(e);
+        if (API::toAdd(level + 1, this->graph, emb, src, dst)) {
+          this->emb_list.set_idx(level + 1, start, pos);
+          this->emb_list.set_vid(level + 1, start++, dst);
+        }
+      }
+    }, galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::loopname("Extending-insert"));
+    indices.clear();
+  }
+
   inline void extend_ordered(unsigned level, size_t chunk_begin,
                              size_t chunk_end) {
     auto cur_size = this->emb_list.size();
@@ -230,11 +290,11 @@ public:
       begin    = chunk_begin;
       end      = chunk_end;
       cur_size = end - begin;
-      std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
-                << chunk_end << "\n";
+      //std::cout << "\t chunk_begin = " << chunk_begin << ", chunk_end "
+      //          << chunk_end << "\n";
     }
-    std::cout << "\t number of current embeddings in level " << level << ": "
-              << cur_size << "\n";
+    //std::cout << "\t number of current embeddings in level " << level << ": "
+    //          << cur_size << "\n";
     UintList num_new_emb(cur_size);
     galois::do_all(
         galois::iterate(begin, end),
@@ -411,20 +471,20 @@ public:
   }
 
   void solver() {
-    size_t nnz          = this->emb_list.size();
-    size_t chunk_length = (nnz - 1) / num_blocks + 1;
-    std::cout << "number of single-edge embeddings: " << nnz << "\n";
+    size_t num = this->emb_list.size();
+    size_t chunk_length = (num - 1) / num_blocks + 1;
+    //std::cout << "number of single-edge embeddings: " << num << "\n";
     for (size_t cid = 0; cid < num_blocks; cid++) {
       size_t chunk_begin = cid * chunk_length;
-      size_t chunk_end   = std::min((cid + 1) * chunk_length, nnz);
-      size_t cur_size    = chunk_end - chunk_begin;
-      std::cout << "Processing the " << cid << " chunk (" << cur_size
-                << " edges) of " << num_blocks << " blocks\n";
+      size_t chunk_end   = std::min((cid + 1) * chunk_length, num);
+      //size_t cur_size    = chunk_end - chunk_begin;
+      //std::cout << "Processing the " << cid << " chunk (" << cur_size
+      //          << " edges) of " << num_blocks << " blocks\n";
       unsigned level = 1;
       while (1) {
         // this->emb_list.printout_embeddings(level);
         if (use_match_order) {
-          extend_ordered(level, chunk_begin, chunk_end);
+          extend_single_ordered(level, chunk_begin, chunk_end);
         } else {
           if (is_single_pattern())
             extend_vertex_single(level, chunk_begin, chunk_end);

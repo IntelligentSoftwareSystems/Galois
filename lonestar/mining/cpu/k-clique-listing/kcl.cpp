@@ -2,7 +2,7 @@
 #include "pangolin/BfsMining/vertex_miner.h"
 
 const char* name = "Kcl";
-const char* desc = "Counts the K-Cliques in a graph using BFS extension";
+const char* desc = "Listing cliques of size k in a graph using BFS extension";
 const char* url  = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
