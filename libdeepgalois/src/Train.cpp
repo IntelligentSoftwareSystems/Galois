@@ -85,6 +85,8 @@ Net::Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
 }
 
 void Net::train(optimizer* opt, bool need_validate) {
+  galois::StatTimer train_timer("Timer_0");
+  train_timer.start();
   std::string separator = "\n";
   double total_train_time = 0.0;
   int num_subg_remain     = 0;
@@ -267,6 +269,7 @@ void Net::train(optimizer* opt, bool need_validate) {
   galois::gPrint(header, "Average training time per epoch: ", avg_train_time,
       " ms. Throughput: ", throughput, " epoch/s\n");
 #endif
+  train_timer.stop();
 }
 
 // evaluate, i.e. inference or predict

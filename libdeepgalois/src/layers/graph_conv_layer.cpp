@@ -92,6 +92,8 @@ void graph_conv_layer::malloc_and_init() {
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 void graph_conv_layer::forward_propagation(const float_t* in_data,
                                            float_t* out_data) {
+  galois::StatTimer conv_timer("GraphConvForward");
+  conv_timer.start();
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
@@ -121,17 +123,20 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-     "AggSync");
+     "GraphConvForward");
 
   // run relu activation on output if specified
   if (act_)
     math::relu_cpu(x * z, out_data, out_data);
+  conv_timer.stop();
 }
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 void graph_conv_layer::back_propagation(const float_t* in_data,
                                         const float_t* out_data,
                                         float_t* out_grad, float_t* in_grad) {
+  galois::StatTimer conv_timer("GraphConvBackward");
+  conv_timer.start();
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
@@ -167,13 +172,14 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_temp;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-     "AggSyncBack");
+     "GraphConvBackward");
 
   if (level_ != 0 && dropout_)
     math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
 
-  layer::syncSub->sync<writeAny, readAny, GradientSync>("GradientSync");
+  layer::syncSub->sync<writeAny, readAny, GradientSync>("Gradients");
   galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
+  conv_timer.stop();
 }
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
