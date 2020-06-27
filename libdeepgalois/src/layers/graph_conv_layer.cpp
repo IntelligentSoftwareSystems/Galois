@@ -34,22 +34,28 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y,
 // aggregate based on graph topology
 void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in,
                                  float_t* out) {
+  galois::StatTimer aggregate_timer("AggregateTime");
+  aggregate_timer.start();
   // normalization constant based on graph structure
 #ifdef USE_MKL
   update_all_csrmm(len, g, in, out, norm_, norm_consts);
 #else
   update_all(len, g, in, out, norm_, norm_consts);
 #endif
+  aggregate_timer.stop();
 }
 
 // since graph is symmetric, the derivative is the same
 void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in,
                                    float_t* out) {
+  galois::StatTimer aggregate_timer("AggregateDerivativeTime");
+  aggregate_timer.start();
 #ifdef USE_MKL
   update_all_csrmm(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
 #else
   update_all(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
 #endif
+  aggregate_timer.stop();
 }
 
 void graph_conv_layer::combine(size_t n, size_t len, const float_t* self,
@@ -98,6 +104,8 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   size_t y = input_dims[1];
   size_t z = output_dims[1];
 
+  galois::StatTimer drop_timer("GraphConvForwardDropout");
+  drop_timer.start();
   // input: x*y; W: y*z; output: x*z
   // if y > z: mult W first to reduce the feature size for aggregation
   // else: aggregate first then mult W
@@ -107,7 +115,10 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   } else {
     math::copy_cpu(x * y, in_data, in_temp);
   }
+  drop_timer.stop();
 
+  galois::StatTimer compute_timer("GraphConvForwardCompute");
+  compute_timer.start();
   if (y > z) {
     math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp,
                     &layer::W[0], 0.0, out_temp);
@@ -117,6 +128,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
     math::sgemm_cpu(CblasNoTrans, CblasNoTrans, x, z, y, 1.0, in_temp1,
                     &layer::W[0], 0.0, out_data);
   }
+  compute_timer.stop();
 
   // TODO sync of out_data required here
   // TODO how to do this for the sampled case?
@@ -126,8 +138,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
      "GraphConvForward");
 
   // run relu activation on output if specified
+  galois::StatTimer relu_timer("GraphConvForwardRelu");
+  relu_timer.start();
   if (act_)
     math::relu_cpu(x * z, out_data, out_data);
+  relu_timer.stop();
+
   conv_timer.stop();
 }
 
@@ -141,10 +157,15 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   size_t y = input_dims[1];
   size_t z = output_dims[1];
   // note; assumption here is that out_grad contains 1s or 0s via relu?
+  galois::StatTimer relu_timer("GraphConvBackwardRelu");
+  relu_timer.start();
   if (act_)
     math::d_relu_cpu(x * z, out_grad, out_data, out_grad);
+  relu_timer.stop();
   // else math::copy_cpu(x * z, out_grad, out_temp); // TODO: avoid copying
 
+  galois::StatTimer compute_timer("GraphConvBackwardCompute");
+  compute_timer.start();
   if (y > z) {
     d_aggregate(z, *graph_cpu, out_grad, out_temp);
     // at this point, out_temp has the derivative of data from last step to
@@ -167,6 +188,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_grad,
                     0.0, &layer::weight_grad[0]);
   }
+  compute_timer.stop();
 
   // sync agg
   deepgalois::_syncVectorSize = z;
@@ -174,8 +196,11 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
      "GraphConvBackward");
 
+  galois::StatTimer drop_timer("GraphConvBackwardDropout");
+  drop_timer.start();
   if (level_ != 0 && dropout_)
     math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
+  drop_timer.stop();
 
   layer::syncSub->sync<writeAny, readAny, GradientSync>("Gradients");
   galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
