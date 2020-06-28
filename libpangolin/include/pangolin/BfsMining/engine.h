@@ -2,7 +2,7 @@
 #include "pangolin/res_man.h"
 #include "pangolin/BfsMining/embedding_list.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarMineStart(argc, argv, name, desc, url);
 

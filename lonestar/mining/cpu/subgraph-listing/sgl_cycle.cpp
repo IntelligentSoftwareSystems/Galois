@@ -1,10 +1,10 @@
 #include "lonestarmine.h"
 #include "pangolin/BfsMining/vertex_miner.h"
 
-const char *name = "sgl";
-const char *desc = "listing edge-induced subgraphs of a given pattern in a "
+const char* name = "sgl";
+const char* desc = "listing edge-induced subgraphs of a given pattern in a "
                    "graph using bfs extension";
-const char *url = nullptr;
+const char* url = nullptr;
 
 #include "pangolin/BfsMining/vertex_miner_api.h"
 class MyAPI : public VertexMinerAPI<BaseEmbedding> {
@@ -16,8 +16,8 @@ public:
     return n - 1; // u[i] extended from u[i-1]
   }
 
-  static inline bool toAdd(unsigned n, PangolinGraph &g,
-                           const BaseEmbedding &emb, unsigned, VertexId dst) {
+  static inline bool toAdd(unsigned n, PangolinGraph& g,
+                           const BaseEmbedding& emb, unsigned, VertexId dst) {
     // std::cout << "\t emb: " << emb << ", dst=" << dst << "\n";
     if (n == 3) {
       if (dst <= emb.get_vertex(0))
