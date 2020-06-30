@@ -5,6 +5,7 @@ DESCRIPTION
 --------------------------------------------------------------------------------
 
 This application counts the occurances of a given subgraph in a graph. 
+Currently only two patterns are supported: diamond and 4-cycle.
 
 INPUT
 --------------------------------------------------------------------------------
