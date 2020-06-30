@@ -37,8 +37,7 @@ class AppMiner
 public:
   AppMiner(unsigned ms, int nt)
       : VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1>(ms, nt,
-                                                                     nblocks) {
-  }
+                                                                     nblocks) {}
   ~AppMiner() {}
   void print_output() {
     std::cout << "\n\ttotal_num_subgraphs = " << get_total_count() << "\n";
