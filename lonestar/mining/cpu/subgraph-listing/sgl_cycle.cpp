@@ -43,7 +43,6 @@ public:
   AppMiner(unsigned ms, int nt)
       : VertexMiner<SimpleElement, BaseEmbedding, MyAPI, 0, 1, 0, 1>(ms, nt,
                                                                      nblocks) {
-    assert(ms > 2);
   }
   ~AppMiner() {}
   void print_output() {
