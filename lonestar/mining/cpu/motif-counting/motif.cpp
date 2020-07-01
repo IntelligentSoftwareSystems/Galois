@@ -14,7 +14,6 @@ public:
   static unsigned getPattern(unsigned n, PangolinGraph& g, unsigned i,
                              VertexId dst, const VertexEmbedding& emb,
                              BYTE* pre_pid, unsigned pos) {
-    assert(n < 4);
     return find_motif_pattern_id(n, g, i, dst, emb, pre_pid, pos);
   }
 };

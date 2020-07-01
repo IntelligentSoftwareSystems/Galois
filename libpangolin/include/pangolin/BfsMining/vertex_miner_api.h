@@ -10,15 +10,21 @@ public:
   static inline bool toExtend(unsigned, const EmbeddingTy&, unsigned) {
     return true;
   }
+
   // toAdd (only add non-automorphisms)
   static inline bool toAdd(unsigned n, PangolinGraph& g, const EmbeddingTy& emb,
                            unsigned pos, VertexId dst) {
     return !is_vertex_automorphism(n, g, emb, pos, dst);
   }
+
   static inline bool toAddOrdered(unsigned, PangolinGraph&, const EmbeddingTy&,
                                   unsigned, VertexId, PangolinGraph&) {
     return true;
   }
+
+  // specify which vertex to extend when using matching order
+  static inline unsigned getExtendableVertex(unsigned n) { return n - 1; }
+
   // given an embedding, return its pattern id (hash value)
   static inline unsigned getPattern(unsigned, PangolinGraph&, unsigned,
                                     VertexId, const EmbeddingTy&, unsigned) {

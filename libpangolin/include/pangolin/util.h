@@ -79,10 +79,10 @@ void DegreeRanking(PangolinGraph& og, PangolinGraph& g) {
 unsigned orientation(PangolinGraph& og, PangolinGraph& g) {
   galois::StatTimer Tdag("DAG");
   Tdag.start();
-  std::cout << "Orientation enabled, using DAG\n";
-  std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
-  std::cout << "Before: num_vertices " << og.size() << " num_edges "
-            << og.sizeEdges() << "\n";
+  // std::cout << "Orientation enabled, using DAG\n";
+  // std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
+  // std::cout << "Before: num_vertices " << og.size() << " num_edges "
+  //          << og.sizeEdges() << "\n";
   std::vector<IndexT> degrees(og.size(), 0);
 
   galois::do_all(
@@ -145,19 +145,19 @@ unsigned read_graph(PangolinGraph& graph, std::string filetype,
   MGraph mgraph(need_dag);
   unsigned max_degree = 0;
   if (filetype == "txt") {
-    printf("Reading .lg file: %s\n", filename.c_str());
+    // printf("Reading .lg file: %s\n", filename.c_str());
     mgraph.read_txt(filename.c_str());
     genGraph(mgraph, graph);
   } else if (filetype == "adj") {
-    printf("Reading .adj file: %s\n", filename.c_str());
+    // printf("Reading .adj file: %s\n", filename.c_str());
     mgraph.read_adj(filename.c_str());
     genGraph(mgraph, graph);
   } else if (filetype == "mtx") {
-    printf("Reading .mtx file: %s\n", filename.c_str());
+    // printf("Reading .mtx file: %s\n", filename.c_str());
     mgraph.read_mtx(filename.c_str(), true); // symmetrize
     genGraph(mgraph, graph);
   } else if (filetype == "gr") {
-    printf("Reading .gr file: %s\n", filename.c_str());
+    // printf("Reading .gr file: %s\n", filename.c_str());
     if (need_dag) {
       PangolinGraph g_temp;
       galois::graphs::readGraph(g_temp, filename);
@@ -186,11 +186,13 @@ unsigned read_graph(PangolinGraph& graph, std::string filetype,
     exit(1);
   }
   // print_graph(graph);
+  galois::gPrint("Input graph: num_vertices ", graph.size(), " num_edges ",
+                 graph.sizeEdges(), "\n");
   if (filetype != "gr") {
     max_degree = mgraph.get_max_degree();
     mgraph.clean();
   }
-  printf("max degree = %u\n", max_degree);
+  // printf("max degree = %u\n", max_degree);
   return max_degree;
 }
 

@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   Tinitial.stop();
   ResourceManager rm;
   for (unsigned nt = 0; nt < num_trials; nt++) {
-    std::cout << "\nStart running trial " << nt + 1 << ": ";
+    // std::cout << "\nStart running trial " << nt + 1 << ": ";
     galois::StatTimer Tinitemb("EmbInitTime");
     Tinitemb.start();
     miner.initialize(pattern_filename);
