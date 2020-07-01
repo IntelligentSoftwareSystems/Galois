@@ -1,9 +1,10 @@
 Overview of Graph Pattern Mining (GPM) in Galois
 ================================================================================
 
-This directory contains benchmarks that run using the Pangolin framework [1]
-for efficient and flexible graph mining. It uses the bliss [2][3] library v0.73
-for graph isomorphism test. The license for this library is in the bliss
+This directory contains benchmarks for efficient and flexible graph mining 
+that run using the Pangolin framework [1] on a multi-core CPU or a GPU. 
+It uses the bliss [2][3] library v0.73 for graph isomorphism test. 
+The license for this library is in the bliss
 directory: note that **it does not use the same license as the rest of Galois**.  
 
 [1] Xuhao Chen, Roshan Dathathri, Gurbinder Gill, Keshav Pingali, 
@@ -16,20 +17,55 @@ labelings of graphs. http://www.tcs.hut.fi/Software/bliss/, 2017.
 canonical labeling tool for large and sparse graphs. In Proceedings 
 of the Meeting on Algorithm Engineering & Expermiments, 135-149.
 
-Compiling Provided Apps
+Compiling GPM Applications Through CMake 
 ================================================================================
 
-Pangolin built by default. To enable GPU mining, you can give the
-`-DGALOIS_ENABLE_GPU=ON` setting to `cmake`.
+The dependencies for LonestarGPU suite are the same as shared-memory.
+Note that  LonestarGPU requires CUDA 8.0 and above.
 
-Note that heterogeneous Galois requires the cub git submodules, which can be cloned using the followed commands.
+Note that heterogeneous Galois requires the cub and moderngpu git submodules,
+which can be cloned using the followed commands.
 
 ```Shell
 cd $GALOIS_ROOT
 git submodule init
-git submodule update --remote
+git submodule update
 ```
 These modules will be cloned in the ${GALOIS\_ROOT}/external directory
+
+Mining applications for CPU are enabled by default.
+To build the mining applications for GPU, first, create a build directory and
+run CMake with -DGALOIS\_CUDA\_CAPABILITY=\<insert CUDA capability here\> flag
+in the build directory. The CUDA capability should be one that your
+GPU supports. For example, if you wanted to build for a GTX 1080 and a K80,
+the commands would look like this:
+
+```Shell
+cd ${GALOIS_ROOT}
+mkdir build
+cd build
+cmake ${GALOIS_ROOT} -DGALOIS_CUDA_CAPABILITY="3.7;6.1"
+```
+
+After compiling through CMake, the system will create the 'lonestar/mining/cpu' 
+and 'lonestar/mining/gpu' directories in ${GALOIS\_ROOT}/build directory. 
+
+Compiling Mining Applications
+================================================================================
+
+Once CMake is completed,  compile the provided mining apps by executing the 
+following command in the ${GALOIS\_ROOT}/build/lonestar/mining directory.
+
+```Shell
+`make -j`
+```
+
+You can compile a specific app by executing the following commands (shown for motif-counting on CPU).
+
+```Shell
+cd cpu/motif-counting
+make -j
+```
 
 INPUT
 ================================================================================
