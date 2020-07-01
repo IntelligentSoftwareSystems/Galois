@@ -14,6 +14,8 @@ This application takes in symmetric and simple Galois .gr graphs.
 You must specify both the -symmetricGraph and the -simpleGraph flags when
 running this benchmark.
 You must also specify the query graph (i.e. pattern) using -p.
+Currently you need to pass the 4-cycle and diamond query graphs
+to the sgl_cycle and sgl_diamond executables respectively.
 
 BUILD
 --------------------------------------------------------------------------------
