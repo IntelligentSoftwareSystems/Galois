@@ -62,7 +62,7 @@ do
       echo "Running on ${input}"
       filename="${appname}_${input}_algo_${algo}_${configType}_Run${run}"
       statfile="${filename}.stats"
-      ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -tolerance=${tol} -maxIterations=${maxIter} -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
+      ${execDir}/${exec} -algo=$algo -t=${Threads} $inputDir/GAP-${input}.${extension} -tolerance=${tol} -maxIterations=${maxIter} -transposedGraph -statFile=${execDir}/logs/${statfile} &> ${execDir}/logs/${filename}.out
     done
   done
 done
