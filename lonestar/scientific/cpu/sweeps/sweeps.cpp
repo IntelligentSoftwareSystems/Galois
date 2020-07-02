@@ -23,6 +23,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <type_traits>
 #include <utility>
 
@@ -51,7 +52,6 @@ static char const* desc =
     "Computes a numerical solution to the Boltzmann Equation using "
     "the sweeps iterative method.";
 static char const* url = "sweeps";
-
 static llvm::cl::opt<unsigned long long> nx{
     "nx", llvm::cl::desc("number of cells in x direction"),
     llvm::cl::init(10u)};
@@ -96,6 +96,11 @@ static llvm::cl::opt<std::string> scattering_outfile{
         "Text file name to use to write final scattering term values "
         "after each step."),
     llvm::cl::init("")};
+static llvm::cl::opt<bool> pull_style{
+    "pull_style",
+    llvm::cl::desc("Use pull style dependency tracking (instead of push "
+                   "style)."),
+    llvm::cl::init(false)};
 
 // Some helper functions for atomic operations with doubles:
 // TODO: try switching these to a load/compute/load/compare/CAS
@@ -531,6 +536,127 @@ std::size_t find_x_direction(std::array<double, 3> const* directions,
          directions;
 }
 
+struct range_iter {
+  std::size_t current;
+  std::size_t step;
+  range_iter()                  = delete;
+  range_iter(range_iter const&) = default;
+  range_iter(std::size_t cur, std::size_t st) noexcept
+      : current(cur), step(st) {}
+  std::size_t operator*() const noexcept { return current; }
+  range_iter& operator++() noexcept {
+    current += step;
+    return *this;
+  }
+  auto operator++(int) noexcept {
+    range_iter old{*this};
+    ++(*this);
+    return old;
+  }
+  bool operator==(const range_iter& other) const noexcept {
+    assert(step == other.step);
+    return current == other.current;
+  }
+  bool operator!=(const range_iter& other) const noexcept {
+    return !(*this == other);
+  }
+  bool operator<(const range_iter& other) const noexcept {
+    assert(step == other.step);
+    return current < other.current;
+  }
+  range_iter& operator=(range_iter const&) = default;
+  using difference_type                    = std::size_t;
+  using value_type                         = std::size_t;
+  using pointer                            = std::size_t*;
+  using reference                          = std::size_t&;
+  using iterator_category                  = std::forward_iterator_tag;
+};
+
+struct range {
+  std::size_t start;
+  std::size_t stop;
+  std::size_t step;
+  range()        = delete;
+  range(range&)  = delete;
+  range(range&&) = delete;
+  range(std::size_t sta, std::size_t sto, std::size_t ste) noexcept
+      : start(sta), stop(sto), step(ste) {}
+  auto begin() const noexcept { return range_iter(start, step); }
+  auto end() const noexcept { return range_iter(stop, step); }
+};
+
+// Iterator-like type for the outer product
+// of two other iterators.
+template <typename S, typename T, typename pair_t>
+struct product_iter {
+  S s_current;
+  T t_current;
+  S s_begin;
+  S s_end;
+  T t_end;
+  using S_val                       = decltype(*std::declval<S>());
+  using T_val                       = decltype(*std::declval<T>());
+  product_iter()                    = delete;
+  product_iter(product_iter const&) = default;
+  product_iter(S const& s_b, S const& s_c, S const& s_e, T const& t_c,
+               T const& t_e) noexcept
+      : s_current(s_c), t_current(t_c), s_begin(s_b), s_end(s_e), t_end(t_e) {}
+  auto operator*() const noexcept { return pair_t{*s_current, *t_current}; }
+  auto operator++() noexcept {
+    assert(s_current <= s_end);
+    assert(t_current <= t_end);
+    if (s_current < s_end) {
+      ++s_current;
+    } else {
+      assert(t_current < t_end);
+      ++t_current;
+      s_current = s_begin;
+    }
+    return *this;
+  }
+  auto operator++(int) noexcept {
+    product_iter old{*this};
+    ++(*this);
+    return old;
+  }
+  auto operator<(product_iter const& other) const noexcept {
+    return t_current < other.t_current ? true : s_current < other.s_current;
+  }
+  bool operator==(product_iter const& other) const noexcept {
+    return t_current == other.t_current && s_current == other.s_current;
+  }
+  bool operator!=(product_iter const& other) const noexcept {
+    return !(*this == other);
+  }
+  product_iter& operator=(product_iter const&) = default;
+  using difference_type                        = std::size_t;
+  using value_type        = decltype(*std::declval<product_iter>());
+  using pointer           = value_type*;
+  using reference         = value_type&;
+  using iterator_category = std::forward_iterator_tag;
+};
+
+template <typename S, typename T, typename pair_t>
+struct product {
+  S const& s_cont;
+  T const& t_cont;
+  using S_iter            = decltype(std::declval<S>().begin());
+  using T_iter            = decltype(std::declval<T>().begin());
+  using iter_t            = product_iter<S_iter, T_iter, pair_t>;
+  product()               = delete;
+  product(product const&) = delete;
+  product(product&&)      = delete;
+  product(S const& s, T const& t) noexcept : s_cont(s), t_cont(t) {}
+  auto begin() const noexcept {
+    return iter_t(s_cont.begin(), s_cont.begin(), s_cont.end(), t_cont.begin(),
+                  t_cont.end());
+  }
+  auto end() const noexcept {
+    return iter_t(s_cont.begin(), s_cont.end(), s_cont.end(), t_cont.end(),
+                  t_cont.end());
+  }
+};
+
 int main(int argc, char** argv) noexcept {
   galois::SharedMemSys galois_system;
   LonestarStart(argc, argv, name, desc, url, nullptr);
@@ -579,72 +705,82 @@ int main(int argc, char** argv) noexcept {
                                               static_cast<double>(ny),
                                               static_cast<double>(nz)};
 
+  // Whether to use push or pull style dependency tracking.
+  bool use_pull = pull_style;
+
+  // Used only in the push style computation.
   // For the regular grid, this will just be the corners
   // (one work item for each direction that lies in the octant opposite
   // the corner)
   // Mimic the irregular case though by finding nodes with
   // no dependencies during the pass that initializes the sweep counters.
   galois::InsertBag<work_t> starting_nodes;
-  // Initialize the dependency counters so that no cell/direction executes
-  // before its predecessors have.
-  // This uses a simple Galois parallel loop.
-  galois::do_all(
-      galois::iterate(graph.begin(), graph.end()),
-      [&](auto node) noexcept {
-        // Nothing to do on boundary nodes.
-        if (node >= ghost_threshold)
-          return;
-        for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
-          std::atomic<std::size_t>& counter =
-              radiation_magnitudes[num_per_element * node +
-                                   num_per_element_and_direction * dir_idx]
-                  .counter;
-          std::size_t local_counter = 0;
-          for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-            if (graph.getEdgeDst(edge) >= ghost_threshold)
-              continue;
-            local_counter +=
-                is_incoming(directions[dir_idx], graph.getEdgeData(edge));
-          }
-          // TODO: This stage is embarassingly parallel,
-          // but writing the value as a size_t and then
-          // later using it as an atomic is undefined behavior,
-          // so, is there some way around this?
-          counter.store(local_counter, std::memory_order_relaxed);
-          if (!local_counter) {
-            work_t work_item{node, dir_idx};
-            starting_nodes.emplace(work_item);
-          }
-        }
-        // Also set the counter for how many directions are remaining
-        // on the current node.
-        auto& node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
-        // TODO: Can this be done without atomics as well?
-        node_data.scatter_use_counter.store(num_directions,
-                                            std::memory_order_relaxed);
-      },
-      galois::loopname("Initialize counters"));
 
-// Check that the counters are properly set.
+  if (!use_pull) {
+    // Initialize the dependency counters so that no cell/direction executes
+    // before its predecessors have.
+    // This uses a simple Galois parallel loop.
+    galois::do_all(
+        galois::iterate(graph.begin(), graph.end()),
+        [&](auto node) noexcept {
+          // Nothing to do on boundary nodes.
+          if (node >= ghost_threshold)
+            return;
+          for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
+            std::atomic<std::size_t>& counter =
+                radiation_magnitudes[num_per_element * node +
+                                     num_per_element_and_direction * dir_idx]
+                    .counter;
+            std::size_t local_counter = 0;
+            for (auto edge :
+                 graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+              if (graph.getEdgeDst(edge) >= ghost_threshold)
+                continue;
+              local_counter +=
+                  is_incoming(directions[dir_idx], graph.getEdgeData(edge));
+            }
+            // TODO: This stage is embarassingly parallel,
+            // but writing the value as a size_t and then
+            // later using it as an atomic is undefined behavior,
+            // so, is there some way around this?
+            counter.store(local_counter, std::memory_order_relaxed);
+            if (!local_counter) {
+              work_t work_item{node, dir_idx};
+              starting_nodes.emplace(work_item);
+            }
+          }
+          // Also set the counter for how many directions are remaining
+          // on the current node.
+          auto& node_data =
+              graph.getData(node, galois::MethodFlag::UNPROTECTED);
+          // TODO: Can this be done without atomics as well?
+          node_data.scatter_use_counter.store(num_directions,
+                                              std::memory_order_relaxed);
+        },
+        galois::loopname("Initialize counters"));
+
+    // Check that the counters are properly set.
 #if !defined(NDEBUG)
-  for (auto node : graph) {
-    if (node >= ghost_threshold)
-      continue;
-    for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
-      std::size_t local_counter = 0;
-      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-        if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) &&
-            graph.getEdgeDst(edge) < ghost_threshold)
-          local_counter++;
+    for (auto node : graph) {
+      if (node >= ghost_threshold)
+        continue;
+      for (std::size_t dir_idx = 0; dir_idx < num_directions; dir_idx++) {
+        std::size_t local_counter = 0;
+        for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+          if (is_incoming(directions[dir_idx], graph.getEdgeData(edge)) &&
+              graph.getEdgeDst(edge) < ghost_threshold)
+            local_counter++;
+        }
+        assert(
+            ("Dependency counter not set propertly.",
+             local_counter ==
+                 radiation_magnitudes[num_per_element * node +
+                                      num_per_element_and_direction * dir_idx]
+                     .counter));
       }
-      assert(("Dependency counter not set propertly.",
-              local_counter ==
-                  radiation_magnitudes[num_per_element * node +
-                                       num_per_element_and_direction * dir_idx]
-                      .counter));
     }
-  }
 #endif // !defined(NDEBUG)
+  }
 
   // Various sweeps papers mention that using topological depth as a
   // heuristic to make sure that parallelism opens up quickly is an important
@@ -672,139 +808,192 @@ int main(int argc, char** argv) noexcept {
       GALOIS_DIE("Unable to write to desired output file.");
   }
 
+  // Used only in pull-style version.
+  // This checks that some work happened each iteration.
+  auto or_reduction = [](bool lhs, bool rhs) noexcept { return lhs || rhs; };
+  auto or_identity  = []() noexcept { return false; };
+  galois::Reducible<bool, decltype(or_reduction), decltype(or_identity)>
+      loop_did_work{or_reduction, or_identity};
+
+  std::size_t current_iteration = 0;
+
+  auto sweep_operator = [&](work_t work_item, auto& ctx) noexcept {
+    auto [node, dir_idx] = work_item;
+    auto& direction      = directions[dir_idx];
+    auto node_magnitude_idx =
+        num_per_element * node + num_per_element_and_direction * dir_idx;
+    auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
+    // TODO: pull-style version currently generates work items for ghost nodes
+    // too. This results in some redundant work items. For now just mark any
+    // ghost node as done for this iteration without any additional processing.
+    if (use_pull && node >= ghost_threshold) {
+      counter.store(current_iteration, std::memory_order_relaxed);
+      return;
+    }
+    assert(("Work item for ghost node generated erroneously.",
+            node < ghost_threshold));
+    if (use_pull) {
+      for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+        auto other_node   = graph.getEdgeDst(edge);
+        auto& face_normal = graph.getEdgeData(edge);
+        if (!is_incoming(direction, face_normal)) {
+          continue;
+        }
+        std::size_t other_magnitude_idx =
+            num_per_element * other_node +
+            num_per_element_and_direction * dir_idx;
+        auto other_counter =
+            radiation_magnitudes[other_magnitude_idx].counter.load(
+                std::memory_order_relaxed);
+        assert(other_counter >= current_iteration);
+        if (other_counter == current_iteration) {
+          return;
+        }
+      }
+    } else {
+      // Don't have to do acquire/release with the counters by hand.
+      // The Galois work lists do the acquire/release whenever migrating
+      // work away from the thread that created it.
+      assert(("Work item asked to run before it was actually ready.",
+              counter.load(std::memory_order_relaxed)));
+    }
+    auto& node_data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
+    // Re-count incoming edges during this computation.
+    std::size_t incoming_edges = 0;
+    // Reset accumulation buffers.
+    auto& new_magnitude_numerators = *accumulation_buffers.getLocal();
+    std::fill(new_magnitude_numerators.get(),
+              new_magnitude_numerators.get() + num_groups,
+              node_data.previous_accumulated_scattering);
+    // Partial computation of the coefficient that will divide the
+    // previous term later.
+    double new_magnitude_denominator = absorption_coef + scattering_coef;
+    std::size_t max_size_t           = std::numeric_limits<std::size_t>::max();
+    // Tracked edges is only used in the push-style case.
+    // Tracked edges in the push-style dependency tracking is
+    // filled in with the edges to the downstream neighbors that
+    // need to be notified when the current operator completes.
+    // Use max size_t value for initialization here mainly to make things
+    // segfault as fast as possible if one of them isn't set in the loop
+    // over the neighbors.
+    std::array<std::size_t, 3> tracked_neighbors{max_size_t, max_size_t,
+                                                 max_size_t};
+    std::size_t downstream_index = 0;
+    for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
+      auto other_node   = graph.getEdgeDst(edge);
+      auto& face_normal = graph.getEdgeData(edge);
+      if (!is_incoming(direction, face_normal)) {
+        if (!use_pull)
+          tracked_neighbors[downstream_index++] = other_node;
+        continue;
+      }
+      if (other_node < ghost_threshold)
+        incoming_edges++;
+      // More partial computation of this node's estimated radiative
+      // fluxes in the given direction. This time based off of the
+      // incoming fluxes from its upwind neighbors.
+      // TODO: Try storing this direction info on the edge.
+      std::size_t axis =
+          face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
+      double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
+      double term_coef = direction[axis] * sign;
+      new_magnitude_denominator += term_coef * grid_spacing_inverses[axis];
+      std::size_t other_magnitude_idx = num_per_element * other_node +
+                                        num_per_element_and_direction * dir_idx;
+      for (std::size_t i = 0; i < num_groups; i++) {
+        std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
+        double& other_magnitude =
+            radiation_magnitudes[other_mag_and_group_idx].magnitude;
+        new_magnitude_numerators[i] +=
+            term_coef * other_magnitude * grid_spacing_inverses[axis];
+      }
+    }
+    assert(("Wrong number of downstream neighbors.", downstream_index == 3));
+    // Finish computing new flux magnitude.
+    // Also compute a new scattering amount
+    // for use in the next iteration based
+    // off of this new flux.
+    double scattering_contribution = 0.;
+    double scattering_contribution_coef =
+        scattering_coef / (num_groups * num_directions);
+    for (std::size_t i = 0; i < num_groups; i++) {
+      std::size_t node_mag_and_group_idx = node_magnitude_idx + i + 1;
+      double& node_magnitude =
+          radiation_magnitudes[node_mag_and_group_idx].magnitude;
+      node_magnitude = new_magnitude_numerators[i] / new_magnitude_denominator;
+      scattering_contribution += scattering_contribution_coef * node_magnitude;
+    }
+    // Update scattering source for use in next step.
+    auto& scattering_atomic = node_data.currently_accumulating_scattering;
+    atomic_relaxed_double_increment(scattering_atomic, scattering_contribution);
+    if (use_pull) {
+      loop_did_work.update(true);
+      // signal that the work for this iteration is done so
+      // the downstream neigbors for this node/direction
+      // can now be processed.
+      counter.store(current_iteration, std::memory_order_relaxed);
+    } else {
+      // Reset dependency counter for next pass.
+      counter.store(incoming_edges, std::memory_order_relaxed);
+      if (!(node_data.scatter_use_counter.fetch_sub(1,
+                                                    std::memory_order_relaxed) -
+            1)) {
+        // Reset counter for next time step.
+        node_data.scatter_use_counter.store(num_directions,
+                                            std::memory_order_relaxed);
+        double abs_change =
+            std::abs(node_data.currently_accumulating_scattering.load(
+                         std::memory_order_relaxed) -
+                     node_data.previous_accumulated_scattering);
+        atomic_relaxed_double_max(global_abs_change, abs_change);
+        // Move currently_accumulating_scattering value into
+        // previous_accumulating_scattering
+        // and then zero currently_accumulating_scattering for the next
+        // iteration.
+        node_data.previous_accumulated_scattering =
+            node_data.currently_accumulating_scattering.load(
+                std::memory_order_relaxed);
+        node_data.currently_accumulating_scattering.store(
+            0., std::memory_order_relaxed);
+      }
+      for (auto other_node : tracked_neighbors) {
+        // Don't send anything to a ghost node.
+        if (other_node >= ghost_threshold)
+          continue;
+        std::size_t other_magnitude_idx =
+            num_per_element * other_node +
+            num_per_element_and_direction * dir_idx;
+        auto& other_counter = radiation_magnitudes[other_magnitude_idx].counter;
+        if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
+          work_t new_work_item{other_node, dir_idx};
+          ctx.push(new_work_item);
+        }
+      }
+    }
+  };
+
   // Iterations in the algorithm.
   // TODO: Try doing this whole thing asynchronously
   // instead of just using a parallel loop for each step.
-  for (std::size_t current_iteration = 0; current_iteration < num_iters;
-       current_iteration++) {
-    // Main parallel loop.
-    galois::for_each(
-        galois::iterate(starting_nodes.begin(), starting_nodes.end()),
-        [&](work_t work_item, auto& ctx) noexcept {
-          auto [node, dir_idx] = work_item;
-          auto& direction      = directions[dir_idx];
-          assert(("Work item for ghost node generated erroneously.",
-                  node < ghost_threshold));
-          auto node_magnitude_idx =
-              num_per_element * node + num_per_element_and_direction * dir_idx;
-          auto& counter = radiation_magnitudes[node_magnitude_idx].counter;
-          // Don't have to do acquire/release with the counters by hand.
-          // The Galois work lists do the acquire/release whenever migrating
-          // work away from the thread that created it.
-          assert(("Work item asked to run before it was actually ready.",
-                  counter.load(std::memory_order_relaxed)));
-          auto& node_data =
-              graph.getData(node, galois::MethodFlag::UNPROTECTED);
-          // Re-count incoming edges during this computation.
-          std::size_t incoming_edges = 0;
-          // Reset accumulation buffers.
-          auto& new_magnitude_numerators = *accumulation_buffers.getLocal();
-          std::fill(new_magnitude_numerators.get(),
-                    new_magnitude_numerators.get() + num_groups,
-                    node_data.previous_accumulated_scattering);
-          // Partial computation of the coefficient that will divide the
-          // previous term later.
-          double new_magnitude_denominator = absorption_coef + scattering_coef;
-          std::size_t max_size_t = std::numeric_limits<std::size_t>::max();
-          // Use max size_t value for initialization here mainly to make things
-          // segfault as fast as possible if one of them isn't set in the loop
-          // over the neighbors.
-          std::array<std::size_t, 3> downstream_neighbors{
-              max_size_t, max_size_t, max_size_t};
-          std::size_t downstream_index = 0;
-          for (auto edge : graph.edges(node, galois::MethodFlag::UNPROTECTED)) {
-            auto other_node   = graph.getEdgeDst(edge);
-            auto& face_normal = graph.getEdgeData(edge);
-            if (!is_incoming(direction, face_normal)) {
-              downstream_neighbors[downstream_index++] = other_node;
-              continue;
-            }
-            if (other_node < ghost_threshold)
-              incoming_edges++;
-            // More partial computation of this node's estimated radiative
-            // fluxes in the given direction. This time based off of the
-            // incoming fluxes from its upwind neighbors.
-            // TODO: Try storing this direction info on the edge.
-            std::size_t axis =
-                face_normal[0] != 0 ? 0 : (face_normal[1] != 0 ? 1 : 2);
-            double sign      = std::signbit(face_normal[axis]) ? -1. : 1.;
-            double term_coef = direction[axis] * sign;
-            new_magnitude_denominator +=
-                term_coef * grid_spacing_inverses[axis];
-            std::size_t other_magnitude_idx =
-                num_per_element * other_node +
-                num_per_element_and_direction * dir_idx;
-            for (std::size_t i = 0; i < num_groups; i++) {
-              std::size_t other_mag_and_group_idx = other_magnitude_idx + i + 1;
-              double& other_magnitude =
-                  radiation_magnitudes[other_mag_and_group_idx].magnitude;
-              new_magnitude_numerators[i] +=
-                  term_coef * other_magnitude * grid_spacing_inverses[axis];
-            }
-          }
-          assert(
-              ("Wrong number of downstream neighbors.", downstream_index == 3));
-          // Finish computing new flux magnitude.
-          // Also compute a new scattering amount
-          // for use in the next iteration based
-          // off of this new flux.
-          double scattering_contribution = 0.;
-          double scattering_contribution_coef =
-              scattering_coef / (num_groups * num_directions);
-          for (std::size_t i = 0; i < num_groups; i++) {
-            std::size_t node_mag_and_group_idx = node_magnitude_idx + i + 1;
-            double& node_magnitude =
-                radiation_magnitudes[node_mag_and_group_idx].magnitude;
-            node_magnitude =
-                new_magnitude_numerators[i] / new_magnitude_denominator;
-            scattering_contribution +=
-                scattering_contribution_coef * node_magnitude;
-          }
-          // Reset dependency counter for next pass.
-          counter.store(incoming_edges, std::memory_order_relaxed);
-          // Update scattering source for use in next step.
-          auto& scattering_atomic = node_data.currently_accumulating_scattering;
-          atomic_relaxed_double_increment(scattering_atomic,
-                                          scattering_contribution);
-
-          if (!(node_data.scatter_use_counter.fetch_sub(
-                    1, std::memory_order_relaxed) -
-                1)) {
-            // Reset counter for next time step.
-            node_data.scatter_use_counter.store(num_directions,
-                                                std::memory_order_relaxed);
-            double abs_change =
-                std::abs(node_data.currently_accumulating_scattering.load(
-                             std::memory_order_relaxed) -
-                         node_data.previous_accumulated_scattering);
-            atomic_relaxed_double_max(global_abs_change, abs_change);
-            // Move currently_accumulating_scattering value into
-            // previous_accumulating_scattering
-            // and then zero currently_accumulating_scattering for the next
-            // iteration.
-            node_data.previous_accumulated_scattering =
-                node_data.currently_accumulating_scattering.load(
-                    std::memory_order_relaxed);
-            node_data.currently_accumulating_scattering.store(
-                0., std::memory_order_relaxed);
-          }
-          for (auto other_node : downstream_neighbors) {
-            // Don't send anything to a ghost node.
-            if (other_node >= ghost_threshold)
-              continue;
-            std::size_t other_magnitude_idx =
-                num_per_element * other_node +
-                num_per_element_and_direction * dir_idx;
-            auto& other_counter =
-                radiation_magnitudes[other_magnitude_idx].counter;
-            if (!(other_counter.fetch_sub(1, std::memory_order_relaxed) - 1)) {
-              work_t new_work_item{other_node, dir_idx};
-              ctx.push(new_work_item);
-            }
-          }
-        },
-        galois::loopname("Sweep"), galois::disable_conflict_detection(),
-        galois::wl<PSchunk>());
+  while (current_iteration < num_iters) {
+    if (use_pull) {
+      // Set up a reduction to tell if work was done during a given iteration.
+      do {
+        loop_did_work.reset();
+        auto frequency_range = range(0, num_groups, 1);
+        auto work_items =
+            product<decltype(graph), decltype(frequency_range), work_t>(
+                graph, frequency_range);
+        galois::for_each(galois::iterate(work_items), sweep_operator,
+                         galois::disable_conflict_detection(),
+                         galois::no_pushes(), galois::loopname("Sweep"));
+      } while (loop_did_work.reduce());
+    } else {
+      galois::for_each(galois::iterate(starting_nodes), sweep_operator,
+                       galois::loopname("Sweep"),
+                       galois::disable_conflict_detection(),
+                       galois::wl<PSchunk>());
+    }
     if (print_convergence)
       std::cout << global_abs_change << std::endl;
 
@@ -821,5 +1010,6 @@ int main(int argc, char** argv) noexcept {
     }
 
     global_abs_change = 0;
+    current_iteration++;
   }
 }
