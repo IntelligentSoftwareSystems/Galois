@@ -23,7 +23,7 @@ public:
     typename Graph::GraphNode source;
     do {
       source = udist(rng);
-    } while (graph.getDegree(source));
+    } while (graph.getDegree(source) == 0);
     return source;
   }
 };
