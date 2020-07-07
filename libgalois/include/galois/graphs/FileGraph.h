@@ -73,6 +73,7 @@ private:
     size_t len;
   };
 
+protected:
   std::deque<mapping> mappings;
   std::deque<int> fds;
 
@@ -98,6 +99,7 @@ private:
   //! adjustments to edge index when we load only part of a graph
   uint64_t edgeOffset;
 
+private:
   //! If initialized, this array stores node degrees in memory for fast access
   //! via the getDegree function
   LargeArray<uint64_t> node_degrees;
@@ -188,7 +190,6 @@ private:
    */
   void pageInByNode(size_t id, size_t total, size_t sizeofEdgeData);
 
-protected:
   /**
    * Copies graph connectivity information from arrays. Returns a pointer to
    * array to populate with edge data.
@@ -678,20 +679,9 @@ public:
  * </ol>
  */
 class FileGraphWriter : public FileGraph {
-  std::vector<uint64_t> outIdx;
-  std::vector<uint32_t> starts;
-  std::vector<uint32_t> outs;
-  std::vector<uint64_t> starts64;
-  std::vector<uint64_t> outs64;
-
-  size_t sizeofEdgeData;
-  size_t numNodes;
-  size_t numEdges;
+  std::unique_ptr<uint64_t[]> starts;
 
 public:
-  //! Constructor: initializes nodes, edges, and edge data to 0
-  FileGraphWriter() : sizeofEdgeData(0), numNodes(0), numEdges(0) {}
-
   //! Set number of nodes to write to n
   //! @param n number of nodes to set to
   void setNumNodes(size_t n) { numNodes = n; }
@@ -700,60 +690,49 @@ public:
   void setNumEdges(size_t n) { numEdges = n; }
   //! Set the size of the edge data to write to n
   //! @param n size of edge data to write
-  void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
+  void setSizeofEdgeData(size_t n) { sizeofEdge = n; }
 
   //! Marks the transition to next phase of parsing: counting the degree of
   //! nodes
-  void phase1() { outIdx.resize(numNodes); }
+  void phase1();
 
   //! Increments degree of id by delta
-  void incrementDegree(size_t id, int delta = 1) {
+  void incrementDegree(size_t id, uint64_t delta = 1) {
     assert(id < numNodes);
     outIdx[id] += delta;
   }
 
   //! Marks the transition to next phase of parsing, adding edges
-  void phase2() {
-    if (numNodes == 0)
-      return;
-
-    // Turn counts into partial sums
-    auto prev = outIdx.begin();
-    for (auto ii = outIdx.begin() + 1, ei = outIdx.end(); ii != ei;
-         ++ii, ++prev) {
-      *ii += *prev;
-    }
-    assert(outIdx[numNodes - 1] == numEdges);
-
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      starts.resize(numNodes);
-      outs.resize(numEdges);
-    } else {
-      // version 2
-      starts64.resize(numNodes);
-      outs64.resize(numEdges);
-    }
-  }
+  void phase2();
 
   //! Adds a neighbor between src and dst
   size_t addNeighbor(size_t src, size_t dst) {
     size_t base = src ? outIdx[src - 1] : 0;
+    size_t idx  = base + starts[src]++;
+    assert(idx < outIdx[src]);
 
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      size_t idx = base + starts[src]++;
-      assert(idx < outIdx[src]);
-      outs[idx] = dst;
-      return idx;
-    } else {
-      // version 2
-      size_t idx = base + (starts64)[src]++;
-      assert(idx < outIdx[src]);
-      outs64[idx] = dst;
-      return idx;
-    }
+    if (numNodes <= std::numeric_limits<uint32_t>::max())
+      reinterpret_cast<uint32_t*>(outs)[idx] = dst; // version 1
+    else
+      reinterpret_cast<uint64_t*>(outs)[idx] = dst; // version 2
+    return idx;
   }
+
+  //! Adds a neighbor between src and dst w/ corresponding data
+  template <typename T>
+  size_t
+  addNeighbor(size_t src, size_t dst,
+              typename std::enable_if<!std::is_void<T>::value>::type&& data) {
+    assert(edgeData);
+    size_t idx                          = addNeighbor(src, dst);
+    reinterpret_cast<T*>(edgeData)[idx] = data;
+    return idx;
+  }
+
+  /**
+   * Finish making graph.
+   */
+  void finish() { starts.reset(nullptr); } // free reserved memory asap
 
   /**
    * Finish making graph. Returns pointer to block of memory that should be
@@ -761,21 +740,8 @@ public:
    */
   template <typename T>
   T* finish() {
-    void* ret;
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      ret = fromArrays(&outIdx[0], numNodes, &outs[0], numEdges, nullptr,
-                       sizeofEdgeData, 0, 0, false, 1);
-      starts.clear();
-      outs.clear();
-    } else {
-      // version 2
-      ret = fromArrays(&outIdx[0], numNodes, &outs64[0], numEdges, nullptr,
-                       sizeofEdgeData, 0, 0, false, 2);
-    }
-
-    outIdx.clear();
-    return reinterpret_cast<T*>(ret);
+    starts.reset(nullptr); // free reserved memory asap
+    return reinterpret_cast<T*>(edgeData);
   }
 };
 
