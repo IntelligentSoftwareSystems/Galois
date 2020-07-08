@@ -537,7 +537,7 @@ public:
 
     CTy* C = p.current;
     if (BlockPeriod &&
-        (BlockPeriod < 0 || (p.numPops++ & ((1ull << BlockPeriod) - 1) == 0)))
+        (BlockPeriod < 0 || ((p.numPops++ & ((1ull << BlockPeriod) - 1)) == 0)))
       return slowPop(p);
 
     galois::optional<value_type> retval;
