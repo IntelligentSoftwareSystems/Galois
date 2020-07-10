@@ -85,7 +85,7 @@ public:
         [&](const size_t& pos) {
           auto& local_counters = *(counters.getLocal());
           unsigned n           = level + 1;
-          StrQpMapFreq* qp_lmap;
+          StrQpMapFreq* qp_lmap = nullptr;
           if (n >= 4)
             qp_lmap = qp_localmaps.getLocal();
           EmbeddingTy emb(n);
