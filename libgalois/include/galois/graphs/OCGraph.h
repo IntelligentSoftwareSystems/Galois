@@ -28,6 +28,7 @@
 
 #include "galois/config.h"
 #include "galois/graphs/Details.h"
+#include "galois/substrate/PageAlloc.h"
 #include "galois/LazyObject.h"
 #include "galois/LargeArray.h"
 #include "galois/optional.h"
@@ -149,12 +150,6 @@ public:
   };
 
 private:
-#ifdef HAVE_MMAP64
-  typedef off64_t offset_t;
-#else
-  typedef off_t offset_t;
-#endif
-
   struct PageSizeConf;
 
   class Block {
