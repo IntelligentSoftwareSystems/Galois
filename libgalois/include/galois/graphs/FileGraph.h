@@ -48,6 +48,15 @@
 #include "galois/substrate/NumaMem.h"
 #include "galois/Reduction.h"
 
+template <typename T>
+struct SizeOf {
+  static constexpr std::size_t value = sizeof(T);
+};
+template <> // sizeof never returns 0
+struct SizeOf<void> {
+  static constexpr std::size_t value = 0;
+};
+
 namespace galois {
 namespace graphs {
 
@@ -720,9 +729,9 @@ public:
 
   //! Adds a neighbor between src and dst w/ corresponding data
   template <typename T>
-  size_t
-  addNeighbor(size_t src, size_t dst,
-              typename std::enable_if<!std::is_void<T>::value>::type&& data) {
+  size_t addNeighbor(
+      size_t src, size_t dst,
+      const typename std::enable_if<!std::is_void<T>::value, T>::type& data) {
     assert(edgeData);
     size_t idx                          = addNeighbor(src, dst);
     reinterpret_cast<T*>(edgeData)[idx] = data;
@@ -753,11 +762,8 @@ public:
 template <typename EdgeTy>
 void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
-  EdgeData edgeData;
 
   size_t numEdges = 0;
 
@@ -776,7 +782,7 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
 
   g.setNumNodes(in_graph.size());
   g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  g.setSizeofEdgeData(SizeOf<EdgeTy>::value);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
@@ -793,7 +799,6 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
        ++ii) {
     GNode src = *ii;
@@ -801,24 +806,20 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
                                   ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
       GNode dst = in_graph.getEdgeDst(jj);
-      if (EdgeData::has_value) {
-        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
-        edgeData.set(g.addNeighbor(src, dst), data);
-        if (src != dst)
-          edgeData.set(g.addNeighbor(dst, src), data);
-      } else {
+      if constexpr (std::is_void<EdgeTy>::value) {
         g.addNeighbor(src, dst);
         if (src != dst)
           g.addNeighbor(dst, src);
+      } else {
+        EdgeTy& data = in_graph.getEdgeData<EdgeTy>(jj);
+        g.addNeighbor<EdgeTy>(src, dst, data);
+        if (src != dst)
+          g.addNeighbor<EdgeTy>(dst, src, data);
       }
     }
   }
 
-  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+  g.finish();
 
   out = std::move(g);
 }
@@ -837,16 +838,13 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
 template <typename EdgeTy, typename PTy>
 void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
-  EdgeData edgeData;
 
   size_t numEdges = in_graph.sizeEdges();
   g.setNumNodes(in_graph.size());
   g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  g.setSizeofEdgeData(SizeOf<EdgeTy>::value);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
@@ -860,7 +858,6 @@ void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
        ++ii) {
     GNode src = *ii;
@@ -868,20 +865,16 @@ void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
                                   ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
       GNode dst = in_graph.getEdgeDst(jj);
-      if (EdgeData::has_value) {
-        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
-        edgeData.set(g.addNeighbor(p[src], p[dst]), data);
-      } else {
+      if constexpr (std::is_void<EdgeTy>::value) {
         g.addNeighbor(p[src], p[dst]);
+      } else {
+        EdgeTy& data = in_graph.getEdgeData<EdgeTy>(jj);
+        g.addNeighbor<EdgeTy>(p[src], p[dst], data);
       }
     }
   }
 
-  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+  g.finish();
 
   out = std::move(g);
 }

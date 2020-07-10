@@ -562,11 +562,8 @@ struct PreflowPush {
     reader.fromFile(inputFile);
 
     typedef galois::graphs::FileGraphWriter Writer;
-    typedef galois::LargeArray<EdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
-    EdgeData edgeData;
 
     // Count edges
     size_t numEdges = 0;
@@ -585,7 +582,7 @@ struct PreflowPush {
 
     p.setNumNodes(reader.size());
     p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(sizeof(edge_value_type));
+    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
 
     p.phase1();
     for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei;
@@ -606,7 +603,6 @@ struct PreflowPush {
     one = galois::convert_le32toh(one);
 
     p.phase2();
-    edgeData.create(numEdges);
     for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei;
          ++ii) {
       ReaderGNode rsrc = *ii;
@@ -615,30 +611,26 @@ struct PreflowPush {
         if (rsrc == rdst)
           continue;
         if (!reader.hasNeighbor(rdst, rsrc))
-          edgeData.set(p.addNeighbor(rdst, rsrc), 0);
+          p.addNeighbor<EdgeTy>(rdst, rsrc, 0);
         EdgeTy cap = useUnitCapacity ? one : reader.getEdgeData<EdgeTy>(jj);
-        edgeData.set(p.addNeighbor(rsrc, rdst), cap);
+        p.addNeighbor<EdgeTy>(rsrc, rdst, cap);
       }
     }
 
-    edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+    p.finish();
 
     using Wnode = Writer::GraphNode;
 
     struct IdLess {
-      bool operator()(
-          const galois::graphs::EdgeSortValue<Wnode, edge_value_type>& e1,
-          const galois::graphs::EdgeSortValue<Wnode, edge_value_type>& e2)
-          const {
+      bool
+      operator()(const galois::graphs::EdgeSortValue<Wnode, EdgeTy>& e1,
+                 const galois::graphs::EdgeSortValue<Wnode, EdgeTy>& e2) const {
         return e1.dst < e2.dst;
       }
     };
 
     for (Writer::iterator i = p.begin(), end_i = p.end(); i != end_i; ++i) {
-      p.sortEdges<edge_value_type>(*i, IdLess());
+      p.sortEdges<EdgeTy>(*i, IdLess());
     }
 
     p.toFile(outputFile);
