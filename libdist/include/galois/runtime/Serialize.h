@@ -43,6 +43,7 @@
 #include <galois/AtomicWrapper.h>
 #include <galois/PODResizeableArray.h>
 #include "galois/CopyableTuple.h"
+#include "galois/BufferWrapper.h"
 #include "galois/Bag.h"
 
 namespace galois {
@@ -305,6 +306,12 @@ gSizedObj(const T&,
   return sizeof(uintptr_t);
 }
 
+//! Size of BufferWrapper is size + number of things in it
+template <typename T>
+inline size_t gSizedObj(const galois::BufferWrapper<T>& data) {
+  return sizeof(size_t) + data.size() * sizeof(T);
+}
+
 /**
  * Returns the size necessary for storing 2 elements of a pair into a
  * serialize buffer.
@@ -561,6 +568,11 @@ template <typename T, typename Alloc>
 inline void gSerializeObj(SerializeBuffer& buf,
                           const std::vector<T, Alloc>& data);
 
+// Forward declaration of buff serialize
+template <typename T>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::BufferWrapper<T>& data);
+
 /**
  * Serialize a sequence type into a buffer.
  *
@@ -606,6 +618,18 @@ inline void gSerializeObj(SerializeBuffer& buf,
     gSerializeLinearSeq(buf, data);
   else
     gSerializeSeq(buf, data);
+}
+
+//! Serialize BufferWrapper similarly to vector
+template <typename T>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::BufferWrapper<T>& data) {
+  if (is_memory_copyable<T>::value) {
+    gSerializeLinearSeq(buf, data);
+  } else {
+    GALOIS_DIE("have not implemented support for serializing nonPOD buffer "
+               "wrapper");
+  }
 }
 
 /**
@@ -919,6 +943,10 @@ gDeserializeObj(DeSerializeBuffer& buf,
 template <typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data);
 
+// Forward declaration of buff wrapper deserialize
+template <typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::BufferWrapper<T>& data);
+
 /**
  * Deserialize into a sequence object
  *
@@ -984,6 +1012,20 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
     gDeserializeLinearSeq(buf, data);
   else
     gDeserializeSeq(buf, data);
+}
+
+//! deserialize into buf wrapper
+template <typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::BufferWrapper<T>& bf) {
+  if (is_memory_copyable<T>::value) {
+    // manual deserialization here
+    size_t buffer_size;
+    gDeserializeObj(buf, buffer_size);
+    bf.resize(buffer_size);
+    buf.extract((uint8_t*)bf.data(), buffer_size * sizeof(T));
+  } else {
+    GALOIS_DIE("deserialize for buf wrapper not implemented for nonpod");
+  }
 }
 
 /**
