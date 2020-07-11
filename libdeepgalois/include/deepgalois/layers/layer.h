@@ -41,11 +41,11 @@ public:
   using ContextType = deepgalois::DistContext;
 
 protected:
-  #ifndef GALOIS_ENABLE_GPU
+#ifndef GALOIS_ENABLE_GPU
   const std::string header =
       "[" + std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
       "] ";
-  #endif
+#endif
   unsigned level_;                 // layer id: [0, num_layers-1]
   size_t begin_;                   // sample begin index
   size_t end_;                     // sample end index
@@ -92,10 +92,11 @@ public:
 #ifndef GALOIS_ENABLE_GPU
     myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
-    std::cout << "[" << myID << "] Layer " << level_ << " type: " << layer_type()
-              << "input[" << input_dims[0] << "," << input_dims[1] << "] output["
-              << output_dims[0] << "," << output_dims[1] << "]\n";
-    //galois::gPrint("[", myID, "] Layer", level_, " type: ", layer_type(),
+    std::cout << "[" << myID << "] Layer " << level_
+              << " type: " << layer_type() << "input[" << input_dims[0] << ","
+              << input_dims[1] << "] output[" << output_dims[0] << ","
+              << output_dims[1] << "]\n";
+    // galois::gPrint("[", myID, "] Layer", level_, " type: ", layer_type(),
     //               "input[", input_dims[0], ",", input_dims[1], "] output[",
     //               output_dims[0], ",", output_dims[1], "]\n");
   }

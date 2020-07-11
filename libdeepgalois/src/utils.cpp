@@ -26,7 +26,7 @@ OutTy* parallel_prefix_sum(const std::vector<InTy>& in) {
   }
   bulk_prefix[num_blocks] = total;
   // TODO do not use new here: difficult to track and free later
-  OutTy* prefix           = new OutTy[in.size() + 1];
+  OutTy* prefix = new OutTy[in.size() + 1];
   galois::do_all(
       galois::iterate((size_t)0, num_blocks), [&](const size_t& block) {
         OutTy local_total = bulk_prefix[block];
@@ -120,7 +120,7 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
 #endif
   std::cout << "[" << myID << "]" << std::setprecision(3) << std::fixed
             << " (f1_micro:" << f1_micro << ", f1_macro: " << f1_macro << ")\n";
-  //galois::gPrint("[", myID, "]", std::setprecision(3), std::fixed,
+  // galois::gPrint("[", myID, "]", std::setprecision(3), std::fixed,
   //               " (f1_micro:", f1_micro, ", f1_macro: ", f1_macro, ")\n");
 
   return f1_micro;

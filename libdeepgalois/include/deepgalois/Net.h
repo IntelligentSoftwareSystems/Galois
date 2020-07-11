@@ -85,20 +85,22 @@ class Net {
 
 public:
   //! Default net constructor
-  Net() : Net("reddit", 1, 2, 200, 16, 0.01, 0.5, 5e-4, 
-              false, true, false, false, 25, 9000, 1) {}
+  Net()
+      : Net("reddit", 1, 2, 200, 16, 0.01, 0.5, 5e-4, false, true, false, false,
+            25, 9000, 1) {}
 
   //! Net constructor
   Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
-      unsigned hidden1, float lr, float dropout, float wd, 
-      bool selfloop, bool single, bool l2norm, bool dense, 
-      unsigned neigh_sz, unsigned subg_sz, int val_itv);
+      unsigned hidden1, float lr, float dropout, float wd, bool selfloop,
+      bool single, bool l2norm, bool dense, unsigned neigh_sz, unsigned subg_sz,
+      int val_itv);
 
   // allocate memory for subgraph masks
   void allocateSubgraphsMasks(int num_subgraphs);
 
   //! Initializes metadata for the partition: loads data, labels, etc
-  void partitionInit(DGraph* graph, std::string dataset_str, bool isSingleClassLabel);
+  void partitionInit(DGraph* graph, std::string dataset_str,
+                     bool isSingleClassLabel);
   size_t get_in_dim(size_t layer_id) { return feature_dims[layer_id]; }
   size_t get_out_dim(size_t layer_id) { return feature_dims[layer_id + 1]; }
   void regularize(); // add weight decay
@@ -131,12 +133,12 @@ public:
 
   // forward propagation
   acc_t fprop(size_t gBegin, size_t gEnd, size_t gCount, mask_t* gMasks);
-  void bprop(); // back propagation
-  void set_contexts(); // Save the context
+  void bprop();                        // back propagation
+  void set_contexts();                 // Save the context
   void set_netphases(net_phase phase); // current phase: train or test
-  void print_layers_info(); // print layer information
-  void print_configs(); // print the configurations
- 
+  void print_layers_info();            // print layer information
+  void print_configs();                // print the configurations
+
   // comparing outputs with the ground truth (labels)
   acc_t masked_accuracy(size_t gBegin, size_t gEnd, size_t gCount,
                         mask_t* gMasks, float_t* preds,

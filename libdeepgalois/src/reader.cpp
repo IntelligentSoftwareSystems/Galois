@@ -31,14 +31,17 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   size_t m, num_classes; // m: number of samples
   in >> m >> num_classes >> std::ws;
   if (is_single_class) {
-    std::cout << "[" << myID << "] Reader: Using single-class (one-hot) labels\n";
-    //galois::gPrint("[", myID,
+    std::cout << "[" << myID
+              << "] Reader: Using single-class (one-hot) labels\n";
+    // galois::gPrint("[", myID,
     //               "] Reader: Using single-class (one-hot) labels\n");
     labels =
         new label_t[m]; // single-class (one-hot) label for each vertex: N x 1
   } else {
-    //galois::gPrint("[", myID, "] Reader: Using multi-class (one-hot) labels\n");
-    std::cout << "[" << myID << "] Reader: Using multi-class (one-hot) labels\n";
+    // galois::gPrint("[", myID, "] Reader: Using multi-class (one-hot)
+    // labels\n");
+    std::cout << "[" << myID
+              << "] Reader: Using multi-class (one-hot) labels\n";
     labels =
         new label_t[m *
                     num_classes]; // multi-class label for each vertex: N x E
@@ -65,8 +68,8 @@ size_t Reader::read_labels(bool is_single_class, label_t*& labels) {
   // print the number of vertex classes
   std::cout << "[" << myID << "] Done, unique label counts: " << num_classes
             << ", time: " << t_read.Millisecs() << " ms\n";
-  //galois::gPrint("[", myID, "] Done, unique label counts: ", num_classes,
-                 //", time: ", t_read.Millisecs(), " ms\n");
+  // galois::gPrint("[", myID, "] Done, unique label counts: ", num_classes,
+  //", time: ", t_read.Millisecs(), " ms\n");
   // for (auto i = 0; i < 10; i ++) std::cout << "labels[" << i << "] = " <<
   // unsigned(labels[i]) << "\n";
   return num_classes;
@@ -158,10 +161,11 @@ size_t Reader::read_masks(std::string mask_type, size_t n, size_t& begin,
     }
     i++;
   }
-  std::cout << "Global read " << mask_type << "_mask range: [" << begin
-            << ", " << end << ") Number of valid samples: " << sample_count
-            << " (" << (float)sample_count / (float)n * (float)100 << "\%)\n";
-  //galois::gPrint("Global read ", mask_type, "_mask range: [", begin, ", ", end,
+  std::cout << "Global read " << mask_type << "_mask range: [" << begin << ", "
+            << end << ") Number of valid samples: " << sample_count << " ("
+            << (float)sample_count / (float)n * (float)100 << "\%)\n";
+  // galois::gPrint("Global read ", mask_type, "_mask range: [", begin, ", ",
+  // end,
   //               ") Number of valid samples: ", sample_count, " (",
   //               (float)sample_count / (float)n * (float)100, "\%)\n");
   in.close();

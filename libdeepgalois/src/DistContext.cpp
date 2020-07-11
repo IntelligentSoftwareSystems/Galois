@@ -3,9 +3,7 @@
 #include "deepgalois/configs.h"
 
 namespace deepgalois {
-DistContext::DistContext() : DistContext(false) {
-  syncSubstrate = NULL;
-}
+DistContext::DistContext() : DistContext(false) { syncSubstrate = NULL; }
 
 DistContext::~DistContext() {}
 

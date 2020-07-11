@@ -35,8 +35,7 @@ protected:
 public:
   typedef size_t iterator;
   LearningGraph(bool use_gpu)
-      : is_device(use_gpu), max_size_(0),
-        num_vertices_(0), num_edges_(0), 
+      : is_device(use_gpu), max_size_(0), num_vertices_(0), num_edges_(0),
         vertex_data_(NULL), edge_data_(NULL) {}
   LearningGraph() : LearningGraph(false) {}
   ~LearningGraph() { dealloc(); }
@@ -57,7 +56,10 @@ public:
   void dealloc();
   void degree_counting();
   void constructNodes() {}
-  void set_max_size(index_t max) { assert(max>0); max_size_ = max; }
+  void set_max_size(index_t max) {
+    assert(max > 0);
+    max_size_ = max;
+  }
 
   void readGraph(std::string dataset, bool selfloop = false);
   void fixEndEdge(index_t vid, index_t row_end) { rowptr_[vid + 1] = row_end; }

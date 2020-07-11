@@ -17,11 +17,11 @@ namespace deepgalois {
 using edge_iterator = index_t;
 using GraphCPU      = LearningGraph;
 #ifdef GALOIS_ENABLE_GPU
-using DGraph        = CSRGraph;
-using Graph         = CSRGraph;
-using GraphGPU      = CSRGraph;
+using DGraph   = CSRGraph;
+using Graph    = CSRGraph;
+using GraphGPU = CSRGraph;
 #else
-using DGraph        = galois::graphs::DistGraph<char, void>;
-using Graph         = LearningGraph;
+using DGraph = galois::graphs::DistGraph<char, void>;
+using Graph  = LearningGraph;
 #endif
 } // namespace deepgalois

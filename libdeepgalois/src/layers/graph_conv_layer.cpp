@@ -135,7 +135,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-     "GraphConvForward");
+      "GraphConvForward");
 
   // run relu activation on output if specified
   galois::StatTimer relu_timer("GraphConvForwardRelu");
@@ -194,7 +194,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_temp;
   layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-     "GraphConvBackward");
+      "GraphConvBackward");
 
   galois::StatTimer drop_timer("GraphConvBackwardDropout");
   drop_timer.start();

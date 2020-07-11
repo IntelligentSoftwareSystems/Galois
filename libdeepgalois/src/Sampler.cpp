@@ -186,7 +186,7 @@ void Sampler::selectVertices(index_t nv, index_t n, Graph* g,
   vertex_set.insert(frontier.begin(), frontier.end());
   // galois::gPrint("vertex_set size: ", vertex_set.size(), "\n");
   int* degrees = new int[m];
-  //galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
+  // galois::do_all(galois::iterate(size_t(0), size_t(m)), [&](const auto i) {
   for (index_t i = 0; i < m; i++) {
     degrees[i] = (int)getDegree(g, frontier[i]);
   } //, galois::loopname("compute_degrees"));
@@ -217,7 +217,8 @@ void Sampler::selectVertices(index_t nv, index_t n, Graph* g,
 
 // Given a subset of vertices and a graph g, generate a subgraph sg from the
 // graph g
-void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& reindexGraph) {
+void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph,
+                              Graph& reindexGraph) {
   // auto n = origGraph.size(); // old graph size
   auto nv            = keptVertices.size(); // new graph (subgraph) size
   VertexList new_ids = this->reindexVertices(globalGraph->size(), keptVertices);
@@ -235,7 +236,9 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& 
   VertexList old_ids(keptVertices.begin(),
                      keptVertices.end()); // vertex ID mapping
 #ifdef PARALLEL_GEN
-  galois::do_all(galois::iterate(size_t(0), size_t(nv)), [&](const auto i) {
+  galois::do_all(
+      galois::iterate(size_t(0), size_t(nv)),
+      [&](const auto i) {
 #else
   for (size_t i = 0; i < nv; i++) {
 #endif
@@ -251,7 +254,8 @@ void Sampler::reindexSubgraph(VertexSet& keptVertices, Graph& origGraph, Graph& 
         }
       }
 #ifdef PARALLEL_GEN
-      , galois::loopname("construct_graph"));
+      ,
+      galois::loopname("construct_graph"));
 #endif
 }
 
@@ -267,53 +271,64 @@ VertexSet Sampler::convertToLID(VertexSet& gidSet) {
 }
 
 template <typename GraphTy>
-void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g, std::vector<uint32_t>& degrees) {
-//template <>
-//void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphCPU* g, std::vector<uint32_t>& degrees) {
+void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphTy* g,
+                               std::vector<uint32_t>& degrees) {
+  // template <>
+  // void Sampler::getMaskedDegrees(size_t n, mask_t* masks, GraphCPU* g,
+  // std::vector<uint32_t>& degrees) {
   assert(degrees.size() == n);
-  galois::do_all(galois::iterate(size_t(0), n), [&](const auto src) {
-  //for (size_t src = 0; src < n; src++) {
-    if (masks[src] == 1) {
-      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-        const auto dst = g->getEdgeDst(e);
-        if (masks[dst] == 1) {
-          // galois::gInfo("Edge ", src, " ", dst);
-          degrees[src]++;
+  galois::do_all(
+      galois::iterate(size_t(0), n),
+      [&](const auto src) {
+        // for (size_t src = 0; src < n; src++) {
+        if (masks[src] == 1) {
+          for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
+            const auto dst = g->getEdgeDst(e);
+            if (masks[dst] == 1) {
+              // galois::gInfo("Edge ", src, " ", dst);
+              degrees[src]++;
+            }
+          }
         }
-      }
-    }
-  } , galois::loopname("update_degrees"));
+      },
+      galois::loopname("update_degrees"));
 }
 
 template <typename GraphTy, typename SubgraphTy>
-void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g, SubgraphTy* sub) {
+void Sampler::getMaskedGraph(index_t n, mask_t* masks, GraphTy* g,
+                             SubgraphTy* sub) {
   std::vector<uint32_t> degrees(n, 0);
   this->getMaskedDegrees(n, masks, g, degrees);
   // auto offsets = deepgalois::parallel_prefix_sum(degrees);
   auto offsets = deepgalois::prefix_sum(degrees);
   size_t ne    = offsets[n];
-  // galois::gPrint("getMaskedGraph: num_vertices=", n, ", num_edges=", ne, "\n");
+  // galois::gPrint("getMaskedGraph: num_vertices=", n, ", num_edges=", ne,
+  // "\n");
 
   // note this constructs the full graph's nodes; just trims edges
   sub->allocateFrom(n, ne);
   sub->constructNodes();
 
-  galois::do_all(galois::iterate(size_t(0), size_t(n)), [&](const auto src) {
-    sub->fixEndEdge(src, offsets[src + 1]);
-    if (masks[src] == 1) {
-      auto idx = offsets[src];
-      for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
-        auto dst = g->getEdgeDst(e);
-        if (masks[dst] == 1) {
-          // galois::gPrint(src, " ", dst, "\n");
-          sub->constructEdge(idx++, dst, 0);
+  galois::do_all(
+      galois::iterate(size_t(0), size_t(n)),
+      [&](const auto src) {
+        sub->fixEndEdge(src, offsets[src + 1]);
+        if (masks[src] == 1) {
+          auto idx = offsets[src];
+          for (auto e = g->edge_begin(src); e != g->edge_end(src); e++) {
+            auto dst = g->getEdgeDst(e);
+            if (masks[dst] == 1) {
+              // galois::gPrint(src, " ", dst, "\n");
+              sub->constructEdge(idx++, dst, 0);
+            }
+          }
         }
-      }
-    }
-  }, galois::loopname("gen_subgraph"));
+      },
+      galois::loopname("gen_subgraph"));
 }
 
-void Sampler::generateSubgraph(VertexSet &sampledSet, mask_t* masks, Graph* sg) {
+void Sampler::generateSubgraph(VertexSet& sampledSet, mask_t* masks,
+                               Graph* sg) {
   // n = 9000 by default
   // do the sampling of vertices from training set + using masked graph
 
@@ -335,7 +350,8 @@ void Sampler::generateSubgraph(VertexSet &sampledSet, mask_t* masks, Graph* sg) 
   Graph maskedSG;
   // TODO use partMaskedGraph once constructed later
   // remove edges whose destination is not masked
-  this->getMaskedGraph(Sampler::partGraph->size(), masks, Sampler::partGraph, &maskedSG);
+  this->getMaskedGraph(Sampler::partGraph->size(), masks, Sampler::partGraph,
+                       &maskedSG);
   this->reindexSubgraph(sampledLIDs, maskedSG, *sg);
 
   // galois::gPrint("sg num edges is ", sg.sizeEdges(), "\n");
