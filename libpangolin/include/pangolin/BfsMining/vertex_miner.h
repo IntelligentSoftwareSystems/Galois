@@ -83,9 +83,9 @@ public:
     galois::do_all(
         galois::iterate(begin, end),
         [&](const size_t& pos) {
-          auto& local_counters = *(counters.getLocal());
-          unsigned n           = level + 1;
-          StrQpMapFreq* qp_lmap;
+          auto& local_counters  = *(counters.getLocal());
+          unsigned n            = level + 1;
+          StrQpMapFreq* qp_lmap = nullptr;
           if (n >= 4)
             qp_lmap = qp_localmaps.getLocal();
           EmbeddingTy emb(n);
