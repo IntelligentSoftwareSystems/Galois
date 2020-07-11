@@ -1022,7 +1022,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, galois::BufferWrapper<T>& bf) {
     size_t buffer_size;
     gDeserializeObj(buf, buffer_size);
     bf.resize(buffer_size);
-    buf.extract((uint8_t*)bf.data(), buffer_size * sizeof(T));
+    buf.extract((uint8_t*)bf.get_vec_data(), buffer_size * sizeof(T));
   } else {
     GALOIS_DIE("deserialize for buf wrapper not implemented for nonpod");
   }
