@@ -1,23 +1,15 @@
 #ifndef GALOIS_ENABLE_GPU
 #ifndef __GRAPH_CONV_SYNC_STRUCT__
 #define __GRAPH_CONV_SYNC_STRUCT__
+#include "galois/BufferWrapper.h"
 
 struct GraphConvSync {
-  using ValTy = std::vector<float>;
+  using ValTy = galois::BufferWrapper<float>;
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
-    // TODO figure out how to avoid copy from C array to vector; best
-    // way is if original data is in a vector probably, but that has the
-    // issue of not being able to directly call BLAS
-    ValTy vecToReturn;
-    // allocate space
-    vecToReturn.resize(deepgalois::_syncVectorSize);
-    // copy the node's data to vector to serialize/send
-    for (unsigned i = 0; i < deepgalois::_syncVectorSize; i++) {
-      vecToReturn[i] =
-          deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize + i];
-    }
+    ValTy vecToReturn(&deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize],
+                      deepgalois::_syncVectorSize);
     // move constructor should kick in here to avoid return copy
     return vecToReturn;
   }
