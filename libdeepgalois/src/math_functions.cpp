@@ -38,15 +38,20 @@ void rng_bernoulli(size_t n, const float_t p, uint8_t* r) {
 }
 */
 
-std::default_random_engine generator;
-std::uniform_real_distribution<float_t> distribution(0.0, 1.0);
+// anon namespace so these things don't leak elsewhere
+namespace {
+static deepgalois::PerThreadRNG* per_thread_rng = nullptr;
+}
 
 namespace deepgalois {
 
 namespace math {
 
 inline uint8_t bernoulli(float_t p) {
-  return distribution(generator) > p ? 1 : 0;
+  if (!per_thread_rng) {
+    per_thread_rng = new PerThreadRNG();
+  }
+  return per_thread_rng->get_number() > p ? 1 : 0;
 }
 
 //! wrapper function to call cblas_sgemm
@@ -116,80 +121,7 @@ void mvmul(const CBLAS_TRANSPOSE TransA, const int M, const int N,
   cblas_sgemv(CblasRowMajor, TransA, M, N, alpha, A, N, x, 1, beta, y, 1);
 }
 
-inline void rng_uniform_cpu(size_t n, float_t* r) {
-#ifdef USE_MKL
-  VSLStreamStatePtr stream;
-  // Initializing the streams
-  vslNewStream(&stream, VSL_BRNG_SOBOL, 1);
-  // Generating
-  vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n, r, 0.0f, 1.0f);
-  // Deleting the streams
-  vslDeleteStream(&stream);
-#else
-  for (size_t i = 0; i < n; ++i) {
-    r[i] = distribution(generator);
-  }
-  // galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-  //  unsigned short xi[3];
-  //  r[i] = erand48(xi);
-  //}, galois::loopname("randomMaskGen"));
-#endif
-}
-
 const size_t vec_len = 8; // for 32-bit floating point in AVX2; TODO AVX512
-/*
-// vector add
-void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* out) {
-#ifdef __AVX2__
-  const size_t alignedN = n - n % vec_len;
-  for (size_t i = 0; i < alignedN; i += vec_len)
-    _mm256_storeu_ps(&out[i], _mm256_add_ps(_mm256_loadu_ps(&a[i]),
-_mm256_loadu_ps(&b[i]))); for (size_t i = alignedN; i < n; ++i) out[i] = a[i] +
-b[i]; #else for (size_t i = 0; i < n; ++i) out[i] = a[i] + b[i]; #endif
-}
-
-#if defined(__AVX__) || defined(__AVX2__)
-void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out)
-{ const size_t alignedN = n - n % vec_len; const __m256 scal =
-_mm256_set1_ps(alpha); for (size_t i = 0; i < alignedN; i += vec_len)
-    _mm256_storeu_ps(&out[i], _mm256_mul_ps(_mm256_loadu_ps(&in[i]), scal));
-  for (size_t i = alignedN; i < n; ++i) out[i] = alpha * in[i];
-}
-
-// SAXPY stands for “Single-precision A*X Plus Y"
-void axpy(size_t n, const float_t a, float_t *x, float_t *y) {
-  const size_t alignedN = n - n % vec_len;
-  const __m256 alpha = _mm256_set1_ps(a);
-  for (size_t i = 0; i < alignedN; i += vec_len) {
-    __m256  product = _mm256_mul_ps(_mm256_loadu_ps(&x[i]), alpha);
-    _mm256_storeu_ps(&y[i], _mm256_add_ps(_mm256_loadu_ps(&y[i]), product));
-  }
-  for (size_t i = alignedN; i < n; ++i) y[i] = a * x[i] + y[i];
-}
-
-float_t l2_norm(size_t n, const float_t* in) {
-  const size_t alignedN = n - n % vec_len;
-  __m256 vsum = _mm256_set1_ps(0.0);
-  for (size_t i = 0; i < alignedN; i += vec_len) {
-    __m256 a = _mm256_loadu_ps(&in[i]);
-    vsum = _mm256_add_ps(vsum, _mm256_mul_ps(a, a));
-  }
-  __m256 sum = _mm256_hadd_ps(vsum, vsum);
-  return (((float_t*)&sum)[0] + ((float_t*)&sum)[2]) / 2.0;
-}
-#else
-// vector multiply scalar
-void mul_scalar(size_t n, const float_t alpha, const float_t* in, float_t* out)
-{ for (size_t i = 0; i < n; ++i) out[i] = alpha * in[i];
-}
-
-float_t l2_norm(size_t n, const float_t* a) {
-  float_t sum = 0.0;
-  for (size_t i = 0; i < n; ++i) sum += a[i] * a[i];
-  return sum / 2.0;
-}
-#endif
-*/
 
 void vadd_cpu(size_t n, const float_t* a, const float_t* b, float_t* y) {
 #ifdef USE_MKL
@@ -259,28 +191,12 @@ void dropout(size_t m, float scale, float dropout_rate, const float_t* in,
 void dropout_cpu(size_t n, size_t m, float scale, float dropout_rate,
                  const float_t* in, mask_t* masks, float_t* out) {
   size_t len = n * m;
-  /*
-  #ifdef USE_MKL
-    vec_t rands(len);
-    rng_uniform_cpu(len, &rands[0]);
-    galois::do_all(galois::iterate((size_t)0, len), [&](const auto& i) {
-      masks[i] = rands[i] > dropout_rate ? 1 : 0;
-    }, galois::loopname("randomMaskGen"));
-  */
-  /*
-    galois::do_all(galois::iterate((size_t)0, n), [&](const auto& i) {
-      auto idx = i * m;
-      vec_t rands(m);
-      rng_uniform_cpu(m, &rands[0]);
-      for (size_t j = 0; j < m; ++j)
-        masks[idx+j] = rands[j] > dropout_rate ? 1 : 0;
-    }, galois::loopname("dropout"));
-  #else
-  */
-  for (size_t i = 0; i < len; ++i) {
-    masks[i] = bernoulli(dropout_rate);
-  }
-  //#endif
+
+  galois::do_all(
+      galois::iterate((size_t)0, len),
+      [&](size_t i) { masks[i] = bernoulli(dropout_rate); },
+      galois::loopname("dropout RNG"));
+
   galois::do_all(
       galois::iterate((size_t)0, len),
       [&](const auto& i) { out[i] = in[i] * (float_t)masks[i] * scale; },

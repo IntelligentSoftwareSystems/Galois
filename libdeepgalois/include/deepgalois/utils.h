@@ -65,6 +65,22 @@ private:
   struct timeval elapsed_time_;
 };
 
+class PerThreadRNG {
+  galois::substrate::PerThreadStorage<std::default_random_engine> engine;
+  galois::substrate::PerThreadStorage<std::uniform_real_distribution<float_t>>
+      distribution;
+
+public:
+  //! init distribution
+  PerThreadRNG() : distribution{0.0, 1.0} {};
+
+  //! thread local RNG float from 0 to 1
+  float_t get_number() {
+    float_t num = (*distribution.getLocal())(*engine.getLocal());
+    return num;
+  }
+};
+
 class random_generator {
 public:
   static random_generator& get_instance() {
