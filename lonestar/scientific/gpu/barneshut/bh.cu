@@ -924,7 +924,7 @@ int main(int argc, char *argv[])
 
     // run timesteps (launch GPU kernels)
 
-    cudaEventCreate(&start);  cudaEventCreate(&stop);  
+    cudaEventCreate(&start);  cudaEventCreate(&stop);
     struct timeval starttime, endtime;
     gettimeofday(&starttime, NULL);
 
