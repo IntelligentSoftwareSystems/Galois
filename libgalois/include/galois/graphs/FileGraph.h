@@ -671,10 +671,11 @@ public:
  *
  * Writer your file in rounds:
  * <ol>
- *  <li>setNumNodes(), setNumEdges()</li>
+ *  <li>setNumNodes(), setNumEdges<EdgeTy>()</li>
  *  <li>phase1(), for each node, incrementDegree(Node x)</li>
- *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node
- *    dst)</li>
+ *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node dst),
+ *    or add neighbors and corresponding data, addNeighbor<EdgeTy>(Node src,
+ *    Node dst, EdgeTy data)</li>
  *  <li>finish(), use as FileGraph</li>
  * </ol>
  */

@@ -25,12 +25,12 @@ If you want to load a .gr (binary Galois graph) into your own graph types, then 
 Use galois::graphs::FileGraph::toFile to write a galois::graphs::FileGraph to a binary file. Use galois::graphs::FileGraphWriter to construct a galois::graphs::FileGraph by the following steps:
 <ol>
 <li> Set the number of nodes by calling galois::graphs::FileGraphWriter::setNumNodes.
-<li> Set the number of edges by calling galois::graphs::FileGraphWriter::setNumEdges.
+<li> Set the number of edges and the type of edge data by calling galois::graphs::FileGraphWriter::setNumEdges<EdgeTy>.
 <li> Call galois::graphs::FileGraphWriter::phase1 to allocate space for arrays of row pointers, edge destination and edge data.
 <li> Set the degree of each node by calling galois::graphs::FileGraphWriter::incrementDegree for each node.
 <li> Call galois::graphs::FileGraphWriter::phase2 to calculate the prefix sum of node degree to have row pointers.
-<li> Add edges by calling galois::graphs::FileGraphWriter::addNeighbor for each edge. The function returns for the edge the index into the edge destination array, which can be used to maintain the edge data array if required.
-<li> Call galois::graphs::FileGraphWriter::finish to get a pointer which points to the memory location where the edge data can be saved. Copy the edge data array to the space pointed by the pointer.
+<li> Add edges by calling galois::graphs::FileGraphWriter::addNeighbor for each edge. The function returns for the edge the index into the edge destination array, which can be used to maintain the edge data array if required. Add edges and corresponding edge data at the same time by calling galois::graphs::FileGraphWriter::addNeighbor<EdgeTy>.
+<li> Call galois::graphs::FileGraphWriter::finish. To get a pointer which points to the memory location where the edge data can be saved, call galois::graphs::FileGraphWriter::finish<EdgeTy> instead and copy the edge data array to the space pointed by the pointer.
 </ol>
 
 @section garph_utility Utility Tools for Graphs
