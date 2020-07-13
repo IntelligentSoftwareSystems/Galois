@@ -424,8 +424,7 @@ void convertEdgelist(const std::string& infilename,
 
   numNodes++;
   p.setNumNodes(numNodes);
-  p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+  p.setNumEdges<EdgeTy>(numEdges);
 
   infile.clear();
   infile.seekg(0, std::ios::beg);
@@ -680,8 +679,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
       // Parse edges
       if (phase == 0) {
         p.setNumNodes(nnodes);
-        p.setNumEdges(nedges);
-        p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+        p.setNumEdges<EdgeTy>(nedges);
         p.phase1();
       } else {
         p.phase2();
@@ -795,7 +793,7 @@ struct Nodelist2Gr : public HasOnlyVoidSpecialization {
 
     numNodes++;
     p.setNumNodes(numNodes);
-    p.setNumEdges(numEdges);
+    p.setNumEdges<void>(numEdges);
 
     infile.clear();
     infile.seekg(0, std::ios::beg);
@@ -1210,8 +1208,7 @@ struct AddRing : public Conversion {
     uint64_t size     = graph.size();
     uint64_t newEdges = AddLine ? size - 1 : size;
     p.setNumNodes(size);
-    p.setNumEdges(graph.sizeEdges() + newEdges);
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(graph.sizeEdges() + newEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1284,8 +1281,7 @@ struct AddTree : public Conversion {
       newEdges *= 2; // reverse edges
 
     p.setNumNodes(size);
-    p.setNumEdges(graph.sizeEdges() + newEdges);
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(graph.sizeEdges() + newEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1619,8 +1615,7 @@ struct RemoveHighDegree : public Conversion {
     }
 
     p.setNumNodes(numNodes);
-    p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1686,8 +1681,7 @@ struct PartitionBySource : public Conversion {
                                  graph.edge_end(*(r.second - 1)));
 
       p.setNumNodes(graph.size());
-      p.setNumEdges(numEdges);
-      p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+      p.setNumEdges<EdgeTy>(numEdges);
 
       p.phase1();
       for (Graph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
@@ -1784,8 +1778,7 @@ struct PartitionByDestination : public Conversion {
       }
 
       p.setNumNodes(graph.size());
-      p.setNumEdges(numEdges);
-      p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+      p.setNumEdges<EdgeTy>(numEdges);
 
       p.phase1();
       for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei;
@@ -1847,8 +1840,7 @@ struct Transpose : public Conversion {
     Writer p;
 
     p.setNumNodes(graph.size());
-    p.setNumEdges(graph.sizeEdges());
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(graph.sizeEdges());
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1952,8 +1944,7 @@ struct Cleanup : public Conversion {
     Writer p;
 
     p.setNumNodes(graph.size());
-    p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -2068,8 +2059,7 @@ struct MakeUnsymmetric : public Conversion {
     Writer p;
 
     p.setNumNodes(graph.size());
-    p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+    p.setNumEdges<EdgeTy>(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -2160,8 +2150,7 @@ struct Dimacs2Gr : public HasNoVoidSpecialization {
       // Parse edges
       if (phase == 0) {
         p.setNumNodes(nnodes);
-        p.setNumEdges(nedges);
-        p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+        p.setNumEdges<EdgeTy>(nedges);
         p.phase1();
       } else {
         p.phase2();
@@ -2249,7 +2238,7 @@ struct Pbbs2Gr : public HasOnlyVoidSpecialization {
     }
 
     p.setNumNodes(nnodes);
-    p.setNumEdges(nedges);
+    p.setNumEdges<void>(nedges);
 
     size_t* offsets = new size_t[nnodes];
     for (size_t i = 0; i < nnodes; ++i) {
@@ -2883,8 +2872,7 @@ struct Svmlight2Gr : public HasNoVoidSpecialization {
         featureOffset = numNodes;
         numNodes += maxFeature + 1;
         p.setNumNodes(numNodes);
-        p.setNumEdges(numEdges);
-        p.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+        p.setNumEdges<EdgeTy>(numEdges);
         p.phase1();
       } else if (phase == 1) {
         p.phase2();

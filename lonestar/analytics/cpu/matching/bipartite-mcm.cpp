@@ -1012,8 +1012,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups,
 
   galois::graphs::FileGraphWriter p;
   p.setNumNodes(numA + numB);
-  p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(galois::LargeArray<edge_data_type>::size_of::value);
+  p.setNumEdges<edge_data_type>(numEdges);
 
   for (int phase = 0; phase < 2; ++phase) {
     if (phase == 0)

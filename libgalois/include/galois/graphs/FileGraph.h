@@ -48,15 +48,6 @@
 #include "galois/substrate/NumaMem.h"
 #include "galois/Reduction.h"
 
-template <typename T>
-struct SizeOf {
-  static constexpr std::size_t value = sizeof(T);
-};
-template <> // sizeof never returns 0
-struct SizeOf<void> {
-  static constexpr std::size_t value = 0;
-};
-
 namespace galois {
 namespace graphs {
 
@@ -680,7 +671,7 @@ public:
  *
  * Writer your file in rounds:
  * <ol>
- *  <li>setNumNodes(), setNumEdges(), setSizeofEdgeData()</li>
+ *  <li>setNumNodes(), setNumEdges()</li>
  *  <li>phase1(), for each node, incrementDegree(Node x)</li>
  *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node
  *    dst)</li>
@@ -695,11 +686,20 @@ public:
   //! @param n number of nodes to set to
   void setNumNodes(size_t n) { numNodes = n; }
   //! Set number of edges to write to n
+  //! @tparam EdgeTy edge data type
   //! @param n number of edges to set to
-  void setNumEdges(size_t n) { numEdges = n; }
-  //! Set the size of the edge data to write to n
-  //! @param n size of edge data to write
-  void setSizeofEdgeData(size_t n) { sizeofEdge = n; }
+  template <typename EdgeTy, typename std::enable_if<
+                                 std::is_void<EdgeTy>::value>::type* = nullptr>
+  void setNumEdges(size_t n) {
+    numEdges   = n;
+    sizeofEdge = 0;
+  }
+  template <typename EdgeTy, typename std::enable_if<
+                                 !std::is_void<EdgeTy>::value>::type* = nullptr>
+  void setNumEdges(size_t n) {
+    numEdges   = n;
+    sizeofEdge = sizeof(EdgeTy);
+  }
 
   //! Marks the transition to next phase of parsing: counting the degree of
   //! nodes
@@ -781,8 +781,7 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   }
 
   g.setNumNodes(in_graph.size());
-  g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+  g.setNumEdges<EdgeTy>(numEdges);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
@@ -843,8 +842,7 @@ void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
 
   size_t numEdges = in_graph.sizeEdges();
   g.setNumNodes(in_graph.size());
-  g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(SizeOf<EdgeTy>::value);
+  g.setNumEdges<EdgeTy>(numEdges);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;

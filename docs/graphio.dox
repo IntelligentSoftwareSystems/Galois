@@ -26,7 +26,6 @@ Use galois::graphs::FileGraph::toFile to write a galois::graphs::FileGraph to a 
 <ol>
 <li> Set the number of nodes by calling galois::graphs::FileGraphWriter::setNumNodes.
 <li> Set the number of edges by calling galois::graphs::FileGraphWriter::setNumEdges.
-<li> Set the size of edge data by calling galois::graphs::FileGraphWriter::setSizeofEdgeData.
 <li> Call galois::graphs::FileGraphWriter::phase1 to allocate space for arrays of row pointers, edge destination and edge data.
 <li> Set the degree of each node by calling galois::graphs::FileGraphWriter::incrementDegree for each node.
 <li> Call galois::graphs::FileGraphWriter::phase2 to calculate the prefix sum of node degree to have row pointers.
