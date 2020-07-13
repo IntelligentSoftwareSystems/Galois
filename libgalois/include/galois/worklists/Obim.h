@@ -405,7 +405,7 @@ public:
       return this->popStored(p, p.curIndex);
 
     if (!UseBarrier && BlockPeriod &&
-        (p.numPops++ & ((1 << BlockPeriod) - 1)) == 0)
+        ((p.numPops++ & ((1 << BlockPeriod) - 1)) == 0))
       return slowPop(p);
 
     galois::optional<value_type> item;
