@@ -23,6 +23,7 @@ module load boost
 module load gdb
 module load isspython # needed for vim
 module load git
+module load fmt
 
 if [ "$1" != "min" ]; then
   module load tbb
