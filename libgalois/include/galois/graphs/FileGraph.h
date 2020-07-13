@@ -73,6 +73,7 @@ private:
     size_t len;
   };
 
+protected:
   std::deque<mapping> mappings;
   std::deque<int> fds;
 
@@ -98,6 +99,7 @@ private:
   //! adjustments to edge index when we load only part of a graph
   uint64_t edgeOffset;
 
+private:
   //! If initialized, this array stores node degrees in memory for fast access
   //! via the getDegree function
   LargeArray<uint64_t> node_degrees;
@@ -188,7 +190,6 @@ private:
    */
   void pageInByNode(size_t id, size_t total, size_t sizeofEdgeData);
 
-protected:
   /**
    * Copies graph connectivity information from arrays. Returns a pointer to
    * array to populate with edge data.
@@ -670,90 +671,78 @@ public:
  *
  * Writer your file in rounds:
  * <ol>
- *  <li>setNumNodes(), setNumEdges(), setSizeofEdgeData()</li>
+ *  <li>setNumNodes(), setNumEdges<EdgeTy>()</li>
  *  <li>phase1(), for each node, incrementDegree(Node x)</li>
- *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node
- *    dst)</li>
+ *  <li>phase2(), add neighbors for each node, addNeighbor(Node src, Node dst),
+ *    or add neighbors and corresponding data, addNeighbor<EdgeTy>(Node src,
+ *    Node dst, EdgeTy data)</li>
  *  <li>finish(), use as FileGraph</li>
  * </ol>
  */
 class FileGraphWriter : public FileGraph {
-  std::vector<uint64_t> outIdx;
-  std::vector<uint32_t> starts;
-  std::vector<uint32_t> outs;
-  std::vector<uint64_t> starts64;
-  std::vector<uint64_t> outs64;
-
-  size_t sizeofEdgeData;
-  size_t numNodes;
-  size_t numEdges;
+  std::unique_ptr<uint64_t[]> starts;
 
 public:
-  //! Constructor: initializes nodes, edges, and edge data to 0
-  FileGraphWriter() : sizeofEdgeData(0), numNodes(0), numEdges(0) {}
-
   //! Set number of nodes to write to n
   //! @param n number of nodes to set to
   void setNumNodes(size_t n) { numNodes = n; }
   //! Set number of edges to write to n
+  //! @tparam EdgeTy edge data type
   //! @param n number of edges to set to
-  void setNumEdges(size_t n) { numEdges = n; }
-  //! Set the size of the edge data to write to n
-  //! @param n size of edge data to write
-  void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
+  template <typename EdgeTy, typename std::enable_if<
+                                 std::is_void<EdgeTy>::value>::type* = nullptr>
+  void setNumEdges(size_t n) {
+    numEdges   = n;
+    sizeofEdge = 0;
+  }
+  template <typename EdgeTy, typename std::enable_if<
+                                 !std::is_void<EdgeTy>::value>::type* = nullptr>
+  void setNumEdges(size_t n) {
+    numEdges   = n;
+    sizeofEdge = sizeof(EdgeTy);
+  }
 
   //! Marks the transition to next phase of parsing: counting the degree of
   //! nodes
-  void phase1() { outIdx.resize(numNodes); }
+  void phase1();
 
   //! Increments degree of id by delta
-  void incrementDegree(size_t id, int delta = 1) {
+  void incrementDegree(size_t id, uint64_t delta = 1) {
     assert(id < numNodes);
     outIdx[id] += delta;
   }
 
   //! Marks the transition to next phase of parsing, adding edges
-  void phase2() {
-    if (numNodes == 0)
-      return;
-
-    // Turn counts into partial sums
-    auto prev = outIdx.begin();
-    for (auto ii = outIdx.begin() + 1, ei = outIdx.end(); ii != ei;
-         ++ii, ++prev) {
-      *ii += *prev;
-    }
-    assert(outIdx[numNodes - 1] == numEdges);
-
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      starts.resize(numNodes);
-      outs.resize(numEdges);
-    } else {
-      // version 2
-      starts64.resize(numNodes);
-      outs64.resize(numEdges);
-    }
-  }
+  void phase2();
 
   //! Adds a neighbor between src and dst
   size_t addNeighbor(size_t src, size_t dst) {
     size_t base = src ? outIdx[src - 1] : 0;
+    size_t idx  = base + starts[src]++;
+    assert(idx < outIdx[src]);
 
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      size_t idx = base + starts[src]++;
-      assert(idx < outIdx[src]);
-      outs[idx] = dst;
-      return idx;
-    } else {
-      // version 2
-      size_t idx = base + (starts64)[src]++;
-      assert(idx < outIdx[src]);
-      outs64[idx] = dst;
-      return idx;
-    }
+    if (numNodes <= std::numeric_limits<uint32_t>::max())
+      reinterpret_cast<uint32_t*>(outs)[idx] = dst; // version 1
+    else
+      reinterpret_cast<uint64_t*>(outs)[idx] = dst; // version 2
+    return idx;
   }
+
+  //! Adds a neighbor between src and dst w/ corresponding data
+  template <typename T>
+  size_t addNeighbor(
+      size_t src, size_t dst,
+      const typename std::enable_if<!std::is_void<T>::value, T>::type& data) {
+    assert(edgeData);
+    size_t idx                          = addNeighbor(src, dst);
+    reinterpret_cast<T*>(edgeData)[idx] = data;
+    return idx;
+  }
+
+  /**
+   * Finish making graph.
+   */
+  void finish() { starts.reset(nullptr); } // free reserved memory asap
 
   /**
    * Finish making graph. Returns pointer to block of memory that should be
@@ -761,21 +750,8 @@ public:
    */
   template <typename T>
   T* finish() {
-    void* ret;
-    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
-      // version 1
-      ret = fromArrays(&outIdx[0], numNodes, &outs[0], numEdges, nullptr,
-                       sizeofEdgeData, 0, 0, false, 1);
-      starts.clear();
-      outs.clear();
-    } else {
-      // version 2
-      ret = fromArrays(&outIdx[0], numNodes, &outs64[0], numEdges, nullptr,
-                       sizeofEdgeData, 0, 0, false, 2);
-    }
-
-    outIdx.clear();
-    return reinterpret_cast<T*>(ret);
+    starts.reset(nullptr); // free reserved memory asap
+    return reinterpret_cast<T*>(edgeData);
   }
 };
 
@@ -787,11 +763,8 @@ public:
 template <typename EdgeTy>
 void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
-  EdgeData edgeData;
 
   size_t numEdges = 0;
 
@@ -809,8 +782,7 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   }
 
   g.setNumNodes(in_graph.size());
-  g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  g.setNumEdges<EdgeTy>(numEdges);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
@@ -827,7 +799,6 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
        ++ii) {
     GNode src = *ii;
@@ -835,24 +806,20 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
                                   ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
       GNode dst = in_graph.getEdgeDst(jj);
-      if (EdgeData::has_value) {
-        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
-        edgeData.set(g.addNeighbor(src, dst), data);
-        if (src != dst)
-          edgeData.set(g.addNeighbor(dst, src), data);
-      } else {
+      if constexpr (std::is_void<EdgeTy>::value) {
         g.addNeighbor(src, dst);
         if (src != dst)
           g.addNeighbor(dst, src);
+      } else {
+        EdgeTy& data = in_graph.getEdgeData<EdgeTy>(jj);
+        g.addNeighbor<EdgeTy>(src, dst, data);
+        if (src != dst)
+          g.addNeighbor<EdgeTy>(dst, src, data);
       }
     }
   }
 
-  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+  g.finish();
 
   out = std::move(g);
 }
@@ -871,16 +838,12 @@ void makeSymmetric(FileGraph& in_graph, FileGraph& out) {
 template <typename EdgeTy, typename PTy>
 void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
-  EdgeData edgeData;
 
   size_t numEdges = in_graph.sizeEdges();
   g.setNumNodes(in_graph.size());
-  g.setNumEdges(numEdges);
-  g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
+  g.setNumEdges<EdgeTy>(numEdges);
 
   g.phase1();
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
@@ -894,7 +857,6 @@ void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
   }
 
   g.phase2();
-  edgeData.create(numEdges);
   for (FileGraph::iterator ii = in_graph.begin(), ei = in_graph.end(); ii != ei;
        ++ii) {
     GNode src = *ii;
@@ -902,20 +864,16 @@ void permute(FileGraph& in_graph, const PTy& p, FileGraph& out) {
                                   ej = in_graph.edge_end(src);
          jj != ej; ++jj) {
       GNode dst = in_graph.getEdgeDst(jj);
-      if (EdgeData::has_value) {
-        edge_value_type& data = in_graph.getEdgeData<edge_value_type>(jj);
-        edgeData.set(g.addNeighbor(p[src], p[dst]), data);
-      } else {
+      if constexpr (std::is_void<EdgeTy>::value) {
         g.addNeighbor(p[src], p[dst]);
+      } else {
+        EdgeTy& data = in_graph.getEdgeData<EdgeTy>(jj);
+        g.addNeighbor<EdgeTy>(p[src], p[dst], data);
       }
     }
   }
 
-  edge_value_type* rawEdgeData = g.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+  g.finish();
 
   out = std::move(g);
 }

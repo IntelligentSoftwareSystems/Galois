@@ -23,11 +23,6 @@
 
 #include <mutex>
 
-#ifdef __linux__
-#include <linux/mman.h>
-#endif
-#include <sys/mman.h>
-
 // figure this out dynamically
 const size_t hugePageSize = 2 * 1024 * 1024;
 // protect mmap, munmap since linux has issues
@@ -36,19 +31,11 @@ static galois::substrate::SimpleLock allocLock;
 static void* trymmap(size_t size, int flag) {
   std::lock_guard<galois::substrate::SimpleLock> lg(allocLock);
   const int _PROT = PROT_READ | PROT_WRITE;
-  void* ptr       = mmap(0, size, _PROT, flag, -1, 0);
+  void* ptr       = galois::mmap(0, size, _PROT, flag, -1, 0);
   if (ptr == MAP_FAILED)
     ptr = nullptr;
   return ptr;
 }
-// mmap flags
-#if defined(MAP_ANONYMOUS)
-static const int _MAP_ANON = MAP_ANONYMOUS;
-#elif defined(MAP_ANON)
-static const int _MAP_ANON     = MAP_ANON;
-#else
-static_assert(0, "No Anonymous mapping");
-#endif
 
 static const int _MAP = _MAP_ANON | MAP_PRIVATE;
 #ifdef MAP_POPULATE

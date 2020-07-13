@@ -24,6 +24,41 @@
 
 #include "galois/config.h"
 
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
+#include <sys/mman.h>
+
+#include <utility>
+#ifdef HAVE_MMAP64
+namespace galois {
+template <typename... Args>
+void* mmap(void* addr, Args... args) { // 0 -> nullptr
+  return ::mmap64(addr, std::forward<Args>(args)...);
+}
+} // namespace galois
+//! offset type for mmap
+typedef off64_t offset_t;
+#else
+namespace galois {
+template <typename... Args>
+void* mmap(void* addr, Args... args) { // 0 -> nullptr
+  return ::mmap(addr, std::forward<Args>(args)...);
+}
+} // namespace galois
+//! offset type for mmap
+typedef off_t offset_t;
+#endif
+
+// mmap flags
+#if defined(MAP_ANONYMOUS)
+static const int _MAP_ANON = MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+static const int _MAP_ANON = MAP_ANON;
+#else
+static_assert(0, "No Anonymous mapping");
+#endif
+
 namespace galois {
 namespace substrate {
 

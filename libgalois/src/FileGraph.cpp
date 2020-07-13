@@ -31,42 +31,14 @@
 #include <cassert>
 #include <fstream>
 
-#ifdef __linux__
-#include <linux/mman.h>
-#endif
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined(MAP_ANONYMOUS)
-static const int _MAP_ANON = MAP_ANONYMOUS;
-#elif defined(MAP_ANON)
-static const int _MAP_ANON = MAP_ANON;
-#else
-// fail
-#endif
-
 /**
  * Performs an mmap of all provided arguments.
  */
-#ifdef HAVE_MMAP64
-template <typename... Args>
-void* mmap_big(Args... args) {
-  return mmap64(std::forward<Args>(args)...);
-}
-//! offset type for mmap
-typedef off64_t offset_t;
-#else
-template <typename... Args>
-void* mmap_big(Args... args) {
-  return mmap(std::forward<Args>(args)...);
-}
-//! offset type for mmap
-typedef off_t offset_t;
-#endif
-
 namespace galois {
 namespace graphs {
 // Graph file format:
@@ -217,8 +189,8 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
   size_t bytes =
       rawBlockSize(num_nodes, num_edges, sizeof_edge_data, oGraphVersion);
 
-  char* base = (char*)mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE,
-                               _MAP_ANON | MAP_PRIVATE, -1, 0);
+  char* base = (char*)mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
+                           _MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed allocating graph");
 
@@ -313,7 +285,7 @@ void FileGraph::fromFile(const std::string& filename) {
 #ifdef MAP_POPULATE
   _MAP_BASE |= MAP_POPULATE;
 #endif
-  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, _MAP_BASE, fd, 0);
+  void* base = mmap(nullptr, buf.st_size, PROT_READ, _MAP_BASE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
@@ -338,7 +310,7 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length,
       offset & ~static_cast<offset_t>(galois::substrate::allocSize() - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
-  void* base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
+  void* base = mmap(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed allocating for fd ", fd);
   mappings.push_back({base, length});
@@ -731,6 +703,55 @@ uint64_t FileGraph::getDegree(uint32_t node_id) const {
   // node_degrees array should be initialized
   assert(this->node_degrees.size());
   return this->node_degrees[node_id];
+}
+
+void FileGraphWriter::phase1() {
+  graphVersion = numNodes <= std::numeric_limits<uint32_t>::max() ? 1 : 2;
+
+  size_t bytes    = galois::graphs::rawBlockSize(numNodes, numEdges, sizeofEdge,
+                                              graphVersion);
+  char* mmap_base = reinterpret_cast<char*>(mmap(
+      nullptr, bytes, PROT_READ | PROT_WRITE, _MAP_ANON | MAP_PRIVATE, -1, 0));
+  if (mmap_base == MAP_FAILED)
+    GALOIS_SYS_DIE("failed allocating graph to write");
+
+  mappings.push_back({mmap_base, bytes});
+
+  uint64_t* fptr = reinterpret_cast<uint64_t*>(mmap_base);
+  // set header info
+  *fptr++    = convert_htole64(graphVersion);
+  *fptr++    = convert_htole64(sizeofEdge);
+  *fptr++    = convert_htole64(numNodes);
+  *fptr++    = convert_htole64(numEdges);
+  nodeOffset = 0;
+  edgeOffset = 0;
+  outIdx     = fptr;
+
+  // move over to outgoing edge data and save it
+  fptr += numNodes;
+  outs = reinterpret_cast<void*>(fptr);
+
+  // skip memory differently depending on file version
+  edgeData = graphVersion == 1
+                 ? reinterpret_cast<char*>(reinterpret_cast<uint32_t*>(fptr) +
+                                           numEdges + numEdges % 2) // padding
+                 : reinterpret_cast<char*>(
+                       /*reinterpret_cast<uint64_t*>*/ (fptr) + numEdges);
+}
+
+void FileGraphWriter::phase2() {
+  if (numNodes == 0)
+    return;
+
+  // Turn counts into partial sums
+  uint64_t* prev = outIdx;
+  for (uint64_t *ii = outIdx + 1, *ei = outIdx + numNodes; ii != ei;
+       ++ii, ++prev) {
+    *ii += *prev;
+  }
+  assert(outIdx[numNodes - 1] == numEdges);
+
+  starts = std::make_unique<uint64_t[]>(numNodes);
 }
 
 } // namespace graphs
