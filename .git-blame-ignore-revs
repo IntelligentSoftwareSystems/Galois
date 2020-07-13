@@ -24,3 +24,6 @@
 
 # Another round of clang-format
 2264b05ece3f9ec2b9bf397594cc14ef99f498de
+
+# Fix endlines for barneshut app
+558ccb83ab2e388c1202396f42d0881912e6393d
