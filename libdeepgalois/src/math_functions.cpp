@@ -6,6 +6,7 @@
 #include "galois/Timer.h"
 #include "galois/Galois.h"
 #include "deepgalois/utils.h"
+#include "deepgalois/random.h"
 #include "deepgalois/math_functions.hh"
 
 #ifdef USE_MKL

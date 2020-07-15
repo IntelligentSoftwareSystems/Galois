@@ -1,6 +1,7 @@
 #include "deepgalois/reader.h"
 #include "deepgalois/utils.h"
 #include "deepgalois/configs.h"
+#include "galois/Galois.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -8,6 +9,9 @@
 #include <unistd.h> /* For open(), creat() */
 #include <fstream>
 #include <cassert>
+#ifndef GALOIS_ENABLE_GPU
+#include "galois/DistGalois.h"
+#endif
 
 namespace deepgalois {
 

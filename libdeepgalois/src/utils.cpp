@@ -1,5 +1,8 @@
 #include "galois/Galois.h"
 #include "deepgalois/utils.h"
+#ifndef GALOIS_ENABLE_GPU
+#include "galois/DistGalois.h"
+#endif
 
 namespace deepgalois {
 
