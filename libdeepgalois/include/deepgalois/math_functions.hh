@@ -48,6 +48,9 @@ void mul_scalar(size_t n, const float_t alpha, const float_t* x, float_t* y);
 //! do dot product of 2 vectors
 float_t dot(size_t n, const float_t* x, const float_t* y);
 
+// concatenation of two vectors into one
+void concat(size_t n, const float_t* x, const float_t* y, float_t* z);
+
 // SAXPY stands for “Single-precision A*X Plus Y"
 void axpy(size_t n, const float_t a, float_t* x, float_t* y);
 

@@ -3,6 +3,7 @@
 #include "deepgalois/utils.h"
 
 namespace deepgalois {
+#include "gat_fw.h"
 
 //! Set this to let sync struct know where to get data from
 float_t* _dataToSync = nullptr;
@@ -86,6 +87,9 @@ void graph_conv_layer::malloc_and_init() {
   // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);
 
+  // alpha is only used for GAT
+  rand_init_matrix(2*z, 1, alpha, 1);
+
   if (dropout_)
     dropout_mask = new mask_t[x * y];
   in_temp    = new float_t[x * y];
@@ -95,6 +99,7 @@ void graph_conv_layer::malloc_and_init() {
     in_temp1 = new float_t[x * y];
 }
 
+#ifndef USE_GAT
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 void graph_conv_layer::forward_propagation(const float_t* in_data,
                                            float_t* out_data) {
@@ -146,6 +151,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
 
   conv_timer.stop();
 }
+#endif
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 void graph_conv_layer::back_propagation(const float_t* in_data,

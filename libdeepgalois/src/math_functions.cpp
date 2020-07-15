@@ -175,6 +175,12 @@ float_t dot(size_t n, const float_t* x, const float_t* y) {
   return cblas_sdot(n, x, 1, y, 1);
 }
 
+// concatenation of two vectors into one
+void concat(size_t n, const float_t* x, const float_t* y, float_t* z) {
+  copy_cpu(n, x, z);
+  copy_cpu(n, y, z+n);
+}
+
 void clear_cpu(size_t n, float_t* in) {
   // for (size_t i = 0; i < n; i++) in[i] = 0;
   std::fill(in, in + n, 0);
