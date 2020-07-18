@@ -2,6 +2,9 @@
 #include "deepgalois/math_functions.hh"
 #include "deepgalois/utils.h"
 
+static galois::DynamicBitSet bitset_gradient;
+#include "deepgalois/layers/GraphConvSyncStructures.h"
+
 namespace deepgalois {
 #include "gat_fw.h"
 
@@ -73,6 +76,9 @@ void graph_conv_layer::malloc_and_init() {
   size_t y = input_dims[1];
   size_t z = output_dims[1];
 
+  galois::gInfo("bitset size is going to be ", x);
+  bitset_gradient.resize(x);
+
   // setup gluon
   layer::gradientGraph =
       new deepgalois::GluonGradients(layer::weight_grad, y * z);
@@ -88,7 +94,7 @@ void graph_conv_layer::malloc_and_init() {
   zero_init_matrix(y, z, layer::weight_grad);
 
   // alpha is only used for GAT
-  rand_init_matrix(2*z, 1, alpha, 1);
+  rand_init_matrix(2 * z, 1, alpha, 1);
 
   if (dropout_)
     dropout_mask = new mask_t[x * y];
@@ -139,8 +145,33 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   // TODO how to do this for the sampled case?
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-      "GraphConvForward");
+  // bitset setting
+  galois::do_all(
+      galois::iterate((size_t)0, bitset_gradient.size()),
+      [&](size_t node_id) {
+        bool set_true = false;
+        // check for non-zeros; the moment one is found, set true becomes true
+        // and we break out of the loop
+        for (size_t i = 0; i < deepgalois::_syncVectorSize; i++) {
+          auto val =
+              deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize +
+                                      i];
+          if (val != 0) {
+            set_true = true;
+            break;
+          }
+        }
+
+        if (set_true) {
+          bitset_gradient.set(node_id);
+        }
+      },
+      galois::loopname("BitsetGraphConvForward"), galois::no_stats());
+  galois::gPrint(bitset_gradient.count(), " out of ", bitset_gradient.size(),
+                 "\n");
+  layer::context->getSyncSubstrate()
+      ->sync<writeAny, readAny, GraphConvSync, Bitset_gradient>(
+          "GraphConvForward");
 
   // run relu activation on output if specified
   galois::StatTimer relu_timer("GraphConvForwardRelu");

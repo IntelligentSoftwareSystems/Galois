@@ -8,8 +8,9 @@ struct GraphConvSync {
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
-    ValTy vecToReturn(&deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize],
-                      deepgalois::_syncVectorSize);
+    ValTy vecToReturn(
+        &deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize],
+        deepgalois::_syncVectorSize);
     // move constructor should kick in here to avoid return copy
     return vecToReturn;
   }
@@ -52,6 +53,18 @@ struct GraphConvSync {
     return false;
   }
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+};
+
+struct Bitset_gradient {
+  static constexpr bool is_vector_bitset() { return false; }
+
+  static constexpr bool is_valid() { return true; }
+
+  static galois::DynamicBitSet& get() { return bitset_gradient; }
+
+  static void reset_range(size_t begin, size_t end) {
+    bitset_gradient.reset(begin, end);
+  }
 };
 
 #endif

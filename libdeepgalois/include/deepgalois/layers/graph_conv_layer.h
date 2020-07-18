@@ -1,7 +1,6 @@
 #pragma once
 #include "layer.h"
 #include "deepgalois/layers/aggregator.h"
-#include "deepgalois/layers/GraphConvSyncStructures.h"
 
 /**
  * GraphConv Layer; based on DGL implementation + follows TinyDNN layer
