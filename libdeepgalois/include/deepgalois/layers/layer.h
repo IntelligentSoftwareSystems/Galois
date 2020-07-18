@@ -18,7 +18,6 @@
 #ifndef GALOIS_ENABLE_GPU
 #include "galois/graphs/GluonSubstrate.h"
 #include "deepgalois/layers/GluonGradients.h"
-#include "deepgalois/layers/GradientSyncStructs.h"
 #endif
 
 namespace deepgalois {

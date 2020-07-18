@@ -2,8 +2,10 @@
 #include "deepgalois/math_functions.hh"
 #include "deepgalois/utils.h"
 
-static galois::DynamicBitSet bitset_gradient;
+static galois::DynamicBitSet bitset_conv;
+
 #include "deepgalois/layers/GraphConvSyncStructures.h"
+#include "deepgalois/layers/GradientSyncStructs.h"
 
 namespace deepgalois {
 #include "gat_fw.h"
@@ -76,8 +78,8 @@ void graph_conv_layer::malloc_and_init() {
   size_t y = input_dims[1];
   size_t z = output_dims[1];
 
-  galois::gInfo("bitset size is going to be ", x);
-  bitset_gradient.resize(x);
+  galois::gInfo("conv bitset size is going to be ", x);
+  bitset_conv.resize(x);
 
   // setup gluon
   layer::gradientGraph =
@@ -86,6 +88,7 @@ void graph_conv_layer::malloc_and_init() {
       new galois::graphs::GluonSubstrate<deepgalois::GluonGradients>(
           *layer::gradientGraph, layer::gradientGraph->myHostID(),
           layer::gradientGraph->numHosts(), false);
+  galois::gInfo("gradient bitset size is going to be ", y * z);
 
   // make sure seed consistent across all hosts for weight matrix
   rand_init_matrix(y, z, W, 1);
@@ -104,6 +107,34 @@ void graph_conv_layer::malloc_and_init() {
   if (y <= z)
     in_temp1 = new float_t[x * y];
 }
+
+namespace {
+void set_conv_bitset() {
+  // bitset setting
+  galois::do_all(
+      galois::iterate((size_t)0, bitset_conv.size()),
+      [&](size_t node_id) {
+        bool set_true = false;
+        // check for non-zeros; the moment one is found, set true becomes true
+        // and we break out of the loop
+        for (size_t i = 0; i < deepgalois::_syncVectorSize; i++) {
+          auto val =
+              deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize +
+                                      i];
+          if (val != 0) {
+            set_true = true;
+            break;
+          }
+        }
+
+        if (set_true) {
+          bitset_conv.set(node_id);
+        }
+      },
+      galois::loopname("BitsetGraphConv"), galois::no_stats());
+}
+
+} // end anonymous namespace
 
 #ifndef USE_GAT
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
@@ -145,33 +176,12 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   // TODO how to do this for the sampled case?
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
-  // bitset setting
-  galois::do_all(
-      galois::iterate((size_t)0, bitset_gradient.size()),
-      [&](size_t node_id) {
-        bool set_true = false;
-        // check for non-zeros; the moment one is found, set true becomes true
-        // and we break out of the loop
-        for (size_t i = 0; i < deepgalois::_syncVectorSize; i++) {
-          auto val =
-              deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize +
-                                      i];
-          if (val != 0) {
-            set_true = true;
-            break;
-          }
-        }
+  set_conv_bitset();
+  galois::gPrint("forward ", bitset_conv.count(), " out of ",
+                 bitset_conv.size(), "\n");
 
-        if (set_true) {
-          bitset_gradient.set(node_id);
-        }
-      },
-      galois::loopname("BitsetGraphConvForward"), galois::no_stats());
-  galois::gPrint(bitset_gradient.count(), " out of ", bitset_gradient.size(),
-                 "\n");
   layer::context->getSyncSubstrate()
-      ->sync<writeAny, readAny, GraphConvSync, Bitset_gradient>(
-          "GraphConvForward");
+      ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>("GraphConvForward");
 
   // run relu activation on output if specified
   galois::StatTimer relu_timer("GraphConvForwardRelu");
@@ -230,32 +240,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // sync agg
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_temp;
-  galois::do_all(
-      galois::iterate((size_t)0, bitset_gradient.size()),
-      [&](size_t node_id) {
-        bool set_true = false;
-        // check for non-zeros; the moment one is found, set true becomes true
-        // and we break out of the loop
-        for (size_t i = 0; i < deepgalois::_syncVectorSize; i++) {
-          auto val =
-              deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize +
-                                      i];
-          if (val != 0) {
-            set_true = true;
-            break;
-          }
-        }
-
-        if (set_true) {
-          bitset_gradient.set(node_id);
-        }
-      },
-      galois::loopname("BitsetGraphConvBackward"), galois::no_stats());
-  galois::gPrint("backward ", bitset_gradient.count(), " out of ",
-                 bitset_gradient.size(), "\n");
+  set_conv_bitset();
+  galois::gPrint("backward ", bitset_conv.count(), " out of ",
+                 bitset_conv.size(), "\n");
 
   layer::context->getSyncSubstrate()
-      ->sync<writeAny, readAny, GraphConvSync, Bitset_gradient>(
+      ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>(
+          //->sync<writeAny, readAny, GraphConvSync>(
           "GraphConvBackward");
 
   galois::StatTimer drop_timer("GraphConvBackwardDropout");

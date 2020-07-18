@@ -42,7 +42,6 @@ struct GradientSync {
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 };
 
-// TODO bitset; might have to do it manually
-// GALOIS_SYNC_STRUCTURE_BITSET(TODOTHIS?);
+// no bitset; everything is sent anyways
 #endif
 #endif

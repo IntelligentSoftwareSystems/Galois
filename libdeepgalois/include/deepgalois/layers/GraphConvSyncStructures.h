@@ -55,17 +55,6 @@ struct GraphConvSync {
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 };
 
-struct Bitset_gradient {
-  static constexpr bool is_vector_bitset() { return false; }
-
-  static constexpr bool is_valid() { return true; }
-
-  static galois::DynamicBitSet& get() { return bitset_gradient; }
-
-  static void reset_range(size_t begin, size_t end) {
-    bitset_gradient.reset(begin, end);
-  }
-};
-
+GALOIS_SYNC_STRUCTURE_BITSET(conv);
 #endif
 #endif
