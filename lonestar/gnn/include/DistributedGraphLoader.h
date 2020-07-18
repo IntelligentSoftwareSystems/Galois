@@ -53,7 +53,8 @@ enum PARTITIONING_SCHEME {
   FENNEL_O,      //!< Fennel, oec
   FENNEL_I,      //!< Fennel, iec
   SUGAR_O,       //!< Sugar, oec
-  GNN_OEC        //!< gnn, oec
+  GNN_OEC,       //!< gnn, oec
+  GNN_CVC        //!< gnn, cvc
 };
 
 /**
@@ -88,6 +89,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "sugar-oec";
   case GNN_OEC:
     return "gnn-oec";
+  case GNN_CVC:
+    return "gnn-cvc";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -144,6 +147,9 @@ DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&) {
         inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
   case GNN_OEC:
     return cuspPartitionGraph<GnnOEC, NodeData, EdgeData>(
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+  case GNN_CVC:
+    return cuspPartitionGraph<GnnCVC, NodeData, EdgeData>(
         inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");

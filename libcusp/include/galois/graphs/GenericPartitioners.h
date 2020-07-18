@@ -956,4 +956,92 @@ public:
   }
 };
 
+class GnnCVC : public galois::graphs::CustomMasterAssignment {
+  unsigned numRowHosts;
+  unsigned numColumnHosts;
+  unsigned _h_offset;
+
+  void factorizeHosts() {
+    numColumnHosts = sqrt(_numHosts);
+
+    while ((_numHosts % numColumnHosts) != 0)
+      numColumnHosts--;
+
+    numRowHosts = _numHosts / numColumnHosts;
+    assert(numRowHosts >= numColumnHosts);
+
+    if (_hostID == 0) {
+      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts,
+                     "\n");
+    }
+  }
+
+  //! Returns the grid row ID of this host
+  unsigned gridRowID() const { return (_hostID / numColumnHosts); }
+  //! Returns the grid row ID of the specified host
+  unsigned gridRowID(unsigned id) const { return (id / numColumnHosts); }
+  //! Returns the grid column ID of this host
+  unsigned gridColumnID() const { return (_hostID % numColumnHosts); }
+  //! Returns the grid column ID of the specified host
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
+
+  //! Find the column of a particular node
+  unsigned getColumnOfNode(uint64_t gid) const {
+    return gridColumnID(retrieveMaster(gid));
+  }
+
+public:
+  GnnCVC(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
+         uint64_t numEdges)
+      : galois::graphs::CustomMasterAssignment(hostID, numHosts, numNodes,
+                                               numEdges) {
+    factorizeHosts();
+    _h_offset = gridRowID() * numColumnHosts;
+  };
+
+  template <typename EdgeTy>
+  uint32_t getMaster(uint32_t src, galois::graphs::BufferedGraph<EdgeTy>&,
+                     const std::vector<uint32_t>&,
+                     std::unordered_map<uint64_t, uint32_t>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&) {
+    // this is expected to be set
+    return _globalHostMap[src];
+  }
+
+  uint32_t retrieveMaster(uint32_t gid) const { return _globalHostMap[gid]; }
+
+  uint32_t getEdgeOwner(uint32_t, uint32_t dst, uint64_t) const {
+    int i = getColumnOfNode(dst);
+    return _h_offset + i;
+  }
+
+  bool noCommunication() { return false; }
+  bool isVertexCut() const {
+    if ((numRowHosts == 1) || (numColumnHosts == 1))
+      return false;
+    return true;
+  }
+
+  void serializePartition(boost::archive::binary_oarchive&) {}
+  void deserializePartition(boost::archive::binary_iarchive&) {}
+  std::pair<unsigned, unsigned> cartesianGrid() {
+    return std::make_pair(numRowHosts, numColumnHosts);
+  }
+
+  bool predeterminedMapping(std::vector<uint32_t>& mappings) {
+    if (mappings.size() != _numNodes) {
+      GALOIS_DIE("predetermined mapping size not equal to num nodes");
+    }
+    _globalHostMap.resize(_numNodes);
+
+    galois::do_all(galois::iterate((size_t)0, mappings.size()),
+                   [&](size_t n) { _globalHostMap[n] = mappings[n]; });
+
+    return true;
+  }
+};
+
 #endif

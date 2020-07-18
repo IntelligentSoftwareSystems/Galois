@@ -32,11 +32,12 @@ namespace cll = llvm::cl;
 
 cll::opt<PARTITIONING_SCHEME> partitionScheme(
     "partition", cll::desc("Type of partitioning."),
-    cll::values(clEnumValN(OEC, "oec", "Outgoing Edge-Cut (default)"),
-                clEnumValN(IEC, "iec", "Incoming Edge-Cut"),
-                clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
-                clEnumValN(CART_VCUT_IEC, "cvc-iec",
-                           "Cartesian Vertex-Cut of iec"),
-                clEnumValN(GNN_OEC, "g-oec",
-                           "gnn oec: train nodes evenly distributed")),
+    cll::values(
+        clEnumValN(OEC, "oec", "Outgoing Edge-Cut (default)"),
+        clEnumValN(IEC, "iec", "Incoming Edge-Cut"),
+        clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
+        clEnumValN(CART_VCUT_IEC, "cvc-iec", "Cartesian Vertex-Cut of iec"),
+        clEnumValN(GNN_OEC, "g-oec", "gnn oec: train nodes evenly distributed"),
+        clEnumValN(GNN_CVC, "g-cvc",
+                   "gnn cvc: train nodes evenly distributed")),
     cll::init(GNN_OEC));
