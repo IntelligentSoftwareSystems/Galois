@@ -230,8 +230,33 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   // sync agg
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_temp;
-  layer::context->getSyncSubstrate()->sync<writeAny, readAny, GraphConvSync>(
-      "GraphConvBackward");
+  galois::do_all(
+      galois::iterate((size_t)0, bitset_gradient.size()),
+      [&](size_t node_id) {
+        bool set_true = false;
+        // check for non-zeros; the moment one is found, set true becomes true
+        // and we break out of the loop
+        for (size_t i = 0; i < deepgalois::_syncVectorSize; i++) {
+          auto val =
+              deepgalois::_dataToSync[node_id * deepgalois::_syncVectorSize +
+                                      i];
+          if (val != 0) {
+            set_true = true;
+            break;
+          }
+        }
+
+        if (set_true) {
+          bitset_gradient.set(node_id);
+        }
+      },
+      galois::loopname("BitsetGraphConvBackward"), galois::no_stats());
+  galois::gPrint("backward ", bitset_gradient.count(), " out of ",
+                 bitset_gradient.size(), "\n");
+
+  layer::context->getSyncSubstrate()
+      ->sync<writeAny, readAny, GraphConvSync, Bitset_gradient>(
+          "GraphConvBackward");
 
   galois::StatTimer drop_timer("GraphConvBackwardDropout");
   drop_timer.start();
