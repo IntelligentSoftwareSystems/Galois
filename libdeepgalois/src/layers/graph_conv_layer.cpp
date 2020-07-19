@@ -37,42 +37,6 @@ inline void graph_conv_layer::zero_init_matrix(size_t dim_x, size_t dim_y,
   }
 }
 
-// aggregate based on graph topology
-void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in,
-                                 float_t* out) {
-  galois::StatTimer aggregate_timer("AggregateTime");
-  aggregate_timer.start();
-  // normalization constant based on graph structure
-#ifdef USE_MKL
-  update_all_csrmm(len, g, in, out, norm_, norm_consts);
-#else
-  update_all(len, g, in, out, norm_, norm_consts);
-#endif
-  aggregate_timer.stop();
-}
-
-// since graph is symmetric, the derivative is the same
-void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in,
-                                   float_t* out) {
-  galois::StatTimer aggregate_timer("AggregateDerivativeTime");
-  aggregate_timer.start();
-#ifdef USE_MKL
-  update_all_csrmm(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
-#else
-  update_all(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
-#endif
-  aggregate_timer.stop();
-}
-
-void graph_conv_layer::combine(size_t n, size_t len, const float_t* self,
-                               const float_t* neighbors, float_t* out) {
-  float_t* a = new float_t[len];
-  float_t* b = new float_t[len];
-  math::mvmul(CblasNoTrans, n, len, 1.0, &Q[0], self, 0.0, a);
-  math::mvmul(CblasNoTrans, n, len, 1.0, &W[0], neighbors, 0.0, b);
-  math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
-}
-
 void graph_conv_layer::malloc_and_init() {
   size_t x = input_dims[0];
   size_t y = input_dims[1];
@@ -92,12 +56,26 @@ void graph_conv_layer::malloc_and_init() {
 
   // make sure seed consistent across all hosts for weight matrix
   rand_init_matrix(y, z, W, 1);
+  //rand_init_matrix(y, z, Q, 1); // for GraphSAGE
 
-  // rand_init_matrix(y, z, Q);
   zero_init_matrix(y, z, layer::weight_grad);
 
+#ifdef USE_GAT
   // alpha is only used for GAT
-  rand_init_matrix(2 * z, 1, alpha, 1);
+  rand_init_matrix(z, 1, alpha_l, 1);
+  rand_init_matrix(z, 1, alpha_r, 1);
+  alpha_lgrad.resize(2*z);
+  alpha_rgrad.resize(2*z);
+  std::fill(alpha_lgrad.begin(), alpha_lgrad.end(), 0);
+  std::fill(alpha_rgrad.begin(), alpha_rgrad.end(), 0);
+  auto ne = graph_cpu->sizeEdges(); // number of edges
+  scores.resize(ne); // a score for each edge
+  temp_scores.resize(ne);
+  scores_grad.resize(ne);
+  norm_scores.resize(ne);
+  norm_scores_grad.resize(ne);
+  epsilon = 0.2; // LeakyReLU angle of negative slope
+#endif
 
   if (dropout_)
     dropout_mask = new mask_t[x * y];
@@ -136,7 +114,43 @@ void set_conv_bitset() {
 
 } // end anonymous namespace
 
+void graph_conv_layer::combine(size_t n, size_t len, const float_t* self,
+                               const float_t* neighbors, float_t* out) {
+  float_t* a = new float_t[len];
+  float_t* b = new float_t[len];
+  math::mvmul(CblasNoTrans, n, len, 1.0, &Q[0], self, 0.0, a);
+  math::mvmul(CblasNoTrans, n, len, 1.0, &W[0], neighbors, 0.0, b);
+  math::vadd_cpu(len, a, b, out); // out = W*self + Q*neighbors
+}
+
 #ifndef USE_GAT
+// aggregate based on graph topology
+void graph_conv_layer::aggregate(size_t len, Graph& g, const float_t* in,
+                                 float_t* out) {
+  galois::StatTimer aggregate_timer("AggregateTime");
+  aggregate_timer.start();
+  // normalization constant based on graph structure
+#ifdef USE_MKL
+  update_all_csrmm(len, g, in, out, norm_, norm_consts);
+#else
+  update_all(len, g, in, out, norm_, norm_consts);
+#endif
+  aggregate_timer.stop();
+}
+
+// since graph is symmetric, the derivative is the same
+void graph_conv_layer::d_aggregate(size_t len, Graph& g, const float_t* in,
+                                   float_t* out) {
+  galois::StatTimer aggregate_timer("AggregateDerivativeTime");
+  aggregate_timer.start();
+#ifdef USE_MKL
+  update_all_csrmm(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
+#else
+  update_all(len, g, in, out, norm_, norm_consts); // x*x; x*z -> x*z
+#endif
+  aggregate_timer.stop();
+}
+
 // 𝒉[𝑙] = σ(𝑊 * Σ(𝒉[𝑙-1]))
 void graph_conv_layer::forward_propagation(const float_t* in_data,
                                            float_t* out_data) {
@@ -192,7 +206,6 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
 
   conv_timer.stop();
 }
-#endif
 
 // 𝜕𝐸 / 𝜕𝑦[𝑙−1] = 𝜕𝐸 / 𝜕𝑦[𝑙] ∗ 𝑊 ^𝑇
 void graph_conv_layer::back_propagation(const float_t* in_data,
@@ -259,6 +272,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
   conv_timer.stop();
 }
+#endif
 
 acc_t graph_conv_layer::get_weight_decay_loss() {
   return math::l2_norm(input_dims[1] * output_dims[1], &layer::W[0]);

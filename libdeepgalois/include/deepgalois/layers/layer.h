@@ -57,18 +57,25 @@ protected:
   bool trainable_;                 // is this layer trainable
   bool use_mask;
   vec_t W; // parameters to learn, for vertex v, layer0: D x 16, layer1: 16 x E
-  vec_t Q; // parameters to learn, for vertex u, i.e. v's neighbors, layer0: D x
-           // 16, layer1: 16 x E
-  vec_t alpha; // parameters to learn (H x 1), only used for GAT
+  vec_t Q; // parameters to learn, for vertex v's neighbors, same size as W
   vec_t weight_grad; // weight gradient for updating parameters
-  float_t* d_W;
-  float_t* d_weight_grad;
+  float_t* d_W; // parameters to learn on device (GPU)
+  float_t* d_weight_grad; // weight gradient on device (GPU)
+  vec_t alpha_l; // parameters to learn (H x 1), only used for GAT
+  vec_t alpha_r; // parameters to learn (H x 1), only used for GAT
+  vec_t alpha_lgrad; // gradients for updating alpha (GAT only)
+  vec_t alpha_rgrad; // gradients for updating alpha (GAT only)
   mask_t* masks_; // masks to show which samples are valid
-  mask_t* d_masks_;
+  mask_t* d_masks_; // masks on device (GPU)
   float_t* loss; // error for each vertex: N x 1
   ContextType* context;
   label_t* labels;
-  float_t* norm_consts;
+  float_t* norm_consts; // normalization score
+  vec_t scores; // un-normalized scores
+  vec_t temp_scores; // un-normalized scores
+  vec_t scores_grad; // gradients of un-normalized scores
+  vec_t norm_scores; // normalized scores
+  vec_t norm_scores_grad; // gradients of normalized scores
 // TODO
 #ifdef GALOIS_ENABLE_GPU
   GraphGPU* graph_gpu;

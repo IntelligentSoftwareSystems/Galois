@@ -81,6 +81,8 @@ void relu_cpu(size_t n, const float_t* in, float_t* out);
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
 
 // Leaky ReLU
+void leaky_relu(float_t epsilon, float_t in, float_t &out);
+void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t &out);
 void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out);
 void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in,
                       const float_t* data, float_t* out);

@@ -244,6 +244,14 @@ void d_relu_cpu(size_t n, const float_t* in, const float_t* data,
       galois::chunk_size<64>(), galois::loopname("d_relu"));
 }
 
+void leaky_relu(float_t epsilon, float_t in, float_t &out) {
+  out = in > 0.0 ? in : epsilon * in;
+}
+
+void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t &out) {
+  out = in * (data > 0.0 ? 1.0 : epsilon);
+}
+
 void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in,
                     float_t* out) {
   // TODO: vectorize
