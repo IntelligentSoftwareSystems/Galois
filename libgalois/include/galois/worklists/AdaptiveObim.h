@@ -296,8 +296,7 @@ private:
         ((double)(p.slowPopsLastPeriod) / (double)(p.sinceLastFix)) >
             1.0 / (double)(chunk_size)) {
       for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-        while (current.getRemote(i)->lock.try_lock())
-          ;
+        current.getRemote(i)->lock.lock();
       }
       unsigned long priosCreatedThisPeriod = 0;
       unsigned long numPushesThisStep      = 0;
@@ -358,8 +357,7 @@ private:
           delta = 0;
 
         for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-          while (current.getRemote(i)->lock.try_lock())
-            ;
+          current.getRemote(i)->lock.lock();
         }
 
         for (unsigned i = 0; i < runtime::activeThreads; ++i) {
@@ -473,8 +471,7 @@ public:
 
   void push(const value_type& val) {
     ThreadData& p = *current.getLocal();
-    while (!p.lock.try_lock())
-      ;
+    std::lock_guard<substrate::PaddedLock<Concurrent>> lk{p.lock};
     Index ind = indexer(val);
     deltaIndex index;
     index.k = ind;
@@ -490,7 +487,6 @@ public:
     // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
-      p.lock.unlock();
       return;
     }
 
@@ -507,7 +503,6 @@ public:
       p.current  = lC;
     }
     lC->push(val);
-    p.lock.unlock();
   }
 
   template <typename Iter>
@@ -526,8 +521,7 @@ public:
 
   galois::optional<value_type> pop() {
     ThreadData& p = *current.getLocal();
-    while (!p.lock.try_lock())
-      ;
+    p.lock.lock();
 
     p.sinceLastFix++;
 
