@@ -20,7 +20,7 @@ Net::Net(std::string dataset_str, int nt, unsigned n_conv, int epochs,
       val_interval(val_itv), num_subgraphs(1), is_selfloop(selfloop) {
   // init some identifiers for this host
   unsigned myID = 0;
-#ifdef GALOIS_ENABLE_DIST
+#ifndef GALOIS_ENABLE_GPU
   myID = galois::runtime::getSystemNetworkInterface().ID;
 #endif
   this->header = "[" + std::to_string(myID) + "] ";
@@ -91,6 +91,9 @@ void Net::train(optimizer* opt, bool need_validate) {
   std::string separator   = "\n";
   double total_train_time = 0.0;
   int num_subg_remain     = 0;
+#ifndef GALOIS_ENABLE_GPU
+  unsigned hostID = galois::runtime::getSystemNetworkInterface().ID;
+#endif
 
   if (subgraph_sample_size) {
     galois::StatTimer construct_time("SubgraphAllocateTime");
@@ -195,7 +198,9 @@ void Net::train(optimizer* opt, bool need_validate) {
 #ifdef GALOIS_ENABLE_GPU
     std::cout << header << "Epoch " << std::setw(3) << curEpoch << " ";
 #else
-    galois::gPrint(header, "Epoch ", std::setw(3), curEpoch, separator);
+    if (hostID == 0) {
+      galois::gPrint("Epoch ", std::setw(3), curEpoch, separator);
+    }
 #endif
     set_netphases(net_phase::train);
     acc_t train_loss = 0.0, train_acc = 0.0;
@@ -224,8 +229,10 @@ void Net::train(optimizer* opt, bool need_validate) {
     std::cout << header << "train_loss " << std::setprecision(3) << std::fixed
               << train_loss << " train_acc " << train_acc << " ";
 #else
-    galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
-                   train_loss, " train_acc ", train_acc, separator);
+    if (hostID == 0) {
+      galois::gPrint(header, "train_loss ", std::setprecision(3), std::fixed,
+                     train_loss, " train_acc ", train_acc, separator);
+    }
 #endif
     t_epoch.Stop();
 
@@ -243,11 +250,13 @@ void Net::train(optimizer* opt, bool need_validate) {
                 << epoch_time + val_time << " ms (train_time " << epoch_time
                 << " val_time " << val_time << ")\n";
 #else
+    if (hostID == 0) {
       galois::gPrint(header, "val_loss ", std::setprecision(3), std::fixed,
                      val_loss, " val_acc ", val_acc, separator);
       galois::gPrint(header, "time ", std::setprecision(3), std::fixed,
                      epoch_time + val_time, " ms (train_time ", epoch_time,
                      " val_time ", val_time, ")\n");
+    }
 #endif
     } else {
 #ifdef GALOIS_ENABLE_GPU
@@ -255,8 +264,10 @@ void Net::train(optimizer* opt, bool need_validate) {
                 << " ms (fw " << fw_time << ", bw " << epoch_time - fw_time
                 << ")\n";
 #else
+    if (hostID == 0) {
       galois::gPrint(header, "train_time ", std::fixed, epoch_time, " ms (fw ",
                      fw_time, ", bw ", epoch_time - fw_time, ")\n");
+    }
 #endif
     }
   } // epoch loop

@@ -191,8 +191,6 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_data;
   set_conv_bitset();
-  galois::gPrint("forward ", bitset_conv.count(), " out of ",
-                 bitset_conv.size(), "\n");
 
   layer::context->getSyncSubstrate()
       ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>("GraphConvForward");
@@ -254,8 +252,6 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   deepgalois::_syncVectorSize = z;
   deepgalois::_dataToSync     = out_temp;
   set_conv_bitset();
-  galois::gPrint("backward ", bitset_conv.count(), " out of ",
-                 bitset_conv.size(), "\n");
 
   layer::context->getSyncSubstrate()
       ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>(
@@ -269,7 +265,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   drop_timer.stop();
 
   layer::syncSub->sync<writeAny, readAny, GradientSync>("Gradients");
-  galois::gInfo("[", layer::gradientGraph->myHostID(), "] Sync done");
+  galois::gDebug("[", layer::gradientGraph->myHostID(), "] Sync done");
   conv_timer.stop();
 }
 #endif

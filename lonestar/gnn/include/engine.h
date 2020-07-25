@@ -105,10 +105,17 @@ int main(int argc, char** argv) {
     Ttest.start();
     acc_t test_loss = 0.0, test_acc = 0.0;
     double test_time = network.evaluate("test", test_loss, test_acc);
+#ifndef GALOIS_ENABLE_GPU
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::gPrint("test_loss = ", test_loss, " test_acc = ", test_acc,
+                     " test_time = ", test_time, "\n");
+    }
+#else
     galois::gPrint("Testing: test_loss = ", test_loss, " test_acc = ", test_acc,
                    " test_time = ", test_time, "\n");
+#endif
     Ttest.stop();
   }
-  galois::gPrint("\n", rm.get_peak_memory(), "\n\n");
+  galois::gInfo(rm.get_peak_memory());
   return 0;
 }
