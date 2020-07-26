@@ -55,24 +55,22 @@ namespace worklists {
  *   int operator()(Item i) const { return i.index; }
  * };
  *
- * typedef galois::WorkList::AdaptiveOrderedByIntegerMetric<Indexer> WL;
+ * typedef galois::worklists::AdaptiveOrderedByIntegerMetric<Indexer> WL;
  * galois::for_each<WL>(items.begin(), items.end(), Fn);
  * \endcode
  *
- * @tparam Indexer Indexer class
- * @tparam Container Scheduler for each bucket
- * @tparam BlockPeriod Check for higher priority work every 2^BlockPeriod
- *                     iterations
- * @tparam BSP Use back-scan prevention
- * @tparam uniformBSP Use uniform back-scan prevention
- * @tparam T Work item type
- * @tparam Index Indexer return type
- * @tparam UseMonotonic Assume that an activity at priority p will not
- *                      schedule work at priority p or any priority p1
- *                      where p1 < p.
- * @tparam UseDescending Use descending order instead
- * @tparam Concurrent Whether or not to allow concurrent execution
- *
+ * @tparam Indexer        Indexer class
+ * @tparam Container      Scheduler for each bucket
+ * @tparam BlockPeriod    Check for higher priority work every 2^BlockPeriod
+ *                        iterations
+ * @tparam BSP            Use back-scan prevention
+ * @tparam uniformBSP     Use uniform back-scan prevention
+ * @tparam T              Work item type
+ * @tparam Index Indexer  return type
+ * @tparam UseMonotonic   Assume that an activity at priority p will not
+ * schedule work at priority p or any priority p1 where p1 < p.
+ * @tparam UseDescending  Use descending order instead
+ * @tparam Concurrent     Whether or not to allow concurrent execution
  */
 template <class Indexer      = DummyIndexer<int>,
           typename Container = PerSocketChunkFIFO<>, int BlockPeriod = 0,
@@ -80,27 +78,26 @@ template <class Indexer      = DummyIndexer<int>,
           typename T = int, typename Index = int, bool UseMonotonic = false,
           bool UseDescending = false, bool Concurrent = true>
 struct AdaptiveOrderedByIntegerMetric : private boost::noncopyable {
-  template <bool Concurrent_>
-  using rethread = AdaptiveOrderedByIntegerMetric<
-      Indexer, typename Container::template rethread<Concurrent_>, BlockPeriod,
-      BSP, uniformBSP, chunk_size, T, Index, UseMonotonic, UseDescending,
-      Concurrent_>;
-
-  template <typename T_>
+  template <typename _T>
   using retype = AdaptiveOrderedByIntegerMetric<
-      Indexer, typename Container::template retype<T_>, BlockPeriod, BSP,
-      uniformBSP, chunk_size, T_, typename std::result_of<Indexer(T_)>::type,
+      Indexer, typename Container::template retype<_T>, BlockPeriod, BSP,
+      uniformBSP, chunk_size, _T, typename std::result_of<Indexer(_T)>::type,
       UseMonotonic, UseDescending, Concurrent>;
 
-  template <unsigned BlockPeriod_>
+  template <bool _b>
+  using rethread = AdaptiveOrderedByIntegerMetric<
+      Indexer, typename Container::template rethread<_b>, BlockPeriod, BSP,
+      uniformBSP, chunk_size, T, Index, UseMonotonic, UseDescending, _b>;
+
+  template <unsigned _period>
   using with_block_period =
-      AdaptiveOrderedByIntegerMetric<Indexer, Container, BlockPeriod_, BSP,
+      AdaptiveOrderedByIntegerMetric<Indexer, Container, _period, BSP,
                                      uniformBSP, chunk_size, T, Index,
                                      UseMonotonic, UseDescending, Concurrent>;
 
-  template <typename Container_>
+  template <typename _container>
   using with_container =
-      AdaptiveOrderedByIntegerMetric<Indexer, Container_, BlockPeriod, BSP,
+      AdaptiveOrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP,
                                      uniformBSP, chunk_size, T, Index,
                                      UseMonotonic, UseDescending, Concurrent>;
 
@@ -228,14 +225,20 @@ private:
     unsigned int lastMasterVersion;
     unsigned int numPops;
 
-    unsigned int sinceLastFix;
-    unsigned int slowPopsLastPeriod;
-    unsigned int pushesLastPeriod;
-    unsigned int priosLastPeriod;
-
     unsigned long pmodAllDeq;
 
-    unsigned int popsFromSameQ;
+    struct {
+      unsigned int popsLastFix;
+      unsigned int slowPopsLastPeriod;
+      unsigned int pushesLastPeriod;
+      unsigned int priosLastPeriod;
+
+      unsigned int popsFromSameQ;
+
+      inline double slowPopFreq() {
+        return ((double)slowPopsLastPeriod / (double)popsLastFix);
+      }
+    } counters;
     unsigned int ctr;
 
     Index maxPrioDiffLastPeriod;
@@ -245,10 +248,9 @@ private:
 
     ThreadData(Index initial)
         : curIndex(initial, 0), scanStart(initial, 0), current(0),
-          lastMasterVersion(0), numPops(0), sinceLastFix(0),
-          slowPopsLastPeriod(0), pushesLastPeriod(0), priosLastPeriod(0),
-          pmodAllDeq(0), popsFromSameQ(0), ctr(0), maxPrioDiffLastPeriod(0),
-          minPrio(std::numeric_limits<Index>::max()),
+          lastMasterVersion(0), numPops(0),
+          pmodAllDeq(0), counters{0, 0, 0, 0, 0}, ctr(0),
+          maxPrioDiffLastPeriod(0), minPrio(std::numeric_limits<Index>::max()),
           maxPrio(std::numeric_limits<Index>::min()) {}
   };
 
@@ -256,7 +258,7 @@ private:
 
   // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
-  substrate::PerThreadStorage<ThreadData> current;
+  substrate::PerThreadStorage<ThreadData> data;
   substrate::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
@@ -287,16 +289,16 @@ private:
   GALOIS_ATTRIBUTE_NOINLINE
   galois::optional<T> slowPop(ThreadData& p) {
     // Failed, find minimum bin
-    p.slowPopsLastPeriod++;
+    p.counters.slowPopsLastPeriod++;
     unsigned myID = galois::substrate::ThreadPool::getTID();
 
     // first give it some time
     // then check the fdeq frequency
-    if (myID == 0 && p.sinceLastFix > counter &&
-        ((double)(p.slowPopsLastPeriod) / (double)(p.sinceLastFix)) >
-            1.0 / (double)(chunk_size)) {
+    if (myID == 0 && p.counters.popsLastFix > counter &&
+        p.counters.slowPopFreq() > 1.0 / (double)(chunk_size)) {
       for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-        current.getRemote(i)->lock.lock();
+        while (!data.getRemote(i)->lock.try_lock())
+          ;
       }
       unsigned long priosCreatedThisPeriod = 0;
       unsigned long numPushesThisStep      = 0;
@@ -304,26 +306,27 @@ private:
       Index minOfMin                       = std::numeric_limits<Index>::max();
       Index maxOfMax                       = std::numeric_limits<Index>::min();
       for (unsigned i = 0; i < runtime::activeThreads; ++i) {
-        Index& otherMinPrio = current.getRemote(i)->minPrio;
+        Index& otherMinPrio = data.getRemote(i)->minPrio;
         minOfMin = compare(minOfMin, otherMinPrio) ? minOfMin : otherMinPrio;
-        Index& otherMaxPrio = current.getRemote(i)->maxPrio;
+        Index& otherMaxPrio = data.getRemote(i)->maxPrio;
         maxOfMax = compare(otherMaxPrio, maxOfMax) ? maxOfMax : otherMaxPrio;
-        priosCreatedThisPeriod += current.getRemote(i)->priosLastPeriod;
-        numPushesThisStep += current.getRemote(i)->pushesLastPeriod;
-        allPmodDeqCounts += current.getRemote(i)->pmodAllDeq;
-        current.getRemote(i)->sinceLastFix          = 0;
-        current.getRemote(i)->slowPopsLastPeriod    = 0;
-        current.getRemote(i)->pushesLastPeriod      = 0;
-        current.getRemote(i)->priosLastPeriod       = 0;
-        current.getRemote(i)->maxPrioDiffLastPeriod = 0;
+        priosCreatedThisPeriod += data.getRemote(i)->counters.priosLastPeriod;
+        numPushesThisStep += data.getRemote(i)->counters.pushesLastPeriod;
+        allPmodDeqCounts += data.getRemote(i)->pmodAllDeq;
+        data.getRemote(i)->counters.popsLastFix        = 0;
+        data.getRemote(i)->counters.slowPopsLastPeriod = 0;
+        data.getRemote(i)->counters.pushesLastPeriod   = 0;
+        data.getRemote(i)->counters.priosLastPeriod    = 0;
+        data.getRemote(i)->maxPrioDiffLastPeriod       = 0;
 
-        current.getRemote(i)->minPrio = std::numeric_limits<Index>::max();
-        current.getRemote(i)->maxPrio = std::numeric_limits<Index>::min();
+        data.getRemote(i)->minPrio = std::numeric_limits<Index>::max();
+        data.getRemote(i)->maxPrio = std::numeric_limits<Index>::min();
       }
 
-      if (((double)numPushesThisStep /
+      if ((double)numPushesThisStep &&
+          ((double)numPushesThisStep /
            ((double)((maxOfMax >> delta) - (minOfMin >> delta)))) <
-          chunk_size / 2) {
+              chunk_size / 2) {
         double xx = ((double)(chunk_size) /
                      ((double)numPushesThisStep /
                       ((double)((maxOfMax >> delta) - (minOfMin >> delta)))));
@@ -332,17 +335,17 @@ private:
       }
 
       for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-        current.getRemote(i)->lock.unlock();
+        data.getRemote(i)->lock.unlock();
       }
     }
 #ifdef UNMERGE_ENABLED
     // serif added here
     // make sure delta is bigger than 0 so that we can actually unmerge things
     // give it some time and check the same queue pops
-    else if (delta > 0 && myID == 0 && p.sinceLastFix > counter &&
-             p.popsFromSameQ > 4 * chunk_size) {
+    else if (delta > 0 && myID == 0 && p.counters.popsLastFix > counter &&
+             p.counters.popsFromSameQ > 4 * chunk_size) {
       if (((p.maxPrio >> delta) - (p.minPrio >> delta)) < 16 &&
-          ((double)p.pushesLastPeriod /
+          ((double)p.counters.pushesLastPeriod /
            ((double)((p.maxPrio >> delta) - (p.minPrio >> delta)))) >
               4 * chunk_size) { // this is a check to make sure we are also
                                 // pushing with the same frequency end of
@@ -357,30 +360,31 @@ private:
           delta = 0;
 
         for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-          current.getRemote(i)->lock.lock();
+          while (!data.getRemote(i)->lock.try_lock())
+            ;
         }
 
         for (unsigned i = 0; i < runtime::activeThreads; ++i) {
 
-          current.getRemote(i)->sinceLastFix          = 0;
-          current.getRemote(i)->slowPopsLastPeriod    = 0;
-          current.getRemote(i)->pushesLastPeriod      = 0;
-          current.getRemote(i)->priosLastPeriod       = 0;
-          current.getRemote(i)->maxPrioDiffLastPeriod = 0;
+          data.getRemote(i)->counters.popsLastFix        = 0;
+          data.getRemote(i)->counters.slowPopsLastPeriod = 0;
+          data.getRemote(i)->counters.pushesLastPeriod   = 0;
+          data.getRemote(i)->counters.priosLastPeriod    = 0;
+          data.getRemote(i)->maxPrioDiffLastPeriod       = 0;
 
-          current.getRemote(i)->minPrio = std::numeric_limits<Index>::max();
-          current.getRemote(i)->maxPrio = std::numeric_limits<Index>::min();
+          data.getRemote(i)->minPrio = std::numeric_limits<Index>::max();
+          data.getRemote(i)->maxPrio = std::numeric_limits<Index>::min();
         }
 
         for (unsigned i = 1; i < runtime::activeThreads; ++i) {
-          current.getRemote(i)->lock.unlock();
+          data.getRemote(i)->lock.unlock();
         }
         p.ctr++;
       }
-      p.popsFromSameQ = 0;
+      p.counters.popsFromSameQ = 0;
     }
 #endif
-    p.popsFromSameQ = 0;
+    p.counters.popsFromSameQ = 0;
 
     updateLocal(p);
     bool localLeader = substrate::ThreadPool::isLeader();
@@ -392,24 +396,23 @@ private:
       msS = p.scanStart;
       if (localLeader || uniformBSP) {
         for (unsigned i = 0; i < runtime::activeThreads; ++i) {
-          msS = std::min(msS, current.getRemote(i)->scanStart);
+          msS = std::min(msS, data.getRemote(i)->scanStart);
         }
       } else {
         msS = std::min(
-            msS,
-            current.getRemote(substrate::ThreadPool::getLeader())->scanStart);
+            msS, data.getRemote(substrate::ThreadPool::getLeader())->scanStart);
       }
     }
 
-    for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee;
+    for (auto ii = p.local.lower_bound(msS), ei = p.local.end(); ii != ei;
          ++ii) {
-      galois::optional<T> retval;
-      if ((retval = ii->second->pop())) {
+      galois::optional<T> item;
+      if ((item = ii->second->pop())) {
         p.current   = ii->second;
         p.curIndex  = ii->first;
         p.scanStart = ii->first;
         p.lock.unlock();
-        return retval;
+        return item;
       }
     }
     p.lock.unlock();
@@ -433,7 +436,7 @@ private:
       p.lastMasterVersion = masterVersion.load(std::memory_order_relaxed) + 1;
       masterLog.push_back(std::make_pair(i, lC2));
       masterVersion.fetch_add(1);
-      p.priosLastPeriod++;
+      p.counters.priosLastPeriod++;
     }
     masterLock.unlock();
     return lC2;
@@ -451,13 +454,13 @@ private:
 
 public:
   AdaptiveOrderedByIntegerMetric(const Indexer& x = Indexer())
-      : current(earliest), heap(sizeof(CTy)), masterVersion(0), indexer(x) {
+      : data(earliest), heap(sizeof(CTy)), masterVersion(0), indexer(x) {
     delta   = 0;
     counter = chunk_size;
   }
 
   ~AdaptiveOrderedByIntegerMetric() {
-    ThreadData& p = *current.getLocal();
+    ThreadData& p = *data.getLocal();
     updateLocal(p);
     // Deallocate in LIFO order to give opportunity for simple garbage
     // collection
@@ -470,75 +473,77 @@ public:
   }
 
   void push(const value_type& val) {
-    ThreadData& p = *current.getLocal();
-    std::lock_guard<substrate::PaddedLock<Concurrent>> lk{p.lock};
-    Index ind = indexer(val);
     deltaIndex index;
-    index.k = ind;
-    index.d = delta;
+    ThreadData& p = *data.getLocal();
+
+    while (!p.lock.try_lock())
+      ;
+    Index ind = indexer(val);
+    index.k   = ind;
+    index.d   = delta;
     if (index.k > p.maxPrio) {
       p.maxPrio = index.k;
     }
     if (index.k < p.minPrio) {
       p.minPrio = index.k;
     }
-    p.pushesLastPeriod++;
+    p.counters.pushesLastPeriod++;
 
     // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
+      p.lock.unlock();
       return;
     }
 
     // Slow path
-    CTy* lC = updateLocalOrCreate(p, index);
+    CTy* C = updateLocalOrCreate(p, index);
     if (BSP && index < p.scanStart)
       p.scanStart = index;
     // Opportunistically move to higher priority work
     if (index < p.curIndex) {
       // we moved to a higher prio
-      p.popsFromSameQ = 0;
+      p.counters.popsFromSameQ = 0;
 
       p.curIndex = index;
-      p.current  = lC;
+      p.current  = C;
     }
-    lC->push(val);
+    C->push(val);
+    p.lock.unlock();
   }
 
   template <typename Iter>
-  unsigned int push(Iter b, Iter e) {
-    int npush;
+  size_t push(Iter b, Iter e) {
+    size_t npush;
     for (npush = 0; b != e; npush++)
       push(*b++);
     return npush;
   }
 
   template <typename RangeTy>
-  unsigned int push_initial(const RangeTy& range) {
+  size_t push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     return push(rp.first, rp.second);
   }
 
   galois::optional<value_type> pop() {
-    ThreadData& p = *current.getLocal();
-    p.lock.lock();
-
-    p.sinceLastFix++;
-
-    unsigned myID = galois::substrate::ThreadPool::getTID();
-
-    current.getRemote(myID)->pmodAllDeq++;
-
+    ThreadData& p = *data.getLocal();
+    while (!p.lock.try_lock())
+      ;
     CTy* C = p.current;
-    if (BlockPeriod &&
-        (BlockPeriod < 0 || ((p.numPops++ & ((1ull << BlockPeriod) - 1)) == 0)))
-      return slowPop(p);
 
-    galois::optional<value_type> retval;
-    if (C && (retval = C->pop())) {
-      p.popsFromSameQ++;
+    p.counters.popsLastFix++;
+    unsigned myID = galois::substrate::ThreadPool::getTID();
+    data.getRemote(myID)->pmodAllDeq++;
+
+    if (BlockPeriod && ((p.numPops++ & ((1ull << BlockPeriod) - 1)) == 0)) {
+      return slowPop(p);
+    }
+    galois::optional<value_type> item;
+    if (C && (item = C->pop())) {
+      p.counters.popsFromSameQ++;
       p.lock.unlock();
-      return retval;
+      return item;
     }
 
     // Slow path
@@ -546,7 +551,8 @@ public:
   }
 };
 GALOIS_WLCOMPILECHECK(AdaptiveOrderedByIntegerMetric)
-} // namespace worklists
-} // namespace galois
+
+} // end namespace worklists
+} // end namespace galois
 
 #endif
