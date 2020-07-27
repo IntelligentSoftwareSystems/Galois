@@ -1,0 +1,5 @@
+add_executable(louvain-partitioning-cpu louvain-partitioning.cpp serial-partitioning.cpp)
+add_dependencies(apps louvain-partitioning-cpu)
+target_link_libraries(louvain-partitioning-cpu PRIVATE Galois::shmem lonestar)
+install(TARGETS louvain-partitioning-cpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+add_test_scale(small1 louvain-partitioning-cpu -symmetricGraph "${BASEINPUT}/scalefree/symmetric/rmat10.sgr")

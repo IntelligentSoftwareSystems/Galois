@@ -40,10 +40,10 @@
 
 namespace cll = llvm::cl;
 
-static const char* name = "HYPAR";
+static const char* name = "BIPART";
 static const char* desc =
     "Partitions a hypergraph into K parts and minimizing the graph cut";
-static const char* url = "HyPar";
+static const char* url = "BiPart";
 
 static cll::opt<std::string>
     inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -98,29 +98,6 @@ static cll::opt<bool>
     output("output", cll::desc("Specify if partitions need to be written"),
            cll::init(false));
 
-// const double COARSEN_FRACTION = 0.9;
-
-/*int cutsize(GGraph& g) {
-  unsigned size = std::distance(g.cellList().begin(), g.cellList().end());
-  unsigned sizen = std::distance(g.getNets().begin(), g.getNets().end());
-  int cutsize = 0;
-  std::vector<int> cells;
-  for (auto n : g.getNets()) {
-    bool cut_status = false;
-    for (auto e : g.edges(n)) {
-      auto cell1 = g.getEdgeDst(e);
-    for (auto c : g.edges(n)) {
-        auto cell2 = g.getEdgeDst(c);
-        if(g.getData(cell1).getPart() != g.getData(cell2).getPart() && cell1 !=
-cell2) { cutsize++; cut_status = true; break;
-        }
-      }
-      if (cut_status == true)
-        break;
-    }
-  }
-  return cutsize;
-}*/
 /**
  * Partitioning
  */
@@ -391,7 +368,7 @@ int main(int argc, char** argv) {
             galois::iterate(uint32_t{0}, totalnodes),
             [&](uint32_t c) {
               pre_edges[c] = edges_ids[c].size();
-              num_edges_acc += prefix_edges[c];
+              num_edges_acc += pre_edges[c];
             },
             galois::steal());
         edges = num_edges_acc.reduce();
@@ -410,7 +387,7 @@ int main(int argc, char** argv) {
           gr.getData(n).netval  = INT_MAX;
           gr.getData(n).nodeid  = n + 1;
         });
-        Partition(&metisG, 25, kValue[i]);
+        Partition(&metisG, csize, kValue[i]);
         MetisGraph* mcg = &metisG;
 
         while (mcg->getCoarserGraph() != NULL) {
@@ -445,8 +422,8 @@ int main(int argc, char** argv) {
     toProcessNew.clear();
   }
   // std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
-  galois::runtime::reportStat_Single("HyPar", "Edge Cut", computingCut(graph));
-  galois::runtime::reportStat_Single("HyParzo", "zero-one",
+  galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
+  galois::runtime::reportStat_Single("BiPart", "zero-one",
                                      computingBalance(graph));
   // galois::reportPageAlloc("MeminfoPost");
 
