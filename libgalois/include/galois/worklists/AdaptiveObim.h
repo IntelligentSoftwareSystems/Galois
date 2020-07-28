@@ -297,7 +297,7 @@ private:
 
     inline bool isSlowPopFreq(double threshold) {
       // return ((double)slowPopsLastPeriod / (double)popsLastFix) > threshold;
-      return ((double)slowPopsLastPeriod > (double)popsLastFix) * threshold;
+      return (double)slowPopsLastPeriod > ((double)popsLastFix * threshold);
     }
 
     ThreadData(Index initial)
