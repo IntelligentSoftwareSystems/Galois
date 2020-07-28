@@ -176,6 +176,9 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
   // galois::GAccumulator<unsigned> nnodes;
   galois::GAccumulator<unsigned> hedge;
   // hyperedge coarsening
+
+	galois::InsertBag<GNode> hedge_bag;
+
   galois::do_all(
       galois::iterate(size_t{0}, fineGGraph->hedges),
       [&](GNode item) {
@@ -212,7 +215,8 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
             return;
           fineGGraph->getData(item).setMatched();
           if (flag)
-            hedges[item] = true;
+						hedge_bag.push(item);
+           // hedges[item] = true;
           bag.push(nodeid);
           unsigned ww = 0;
           for (auto pp : edges) {
@@ -225,6 +229,9 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
         }
       },
       galois::loopname("phaseI"));
+
+			for(auto item: hedge_bag)
+				hedges[item] = true;
 }
 
 void moreCoarse(MetisGraph* graph, std::vector<unsigned>& weight) {
@@ -309,6 +316,8 @@ void coarsePhaseII(MetisGraph* graph, std::vector<bool>& hedges,
   galois::GAccumulator<int> hnode;
   moreCoarse(graph, weight);
 
+	galois::InsertBag<GNode> hedge_bag;
+
   galois::do_all(
       galois::iterate(size_t{0}, fineGGraph->hedges),
       [&](GNode item) {
@@ -336,11 +345,15 @@ void coarsePhaseII(MetisGraph* graph, std::vector<bool>& hedges,
           fineGGraph->getData(item).setMatched();
 
         } else {
-          hedges[item] = true;
-          fineGGraph->getData(item).setMatched();
+          //hedges[item] = true;
+          hedge_bag.push(item);
+					fineGGraph->getData(item).setMatched();
         }
       },
       galois::loopname("count # Hyperedges"));
+
+			for(auto item: hedge_bag)
+				hedges[item] = true;
 }
 
 void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
