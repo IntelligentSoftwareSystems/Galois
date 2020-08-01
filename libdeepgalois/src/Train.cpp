@@ -199,7 +199,7 @@ void Net::train(optimizer* opt, bool need_validate) {
     std::cout << header << "Epoch " << std::setw(3) << curEpoch << " ";
 #else
     if (hostID == 0) {
-      galois::gPrint("Epoch ", std::setw(3), curEpoch, separator);
+      galois::gInfo("Epoch ", std::setw(3), curEpoch);
     }
 #endif
     set_netphases(net_phase::train);
