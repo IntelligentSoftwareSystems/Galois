@@ -1,55 +1,53 @@
-#pragma once
 #include <string>
 #include <sstream>
 #include <iostream>
-#include "llvm/Support/CommandLine.h"
 #ifndef GALOIS_ENABLE_GPU
 #include "galois/Galois.h"
 #endif
+#include "galois/gIO.h"
+#include "lonestarmine.h"
 
 namespace cll = llvm::cl;
-static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<filename: symmetrized graph>"),
-             cll::Required);
-static cll::opt<std::string>
-    filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"), cll::init("gr"));
-static cll::opt<unsigned>
-    num_trials("n", cll::desc("perform n trials (default value 1)"),
-               cll::init(1));
-static cll::opt<unsigned>
+cll::opt<std::string> filename(cll::Positional,
+                               cll::desc("<filename: symmetrized graph>"),
+                               cll::Required);
+cll::opt<std::string> filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"),
+                               cll::init("gr"));
+cll::opt<unsigned> num_trials("n",
+                              cll::desc("perform n trials (default value 1)"),
+                              cll::init(1));
+cll::opt<unsigned>
     nblocks("b", cll::desc("edge blocking to b blocks (default value 1)"),
             cll::init(1));
-static cll::opt<std::string>
+cll::opt<std::string>
     pattern_filename("p",
                      cll::desc("<pattern graph filename: symmetrized graph>"),
                      cll::init(""));
-static cll::opt<std::string>
+cll::opt<std::string>
     morder_filename("mo", cll::desc("<filename: pre-defined matching order>"),
                     cll::init(""));
-static cll::opt<unsigned> fv("fv", cll::desc("first vertex is special"),
-                             cll::init(0));
-static cll::opt<unsigned>
+cll::opt<unsigned> fv("fv", cll::desc("first vertex is special"), cll::init(0));
+cll::opt<unsigned>
     k("k", cll::desc("max number of vertices in k-clique (default value 3)"),
       cll::init(3));
-static cll::opt<unsigned> show("s", cll::desc("print out the details"),
-                               cll::init(0));
-static cll::opt<unsigned>
+cll::opt<unsigned> show("s", cll::desc("print out the details"), cll::init(0));
+cll::opt<unsigned>
     debug("d", cll::desc("print out the frequent patterns for debugging"),
           cll::init(0));
-static cll::opt<unsigned>
-    minsup("ms", cll::desc("minimum support (default value 300)"),
-           cll::init(300));
-static cll::opt<int>
-    numThreads("t", llvm::cl::desc("Number of threads (default value 1)"),
-               llvm::cl::init(1));
-static cll::opt<std::string>
+cll::opt<unsigned> minsup("ms",
+                          cll::desc("minimum support (default value 300)"),
+                          cll::init(300));
+cll::opt<int> numThreads("t",
+                         llvm::cl::desc("Number of threads (default value 1)"),
+                         llvm::cl::init(1));
+cll::opt<std::string>
     preset_filename("pf", cll::desc("<filename: preset matching order>"),
                     cll::init(""));
-static cll::opt<bool>
+cll::opt<bool>
     verify("v", llvm::cl::desc("do verification step (default value false)"),
            llvm::cl::init(false));
 
-static cll::opt<bool>
+cll::opt<bool>
     simpleGraph("simpleGraph",
                 cll::desc("Specify that the input graph is "
                           "simple (has no multiple edges or self-loops)"),
@@ -61,7 +59,7 @@ cll::opt<bool>
                    cll::init(false));
 
 #ifndef GALOIS_ENABLE_GPU
-static cll::opt<std::string>
+cll::opt<std::string>
     statFile("statFile",
              llvm::cl::desc("Optional output file to print stats to"));
 #endif
