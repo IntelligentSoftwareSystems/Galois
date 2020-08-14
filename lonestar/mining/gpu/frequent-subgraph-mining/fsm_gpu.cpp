@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
   AccType total = 0;
-  fsm_gpu_solver(filename, k, minsup, total);
+  fsm_gpu_solver(inputFile, k, minsup, total);
   std::cout << "\n\ttotal_num_frequent_patterns = " << total << "\n\n";
   return 0;
 }

@@ -8,9 +8,6 @@
 #include "lonestarmine.h"
 
 namespace cll = llvm::cl;
-cll::opt<std::string> filename(cll::Positional,
-                               cll::desc("<filename: symmetrized graph>"),
-                               cll::Required);
 cll::opt<std::string> filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"),
                                cll::init("gr"));
 cll::opt<unsigned> num_trials("n",
@@ -97,7 +94,7 @@ void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
   galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
   galois::runtime::reportParam("(NULL)", "Threads", numThreads);
   galois::runtime::reportParam("(NULL)", "Runs", num_trials);
-  galois::runtime::reportParam("(NULL)", "Input", filename);
+  galois::runtime::reportParam("(NULL)", "Input", inputFile);
   galois::runtime::reportParam("(NULL)", "Hosts", 1);
 #endif
 }

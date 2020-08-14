@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  if (!inputFileSymmetric) {
+  if (!symmetricGraph) {
     GALOIS_DIE("This application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
                " to indicate the input is a symmetric graph.");

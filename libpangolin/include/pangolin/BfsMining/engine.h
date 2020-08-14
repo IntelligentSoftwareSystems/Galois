@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
   AppMiner miner(k, numThreads);
   galois::StatTimer Tinitial("GraphReadingTime");
   Tinitial.start();
-  miner.read_graph(filetype, filename);
+  miner.read_graph(filetype, inputFile);
   Tinitial.stop();
   ResourceManager rm;
   for (unsigned nt = 0; nt < num_trials; nt++) {

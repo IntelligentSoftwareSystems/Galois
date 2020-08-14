@@ -2,7 +2,7 @@
 #include "llvm/Support/CommandLine.h"
 
 namespace cll = llvm::cl;
-extern cll::opt<std::string> filename;
+extern cll::opt<std::string> inputFile;
 extern cll::opt<std::string> filetype;
 extern cll::opt<unsigned> num_trials;
 extern cll::opt<unsigned> nblocks;

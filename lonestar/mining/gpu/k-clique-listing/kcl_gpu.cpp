@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
   }
 
   AccType total = 0;
-  kcl_gpu_solver(filename, k, total);
+  kcl_gpu_solver(inputFile, k, total);
   std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
   return 0;
 }

@@ -31,6 +31,6 @@ int main(int argc, char** argv) {
   for (int i = 0; i < npatterns; i++)
     accumulators[i] = 0;
 
-  motif_gpu_solver(filename, k, accumulators);
+  motif_gpu_solver(inputFile, k, accumulators);
   return 0;
 }
