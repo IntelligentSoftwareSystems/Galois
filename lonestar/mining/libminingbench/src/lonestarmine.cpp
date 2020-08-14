@@ -37,12 +37,10 @@ cll::opt<unsigned>
 cll::opt<unsigned> minsup("ms",
                           cll::desc("minimum support (default value 300)"),
                           cll::init(300));
-cll::opt<int> numThreads("t",
-                         llvm::cl::desc("Number of threads (default value 1)"),
-                         llvm::cl::init(1));
 cll::opt<std::string>
     preset_filename("pf", cll::desc("<filename: preset matching order>"),
                     cll::init(""));
+// TODO use skipVerify from liblonestar
 cll::opt<bool>
     verify("v", llvm::cl::desc("do verification step (default value false)"),
            llvm::cl::init(false));
@@ -53,17 +51,18 @@ cll::opt<bool>
                           "simple (has no multiple edges or self-loops)"),
                 cll::init(false));
 
+#ifdef GALOIS_ENABLE_GPU
+// TODO is numThreads necessary for gpu apps? remove it if not.
+cll::opt<int> numThreads("t",
+                         llvm::cl::desc("Number of threads (default value 1)"),
+                         llvm::cl::init(1));
 cll::opt<bool>
     symmetricGraph("symmetricGraph",
                    cll::desc("Specify that the input graph is symmetric"),
                    cll::init(false));
-
-#ifndef GALOIS_ENABLE_GPU
-cll::opt<std::string>
-    statFile("statFile",
-             llvm::cl::desc("Optional output file to print stats to"));
 #endif
 
+// TODO merge LonestarStart for cpu apps
 void LonestarMineStart(int argc, char** argv, const char* app, const char* desc,
                        const char* url) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
