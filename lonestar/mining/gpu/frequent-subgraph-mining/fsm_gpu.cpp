@@ -3,7 +3,7 @@
 #define EDGE_INDUCED
 #include "galois/Galois.h"
 #include "fsm.h"
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 #include "llvm/Support/CommandLine.h"
 
 const char* name = "FSM";

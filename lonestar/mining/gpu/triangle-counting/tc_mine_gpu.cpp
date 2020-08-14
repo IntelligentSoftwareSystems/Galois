@@ -2,7 +2,7 @@
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #include "galois/Galois.h"
 #include "tc.h"
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 #include "llvm/Support/CommandLine.h"
 
 const char* name = "Triangle counting";

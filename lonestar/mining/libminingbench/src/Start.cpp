@@ -5,7 +5,7 @@
 #include "galois/Galois.h"
 #endif
 #include "galois/gIO.h"
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 
 namespace cll = llvm::cl;
 cll::opt<std::string> filetype("ft", cll::desc("<filetype: txt,adj,mtx,gr>"),
