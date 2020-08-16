@@ -2,7 +2,7 @@
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #include "galois/Galois.h"
 #include "kcl.h"
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 #include "llvm/Support/CommandLine.h"
 
 const char* name = "k-cliques";
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
   }
 
   AccType total = 0;
-  kcl_gpu_solver(filename, k, total);
+  kcl_gpu_solver(inputFile, k, total);
   std::cout << "\n\ttotal_num_cliques = " << total << "\n\n";
   return 0;
 }

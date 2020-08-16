@@ -1,6 +1,6 @@
 add_executable(triangle-counting-mining-gpu tc_mine_gpu.cpp tc_mine.cu)
 add_dependencies(apps triangle-counting-mining-gpu)
-target_link_libraries(triangle-counting-mining-gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
+target_link_libraries(triangle-counting-mining-gpu PRIVATE Galois::pangolin_gpu miningbench_gpu)
 target_compile_definitions(triangle-counting-mining-gpu PRIVATE GALOIS_ENABLE_GPU=1)
 set_property(TARGET triangle-counting-mining-gpu PROPERTY CUDA_STANDARD 14)
 install(TARGETS triangle-counting-mining-gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

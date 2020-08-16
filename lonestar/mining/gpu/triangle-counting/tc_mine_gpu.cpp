@@ -2,7 +2,7 @@
 // Authors: Xuhao Chen <cxh@utexas.edu>
 #include "galois/Galois.h"
 #include "tc.h"
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 #include "llvm/Support/CommandLine.h"
 
 const char* name = "Triangle counting";
@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
   AccType total = 0;
-  tc_gpu_solver(filename, total);
+  tc_gpu_solver(inputFile, total);
   std::cout << "\n\ttotal_num_triangles = " << total << "\n\n";
   return 0;
 }

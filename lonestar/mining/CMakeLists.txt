@@ -1,5 +1,6 @@
-include_directories(include)
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
+
+add_subdirectory(libminingbench)
 
 add_subdirectory(cpu)
 

@@ -1,6 +1,6 @@
 add_executable(frequent-subgraph-mining-gpu fsm_gpu.cpp fsm.cu)
 add_dependencies(apps frequent-subgraph-mining-gpu)
-target_link_libraries(frequent-subgraph-mining-gpu PRIVATE Galois::pangolin_gpu LLVMSupport)
+target_link_libraries(frequent-subgraph-mining-gpu PRIVATE Galois::pangolin_gpu miningbench_gpu)
 target_compile_definitions(frequent-subgraph-mining-gpu PRIVATE GALOIS_ENABLE_GPU=1)
 set_property(TARGET frequent-subgraph-mining-gpu PROPERTY CUDA_STANDARD 14)
 install(TARGETS frequent-subgraph-mining-gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

@@ -36,7 +36,7 @@ cll::opt<std::string> inputFileTranspose("graphTranspose",
                                          cll::desc("<input file, transposed>"),
                                          cll::init(""));
 cll::opt<bool>
-    inputFileSymmetric("symmetricGraph",
+    symmetricGraph("symmetricGraph",
                        cll::desc("Specify that the input graph is symmetric"),
                        cll::init(false));
 

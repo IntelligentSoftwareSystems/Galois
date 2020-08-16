@@ -1,4 +1,4 @@
-#include "lonestarmine.h"
+#include "MiningBench/Start.h"
 #include "pangolin/BfsMining/edge_miner.h"
 
 const char* name = "FSM";
