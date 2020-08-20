@@ -15,5 +15,3 @@ add_subdirectory(pointstoanalysis)
 add_subdirectory(preflowpush)
 add_subdirectory(sssp)
 add_subdirectory(triangle-counting)
-
-add_subdirectory(louvain-partitioning)
