@@ -202,9 +202,8 @@ double calModularityDelay(GraphTy& graph, double& e_xx,
     }
   });
 
-  galois::do_all(galois::iterate(graph), [&](GNode n) {
-    acc_e_xx += cluster_wt_internal[n];
-  });
+  galois::do_all(galois::iterate(graph),
+                 [&](GNode n) { acc_e_xx += cluster_wt_internal[n]; });
 
   e_xx = acc_e_xx.reduce();
 

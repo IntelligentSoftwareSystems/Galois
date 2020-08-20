@@ -177,7 +177,7 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
   galois::GAccumulator<unsigned> hedge;
   // hyperedge coarsening
 
-	galois::InsertBag<GNode> hedge_bag;
+  galois::InsertBag<GNode> hedge_bag;
 
   galois::do_all(
       galois::iterate(size_t{0}, fineGGraph->hedges),
@@ -215,8 +215,8 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
             return;
           fineGGraph->getData(item).setMatched();
           if (flag)
-						hedge_bag.push(item);
-           // hedges[item] = true;
+            hedge_bag.push(item);
+          // hedges[item] = true;
           bag.push(nodeid);
           unsigned ww = 0;
           for (auto pp : edges) {
@@ -230,8 +230,8 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
       },
       galois::loopname("phaseI"));
 
-			for(auto item: hedge_bag)
-				hedges[item] = true;
+  for (auto item : hedge_bag)
+    hedges[item] = true;
 }
 
 void moreCoarse(MetisGraph* graph, std::vector<unsigned>& weight) {
@@ -346,13 +346,13 @@ void coarsePhaseII(MetisGraph* graph, std::vector<bool>& hedges,
 
         } else {
           hedge_bag.push(item);
-	  fineGGraph->getData(item).setMatched();
+          fineGGraph->getData(item).setMatched();
         }
       },
       galois::loopname("count # Hyperedges"));
 
-      for(auto item: hedge_bag)
-        hedges[item] = true;
+  for (auto item : hedge_bag)
+    hedges[item] = true;
 }
 
 void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
@@ -383,7 +383,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
       },
       galois::steal(), galois::loopname("noedgebag match"));
   unsigned hnum   = hg.reduce();
-  unsigned nodes  = std::distance(bag.begin(), bag.end()); 
+  unsigned nodes  = std::distance(bag.begin(), bag.end());
   unsigned newval = hnum;
   std::vector<unsigned> idmap(fineGGraph->hnodes);
   std::vector<unsigned> newrand(nodes);
@@ -469,8 +469,7 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
           coarseGGraph->getData(ii).netval  = INT_MAX;
           coarseGGraph->getData(ii).netnum  = INT_MAX;
           coarseGGraph->getData(ii).netrand = INT_MAX;
-          coarseGGraph->getData(ii).nodeid =
-              ii; 
+          coarseGGraph->getData(ii).nodeid  = ii;
           coarseGGraph->getData(ii).setWeight(
               newWeight[ii - coarseGGraph->hedges]);
         }
