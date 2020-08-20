@@ -96,7 +96,7 @@ extern cll::opt<std::string> inputFile;
 //! input graph file, but transposed
 extern cll::opt<std::string> inputFileTranspose;
 //! symmetric input graph file
-extern cll::opt<bool> inputFileSymmetric;
+extern cll::opt<bool> symmetricGraph;
 //! partitioning scheme to use
 extern cll::opt<PARTITIONING_SCHEME> partitionScheme;
 ////! path to vertex id map for custom edge cut
@@ -133,7 +133,7 @@ using DistGraphPtr =
 template <typename NodeData, typename EdgeData>
 DistGraphPtr<NodeData, EdgeData>
 constructSymmetricGraph(std::vector<unsigned>& GALOIS_UNUSED(scaleFactor)) {
-  if (!inputFileSymmetric) {
+  if (!symmetricGraph) {
     GALOIS_DIE("application requires a symmetric graph input;"
                " please use the -symmetricGraph flag "
                " to indicate the input is a symmetric graph");
