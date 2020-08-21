@@ -28,50 +28,6 @@
 
 namespace {
 
-// This is only used on the terminal graph (find graph)
-// Should workd for hmetis
-
-/*int calculate_cutsize(GGraph& g) {
-
-  GNodeBag bag;
-  galois::do_all(galois::iterate(g.getNets()),
-        [&](GNode n) {
-            auto c = g.edges(n).begin();
-            GNode cn = g.getEdgeDst(*c);
-            int part = g.getData(cn).getPart();
-            for (auto x : g.edges(n)) {
-              auto cc = g.getEdgeDst(x);
-              int partc = g.getData(cc).getPart();
-              if (partc != part) {
-                bag.push(n);
-                return;
-              }
-            }
-        },
-        galois::loopname("cutsize"));
-  return std::distance(bag.begin(), bag.end());
-}*/
-
-/*int calculate_cutsize(GGraph& g, std::map<GNode, unsigned> part) {
-
-  GNodeBag bag;
-  galois::do_all(galois::iterate(g.getNets()),
-        [&](GNode n) {
-            auto c = g.edges(n).begin();
-            GNode cn = g.getEdgeDst(*c);
-            unsigned ppart = part[cn];
-            for (auto x : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-              auto cc = g.getEdgeDst(x);
-              unsigned partc = part[cc];
-              if (partc != ppart) {
-                bag.push(n);
-                return;
-              }
-            }
-        },
-        galois::steal(), galois::loopname("cutsize"));
-  return std::distance(bag.begin(), bag.end());
-}*/
 void projectPart(MetisGraph* Graph) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
@@ -312,7 +268,7 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
                 int d   = gain * 10.0f;
                 int idx = 10 - d;
                 nodelistz[idx].push(n);
-              } else if (gain >= -9.0f) {
+              } else if (gain > -9.0f) {
                 int d   = gain * 10.0f - 1;
                 int idx = 10 - d;
                 nodelistz[idx].push(n);
@@ -578,12 +534,12 @@ bool isPT(int n) {
   return (ceil(log2(n)) == floor(log2(n)));
 }
 
-void refine(MetisGraph* coarseGraph, unsigned K) {
+void refine(MetisGraph* coarseGraph, unsigned K, double imbalance) {
   float ratio = 0.0f;
   float tol   = 0.0f;
   bool flag   = isPT(K);
   if (flag) {
-    ratio = 55.0 / 45.0; // change if needed
+    ratio = (50.0f + (double) imbalance)/(50.0f - (double) imbalance);
     tol   = std::max(ratio, 1 - ratio) - 1;
   } else {
     ratio = ((float)((K + 1) / 2)) / ((float)(K / 2)); // change if needed

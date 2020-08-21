@@ -23,11 +23,16 @@ tags
 .ycm_extra_conf.py
 
 # no build files
+<<<<<<< HEAD
 /build*
 /dockerbuild*
+=======
+/*build*
+>>>>>>> 8e396b028 (Fixed CMakeLists.txt for Stack_Capture)
 
 # no python build artifacts
 *.pyc
 /python/galois.egg-info
 /python/galois/*.so
 /_skbuild
+

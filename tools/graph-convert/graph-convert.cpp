@@ -36,6 +36,7 @@
 
 #include <fcntl.h>
 #include <cstdlib>
+#include <optional>
 
 // TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {

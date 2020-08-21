@@ -11,17 +11,17 @@ an implicitly parallel programming model, where the programmer replaces serial l
 constructs (e.g. for and while) and serial data structures in their algorithms with parallel loop
 constructs and concurrent data structures provided by Galois to express their algorithms.
 Galois is designed so that the programmer does not have to deal with low-level parallel programming constructs such as
-threads, locks, barriers, condition variables, etc. 
+threads, locks, barriers, condition variables, etc.
 
 Highlights include:
 - Parallel *for_each* loop that handles dependencies between iterations, as well as
   dynamic work creation, and a *do_all* loop for simple parallelism. Both provide load balancing and excellent
   scalability on multi-socket systems
 - A concurrent graph library designed for graph analytics algorithms as well as
-  other domains such as irregular meshes. 
-- Scalable concurrent containers such as bag, vector, list, etc. 
+  other domains such as irregular meshes.
+- Scalable concurrent containers such as bag, vector, list, etc.
 
-Galois is released under the BSD-3-Clause license. 
+Galois is released under the BSD-3-Clause license.
 
 
 Building Galois
@@ -45,7 +45,7 @@ Dependencies
 
 Galois builds, runs, and has been tested on GNU/Linux. Even though
 Galois may build on systems similar to Linux, we have not tested correctness or performance, so please
-beware. 
+beware.
 
 At the minimum, Galois depends on the following software:
 
@@ -55,7 +55,7 @@ At the minimum, Galois depends on the following software:
 - libllvm (>= 7.0 with RTTI support)
 - libfmt (>= 4.0)
 
-Here are the dependencies for the optional features: 
+Here are the dependencies for the optional features:
 
 - Linux HUGE_PAGES support (please see [www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)). Performance will most likely degrade without HUGE_PAGES
   enabled. Galois uses 2MB huge page size and relies on the kernel configuration to set aside a large amount of 2MB pages. For example, our performance testing machine (4x14 cores, 192GB RAM) is configured to support up to 65536 2MB pages:
@@ -70,13 +70,14 @@ Here are the dependencies for the optional features:
   ```
 
 - libnuma support. Performance may degrade without it. Please install
-  libnuma-dev on Debian like systems, and numactl-dev on Red Hat like systems. 
-- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files 
+  libnuma-dev on Debian like systems, and numactl-dev on Red Hat like systems.
+- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
 - PAPI (>= 5.2.0.0 ) for profiling sections of code
 - Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
-- CUDA (>= 8.0) if you want to build GPU or distributed heterogeneous applications
+- CUDA (>= 8.0 and < 11.0) if you want to build GPU or distributed heterogeneous applications.
+  Note that versions >= 11.0 use an incompatible CUB module and will fail to execute.
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
@@ -148,6 +149,12 @@ ctest
 
 in the build directory.
 
+Capturing Stack Information
+---------------------------
+Currently if you add `-DSTACK_CAPTURE` to your `cmake` line then you will configure stack capturing.
+Please view `libgalois/include/runtime/StackTracer.h` for documentation on functions for printing and reseting.
+Do not attempt to modify the capture process otherwise.
+
 
 Running Galois Applications
 ===========================
@@ -156,9 +163,9 @@ Graph Format
 ------------
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
-called *galois graph file* 
+called *galois graph file*
 (`.gr` file extension). Other formats such as edge-list or Matrix-Market can be
-converted to `.gr` format with `graph-convert` tool provided in galois. 
+converted to `.gr` format with `graph-convert` tool provided in galois.
 You can build graph-convert as follows:
 
 ```Shell
@@ -168,20 +175,20 @@ make graph-convert
 ```
 
 Other applications, such as Delaunay Mesh Refinement may read special file formats
-or some may even generate random inputs on the fly. 
+or some may even generate random inputs on the fly.
 
 Running
 -------
 
 All Lonestar applications take a `-t` command-line option to specify the number of
 threads to use. All applications run a basic sanity check (often insufficient for
-correctness) on the program output, which can be turned off with the `-noverify` option. You 
-can specify `-help` command-line option to print all available options. 
+correctness) on the program output, which can be turned off with the `-noverify` option. You
+can specify `-help` command-line option to print all available options.
 
 Upon successful completion, each application will produce some stats regarding running
 time of various sections, parallel loop iterations and memory usage, etc. These
 stats are in CSV format and can be redirected to a file using `-statFile` option.
-Please refer to the manual for details on stats. 
+Please refer to the manual for details on stats.
 
 Running LonestarGPU applications
 --------------------------
@@ -199,7 +206,7 @@ Documentation
 =============
 
 Galois documentation is produced using doxygen, included in this repository, which includes a tutorial, a user's
-manual and API documentation for the Galois library. 
+manual and API documentation for the Galois library.
 
 Users can build doxygen documentation in the build directory using:
 
@@ -215,12 +222,12 @@ See online documentation at:
 Source-Tree Organization
 ========================
 
-- `libgalois` contains the source code for the shared-memory Galois library, e.g., runtime, graphs, worklists, etc. 
+- `libgalois` contains the source code for the shared-memory Galois library, e.g., runtime, graphs, worklists, etc.
 - `lonestar` contains the Lonestar benchmark applications and tutorial examples for Galois
 - `libdist` contains the source code for the distributed-memory and heterogeneous Galois library
 - `lonestardist` contains the source code for the distributed-memory and heterogeneous
   benchmark applications. Please refer to `lonestardist/README.md` for instructions on
-  building and running these apps. 
+  building and running these apps.
 - `tools` contains various helper programs such as graph-converter to convert
   between graph file formats and graph-stats to print graph properties
 

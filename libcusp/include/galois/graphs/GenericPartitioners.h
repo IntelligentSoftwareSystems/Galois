@@ -25,8 +25,6 @@ public:
   }
 };
 
-/**
- */
 class MiningPolicyNaive : public galois::graphs::ReadMasterAssignment {
 public:
   MiningPolicyNaive(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
@@ -36,6 +34,17 @@ public:
   static bool needNodeDegrees() { return false; }
 
   bool keepEdge(uint32_t src, uint32_t dst) const { return src < dst; }
+};
+
+class OECPolicy : public galois::graphs::ReadMasterAssignment {
+public:
+  OECPolicy(uint32_t, uint32_t numHosts, uint64_t, uint64_t,
+            std::vector<uint64_t>&)
+      : galois::graphs::ReadMasterAssignment(0, numHosts, 0, 0) {}
+
+  static bool needNodeDegrees() { return false; }
+
+  bool keepEdge(uint32_t, uint32_t) const { return true; }
 };
 
 class MiningPolicyDegrees : public galois::graphs::ReadMasterAssignment {

@@ -28,7 +28,9 @@
 #define GALOIS_RUNTIME_SERIALIZE_H
 
 #include <type_traits>
+#include <fstream>
 #include <ostream>
+#include <cstdlib>
 #include <vector>
 #include <deque>
 #include <string>
@@ -276,12 +278,22 @@ gSizedObj(const T&,
   return sizeof(uintptr_t);
 }
 
+<<<<<<< HEAD
 //! Size of BufferWrapper is size + number of things in it
 template <typename T>
 inline size_t gSizedObj(const galois::BufferWrapper<T>& data) {
   return sizeof(size_t) + data.size() * sizeof(T);
 }
 
+=======
+template <typename T1, typename T2>
+inline size_t gSizedObj(const std::unordered_map<T1, T2>& data) {
+  size_t sz = 0;
+  for (auto i : data)
+    sz += gSizedObj(i.first) + gSizedObj(i.second);
+  return sz;
+}
+>>>>>>> b1a39cdd7 (bug fix)
 /**
  * Returns the size necessary for storing 2 elements of a pair into a
  * serialize buffer.
@@ -447,6 +459,16 @@ inline void gSerializeObj(
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data Data to serialize
  */
+template <typename T1, typename T2>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const std::unordered_map<T1, T2>& data) {
+  uint64_t cnt = 0;
+  for (auto i : data) {
+    cnt++;
+    gSerialize(buf, i.first, i.second);
+  }
+}
+
 template <typename T>
 inline void
 gSerializeObj(SerializeBuffer& buf, const T& data,
@@ -794,6 +816,17 @@ void gDeserializeObj(
   data.deserialize(buf);
 }
 
+template <typename T1, typename T2>
+void gDeserializeObj(DeSerializeBuffer& buf, std::unordered_map<T1, T2>& data) {
+  while (!buf.empty()) {
+    std::pair<T1, T2> i;
+    gDeserialize(buf, i.first, i.second);
+    if (buf.getOffset() > buf.size()) {
+      break;
+    }
+    data[i.first] = i.second;
+  }
+}
 /**
  * Deserialize a pair from a buffer.
  *

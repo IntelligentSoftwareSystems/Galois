@@ -30,8 +30,12 @@
 #include <unordered_map>
 #include <fstream>
 
+<<<<<<< HEAD
 #include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/LC_CSR_CSC_Graph.h"
+=======
+#include "galois/graphs/LS_LC_CSR_64_Graph.h"
+>>>>>>> 3945b1acc (Experimental changes for Distributed Graph)
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
@@ -68,9 +72,13 @@ private:
   //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
+<<<<<<< HEAD
   using GraphTy =
       galois::graphs::LC_CSR_CSC_Graph<NodeTy, EdgeTy, false, true, false,
                                        false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+=======
+  using GraphTy = galois::graphs::LS_LC_CSR_64_Graph<NodeTy, EdgeTy, true>;
+>>>>>>> 3945b1acc (Experimental changes for Distributed Graph)
 
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
@@ -897,6 +905,11 @@ public:
   }
 
   /**
+   * Return the degree of the edge in the local graph
+   **/
+  inline uint64_t localDegree(GraphNode N) { return graph.getDegree(N); }
+
+  /**
    * Returns an iterable object over the edges of a particular node in the
    * graph.
    *
@@ -1081,7 +1094,8 @@ protected:
     } else {
       masterRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, beginMaster,
-          beginMaster + numOwned, 0);
+          beginMaster + numOwned, 0,
+          (galois::graphs::is_LS_LC_CSR_64_Graph<decltype(graph)>::value == 1));
     }
   }
 
@@ -1148,6 +1162,12 @@ protected:
    * for masters.
    */
   void edgesEqualMasters() { specificRanges[2] = specificRanges[1]; }
+
+  void recalculateG2LMap() {
+    for (uint64_t i = 0; i < localToGlobalVector.size(); i++) {
+      globalToLocalMap[localToGlobalVector[i]] = i;
+    }
+  }
 
 public:
   /**

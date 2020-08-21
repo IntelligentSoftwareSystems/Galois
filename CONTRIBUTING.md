@@ -6,12 +6,57 @@ tools like `clang-format` manually.
 
 Code should be clear and documented where needed.
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 ## Setup
 
 Users can run `make docker-image` to setup all dependecies needed for
 `pando-galois`.  After creating the image it can be run via `make docker`.
 And for first time cmake users can run `make run-cmake`.
 
+=======
+>>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
+=======
+# Instrumentation
+
+This section pertains to enabling and instrumenting memory accesses for
+performance projections on the theoretical PANDO hardware.
+
+In order for the instrumentation code in `libwmd/include/galois/wmd/instrument.h`,
+the following should be added to your top level source directory:
+
+```cmake
+set(GALOIS_ENABLE_INSTRUMENT ON)
+if (GALOIS_ENABLE_INSTRUMENT)
+  add_definitions(-DGALOIS_INSTRUMENT)
+endif()
+```
+
+Here is a description of the control-flow macros used by the instrumentation
+and when they should be used.
+
+```cpp
+// Should be called once at the start of the program to initialize the instrumentation
+// For example specifying `GRAPH_NAME=example-graph` will result in instrumentation
+// files starting with `example-graph`
+I_INIT(GRAPH_NAME, HOST, NUM_HOSTS, NUM_EDGES)
+// Should be called once at the end of the program to cleanup the instrumentation
+I_DEINIT()
+// Should be called after the first kernel measured if multiple kernels are being measured
+// For example if you specified `GRAPH_NAME=example-graph` above then specifying here that
+// `NAME_SUFFIX=-kernel2` will result in instrumentation files starting `example-graph-kernel2`
+I_NEW_FILE(NAME_SUFFIX, NUM_EDGES)
+// I_ROUND should be called at the end of a communication round to log all memory accesses
+// and communication recorded into instrumentation files
+// I_CLEAR should be called after I_ROUND
+I_ROUND(ROUND_NUM)
+I_CLEAR()
+// Should be called when sending custom communication to a remote host, recommended practice
+// is to just pass in the size of the SendBuffer you are using
+I_LC(REMOTE_HOST, BYTES)
+```
+
+>>>>>>> 43672aff5 (chore: Add instrument.h header file to libwmd)
 ## Tools
 
 ### [asdf](https://asdf-vm.com)

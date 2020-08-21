@@ -6,7 +6,19 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 include(GNUInstallDirs)
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+if(STACK_CAPTURE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -finstrument-functions")
+  set(INSTRUMENT_EXCLUDE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include/galois/runtime/StackTracer.h")
+  set(INSTRUMENT_EXCLUDE_FILE "${INSTRUMENT_EXCLUDE_FILE},/usr/include/c++/11/sstream")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -finstrument-functions-exclude-file-list=${INSTRUMENT_EXCLUDE_FILE}")
+endif(STACK_CAPTURE)
+>>>>>>> deb11e279 (Added StackTracer to CMakeLists)
 
+=======
+>>>>>>> 8e396b028 (Fixed CMakeLists.txt for Stack_Capture)
 file(STRINGS config/version.txt GALOIS_VERSION)
 string(REGEX REPLACE "[ \t\n]" "" GALOIS_VERSION ${GALOIS_VERSION})
 string(REGEX REPLACE "([0-9]+)\\.([0-9]+)\\.([0-9]+)" "\\1" GALOIS_VERSION_MAJOR ${GALOIS_VERSION})
@@ -23,9 +35,10 @@ endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
-set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
+set(GALOIS_ENABLE_DIST ON CACHE BOOL "Enable distributed features")
 set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Semi-colon list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7;6.1"
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
+set(GALOIS_ENABLE_WMD ON CACHE BOOL "Enable WMD dataset support")
 ###### General features ######
 set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
@@ -51,6 +64,7 @@ set(GALOIS_NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a sing
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(GALOIS_NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
+set(GALOIS_ENABLE_INSTRUMENT OFF CACHE BOOL "Enable generating instrument in the runtime")
 
 if(NOT GALOIS_NUM_TEST_THREADS)
   cmake_host_system_information(RESULT GALOIS_NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
@@ -175,6 +189,10 @@ if(GALOIS_ENABLE_PAPI)
   add_definitions(-DGALOIS_ENABLE_PAPI)
 endif()
 
+if (GALOIS_ENABLE_INSTRUMENT)
+  add_definitions(-DGALOIS_INSTRUMENT)
+endif()
+
 find_package(Threads REQUIRED)
 
 include(CheckMmap)
@@ -233,6 +251,10 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
+  if (GALOIS_ENABLE_WMD)
+    find_package(MPI REQUIRED)
+    add_subdirectory(libwmd)
+  endif()
 endif()
 
 # TODO(loc) prefix with GALOIS
@@ -248,6 +270,13 @@ if (GALOIS_ENABLE_GPU)
     string(REPLACE "." "" GENCODE ${GENCODE})
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
+<<<<<<< HEAD
+=======
+
+  # This is necessary to allow building for CUDA 11.x (where CUB is bundled) and earlier versions (where CUB is not included)
+  add_definitions(-DTHRUST_IGNORE_CUB_VERSION_CHECK)
+
+>>>>>>> 191e9ff91 (Fix 0-initialization of elements in a multiple_sum structure on GPU)
   add_subdirectory(libgpu)
 
   if (USE_DEEPGALOIS)
@@ -343,3 +372,11 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${GALOIS_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${GALOIS_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
+
+if(STACK_CAPTURE)
+  message("Writing CMAKE_CXX_FLAGS")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTACK_TRACE -finstrument-functions")
+  set(INSTRUMENT_EXCLUDE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include/galois/runtime/StackTracer.h")
+  set(INSTRUMENT_EXCLUDE_FILE "${INSTRUMENT_EXCLUDE_FILE},/usr/include/c++/11/sstream")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -finstrument-functions-exclude-file-list=${INSTRUMENT_EXCLUDE_FILE}" CACHE STRING "CMAKE Flags" FORCE)
+endif(STACK_CAPTURE)

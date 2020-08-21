@@ -248,19 +248,24 @@ bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
  * @param endNode End of range, non-inclusive
  * @param returnRanges Vector to store unit offsets for ranges in
  * @param nodeAlpha The higher the number, the more weight nodes have in
+ * @param is_LS_LC_CSR True if `graph` is a log structured csr graph
  * determining division of nodes (edges have weight 1).
  */
 template <typename GraphTy>
 void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
                                   uint32_t beginNode, uint32_t endNode,
                                   std::vector<uint32_t>& returnRanges,
-                                  uint32_t nodeAlpha) {
+                                  uint32_t nodeAlpha, bool is_LS_LC_CSR) {
   assert(beginNode != endNode);
 
   uint32_t numNodesInRange = endNode - beginNode;
-  uint64_t numEdgesInRange =
-      graph.edge_end(endNode - 1) - graph.edge_begin(beginNode);
-  uint64_t edgeOffset = *graph.edge_begin(beginNode);
+
+  // cannot use edge_end/begin on log strcutred CSR since its edges are not
+  // consecutive.
+  uint64_t numEdgesInRange = (is_LS_LC_CSR) ? graph.sizeEdges()
+                                            : graph.edge_end(endNode - 1) -
+                                                  graph.edge_begin(beginNode);
+  uint64_t edgeOffset      = (is_LS_LC_CSR) ? 0 : *graph.edge_begin(beginNode);
 
   returnRanges[0] = beginNode;
   std::vector<unsigned int> dummyScaleFactor;
@@ -285,6 +290,20 @@ void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
       // unit assinged no nodes, copy last one
       returnRanges[i + 1] = returnRanges[i];
     }
+<<<<<<< HEAD
+=======
+
+    if (is_LS_LC_CSR) {
+      galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
+                     " to ", returnRanges[i + 1], ", num edges is ",
+                     graph[returnRanges[i + 1] - 1] - graph[returnRanges[i]]);
+    } else {
+      galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
+                     " to ", returnRanges[i + 1], ", num edges is ",
+                     graph.edge_end(returnRanges[i + 1] - 1) -
+                         graph.edge_begin(returnRanges[i]));
+    }
+>>>>>>> 1d4ff12ff (feat: support loop ranges for LS_LC_CSR_64)
   }
 }
 
@@ -425,13 +444,13 @@ std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
  * @param endNode End of range, non-inclusive
  * @param nodeAlpha The higher the number, the more weight nodes have in
  * determining division of nodes (edges have weight 1).
+ * @param is_LS_LC_CSR True if `graph` is a log structured csr graph
  * @returns vector that indirectly specifies which units get which nodes
  */
 template <typename GraphTy>
-std::vector<uint32_t>
-determineUnitRangesFromGraph(GraphTy& graph, uint32_t unitsToSplit,
-                             uint32_t beginNode, uint32_t endNode,
-                             uint32_t nodeAlpha = 0) {
+std::vector<uint32_t> determineUnitRangesFromGraph(
+    GraphTy& graph, uint32_t unitsToSplit, uint32_t beginNode, uint32_t endNode,
+    uint32_t nodeAlpha = 0, bool is_LS_LC_CSR = false) {
   std::vector<uint32_t> returnRanges;
   returnRanges.resize(unitsToSplit + 1);
 
@@ -443,7 +462,8 @@ determineUnitRangesFromGraph(GraphTy& graph, uint32_t unitsToSplit,
   // no corner cases: onto main loop over nodes that determines
   // node ranges
   internal::determineUnitRangesLoopGraph(graph, unitsToSplit, beginNode,
-                                         endNode, returnRanges, nodeAlpha);
+                                         endNode, returnRanges, nodeAlpha,
+                                         is_LS_LC_CSR);
 
   internal::unitRangeSanity(unitsToSplit, beginNode, endNode, returnRanges);
 

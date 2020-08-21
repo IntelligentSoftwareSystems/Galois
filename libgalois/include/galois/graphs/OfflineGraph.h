@@ -189,10 +189,16 @@ class OfflineGraph {
     return retval;
   }
 
+protected:
+  void setSize(size_t val) { numNodes = val; }
+  void setSizeEdges(size_t val) { numEdges = val; }
+
 public:
   typedef boost::counting_iterator<uint64_t> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef uint64_t GraphNode;
+
+  OfflineGraph() {}
 
   OfflineGraph(const std::string& name)
       : fileEdgeDst(name, std::ios_base::binary),
@@ -321,9 +327,9 @@ public:
    * @param scaleFactor Vector specifying if certain divisions should get more
    * than other divisions
    */
-  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id,
-                    size_t total,
-                    std::vector<unsigned> scaleFactor = std::vector<unsigned>())
+  virtual auto
+  divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total,
+               std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
     return galois::graphs::divideNodesBinarySearch<OfflineGraph>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, *this,

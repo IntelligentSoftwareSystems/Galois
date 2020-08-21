@@ -286,13 +286,18 @@ void DistStatManager::combineAtHost_0(void) {
   combineAtHost_0_helper();
   getSystemNetworkInterface().flush();
 
+  // work done before check
+  td += 1;
+
   // barrier
   while (td.reduce()) {
+    td.reset();
     if (getHostID() == 0) {
       // receive from other hosts
       receiveAtHost_0_helper();
     }
-  };
+  }
+
   // explicit barrier after logical barrier is required
   // as next async phase begins immediately
   getHostBarrier().wait();
@@ -302,13 +307,18 @@ void DistStatManager::combineAtHost_0(void) {
   combineAtHost_0_helper2();
   getSystemNetworkInterface().flush();
 
+  td += 1;
+
   // barrier
   while (td.reduce()) {
+    td.reset();
+
     if (getHostID() == 0) {
       // receive from other hosts
       receiveAtHost_0_helper2();
     }
-  };
+  }
+
   // explicit barrier after logical barrier is required
   // as next async phase begins immediately
   getHostBarrier().wait();

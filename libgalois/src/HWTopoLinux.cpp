@@ -118,6 +118,7 @@ std::vector<cpuinfo> parseCPUInfo() {
     if (sscanf(line.data(), "processor : %d", &num) == 1) {
       assert(cur < num);
       cur = num;
+      // if(cur != 0) break;
       vals.resize(cur + 1);
       vals.at(cur).proc = num;
     } else if (sscanf(line.data(), "physical id : %d", &num) == 1) {

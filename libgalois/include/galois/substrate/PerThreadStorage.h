@@ -156,6 +156,10 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
+  T* get(unsigned int thread) { return getRemote(thread); }
+
+  const T* get(unsigned int thread) const { return getRemote(thread); }
+
   unsigned size() const { return getThreadPool().getMaxThreads(); }
 };
 
