@@ -491,7 +491,7 @@ acc_t Net::fprop(size_t gBegin, size_t gEnd, size_t gCount, mask_t* gMasks) {
   layers[num_layers - 1]->set_sample_mask(gBegin, gEnd, gCount, gMasks);
 
   for (size_t i = 0; i < num_layers; i++) {
-    // galois::gPrint(header, "fprop: layer ", i, " forward call\n");
+    galois::gPrint(header, "fprop: layer ", i, " forward call\n");
     layers[i]->forward();
   }
 

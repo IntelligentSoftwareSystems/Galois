@@ -9,7 +9,7 @@ struct GradientSync {
 
   static ValTy extract(uint32_t, float_t& weight) { return weight; }
 
-  static bool reduce(uint32_t, float_t& weight, ValTy y) {
+  static bool reduce(uint32_t, float_t&, ValTy) {
     // TODO merge function here
     // for now make sure the weights are close enough
     // if (std::abs(weight - y) > 0.00001) {

@@ -52,7 +52,7 @@ void graph_conv_layer::malloc_and_init() {
       new galois::graphs::GluonSubstrate<deepgalois::GluonGradients>(
           *layer::gradientGraph, layer::gradientGraph->myHostID(),
           layer::gradientGraph->numHosts(), false);
-  galois::gInfo("gradient bitset size is going to be ", y * z);
+  galois::gInfo("gradient bitset size is going to be ", y * z, " ", y, " ", z);
 
   // make sure seed consistent across all hosts for weight matrix
   rand_init_matrix(y, z, W, 1);
@@ -159,6 +159,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   size_t x = input_dims[0];
   size_t y = input_dims[1];
   size_t z = output_dims[1];
+  galois::gPrint("forward ", x, " ", y, " ", z, "\n");
 
   galois::StatTimer drop_timer("GraphConvForwardDropout");
   drop_timer.start();
@@ -192,6 +193,7 @@ void graph_conv_layer::forward_propagation(const float_t* in_data,
   deepgalois::_dataToSync     = out_data;
   set_conv_bitset();
 
+  galois::gPrint("forward ", x, " ", y, " ", z, " sync calling\n");
   layer::context->getSyncSubstrate()
       ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>("GraphConvForward");
 
@@ -229,10 +231,11 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     // at this point, out_temp has the derivative of data from last step to
     // use for both updating gradients for features and gradients for weights
     // this calculates gradients for the node predictions
-    if (level_ != 0) // no need to calculate in_grad for the first layer
+    if (level_ != 0) {// no need to calculate in_grad for the first layer
       // derivative of matmul needs transposed matrix
       math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0],
                       0.0, in_grad); // x*z; z*y -> x*y
+    }
     // calculate weight gradients using input data; multiplied by gradients from
     // last back prop step
     math::sgemm_cpu(CblasTrans, CblasNoTrans, y, z, x, 1.0, in_data, out_temp,
@@ -249,15 +252,16 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   compute_timer.stop();
 
   // sync agg
-  deepgalois::_syncVectorSize = z;
-  deepgalois::_dataToSync     = out_temp;
-  set_conv_bitset();
-
-  layer::context->getSyncSubstrate()
-      ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>(
-          //->sync<writeAny, readAny, GraphConvSync>(
-          "GraphConvBackward");
-
+  //galois::gPrint(header, "x is ", x, " y is ", y,  " z is ", z, "\n");
+  if (level_ != 0) {
+    deepgalois::_syncVectorSize = y;
+    deepgalois::_dataToSync     = in_grad;
+    set_conv_bitset();
+    layer::context->getSyncSubstrate()
+        ->sync<writeAny, readAny, GraphConvSync, Bitset_conv>(
+            //->sync<writeAny, readAny, GraphConvSync>(
+            "GraphConvBackward");
+  }
   galois::StatTimer drop_timer("GraphConvBackwardDropout");
   drop_timer.start();
   if (level_ != 0 && dropout_)
