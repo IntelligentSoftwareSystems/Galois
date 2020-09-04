@@ -43,6 +43,8 @@ static const char* desc =
     "Partitions a graph into K parts and minimizing the graph cut";
 static const char* url = "gMetis";
 
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<InitialPartMode> partMode(
     cll::desc("Choose a inital part mode:"),
     cll::values(clEnumVal(GGP, "GGP"), clEnumVal(GGGP, "GGGP (default)"),
@@ -70,9 +72,7 @@ static cll::opt<std::string>
     orderedfile("ordered", cll::desc("output ordered graph file name"));
 static cll::opt<std::string>
     permutationfile("permutation", cll::desc("output permutation file name"));
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
-static cll::opt<int> numPartitions(cll::Positional,
+static cll::opt<int> numPartitions("numPartitions",
                                    cll::desc("<Number of partitions>"),
                                    cll::Required);
 static cll::opt<double> imbalance(
@@ -86,8 +86,6 @@ static cll::opt<double> imbalance(
  * KMetis Algorithm
  */
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
-  galois::StatTimer TM;
-  TM.start();
   unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
   unsigned meanWeight = ((double)fineMetisGraphWeight) / (double)nparts;
   unsigned coarsenTo  = 20 * nparts;
@@ -142,8 +140,6 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   if (verbose)
     std::cout << "Time refinement: " << T3.get() << "\n";
 
-  TM.stop();
-
   std::cout << "Initial dist\n";
   printPartStats(initParts);
   std::cout << "\n";
@@ -151,11 +147,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   std::cout << "Refined dist\n";
   printPartStats(parts);
   std::cout << "\n";
-
-  std::cout << "Time:  " << TM.get() << '\n';
 }
-
-// printGraphBeg(*graph)
 
 typedef galois::graphs::FileGraph FG;
 typedef FG::GraphNode FN;
@@ -181,13 +173,16 @@ typedef galois::substrate::PerThreadStorage<std::map<GNode, uint64_t>>
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   srand(-1);
   MetisGraph metisGraph;
   GGraph& graph = *metisGraph.getGraph();
 
-  galois::graphs::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, inputFile);
 
   galois::do_all(
       galois::iterate(graph),
@@ -204,7 +199,12 @@ int main(int argc, char** argv) {
 
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   Partition(&metisGraph, numPartitions);
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Total edge cut: " << computeCut(graph) << "\n";
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
   if (orderedfile != "" || permutationfile != "") {
     galois::graphs::FileGraph g;
-    g.fromFile(filename);
+    g.fromFile(inputFile);
     typedef galois::LargeArray<GNode> Permutation;
     Permutation perm;
     perm.create(g.size());
@@ -295,7 +295,6 @@ int main(int argc, char** argv) {
     for (auto pb = perm.begin(), pe = perm.end(); pb != pe; pb++) {
       int prevId    = nodeIdMap[*pb];
       perm2[prevId] = id;
-      // std::cout<<prevId <<" "<<id<<std::endl;
       id++;
     }
     galois::graphs::FileGraph out;
@@ -315,5 +314,8 @@ int main(int argc, char** argv) {
       }
     }
   }
+
+  totalTime.stop();
+
   return 0;
 }

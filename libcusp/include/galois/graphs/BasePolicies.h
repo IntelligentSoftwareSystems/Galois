@@ -230,7 +230,7 @@ public:
       }
     } else {
       // stage 0 = this function shouldn't be called
-      GALOIS_DIE("Master setup incomplete");
+      GALOIS_DIE("master setup incomplete");
       return (uint32_t)-1;
     }
   }
@@ -287,29 +287,16 @@ public:
    * a host.
    *
    * @todo Consolidate metadata into single struct to clean up function.
-   *
-   * @param src Node to determine master of
-   * @param bufGraph In-memory representation of read graph
-   * @param localNodeToMaster Vector mapping a local node to a master (if
-   * already assigned)
-   * @param gid2offsets Given some GID, gives offset into vector to get info.
-   * @param nodeLoads Current node load information for each host in system
-   * @param nodeAccum Newly accumualted node counts to be processed later
-   * @param edgeLoads Current edge load information for each host in system
-   * @param edgeAccum Newly accumulated edge counts to be processed later
-   *
    * @returns Host id in which to assing a node
    */
   template <typename EdgeTy>
-  uint32_t getMaster(
-      uint32_t GALOIS_UNUSED(src),
-      galois::graphs::BufferedGraph<EdgeTy>& GALOIS_UNUSED(bufGraph),
-      const std::vector<uint32_t>& GALOIS_UNUSED(localNodeToMaster),
-      std::unordered_map<uint64_t, uint32_t>& GALOIS_UNUSED(gid2offsets),
-      const std::vector<uint64_t>& GALOIS_UNUSED(nodeLoads),
-      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(nodeAccum),
-      const std::vector<uint64_t>& GALOIS_UNUSED(edgeLoads),
-      std::vector<galois::CopyableAtomic<uint64_t>>& GALOIS_UNUSED(edgeAccum)) {
+  uint32_t getMaster(uint32_t, galois::graphs::BufferedGraph<EdgeTy>&,
+                     const std::vector<uint32_t>&,
+                     std::unordered_map<uint64_t, uint32_t>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&,
+                     const std::vector<uint64_t>&,
+                     std::vector<galois::CopyableAtomic<uint64_t>>&) {
     return (uint32_t)-1;
   }
 
@@ -338,7 +325,7 @@ public:
         return false;
       }
     } else {
-      GALOIS_DIE("add master mapping should only be called in stage 0/1");
+      GALOIS_DIE("unexpected status in add master mapping: ", _status);
       return false;
     }
   }

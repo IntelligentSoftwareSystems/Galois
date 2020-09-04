@@ -114,7 +114,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
      * Return a (moved) vector if the len bytes requested are the last len
      * bytes of the front of the buffer queue
      */
-    optional_t<vTy> popVec(uint32_t len, std::atomic<size_t>& inflightRecvs) {
+    std::optional<vTy> popVec(uint32_t len,
+                              std::atomic<size_t>& inflightRecvs) {
       if (data[0].data.size() == frontOffset + len) {
         vTy retval(std::move(data[0].data));
         data.pop_front();
@@ -125,9 +126,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         } else {
           dataPresent = ~0;
         }
-        return optional_t<vTy>(std::move(retval));
+        return std::optional<vTy>(std::move(retval));
       } else {
-        return optional_t<vTy>();
+        return std::optional<vTy>();
       }
     }
 
@@ -159,16 +160,16 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
   public:
-    optional_t<RecvBuffer> popMsg(uint32_t tag,
-                                  std::atomic<size_t>& inflightRecvs) {
+    std::optional<RecvBuffer> popMsg(uint32_t tag,
+                                     std::atomic<size_t>& inflightRecvs) {
       std::lock_guard<SimpleLock> lg(qlock);
 #ifndef NO_AGG
       uint32_t len = getLenFromFront(tag);
       //      assert(len);
       if (len == ~0U || len == 0)
-        return optional_t<RecvBuffer>();
+        return std::optional<RecvBuffer>();
       if (!sizeAtLeast(sizeof(uint32_t) + len, tag))
-        return optional_t<RecvBuffer>();
+        return std::optional<RecvBuffer>();
       erase(4, inflightRecvs);
 
       // Try just using the buffer
@@ -176,7 +177,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         auto start = r->size() - len;
         //        std::cerr << "FP " << r->size() << " " << len << " " << start
         //        << "\n";
-        return optional_t<RecvBuffer>(RecvBuffer(std::move(*r), start));
+        return std::optional<RecvBuffer>(RecvBuffer(std::move(*r), start));
       }
 
       RecvBuffer buf(len);
@@ -184,10 +185,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       copyOut((char*)buf.linearData(), len);
       erase(len, inflightRecvs);
       // std::cerr << "p " << tag << " " << len << "\n";
-      return optional_t<RecvBuffer>(std::move(buf));
+      return std::optional<RecvBuffer>(std::move(buf));
 #else
       if (data.empty() || data.front().tag != tag)
-        return optional_t<RecvBuffer>();
+        return std::optional<RecvBuffer>();
 
       vTy vec(std::move(data.front().data));
 
@@ -199,7 +200,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         dataPresent = ~0;
       }
 
-      return optional_t<RecvBuffer>(RecvBuffer(std::move(vec), 0));
+      return std::optional<RecvBuffer>(RecvBuffer(std::move(vec), 0));
 #endif
     }
 
@@ -298,7 +299,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 #endif
     }
 
-    std::pair<uint32_t, vTy> assemble(std::atomic<size_t>& inflightSends) {
+    std::pair<uint32_t, vTy>
+    assemble(std::atomic<size_t>& GALOIS_UNUSED(inflightSends)) {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
         return std::make_pair(~0, vTy());
@@ -464,7 +466,7 @@ public:
     sd.add(tag, buf.getVec());
   }
 
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>>
+  virtual std::optional<std::pair<uint32_t, RecvBuffer>>
   recieveTagged(uint32_t tag,
                 std::unique_lock<galois::substrate::SimpleLock>* rlg,
                 int phase) {
@@ -485,35 +487,16 @@ public:
             galois::runtime::trace("recvTagged", h, tag,
                                    galois::runtime::printVec(buf->getVec()));
             anyReceivedMessages = true;
-            return optional_t<std::pair<uint32_t, RecvBuffer>>(
+            return std::optional<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));
           }
         }
       }
       galois::runtime::trace("recvTagged BLOCKED this by that", tag,
                              rq.getPresentTag());
-#if 0
-      else if (rq.getPresentTag() != ~0){
-        galois::runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
-        if (recvLock[h].try_lock()) {
-          std::unique_lock<galois::substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
-          auto buf = rq.popMsg(rq.getPresentTag());
-          if (buf) {
-            if (rlg)
-              *rlg = std::move(lg);
-            uintptr_t fp = 0;
-            gDeserializeRaw(buf->r_linearData() + buf->r_size() - sizeof(uintptr_t), fp);
-            buf->pop_back(sizeof(uintptr_t));
-            assert(fp);
-            galois::runtime::trace("FP BLOCKED :", fp);
-            return optional_t<std::pair<uint32_t, RecvBuffer>>();
-          }
-        }
-      }
-#endif
     }
 
-    return optional_t<std::pair<uint32_t, RecvBuffer>>();
+    return std::optional<std::pair<uint32_t, RecvBuffer>>();
   }
 
   virtual void flush() {
@@ -530,7 +513,7 @@ public:
       return true;
     }
     // if (inflightRecvs > 0) {
-      // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
+    // galois::gDebug("[", ID, "] inflight receive: ", inflightRecvs, " \n");
     // }
     return (inflightRecvs > 0);
   }

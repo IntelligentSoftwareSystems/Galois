@@ -17,32 +17,28 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include <stdio.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
+#include "galois/DynamicBitset.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-#include "galois/graphs/B_LC_CSR_Graph.h"
-#include "galois/AtomicHelpers.h"
-#include "galois/DynamicBitset.h"
-
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
+#include "galois/runtime/Profile.h"
+#include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Utils.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "galois/runtime/Profile.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "Lonestar/BFS_SSSP.h"
-
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <iostream>
 #include <deque>
 #include <type_traits>
-
 #include <cstdlib>
 
 namespace cll = llvm::cl;
@@ -56,9 +52,8 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
-static cll::opt<unsigned long long>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<uint64_t>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
               cll::init(0));
@@ -94,9 +89,9 @@ static cll::opt<unsigned int>
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { SyncDO = 0, Async };
+enum Algo { SyncDO = 0, Async, AutoAlgo };
 
-const char* const ALGO_NAMES[] = {"SyncDO", "Async"};
+const char* const ALGO_NAMES[] = {"SyncDO", "Async", "Auto"};
 
 static cll::opt<Exec> execution(
     "exec",
@@ -105,14 +100,17 @@ static cll::opt<Exec> execution(
     cll::init(PARALLEL));
 
 static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm (default value SyncDO):"),
-         cll::values(clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async")),
-         cll::init(SyncDO));
+    algo("algo", cll::desc("Choose an algorithm (default value Auto):"),
+         cll::values(
+             clEnumVal(SyncDO, "SyncDO"), clEnumVal(Async, "Async"),
+             clEnumVal(AutoAlgo,
+                       "Auto: choose between SyncDO and Async automatically")),
+         cll::init(AutoAlgo));
 
 using Graph =
-    // galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-    galois::graphs::B_LC_CSR_Graph<unsigned, void, false, true, true>;
-// galois::graphs::B_LC_CSR_Graph<unsigned,
+    // galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
+    galois::graphs::LC_CSR_CSC_Graph<unsigned, void, false, true, true>;
+// galois::graphs::LC_CSR_CSC_Graph<unsigned,
 // void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
 
@@ -387,12 +385,12 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
           }
         }
       },
-      galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+      galois::wl<WL>(), galois::loopname("runBFS"),
+      galois::disable_conflict_detection());
 }
 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
-
   switch (algo) {
   case SyncDO:
     syncDOAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
@@ -404,23 +402,27 @@ void runAlgo(Graph& graph, const GNode& source, const uint32_t runID) {
     break;
 
   default:
-    std::cerr << "ERROR: unkown algo type" << std::endl;
+    std::cerr << "ERROR: unkown algo type\n";
   }
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
   galois::StatTimer StatTimer_graphConstuct("TimerConstructGraph", "BFS");
   StatTimer_graphConstuct.start();
-  graph.readAndConstructBiGraphFromGRFile(filename);
+  graph.readAndConstructBiGraphFromGRFile(inputFile);
   StatTimer_graphConstuct.stop();
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -430,10 +432,10 @@ int main(int argc, char** argv) {
   }
 
   auto it = graph.begin();
-  std::advance(it, static_cast<unsigned long long>(startNode));
+  std::advance(it, startNode.getValue());
   source = *it;
   it     = graph.begin();
-  std::advance(it, static_cast<unsigned long long>(reportNode));
+  std::advance(it, reportNode.getValue());
   report = *it;
 
   galois::preAlloc(preAlloc);
@@ -446,8 +448,7 @@ int main(int argc, char** argv) {
   graph.getData(source) = 0;
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
-            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
-            << std::endl;
+            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
   std::cout
       << "WARNING: This bfs version uses bi-directional CSR graph "
@@ -460,12 +461,25 @@ int main(int argc, char** argv) {
   }
 
   std::cout << " Execution started\n";
-  galois::StatTimer Tmain;
-  Tmain.start();
+
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
+
+  if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = SyncDO;
+    } else {
+      algo = Async;
+    }
+    autoAlgoTimer.stop();
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
 
   for (unsigned int run = 0; run < numRuns; ++run) {
     galois::gPrint("BFS::go run ", run, " called\n");
-    std::string timer_str("Timer_" + std::to_string(run));
+    std::string timer_str("Timer_Run" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), "BFS");
     StatTimer_main.start();
 
@@ -475,8 +489,7 @@ int main(int argc, char** argv) {
       galois::runtime::profileVtune(
           [&]() { runAlgo<true>(graph, source, run); }, "runAlgo");
     } else {
-      std::cerr << "ERROR: unknown type of execution passed to -exec"
-                << std::endl;
+      std::cerr << "ERROR: unknown type of execution passed to -exec\n";
       std::abort();
     }
 
@@ -490,7 +503,9 @@ int main(int argc, char** argv) {
       }
     }
   }
-  Tmain.stop();
+
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Node " << reportNode << " has parent " << graph.getData(report)
@@ -501,6 +516,8 @@ int main(int argc, char** argv) {
       galois::gPrint("parent[", n, "] : ", graph.getData(n), "\n");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }

@@ -523,8 +523,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     galois::for_each(
         galois::iterate(pBodies),
         [&](Body* b, auto& cnx) { cf.computeForce(b, cnx); },
-        galois::loopname("compute"), galois::wl<WLL>(), galois::no_conflicts(),
-        galois::no_pushes(), galois::per_iter_alloc());
+        galois::loopname("compute"), galois::wl<WLL>(),
+        galois::disable_conflict_detection(), galois::no_pushes(),
+        galois::per_iter_alloc());
     T_compute.stop();
 
     if (!skipVerify) {
@@ -563,7 +564,10 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, nullptr);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   std::cout << config << "\n";
   std::cout << nbodies << " bodies, " << ntimesteps << " time steps\n";
@@ -572,8 +576,12 @@ int main(int argc, char** argv) {
   BodyPtrs pBodies;
   generateInput(bodies, pBodies, nbodies, seed);
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   run(bodies, pBodies, nbodies);
-  T.stop();
+  execTime.stop();
+
+  totalTime.stop();
+
+  return 0;
 }

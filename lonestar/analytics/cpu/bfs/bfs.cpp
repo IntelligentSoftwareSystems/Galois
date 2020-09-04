@@ -21,14 +21,12 @@
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
-
 #include "Lonestar/BFS_SSSP.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 #include <deque>
@@ -45,8 +43,7 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
@@ -55,16 +52,16 @@ static cll::opt<unsigned int>
     reportNode("reportNode",
                cll::desc("Node to report distance to (default value 1)"),
                cll::init(1));
+
 // static cll::opt<unsigned int> stepShiftw("delta",
 // cll::desc("Shift value for the deltastep"),
 // cll::init(10));
 
 enum Exec { SERIAL, PARALLEL };
 
-enum Algo { AsyncTile = 0, Async, SyncTile, Sync, Sync2pTile, Sync2p };
+enum Algo { AsyncTile = 0, Async, SyncTile, Sync };
 
-const char* const ALGO_NAMES[] = {"AsyncTile", "Async",      "SyncTile",
-                                  "Sync",      "Sync2pTile", "Sync2p"};
+const char* const ALGO_NAMES[] = {"AsyncTile", "Async", "SyncTile", "Sync"};
 
 static cll::opt<Exec> execution(
     "exec",
@@ -75,9 +72,7 @@ static cll::opt<Exec> execution(
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value SyncTile):"),
     cll::values(clEnumVal(AsyncTile, "AsyncTile"), clEnumVal(Async, "Async"),
-                clEnumVal(SyncTile, "SyncTile"), clEnumVal(Sync, "Sync"),
-                clEnumVal(Sync2pTile, "Sync2pTile"),
-                clEnumVal(Sync2p, "Sync2p")),
+                clEnumVal(SyncTile, "SyncTile"), clEnumVal(Sync, "Sync")),
     cll::init(SyncTile));
 
 using Graph =
@@ -87,7 +82,7 @@ using Graph =
 using GNode = Graph::GraphNode;
 
 constexpr static const bool TRACK_WORK          = false;
-constexpr static const unsigned CHUNK_SIZE      = 256u;
+constexpr static const unsigned CHUNK_SIZE      = 256U;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
 
 using BFS = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
@@ -236,7 +231,8 @@ void asyncAlgo(Graph& graph, GNode source, const P& pushWrap,
           }
         }
       },
-      galois::wl<WL>(), galois::loopname("runBFS"), galois::no_conflicts());
+      galois::wl<WL>(), galois::loopname("runBFS"),
+      galois::disable_conflict_detection());
 
   if (TRACK_WORK) {
     galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());
@@ -258,11 +254,11 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
 
   Loop loop;
 
-  Cont* curr = new Cont();
-  Cont* next = new Cont();
+  auto curr = std::make_unique<Cont>();
+  auto next = std::make_unique<Cont>();
 
-  Dist nextLevel              = 0u;
-  graph.getData(source, flag) = 0u;
+  Dist nextLevel              = 0U;
+  graph.getData(source, flag) = 0U;
 
   if (CONCURRENT) {
     pushWrap(*next, source, "parallel");
@@ -282,9 +278,7 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         galois::iterate(*curr),
         [&](const T& item) {
           for (auto e : edgeRange(item)) {
-            auto dst = graph.getEdgeDst(e);
-            // if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " <<
-            // dst << " visited"<<std::endl;
+            auto dst      = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
             if (dstData == BFS::DIST_INFINITY) {
@@ -295,65 +289,6 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap,
         },
         galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
         galois::loopname("Sync"));
-  }
-
-  delete curr;
-  delete next;
-}
-
-template <bool CONCURRENT, typename P, typename R>
-void sync2phaseAlgo(Graph& graph, GNode source, const P& pushWrap,
-                    const R& edgeRange) {
-
-  using NodeCont =
-      typename std::conditional<CONCURRENT, galois::InsertBag<GNode>,
-                                galois::SerStack<GNode>>::type;
-  using TileCont =
-      typename std::conditional<CONCURRENT, galois::InsertBag<EdgeTile>,
-                                galois::SerStack<EdgeTile>>::type;
-
-  using Loop = typename std::conditional<CONCURRENT, galois::DoAll,
-                                         galois::StdForEach>::type;
-
-  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-
-  Loop loop;
-
-  NodeCont activeNodes;
-  TileCont edgeTiles;
-
-  Dist nextLevel              = 0u;
-  graph.getData(source, flag) = 0u;
-
-  activeNodes.push(source);
-
-  while (!activeNodes.empty()) {
-
-    loop(
-        galois::iterate(activeNodes),
-        [&](const GNode& src) { pushWrap(edgeTiles, src); }, galois::steal(),
-        galois::chunk_size<CHUNK_SIZE>(), galois::loopname("activeNodes"));
-
-    ++nextLevel;
-    activeNodes.clear();
-
-    loop(
-        galois::iterate(edgeTiles),
-        [&](const EdgeTile& item) {
-          for (auto e : edgeRange(item)) {
-            auto dst      = graph.getEdgeDst(e);
-            auto& dstData = graph.getData(dst, flag);
-
-            if (dstData == BFS::DIST_INFINITY) {
-              dstData = nextLevel;
-              activeNodes.push(dst);
-            }
-          }
-        },
-        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("edgeTiles"));
-
-    edgeTiles.clear();
   }
 }
 
@@ -377,35 +312,30 @@ void runAlgo(Graph& graph, const GNode& source) {
     syncAlgo<CONCURRENT, GNode>(graph, source, NodePushWrap(),
                                 OutEdgeRangeFn{graph});
     break;
-  case Sync2pTile:
-    sync2phaseAlgo<CONCURRENT>(graph, source, EdgeTilePushWrap{graph},
-                               TileRangeFn());
-    break;
-  case Sync2p:
-    sync2phaseAlgo<CONCURRENT>(graph, source, OneTilePushWrap{graph},
-                               TileRangeFn());
-    break;
   default:
-    std::cerr << "ERROR: unkown algo type" << std::endl;
+    std::cerr << "ERROR: unkown algo type\n";
   }
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
-  std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
               << " or failed to set source: " << startNode << "\n";
-    assert(0);
     abort();
   }
 
@@ -417,8 +347,6 @@ int main(int argc, char** argv) {
   report = *it;
 
   size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
   galois::preAlloc(8 * numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
 
@@ -429,23 +357,20 @@ int main(int argc, char** argv) {
   graph.getData(source) = 0;
 
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
-            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution "
-            << std::endl;
+            << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
-  galois::StatTimer Tmain;
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   if (execution == SERIAL) {
     runAlgo<false>(graph, source);
   } else if (execution == PARALLEL) {
     runAlgo<true>(graph, source);
   } else {
-    std::cerr << "ERROR: unknown type of execution passed to -exec"
-              << std::endl;
-    std::abort();
+    std::cerr << "ERROR: unknown type of execution passed to -exec\n";
   }
 
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -485,9 +410,11 @@ int main(int argc, char** argv) {
     if (BFS::verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
-      GALOIS_DIE("Verification failed");
+      GALOIS_DIE("verification failed");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }

@@ -17,13 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "galois/Galois.h"
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
-#include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
@@ -40,11 +39,11 @@ const char* url = "preflow_push";
 
 enum DetAlgo { nondet = 0, detBase, detDisjoint };
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
-static cll::opt<uint32_t> sourceId(cll::Positional, cll::desc("sourceID"),
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<uint32_t> sourceId("sourceNode", cll::desc("Source node"),
                                    cll::Required);
-static cll::opt<uint32_t> sinkId(cll::Positional, cll::desc("sinkID"),
+static cll::opt<uint32_t> sinkId("sinkNode", cll::desc("Sink node"),
                                  cll::Required);
 static cll::opt<bool> useHLOrder("useHLOrder",
                                  cll::desc("Use HL ordering heuristic"),
@@ -159,18 +158,18 @@ struct PreflowPush {
       Graph* g;
       Graph::edge_iterator ei;
 
-      EdgeDstIter(void) : g(nullptr) {}
+      EdgeDstIter() : g(nullptr) {}
 
       EdgeDstIter(Graph* g, Graph::edge_iterator ei) : g(g), ei(ei) {}
 
     private:
       friend boost::iterator_core_access;
 
-      GNode dereference(void) const { return g->getEdgeDst(ei); }
+      GNode dereference() const { return g->getEdgeDst(ei); }
 
-      void increment(void) { ++ei; }
+      void increment() { ++ei; }
 
-      void decrement(void) { --ei; }
+      void decrement() { --ei; }
 
       bool equal(const EdgeDstIter& that) const {
         assert(this->g == that.g);
@@ -237,9 +236,7 @@ struct PreflowPush {
 
   template <typename C>
   bool discharge(const GNode& src, C& ctx) {
-    // Node& node = graph.getData(src, galois::MethodFlag::WRITE);
-    Node& node = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-    // int prevHeight = node.height;
+    Node& node     = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     bool relabeled = false;
 
     if (node.excess == 0 || node.height >= (int)graph.size()) {
@@ -247,8 +244,6 @@ struct PreflowPush {
     }
 
     while (true) {
-      // galois::MethodFlag flag = relabeled ? galois::MethodFlag::UNPROTECTED :
-      // galois::MethodFlag::WRITE;
       galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
       bool finished           = false;
       int current             = node.current;
@@ -424,7 +419,7 @@ struct PreflowPush {
                       .height +
                   1;
               if (useCAS) {
-                int oldHeight;
+                int oldHeight = 0;
                 while (newHeight < (oldHeight = node.height)) {
                   if (__sync_bool_compare_and_swap(&node.height, oldHeight,
                                                    newHeight)) {
@@ -441,7 +436,7 @@ struct PreflowPush {
             }
           } // end for
         },
-        galois::wl<WL>(), galois::no_conflicts(),
+        galois::wl<WL>(), galois::disable_conflict_detection(),
         galois::loopname("updateHeights"));
   }
 
@@ -567,11 +562,8 @@ struct PreflowPush {
     reader.fromFile(inputFile);
 
     typedef galois::graphs::FileGraphWriter Writer;
-    typedef galois::LargeArray<EdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
-    EdgeData edgeData;
 
     // Count edges
     size_t numEdges = 0;
@@ -589,8 +581,7 @@ struct PreflowPush {
     }
 
     p.setNumNodes(reader.size());
-    p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(sizeof(edge_value_type));
+    p.setNumEdges<EdgeTy>(numEdges);
 
     p.phase1();
     for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei;
@@ -611,7 +602,6 @@ struct PreflowPush {
     one = galois::convert_le32toh(one);
 
     p.phase2();
-    edgeData.create(numEdges);
     for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei;
          ++ii) {
       ReaderGNode rsrc = *ii;
@@ -620,30 +610,26 @@ struct PreflowPush {
         if (rsrc == rdst)
           continue;
         if (!reader.hasNeighbor(rdst, rsrc))
-          edgeData.set(p.addNeighbor(rdst, rsrc), 0);
+          p.addNeighbor<EdgeTy>(rdst, rsrc, 0);
         EdgeTy cap = useUnitCapacity ? one : reader.getEdgeData<EdgeTy>(jj);
-        edgeData.set(p.addNeighbor(rsrc, rdst), cap);
+        p.addNeighbor<EdgeTy>(rsrc, rdst, cap);
       }
     }
 
-    edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
-                            std::make_move_iterator(edgeData.end()),
-                            rawEdgeData);
+    p.finish();
 
     using Wnode = Writer::GraphNode;
 
     struct IdLess {
-      bool operator()(
-          const galois::graphs::EdgeSortValue<Wnode, edge_value_type>& e1,
-          const galois::graphs::EdgeSortValue<Wnode, edge_value_type>& e2)
-          const {
+      bool
+      operator()(const galois::graphs::EdgeSortValue<Wnode, EdgeTy>& e1,
+                 const galois::graphs::EdgeSortValue<Wnode, EdgeTy>& e2) const {
         return e1.dst < e2.dst;
       }
     };
 
     for (Writer::iterator i = p.begin(), end_i = p.end(); i != end_i; ++i) {
-      p.sortEdges<edge_value_type>(*i, IdLess());
+      p.sortEdges<EdgeTy>(*i, IdLess());
     }
 
     p.toFile(outputFile);
@@ -841,10 +827,13 @@ struct PreflowPush {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   PreflowPush app;
-  app.initializeGraph(filename, sourceId, sinkId);
+  app.initializeGraph(inputFile, sourceId, sinkId);
 
   app.checkSorting();
 
@@ -858,23 +847,27 @@ int main(int argc, char** argv) {
   std::cout << "Global relabel interval: " << app.global_relabel_interval
             << "\n";
 
-  galois::StatTimer T;
   galois::preAlloc(numThreads * app.graph.size() /
                    galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
-  T.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   app.run();
-  T.stop();
+  execTime.stop();
+
   galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Flow is " << app.graph.getData(app.sink).excess << "\n";
 
   if (!skipVerify) {
     PreflowPush orig;
-    orig.initializeGraph(filename, sourceId, sinkId);
+    orig.initializeGraph(inputFile, sourceId, sinkId);
     app.verify(orig);
     std::cout << "(Partially) Verified\n";
   }
+
+  totalTime.stop();
 
   return 0;
 }

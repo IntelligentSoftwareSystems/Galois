@@ -17,12 +17,18 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "DistBench/Output.h"
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
-#include "DistBenchStart.h"
 #include "galois/gstl.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
+
+#include <algorithm>
+#include <iostream>
+#include <limits>
+#include <vector>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "pagerank_pull_cuda.h"
@@ -31,11 +37,6 @@ struct CUDA_Context* cuda_ctx;
 enum { CPU, GPU_CUDA };
 int personality = CPU;
 #endif
-
-#include <iostream>
-#include <limits>
-#include <algorithm>
-#include <vector>
 
 constexpr static const char* const REGION_NAME = "PageRank";
 
@@ -78,7 +79,7 @@ galois::DynamicBitSet bitset_nout;
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 #include "pagerank_pull_sync.hh"
 
@@ -431,6 +432,45 @@ struct PageRankSanity {
   }
 };
 
+std::vector<float> makeResultsCPU(std::unique_ptr<Graph>& hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).value);
+  }
+
+  return values;
+}
+
+#ifdef GALOIS_ENABLE_GPU
+std::vector<float> makeResultsGPU(std::unique_ptr<Graph>& hg) {
+  std::vector<float> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(get_node_value_cuda(cuda_ctx, node));
+  }
+
+  return values;
+}
+#else
+std::vector<float> makeResultsGPU(std::unique_ptr<Graph>& /*unused*/) {
+  abort();
+}
+#endif
+
+std::vector<float> makeResults(std::unique_ptr<Graph>& hg) {
+  switch (personality) {
+  case CPU:
+    return makeResultsCPU(hg);
+  case GPU_CUDA:
+    return makeResultsGPU(hg);
+  default:
+    abort();
+  }
+}
+
 /******************************************************************************/
 /* Main */
 /******************************************************************************/
@@ -439,7 +479,7 @@ constexpr static const char* const name = "PageRank - Compiler Generated "
                                           "Distributed Heterogeneous";
 constexpr static const char* const desc = "PageRank Residual Pull version on "
                                           "Distributed Galois.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -448,8 +488,7 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
-                                 (unsigned long)maxIterations);
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", maxIterations);
     std::ostringstream ss;
     ss << tolerance;
     galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());
@@ -459,7 +498,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, void, false>(&cuda_ctx);
@@ -515,7 +554,7 @@ int main(int argc, char** argv) {
         bitset_nout.reset();
       }
 
-      (*syncSubstrate).set_num_run(run + 1);
+      syncSubstrate->set_num_run(run + 1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
@@ -523,25 +562,13 @@ int main(int argc, char** argv) {
 
   StatTimer_total.stop();
 
-  // Verify
-  if (verify) {
-    if (personality == CPU) {
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-                                     (*hg).getData(*ii).value);
-      }
-    } else if (personality == GPU_CUDA) {
-#ifdef GALOIS_ENABLE_GPU
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-                                     get_node_value_cuda(cuda_ctx, *ii));
-      }
-#else
-      abort();
-#endif
-    }
+  if (output) {
+    std::vector<float> results = makeResults(hg);
+    auto globalIDs             = hg->getMasterGlobalIDs();
+    assert(results.size() == globalIDs.size());
+
+    writeOutput(outputLocation, "pagerank", results.data(), results.size(),
+                globalIDs.data());
   }
 
   return 0;

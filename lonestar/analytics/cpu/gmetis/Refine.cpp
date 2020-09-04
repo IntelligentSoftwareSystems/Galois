@@ -379,10 +379,6 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter) {
         },
         galois::loopname("make moves"));
   }
-  /*  std::cout<<ratiocut(nbParti, degreeIn, card)<< '\n';
-  for (int i=0; i<nbParti; i++)
-    std::cout<<card[i]<< ' ';
-  std::cout<<std::endl;*/
 }
 
 } // namespace

@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+#include "bipart.h"
+#include "galois/graphs/ReadGraph.h"
+#include "galois/Timer.h"
+#include "Lonestar/BoilerPlate.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/LargeArray.h"
+
 #include <vector>
 #include <set>
 #include <map>
@@ -31,21 +38,15 @@
 #include <array>
 #include <unordered_set>
 
-#include "bipart.h"
-#include "galois/graphs/ReadGraph.h"
-#include "galois/Timer.h"
-//#include "GraphReader.h"
-#include "Lonestar/BoilerPlate.h"
-#include "galois/graphs/FileGraph.h"
-#include "galois/LargeArray.h"
-
 namespace cll = llvm::cl;
 
-static const char* name = "HYPAR";
+static const char* name = "BIPART";
 static const char* desc =
     "Partitions a hypergraph into K parts and minimizing the graph cut";
-static const char* url = "HyPar";
+static const char* url = "BiPart";
 
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<scheduleMode> schedulingMode(
     cll::desc("Choose a inital scheduling mode:"),
     cll::values(clEnumVal(PLD, "PLD"), clEnumVal(PP, "PP"), clEnumVal(WD, "WD"),
@@ -65,14 +66,12 @@ static cll::opt<bool>
     verbose("verbose",
             cll::desc("verbose output (debugging mode, takes extra time)"),
             cll::init(false));
-static cll::opt<std::string> outfile("output",
+static cll::opt<std::string> outfile("outputFile",
                                      cll::desc("output partition file name"));
 static cll::opt<std::string>
     orderedfile("ordered", cll::desc("output ordered graph file name"));
 static cll::opt<std::string>
     permutationfile("permutation", cll::desc("output permutation file name"));
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> csize(cll::Positional,
                                 cll::desc("<size of coarsest graph>"),
                                 cll::init(25));
@@ -88,35 +87,23 @@ static cll::opt<double> imbalance(
     cll::desc("Fraction deviated from mean partition size (default 0.01)"),
     cll::init(0.01));
 
-// const double COARSEN_FRACTION = 0.9;
+//! Flag that forces user to be aware that they should be passing in a
+//! hMetis graph.
+static cll::opt<bool>
+    hMetisGraph("hMetisGraph",
+                cll::desc("Specify that the input graph is a hMetis"),
+                cll::init(false));
 
-/*int cutsize(GGraph& g) {
-  unsigned size = std::distance(g.cellList().begin(), g.cellList().end());
-  unsigned sizen = std::distance(g.getNets().begin(), g.getNets().end());
-  int cutsize = 0;
-  std::vector<int> cells;
-  for (auto n : g.getNets()) {
-    bool cut_status = false;
-    for (auto e : g.edges(n)) {
-      auto cell1 = g.getEdgeDst(e);
-    for (auto c : g.edges(n)) {
-        auto cell2 = g.getEdgeDst(c);
-        if(g.getData(cell1).getPart() != g.getData(cell2).getPart() && cell1 !=
-cell2) { cutsize++; cut_status = true; break;
-        }
-      }
-      if (cut_status == true)
-        break;
-    }
-  }
-  return cutsize;
-}*/
+static cll::opt<bool>
+    output("output", cll::desc("Specify if partitions need to be written"),
+           cll::init(false));
+
 /**
  * Partitioning
  */
 void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
-  galois::StatTimer TM;
-  TM.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   galois::StatTimer T("CoarsenSEP");
   T.start();
@@ -135,7 +122,8 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   std::cout << "coarsen:," << T.get() << "\n";
   std::cout << "clustering:," << T2.get() << '\n';
   std::cout << "Refinement:," << T3.get() << "\n";
-  return;
+
+  execTime.stop();
 }
 
 int computingCut(GGraph& g) {
@@ -210,12 +198,21 @@ int hash(unsigned val) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  if (!hMetisGraph) {
+    GALOIS_DIE("This application requires a hMetis graph input;"
+               " please use the -hMetisGraph flag "
+               " to indicate the input is a hMetisGraph graph.");
+  }
 
   // srand(-1);
   MetisGraph metisGraph;
   GGraph& graph = *metisGraph.getGraph();
-  std::ifstream f(filename.c_str());
+  std::ifstream f(inputFile.c_str());
   // GGraph graph;// = *metisGraph.getGraph();
   std::string line;
   std::getline(f, line);
@@ -286,7 +283,6 @@ int main(int argc, char** argv) {
   std::cout << "\n";
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   galois::reportPageAlloc("MeminfoPre");
-  //  Partition(&metisGraph, csize, refiter);
   galois::do_all(
       galois::iterate(graph.hedges, graph.size()),
       [&](GNode item) {
@@ -372,7 +368,7 @@ int main(int argc, char** argv) {
             galois::iterate(uint32_t{0}, totalnodes),
             [&](uint32_t c) {
               pre_edges[c] = edges_ids[c].size();
-              num_edges_acc += prefix_edges[c];
+              num_edges_acc += pre_edges[c];
             },
             galois::steal());
         edges = num_edges_acc.reduce();
@@ -391,7 +387,7 @@ int main(int argc, char** argv) {
           gr.getData(n).netval  = INT_MAX;
           gr.getData(n).nodeid  = n + 1;
         });
-        Partition(&metisG, 25, kValue[i]);
+        Partition(&metisG, csize, kValue[i]);
         MetisGraph* mcg = &metisG;
 
         while (mcg->getCoarserGraph() != NULL) {
@@ -426,10 +422,31 @@ int main(int argc, char** argv) {
     toProcessNew.clear();
   }
   // std::cout<<"Total Edge Cut: "<<computingCut(graph)<<"\n";
-  galois::runtime::reportStat_Single("HyPar", "Edge Cut", computingCut(graph));
-  galois::runtime::reportStat_Single("HyParzo", "zero-one",
+  galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
+  galois::runtime::reportStat_Single("BiPart", "zero-one",
                                      computingBalance(graph));
   // galois::reportPageAlloc("MeminfoPost");
 
+  totalTime.stop();
+
+  if (output) {
+
+    std::cout << "hedgs: " << graph.hedges << "\n";
+    std::cout << "size: " << graph.size() << "\n";
+    std::vector<uint32_t> parts(graph.size() - graph.hedges);
+    std::vector<uint64_t> IDs(graph.size() - graph.hedges);
+
+    for (GNode n = graph.hedges; n < graph.size(); n++) {
+      parts[n - graph.hedges] = graph.getData(n).getPart();
+      IDs[n - graph.hedges]   = n - graph.hedges + 1;
+    }
+
+    std::ofstream outputFile(outfile.c_str());
+
+    for (size_t i = 0; i < parts.size(); i++)
+      outputFile << IDs[i] << " " << parts[i] << "\n";
+
+    outputFile.close();
+  }
   return 0;
 }

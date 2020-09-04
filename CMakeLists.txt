@@ -24,16 +24,13 @@ endif()
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 ###### Distributed-heterogeneous features ######
 set(GALOIS_ENABLE_DIST OFF CACHE BOOL "Enable distributed features")
-set(GALOIS_ENABLE_GPU OFF CACHE BOOL "Enable heterogeneous features")
-set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
+set(GALOIS_CUDA_CAPABILITY "" CACHE STRING "Semi-colon list of CUDA compute capability version numbers to enable GPU features") # e.g., "3.7;6.1"
 set(GALOIS_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
-set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
-set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
-set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
-set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
-set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(GALOIS_ENABLE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
+set(GALOIS_ENABLE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
+set(GALOIS_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
+set(GALOIS_GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
@@ -50,27 +47,16 @@ SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.2)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 ###### Developer features ######
 set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
-set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
+set(GALOIS_NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 set(GALOIS_USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(GALOIS_USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
+set(GALOIS_NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
 
-# Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
-set(USE_EXP OFF CACHE BOOL "Use experimental features")
-set(USE_DIST_EXP OFF CACHE BOOL "Use experimental features in distributed branch")
-set(USE_HTM OFF CACHE BOOL "Use HTM")
-set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
-set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
-
-# Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
-set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
-
-set(NUM_TEST_THREADS "" CACHE STRING "Maximum number of threads to use when running tests (default: number of physical cores)")
-
-if(NOT NUM_TEST_THREADS)
-  cmake_host_system_information(RESULT NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
+if(NOT GALOIS_NUM_TEST_THREADS)
+  cmake_host_system_information(RESULT GALOIS_NUM_TEST_THREADS QUERY NUMBER_OF_PHYSICAL_CORES)
 endif()
-if(NUM_TEST_THREADS LESS_EQUAL 0)
-  set(NUM_TEST_THREADS 1)
+if(GALOIS_NUM_TEST_THREADS LESS_EQUAL 0)
+  set(GALOIS_NUM_TEST_THREADS 1)
 endif()
 
 ###### Configure (users don't need to go beyond here) ######
@@ -96,11 +82,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
-    # Avoid warnings from openmpi
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-cast-function-type>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
   endif()
 endif()
 
@@ -109,13 +94,19 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
+
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
 
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Werror>")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -127,21 +118,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-wd2196>")
 endif()
 
-if(CYGWIN)
-  message(STATUS "On Cygwin")
-  add_definitions(-U__STRICT_ANSI__)
-endif()
-
 # Enable architecture-specific optimizations
 include(CheckArchFlags)
 if(ARCH_FLAGS_FOUND)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARCH_CXX_FLAGS}>")
   add_compile_options("$<$<COMPILE_LANGUAGE:C>:${ARCH_C_FLAGS}>")
   add_link_options(${ARCH_LINK_FLAGS})
-endif()
-
-if(USE_SANITIZER)
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
 endif()
 
 if(CXX_CLANG_TIDY)
@@ -154,13 +136,10 @@ endif()
 
 ###### Configure features ######
 
-if(USE_VTUNE)
-  set(VTune_ROOT /opt/intel/vtune_amplifier)
-  find_package(VTune REQUIRED)
-  include_directories(${VTune_INCLUDE_DIRS})
-  add_definitions(-DGALOIS_USE_VTUNE)
-endif()
-
+################################################################################
+# For GNN matrix multiplies
+# TODO (loc) prefix with GALOIS, move elsewhere more fitting in this file
+################################################################################
 if(USE_MKL_BLAS)
   SET(INTEL_ROOT /opt/apps/sysnet/intel/19.0)
   SET(MKL_ROOT ${INTEL_ROOT}/mkl)
@@ -185,13 +164,20 @@ if(USE_OPENBLAS)
   endif()
 endif()
 
-if(USE_PAPI)
-  if (PAPI_ROOT STREQUAL "")
-    set(PAPI_ROOT /usr)
-  endif()
+################################################################################
+
+if(GALOIS_ENABLE_VTUNE)
+  set(VTune_ROOT /opt/intel/vtune_amplifier)
+  find_package(VTune REQUIRED)
+  include_directories(${VTune_INCLUDE_DIRS})
+  add_definitions(-DGALOIS_ENABLE_VTUNE)
+endif()
+
+
+if(GALOIS_ENABLE_PAPI)
   find_package(PAPI REQUIRED)
   include_directories(${PAPI_INCLUDE_DIRS})
-  add_definitions(-DGALOIS_USE_PAPI)
+  add_definitions(-DGALOIS_ENABLE_PAPI)
 endif()
 
 find_package(Threads REQUIRED)
@@ -199,7 +185,7 @@ find_package(Threads REQUIRED)
 include(CheckMmap)
 
 include(CheckHugePages)
-if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
+if(NOT HAVE_HUGEPAGES AND GALOIS_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
@@ -223,15 +209,19 @@ include(CheckEndian)
 
 ###### Test Inputs ######
 
-if(GRAPH_LOCATION)
-  message(STATUS "Using graph location ${GRAPH_LOCATION}")
-  set(BASEINPUT "${GRAPH_LOCATION}")
-elseif(EXISTS /net/ohm/export/iss/inputs)
+if(GALOIS_GRAPH_LOCATION)
+  set(BASEINPUT "${GALOIS_GRAPH_LOCATION}")
+  set(BASEOUTPUT "${GALOIS_GRAPH_LOCATION}")
+  message(STATUS "Using graph input and output location ${GALOIS_GRAPH_LOCATION}")
+elseif(EXISTS /net/ohm/export/iss)
   set(BASEINPUT /net/ohm/export/iss/inputs)
-  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
+  MESSAGE(STATUS "Using graph input location /net/ohm/export/iss/inputs")
+  set(BASEOUTPUT /net/ohm/export/iss/dist-outputs)
+  MESSAGE(STATUS "Using graph output location /net/ohm/export/iss/dist-outputs")
 else()
   set(BASEINPUT "${PROJECT_BINARY_DIR}/inputs")
-  message(STATUS "Use 'make input' to download inputs in the build directory")
+  set(BASEOUTPUT "${PROJECT_BINARY_DIR}/inputs")
+  message(STATUS "Use 'make input' to download inputs and outputs in the build directory")
 endif()
 
 ###### Source finding ######
@@ -240,8 +230,9 @@ add_custom_target(lib)
 add_custom_target(apps)
 
 # Core libraries (lib)
+add_subdirectory(libsupport)
 add_subdirectory(libgalois)
-
+add_subdirectory(libpygalois)
 if (GALOIS_ENABLE_DIST)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
@@ -249,15 +240,17 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libgluon)
 endif()
 
+# TODO(loc) prefix with GALOIS
 if(USE_DEEPGALOIS)
   add_subdirectory(libdeepgalois)
 endif(USE_DEEPGALOIS)
 
+string(COMPARE NOTEQUAL "${GALOIS_CUDA_CAPABILITY}" "" GALOIS_ENABLE_GPU)
+
 if (GALOIS_ENABLE_GPU)
   enable_language(CUDA)
-  string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
-  string(REPLACE "," ";" GENCODES ${GENCODES})
-  foreach(GENCODE ${GENCODES})
+  foreach(GENCODE ${GALOIS_CUDA_CAPABILITY})
+    string(REPLACE "." "" GENCODE ${GENCODE})
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
   add_subdirectory(libgpu)
@@ -305,7 +298,7 @@ endif(USE_EXP)
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
   #TODO: double check the list of directories here
-  set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libcusp\" \"${CMAKE_CURRENT_SOURCE_DIR}/libdist\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgluon")
+  set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libcusp\" \"${CMAKE_CURRENT_SOURCE_DIR}/libdist\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgluon")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}

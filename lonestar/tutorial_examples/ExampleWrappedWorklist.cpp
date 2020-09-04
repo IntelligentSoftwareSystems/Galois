@@ -48,7 +48,7 @@ public:
             this->enqueue(item + item);
           }
         },
-        galois::loopname("execute"), galois::no_conflicts());
+        galois::loopname("execute"), galois::disable_conflict_detection());
 
     inParallelPhase = false;
     reset();
@@ -57,7 +57,7 @@ public:
 
 int main(int argc, char* argv[]) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, nullptr, nullptr, nullptr);
+  LonestarStart(argc, argv);
 
   ExampleWrappedWorklist q;
   for (unsigned i = 0; i < galois::getActiveThreads(); i++) {

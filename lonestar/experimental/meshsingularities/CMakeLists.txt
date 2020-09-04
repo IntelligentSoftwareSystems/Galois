@@ -1,5 +1,0 @@
-if(CBLAS_FOUND)
-  add_subdirectory(DAGSolver)
-  add_subdirectory(DAGSolver3D)
-  add_subdirectory(tests)
-endif()

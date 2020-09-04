@@ -34,11 +34,9 @@ namespace cll = llvm::cl;
 const char* name = "Points-to Analysis";
 const char* desc = "Performs inclusion-based points-to analysis over the input "
                    "constraints.";
-const char* url = NULL;
 
 static cll::opt<std::string>
-    input(cll::Positional, cll::desc("Constraints file"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<bool>
     useSerial("serial",
               cll::desc("Runs serial version of the algorithm "
@@ -76,7 +74,7 @@ static cll::opt<unsigned>
  */
 class PtsToCons {
 public:
-  using ConstraintType = enum { AddressOf = 0, Copy, Load, Store };
+  using ConstraintType = enum { AddressOf = 0, Copy, Load, Store, GEP };
 
 private:
   unsigned src;
@@ -121,7 +119,7 @@ public:
 
     std::cerr << "v" << src;
 
-    std::cerr << std::endl;
+    std::cerr << "\n";
   }
 };
 
@@ -484,7 +482,7 @@ protected:
       // propogate src's points to info to dst
       if (srcRepr != dstRepr &&
           !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
-        galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
+        // galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
       }
@@ -518,6 +516,14 @@ public:
     }
 
     ocd.init();
+  }
+
+  //! frees memory allocated by the node allocator
+  void freeNodeAllocatorMemory() {
+    for (unsigned i = 0; i < numNodes; i++) {
+      pointsToResult[i].freeAll();
+      outgoingEdges[i].freeAll();
+    }
   }
 
   /**
@@ -741,10 +747,9 @@ public:
                 ctx.push(this->ocd.getFinalRepresentative(*dst));
             }
           },
-          galois::loopname("PointsToMainUpdateLoop"), galois::no_conflicts(),
-          galois::wl<galois::worklists::PerSocketChunkFIFO<8>>() // TODO exp
-                                                                 // with this
-      );
+          galois::loopname("PointsToMainUpdateLoop"),
+          galois::disable_conflict_detection(),
+          galois::wl<galois::worklists::PerSocketChunkFIFO<8>>());
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
 
@@ -764,15 +769,15 @@ public:
  * Method from running PTA.
  */
 template <typename PTAClass, typename Alloc>
-void runPTA(PTAClass& pta, Alloc nodeAllocator) {
-  size_t numNodes = pta.readConstraints(input.c_str());
+void runPTA(PTAClass& pta, Alloc& nodeAllocator) {
+  size_t numNodes = pta.readConstraints(inputFile.c_str());
   pta.initialize(numNodes, nodeAllocator);
 
-  galois::StatTimer T; // main timer
+  galois::StatTimer execTime("Timer_0");
 
-  T.start();
+  execTime.start();
   pta.run();
-  T.stop();
+  execTime.stop();
 
   galois::gInfo("No of points-to facts computed = ", pta.countPointsToFacts());
 
@@ -785,11 +790,17 @@ void runPTA(PTAClass& pta, Alloc nodeAllocator) {
   if (printAnswer) {
     pta.printPointsToInfo();
   }
+
+  // free everything nodeallocator allocated
+  pta.freeNodeAllocatorMemory();
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, nullptr, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   // depending on serial or concurrent, create the correct class and pass it
   // into the run harness which takes care of the rest
@@ -814,6 +825,8 @@ int main(int argc, char** argv) {
         nodeAllocator;
     runPTA(p, nodeAllocator);
   }
+
+  totalTime.stop();
 
   return 0;
 }

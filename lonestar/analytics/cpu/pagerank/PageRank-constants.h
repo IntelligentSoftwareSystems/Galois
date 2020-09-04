@@ -25,7 +25,7 @@
 #define DEBUG 0
 
 static const char* name = "Page Rank";
-static const char* url  = 0;
+static const char* url  = nullptr;
 
 //! All PageRank algorithm variants use the same constants for ease of
 //! comparison.
@@ -38,14 +38,15 @@ constexpr static const unsigned MAX_ITER = 1000;
 constexpr static const unsigned PRINT_TOP = 20;
 
 namespace cll = llvm::cl;
+
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
                                  cll::init(TOLERANCE));
 static cll::opt<unsigned int> maxIterations(
     "maxIterations",
     cll::desc("Maximum iterations, applies round-based versions only"),
     cll::init(MAX_ITER));
-static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 
 //! Type definitions.
 typedef float PRTy;

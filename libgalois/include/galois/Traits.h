@@ -256,8 +256,9 @@ struct more_stats : public trait_has_type<bool>, more_stats_tag {};
 /**
  * Indicates the operator doesn't need abort support
  */
-struct no_conflicts_tag {};
-struct no_conflicts : public trait_has_type<bool>, no_conflicts_tag {};
+struct disable_conflict_detection_tag {};
+struct disable_conflict_detection : public trait_has_type<bool>,
+                                    disable_conflict_detection_tag {};
 
 /**
  * Indicates that the neighborhood set does not change through out i.e. is not
@@ -313,10 +314,6 @@ struct det_parallel_break : public trait_has_value<T>, det_parallel_break_tag {
  *
  * The function should have the signature <code>uintptr_t (A)</code> where
  * A is the type of active elements.
- *
- * An example of use:
- *
- * \snippet test/deterministic.cpp Id
  */
 struct det_id_tag {};
 template <typename T>
@@ -329,10 +326,6 @@ struct det_id : public trait_has_value<T>, det_id_tag {
  * Indicates the operator has a type that encapsulates state that is passed
  * between the suspension and resumpsion of an operator during deterministic
  * scheduling.
- *
- * An example of use:
- *
- * \snippet test/deterministic.cpp Local state
  */
 struct local_state_tag {};
 template <typename T>

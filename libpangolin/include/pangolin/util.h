@@ -7,7 +7,7 @@
 
 namespace util {
 
-void print_graph(Graph& graph) {
+void print_graph(PangolinGraph& graph) {
   for (GNode n : graph) {
     std::cout << "vertex " << n << ": label = " << graph.getData(n)
               << ": degree = " << graph.get_degree(n) << " edgelist = [ ";
@@ -17,7 +17,7 @@ void print_graph(Graph& graph) {
   }
 }
 
-void genGraph(MGraph& mg, Graph& g) {
+void genGraph(MGraph& mg, PangolinGraph& g) {
   g.allocateFrom(mg.num_vertices(), mg.num_edges());
   g.constructNodes();
   for (size_t i = 0; i < mg.num_vertices(); i++) {
@@ -31,7 +31,7 @@ void genGraph(MGraph& mg, Graph& g) {
   }
 }
 // relabel vertices by descending degree order (do not apply to weighted graphs)
-void DegreeRanking(Graph& og, Graph& g) {
+void DegreeRanking(PangolinGraph& og, PangolinGraph& g) {
   std::cout << " Relabeling vertices by descending degree order\n";
   std::vector<IndexT> old_degrees(og.size(), 0);
   galois::do_all(
@@ -76,13 +76,13 @@ void DegreeRanking(Graph& og, Graph& g) {
   g.sortAllEdgesByDst();
 }
 
-unsigned orientation(Graph& og, Graph& g) {
+unsigned orientation(PangolinGraph& og, PangolinGraph& g) {
   galois::StatTimer Tdag("DAG");
   Tdag.start();
-  std::cout << "Orientation enabled, using DAG\n";
-  std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
-  std::cout << "Before: num_vertices " << og.size() << " num_edges "
-            << og.sizeEdges() << "\n";
+  // std::cout << "Orientation enabled, using DAG\n";
+  // std::cout << "Assume the input graph is clean and symmetric (.csgr)\n";
+  // std::cout << "Before: num_vertices " << og.size() << " num_edges "
+  //          << og.sizeEdges() << "\n";
   std::vector<IndexT> degrees(og.size(), 0);
 
   galois::do_all(
@@ -140,26 +140,26 @@ unsigned orientation(Graph& og, Graph& g) {
 
 // relabel is needed when we use DAG as input graph, and it is disabled when we
 // use symmetrized graph
-unsigned read_graph(Graph& graph, std::string filetype, std::string filename,
-                    bool need_dag = false) {
+unsigned read_graph(PangolinGraph& graph, std::string filetype,
+                    std::string filename, bool need_dag = false) {
   MGraph mgraph(need_dag);
   unsigned max_degree = 0;
   if (filetype == "txt") {
-    printf("Reading .lg file: %s\n", filename.c_str());
+    // printf("Reading .lg file: %s\n", filename.c_str());
     mgraph.read_txt(filename.c_str());
     genGraph(mgraph, graph);
   } else if (filetype == "adj") {
-    printf("Reading .adj file: %s\n", filename.c_str());
+    // printf("Reading .adj file: %s\n", filename.c_str());
     mgraph.read_adj(filename.c_str());
     genGraph(mgraph, graph);
   } else if (filetype == "mtx") {
-    printf("Reading .mtx file: %s\n", filename.c_str());
+    // printf("Reading .mtx file: %s\n", filename.c_str());
     mgraph.read_mtx(filename.c_str(), true); // symmetrize
     genGraph(mgraph, graph);
   } else if (filetype == "gr") {
-    printf("Reading .gr file: %s\n", filename.c_str());
+    // printf("Reading .gr file: %s\n", filename.c_str());
     if (need_dag) {
-      Graph g_temp;
+      PangolinGraph g_temp;
       galois::graphs::readGraph(g_temp, filename);
       max_degree = orientation(g_temp, graph);
     } else {
@@ -186,11 +186,13 @@ unsigned read_graph(Graph& graph, std::string filetype, std::string filename,
     exit(1);
   }
   // print_graph(graph);
+  galois::gPrint("Input graph: num_vertices ", graph.size(), " num_edges ",
+                 graph.sizeEdges(), "\n");
   if (filetype != "gr") {
     max_degree = mgraph.get_max_degree();
     mgraph.clean();
   }
-  printf("max degree = %u\n", max_degree);
+  // printf("max degree = %u\n", max_degree);
   return max_degree;
 }
 

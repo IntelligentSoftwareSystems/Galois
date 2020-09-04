@@ -509,28 +509,25 @@ private: ///////////////////////////////////////////////////////////////////////
   internal::EdgeFactory<EdgeTy, Directional && !InOut> edgesF;
 
   // Helpers for iterator classes
-  struct is_node : public std::unary_function<gNode&, bool> {
+  struct is_node {
     bool operator()(const gNode& g) const { return g.active; }
   };
-  struct is_edge
-      : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
+  struct is_edge {
     bool operator()(typename gNodeTypes::EdgeInfo& e) const {
       return e.first()->active;
     }
   };
-  struct is_in_edge
-      : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
+  struct is_in_edge {
     bool operator()(typename gNodeTypes::EdgeInfo& e) const {
       return e.first()->active && e.isInEdge();
     }
   };
-  struct is_out_edge
-      : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
+  struct is_out_edge {
     bool operator()(typename gNodeTypes::EdgeInfo& e) const {
       return e.first()->active && !e.isInEdge();
     }
   };
-  struct makeGraphNode : public std::unary_function<gNode&, gNode*> {
+  struct makeGraphNode {
     gNode* operator()(gNode& data) const { return &data; }
   };
 

@@ -22,6 +22,7 @@
 
 #include "galois/config.h"
 #include "galois/optional.h"
+#include "galois/worklists/AdaptiveObim.h"
 #include "galois/worklists/PerThreadChunk.h"
 #include "galois/worklists/BulkSynchronous.h"
 #include "galois/worklists/Chunk.h"

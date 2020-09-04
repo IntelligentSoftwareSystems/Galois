@@ -65,7 +65,7 @@ class Fixed2DGraphTiledExecutor {
    * Functor: given a graph on initialization, passing it an edge iterator
    * will return the destination of that edge in the graph.
    */
-  struct GetDst : public std::unary_function<edge_iterator, GNode> {
+  struct GetDst {
     Graph* g;
     GetDst() {}
     GetDst(Graph* _g) : g(_g) {}

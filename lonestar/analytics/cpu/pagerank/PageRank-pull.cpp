@@ -36,6 +36,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                                        clEnumVal(Residual, "Residual")),
                            cll::init(Residual));
 
+//! Flag that forces user to be aware that they should be passing in a
+//! transposed graph.
+static cll::opt<bool>
+    transposedGraph("transposedGraph",
+                    cll::desc("Specify that the input graph is transposed"),
+                    cll::init(false));
+
 constexpr static const unsigned CHUNK_SIZE = 32;
 
 struct LNode {
@@ -52,11 +59,12 @@ using ResidualArray = galois::LargeArray<PRTy>;
 
 //! Initialize nodes for the topological algorithm.
 void initNodeDataTopological(Graph& g) {
+  PRTy init_value = 1.0f / g.size();
   galois::do_all(
       galois::iterate(g),
       [&](const GNode& n) {
         auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
-        sdata.value = INIT_RESIDUAL;
+        sdata.value = init_value;
         sdata.nout  = 0;
       },
       galois::no_stats(), galois::loopname("initNodeData"));
@@ -120,6 +128,7 @@ void computeOutDeg(Graph& graph) {
  * If the residual is smaller than the tolerance, that is not reflected to
  * the next pagerank.
  */
+//! [scalarreduction]
 void computePRResidual(Graph& graph, DeltaArray& delta,
                        ResidualArray& residual) {
   unsigned int iterations = 0;
@@ -166,17 +175,17 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
 #if DEBUG
     std::cout << "iteration: " << iterations << "\n";
 #endif
-
     iterations++;
     if (iterations >= maxIterations || !accum.reduce()) {
       break;
     }
     accum.reset();
   } ///< End while(true).
+    //! [scalarreduction]
 
   if (iterations >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iterations << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iterations
+              << " iterations\n";
   }
 }
 
@@ -186,8 +195,9 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
  */
 void computePRTopological(Graph& graph) {
   unsigned int iteration = 0;
-  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> accum;
 
+  float base_score = (1.0f - ALPHA) / graph.size();
   while (true) {
     galois::do_all(
         galois::iterate(graph),
@@ -209,45 +219,45 @@ void computePRTopological(Graph& graph) {
 
           //! New value of pagerank after computing contributions from
           //! incoming edges in the original graph.
-          float value = sum * ALPHA + (1.0 - ALPHA);
+          float value = sum * ALPHA + base_score;
           //! Find the delta in new and old pagerank values.
           float diff = std::fabs(value - sdata.value);
 
           //! Do not update pagerank before the diff is computed since
           //! there is a data dependence on the pagerank value.
           sdata.value = value;
-          max_delta.update(diff);
+          accum += diff;
         },
         galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
         galois::loopname("PageRank"));
-
-    float delta = max_delta.reduce();
 
 #if DEBUG
     std::cout << "iteration: " << iteration << " max delta: " << delta << "\n";
 #endif
 
     iteration += 1;
-    if (delta <= tolerance || iteration >= maxIterations) {
+    if (accum.reduce() <= tolerance || iteration >= maxIterations) {
       break;
     }
-    max_delta.reset();
+    accum.reset();
 
   } ///< End while(true).
 
+  galois::runtime::reportStat_Single("PageRank", "Rounds", iteration);
   if (iteration >= maxIterations) {
-    std::cerr << "ERROR: failed to converge in " << iteration << " iterations"
-              << std::endl;
+    std::cerr << "ERROR: failed to converge in " << iteration
+              << " iterations\n";
   }
 }
 
 void prTopological(Graph& graph) {
   initNodeDataTopological(graph);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRTopological(graph);
-  prTimer.stop();
+  execTime.stop();
 }
 
 void prResidual(Graph& graph) {
@@ -258,27 +268,33 @@ void prResidual(Graph& graph) {
 
   initNodeDataResidual(graph, delta, residual);
   computeOutDeg(graph);
-  galois::StatTimer prTimer;
-  prTimer.start();
+
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   computePRResidual(graph, delta, residual);
-  prTimer.stop();
+  execTime.stop();
 }
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
 
-  galois::StatTimer overheadTime("OverheadTime");
-  overheadTime.start();
+  if (!transposedGraph) {
+    GALOIS_DIE("This application requires a transposed graph input;"
+               " please use the -transposedGraph flag "
+               " to indicate the input is a transposed graph.");
+  }
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph transposeGraph;
   std::cout << "WARNING: pull style algorithms work on the transpose of the "
                "actual graph\n"
-            << "WARNING: this program assumes that " << filename
+            << "WARNING: this program assumes that " << inputFile
             << " contains transposed representation\n\n"
-            << "Reading graph: " << filename << std::endl;
+            << "Reading graph: " << inputFile << "\n";
 
-  galois::graphs::readGraph(transposeGraph, filename);
+  galois::graphs::readGraph(transposeGraph, inputFile);
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
@@ -288,21 +304,18 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
-  case Topo: {
+  case Topo:
     std::cout << "Running Pull Topological version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prTopological(transposeGraph);
     break;
-  }
-  case Residual: {
+  case Residual:
     std::cout << "Running Pull Residual version, tolerance:" << tolerance
               << ", maxIterations:" << maxIterations << "\n";
     prResidual(transposeGraph);
     break;
-  }
-  default: {
+  default:
     std::abort();
-  }
   }
 
   galois::reportPageAlloc("MeminfoPost");
@@ -315,6 +328,7 @@ int main(int argc, char** argv) {
   minRank.reset();
   distanceSum.reset();
 
+  //! [example of no_stats]
   galois::do_all(
       galois::iterate(transposeGraph),
       [&](uint64_t i) {
@@ -325,6 +339,7 @@ int main(int argc, char** argv) {
         distanceSum += rank;
       },
       galois::loopname("Sanity check"), galois::no_stats());
+  //! [example of no_stats]
 
   PRTy rMaxRank = maxRank.reduce();
   PRTy rMinRank = minRank.reduce();
@@ -341,6 +356,7 @@ int main(int argc, char** argv) {
   printPageRank(transposeGraph);
 #endif
 
-  overheadTime.stop();
+  totalTime.stop();
+
   return 0;
 }

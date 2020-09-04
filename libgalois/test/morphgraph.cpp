@@ -53,19 +53,19 @@ void traverseGraph(Graph& g) {
       sum += g.getEdgeData(oe);
     }
   }
-  std::cout << "  out sum = " << sum << std::endl;
+  std::cout << "  out sum = " << sum << "\n";
 
   for (auto n : g) {
     for (auto ie : g.in_edges(n)) {
       sum -= g.getEdgeData(ie);
     }
   }
-  std::cout << "  all sum = " << sum << std::endl;
+  std::cout << "  all sum = " << sum << "\n";
 }
 
 template <typename Graph>
 void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
-  std::cout << prompt << std::endl;
+  std::cout << prompt << "\n";
 
   galois::graphs::FileGraph f;
   f.fromFileInterleaved<typename Graph::file_edge_data_type>(filename);
@@ -97,8 +97,7 @@ int main(int argc, char** argv) {
 
   if (argc < 4) {
     std::cout << "Usage: ./test-morphgraph <input> <num_threads> "
-                 "<out|in-out|symmetric> [stat_file]"
-              << std::endl;
+                 "<out|in-out|symmetric> [stat_file]\n";
     return 0;
   }
 
@@ -106,8 +105,8 @@ int main(int argc, char** argv) {
   graphtype = argv[3];
 
   auto numThreads = galois::setActiveThreads(std::stoul(argv[2]));
-  std::cout << "Loading " << filename << " with " << numThreads << " threads."
-            << std::endl;
+  std::cout << "Loading " << filename << " with " << numThreads
+            << " threads.\n";
 
   if (argc >= 5) {
     galois::runtime::setStatFile(argv[4]);

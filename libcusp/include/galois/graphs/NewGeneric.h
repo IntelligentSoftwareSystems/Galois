@@ -3,7 +3,7 @@
  * parallelism. The code is being released under the terms of the 3-Clause BSD
  * License (a copy is located in LICENSE.txt at the top-level directory).
  *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2020, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,9 +18,10 @@
  */
 
 /**
- * @file TBD
+ * @file NewGeneric.h
  *
- * Generic, new
+ * Contains the main graph class as well as the partitioning logic that CuSP
+ * uses.
  */
 
 #ifndef _GALOIS_DIST_NEWGENERIC_H
@@ -28,6 +29,7 @@
 
 #include "galois/graphs/DistributedGraph.h"
 #include "galois/DReducible.h"
+#include <optional>
 #include <sstream>
 
 #define CUSP_PT_TIMER 0
@@ -46,7 +48,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME          = "dGraph_Generic";
-  Partitioner* graphPartitioner;
+  std::unique_ptr<Partitioner> graphPartitioner;
 
   //! How many rounds to sync state during edge assignment phase
   uint32_t _edgeStateRounds;
@@ -54,7 +56,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   std::vector<uint64_t> old_hostLoads;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
+    assert(base_DistGraph::isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -99,17 +101,18 @@ public:
   //! typedef for base DistGraph class
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
-  virtual unsigned getHostID(uint64_t gid) const {
+private:
+  virtual unsigned getHostIDImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->retrieveMaster(gid);
   }
 
-  virtual bool isOwned(uint64_t gid) const {
+  virtual bool isOwnedImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
   }
 
-  virtual bool isLocal(uint64_t gid) const {
+  virtual bool isLocalImpl(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return (base_DistGraph::globalToLocalMap.find(gid) !=
             base_DistGraph::globalToLocalMap.end());
@@ -119,11 +122,14 @@ public:
   // TODO make it so user doens't have to specify; can be done by tracking
   // if an outgoing mirror is marked as having an incoming edge on any
   // host
-  virtual bool is_vertex_cut() const { return graphPartitioner->isVertexCut(); }
-  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
+  virtual bool isVertexCutImpl() const {
+    return graphPartitioner->isVertexCut();
+  }
+  virtual std::pair<unsigned, unsigned> cartesianGridImpl() const {
     return graphPartitioner->cartesianGrid();
   }
 
+public:
   /**
    * Reset load balance on host reducibles.
    */
@@ -207,9 +213,9 @@ public:
       base_DistGraph::readersFromFile(g, masterBlockFile);
     }
 
-    graphPartitioner =
-        new Partitioner(host, _numHosts, base_DistGraph::numGlobalNodes,
-                        base_DistGraph::numGlobalEdges);
+    graphPartitioner = std::make_unique<Partitioner>(
+        host, _numHosts, base_DistGraph::numGlobalNodes,
+        base_DistGraph::numGlobalEdges);
     // TODO abstract this away somehow
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
@@ -364,8 +370,6 @@ public:
     fillMirrors();
     TfillMirrors.stop();
 
-    base_DistGraph::printStatistics();
-
     if (_edgeStateRounds > 1) {
       // reset edge load since we need exact same answers again
       resetEdgeLoad();
@@ -420,11 +424,6 @@ public:
     }
   }
 
-  /**
-   * Free the graph partitioner
-   */
-  ~NewDistGraphGeneric() { delete graphPartitioner; }
-
 private:
   galois::runtime::SpecificRange<boost::counting_iterator<size_t>>
   getSpecificThreadRange(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
@@ -455,11 +454,6 @@ private:
     for (unsigned i = 0; i < galois::runtime::activeThreads + 1; i++) {
       assignedThreadRanges[i] += startNode;
     }
-
-    // galois::gPrint("[", base_DistGraph::id, "] num local is ", numLocalNodes,
-    // "\n"); for (uint32_t i : assignedThreadRanges) {
-    //  galois::gPrint("[", base_DistGraph::id, "]", i , "\n");
-    //}
 
     auto toReturn = galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(startNode),
@@ -494,14 +488,6 @@ private:
 
     galois::runtime::SpecificRange<boost::counting_iterator<size_t>> work =
         getSpecificThreadRange(bufGraph, rangeVector, start, end);
-
-    // galois::on_each([&] (unsigned i, unsigned j) {
-    //  galois::gPrint("[", base_DistGraph::id, " ", i, "] local range ",
-    //  *work.local_begin(), " ", *work.local_end(), "\n");
-    //});
-    // galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
-    //  GRNAME, "Phase0DetNeighLocation_" + std::string(base_DistGraph::id)
-    //);
 
     // Step 2: loop over all local nodes, determine neighbor locations
     galois::do_all(
@@ -579,8 +565,8 @@ private:
                    (ghosts.size() - numLocal) / 64, " vs. total vector size ",
                    numToReserve / 2);
 
-    ghosts.resize(
-        0); // TODO: should not be used after this - refactor to make this clean
+    // TODO: should not be used after this - refactor to make this clean
+    ghosts.resize(0);
 
     mapSetupTimer.stop();
 
@@ -625,10 +611,6 @@ private:
       uint32_t sendingHost = p->first;
       // deserialize into neighbor bitsets
       galois::runtime::gDeserialize(p->second, syncNodes[sendingHost]);
-
-      // for (uint32_t i : ghosts[sendingHost].getOffsets()) {
-      //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
-      //}
     }
 
     p0BitsetCommTimer.stop();
@@ -771,7 +753,8 @@ private:
           assert(!loadsClear.test(sendingHost));
           loadsClear.set(sendingHost);
         } else {
-          GALOIS_DIE("Invalid message type for async load synchronization");
+          GALOIS_DIE("unexpected message type in async load synchronization: ",
+                     messageType);
         }
       }
     } while (p);
@@ -906,12 +889,6 @@ private:
       std::vector<uint32_t> mastersToSend =
           getDataFromOffsets(offsetVector, dataVector);
 
-      // for (unsigned i : mastersToSend) {
-      //  galois::gDebug("[", base_DistGraph::id, "] gid ",
-      //                 i + base_DistGraph::gid2host[net.ID].first,
-      //                 " master send ", i);
-      //}
-      // assert it's a positive number
       assert(mastersToSend.size());
 
       size_t num_selected = toSync.count();
@@ -1019,7 +996,7 @@ private:
         } else if (phase == 0) {
           net.sendTagged(h, galois::runtime::evilPhase, b);
         } else {
-          GALOIS_DIE("phase in send all clears should be 0 or 1");
+          GALOIS_DIE("unexpected phase: ", phase);
         }
       }
     }
@@ -1088,7 +1065,8 @@ private:
       galois::runtime::gDeserialize(p->second, receivedOffsets);
       galois::runtime::gDeserialize(p->second, receivedMasters);
     } else if (messageType != 0) {
-      GALOIS_DIE("Invalid message type for sync of master assignments");
+      GALOIS_DIE("invalid message type for sync of master assignments: ",
+                 messageType);
     }
 
     galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
@@ -1145,7 +1123,8 @@ private:
           assert(!hostFinished.test(sendingHost));
           hostFinished.set(sendingHost);
         } else if (messageType != 0) {
-          GALOIS_DIE("Invalid message type for sync of master assignments");
+          GALOIS_DIE("invalid message type for sync of master assignments: ",
+                     messageType);
         }
 
         galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
@@ -2031,7 +2010,7 @@ private:
 #ifndef NDEBUG
     for (uint32_t i : masterMap) {
       assert(i != (uint32_t)-1);
-      assert(i >= 0 && i < base_DistGraph::numHosts);
+      assert(i < base_DistGraph::numHosts);
     }
 #endif
 
@@ -2733,7 +2712,7 @@ private:
           [&](uint64_t src) {
             uint32_t lsrc    = 0;
             uint64_t curEdge = 0;
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               lsrc = this->G2L(src);
               curEdge =
                   *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
@@ -2764,7 +2743,7 @@ private:
 
               if (hostBelongs == id) {
                 // edge belongs here, construct on self
-                assert(this->isLocal(src));
+                assert(base_DistGraph::isLocal(src));
                 uint32_t ldst = this->G2L(gdst);
                 graph.constructEdge(curEdge++, ldst, gdata);
                 // TODO
@@ -2777,7 +2756,7 @@ private:
             }
 
             // make sure all edges accounted for if local
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               assert(curEdge == (*graph.edge_end(lsrc)));
             }
 
@@ -2886,7 +2865,7 @@ private:
           [&](uint64_t src) {
             uint32_t lsrc    = 0;
             uint64_t curEdge = 0;
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               lsrc = this->G2L(src);
               curEdge =
                   *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
@@ -2912,7 +2891,7 @@ private:
 
               if (hostBelongs == id) {
                 // edge belongs here, construct on self
-                assert(this->isLocal(src));
+                assert(base_DistGraph::isLocal(src));
                 uint32_t ldst = this->G2L(gdst);
                 graph.constructEdge(curEdge++, ldst);
                 // TODO
@@ -2924,7 +2903,7 @@ private:
             }
 
             // make sure all edges accounted for if local
-            if (this->isLocal(src)) {
+            if (base_DistGraph::isLocal(src)) {
               assert(curEdge == (*graph.edge_end(lsrc)));
             }
 
@@ -2992,18 +2971,10 @@ private:
         GRNAME, std::string("EdgeLoadingMaxBytesSent"), maxBytesSent.reduce());
   }
 
-  //! Optional type
-  //! @tparam T type that the variable may possibly take
-  template <typename T>
-#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
-  using optional_t = std::experimental::optional<T>;
-#else
-  using optional_t = boost::optional<T>;
-#endif
   //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
   template <typename GraphTy>
   void processReceivedEdgeBuffer(
-      optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
+      std::optional<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
       GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
     if (buffer) {
       auto& rb = buffer->second;
@@ -3012,7 +2983,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
+        assert(base_DistGraph::isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
@@ -3053,8 +3024,7 @@ private:
       uint64_t gdst = gdst_vec[i++];
       uint32_t ldst = this->G2L(gdst);
       graph.constructEdge(cur++, ldst, gdata);
-      // TODO
-      // if ldst is an outgoing mirror, this is vertex cut
+      // TODO if ldst is an outgoing mirror, this is vertex cut
     }
   }
 
@@ -3069,46 +3039,9 @@ private:
       uint64_t gdst = gdst_vec[i++];
       uint32_t ldst = this->G2L(gdst);
       graph.constructEdge(cur++, ldst);
-      // TODO
-      // if ldst is an outgoing mirror, this is vertex cut
+      // TODO if ldst is an outgoing mirror, this is vertex cut
     }
   }
-
-  // public:
-  // virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
-  //                                      const unsigned int version = 0) const
-  //                                      {
-  //  // unsigned ints
-  //  ar << base_DistGraph::numNodes;
-
-  //  // partition specific
-  //  graphPartitioner->serializePartition(ar);
-
-  //  // maps and vectors
-  //  ar << base_DistGraph::localToGlobalVector;
-  //  ar << base_DistGraph::globalToLocalMap;
-  //}
-
-  // virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive&
-  // ar,
-  //                                        const unsigned int version = 0) {
-  //  graphPartitioner = new Partitioner(base_DistGraph::id,
-  //  base_DistGraph::numHosts,
-  //                                     base_DistGraph::numGlobalNodes,
-  //                                     base_DistGraph::numGlobalEdges);
-
-  //  graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
-
-  //  // unsigned ints
-  //  ar >> base_DistGraph::numNodes;
-
-  //  // partition specific
-  //  graphPartitioner->deserializePartition(ar);
-
-  //  // maps and vectors
-  //  ar >> base_DistGraph::localToGlobalVector;
-  //  ar >> base_DistGraph::globalToLocalMap;
-  //}
 };
 
 // make GRNAME visible to public

@@ -41,8 +41,7 @@ public:
   typedef _Compare key_compare;
   typedef _Alloc allocator_type;
 
-  class value_compare
-      : public std::binary_function<value_type, value_type, bool> {
+  class value_compare {
     friend class flat_map<_Key, _Tp, _Compare, _Alloc, _Store>;
 
   protected:
@@ -64,8 +63,7 @@ private:
   _VectTy _data;
   _Compare _comp;
 
-  class value_key_compare
-      : public std::binary_function<value_type, key_type, bool> {
+  class value_key_compare {
     friend class flat_map<_Key, _Tp, _Compare, _Alloc, _Store>;
 
   protected:

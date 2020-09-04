@@ -1,6 +1,7 @@
 # distutils: language=c++
 from libcpp cimport bool
 from libc.stdint cimport *
+from libstd.atomic cimport atomic
 
 # Declaration from "Galois/Threads.h"
 
@@ -18,6 +19,7 @@ cdef extern from "galois/Galois.h" namespace "galois" nogil:
     void gPrint(...)
     cppclass UserContext[T]:
         pass
+        void push(...)
 
     void for_each(...)
     void do_all(...)
@@ -37,8 +39,8 @@ cdef extern from "galois/Galois.h" namespace "galois" nogil:
     cppclass steal:
         steal()
 
-    cppclass no_conflicts:
-        no_conflicts()
+    cppclass disable_conflict_detection:
+        disable_conflict_detection()
 
     cppclass GReduceMax[T]:
         pass
@@ -59,6 +61,12 @@ cdef extern from "galois/Galois.h" namespace "galois" nogil:
         void allocateBlocked(size_t)
         T &operator[](size_t)
 
+
+    #### Atomic Helpers ####
+cdef extern from "galois/AtomicHelpers.h" namespace "galois" nogil:
+    const T atomicMin[T](atomic[T]&, const T)
+    const uint32_t atomicMin[uint32_t](atomic[uint32_t]&, const uint32_t)
+
 cdef extern from "galois/MethodFlags.h" namespace "galois" nogil:
     cdef cppclass MethodFlag:
         pass
@@ -70,3 +78,4 @@ cdef extern from "galois/MethodFlags.h" namespace "galois" nogil:
     cdef MethodFlag PREVIOUS "galois::MethodFlag::PREVIOUS"
 
     
+

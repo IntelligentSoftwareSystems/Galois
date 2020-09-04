@@ -196,7 +196,7 @@ public:
   bool propagate() { return this->find()->isReady(); }
 
   virtual void alwaysAcquire(Lockable*, galois::MethodFlag) {
-    GALOIS_DIE("shouldn't reach here");
+    GALOIS_DIE("unreachable");
   }
 };
 
@@ -392,7 +392,7 @@ struct DNewItem {
 
   bool operator!=(const DNewItem<T>& o) const { return !(*this == o); }
 
-  struct GetValue : public std::unary_function<DNewItem<T>, const T&> {
+  struct GetValue {
     const T& operator()(const DNewItem<T>& x) const { return x.val; }
   };
 };
@@ -460,9 +460,10 @@ struct OptionsCommon {
 
   constexpr static bool needStats = galois::internal::NeedStats<ArgsTy>::value;
   constexpr static bool needsPush = !has_trait<no_pushes_tag, ArgsTy>();
-  constexpr static bool needsAborts = !has_trait<no_conflicts_tag, ArgsTy>();
-  constexpr static bool needsPia    = has_trait<per_iter_alloc_tag, ArgsTy>();
-  constexpr static bool needsBreak  = has_trait<parallel_break_tag, ArgsTy>();
+  constexpr static bool needsAborts =
+      !has_trait<disable_conflict_detection_tag, ArgsTy>();
+  constexpr static bool needsPia   = has_trait<per_iter_alloc_tag, ArgsTy>();
+  constexpr static bool needsBreak = has_trait<parallel_break_tag, ArgsTy>();
 
   constexpr static bool hasBreak = has_trait<det_parallel_break_tag, ArgsTy>();
   constexpr static bool hasId    = has_trait<det_id_tag, ArgsTy>();
@@ -964,7 +965,7 @@ class NewWorkManager : public IdManager<OptionsTy> {
   typedef FIFO<1024, Item> ReserveTy;
   typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize, NewItem> NewWork;
 
-  struct GetNewItem : public std::unary_function<int, NewItemsTy&> {
+  struct GetNewItem {
     NewWorkManager* self;
     GetNewItem(NewWorkManager* s = 0) : self(s) {}
     NewItemsTy& operator()(int i) const {
@@ -1593,7 +1594,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
     return false;
     break;
   default:
-    GALOIS_DIE("Unknown conflict flag");
+    GALOIS_DIE("unknown conflict flag");
     break;
   }
 
@@ -1605,7 +1606,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
     for (auto& item : tld.facing.getPushBuffer()) {
       this->pushNew(item, parent, ++count);
       if (count == 0) {
-        GALOIS_DIE("Counter overflow");
+        GALOIS_DIE("counter overflow");
       }
     }
     if (count)

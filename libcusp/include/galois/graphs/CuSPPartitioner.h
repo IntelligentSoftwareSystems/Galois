@@ -38,6 +38,10 @@ enum CUSP_GRAPH_TYPE {
   CUSP_CSC  //!< Compressed sparse column graph format, i.e. incoming edges
 };
 
+template <typename NodeData, typename EdgeData>
+using DistGraphPtr =
+    std::unique_ptr<galois::graphs::DistGraph<NodeData, EdgeData>>;
+
 /**
  * Main CuSP function: partitions a graph on disk, one partition per host.
  *
@@ -51,6 +55,7 @@ enum CUSP_GRAPH_TYPE {
  * @param transposeGraphFile Transpose graph of graphFile in Galois binary
  * CSC format (i.e. give it the transpose version of graphFile). Ignore
  * this argument if the graph is symmetric.
+ * @param masterBlockFile
  * @param cuspAsync Toggles asynchronous master assignment phase during
  * partitioning
  * @param cuspStateRounds Toggles number of rounds used to synchronize
@@ -76,7 +81,7 @@ enum CUSP_GRAPH_TYPE {
  */
 template <typename PartitionPolicy, typename NodeData = char,
           typename EdgeData = void>
-galois::graphs::DistGraph<NodeData, EdgeData>*
+DistGraphPtr<NodeData, EdgeData>
 cuspPartitionGraph(std::string graphFile, CUSP_GRAPH_TYPE inputType,
                    CUSP_GRAPH_TYPE outputType, bool symmetricGraph = false,
                    std::string transposeGraphFile = "",
@@ -120,15 +125,15 @@ cuspPartitionGraph(std::string graphFile, CUSP_GRAPH_TYPE inputType,
       GALOIS_DIE("Invalid input graph type specified in CuSP partitioner");
     }
 
-    return new DistGraphConstructor(inputToUse, net.ID, net.Num, cuspAsync,
-                                    cuspStateRounds, useTranspose, readPolicy,
-                                    nodeWeight, edgeWeight, masterBlockFile);
+    return std::make_unique<DistGraphConstructor>(
+        inputToUse, net.ID, net.Num, cuspAsync, cuspStateRounds, useTranspose,
+        readPolicy, nodeWeight, edgeWeight, masterBlockFile);
   } else {
     // symmetric graph path: assume the passed in graphFile is a symmetric
     // graph; output is also symmetric
-    return new DistGraphConstructor(graphFile, net.ID, net.Num, cuspAsync,
-                                    cuspStateRounds, false, readPolicy,
-                                    nodeWeight, edgeWeight, masterBlockFile);
+    return std::make_unique<DistGraphConstructor>(
+        graphFile, net.ID, net.Num, cuspAsync, cuspStateRounds, false,
+        readPolicy, nodeWeight, edgeWeight, masterBlockFile);
   }
 }
 } // end namespace galois

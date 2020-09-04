@@ -140,8 +140,8 @@ int main(int argc, char** argv) {
   galois::for_each(
       galois::iterate(graph),
       [&](GNode n, auto&) { incrementNeighborsAtomically(n); },
-      galois::loopname("for_each_self_sync"), galois::no_conflicts(),
-      galois::no_pushes());
+      galois::loopname("for_each_self_sync"),
+      galois::disable_conflict_detection(), galois::no_pushes());
   verify(graph, N);
 
   return 0;

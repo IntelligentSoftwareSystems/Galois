@@ -39,13 +39,6 @@
 /*
  * Headers for boost serialization
  */
-//#include <boost/archive/binary_oarchive.hpp>
-//#include <boost/archive/binary_iarchive.hpp>
-//#include <boost/serialization/split_member.hpp>
-//#include <boost/serialization/binary_object.hpp>
-//#include <boost/serialization/serialization.hpp>
-//#include <boost/serialization/vector.hpp>
-//#include <boost/serialization/unordered_map.hpp>
 
 namespace galois {
 namespace graphs {
@@ -77,6 +70,29 @@ private:
 
   using GraphTy = galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true, false,
                   false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+
+  // vector for determining range objects for master nodes + nodes
+  // with edges (which includes masters)
+  //! represents split of all nodes among threads to balance edges
+  std::vector<uint32_t> allNodesRanges;
+  //! represents split of master nodes among threads to balance edges
+  std::vector<uint32_t> masterRanges;
+  //! represents split of nodes with edges (includes masters) among threads to
+  //! balance edges
+  std::vector<uint32_t> withEdgeRanges;
+  //! represents split of all nodes among threads to balance in-edges
+  std::vector<uint32_t> allNodesRangesIn;
+  //! represents split of master nodes among threads to balance in-edges
+  std::vector<uint32_t> masterRangesIn;
+
+  using NodeRangeType =
+      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
+
+  //! Vector of ranges that stores the 3 different range objects that a user is
+  //! able to access
+  std::vector<NodeRangeType> specificRanges;
+  //! Like specificRanges, but for in edges
+  std::vector<NodeRangeType> specificRangesIn;
 
 protected:
   //! The internal graph used by DistGraph to represent the graph
@@ -114,49 +130,6 @@ protected:
   //! LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
-private:
-  // vector for determining range objects for master nodes + nodes
-  // with edges (which includes masters)
-  //! represents split of all nodes among threads to balance edges
-  std::vector<uint32_t> allNodesRanges;
-  //! represents split of master nodes among threads to balance edges
-  std::vector<uint32_t> masterRanges;
-  //! represents split of nodes with edges (includes masters) among threads to
-  //! balance edges
-  std::vector<uint32_t> withEdgeRanges;
-  //! represents split of all nodes among threads to balance in-edges
-  std::vector<uint32_t> allNodesRangesIn;
-  //! represents split of master nodes among threads to balance in-edges
-  std::vector<uint32_t> masterRangesIn;
-
-  using NodeRangeType =
-      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
-
-  //! Vector of ranges that stores the 3 different range objects that a user is
-  //! able to access
-  std::vector<NodeRangeType> specificRanges;
-  //! Like specificRanges, but for in edges
-  std::vector<NodeRangeType> specificRangesIn;
-
-protected:
-  //! Prints graph statistics.
-  void printStatistics() {
-    if (id == 0) {
-      galois::gPrint("Total nodes: ", numGlobalNodes, "\n");
-      galois::gPrint("Total edges: ", numGlobalEdges, "\n");
-    }
-    galois::gPrint("[", id, "] Master nodes: ", numOwned, "\n");
-    galois::gPrint("[", id, "] Mirror nodes: ", size() - numOwned, "\n");
-    galois::gPrint("[", id, "] Nodes with edges: ", numNodesWithEdges, "\n");
-    galois::gPrint("[", id, "] Edges: ", sizeEdges(), "\n");
-
-    // reports the number of nodes + edge as well
-    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-        "dGraph", "TotalNodes", numOwned);
-    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-        "dGraph", "TotalEdges", sizeEdges());
-  }
-
   //! Increments evilPhase, a phase counter used by communication.
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
@@ -173,11 +146,10 @@ protected:
     unsigned result = galois::runtime::evilPhase + 1;
 
     // limit defined by MPI or LCI
-    if (result >= static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
+    if (result >= uint32_t{std::numeric_limits<int16_t>::max()}) {
       return 1;
-    } else {
-      return result;
     }
+    return result;
   }
 
   //! used to sort edges in the sort edges function
@@ -189,33 +161,6 @@ protected:
       return e1.dst < e2.dst;
     }
   };
-
-  /**
-   * Print edges of the graph (in parallel)
-   */
-  void printEdges() {
-    using GN = typename GraphTy::GraphNode;
-    galois::do_all(
-        galois::iterate(graph),
-        [&](GN n) {
-          for (auto e : edges(n)) {
-            galois::gPrint("[", id, "] ", n, " ", getEdgeDst(e), "\n");
-          }
-        },
-        galois::no_stats(), galois::loopname("CSREdgePrint"), galois::steal());
-  }
-
-  /**
-   * Sort the underlying LC_CSR_Graph by ID (destinations)
-   */
-  void sortEdges() {
-    galois::gPrint("[", id, "] Sorting edges\n");
-    using GN = typename GraphTy::GraphNode;
-    galois::do_all(
-        galois::iterate(graph),
-        [&](GN n) { graph.sortEdges(n, IdLess<GN, EdgeTy>()); },
-        galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
-  }
 
 private:
   /**
@@ -238,36 +183,38 @@ private:
     uint64_t numNodes_to_divide = g.size();
     if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
       for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
-        gid2host.push_back(galois::block_range(0U, (unsigned)numNodes_to_divide,
+        gid2host.push_back(galois::block_range(uint64_t{0}, numNodes_to_divide,
                                                i, numHosts * DecomposeFactor));
-    } else { // TODO: not compatible with DecomposeFactor.
-      assert(scalefactor.size() == numHosts);
+      return;
+    }
 
-      unsigned numBlocks = 0;
+    // TODO: not compatible with DecomposeFactor.
+    assert(scalefactor.size() == numHosts);
 
-      for (unsigned i = 0; i < numHosts; ++i) {
-        numBlocks += scalefactor[i];
-      }
+    unsigned numBlocks = 0;
 
-      std::vector<std::pair<uint64_t, uint64_t>> blocks;
-      for (unsigned i = 0; i < numBlocks; ++i) {
-        blocks.push_back(galois::block_range(0U, (unsigned)numNodes_to_divide,
-                                             i, numBlocks));
-      }
+    for (unsigned i = 0; i < numHosts; ++i) {
+      numBlocks += scalefactor[i];
+    }
 
-      std::vector<unsigned> prefixSums;
-      prefixSums.push_back(0);
+    std::vector<std::pair<uint64_t, uint64_t>> blocks;
+    for (unsigned i = 0; i < numBlocks; ++i) {
+      blocks.push_back(
+          galois::block_range(uint64_t{0}, numNodes_to_divide, i, numBlocks));
+    }
 
-      for (unsigned i = 1; i < numHosts; ++i) {
-        prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-      }
+    std::vector<unsigned> prefixSums;
+    prefixSums.push_back(0);
 
-      for (unsigned i = 0; i < numHosts; ++i) {
-        unsigned firstBlock = prefixSums[i];
-        unsigned lastBlock  = prefixSums[i] + scalefactor[i] - 1;
-        gid2host.push_back(
-            std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
-      }
+    for (unsigned i = 1; i < numHosts; ++i) {
+      prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+    }
+
+    for (unsigned i = 0; i < numHosts; ++i) {
+      unsigned firstBlock = prefixSums[i];
+      unsigned lastBlock  = prefixSums[i] + scalefactor[i] - 1;
+      gid2host.push_back(
+          std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
     }
   }
 
@@ -305,8 +252,9 @@ private:
     }
 
     for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id)
+      if (h == id) {
         continue;
+      }
       galois::runtime::SendBuffer b;
       for (unsigned d = 0; d < DecomposeFactor; ++d) {
         galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
@@ -363,8 +311,7 @@ private:
    */
   void computeMastersBalancedNodesAndEdges(
       galois::graphs::OfflineGraph& g, const std::vector<unsigned>& scalefactor,
-      uint32_t nodeWeight, uint32_t edgeWeight,
-      unsigned GALOIS_UNUSED(DecomposeFactor) = 1) {
+      uint32_t nodeWeight, uint32_t edgeWeight, unsigned) {
     if (nodeWeight == 0) {
       nodeWeight = g.sizeEdges() / g.size(); // average degree
     }
@@ -404,10 +351,13 @@ protected:
    * Wrapper call that will call into more specific compute masters
    * functions that compute masters based on nodes, edges, or both.
    *
+   * @param masters_distribution method of masters distribution to use
    * @param g The offline graph which has loaded the graph you want
    * to get the masters for
    * @param scalefactor A vector that specifies if a particular host
    * should have more or less than other hosts
+   * @param nodeWeight weight to give nodes when computing balance
+   * @param edgeWeight weight to give edges when computing balance
    * @param DecomposeFactor Specifies how decomposed the blocking
    * of nodes should be. For example, a factor of 2 will make 2 blocks
    * out of 1 block had the decompose factor been set to 1.
@@ -463,7 +413,6 @@ protected:
       std::getline(mappings, curLine);
     }
 
-    // galois::gPrint("[", id, "] Read line: ", curLine, "\n");
     std::vector<char> modifyLine(curLine.begin(), curLine.end());
     char* tokenizedString = modifyLine.data();
     char* token;
@@ -480,8 +429,6 @@ protected:
       token = strtok(NULL, " ");
     }
     std::string right(token);
-
-    // galois::gPrint("[", id, "] Left: ", left, ", Right: ", right, "\n");
 
     gid2host.resize(numHosts);
     gid2host[id].first  = std::stoul(left);
@@ -563,12 +510,6 @@ public:
     mirrorNodes.resize(numHosts);
     numGlobalNodes = 0;
     numGlobalEdges = 0;
-
-    // report edge buffer size
-    // if (host == 0) {
-    //  galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
-    //                                     (unsigned)edgePartitionSendBufSize);
-    //}
   }
 
   /**
@@ -590,25 +531,36 @@ public:
 
   std::vector<std::vector<size_t>>& getMirrorNodes() { return mirrorNodes; }
 
+private:
+  virtual unsigned getHostIDImpl(uint64_t) const = 0;
+  virtual bool isOwnedImpl(uint64_t) const       = 0;
+  virtual bool isLocalImpl(uint64_t) const       = 0;
+  virtual bool isVertexCutImpl() const           = 0;
+  virtual std::pair<unsigned, unsigned> cartesianGridImpl() const {
+    return std::make_pair(0u, 0u);
+  }
+
+public:
+  virtual ~DistGraph() {}
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
-  virtual unsigned getHostID(uint64_t) const = 0;
+  inline unsigned getHostID(uint64_t gid) const { return getHostIDImpl(gid); }
   //! Determine if a node has a master on this host.
   //! @returns True if passed in global id has a master on this host
-  virtual bool isOwned(uint64_t) const = 0;
+  inline bool isOwned(uint64_t gid) const { return isOwnedImpl(gid); }
   //! Determine if a node has a proxy on this host
   //! @returns True if passed in global id has a proxy on this host
-  virtual bool isLocal(uint64_t) const = 0;
+  inline bool isLocal(uint64_t gid) const { return isLocalImpl(gid); }
   /**
    * Returns true if current partition is a vertex cut
    * @returns true if partition being stored in this graph is a vertex cut
    */
-  virtual bool is_vertex_cut() const = 0;
+  inline bool is_vertex_cut() const { return isVertexCutImpl(); }
   /**
    * Returns Cartesian split (if it exists, else returns pair of 0s
    */
-  virtual std::pair<unsigned, unsigned> cartesianGrid() const {
-    return std::make_pair(0u, 0u);
+  inline std::pair<unsigned, unsigned> cartesianGrid() const {
+    return cartesianGridImpl();
   }
 
   bool isTransposed() { return transposed; }
@@ -636,7 +588,7 @@ public:
    * @param mflag access flag for node data
    * @returns A node data object
    */
-  inline NodeTy&
+  inline typename GraphTy::node_data_reference
   getData(GraphNode N,
           galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getData(N, mflag);
@@ -775,6 +727,24 @@ public:
     return specificRanges[2];
   }
 
+  /**
+   * Returns a vector object that contains the global IDs (in order) of
+   * the master nodes in this graph.
+   *
+   * @returns A vector object that contains the global IDs (in order) of
+   * the master nodes in this graph
+   */
+  std::vector<uint64_t> getMasterGlobalIDs() {
+    std::vector<uint64_t> IDs;
+
+    IDs.reserve(numMasters());
+    for (auto node : masterNodesRange()) {
+      IDs.push_back(getGID(node));
+    }
+
+    return IDs;
+  }
+
 protected:
   /**
    * Uses a pre-computed prefix sum to determine division of nodes among
@@ -879,127 +849,20 @@ protected:
   void edgesEqualMasters() { specificRanges[2] = specificRanges[1]; }
 
 public:
-  // TODO make these work again
   /**
    * Write the local LC_CSR graph to the file on a disk.
    *
-   * @param localGraphFileName file name to write local graph to.
    * @todo revive this
    */
-  void save_local_graph_to_file(
-      std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
-    galois::gWarn("Currently not implemented. TODO");
-    // using namespace boost::archive;
-    // galois::StatTimer dGraphTimerSaveLocalGraph("TimerSaveLocalGraph",
-    // GRNAME); dGraphTimerSaveLocalGraph.start();
-
-    // std::string fileName = localGraphFileName + "_" + std::to_string(id);
-
-    // galois::gDebug("[", id, "] inside save_local_graph_to_file \n");
-
-    // std::ofstream outputStream(fileName, std::ios::binary);
-    // if (!outputStream.is_open()) {
-    //  std::cerr << "ERROR: Could not open " << fileName
-    //            << " to save local graph!!!\n";
-    //}
-
-    // boost::archive::binary_oarchive ar(outputStream,
-    // boost::archive::no_header);
-
-    //// graph topology
-    // ar << graph;
-    // ar << numGlobalNodes;
-    // ar << numGlobalEdges;
-
-    //// bool
-    // ar << transposed;
-
-    //// Proxy information
-    //// TODO: Find better way to serialize vector of vectors in boost
-    //// serialization
-    // for (uint32_t i = 0; i < numHosts; ++i) {
-    //  ar << masterNodes[i];
-    //  ar << mirrorNodes[i];
-    //}
-
-    // ar << numOwned;
-    // ar << beginMaster;
-    // ar << numNodesWithEdges;
-    // ar << gid2host;
-
-    //// Serialize partitioning scheme specific data structures.
-    // boostSerializeLocalGraph(ar);
-
-    // outputStream.close();
-    // dGraphTimerSaveLocalGraph.stop();
-  }
+  void save_local_graph_to_file(std::string) { GALOIS_DIE("not implemented"); }
 
   /**
    * Read the local LC_CSR graph from the file on a disk.
    *
-   * @param localGraphFileName file name to read local graph from.
    * @todo revive this
    */
-  void read_local_graph_from_file(
-      std::string GALOIS_UNUSED(localGraphFileName) = "local_graph") {
-    galois::gWarn("Currently not implemented. TODO");
-    // using namespace boost::archive;
-    // galois::StatTimer dGraphTimerReadLocalGraph("TimerReadLocalGraph",
-    // GRNAME); dGraphTimerReadLocalGraph.start();
-
-    // std::string fileName = localGraphFileName + "_" + std::to_string(id);
-
-    // std::ifstream inputStream(fileName, std::ios::binary);
-    // if (!inputStream.is_open()) {
-    //  std::cerr << "ERROR: Could not open " << fileName
-    //            << " to read local graph!!!\n";
-    //}
-
-    // galois::gPrint("[", id, "] inside read_local_graph_from_file \n");
-
-    // boost::archive::binary_iarchive ar(inputStream,
-    // boost::archive::no_header);
-
-    //// Graph topology
-    // ar >> graph;
-    // ar >> numGlobalNodes;
-    // ar >> numGlobalEdges;
-
-    //// bool
-    // ar >> transposed;
-
-    //// Proxy information
-    //// TODO: Find better way to Deserialize vector of vectors in boost
-    //// serialization
-    // for (uint32_t i = 0; i < numHosts; ++i) {
-    //  ar >> masterNodes[i];
-    //  ar >> mirrorNodes[i];
-    //}
-
-    // ar >> numOwned;
-    // ar >> beginMaster;
-    // ar >> numNodesWithEdges;
-    // ar >> gid2host;
-
-    //// Serialize partitioning scheme specific data structures.
-    // boostDeSerializeLocalGraph(ar);
-
-    // allNodesRanges.clear();
-    // masterRanges.clear();
-    // withEdgeRanges.clear();
-    // specificRanges.clear();
-
-    //// find ranges again
-    // determineThreadRanges();
-    // determineThreadRangesMaster();
-    // determineThreadRangesWithEdges();
-    // initializeSpecificRanges();
-
-    //// Exchange information among hosts
-    //// send_info_to_host();
-
-    // inputStream.close();
-    // dGraphTimerReadLocalGraph.stop();
+  void read_local_graph_from_file(std::string) {
+    GALOIS_DIE("not implemented");
   }
 
   /**
@@ -1010,6 +873,17 @@ public:
     graph.deallocate();
   }
 
+  /**
+   * Sort the underlying LC_CSR_Graph by ID (destinations)
+   * It sorts edges of the nodes by destination.
+   */
+  void sortEdgesByDestination() {
+    using GN = typename GraphTy::GraphNode;
+    galois::do_all(
+        galois::iterate(graph),
+        [&](GN n) { graph.sortEdges(n, IdLess<GN, EdgeTy>()); },
+        galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
+  }
 
 ////////////////////////////////////////////////////////////////////////////////
 // what follows are GNN functions; some are not great (e.g. expose arrays)

@@ -17,14 +17,16 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include <iostream>
-#include <limits>
+#include "DistBench/Output.h"
+#include "DistBench/Start.h"
 #include "galois/DistGalois.h"
-#include "galois/gstl.h"
-#include "DistBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/DTerminationDetector.h"
+#include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
+
+#include <iostream>
+#include <limits>
 
 #ifdef GALOIS_ENABLE_GPU
 #include "sssp_push_cuda.h"
@@ -46,9 +48,8 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"),
                                             cll::init(1000));
-static cll::opt<unsigned long long>
-    src_node("startNode", // not uint64_t due to a bug in llvm cl
-             cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<uint64_t>
+    src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 
 static cll::opt<uint32_t>
     delta("delta",
@@ -79,7 +80,7 @@ galois::DynamicBitSet bitset_dist_current;
 typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
-galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
+std::unique_ptr<galois::graphs::GluonSubstrate<Graph>> syncSubstrate;
 
 #include "sssp_push_sync.hh"
 
@@ -89,11 +90,11 @@ galois::graphs::GluonSubstrate<Graph>* syncSubstrate;
 
 struct InitializeGraph {
   const uint32_t& local_infinity;
-  cll::opt<unsigned long long>& local_src_node;
+  cll::opt<uint64_t>& local_src_node;
   Graph* graph;
 
-  InitializeGraph(cll::opt<unsigned long long>& _src_node,
-                  const uint32_t& _infinity, Graph* _graph)
+  InitializeGraph(cll::opt<uint64_t>& _src_node, const uint32_t& _infinity,
+                  Graph* _graph)
       : local_infinity(_infinity), local_src_node(_src_node), graph(_graph) {}
 
   void static go(Graph& _graph) {
@@ -251,14 +252,14 @@ struct SSSP {
 
       galois::runtime::reportStat_Tsum(
           "SSSP", "NumWorkItems_" + (syncSubstrate->get_run_identifier()),
-          (unsigned long)work_edges.read_local());
+          work_edges.read_local());
       ++_num_iterations;
     } while ((async || (_num_iterations < maxIterations)) &&
              dga.reduce(syncSubstrate->get_run_identifier()));
 
     galois::runtime::reportStat_Tmax(
         "SSSP", "NumIterations_" + std::to_string(syncSubstrate->get_run_num()),
-        (unsigned long)_num_iterations);
+        _num_iterations);
   }
 
   void operator()(GNode src) const {
@@ -359,6 +360,49 @@ struct SSSPSanityCheck {
 };
 
 /******************************************************************************/
+/* Make results */
+/******************************************************************************/
+
+std::vector<uint32_t> makeResultsCPU(std::unique_ptr<Graph>& hg) {
+  std::vector<uint32_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(hg->getData(node).dist_current);
+  }
+
+  return values;
+}
+
+#ifdef GALOIS_ENABLE_GPU
+std::vector<uint32_t> makeResultsGPU(std::unique_ptr<Graph>& hg) {
+  std::vector<uint32_t> values;
+
+  values.reserve(hg->numMasters());
+  for (auto node : hg->masterNodesRange()) {
+    values.push_back(get_node_dist_current_cuda(cuda_ctx, node));
+  }
+
+  return values;
+}
+#else
+std::vector<uint32_t> makeResultsGPU(std::unique_ptr<Graph>& /*unused*/) {
+  abort();
+}
+#endif
+
+std::vector<uint32_t> makeResults(std::unique_ptr<Graph>& hg) {
+  switch (personality) {
+  case CPU:
+    return makeResultsCPU(hg);
+  case GPU_CUDA:
+    return makeResultsGPU(hg);
+  default:
+    abort();
+  }
+}
+
+/******************************************************************************/
 /* Main */
 /******************************************************************************/
 
@@ -366,7 +410,7 @@ constexpr static const char* const name = "SSSP - Distributed Heterogeneous "
                                           "with worklist.";
 constexpr static const char* const desc = "Variant of Chaotic relaxation SSSP "
                                           "on Distributed Galois.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url = nullptr;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -375,17 +419,15 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("SSSP", "Max Iterations",
-                                 (unsigned long)maxIterations);
-    galois::runtime::reportParam("SSSP", "Source Node ID",
-                                 (unsigned long)src_node);
+    galois::runtime::reportParam("SSSP", "Max Iterations", maxIterations);
+    galois::runtime::reportParam("SSSP", "Source Node ID", src_node);
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
 
-  Graph* hg;
+  std::unique_ptr<Graph> hg;
 #ifdef GALOIS_ENABLE_GPU
   std::tie(hg, syncSubstrate) =
       distGraphInitialization<NodeData, unsigned int>(&cuda_ctx);
@@ -440,25 +482,13 @@ int main(int argc, char** argv) {
 
   StatTimer_total.stop();
 
-  // Verify
-  if (verify) {
-    if (personality == CPU) {
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-                                     (*hg).getData(*ii).dist_current);
-      }
-    } else if (personality == GPU_CUDA) {
-#ifdef GALOIS_ENABLE_GPU
-      for (auto ii = (*hg).masterNodesRange().begin();
-           ii != (*hg).masterNodesRange().end(); ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-                                     get_node_dist_current_cuda(cuda_ctx, *ii));
-      }
-#else
-      abort();
-#endif
-    }
+  if (output) {
+    std::vector<uint32_t> results = makeResults(hg);
+    auto globalIDs                = hg->getMasterGlobalIDs();
+    assert(results.size() == globalIDs.size());
+
+    writeOutput(outputLocation, "distance", results.data(), results.size(),
+                globalIDs.data());
   }
 
   return 0;

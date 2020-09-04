@@ -1,0 +1,8 @@
+add_executable(sgl_cycle sgl_cycle.cpp)
+add_executable(sgl_diamond sgl_diamond.cpp)
+add_dependencies(apps sgl_cycle)
+add_dependencies(apps sgl_diamond)
+target_link_libraries(sgl_cycle PRIVATE Galois::pangolin miningbench)
+target_link_libraries(sgl_diamond PRIVATE Galois::pangolin miningbench)
+install(TARGETS sgl_cycle DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+install(TARGETS sgl_diamond DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)

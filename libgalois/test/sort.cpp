@@ -121,7 +121,7 @@ int do_count_if() {
 }
 
 template <typename T>
-struct mymax : std::binary_function<T, T, T> {
+struct mymax {
   T operator()(const T& x, const T& y) const { return std::max(x, y); }
 };
 

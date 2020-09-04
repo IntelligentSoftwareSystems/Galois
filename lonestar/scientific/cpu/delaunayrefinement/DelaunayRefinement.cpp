@@ -40,8 +40,8 @@ static const char* desc = "Refines a Delaunay triangulation mesh such that no "
                           "angle in the mesh is less than 30 degrees";
 static const char* url = "delaunay_mesh_refinement";
 
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 enum DetAlgo { nondet, detBase, detPrefix, detDisjoint };
 
@@ -52,6 +52,12 @@ static cll::opt<DetAlgo>
                         clEnumVal(detPrefix, "Prefix execution"),
                         clEnumVal(detDisjoint, "Disjoint execution")),
             cll::init(nondet));
+
+//! Flag that forces user to be aware that they should be passing in a
+//! mesh graph.
+static cll::opt<bool>
+    meshGraph("meshGraph", cll::desc("Specify that the input graph is a mesh"),
+              cll::init(false));
 
 template <typename WL, int Version = detBase>
 void refine(galois::InsertBag<GNode>& initialBad, Graph& graph) {
@@ -128,12 +134,21 @@ struct DetLessThan {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  if (!meshGraph) {
+    GALOIS_DIE("This application requires a mesh graph input;"
+               " please use the -meshGraph flag "
+               " to indicate the input is a mesh graph.");
+  }
 
   Graph graph;
   {
     Mesh m;
-    m.read(graph, filename.c_str(), detAlgo == nondet);
+    m.read(graph, inputFile.c_str(), detAlgo == nondet);
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
       GALOIS_DIE("bad input mesh");
@@ -154,8 +169,8 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPre2");
 
-  galois::StatTimer T;
-  T.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
 
   galois::InsertBag<GNode> initialBad;
 
@@ -192,7 +207,7 @@ int main(int argc, char** argv) {
     abort();
   }
   Trefine.stop();
-  T.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -200,16 +215,18 @@ int main(int argc, char** argv) {
     int size = galois::ParallelSTL::count_if(graph.begin(), graph.end(),
                                              is_bad(graph));
     if (size != 0) {
-      GALOIS_DIE("Bad triangles remaining");
+      GALOIS_DIE("bad triangles remaining");
     }
     Verifier v;
     if (!v.verify(graph)) {
-      GALOIS_DIE("Refinement failed");
+      GALOIS_DIE("refinement failed");
     }
     std::cout << std::distance(graph.begin(), graph.end())
               << " total triangles\n";
     std::cout << "Refinement OK\n";
   }
+
+  totalTime.stop();
 
   return 0;
 }

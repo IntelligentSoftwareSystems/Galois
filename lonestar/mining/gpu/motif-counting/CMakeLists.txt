@@ -1,0 +1,8 @@
+add_executable(motif-counting-gpu motif_gpu.cpp motif.cu)
+add_dependencies(apps motif-counting-gpu)
+target_link_libraries(motif-counting-gpu PRIVATE Galois::pangolin_gpu miningbench_gpu)
+target_compile_definitions(motif-counting-gpu PRIVATE GALOIS_ENABLE_GPU=1)
+set_property(TARGET motif-counting-gpu PROPERTY CUDA_STANDARD 14)
+install(TARGETS motif-counting-gpu DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
+#add_test_mine(small1 motif "${BASEINPUT}/Mining/citeseer.csgr")
+add_test_mine(small1 motif-counting-gpu -symmetricGraph -simpleGraph "${BASEINPUT}/Mining/citeseer.csgr")

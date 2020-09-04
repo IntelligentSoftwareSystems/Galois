@@ -18,14 +18,14 @@
  */
 
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
 #include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
+
 #include "llvm/Support/CommandLine.h"
-#include "galois/AtomicHelpers.h"
 
 #include <iostream>
 #include <fstream>
@@ -45,8 +45,7 @@ static const char* url = "louvain_clustering";
 enum Algo { foreach };
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
     cll::values(clEnumValN(Algo::foreach, "Foreach",
@@ -115,7 +114,7 @@ double algoLeidenWithLocking(Graph& graph, double lower, double threshold,
 
     galois::do_all(galois::iterate(graph), [&](GNode n) {
       auto& n_data = graph.getData(n);
-      galois::atomicAdd(c_info[n_data.curr_comm_ass].size, (uint64_t)1);
+      galois::atomicAdd(c_info[n_data.curr_comm_ass].size, uint64_t{1});
       galois::atomicAdd(c_info[n_data.curr_comm_ass].node_wt, n_data.node_wt);
       galois::atomicAdd(c_info[n_data.curr_comm_ass].degree_wt,
                         n_data.degree_wt);
@@ -172,13 +171,13 @@ double algoLeidenWithLocking(Graph& graph, double lower, double threshold,
               local_target != UNASSIGNED) {
 
             galois::atomicAdd(c_info[local_target].degree_wt, n_data.degree_wt);
-            galois::atomicAdd(c_info[local_target].size, (uint64_t)1);
+            galois::atomicAdd(c_info[local_target].size, uint64_t{1});
             galois::atomicAdd(c_info[local_target].node_wt, n_data.node_wt);
 
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].degree_wt,
                                    n_data.degree_wt);
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].size,
-                                   (uint64_t)1);
+                                   uint64_t{1});
             galois::atomicSubtract(c_info[n_data.curr_comm_ass].node_wt,
                                    n_data.node_wt);
 
@@ -277,12 +276,12 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size,
 
       if (phase == 1) {
         galois::do_all(
-            galois::iterate((uint64_t)0, num_nodes_orig), [&](GNode n) {
+            galois::iterate(uint64_t{0}, num_nodes_orig), [&](GNode n) {
               clusters_orig[n] = (*graph_curr).getData(n).curr_subcomm_ass;
             });
       } else {
         galois::do_all(
-            galois::iterate((uint64_t)0, num_nodes_orig),
+            galois::iterate(uint64_t{0}, num_nodes_orig),
             [&](GNode n) {
               assert(clusters_orig[n] < (*graph_curr).size());
               clusters_orig[n] =
@@ -316,20 +315,27 @@ void runMultiPhaseLouvainAlgorithm(Graph& graph, uint64_t min_graph_size,
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
 
-  Graph graph, graph_next;
+  if (!symmetricGraph) {
+    GALOIS_DIE("This application requires a symmetric graph input;"
+               " please use the -symmetricGraph flag "
+               " to indicate the input is a symmetric graph.");
+  }
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
+
+  Graph graph;
+  Graph graph_next;
   Graph* graph_curr;
 
-  galois::StatTimer TEnd2End("Timer_end2end");
-  TEnd2End.start();
-
-  std::cout << "Reading from file: " << filename << std::endl;
-  std::cout << "[WARNING:] Make sure " << filename
-            << " is symmetric graph without duplicate edges" << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  std::cout << "[WARNING:] Make sure " << inputFile
+            << " is symmetric graph without duplicate edges\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   graph_curr = &graph;
 
@@ -376,13 +382,11 @@ int main(int argc, char** argv) {
   }
 
   uint64_t min_graph_size = 10;
-  galois::StatTimer Tmain("Timer_LC");
-  Tmain.start();
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   runMultiPhaseLouvainAlgorithm(*graph_curr, min_graph_size, c_threshold,
                                 clusters_orig);
-  Tmain.stop();
-
-  TEnd2End.stop();
+  execTime.stop();
 
   /*
    * Sanity check: Check modularity at the end
@@ -391,5 +395,8 @@ int main(int argc, char** argv) {
   if (output_CID) {
     printNodeClusterId(graph, output_CID_filename);
   }
+
+  totalTime.stop();
+
   return 0;
 }

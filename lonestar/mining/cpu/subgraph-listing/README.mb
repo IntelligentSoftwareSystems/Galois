@@ -1,0 +1,39 @@
+Subgraph Listing
+================================================================================
+
+DESCRIPTION 
+--------------------------------------------------------------------------------
+
+This application counts the occurances of a given subgraph in a graph. 
+Currently only two patterns are supported: diamond and 4-cycle.
+
+INPUT
+--------------------------------------------------------------------------------
+
+This application takes in symmetric and simple Galois .gr graphs.
+You must specify both the -symmetricGraph and the -simpleGraph flags when
+running this benchmark.
+You must also specify the query graph (i.e. pattern) using -p.
+Currently you need to pass the 4-cycle and diamond query graphs
+to the sgl_cycle and sgl_diamond executables respectively.
+
+BUILD
+--------------------------------------------------------------------------------
+
+1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
+
+2. Run `cd <BUILD>/lonestar/mining/cpu/subgraph-listing; make -j`
+
+RUN
+--------------------------------------------------------------------------------
+
+The following is an example command line.
+
+-`$ ./sgl_cycle -symmetricGraph -simpleGraph <path-to-graph> -k 4 -p query/p0.graph -t 16`
+-`$ ./sgl_diamond -symmetricGraph -simpleGraph <path-to-graph> -k 4 -p query/p1.graph -t 16`
+
+PERFORMANCE
+--------------------------------------------------------------------------------
+
+Please see details in the paper.
+

@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
 
   // Get a partitioned graph first
   std::vector<unsigned> dummyVec;
-  deepgalois::DGraph* dGraph = NULL;
+  std::unique_ptr<deepgalois::DGraph> dGraph;
 #ifndef GALOIS_ENABLE_GPU
   dGraph = galois::graphs::constructSymmetricGraph<char, void>(dummyVec);
 #endif
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
                           neighbor_sample_sz, subgraph_sample_sz, val_interval);
 
   // initialize distributed context
-  network.partitionInit(dGraph, dataset, is_single_class);
+  network.partitionInit(dGraph.get(), dataset, is_single_class);
 
   // construct layers from distributed context
   network.construct_layers();

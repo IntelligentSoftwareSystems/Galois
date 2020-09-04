@@ -325,7 +325,6 @@ public:
         }
 
         assert(offsetIntoMap != (unsigned)-1);
-        assert(offsetIntoMap >= 0);
         assert(offsetIntoMap < localNodeToMaster.size());
 
         unsigned currentAssignment = localNodeToMaster[offsetIntoMap];
@@ -469,7 +468,6 @@ public:
         }
 
         assert(offsetIntoMap != (unsigned)-1);
-        assert(offsetIntoMap >= 0);
         assert(offsetIntoMap < localNodeToMaster.size());
 
         unsigned currentAssignment = localNodeToMaster[offsetIntoMap];
@@ -645,7 +643,6 @@ public:
         }
 
         assert(offsetIntoMap != (unsigned)-1);
-        assert(offsetIntoMap >= 0);
         assert(offsetIntoMap < localNodeToMaster.size());
 
         unsigned currentAssignment = localNodeToMaster[offsetIntoMap];
@@ -840,7 +837,6 @@ public:
         }
 
         assert(offsetIntoMap != (unsigned)-1);
-        assert(offsetIntoMap >= 0);
         assert(offsetIntoMap < localNodeToMaster.size());
 
         unsigned currentAssignment = localNodeToMaster[offsetIntoMap];

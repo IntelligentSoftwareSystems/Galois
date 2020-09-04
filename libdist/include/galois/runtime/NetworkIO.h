@@ -97,6 +97,8 @@ public:
 
   //! The default constructor takes a memory usage tracker and saves it
   //! @param tracker reference to a memory usage tracker used by the system
+  //! @param sends
+  //! @param recvs
   NetworkIO(MemUsageTracker& tracker, std::atomic<size_t>& sends,
             std::atomic<size_t>& recvs)
       : memUsageTracker(tracker), inflightSends(sends), inflightRecvs(recvs) {}

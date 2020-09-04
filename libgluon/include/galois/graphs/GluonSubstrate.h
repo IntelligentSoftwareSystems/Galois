@@ -369,11 +369,11 @@ private:
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
     if ((unsigned)taskRank != id)
-      GALOIS_DIE("Mismatch in MPI rank");
+      GALOIS_DIE("mismatch in MPI rank");
     int numTasks;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     if ((unsigned)numTasks != numHosts)
-      GALOIS_DIE("Mismatch in MPI rank");
+      GALOIS_DIE("mismatch in MPI rank");
 #endif
     // group setup
     MPI_Group world_group;
@@ -395,7 +395,7 @@ private:
         break;
       case noBareMPI:
       default:
-        GALOIS_DIE("Unsupported bare MPI");
+        GALOIS_DIE("unsupported bare MPI");
       }
     }
 #endif
@@ -411,9 +411,14 @@ public:
   /**
    * Constructor for GluonSubstrate. Initializes metadata fields.
    *
+   * @param _userGraph graph to build substrate on
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    * @param _transposed True if the graph is transposed
+   * @param _cartesianGrid cartesian grid for sync
+   * @param _partitionAgnostic determines if sync should be partition agnostic
+   * or not
+   * @param _enforcedDataMode Forced data comm mode for sync
    */
   GluonSubstrate(
       GraphTy& _userGraph, unsigned host, unsigned numHosts, bool _transposed,
@@ -616,31 +621,30 @@ private:
         get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
   }
 
-
   template <typename SyncFnTy>
   size_t getMaxSendBufferSize(uint32_t numShared) {
     if (substrateDataMode == gidsData) {
-      return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
-                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else if (substrateDataMode == offsetsData) {
-      return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t) + (numShared * sizeof(unsigned int)) +
-                sizeof(size_t) + (numShared * sizeof(typename SyncFnTy::ValTy));
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else if (substrateDataMode == bitsetData) {
       size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
       return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t)   // bitset size
-                + sizeof(size_t) // bitset vector size
-                + bitset_alloc_size + sizeof(size_t) +
-                (numShared * sizeof(typename SyncFnTy::ValTy));
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     } else { // onlyData or noData (auto)
       size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
       return sizeof(DataCommMode) + sizeof(size_t) +
-                sizeof(size_t)   // bitset size
-                + sizeof(size_t) // bitset vector size
-                + bitset_alloc_size + sizeof(size_t) +
-                (numShared * sizeof(typename SyncFnTy::ValTy));
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy));
     }
   }
 
@@ -917,7 +921,7 @@ private:
           return ((gridRowID() != gridRowID(host)) &&
                   (gridColumnID() != gridColumnID(host))); // false
         default:
-          GALOIS_DIE("isNotCommPartnerCVC error");
+          GALOIS_DIE("unreachable");
         }
       } else { // syncBroadcast
         switch (readLocation) {
@@ -931,7 +935,7 @@ private:
           return ((gridRowID() != gridRowID(host)) &&
                   (gridColumnID() != gridColumnID(host))); // false
         default:
-          GALOIS_DIE("isNotCommPartnerCVC error");
+          GALOIS_DIE("unreachable");
         }
       }
     } else {
@@ -947,7 +951,7 @@ private:
           return ((gridRowID() != gridRowID(host)) &&
                   (gridColumnID() != gridColumnID(host))); // false
         default:
-          GALOIS_DIE("isNotCommPartnerCVC error");
+          GALOIS_DIE("unreachable");
         }
       } else { // syncBroadcast, 1
         switch (readLocation) {
@@ -961,7 +965,7 @@ private:
           return ((gridRowID() != gridRowID(host)) &&
                   (gridColumnID() != gridColumnID(host))); // false
         default:
-          GALOIS_DIE("isNotCommPartnerCVC error");
+          GALOIS_DIE("unreachable");
         }
       }
       return false;
@@ -2048,8 +2052,8 @@ private:
         b[x].getVec().clear();
       }
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
-                    (loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x,
+                                                                  b[x]);
 
       MPI_Isend((uint8_t*)b[x].linearData(), b[x].size(), MPI_BYTE, x, 32767,
                 MPI_COMM_WORLD, &request[x]);
@@ -2081,7 +2085,8 @@ private:
       if (nothingToSend(x, syncType, writeLocation, readLocation))
         continue;
 
-      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x, b[x]);
+      getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x,
+                                                                  b[x]);
 
       size[x] = b[x].size();
       send_buffers_size += size[x];
@@ -2433,8 +2438,8 @@ private:
 
       galois::runtime::RecvBuffer rbuf(rb[x].begin(), rb[x].begin() + size);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>
-                   (x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf,
+                                                                  loopName);
     }
   }
 
@@ -2461,7 +2466,8 @@ private:
 
       MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf, loopName);
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(x, rbuf,
+                                                                  loopName);
     }
   }
 #endif
@@ -2594,8 +2600,8 @@ private:
 
     TSendTime.start();
     if (use_bitset_to_send) {
-      sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
-                    BitsetFnTy, VecTy, async>(loopName);
+      sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
+                    VecTy, async>(loopName);
     } else {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy,
                     galois::InvalidBitsetFnTy, VecTy, async>(loopName);
@@ -2680,19 +2686,17 @@ private:
     TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
-                   VecTy, async>(
-          loopName, mpi_access_group, window);
+                   VecTy, async>(loopName, mpi_access_group, window);
     } else {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy,
-                   galois::InvalidBitsetFnTy, VecTy, async>
-                     (loopName, mpi_access_group, window);
+                   galois::InvalidBitsetFnTy, VecTy, async>(
+          loopName, mpi_access_group, window);
     }
     TSendTime.stop();
 
     TRecvTime.start();
     sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy,
-                 VecTy, async>(
-        loopName, window, rb);
+                 VecTy, async>(loopName, window, rb);
     TRecvTime.stop();
   }
 #endif
@@ -2745,7 +2749,7 @@ private:
                       BitsetFnTy, VecTy, async>(loopName);
       break;
     default:
-      GALOIS_DIE("Unsupported bare MPI");
+      GALOIS_DIE("unsupported bare MPI");
     }
 #endif
 
@@ -2817,14 +2821,15 @@ private:
       break;
     case nonBlockingBareMPI:
       syncNonblockingMPI<writeLocation, readLocation, syncBroadcast,
-                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName, use_bitset);
+                         BroadcastFnTy, BitsetFnTy, VecTy, async>(loopName,
+                                                                  use_bitset);
       break;
     case oneSidedBareMPI:
       syncOnesidedMPI<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
                       BitsetFnTy, VecTy, async>(loopName, use_bitset);
       break;
     default:
-      GALOIS_DIE("Unsupported bare MPI");
+      GALOIS_DIE("unsupported bare MPI");
     }
 #endif
 
@@ -3090,7 +3095,7 @@ private:
     // note this call function signature is diff. from specialized versions:
     // will cause compile time error if this struct is used (which is what
     // we want)
-    void call() { GALOIS_DIE("Invalid read location for sync on demand"); }
+    void call() { GALOIS_DIE("invalid read location for sync on demand"); }
   };
 
   /**
@@ -3208,7 +3213,7 @@ private:
               substrate->sync_src_to_src<SyncFnTy, BitsetFnTy>(loopName);
               substrate->sync_src_to_dst<SyncFnTy, BitsetFnTy>(loopName);
             } else {
-              GALOIS_DIE("Invalid bitvector flag setting in syncOnDemand");
+              GALOIS_DIE("invalid bitvector flag setting in syncOnDemand");
             }
           } else if (fieldFlags.src_to_src()) {
             substrate->sync_src_to_src<SyncFnTy, BitsetFnTy>(loopName);
@@ -3226,7 +3231,7 @@ private:
               substrate->sync_dst_to_src<SyncFnTy, BitsetFnTy>(loopName);
               substrate->sync_dst_to_dst<SyncFnTy, BitsetFnTy>(loopName);
             } else {
-              GALOIS_DIE("Invalid bitvector flag setting in syncOnDemand");
+              GALOIS_DIE("invalid bitvector flag setting in syncOnDemand");
             }
           } else if (fieldFlags.dst_to_src()) {
             substrate->sync_dst_to_src<SyncFnTy, BitsetFnTy>(loopName);
@@ -3255,7 +3260,7 @@ private:
             substrate->sync_any_to_src<SyncFnTy, BitsetFnTy>(loopName);
             substrate->sync_any_to_dst<SyncFnTy, BitsetFnTy>(loopName);
           } else {
-            GALOIS_DIE("Invalid bitvector flag setting in syncOnDemand");
+            GALOIS_DIE("invalid bitvector flag setting in syncOnDemand");
           }
         } else if (src_read) {
           substrate->sync_any_to_src<SyncFnTy, BitsetFnTy>(loopName);

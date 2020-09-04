@@ -47,10 +47,10 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
   constexpr static const char* const GRNAME          = "dGraph_Mining";
-  Partitioner* graphPartitioner;
+  std::unique_ptr<Partitioner> graphPartitioner;
 
   uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
-    assert(isLocal(gid));
+    assert(base_DistGraph::isLocal(gid));
     // optimized for edge cuts
     if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
       return gid - globalOffset;
@@ -88,7 +88,7 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
 
     uint64_t* outIndexBuffer = (uint64_t*)malloc(sizeof(uint64_t) * numNodes);
     if (outIndexBuffer == nullptr) {
-      GALOIS_DIE("OOM, get node degrees");
+      GALOIS_DIE("out of memory");
     }
     uint64_t numBytesToLoad = numNodes * sizeof(uint64_t);
     uint64_t bytesRead      = 0;
@@ -130,6 +130,24 @@ class MiningGraph : public DistGraph<NodeTy, EdgeTy> {
     return nodeDegrees;
   }
 
+  virtual unsigned getHostIDImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return graphPartitioner->retrieveMaster(gid);
+  }
+
+  virtual bool isOwnedImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
+  }
+
+  virtual bool isLocalImpl(uint64_t gid) const {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    return (base_DistGraph::globalToLocalMap.find(gid) !=
+            base_DistGraph::globalToLocalMap.end());
+  }
+
+  virtual bool isVertexCutImpl() const { return false; }
+
 public:
   //! typedef for base DistGraph class
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
@@ -160,22 +178,6 @@ public:
       }
     }
     return -1;
-  }
-
-  virtual unsigned getHostID(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return graphPartitioner->retrieveMaster(gid);
-  }
-
-  virtual bool isOwned(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return (graphPartitioner->retrieveMaster(gid) == base_DistGraph::id);
-  }
-
-  virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return (base_DistGraph::globalToLocalMap.find(gid) !=
-            base_DistGraph::globalToLocalMap.end());
   }
 
   /**
@@ -213,9 +215,9 @@ public:
       ndegrees = getNodeDegrees(filename, base_DistGraph::numGlobalNodes);
     }
 
-    graphPartitioner =
-        new Partitioner(host, _numHosts, base_DistGraph::numGlobalNodes,
-                        base_DistGraph::numGlobalEdges, ndegrees);
+    graphPartitioner = std::make_unique<Partitioner>(
+        host, _numHosts, base_DistGraph::numGlobalNodes,
+        base_DistGraph::numGlobalEdges, ndegrees);
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -321,18 +323,15 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    base_DistGraph::printStatistics();
     loadEdges(base_DistGraph::graph, bufGraph, proxiesOnOtherHosts);
     // TODO this might be useful to keep around
     proxiesOnOtherHosts.clear();
     ndegrees.clear();
 
-    // base_DistGraph::printEdges();
     // SORT EDGES
     if (doSort) {
-      base_DistGraph::sortEdges();
+      base_DistGraph::sortEdgesByDestination();
     }
-    // base_DistGraph::printEdges();
 
     if (setupGluon) {
       galois::CondStatTimer<MORE_DIST_STATS> TfillMirrorsEdges(
@@ -394,11 +393,6 @@ public:
           (totalEdgeProxies) / (double)globalKeptEdges);
     }
   }
-
-  /**
-   * Free the graph partitioner
-   */
-  ~MiningGraph() { delete graphPartitioner; }
 
 private:
   galois::DynamicBitSet
@@ -699,7 +693,7 @@ private:
         // no data sent; just clear again
         numOutgoingEdges[sendingHost].clear();
       } else {
-        GALOIS_DIE("invalid recv inspection data metadata mode, outgoing");
+        GALOIS_DIE("unreachable: ", outgoingExists);
       }
     }
 
@@ -750,7 +744,7 @@ private:
           uint64_t gid = base_DistGraph::localToGlobalVector[lid];
           assert(gid < base_DistGraph::numGlobalNodes);
           unsigned hostReader = getHostReader(gid);
-          assert(hostReader >= 0 && hostReader < base_DistGraph::numHosts);
+          assert(hostReader < base_DistGraph::numHosts);
           assert(hostReader != base_DistGraph::id); // self shouldn't be proxy
 
           uint64_t nodeOffset = base_DistGraph::gid2host[hostReader].first;
@@ -864,7 +858,7 @@ public:
         return *edge;
       }
     }
-    GALOIS_DIE("edge lid should be found from edge gid");
+    GALOIS_DIE("unreachable");
     return (uint64_t)-1;
   }
 
@@ -883,7 +877,7 @@ public:
       }
     }
 
-    GALOIS_DIE("source not found for edge, shouldn't happen");
+    GALOIS_DIE("unreachable");
     return (uint32_t)-1;
   }
 
@@ -1006,7 +1000,7 @@ private:
         [&](uint64_t src) {
           uint32_t lsrc    = 0;
           uint64_t curEdge = 0;
-          if (this->isLocal(src)) {
+          if (base_DistGraph::isLocal(src)) {
             lsrc    = this->G2L(src);
             curEdge = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
@@ -1023,7 +1017,7 @@ private:
             uint32_t gdst = bufGraph.edgeDestination(*ee);
             // make sure this edge is going to be kept and not dropped
             if (graphPartitioner->keepEdge(src, gdst)) {
-              assert(this->isLocal(src));
+              assert(base_DistGraph::isLocal(src));
               uint32_t ldst = this->G2L(gdst);
               graph.constructEdge(curEdge++, ldst);
 
@@ -1043,7 +1037,7 @@ private:
           }
 
           // make sure all edges accounted for if local
-          if (this->isLocal(src)) {
+          if (base_DistGraph::isLocal(src)) {
             assert(curEdge == (*graph.edge_end(lsrc)));
           }
 
@@ -1107,18 +1101,10 @@ private:
         GRNAME, std::string("EdgeLoadingMaxBytesSent"), maxBytesSent.reduce());
   }
 
-  //! Optional type
-  //! @tparam T type that the variable may possibly take
-  template <typename T>
-#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
-  using optional_t = std::experimental::optional<T>;
-#else
-  using optional_t = boost::optional<T>;
-#endif
   //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
   template <typename GraphTy>
   void processReceivedEdgeBuffer(
-      optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
+      std::optional<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
       GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
     if (buffer) {
       auto& rb = buffer->second;
@@ -1127,7 +1113,7 @@ private:
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
         galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
+        assert(base_DistGraph::isLocal(n));
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         uint64_t cur_end = *graph.edge_end(lsrc);
@@ -1164,8 +1150,6 @@ private:
       graph.constructEdge(cur++, ldst);
     }
   }
-
-  virtual bool is_vertex_cut() const { return false; }
 };
 
 // make GRNAME visible to public

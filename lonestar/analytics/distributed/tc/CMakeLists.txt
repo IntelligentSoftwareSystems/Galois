@@ -1,1 +1,0 @@
-app_dist(tc)

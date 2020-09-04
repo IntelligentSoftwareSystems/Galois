@@ -76,45 +76,45 @@ struct Worklist {
     } else {
       wl = (int*)calloc(nsize, sizeof(int));
       CUDA_SAFE_CALL(cudaMalloc(&dwl, nsize * sizeof(int)));
-      CUDA_SAFE_CALL(cudaMalloc(&dnsize, 1 * sizeof(int)));
+    }
+    CUDA_SAFE_CALL(cudaMalloc(&dnsize, 1 * sizeof(int)));
 #ifdef SLOTS
-      CUDA_SAFE_CALL(cudaMalloc(&dcounters, 2 * sizeof(int)));
-      dindex = &dcounters[currslot];
+    CUDA_SAFE_CALL(cudaMalloc(&dcounters, 2 * sizeof(int)));
+    dindex = &dcounters[currslot];
 #else
-      CUDA_SAFE_CALL(cudaMalloc(&dindex, 1 * sizeof(int)));
+    CUDA_SAFE_CALL(cudaMalloc(&dindex, 1 * sizeof(int)));
 #endif
-      // CUDA_SAFE_CALL(cudaMalloc(&dindex, 2 * sizeof(int)));
+    // CUDA_SAFE_CALL(cudaMalloc(&dindex, 2 * sizeof(int)));
 
-      init_wl<<<1, 1>>>(nsize, dnsize, dindex);
+    init_wl<<<1, 1>>>(nsize, dnsize, dindex);
 
-      // CUDA_SAFE_CALL(cudaMemcpy(dnsize, &nsize, 1 * sizeof(int),
-      // cudaMemcpyHostToDevice)); CUDA_SAFE_CALL(cudaMemcpy((void *) dindex,
-      // &zero, 1 * sizeof(zero), cudaMemcpyHostToDevice));
+    // CUDA_SAFE_CALL(cudaMemcpy(dnsize, &nsize, 1 * sizeof(int),
+    // cudaMemcpyHostToDevice)); CUDA_SAFE_CALL(cudaMemcpy((void *) dindex,
+    // &zero, 1 * sizeof(zero), cudaMemcpyHostToDevice));
 
 #ifdef COUNT_ATOMICS
-      CUDA_SAFE_CALL(cudaMalloc(&atomic_counter, sizeof(int) * 1));
-      CUDA_SAFE_CALL(cudaMemcpy((void*)atomic_counter, &zero, 1 * sizeof(zero),
-                                cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMalloc(&atomic_counter, sizeof(int) * 1));
+    CUDA_SAFE_CALL(cudaMemcpy((void*)atomic_counter, &zero, 1 * sizeof(zero),
+                              cudaMemcpyHostToDevice));
 #endif
 
 #ifdef ATOMIC_DENSITY
-      CUDA_SAFE_CALL(
-          cudaMalloc(&atomic_density, sizeof(unsigned int) * (32 + 1)));
-      CUDA_SAFE_CALL(
-          cudaMemset(atomic_density, 0, sizeof(unsigned int) * (32 + 1)));
+    CUDA_SAFE_CALL(
+        cudaMalloc(&atomic_density, sizeof(unsigned int) * (32 + 1)));
+    CUDA_SAFE_CALL(
+        cudaMemset(atomic_density, 0, sizeof(unsigned int) * (32 + 1)));
 #endif
 
-      // CUDA_SAFE_CALL(cudaMalloc(&rcounter, 1 * sizeof(int)));
-      // CUDA_SAFE_CALL(cudaMemcpy((void *) rcounter, &zero, 1 * sizeof(zero),
-      // cudaMemcpyHostToDevice));
+    // CUDA_SAFE_CALL(cudaMalloc(&rcounter, 1 * sizeof(int)));
+    // CUDA_SAFE_CALL(cudaMemcpy((void *) rcounter, &zero, 1 * sizeof(zero),
+    // cudaMemcpyHostToDevice));
 
-      prio.alloc(nsize);
-      // prio.cpu_wr_ptr();
-      dprio        = prio.gpu_wr_ptr(true);
-      length       = nsize;
-      f_will_write = false;
-      index        = 0;
-    }
+    prio.alloc(nsize);
+    // prio.cpu_wr_ptr();
+    dprio        = prio.gpu_wr_ptr(true);
+    length       = nsize;
+    f_will_write = false;
+    index        = 0;
   }
 
   void free() {

@@ -22,13 +22,13 @@
 #include "galois/Reduction.h"
 #include "galois/PriorityQueue.h"
 #include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
 #include "Lonestar/BFS_SSSP.h"
+#include "Lonestar/Utils.h"
+
+#include "llvm/Support/CommandLine.h"
 
 #include <iostream>
 
@@ -41,8 +41,7 @@ static const char* desc =
 static const char* url = "single_source_shortest_path";
 
 static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int>
     startNode("startNode",
               cll::desc("Node to start search from (default value 0)"),
@@ -65,28 +64,29 @@ enum Algo {
   dijkstraTile,
   dijkstra,
   topo,
-  topoTile
+  topoTile,
+  AutoAlgo
 };
 
 const char* const ALGO_NAMES[] = {
-    "deltaTile",    "deltaStep", "deltaStepBarrier",
-    "serDeltaTile", "serDelta",  "dijkstraTile",
-    "dijkstra",     "topo",      "topoTile"};
+    "deltaTile", "deltaStep",    "deltaStepBarrier", "serDeltaTile",
+    "serDelta",  "dijkstraTile", "dijkstra",         "topo",
+    "topoTile",  "Auto"};
 
-static cll::opt<Algo>
-    algo("algo", cll::desc("Choose an algorithm:"),
-         cll::values(clEnumVal(deltaTile, "deltaTile"),
-                     clEnumVal(deltaStep, "deltaStep"),
-                     clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
-                     clEnumVal(serDeltaTile, "serDeltaTile"),
-                     clEnumVal(serDelta, "serDelta"),
-                     clEnumVal(dijkstraTile, "dijkstraTile"),
-                     clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
-                     clEnumVal(topoTile, "topoTile")),
-         cll::init(deltaTile));
+static cll::opt<Algo> algo(
+    "algo", cll::desc("Choose an algorithm (default value auto):"),
+    cll::values(clEnumVal(deltaTile, "deltaTile"),
+                clEnumVal(deltaStep, "deltaStep"),
+                clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
+                clEnumVal(serDeltaTile, "serDeltaTile"),
+                clEnumVal(serDelta, "serDelta"),
+                clEnumVal(dijkstraTile, "dijkstraTile"),
+                clEnumVal(dijkstra, "dijkstra"), clEnumVal(topo, "topo"),
+                clEnumVal(topoTile, "topoTile"),
+                clEnumVal(AutoAlgo,
+                          "auto: choose among the algorithms automatically")),
+    cll::init(AutoAlgo));
 
-// typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>,
-// uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 //! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
     with_no_lockable<true>::type ::with_numa_alloc<true>::type;
@@ -94,7 +94,7 @@ using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>::
 typedef Graph::GraphNode GNode;
 
 constexpr static const bool TRACK_WORK          = false;
-constexpr static const unsigned CHUNK_SIZE      = 64u;
+constexpr static const unsigned CHUNK_SIZE      = 64U;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 512;
 
 using SSSP                 = BFS_SSSP<Graph, uint32_t, true, EDGE_TILE_SIZE>;
@@ -161,7 +161,7 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
         }
       },
       galois::wl<OBIMTy>(UpdateRequestIndexer{stepShift}),
-      galois::no_conflicts(), galois::loopname("SSSP"));
+      galois::disable_conflict_detection(), galois::loopname("SSSP"));
 
   if (TRACK_WORK) {
     //! [report self-defined stats]
@@ -182,7 +182,7 @@ void serDeltaAlgo(Graph& graph, const GNode& source, const P& pushWrap,
 
   pushWrap(wl, source, 0);
 
-  size_t iter = 0ul;
+  size_t iter = 0UL;
   while (!wl.empty()) {
 
     auto& curr = wl.minBucket();
@@ -354,15 +354,19 @@ void topoTileAlgo(Graph& graph, const GNode& source) {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+  LonestarStart(argc, argv, name, desc, url, &inputFile);
+
+  galois::StatTimer totalTime("TimerTotal");
+  totalTime.start();
 
   Graph graph;
-  GNode source, report;
+  GNode source;
+  GNode report;
 
-  std::cout << "Reading from file: " << filename << std::endl;
-  galois::graphs::readGraph(graph, filename);
+  std::cout << "Reading from file: " << inputFile << "\n";
+  galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
-            << " edges" << std::endl;
+            << " edges\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -379,8 +383,6 @@ int main(int argc, char** argv) {
   report = *it;
 
   size_t approxNodeData = graph.size() * 64;
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
   galois::preAlloc(numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
@@ -399,10 +401,22 @@ int main(int argc, char** argv) {
 
   graph.getData(source) = 0;
 
-  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm" << std::endl;
+  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
-  galois::StatTimer Tmain;
-  Tmain.start();
+  galois::StatTimer autoAlgoTimer("AutoAlgo_0");
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
+
+  if (algo == AutoAlgo) {
+    autoAlgoTimer.start();
+    if (isApproximateDegreeDistributionPowerLaw(graph)) {
+      algo = deltaStep;
+    } else {
+      algo = deltaStepBarrier;
+    }
+    autoAlgoTimer.stop();
+    galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
+  }
 
   switch (algo) {
   case deltaTile:
@@ -437,7 +451,6 @@ int main(int argc, char** argv) {
     break;
 
   case deltaStepBarrier:
-    std::cout << "Using OBIM with barrier\n";
     deltaStepAlgo<UpdateRequest, OBIM_Barrier>(graph, source, ReqPushWrap(),
                                                OutEdgeRangeFn{graph});
     break;
@@ -446,7 +459,7 @@ int main(int argc, char** argv) {
     std::abort();
   }
 
-  Tmain.stop();
+  execTime.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
@@ -486,9 +499,11 @@ int main(int argc, char** argv) {
     if (SSSP::verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
-      GALOIS_DIE("Verification failed");
+      GALOIS_DIE("verification failed");
     }
   }
+
+  totalTime.stop();
 
   return 0;
 }
