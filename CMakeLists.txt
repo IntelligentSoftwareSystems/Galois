@@ -238,6 +238,7 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
+  add_subdirectory(libgnn)
 endif()
 
 # TODO(loc) prefix with GALOIS
