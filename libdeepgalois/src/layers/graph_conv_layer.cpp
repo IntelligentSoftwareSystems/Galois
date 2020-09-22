@@ -268,7 +268,20 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     math::d_dropout_cpu(x, y, scale_, in_grad, dropout_mask, in_grad);
   drop_timer.stop();
 
+  deepgalois::_syncVectorSize = z;
+  deepgalois::_dataToSync     = &layer::weight_grad[0];
+  unsigned host_num = galois::runtime::getSystemNetworkInterface().Num;
   layer::syncSub->sync<writeAny, readAny, GradientSync>("Gradients");
+  galois::do_all(
+    galois::iterate((size_t)0, (size_t)z),
+    [&] (size_t i) {
+      //galois::gPrint("before ", i, " ", layer::weight_grad[i], "\n");
+      layer::weight_grad[i] /= host_num;
+      //galois::gPrint("after ", i, " ", layer::weight_grad[i], "\n");
+    },
+    galois::loopname("sync post process")
+  );
+
   galois::gDebug("[", layer::gradientGraph->myHostID(), "] Sync done");
   conv_timer.stop();
 }

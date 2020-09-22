@@ -15,8 +15,12 @@ struct GradientSync {
     // if (std::abs(weight - y) > 0.00001) {
     //  galois::gInfo("weight ", node_id, " not consistent with one received");
     //}
+    if (y == 0) {
+      galois::gPrint("nothing important\n");
+    }
     weight += y;
-    weight /= 2;
+    // need a post process divide all step
+    //weight /= 2;
     return true;
   }
 
