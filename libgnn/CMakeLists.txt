@@ -18,6 +18,9 @@ link_directories(${BLAS_LIB_DIR})
 
 set(sources
   src/GNNGraph.cpp
+  src/GNNLayer.cpp
+  src/GNNMath.cpp
+  src/GraphConvolutionalLayer.cpp
 )
 
 add_library(galois_gnn STATIC ${sources})

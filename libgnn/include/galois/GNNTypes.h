@@ -3,6 +3,7 @@
 //! Typedefs used by the Galois GNN code
 
 #include <cstdint>
+#include <cstddef>
 
 namespace galois {
 //! Floating point type to use throughout GNN compute; typedef'd so it's easier

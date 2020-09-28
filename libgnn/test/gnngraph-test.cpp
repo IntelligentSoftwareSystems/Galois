@@ -30,4 +30,5 @@ int main() {
   // TODO fix citeseer and goec
   // galois::graphs::GNNGraph("citeseer",
   // galois::graphs::GNNPartitionScheme::kOEC, false);
+  return 0;
 }
