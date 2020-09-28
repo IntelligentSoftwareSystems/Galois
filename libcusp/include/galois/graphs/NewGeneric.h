@@ -76,7 +76,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   uint32_t nodesToReceive;
 
   std::vector<uint32_t> getGNNBreakpoints(std::string filename) {
-    // contains 2 numbers: begin and end of test
+    // contains 2 numbers: begin and end of train
     // everything else can be split evenly among hosts as they are not
     // performance critical
     std::vector<uint32_t> bps;
@@ -91,6 +91,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     } else if (filename.find("ppi") != std::string::npos) {
       bps.push_back(0);
       bps.push_back(9716);
+    } else if (filename.find("tester") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(5);
+    } else {
+      GALOIS_DIE("invalid input for gnn partitioning ", filename,
+                 " hardcode needed");
     }
     // TODO hardcode the rest
 

@@ -1,6 +1,7 @@
 // XXX include net interface if necessary
-#include "galois/graphs/GNNGraph.h"
 #include "galois/Logging.h"
+#include "galois/graphs/ReadGraph.h"
+#include "galois/graphs/GNNGraph.h"
 
 namespace {
 //! Partitions a particular dataset given some partitioning scheme
@@ -9,7 +10,7 @@ LoadPartition(const std::string& dataset_name,
               galois::graphs::GNNPartitionScheme partition_scheme) {
   // XXX input path
   std::string input_file = galois::gnn_dataset_path + dataset_name + ".csgr";
-  GALOIS_LOG_VERBOSE("File to read is {}", input_file);
+  GALOIS_LOG_VERBOSE("Partition loading: File to read is {}", input_file);
 
   // load partition
   switch (partition_scheme) {
@@ -30,6 +31,8 @@ LoadPartition(const std::string& dataset_name,
 galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
                                    bool has_single_class_label) {
+  GALOIS_LOG_VERBOSE("[{}] Constructing partitiong for {}", host_id_,
+                     dataset_name);
   // save host id
   host_id_ = galois::runtime::getSystemNetworkInterface().ID;
   // load partition
@@ -45,6 +48,13 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
       std::make_unique<galois::graphs::GluonSubstrate<GNNDistGraph>>(
           *partitioned_graph_, host_id_,
           galois::runtime::getSystemNetworkInterface().Num, false);
+
+  // create the 0 based row indices for MKL use
+  InitZeroStartGraphIndices();
+  // read in entire graph topology
+  ReadWholeGraph(dataset_name);
+  // init norm factors using the whole graph topology
+  InitNormFactor();
 }
 
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
@@ -62,12 +72,11 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
   // allocate memory for labels
   if (has_single_class_label) {
     // single-class (one-hot) label for each vertex: N x 1
-    local_ground_truth_labels_ =
-        std::make_unique<GNNLabel[]>(partitioned_graph_->size());
+    local_ground_truth_labels_.resize(partitioned_graph_->size());
   } else {
     // multi-class label for each vertex: N x num classes
-    local_ground_truth_labels_ = std::make_unique<GNNLabel[]>(
-        partitioned_graph_->size() * num_label_classes_);
+    local_ground_truth_labels_.resize(partitioned_graph_->size() *
+                                      num_label_classes_);
   }
 
   size_t cur_gid              = 0;
@@ -148,8 +157,8 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
   file_stream.close();
 
   // allocate memory for local features
-  local_node_features_ = std::make_unique<GNNFeature[]>(
-      partitioned_graph_->size() * node_feature_length_);
+  local_node_features_.resize(partitioned_graph_->size() *
+                              node_feature_length_);
 
   // copy over features for local nodes only
   size_t local_vertex = 0;
@@ -214,12 +223,9 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
 
 void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   // allocate the memory for the local masks
-  local_training_mask_ =
-      std::make_unique<GNNLabel[]>(partitioned_graph_->size());
-  local_validation_mask_ =
-      std::make_unique<GNNLabel[]>(partitioned_graph_->size());
-  local_testing_mask_ =
-      std::make_unique<GNNLabel[]>(partitioned_graph_->size());
+  local_training_mask_.resize(partitioned_graph_->size());
+  local_validation_mask_.resize(partitioned_graph_->size());
+  local_testing_mask_.resize(partitioned_graph_->size());
 
   if (dataset_name == "reddit") {
     // TODO reddit is hardcode handled at the moment; better way to not do
@@ -256,10 +262,55 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   } else {
     // XXX i can get local sample counts from here if i need it
     ReadLocalMasksFromFile(dataset_name, "train", &global_training_mask_range_,
-                           local_training_mask_.get());
+                           local_training_mask_.data());
     ReadLocalMasksFromFile(dataset_name, "val", &global_validation_mask_range_,
-                           local_validation_mask_.get());
+                           local_validation_mask_.data());
     ReadLocalMasksFromFile(dataset_name, "test", &global_testing_mask_range_,
-                           local_testing_mask_.get());
+                           local_testing_mask_.data());
   }
+}
+
+void galois::graphs::GNNGraph::InitZeroStartGraphIndices() {
+  GALOIS_LOG_VERBOSE("[{}] Initializing node indices with 0 prepended",
+                     host_id_);
+  // size is num nodes + 1
+  zero_start_graph_indices_.resize(partitioned_graph_->size() + 1);
+  // first element is zero
+  zero_start_graph_indices_[0] = 0;
+  // the rest is a straight copy from partitioned graph (use edge_end to access
+  // it)
+  galois::do_all(
+      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
+      [&](size_t i) {
+        zero_start_graph_indices_[i + 1] = *(partitioned_graph_->edge_end(i));
+      },
+      galois::loopname("InitZeroStartGraphIndices"));
+}
+
+void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
+  std::string input_file = galois::gnn_dataset_path + dataset_name + ".csgr";
+  GALOIS_LOG_VERBOSE("[{}] Reading entire graph: file to read is {}", host_id_,
+                     input_file);
+  galois::graphs::readGraph(whole_graph_, input_file);
+}
+
+void galois::graphs::GNNGraph::InitNormFactor() {
+  GALOIS_LOG_VERBOSE("[{}] Initializing norm factors", host_id_);
+  norm_factors_.resize(partitioned_graph_->size(), 0.0);
+
+  // get the norm factor contribution for each node based on the GLOBAL graph
+  galois::do_all(
+      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
+      [&](size_t local_id) {
+        // translate lid into gid to get global degree
+        size_t global_id     = partitioned_graph_->getGID(local_id);
+        size_t global_degree = whole_graph_.edge_end(global_id) -
+                               whole_graph_.edge_begin(global_id);
+        // only set if non-zero
+        if (global_degree != 0) {
+          norm_factors_[local_id] =
+              1.0 / std::sqrt(static_cast<float>(global_degree));
+        }
+      },
+      galois::loopname("InitNormFactor"));
 }

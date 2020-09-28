@@ -27,12 +27,44 @@ enum class GNNPartitionScheme { kOEC, kCVC };
 //! XXX
 class GNNGraph {
 public:
-  // using LocalGraphType    = LearningGraph;
   using GNNDistGraph = galois::graphs::DistGraph<char, void>;
+  using WholeGraph   = galois::graphs::LC_CSR_Graph<char, void>;
+  using GraphNode    = GNNDistGraph::GraphNode;
+  using EdgeIterator = GNNDistGraph::edge_iterator;
 
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
            bool has_single_class_label);
+
+  //! Return # of nodes in the partitioned graph
+  size_t size() const { return partitioned_graph_->size(); }
+
+  // All following functions take a local id
+  EdgeIterator EdgeBegin(GraphNode n) const {
+    return partitioned_graph_->edge_begin(n);
+  };
+  EdgeIterator EdgeEnd(GraphNode n) const {
+    return partitioned_graph_->edge_end(n);
+  };
+  GraphNode EdgeDestination(EdgeIterator ei) const {
+    return partitioned_graph_->getEdgeDst(ei);
+  };
+  GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
+
+  const std::vector<GNNFloat>& GetLocalFeatures() const {
+    return local_node_features_;
+  }
+
+  //! Returns a pointer to the CSR indices where the first element starts at
+  //! 0 (used with MKL)
+  const uint32_t* GetZeroBasedRowPointer() {
+    return zero_start_graph_indices_.data();
+  }
+
+  //! Return pointer to all edge destinations; used with MKL
+  const uint32_t* GetEdgeDestPointer() {
+    return partitioned_graph_->edge_dst_ptr();
+  }
 
 private:
   //! In a multi-host setting, this variable stores the host id that the graph
@@ -44,6 +76,12 @@ private:
   size_t node_feature_length_{0};
   //! Partitioned graph
   std::unique_ptr<GNNDistGraph> partitioned_graph_;
+  //! The entire topology of the dataset: used for things like norm factor
+  //! calculation or sampling
+  WholeGraph whole_graph_;
+  //! The indices pointer from the partitioned graph except with a 0
+  //! prepended to it; needed for MKL calls
+  std::vector<uint32_t> zero_start_graph_indices_;
   // XXX is this necessary
   //! Copy of underlying topology of the distributed graph
   // std::unique_ptr<LocalGraphType> local_graph_;
@@ -51,17 +89,17 @@ private:
   std::unique_ptr<galois::graphs::GluonSubstrate<GNNDistGraph>> sync_substrate_;
   //! Ground truth label for nodes in the partitioned graph; Nx1 if single
   //! class, N x num classes if multi-class label
-  std::unique_ptr<GNNLabel[]> local_ground_truth_labels_;
+  std::vector<GNNLabel> local_ground_truth_labels_;
   //! Feature vectors for nodes in partitioned graph
-  std::unique_ptr<GNNFeature[]> local_node_features_;
+  std::vector<GNNFeature> local_node_features_;
 
   // TODO maybe revisit this and use an actual bitset
   //! Bitset indicating which nodes are training nodes
-  std::unique_ptr<GNNLabel[]> local_training_mask_;
+  std::vector<GNNLabel> local_training_mask_;
   //! Bitset indicating which nodes are validation nodes
-  std::unique_ptr<GNNLabel[]> local_validation_mask_;
+  std::vector<GNNLabel> local_validation_mask_;
   //! Bitset indicating which nodes are testing nodes
-  std::unique_ptr<GNNLabel[]> local_testing_mask_;
+  std::vector<GNNLabel> local_testing_mask_;
 
   //! Global mask range for training nodes; must convert to LIDs when using
   //! in this class
@@ -73,8 +111,7 @@ private:
   //! in this class
   GNNRange global_testing_mask_range_;
 
-  // XXX figure out what this is really used for
-  //! Normalization constant based on structure of the graph
+  //! Normalization constant based on structure of the graph (degrees)
   std::vector<GNNFloat> norm_factors_;
 
   // TODO vars for subgraphs as necessary
@@ -91,15 +128,17 @@ private:
                                 GNNRange* mask_range, GNNLabel* masks);
   //! Read masks of local nodes only for training, validation, and testing
   void ReadLocalMasks(const std::string& dataset_name);
+  //! Init the node start indices that have a 0 at the beginning; straight
+  //! copy of the array from the partitioned graph save for the 0 at the
+  //! first element.
+  void InitZeroStartGraphIndices();
+  //! Reads the entire graph topology in (but nothing else)
+  void ReadWholeGraph(const std::string& dataset_name);
+  //! Initializes the norm factors using the entire graph's topology for global
+  //! degree access
+  void InitNormFactor();
 
   // public:
-  //
-  //  DGraph* getGraphPointer() { return partitionedGraph; }
-  //  Graph* getLGraphPointer() { return lGraph; }
-  //  Graph* getSubgraphPointer(int id) { return partitionedSubgraphs[id]; };
-  //
-  //  void initializeSyncSubstrate();
-  //
   //  void saveDistGraph(DGraph* a);
   //  galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
   //  float_t* get_feats_ptr() { return h_feats; }
