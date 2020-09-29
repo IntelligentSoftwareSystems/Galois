@@ -19,6 +19,8 @@ struct GNNLayerDimensions {
 
 //! Config options for operations that can occur in a layer
 struct GNNConfig {
+  //! True if weights should be allocated
+  bool allocate_weights{true};
   //! True if dropout is to be done at beginning of forward phase
   bool do_dropout{false};
   //! Rate at which to drop things if dropout is on
@@ -47,6 +49,9 @@ public:
   GNNLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
            const GNNLayerDimensions& dimensions)
       : GNNLayer(layer_num, graph, dimensions, GNNConfig()) {}
+
+  //! Changes this layer's phase
+  void SetLayerPhase(GNNPhase new_phase) { layer_phase_ = new_phase; }
 
   //! Initializes all layer weights to 1. This is used as a debug function for
   //! testing.
@@ -109,6 +114,8 @@ protected:
   //! Indicates which fields of the weight matrix are dropped if dropout is
   //! used
   std::vector<bool> dropout_mask_;
+  //! Phase of GNN computation that this layer is currently in
+  galois::GNNPhase layer_phase_{galois::GNNPhase::kTrain};
 
   //////////////////////////////////////////////////////////////////////////////
 

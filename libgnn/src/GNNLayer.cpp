@@ -6,17 +6,19 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
                            const GNNConfig& config)
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
-  // TODO some of this does not need alloc if not used
-  // dropout allocation; dropout is same as input
-  dropout_mask_.resize(layer_dimensions_.input_rows *
-                       layer_dimensions_.input_columns);
-  // allocate memory based on layer dimensions
-  size_t num_weight_elements =
-      layer_dimensions_.input_columns * layer_dimensions_.output_columns;
-  layer_weights_.resize(num_weight_elements);
-  layer_weight_gradients_.resize(num_weight_elements, 0);
-  // init weights randomly with a parallel loop
-  RandomInitVector(&layer_weights_);
+  if (config_.allocate_weights) {
+    // TODO some of this does not need alloc if not used
+    // dropout allocation; dropout is same as input
+    dropout_mask_.resize(layer_dimensions_.input_rows *
+                         layer_dimensions_.input_columns);
+    // allocate memory based on layer dimensions
+    size_t num_weight_elements =
+        layer_dimensions_.input_columns * layer_dimensions_.output_columns;
+    layer_weights_.resize(num_weight_elements);
+    layer_weight_gradients_.resize(num_weight_elements, 0);
+    // init weights randomly with a parallel loop
+    RandomInitVector(&layer_weights_);
+  }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
