@@ -1,5 +1,22 @@
+#include <cmath>
+#include <algorithm>
 #include <immintrin.h>
 #include "galois/GNNMath.h"
+#include "galois/Logging.h"
+
+size_t galois::MaxIndex(const size_t length, const GNNFloat* vector) {
+  size_t index     = 0;
+  GNNFloat cur_max = vector[0];
+
+  for (size_t i = 1; i < length; i++) {
+    if (vector[i] > cur_max) {
+      index   = i;
+      cur_max = vector[i];
+    }
+  }
+
+  return index;
+}
 
 void galois::VectorAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
                        GNNFloat* output) {
@@ -24,6 +41,68 @@ void galois::VectorAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
     output[i] = a[i] + b[i];
   }
 #endif
+}
+
+void galois::GNNSoftmax(const size_t vector_length, const GNNFloat* input,
+                        GNNFloat* output) {
+  const GNNFloat max_element =
+      *(std::max_element(input, input + vector_length));
+  GNNFloat denominator = 0;
+  // normalize all elements using exponentional of max element
+  for (size_t i = 0; i < vector_length; i++) {
+    output[i] = std::exp(input[i] - max_element);
+    denominator += output[i];
+  }
+  // divide all by total to get a distribution
+  for (size_t i = 0; i < vector_length; i++) {
+    output[i] /= denominator;
+  }
+}
+
+void galois::GNNSoftmaxDerivative(const size_t vector_length,
+                                  const GNNFloat* prev_output,
+                                  const GNNFloat* prev_output_derivative,
+                                  GNNFloat* temp_vector, GNNFloat* output) {
+  for (size_t i = 0; i < vector_length; i++) {
+    for (size_t j = 0; j < vector_length; j++) {
+      temp_vector[j] = (j == i) ? prev_output[i] * (1.0 - prev_output[i])
+                                : -prev_output[j] * prev_output[i];
+    }
+    // TODO is sdot using threads? if so this is a nested parallelism problem
+    output[i] =
+        cblas_sdot(vector_length, prev_output_derivative, 1, temp_vector, 1);
+  }
+}
+
+galois::GNNFloat galois::GNNCrossEntropy(const size_t vector_length,
+                                         const GNNFloat* ground_truth,
+                                         const GNNFloat* input) {
+  GNNFloat loss = 0.0;
+
+  for (size_t i = 0; i < vector_length; i++) {
+    if (ground_truth[i] == 0.0) {
+      continue;
+    }
+
+    GALOIS_LOG_VERBOSE("Truth {} input {}", ground_truth[i], input[i]);
+
+    if (input[i] == 0.0) {
+      loss -= ground_truth[i] * std::log(static_cast<GNNFloat>(1e-10));
+    } else {
+      loss -= ground_truth[i] * std::log(input[i]);
+    }
+  }
+
+  return loss;
+}
+
+void galois::GNNCrossEntropyDerivative(const size_t vector_length,
+                                       const GNNFloat* ground_truth,
+                                       const GNNFloat* input,
+                                       GNNFloat* gradients) {
+  for (size_t i = 0; i < vector_length; i++) {
+    gradients[i] = -(ground_truth[i]) / (input[i] + 1e-10);
+  }
 }
 
 void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
