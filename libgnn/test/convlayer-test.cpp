@@ -7,9 +7,8 @@
 int main() {
   galois::DistMemSys G;
 
-  // size_t num_threads = galois::setActiveThreads(
-  //    56 / galois::runtime::getSystemNetworkInterface().Num);
-  size_t num_threads = galois::setActiveThreads(1);
+  size_t num_threads = galois::setActiveThreads(
+      56 / galois::runtime::getSystemNetworkInterface().Num);
 
   GALOIS_LOG_VERBOSE("[{}] Using {} threads",
                      galois::runtime::getSystemNetworkInterface().ID,
