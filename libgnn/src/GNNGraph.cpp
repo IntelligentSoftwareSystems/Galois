@@ -57,6 +57,39 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
   InitNormFactor();
 }
 
+bool galois::graphs::GNNGraph::IsValidForPhase(
+    const unsigned lid, const galois::GNNPhase current_phase) const {
+  // convert to gid first
+  size_t gid = partitioned_graph_->getGID(lid);
+
+  // select range to use based on phase
+  const GNNRange* range_to_use;
+  switch (current_phase) {
+  case GNNPhase::kTrain:
+    range_to_use = &global_training_mask_range_;
+    break;
+  case GNNPhase::kValidate:
+    range_to_use = &global_validation_mask_range_;
+    break;
+  case GNNPhase::kTest:
+    range_to_use = &global_testing_mask_range_;
+    break;
+  default:
+    GALOIS_LOG_FATAL("Invalid phase used");
+    range_to_use = nullptr;
+  }
+
+  // if within range, it is valid
+  // TODO there is an assumption here that ranges are contiguous; may not
+  // necessarily be the case in all inputs in which case using the mask is safer
+  // (but less cache efficient)
+  if (range_to_use->begin <= gid && gid < range_to_use->end) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
   GALOIS_LOG_VERBOSE("[{}] Reading labels from disk...", host_id_);
@@ -72,9 +105,11 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
   // allocate memory for labels
   if (has_single_class_label) {
     // single-class (one-hot) label for each vertex: N x 1
+    using_single_class_labels_ = true;
     local_ground_truth_labels_.resize(partitioned_graph_->size());
   } else {
     // multi-class label for each vertex: N x num classes
+    using_single_class_labels_ = false;
     local_ground_truth_labels_.resize(partitioned_graph_->size() *
                                       num_label_classes_);
   }

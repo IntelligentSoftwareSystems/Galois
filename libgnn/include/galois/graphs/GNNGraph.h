@@ -30,6 +30,8 @@ public:
   using GNNDistGraph = galois::graphs::DistGraph<char, void>;
   using WholeGraph   = galois::graphs::LC_CSR_Graph<char, void>;
   using GraphNode    = GNNDistGraph::GraphNode;
+  // defined as such because dist graph range objects used long unsigned
+  using NodeIterator = boost::counting_iterator<size_t>;
   using EdgeIterator = GNNDistGraph::edge_iterator;
 
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
@@ -38,6 +40,29 @@ public:
 
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
+
+  //! Node begin for all local nodes
+  NodeIterator begin() const {
+    return partitioned_graph_->allNodesRange().begin();
+  }
+  //! Node end for all local nodes
+  NodeIterator end() const { return partitioned_graph_->allNodesRange().end(); }
+  //! Return GID of some local node
+  size_t GetGID(unsigned lid) const { return partitioned_graph_->getGID(lid); }
+  //! Given an LID and the current phase of GNN computation, determine if the
+  //! lid in question is valid for the current phase (i.e., it is part of
+  //! a training, validation, or test phase mask)
+  bool IsValidForPhase(const unsigned lid,
+                       const galois::GNNPhase current_phase) const;
+  //! Returns the label of some local id assuming labels are single class
+  //! labels.
+  GNNFloat GetSingleClassLabel(const unsigned lid) const {
+    assert(using_single_class_labels_);
+    return local_ground_truth_labels_[lid];
+  }
+
+  //! Return the number of label classes
+  size_t GetNumLabelClasses() const { return num_label_classes_; };
 
   // All following functions take a local id
   EdgeIterator EdgeBegin(GraphNode n) const {
@@ -57,12 +82,12 @@ public:
 
   //! Returns a pointer to the CSR indices where the first element starts at
   //! 0 (used with MKL)
-  const uint32_t* GetZeroBasedRowPointer() {
+  const uint32_t* GetZeroBasedRowPointer() const {
     return zero_start_graph_indices_.data();
   }
 
   //! Return pointer to all edge destinations; used with MKL
-  const uint32_t* GetEdgeDestPointer() {
+  const uint32_t* GetEdgeDestPointer() const {
     return partitioned_graph_->edge_dst_ptr();
   }
 
@@ -82,11 +107,10 @@ private:
   //! The indices pointer from the partitioned graph except with a 0
   //! prepended to it; needed for MKL calls
   std::vector<uint32_t> zero_start_graph_indices_;
-  // XXX is this necessary
-  //! Copy of underlying topology of the distributed graph
-  // std::unique_ptr<LocalGraphType> local_graph_;
   //! Sync substrate for the partitioned graph
   std::unique_ptr<galois::graphs::GluonSubstrate<GNNDistGraph>> sync_substrate_;
+  //! True if labels are single class
+  bool using_single_class_labels_;
   //! Ground truth label for nodes in the partitioned graph; Nx1 if single
   //! class, N x num classes if multi-class label
   std::vector<GNNLabel> local_ground_truth_labels_;

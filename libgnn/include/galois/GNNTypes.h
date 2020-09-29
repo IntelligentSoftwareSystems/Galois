@@ -13,4 +13,8 @@ using GNNFloat = float;
 using GNNLabel = uint8_t;
 //! Type of a feature on vertices
 using GNNFeature = float;
+
+//! Phase of GNN computation
+enum class GNNPhase { kTrain, kValidate, kTest };
+
 } // end namespace galois
