@@ -5,7 +5,7 @@
 galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     size_t layer_num, const galois::graphs::GNNGraph& graph,
     const GNNLayerDimensions& dimensions, const GNNConfig& config)
-    : galois::GNNLayer::GNNLayer(layer_num, graph, dimensions, config),
+    : GNNLayer(layer_num, graph, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
   size_t num_input_elements =
@@ -98,7 +98,6 @@ void galois::GraphConvolutionalLayer::AggregateAll(
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts) {
   size_t num_nodes = graph_.size();
-  // galois::gPrint(pts, "\n");
 
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), num_nodes),
