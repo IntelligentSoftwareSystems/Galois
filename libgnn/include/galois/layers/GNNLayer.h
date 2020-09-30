@@ -5,6 +5,19 @@
 
 namespace galois {
 
+//! Supported layer types in the GNN
+enum class GNNLayerType {
+  //! Invalid placeholder
+  kInvalid,
+  //! GCN
+  kGraphConvolutional
+  // TODO SAGE and GAT
+};
+
+// TODO Sigmoid
+//! Supported output layer types in the GNN
+enum class GNNOutputLayerType { kInvalid, kSoftmax };
+
 //! Struct holding the dimensions of a layer. Assumption is that a layer takes
 //! a matrix and outputs another matrix with a different # of columns (e.g.
 //! matrix multiply with a set of weights)
@@ -50,6 +63,7 @@ public:
            const GNNLayerDimensions& dimensions)
       : GNNLayer(layer_num, graph, dimensions, GNNConfig()) {}
 
+  GNNPhase layer_phase() { return layer_phase_; }
   //! Changes this layer's phase
   void SetLayerPhase(GNNPhase new_phase) { layer_phase_ = new_phase; }
 
@@ -76,13 +90,20 @@ public:
   BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
                 std::vector<galois::GNNFloat>* input_gradient) = 0;
 
-  const std::vector<GNNFloat>& GetLayerWeightGradients() {
+  //! Returns the weight gradients
+  const std::vector<GNNFloat>& GetLayerWeightGradients() const {
     return layer_weight_gradients_;
   }
 
   //! Returns dimensions of this layer
-  // XXX may not be needed
-  const GNNLayerDimensions& GetLayerDimensions() { return layer_dimensions_; }
+  const GNNLayerDimensions& GetLayerDimensions() const {
+    return layer_dimensions_;
+  }
+
+  galois::GNNLayerType layer_type() const { return layer_type_; }
+  galois::GNNOutputLayerType output_layer_type() const {
+    return output_layer_type_;
+  }
 
 protected:
   //! Layer order (starts from 0); used in backward to shortcut output as layer
@@ -116,6 +137,11 @@ protected:
   std::vector<bool> dropout_mask_;
   //! Phase of GNN computation that this layer is currently in
   galois::GNNPhase layer_phase_{galois::GNNPhase::kTrain};
+  //! Layer type (invalid if output layer)
+  galois::GNNLayerType layer_type_{galois::GNNLayerType::kInvalid};
+  //! Output layer type (remains invalid if not an output layer)
+  galois::GNNOutputLayerType output_layer_type_{
+      galois::GNNOutputLayerType::kInvalid};
 
   //////////////////////////////////////////////////////////////////////////////
 

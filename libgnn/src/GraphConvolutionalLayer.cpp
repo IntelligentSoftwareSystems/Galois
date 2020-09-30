@@ -18,6 +18,7 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
   GALOIS_LOG_VERBOSE("Output elements {}", num_output_elements);
   out_temp_.resize(num_output_elements, 0);
+  layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 }
 
 const std::vector<galois::GNNFloat>&

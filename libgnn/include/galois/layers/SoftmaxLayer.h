@@ -16,8 +16,11 @@ public:
         ground_truth_vectors_(dimensions.input_columns),
         norm_gradient_vectors_(dimensions.input_columns),
         softmax_temp_vectors_(dimensions.input_columns) {
+    output_layer_type_ = galois::GNNOutputLayerType::kSoftmax;
     // input/output columns must be equivalent in a softmax
     GALOIS_LOG_ASSERT(dimensions.input_columns == dimensions.output_columns);
+    // output needs to match number of possible classes
+    GALOIS_LOG_ASSERT(dimensions.input_columns == graph.GetNumLabelClasses());
   }
 
   //! Creates probability distribution of each row of input
