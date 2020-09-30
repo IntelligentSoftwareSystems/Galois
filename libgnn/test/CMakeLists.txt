@@ -10,4 +10,8 @@ add_executable(softmaxlayer-test softmaxlayer-test.cpp)
 target_link_libraries(softmaxlayer-test galois_gnn)
 add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
 
-# TODO multi host tests
+add_executable(gnnconstruct-test gnnconstruct-test.cpp)
+target_link_libraries(gnnconstruct-test galois_gnn)
+add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
+
+# TODO multi host tests?

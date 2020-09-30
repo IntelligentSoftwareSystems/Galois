@@ -76,6 +76,8 @@ public:
   };
   GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
 
+  size_t node_feature_length() const { return node_feature_length_; }
+
   const std::vector<GNNFloat>& GetLocalFeatures() const {
     return local_node_features_;
   }
