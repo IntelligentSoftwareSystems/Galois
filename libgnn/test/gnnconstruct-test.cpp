@@ -1,7 +1,8 @@
-#include "galois/Logging.h"
-#include "galois/GraphNeuralNetwork.h"
 //! @file gnnconstruct-test.cpp
 //! Test to make sure construction works as expected
+
+#include "galois/Logging.h"
+#include "galois/GraphNeuralNetwork.h"
 
 int main() {
   galois::DistMemSys G;

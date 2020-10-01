@@ -55,3 +55,12 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     GALOIS_LOG_FATAL("Invalid layer type during network construction");
   }
 }
+
+const std::vector<galois::GNNFloat>* galois::GraphNeuralNetwork::DoInference() {
+  // start with graph features and pass it through all layers of the network
+  const std::vector<GNNFloat>* layer_input = &(graph_->GetLocalFeatures());
+  for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+    layer_input = &(ptr->ForwardPhase(*layer_input));
+  }
+  return layer_input;
+}

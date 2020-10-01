@@ -113,8 +113,29 @@ public:
       GALOIS_LOG_FATAL("Accessing out of bounds intermediate layer {}", i);
     }
   }
+
+  //! Set the phases of all layers at once
+  void SetLayerPhases(galois::GNNPhase phase) {
+    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+      ptr->SetLayerPhase(phase);
+    }
+  }
+
+  //! Set weights on all layers to 1; should be used for debugging only
+  void SetAllLayerWeightsTo1() {
+    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+      ptr->InitAllWeightsTo1();
+    }
+  }
+
   //! Returns the output layer
   const galois::GNNLayer* GetOutputLayer() { return gnn_layers_.back().get(); }
+
+  //! Propogates the graph's feature vectors through the network to get a new
+  //! vector representation.
+  //! Also known as the forward phase in most literature
+  //! @returns Output layer's output
+  const std::vector<GNNFloat>* DoInference();
 
 private:
   //! Underlying graph to train

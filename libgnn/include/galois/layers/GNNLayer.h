@@ -69,7 +69,33 @@ public:
 
   //! Initializes all layer weights to 1. This is used as a debug function for
   //! testing.
-  void InitAllWeightsTo1() { layer_weights_.assign(layer_weights_.size(), 1); }
+  void InitAllWeightsTo1() {
+    if (layer_weights_.size()) {
+      layer_weights_.assign(layer_weights_.size(), 1);
+    }
+  }
+
+  const std::vector<GNNFloat>& GetForwardOutput() const {
+    return forward_output_matrix_;
+  }
+  const std::vector<GNNFloat>& GetBackwardOutput() const {
+    return backward_output_matrix_;
+  }
+
+  //! Returns the weight gradients
+  const std::vector<GNNFloat>& GetLayerWeightGradients() const {
+    return layer_weight_gradients_;
+  }
+
+  //! Returns dimensions of this layer
+  const GNNLayerDimensions& GetLayerDimensions() const {
+    return layer_dimensions_;
+  }
+
+  galois::GNNLayerType layer_type() const { return layer_type_; }
+  galois::GNNOutputLayerType output_layer_type() const {
+    return output_layer_type_;
+  }
 
   //! Conducts the forward phase given the input to this layer which
   //! ultimately leads to an output (classfication of node labels) at the end
@@ -89,21 +115,6 @@ public:
   virtual std::vector<galois::GNNFloat>*
   BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
                 std::vector<galois::GNNFloat>* input_gradient) = 0;
-
-  //! Returns the weight gradients
-  const std::vector<GNNFloat>& GetLayerWeightGradients() const {
-    return layer_weight_gradients_;
-  }
-
-  //! Returns dimensions of this layer
-  const GNNLayerDimensions& GetLayerDimensions() const {
-    return layer_dimensions_;
-  }
-
-  galois::GNNLayerType layer_type() const { return layer_type_; }
-  galois::GNNOutputLayerType output_layer_type() const {
-    return output_layer_type_;
-  }
 
 protected:
   //! Layer order (starts from 0); used in backward to shortcut output as layer

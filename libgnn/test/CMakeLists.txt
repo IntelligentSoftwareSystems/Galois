@@ -14,4 +14,8 @@ add_executable(gnnconstruct-test gnnconstruct-test.cpp)
 target_link_libraries(gnnconstruct-test galois_gnn)
 add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
 
+add_executable(gnnfb-test gnnfb-test.cpp)
+target_link_libraries(gnnfb-test galois_gnn)
+add_test(NAME gnnfb-test COMMAND gnnfb-test)
+
 # TODO multi host tests?
