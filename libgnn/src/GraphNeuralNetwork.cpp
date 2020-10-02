@@ -64,3 +64,33 @@ const std::vector<galois::GNNFloat>* galois::GraphNeuralNetwork::DoInference() {
   }
   return layer_input;
 }
+
+void galois::GraphNeuralNetwork::GradientPropagation() {
+  // from output layer get initial gradients
+  std::vector<galois::GNNFloat> dummy;
+  std::unique_ptr<galois::GNNLayer>& output_layer = gnn_layers_.back();
+  std::vector<galois::GNNFloat>* current_gradients =
+      output_layer->BackwardPhase(dummy, nullptr);
+
+  // loops through intermediate layers in a backward fashion
+  // -1 to ignore output layer which was handled above
+  for (size_t i = 0; i < gnn_layers_.size() - 1; i++) {
+    // note this assumes you have at least 2 layers
+    size_t layer_index = gnn_layers_.size() - 2 - i;
+
+    // get the input to the layer before this one
+    const std::vector<galois::GNNFloat>* prev_layer_input;
+    if (layer_index != 0) {
+      prev_layer_input = &(gnn_layers_[layer_index - 1]->GetForwardOutput());
+    } else {
+      prev_layer_input = &(graph_->GetLocalFeatures());
+    }
+
+    // backward prop and get a new set of gradients
+    current_gradients = gnn_layers_[layer_index]->BackwardPhase(
+        *prev_layer_input, current_gradients);
+    // at this point in the layer the gradients exist; use the gradients to
+    // update the weights of the layer
+    // XXX need optimizers
+  }
+}

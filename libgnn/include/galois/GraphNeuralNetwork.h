@@ -32,6 +32,7 @@ public:
                                  output_layer_type,
                                  GNNConfig{.do_dropout       = true,
                                            .dropout_rate     = 0.3,
+                                           .do_activation    = true,
                                            .do_normalization = true}) {}
 
   //! Construction with a specified config for layers
@@ -136,6 +137,11 @@ public:
   //! Also known as the forward phase in most literature
   //! @returns Output layer's output
   const std::vector<GNNFloat>* DoInference();
+
+  //! Backpropagate gradients from the output layer backwards through the
+  //! network to update the layer weights. Also known as a backward phase in
+  //! most literature
+  void GradientPropagation();
 
 private:
   //! Underlying graph to train

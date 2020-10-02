@@ -108,8 +108,11 @@ int main() {
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  // TODO backward phase
+  // backward phase; run it; verifying is difficult due to floating point
+  // nature of softmax gradients
   //////////////////////////////////////////////////////////////////////////////
+
+  gnn->GradientPropagation();
 
   //////////////////////////////////////////////////////////////////////////////
   // verify forward val and test masks
@@ -151,6 +154,19 @@ int main() {
       GALOIS_LOG_ASSERT(fo_out_test[c + i] == 0);
     }
   }
+  //////////////////////////////////////////////////////////////////////////////
+  // run different config of gnn with dropout/activation
+  //////////////////////////////////////////////////////////////////////////////
 
-  // TODO different config of gnn
+  GALOIS_LOG_VERBOSE("Running with different congifuration");
+
+  test_graph = std::make_unique<galois::graphs::GNNGraph>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::GraphNeuralNetworkConfig gnn_config2(
+      2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax);
+  auto gnn2 = std::make_unique<galois::GraphNeuralNetwork>(
+      std::move(test_graph), std::move(gnn_config2));
+  // run to make sure no crashes occur
+  gnn2->DoInference();
+  gnn2->GradientPropagation();
 }
