@@ -18,4 +18,8 @@ add_executable(gnnfb-test gnnfb-test.cpp)
 target_link_libraries(gnnfb-test galois_gnn)
 add_test(NAME gnnfb-test COMMAND gnnfb-test)
 
+add_executable(adam-test adam-test.cpp)
+target_link_libraries(adam-test galois_gnn)
+add_test(NAME adam-test COMMAND adam-test)
+
 # TODO multi host tests?

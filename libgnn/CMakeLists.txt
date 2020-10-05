@@ -23,6 +23,7 @@ set(sources
   src/GraphConvolutionalLayer.cpp
   src/SoftmaxLayer.cpp
   src/GraphNeuralNetwork.cpp
+  src/GNNOptimizers.cpp
 )
 
 add_library(galois_gnn STATIC ${sources})
