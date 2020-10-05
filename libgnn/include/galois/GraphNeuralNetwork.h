@@ -5,6 +5,7 @@
 //! well as helper enums/classes involved with the GNN.
 
 #include "galois/Logging.h"
+#include "galois/GNNOptimizers.h"
 #include "galois/graphs/GNNGraph.h"
 #include "galois/layers/GNNLayer.h"
 
@@ -101,6 +102,7 @@ public:
   //! Construct the graph neural network given the graph to train on as well as
   //! a configuration object
   GraphNeuralNetwork(std::unique_ptr<graphs::GNNGraph> graph,
+                     std::unique_ptr<BaseOptimizer> optimizer,
                      GraphNeuralNetworkConfig&& config);
 
   //! Number of intermediate layers (DOES NOT INCLUDE OUTPUT LAYER)
@@ -146,6 +148,8 @@ public:
 private:
   //! Underlying graph to train
   std::unique_ptr<graphs::GNNGraph> graph_;
+  //! Optimizer object for weight updates
+  std::unique_ptr<BaseOptimizer> optimizer_;
   //! Configuration object used to construct this GNN
   GraphNeuralNetworkConfig config_;
   //! GNN layers including the output

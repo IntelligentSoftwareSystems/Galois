@@ -28,8 +28,9 @@ int main() {
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
       galois::GNNConfig());
-  auto gnn = std::make_unique<galois::GraphNeuralNetwork>(
-      std::move(test_graph), std::move(gnn_config));
+  auto adam = std::make_unique<galois::AdamOptimizer>(layer_output_sizes, 2);
+  auto gnn  = std::make_unique<galois::GraphNeuralNetwork>(
+      std::move(test_graph), std::move(adam), std::move(gnn_config));
   // for constancy set everything to 1
   gnn->SetAllLayerWeightsTo1();
 
@@ -164,8 +165,9 @@ int main() {
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
   galois::GraphNeuralNetworkConfig gnn_config2(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax);
-  auto gnn2 = std::make_unique<galois::GraphNeuralNetwork>(
-      std::move(test_graph), std::move(gnn_config2));
+  auto adam2 = std::make_unique<galois::AdamOptimizer>(layer_output_sizes, 2);
+  auto gnn2  = std::make_unique<galois::GraphNeuralNetwork>(
+      std::move(test_graph), std::move(adam2), std::move(gnn_config2));
   // run to make sure no crashes occur
   gnn2->DoInference();
   gnn2->GradientPropagation();

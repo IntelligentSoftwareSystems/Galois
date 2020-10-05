@@ -4,8 +4,10 @@
 
 galois::GraphNeuralNetwork::GraphNeuralNetwork(
     std::unique_ptr<galois::graphs::GNNGraph> graph,
+    std::unique_ptr<BaseOptimizer> optimizer,
     galois::GraphNeuralNetworkConfig&& config)
-    : graph_(std::move(graph)), config_(std::move(config)) {
+    : graph_(std::move(graph)), optimizer_(std::move(optimizer)),
+      config_(std::move(config)) {
   // max number of rows that can be passed as inputs; allocate space for it as
   // this will be the # of rows for each layer
   size_t max_rows = graph_->size();

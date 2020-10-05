@@ -8,6 +8,7 @@
 // Changed by Galois under 3-BSD
 #include "galois/GNNTypes.h"
 #include <vector>
+#include <cassert>
 
 namespace galois {
 
@@ -30,6 +31,11 @@ public:
     GNNFloat epsilon{1e-8};
   };
 
+  AdamOptimizer(const std::vector<size_t>& trainable_layer_sizes,
+                size_t num_trainable_layers)
+      : AdamOptimizer(AdamConfiguration(), trainable_layer_sizes,
+                      num_trainable_layers) {}
+
   //! Constructor allocates memory, initializes training vars for each layer
   AdamOptimizer(const AdamConfiguration& config,
                 const std::vector<size_t>& trainable_layer_sizes,
@@ -37,11 +43,12 @@ public:
       : config_(config), num_trainable_layers_(num_trainable_layers),
         beta1_power_t_(num_trainable_layers_, config.beta1),
         beta2_power_t_(num_trainable_layers_, config.beta2) {
-    assert(trainable_layer_sizes.size() == num_trainable_layers_);
+    // >= because only prefix will be considered otherwise
+    assert(trainable_layer_sizes.size() >= num_trainable_layers_);
     // allocate vectors based on # of trainable layers
-    for (size_t layer_size : trainable_layer_sizes) {
-      first_moments_.emplace_back(layer_size, 0.0);
-      second_moments_.emplace_back(layer_size, 0.0);
+    for (size_t i = 0; i < num_trainable_layers_; i++) {
+      first_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
+      second_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
     }
     assert(first_moments_.size() == num_trainable_layers_);
     assert(second_moments_.size() == num_trainable_layers_);
