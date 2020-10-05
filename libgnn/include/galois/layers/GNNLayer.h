@@ -1,6 +1,7 @@
 #pragma once
 
 #include "galois/PerThreadRNG.h"
+#include "galois/GNNOptimizers.h"
 #include "galois/graphs/GNNGraph.h"
 
 namespace galois {
@@ -116,6 +117,10 @@ public:
   BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
                 std::vector<galois::GNNFloat>* input_gradient) = 0;
 
+  //! Given an optimizer, update the weights in this layer based on gradients
+  //! stored in the layer
+  void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
+
 protected:
   //! Layer order (starts from 0); used in backward to shortcut output as layer
   //! 0 does not need to do some things that other layers need to do
@@ -170,7 +175,6 @@ protected:
   //! matrix
   void Activation();
   //! Calculate derivative of activation function based on config on the matrix
-  // XXX
   void ActivationDerivative(std::vector<GNNFloat>* matrix);
 };
 

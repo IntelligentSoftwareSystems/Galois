@@ -25,7 +25,8 @@ int main() {
   std::vector<size_t> layer_output_sizes = {4, 7, 7};
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax);
-  auto adam = std::make_unique<galois::AdamOptimizer>(layer_output_sizes, 2);
+  std::vector<size_t> adam_sizes = {12, 28};
+  auto adam = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
 
   galois::GraphNeuralNetwork gnn(std::move(test_graph), std::move(adam),
                                  std::move(gnn_config));

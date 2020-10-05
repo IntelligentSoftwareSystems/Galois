@@ -100,3 +100,9 @@ void galois::GNNLayer::ActivationDerivative(std::vector<GNNFloat>* gradient) {
       },
       galois::loopname("ReLU-Derivative"));
 }
+
+void galois::GNNLayer::OptimizeLayer(BaseOptimizer* optimizer,
+                                     size_t trainable_layer_number) {
+  optimizer->GradientDescent(layer_weight_gradients_, &layer_weights_,
+                             trainable_layer_number);
+}

@@ -14,6 +14,7 @@ namespace galois {
 
 //! Virtual class; optimizers all need the descent function
 class BaseOptimizer {
+public:
   virtual void GradientDescent(const std::vector<GNNFloat>& derivatives,
                                std::vector<GNNFloat>* matrix,
                                size_t layer_number) = 0;

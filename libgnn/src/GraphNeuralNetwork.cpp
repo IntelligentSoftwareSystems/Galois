@@ -91,8 +91,9 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
     // backward prop and get a new set of gradients
     current_gradients = gnn_layers_[layer_index]->BackwardPhase(
         *prev_layer_input, current_gradients);
+    // if not output do optimization/gradient descent
     // at this point in the layer the gradients exist; use the gradients to
     // update the weights of the layer
-    // XXX need optimizers
+    gnn_layers_[layer_index]->OptimizeLayer(optimizer_.get(), layer_index);
   }
 }
