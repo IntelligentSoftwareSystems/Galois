@@ -117,8 +117,9 @@ public:
     }
   }
 
-  //! Set the phases of all layers at once
+  //! Set the phases of all layers at once as well as this network
   void SetLayerPhases(galois::GNNPhase phase) {
+    phase_ = phase;
     for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
       ptr->SetLayerPhase(phase);
     }
@@ -140,6 +141,8 @@ public:
   //! @returns Output layer's output
   const std::vector<GNNFloat>* DoInference();
 
+  float GetGlobalAccuracy(const std::vector<GNNFloat>& predictions);
+
   //! Backpropagate gradients from the output layer backwards through the
   //! network to update the layer weights. Also known as a backward phase in
   //! most literature
@@ -154,6 +157,12 @@ private:
   GraphNeuralNetworkConfig config_;
   //! GNN layers including the output
   std::vector<std::unique_ptr<galois::GNNLayer>> gnn_layers_;
+  //! Current phase of the GNN: train, validation, test
+  GNNPhase phase_{GNNPhase::kTrain};
+  //! Used to track accurate predictions during accuracy calculation
+  DGAccumulator<size_t> num_correct_;
+  //! Used to count total number of things checked during accuracy calculation
+  DGAccumulator<size_t> total_checked_;
 };
 
 } // namespace galois

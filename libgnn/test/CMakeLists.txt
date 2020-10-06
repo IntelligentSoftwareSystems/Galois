@@ -22,4 +22,8 @@ add_executable(adam-test adam-test.cpp)
 target_link_libraries(adam-test galois_gnn)
 add_test(NAME adam-test COMMAND adam-test)
 
+add_executable(accuracy-test accuracy-test.cpp)
+target_link_libraries(accuracy-test galois_gnn)
+add_test(NAME accuracy-test COMMAND accuracy-test)
+
 # TODO multi host tests?

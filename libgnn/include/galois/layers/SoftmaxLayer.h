@@ -33,7 +33,6 @@ public:
   BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
                 std::vector<GNNFloat>* input_gradient) final;
 
-  // TODO prediction loss function?
 private:
   //! Loss for each row of the input
   std::vector<GNNFloat> input_loss_;

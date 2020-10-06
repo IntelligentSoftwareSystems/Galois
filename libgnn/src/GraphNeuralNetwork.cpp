@@ -1,3 +1,4 @@
+#include "galois/GNNMath.h"
 #include "galois/GraphNeuralNetwork.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
 #include "galois/layers/SoftmaxLayer.h"
@@ -65,6 +66,46 @@ const std::vector<galois::GNNFloat>* galois::GraphNeuralNetwork::DoInference() {
     layer_input = &(ptr->ForwardPhase(*layer_input));
   }
   return layer_input;
+}
+
+float galois::GraphNeuralNetwork::GetGlobalAccuracy(
+    const std::vector<GNNFloat>& predictions) {
+  // check owned nodes' accuracy
+  size_t num_labels = graph_->GetNumLabelClasses();
+  assert((graph_->GetNumLabelClasses() * graph_->size()) == predictions.size());
+  num_correct_.reset();
+  total_checked_.reset();
+
+  galois::do_all(
+      galois::iterate(graph_->begin_owned(), graph_->end_owned()),
+      [&](const unsigned lid) {
+        if (graph_->IsValidForPhase(lid, phase_)) {
+          total_checked_ += 1;
+          // get prediction by getting max
+          size_t predicted_label =
+              galois::MaxIndex(num_labels, &(predictions[lid * num_labels]));
+          // GALOIS_LOG_VERBOSE("Checking LID {} with label {} against
+          // prediction {}",
+          //                   lid, graph_->GetSingleClassLabel(lid),
+          //                   predicted_label);
+          // check against ground truth and track accordingly
+          // TODO static cast used here is dangerous
+          if (predicted_label ==
+              static_cast<size_t>(graph_->GetSingleClassLabel(lid))) {
+            num_correct_ += 1;
+          }
+        }
+      },
+      // TODO chunk size?
+      // steal on as some threads may have nothing to work on
+      galois::steal(), galois::loopname("GlobalAccuracy"));
+  // TODO revise for later when multi-class labels come in
+
+  size_t global_correct = num_correct_.reduce();
+  size_t global_checked = total_checked_.reduce();
+
+  return static_cast<float>(global_correct) /
+         static_cast<float>(global_checked);
 }
 
 void galois::GraphNeuralNetwork::GradientPropagation() {

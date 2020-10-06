@@ -49,6 +49,15 @@ public:
   NodeIterator end() const { return partitioned_graph_->allNodesRange().end(); }
   //! Return GID of some local node
   size_t GetGID(unsigned lid) const { return partitioned_graph_->getGID(lid); }
+
+  NodeIterator begin_owned() const {
+    return partitioned_graph_->masterNodesRange().begin();
+  }
+
+  NodeIterator end_owned() const {
+    return partitioned_graph_->masterNodesRange().end();
+  }
+
   //! Given an LID and the current phase of GNN computation, determine if the
   //! lid in question is valid for the current phase (i.e., it is part of
   //! a training, validation, or test phase mask)
