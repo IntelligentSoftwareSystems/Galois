@@ -24,13 +24,11 @@ void galois::AdamOptimizer::GradientDescent(
         second_moment[i] =
             config_.beta2 * second_moment[i] +
             (1.0 - config_.beta2) * (derivatives[i] * derivatives[i]);
-        GALOIS_LOG_VERBOSE("{} {}", first_moment[i], second_moment[i]);
         // bias corrected moments using beta power
         GNNFloat bias_correct_first =
             first_moment[i] / (1.0 - beta1_power_t_[layer_number]);
         GNNFloat bias_correct_second =
             second_moment[i] / (1.0 - beta2_power_t_[layer_number]);
-        GALOIS_LOG_VERBOSE("{} {}", bias_correct_first, bias_correct_second);
         // weight update using bias corrected moments
         (matrix->data())[i] -=
             config_.alpha * bias_correct_first /

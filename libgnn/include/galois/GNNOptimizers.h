@@ -26,7 +26,7 @@ class AdamOptimizer : public BaseOptimizer {
 public:
   //! Struct for specifying adam config. Defaults based on the Adam paper.
   struct AdamConfiguration {
-    GNNFloat alpha{0.001};
+    GNNFloat alpha{0.01};
     GNNFloat beta1{0.9};
     GNNFloat beta2{0.999};
     GNNFloat epsilon{1e-8};

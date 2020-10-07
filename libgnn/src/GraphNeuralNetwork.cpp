@@ -104,6 +104,8 @@ float galois::GraphNeuralNetwork::GetGlobalAccuracy(
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
 
+  GALOIS_LOG_VERBOSE("Accuracy: {} / {}", global_correct, global_checked);
+
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
 }
@@ -118,7 +120,7 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
   // loops through intermediate layers in a backward fashion
   // -1 to ignore output layer which was handled above
   for (size_t i = 0; i < gnn_layers_.size() - 1; i++) {
-    // note this assumes you have at least 2 layers
+    // note this assumes you have at least 2 layers (including output)
     size_t layer_index = gnn_layers_.size() - 2 - i;
 
     // get the input to the layer before this one

@@ -84,8 +84,6 @@ galois::GNNFloat galois::GNNCrossEntropy(const size_t vector_length,
       continue;
     }
 
-    GALOIS_LOG_VERBOSE("Truth {} input {}", ground_truth[i], input[i]);
-
     if (input[i] == 0.0) {
       loss -= ground_truth[i] * std::log(static_cast<GNNFloat>(1e-10));
     } else {
@@ -101,7 +99,7 @@ void galois::GNNCrossEntropyDerivative(const size_t vector_length,
                                        const GNNFloat* input,
                                        GNNFloat* gradients) {
   for (size_t i = 0; i < vector_length; i++) {
-    gradients[i] = -(ground_truth[i]) / (input[i] + 1e-10);
+    gradients[i] = -(ground_truth[i]) / (input[i] + static_cast<float>(1e-10));
   }
 }
 

@@ -34,17 +34,14 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
   // TODO only dropout if in training apparently
-  if (config_.do_dropout) {
-    GALOIS_LOG_VERBOSE("Doing dropout");
+  if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
     DoDropout(&in_temp_1_);
     input_data = in_temp_1_.data();
   }
 
-  GALOIS_LOG_VERBOSE("Doing aggregate");
   // aggregation and update (or vice versa)
   AggregateAll(layer_dimensions_.input_columns, input_data, in_temp_2_.data(),
                &input_column_intermediates_);
-  GALOIS_LOG_VERBOSE("Doing embedding update");
   // TODO synchronization of aggregation functions
   UpdateEmbeddings(in_temp_2_.data(), forward_output_matrix_.data());
 
@@ -64,6 +61,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
 std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
     const std::vector<galois::GNNFloat>& prev_layer_input,
     std::vector<galois::GNNFloat>* input_gradient) {
+  assert(layer_phase_ == GNNPhase::kTrain);
   // derivative of activation
   if (config_.do_activation) {
     ActivationDerivative(input_gradient);
@@ -73,6 +71,10 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
   // TODO do optimized cased like the forward
   if (layer_number_ != 0) {
     // transposed sgemm for derivative; in_temp is output
+    assert(input_gradient->size() ==
+           layer_dimensions_.input_rows * layer_dimensions_.output_columns);
+    assert(in_temp_1_.size() ==
+           layer_dimensions_.input_columns * layer_dimensions_.input_rows);
     UpdateEmbeddingsDerivative(input_gradient->data(), in_temp_1_.data());
     // derivative of aggregate is the same due to symmetric graph
     AggregateAll(layer_dimensions_.input_columns, in_temp_1_.data(),
@@ -87,7 +89,7 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
                      input_gradient->data(), layer_weight_gradients_.data());
   // TODO sync weights
 
-  if (config_.do_dropout) {
+  if (config_.do_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
   }
 
@@ -155,6 +157,8 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddings(
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
     const GNNFloat* gradients, GNNFloat* output) {
+  assert(layer_weights_.size() ==
+         layer_dimensions_.input_columns * layer_dimensions_.output_columns);
   // difference is Trans for B matrix (data) to get z by y (weights is y by z
   // normally); result is x by y
   galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,

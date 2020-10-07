@@ -26,4 +26,8 @@ add_executable(accuracy-test accuracy-test.cpp)
 target_link_libraries(accuracy-test galois_gnn)
 add_test(NAME accuracy-test COMMAND accuracy-test)
 
+add_executable(epoch-test epoch-test.cpp)
+target_link_libraries(epoch-test galois_gnn)
+add_test(NAME epoch-test COMMAND epoch-test)
+
 # TODO multi host tests?

@@ -1,7 +1,9 @@
 #pragma once
 #include <random>
 #include "galois/substrate/PerThreadStorage.h"
+#include "galois/Galois.h"
 #include "galois/GNNTypes.h"
+#include "galois/Logging.h"
 
 namespace galois {
 
@@ -9,9 +11,15 @@ namespace galois {
 class PerThreadRNG {
 public:
   //! Default seed 0, default distribution 0 to 1
-  PerThreadRNG() : distribution_{0.0, 1.0} {};
+  PerThreadRNG() : PerThreadRNG(0.0, 1.0){};
   //! User specified range
-  PerThreadRNG(float begin, float end) : distribution_{begin, end} {};
+  PerThreadRNG(float begin, float end) : distribution_{begin, end} {
+    // each thread needs to have a different seed so that the same # isn't
+    // chosen across all threads
+    galois::on_each([&](unsigned tid, unsigned n_threads) {
+      engine_.getLocal()->seed(tid * n_threads);
+    });
+  };
   //! Returns a random number between numbers specified during init
   GNNFloat GetRandomNumber() {
     return (*distribution_.getLocal())(*engine_.getLocal());
