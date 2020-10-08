@@ -161,6 +161,14 @@ protected:
 
   //////////////////////////////////////////////////////////////////////////////
 
+  //! Init based from following paper
+  //! http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+  //! Since it is unclear what j and j+1 refer to in that paper, the things
+  //! used are the dimensions of this particular weight matrix
+  //! TODO revisit paper and see what they really mean
+  //! Code inspired DGL and TinyDNN
+  void GlorotBengioInit(std::vector<GNNFloat>* vector_to_init);
+
   //! Randomly init a float vector using the class's random init RNG
   void RandomInitVector(std::vector<GNNFloat>* vector_to_init);
 

@@ -17,8 +17,7 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         layer_dimensions_.input_columns * layer_dimensions_.output_columns;
     layer_weights_.resize(num_weight_elements);
     layer_weight_gradients_.resize(num_weight_elements, 0);
-    // init weights randomly with a parallel loop
-    RandomInitVector(&layer_weights_);
+    GlorotBengioInit(&layer_weights_);
   }
 
   size_t num_output_elements =
@@ -26,6 +25,18 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
   forward_output_matrix_.resize(num_output_elements, 0);
   backward_output_matrix_.resize(
       layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
+}
+
+void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
+  float max = std::sqrt(6.0) / std::sqrt(layer_dimensions_.output_columns +
+                                         layer_dimensions_.input_columns);
+  // TODO this seed should be configurable
+  std::default_random_engine rng(1);
+  std::uniform_real_distribution<GNNFloat> dist(-max, max);
+
+  for (size_t i = 0; i < vector_to_init->size(); i++) {
+    (*vector_to_init)[i] = dist(rng);
+  }
 }
 
 void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
