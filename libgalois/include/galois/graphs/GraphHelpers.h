@@ -167,8 +167,6 @@ auto divideNodesBinarySearch(
   // weight of a block (one block for each division by default; if scale
   // factor specifies something different, then use that instead)
   uint64_t blockWeight = (weight + numBlocks - 1) / numBlocks;
-  // galois::gDebug("weight ", weight, " numblock ", numBlocks, " blockwegith ",
-  //               blockWeight);
 
   // lower and upper blocks that this division should use determined
   // using scaleFactor
@@ -182,9 +180,6 @@ auto divideNodesBinarySearch(
   uint32_t blockUpper = scaleFactor[id];
 
   assert(blockLower <= blockUpper);
-  // galois::gDebug("Unit ", id, " block ", blockLower, " to ",
-  //               blockUpper, "; ", blockLower * blockWeight, " ",
-  //               blockUpper * blockWeight);
 
   uint64_t nodesLower;
   // use prefix sum to find node bounds
@@ -214,10 +209,6 @@ auto divideNodesBinarySearch(
 
     edgesUpper = edgePrefixSum[nodesUpper - 1 + nodeOffset] - edgeOffset;
   }
-
-  // galois::gDebug("Unit ", id, " nodes ", nodesLower, " to ",
-  //               nodesUpper, " edges ", edgesLower, " ",
-  //               edgesUpper);
 
   return GraphRange(
       NodeRange(iterator(nodesLower), iterator(nodesUpper)),
@@ -294,11 +285,6 @@ void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
       // unit assinged no nodes, copy last one
       returnRanges[i + 1] = returnRanges[i];
     }
-
-    galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
-                   " to ", returnRanges[i + 1], ", num edges is ",
-                   graph.edge_end(returnRanges[i + 1] - 1) -
-                       graph.edge_begin(returnRanges[i]));
   }
 }
 
@@ -362,9 +348,6 @@ void determineUnitRangesLoopPrefixSum(VectorTy& prefixSum,
       // unit assinged no nodes
       returnRanges[i + 1] = returnRanges[i];
     }
-
-    galois::gDebug("Unit ", i, " gets nodes ", returnRanges[i], " to ",
-                   returnRanges[i + 1]);
   }
 }
 
@@ -522,9 +505,6 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
       // unit assinged no nodes
       nodeRanges[i + 1] = nodeRanges[i];
     }
-
-    galois::gDebug("Unit ", i, " gets nodes ", nodeRanges[i], " to ",
-                   nodeRanges[i + 1]);
   }
 
   return nodeRanges;

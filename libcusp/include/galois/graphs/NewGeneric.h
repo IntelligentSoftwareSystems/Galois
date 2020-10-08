@@ -560,16 +560,10 @@ private:
           lid++;
         }
       }
-      galois::gDebug("[", base_DistGraph::id, " -> ", h, "] bitset size ",
-                     (end - start) / 64, " vs. vector size ",
-                     syncNodes[h].size() / 2);
     }
     lid -= numLocal;
 
     assert(lid == numToReserve);
-    galois::gDebug("[", base_DistGraph::id, "] total bitset size ",
-                   (ghosts.size() - numLocal) / 64, " vs. total vector size ",
-                   numToReserve / 2);
 
     // TODO: should not be used after this - refactor to make this clean
     ghosts.resize(0);
@@ -1450,13 +1444,6 @@ private:
         asyncSyncLoad(nodeLoads, nodeAccum, edgeLoads, edgeAccum, loadsClear);
       }
       loadSyncTimer.stop();
-
-#ifndef NDEBUG
-      if (async) {
-        galois::gDebug("[", base_DistGraph::id, "] host count ",
-                       hostFinished.count());
-      }
-#endif
     }
 
     // if asynchronous, don't move on until everything is done
