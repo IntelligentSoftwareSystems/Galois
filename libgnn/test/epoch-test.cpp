@@ -22,9 +22,12 @@ int main() {
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
   // XXX fix dropout accuracy
+  // XXX fix activation too
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
-      galois::GNNConfig{.do_dropout = false, .do_normalization = true});
+      galois::GNNConfig{.do_dropout       = false,
+                        .do_activation    = false,
+                        .do_normalization = true});
 
   std::vector<size_t> adam_sizes = {16 * test_graph->node_feature_length(),
                                     16 * test_graph->GetNumLabelClasses()};
@@ -37,6 +40,8 @@ int main() {
 
   // no verification; test should be eyeballed to make sure accuracy is
   // increasing
+  galois::StatTimer main_timer("Timer_0");
+  main_timer.start();
   for (size_t epoch = 0; epoch < 100; epoch++) {
     const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
     gnn->GradientPropagation();
@@ -49,4 +54,5 @@ int main() {
   const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
   galois::gPrint("Test accuracy is ", gnn->GetGlobalAccuracy(*predictions),
                  "\n");
+  main_timer.stop();
 }
