@@ -175,7 +175,8 @@ protected:
   //! Choose a set of weights from this layer's weights to keep and save to
   //! the output matrix + apply some scaling to the kept weights based on
   //! dropout rate
-  void DoDropout(std::vector<GNNFloat>* output_matrix);
+  void DoDropout(const std::vector<GNNFloat>& input_to_drop,
+                 std::vector<GNNFloat>* output_matrix);
   //! Apply the derivative of dropout to the backward phase output
   void DoDropoutDerivative();
 

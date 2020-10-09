@@ -14,7 +14,7 @@ int main() {
 
   // load graph
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "cora", galois::graphs::GNNPartitionScheme::kOEC, true);
+      "reddit", galois::graphs::GNNPartitionScheme::kOEC, true);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
@@ -25,7 +25,7 @@ int main() {
   // XXX fix activation too
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
-      galois::GNNConfig{.do_dropout       = false,
+      galois::GNNConfig{.do_dropout       = true,
                         .do_activation    = false,
                         .do_normalization = true});
 
@@ -42,7 +42,7 @@ int main() {
   // increasing
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
-  for (size_t epoch = 0; epoch < 100; epoch++) {
+  for (size_t epoch = 0; epoch < 5; epoch++) {
     const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
     gnn->GradientPropagation();
     galois::gPrint("Epoch ", epoch, ": Accuracy is ",

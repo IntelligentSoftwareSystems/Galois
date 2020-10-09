@@ -34,7 +34,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
   if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
-    DoDropout(&in_temp_1_);
+    DoDropout(input_embeddings, &in_temp_1_);
     input_data = in_temp_1_.data();
   }
 
