@@ -33,17 +33,25 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
-  // TODO only dropout if in training apparently
   if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
     DoDropout(&in_temp_1_);
     input_data = in_temp_1_.data();
   }
 
-  // aggregation and update (or vice versa)
-  AggregateAll(layer_dimensions_.input_columns, input_data, in_temp_2_.data(),
-               &input_column_intermediates_);
+  // flip aggregate/update if dimensions favor it (do less work)
+  if (layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    // aggregation and update
+    AggregateAll(layer_dimensions_.input_columns, input_data, in_temp_2_.data(),
+                 &input_column_intermediates_);
+    UpdateEmbeddings(in_temp_2_.data(), forward_output_matrix_.data());
+  } else {
+    // update to aggregate
+    UpdateEmbeddings(input_data, out_temp_.data());
+    AggregateAll(layer_dimensions_.output_columns, out_temp_.data(),
+                 forward_output_matrix_.data(), &output_column_intermediates_);
+  }
+
   // TODO synchronization of aggregation functions
-  UpdateEmbeddings(in_temp_2_.data(), forward_output_matrix_.data());
 
   // TODO if input columns > output columns do update first then aggregate for
   // efficiency
@@ -68,25 +76,46 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
   }
 
   // derivative of aggregation/update
-  // TODO do optimized cased like the forward
-  if (layer_number_ != 0) {
-    // transposed sgemm for derivative; in_temp is output
-    assert(input_gradient->size() ==
-           layer_dimensions_.input_rows * layer_dimensions_.output_columns);
-    assert(in_temp_1_.size() ==
-           layer_dimensions_.input_columns * layer_dimensions_.input_rows);
-    UpdateEmbeddingsDerivative(input_gradient->data(), in_temp_1_.data());
-    // derivative of aggregate is the same due to symmetric graph
-    AggregateAll(layer_dimensions_.input_columns, in_temp_1_.data(),
-                 backward_output_matrix_.data(), &input_column_intermediates_);
+  // TODO clean up logic here to reduce nesting
+  if (layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    if (layer_number_ != 0) {
+      // transposed sgemm for derivative; in_temp is output
+      assert(input_gradient->size() ==
+             layer_dimensions_.input_rows * layer_dimensions_.output_columns);
+      assert(in_temp_1_.size() ==
+             layer_dimensions_.input_columns * layer_dimensions_.input_rows);
+      UpdateEmbeddingsDerivative(input_gradient->data(), in_temp_1_.data());
+      // derivative of aggregate is the same due to symmetric graph
+      AggregateAll(layer_dimensions_.input_columns, in_temp_1_.data(),
+                   backward_output_matrix_.data(),
+                   &input_column_intermediates_);
+    }
+    // weight gradient calculation
+    galois::CBlasSGEMM(
+        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+        prev_layer_input.data(), input_gradient->data(),
+        layer_weight_gradients_.data());
+  } else {
+    // aggregate occurs regardless of layer being equal to 0 because it is
+    // required in this case for the weight gradient calculation
+    AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
+                 out_temp_.data(), &output_column_intermediates_);
+    if (layer_number_ != 0) {
+      // derivative for update
+      UpdateEmbeddingsDerivative(out_temp_.data(),
+                                 backward_output_matrix_.data());
+    }
+    // weight gradient; note the use of the aggregated gradient in out_temp
+    galois::CBlasSGEMM(
+        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+        prev_layer_input.data(), out_temp_.data(),
+        layer_weight_gradients_.data());
   }
+
   // TODO sync agg/update
 
-  // weight gradient calculation
-  galois::CBlasSGEMM(CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-                     layer_dimensions_.input_rows,
-                     layer_dimensions_.output_columns, prev_layer_input.data(),
-                     input_gradient->data(), layer_weight_gradients_.data());
   // TODO sync weights
 
   if (config_.do_dropout && layer_number_ != 0) {
