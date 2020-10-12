@@ -1,20 +1,10 @@
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -pthread")
-SET(BLAS_INC_DIR ${OPENBLAS_ROOT}/include/openblas)
-SET(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib64)
-set(BLAS_LIB "-lopenblas -lpthread")
-if(USE_MKL_BLAS)
-  link_directories(${INTEL_LIBS_DIR})
-  message(STATUS "ICC Libraries for MKL: ${INTEL_LIBS_DIR}")
-  SET(BLAS_INC_DIR ${MKL_ROOT}/include)
-  SET(BLAS_LIB_DIR ${MKL_ROOT}/lib/intel64)
-  set(BLAS_LIB "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
-  #set(BLAS_LIB "-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread -liomp5")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_MKL")
-endif()
-
+set(BLAS_INC_DIR ${OPENBLAS_ROOT}/include/openblas)
+set(BLAS_LIB_DIR ${OPENBLAS_ROOT}/lib64)
 # blas library
 include_directories(${BLAS_INC_DIR})
 link_directories(${BLAS_LIB_DIR})
+
+set(BLAS_LIB "-lopenblas")
 
 set(sources
   src/GNNGraph.cpp
