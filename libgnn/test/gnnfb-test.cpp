@@ -27,7 +27,7 @@ int main() {
   // like dropout or activation and the like so that input is easier to verify
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
-      galois::GNNConfig());
+      galois::GNNConfig{.allow_aggregate_after_update = false});
   // input is 7 x 3, layers are then 3 x 4 and 4 x 7 and 7 x 7
   // middle 2 are trainable so 12 and 28
   std::vector<size_t> adam_sizes = {12, 28};
@@ -142,7 +142,6 @@ int main() {
       GALOIS_LOG_ASSERT(fo_out_val[c + i] == 0);
     }
   }
-  gnn->GradientPropagation();
 
   // all but last should be 0s
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
@@ -161,7 +160,6 @@ int main() {
       GALOIS_LOG_ASSERT(fo_out_test[c + i] == 0);
     }
   }
-  gnn->GradientPropagation();
 
   //////////////////////////////////////////////////////////////////////////////
   // run different config of gnn with dropout/activation
@@ -172,7 +170,8 @@ int main() {
   test_graph = std::make_unique<galois::graphs::GNNGraph>(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
   galois::GraphNeuralNetworkConfig gnn_config2(
-      2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax);
+      2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
+      galois::GNNConfig{.allow_aggregate_after_update = false});
   auto adam2 = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
   auto gnn2  = std::make_unique<galois::GraphNeuralNetwork>(
       std::move(test_graph), std::move(adam2), std::move(gnn_config2));

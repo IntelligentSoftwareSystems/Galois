@@ -44,6 +44,9 @@ struct GNNConfig {
   bool do_activation{false};
   //! True if normalization is to occur during multiplies
   bool do_normalization{false};
+  //! If this is true, aggregate may occur after multiply if # of input columns
+  //! is higher than output columns to do less work in aggregation
+  bool allow_aggregate_after_update{true};
   // TODO activation type; for now default is softmax
 };
 

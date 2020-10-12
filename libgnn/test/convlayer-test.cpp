@@ -50,8 +50,9 @@ int main() {
   // create the layer, no norm factor
   // note layer number is 1 so that it does something in backward phase
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(0, test_graph,
-                                                        dimension_0);
+      std::make_unique<galois::GraphConvolutionalLayer>(
+          0, test_graph, dimension_0,
+          galois::GNNConfig{.allow_aggregate_after_update = false});
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
   const std::vector<galois::GNNFloat>& layer_0_forward_output =
@@ -133,8 +134,9 @@ int main() {
   // create layer 1 for testing backward prop actually giving weights back
 
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph,
-                                                        dimension_0);
+      std::make_unique<galois::GraphConvolutionalLayer>(
+          1, test_graph, dimension_0,
+          galois::GNNConfig{.allow_aggregate_after_update = false});
   layer_1->InitAllWeightsTo1();
   const std::vector<galois::GNNFloat>& layer_1_forward_output =
       layer_1->ForwardPhase(test_graph.GetLocalFeatures());
@@ -199,8 +201,10 @@ int main() {
 
   //////////////////////////////////////////////////////////////////////////////
 
-  galois::GNNConfig config = {
-      .do_dropout = true, .do_activation = true, .do_normalization = true};
+  galois::GNNConfig config = {.do_dropout                   = true,
+                              .do_activation                = true,
+                              .do_normalization             = true,
+                              .allow_aggregate_after_update = false};
 
   // finally, just make sure dropout and activation run without crashes
   // (verification requires floating point accuracy or setting a seed which I

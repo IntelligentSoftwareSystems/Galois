@@ -39,7 +39,8 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   }
 
   // flip aggregate/update if dimensions favor it (do less work)
-  if (layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+  if (!config_.allow_aggregate_after_update ||
+      layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     // aggregation and update
     AggregateAll(layer_dimensions_.input_columns, input_data, in_temp_2_.data(),
                  &input_column_intermediates_);
@@ -77,7 +78,8 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
-  if (layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+  if (!config_.allow_aggregate_after_update ||
+      layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     if (layer_number_ != 0) {
       // transposed sgemm for derivative; in_temp is output
       assert(input_gradient->size() ==
