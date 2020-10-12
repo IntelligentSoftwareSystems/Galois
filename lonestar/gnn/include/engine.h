@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
   // see optimizer.h for more details
   // optimizer *opt = new gradient_descent();
   // optimizer *opt = new adagrad();
-  deepgalois::optimizer* opt = new deepgalois::adagrad();
+  deepgalois::optimizer* opt = new deepgalois::adam();
   galois::StatTimer Ttrain("TrainAndVal");
   Ttrain.start();
   network.train(opt, do_validate); // do training using training samples
