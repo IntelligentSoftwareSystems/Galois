@@ -776,7 +776,6 @@ protected:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      galois::gDebug("Manually det. master thread ranges");
       masterRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, beginMaster,
           beginMaster + numOwned, 0);
@@ -802,7 +801,6 @@ protected:
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
-      galois::gDebug("Manually det. with edges thread ranges");
       withEdgeRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, 0, numNodesWithEdges, 0);
     }
@@ -869,7 +867,6 @@ public:
    * Deallocates underlying LC CSR Graph
    */
   void deallocate() {
-    galois::gDebug("Deallocating CSR in DistGraph");
     graph.deallocate();
   }
 

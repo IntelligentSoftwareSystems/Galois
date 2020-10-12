@@ -150,10 +150,8 @@ public:
 
   bool terminate() {
     bool active = (local_mdata != 0);
-    // if (active) galois::gDebug("[", net.ID, "] local work done \n");
     if (!active) {
       active = net.anyPendingSends();
-      // if (active) galois::gDebug("[", net.ID, "] pending send \n");
     }
     int snapshot_ended = 0;
     if (!active) {
@@ -166,8 +164,6 @@ public:
     }
     if (!active) { // check pending receives after checking snapshot
       active = net.anyPendingReceives();
-      if (active)
-        galois::gDebug("[", net.ID, "] pending receive");
     }
     if (active) {
       work_done = true;
@@ -178,16 +174,11 @@ public:
           work_done     = false;
           prev_snapshot = snapshot;
           ++snapshot;
-          galois::gDebug("[", net.ID, "] work done, taking snapshot ",
-                         snapshot);
           initiate_snapshot();
         } else if (prev_snapshot != snapshot) {
           prev_snapshot = snapshot;
-          galois::gDebug("[", net.ID, "] no work done, taking snapshot ",
-                         snapshot);
           initiate_snapshot();
         } else {
-          galois::gDebug("[", net.ID, "] terminating ", snapshot);
           // an explicit barrier may be required here
           // so that the next async phase begins on all hosts at the same time
           // however, this may add overheads when it is not required

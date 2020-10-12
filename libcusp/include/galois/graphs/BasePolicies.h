@@ -203,16 +203,12 @@ public:
         // found in map
         if (gidMasterIter != _gid2masters.end()) {
           uint32_t mappedMaster = gidMasterIter->second;
-          // galois::gDebug("[", _hostID, "] ", gid, " found with master ",
-          //               mappedMaster, "!");
           // make sure host is in bounds
           assert(mappedMaster < _numHosts);
           return mappedMaster;
         } else {
           // NOT FOUND (not necessarily a bad thing, and required for
           // some cases)
-          galois::gDebug("[", _hostID, "] ", gid,
-                         " not found for retrieveMaster!");
           if (_status == 2) {
             // die if we expect all gids to be mapped already (stage 2)
             GALOIS_DIE("should not fail to find a GID after stage 2 "
@@ -253,7 +249,6 @@ public:
 
     for (auto i = gid2offsets.begin(); i != gid2offsets.end(); i++) {
       assert(i->second < localNodeToMaster.size());
-      galois::gDebug("Map ", i->first, " to ", localNodeToMaster[i->second]);
       _gid2masters[i->first] = localNodeToMaster[i->second];
     }
     assert(_gid2masters.size() == (originalSize + gid2offsets.size()));
@@ -314,13 +309,10 @@ public:
       auto offsetIntoMapIter = _gid2masters.find(gid);
       if (offsetIntoMapIter == _gid2masters.end()) {
         // NOT FOUND
-        galois::gDebug("[", _hostID, "] ", gid, " not found; mapping!");
         _gid2masters[gid] = mappedMaster;
         return true;
       } else {
         // already mapped
-        galois::gDebug("[", _hostID, "] ", gid, " already mapped with master ",
-                       offsetIntoMapIter->second, "!");
         assert(offsetIntoMapIter->second == mappedMaster);
         return false;
       }

@@ -1012,8 +1012,6 @@ private:
                             std::vector<uint32_t>& receivedOffsets,
                             std::vector<uint32_t>& receivedMasters) {
     uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
-    galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost, " offset ",
-                   hostOffset);
 
     // if execution gets here, messageType was 1 or 2
     assert(receivedMasters.size() == receivedOffsets.size());
@@ -1021,10 +1019,8 @@ private:
     galois::do_all(
         galois::iterate((size_t)0, receivedMasters.size()),
         [&](size_t i) {
-          uint64_t curGID       = hostOffset + receivedOffsets[i];
-          uint32_t indexIntoMap = gid2offsets[curGID];
-          galois::gDebug("[", base_DistGraph::id, "] gid ", curGID, " offset ",
-                         indexIntoMap);
+          uint64_t curGID                 = hostOffset + receivedOffsets[i];
+          uint32_t indexIntoMap           = gid2offsets[curGID];
           localNodeToMaster[indexIntoMap] = receivedMasters[i];
         },
         galois::no_stats());
@@ -1068,9 +1064,6 @@ private:
       GALOIS_DIE("invalid message type for sync of master assignments: ",
                  messageType);
     }
-
-    galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
-                   " send message type ", messageType);
 
     return std::make_pair(sendingHost, messageType);
   }
@@ -1126,9 +1119,6 @@ private:
           GALOIS_DIE("invalid message type for sync of master assignments: ",
                      messageType);
         }
-
-        galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
-                       " send message type ", messageType);
       }
     } while (p);
   }
@@ -1316,8 +1306,6 @@ private:
     // gid to vector offset setup
     std::unordered_map<uint64_t, uint32_t> gid2offsets;
     uint64_t neighborCount = phase0MapSetup(ghosts, gid2offsets, syncNodes);
-    galois::gDebug("[", base_DistGraph::id, "] num neighbors found is ",
-                   neighborCount);
     // send off neighbor metadata
     phase0SendRecv(syncNodes);
 
@@ -1386,13 +1374,6 @@ private:
       auto work =
           getSpecificThreadRange(bufGraph, rangeVec, beginNode, endNode);
 
-      // debug print
-      // galois::on_each([&] (unsigned i, unsigned j) {
-      //  galois::gDebug("[", base_DistGraph::id, " ", i, "] sync round ",
-      //  syncRound, " local range ",
-      //                 *work.local_begin(), " ", *work.local_end());
-      //});
-
       galois::do_all(
           // iterate over my read nodes
           galois::iterate(work),
@@ -1409,10 +1390,6 @@ private:
             // update mapping; this is a local node, so can get position
             // on map with subtraction
             localNodeToMaster[node - globalOffset] = assignedHost;
-
-            // galois::gDebug("[", base_DistGraph::id, "] state round ",
-            // syncRound,
-            //               " set ", node, " ", node - globalOffset);
 
             // ptt.stop();
           },
@@ -1460,14 +1437,6 @@ private:
       waitTime.start();
       while (hostFinished.count() != base_DistGraph::numHosts ||
              loadsClear.count() != base_DistGraph::numHosts) {
-        //#ifndef NDEBUG
-        // galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts to
-        // finish, ",
-        //               hostFinished.count());
-        // galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts
-        // loads "
-        //               "syncs to finish, ", loadsClear.count());
-        //#endif
         // make sure all assignments are done and all loads are done
         syncAssignmentReceivesAsync(localNodeToMaster, gid2offsets,
                                     hostFinished);
@@ -1476,15 +1445,9 @@ private:
       waitTime.stop();
     }
 
-#ifndef NDEBUG
-    printLoad(nodeLoads, nodeAccum);
-    printLoad(edgeLoads, edgeAccum);
-#endif
-
     // sanity check for correctness (all should be assigned)
     for (uint32_t i = 0; i < localNodeToMaster.size(); i++) {
       if (localNodeToMaster[i] == (uint32_t)-1) {
-        // galois::gDebug("[", base_DistGraph::id, "] bad index ", i);
         assert(localNodeToMaster[i] != (uint32_t)-1);
       }
     }
@@ -2041,9 +2004,6 @@ private:
     size_t curCount = 0;
     // size_t actuallySet = 0;
     for (uint32_t offset : offsetsToConsider.getOffsets()) {
-      // galois::gDebug("[", base_DistGraph::id, "] ", " setting ",
-      //               offset + hostOffset, " from host ", senderHost,
-      //               " to ", recvMasterLocations[curCount]);
       graphPartitioner->addMasterMapping(offset + hostOffset,
                                          recvMasterLocations[curCount]);
       // bool set = graphPartitioner->addMasterMapping(offset + hostOffset,
@@ -2051,9 +2011,6 @@ private:
       // if (set) { actuallySet++; }
       curCount++;
     }
-
-    // galois::gDebug("[", base_DistGraph::id, "] host ", senderHost, ": set ",
-    //               actuallySet, " out of ", recvMasterLocations.size());
   }
 
   /**
@@ -2070,9 +2027,6 @@ private:
     size_t curCount = 0;
     for (uint64_t gid : gids) {
       assert(gid < base_DistGraph::numGlobalNodes);
-      // galois::gDebug("[", base_DistGraph::id, "] ", " in-setting ", gid, " to
-      // ",
-      //               recvMasterLocations[curCount]);
       graphPartitioner->addMasterMapping(gid, recvMasterLocations[curCount]);
       curCount++;
     }
@@ -2133,7 +2087,6 @@ private:
         galois::runtime::gSerialize(b, offsets);
 
         if (graphPartitioner->masterAssignPhase()) {
-          // galois::gDebug("incoming master map serialization");
           // serializeIncomingMasterMap(b, curBitset, h);
           serializeIncomingMasterMap(b, curBitset);
         }
@@ -2142,7 +2095,6 @@ private:
         galois::runtime::gSerialize(b, 1);
         galois::runtime::gSerialize(b, curBitset);
         if (graphPartitioner->masterAssignPhase()) {
-          // galois::gDebug("incoming master map serialization");
           // serializeIncomingMasterMap(b, curBitset, h);
           serializeIncomingMasterMap(b, curBitset);
         }
@@ -2268,9 +2220,6 @@ private:
     inspectIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
     finalizeInspection(prefixSumOfEdges);
 
-    galois::gDebug("[", base_DistGraph::id,
-                   "] To receive this many nodes: ", nodesToReceive);
-
     galois::gPrint("[", base_DistGraph::id, "] Inspection mapping complete.\n");
     return prefixSumOfEdges;
   }
@@ -2307,9 +2256,6 @@ private:
             galois::block_range((size_t)0, hostSize, tid, nthreads);
         uint64_t count = 0;
         for (size_t i = beginNode; i < endNode; i++) {
-          // galois::gDebug("[", base_DistGraph::id, "] ", i + startNode,
-          //               " mapped to ",
-          //               graphPartitioner->retrieveMaster(i+startNode));
           if (graphPartitioner->retrieveMaster(i + startNode) == myHID) {
             count++;
           }
@@ -2326,9 +2272,7 @@ private:
       assert(base_DistGraph::localToGlobalVector.size() ==
              base_DistGraph::numNodes);
 
-      uint32_t newMasterNodes = threadPrefixSums[activeThreads - 1];
-      galois::gDebug("[", base_DistGraph::id, "] This many masters from host ",
-                     h, ": ", newMasterNodes);
+      uint32_t newMasterNodes    = threadPrefixSums[activeThreads - 1];
       uint32_t startingNodeIndex = base_DistGraph::numNodes;
       // increase size of prefix sum + mapping vector
       prefixSumOfEdges.resize(base_DistGraph::numNodes + newMasterNodes);

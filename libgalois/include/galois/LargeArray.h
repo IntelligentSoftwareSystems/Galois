@@ -80,21 +80,17 @@ protected:
     m_size = n;
     switch (t) {
     case Blocked:
-      galois::gDebug("Block-alloc'd");
       m_realdata =
           substrate::largeMallocBlocked(n * sizeof(T), runtime::activeThreads);
       break;
     case Interleaved:
-      galois::gDebug("Interleave-alloc'd");
       m_realdata = substrate::largeMallocInterleaved(n * sizeof(T),
                                                      runtime::activeThreads);
       break;
     case Local:
-      galois::gDebug("Local-allocd");
       m_realdata = substrate::largeMallocLocal(n * sizeof(T));
       break;
     case Floating:
-      galois::gDebug("Floating-alloc'd");
       m_realdata = substrate::largeMallocFloating(n * sizeof(T));
       break;
     };

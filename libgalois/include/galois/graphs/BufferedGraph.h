@@ -181,8 +181,6 @@ private:
   void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart,
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
-    galois::gDebug("Loading edge data");
-
     if (numEdgesToLoad == 0) {
       return;
     }
@@ -233,7 +231,6 @@ private:
       typename EdgeType,
       typename std::enable_if<std::is_void<EdgeType>::value>::type* = nullptr>
   void loadEdgeData(std::ifstream&, uint64_t, uint64_t, uint64_t, uint64_t) {
-    galois::gDebug("Not loading edge data");
     // do nothing (edge data is void, i.e. no edge data)
   }
 
