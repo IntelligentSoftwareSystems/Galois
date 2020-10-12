@@ -14,15 +14,14 @@ int main() {
 
   // load graph
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "reddit", galois::graphs::GNNPartitionScheme::kOEC, true);
+      "cora", galois::graphs::GNNPartitionScheme::kOEC, true);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
       galois::GNNLayerType::kGraphConvolutional};
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
-  // XXX fix dropout accuracy
-  // XXX fix activation too
+  // XXX Activation kills accuracy compared to old code, esp. for cora
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
       galois::GNNConfig{.do_dropout       = true,
@@ -42,7 +41,7 @@ int main() {
   // increasing
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
-  for (size_t epoch = 0; epoch < 5; epoch++) {
+  for (size_t epoch = 0; epoch < 100; epoch++) {
     const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
     gnn->GradientPropagation();
     galois::gPrint("Epoch ", epoch, ": Accuracy is ",
