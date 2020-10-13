@@ -20,6 +20,7 @@ int main() {
   std::vector<galois::GNNFloat> feats = test_graph.GetLocalFeatures();
   //////////////////////////////////////////////////////////////////////////////
   // doubles as a test for reading as well
+  GALOIS_LOG_ASSERT(7 == test_graph.size());
   GALOIS_LOG_ASSERT(21 == feats.size());
   GALOIS_LOG_ASSERT(0.0 == feats[0]);
   GALOIS_LOG_ASSERT(0.0 == feats[1]);

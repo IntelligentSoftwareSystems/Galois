@@ -3,6 +3,7 @@
 #include "galois/GNNTypes.h"
 #include "galois/graphs/CuSPPartitioner.h"
 #include "galois/graphs/GluonSubstrate.h"
+#include "galois/graphs/GraphAggregationSyncStructures.h"
 
 namespace galois {
 
@@ -37,6 +38,12 @@ public:
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
            bool has_single_class_label);
+
+  //! Returns host id
+  size_t host_id() const { return host_id_; }
+
+  //! Returns host id in brackets to use for printing things
+  const std::string& host_prefix() const { return host_prefix_; }
 
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
@@ -102,10 +109,21 @@ public:
     return partitioned_graph_->edge_dst_ptr();
   }
 
+  //! Given a matrix and the column size, do an aggregate sync where each row
+  //! is considered a node's data and sync using the graph's Gluon
+  //! substrate
+  //! Note that it's const because the only thing being used is the graph
+  //! topology of this object; the thing modified is the passed in matrix
+  void AggregateSync(GNNFloat* matrix_to_sync,
+                     const size_t matrix_column_size) const;
+
 private:
   //! In a multi-host setting, this variable stores the host id that the graph
   //! is currently running on
   unsigned host_id_;
+  //! String header that can be used for debug print statements to get the host
+  //! this graph is on
+  std::string host_prefix_;
   //! Number of classes for a single vertex label
   size_t num_label_classes_{1};
   //! Length of a feature node

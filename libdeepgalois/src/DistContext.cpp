@@ -136,7 +136,7 @@ size_t DistContext::read_features(std::string dataset_str) {
       // h_feats[count * feat_len] = fullFeats[i];
       std::copy(fullFeats + i * DistContext::feat_len,
                 fullFeats + (i + 1) * DistContext::feat_len,
-                &this->h_feats[count * DistContext::feat_len]);
+                &this->h_feats[dGraph->getLID(i) * DistContext::feat_len]);
       count++;
     }
   }

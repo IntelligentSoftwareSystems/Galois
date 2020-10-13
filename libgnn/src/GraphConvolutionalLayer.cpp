@@ -54,9 +54,6 @@ galois::GraphConvolutionalLayer::ForwardPhase(
 
   // TODO synchronization of aggregation functions
 
-  // TODO if input columns > output columns do update first then aggregate for
-  // efficiency
-
   if (config_.do_activation) {
     GALOIS_LOG_VERBOSE("Doing activation");
     Activation();
@@ -116,9 +113,9 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
         layer_weight_gradients_.data());
   }
 
-  // TODO sync agg/update
-
-  // TODO sync weights
+  // sync weight gradients; note aggregation sync occurs in the function call
+  // already
+  // XXX
 
   if (config_.do_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
@@ -176,6 +173,9 @@ void galois::GraphConvolutionalLayer::AggregateAll(
         }
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
+
+  // aggregate sync
+  graph_.AggregateSync(aggregate_output, column_length);
 }
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(

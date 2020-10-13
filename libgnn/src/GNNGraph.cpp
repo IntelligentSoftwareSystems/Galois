@@ -28,6 +28,13 @@ LoadPartition(const std::string& dataset_name,
 
 } // end namespace
 
+namespace galois {
+namespace graphs {
+GNNFloat* gnn_matrix_to_sync_            = nullptr;
+size_t gnn_matrix_to_sync_column_length_ = 0;
+} // namespace graphs
+} // namespace galois
+
 galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
                                    bool has_single_class_label) {
@@ -35,6 +42,10 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                      dataset_name);
   // save host id
   host_id_ = galois::runtime::getSystemNetworkInterface().ID;
+  host_prefix_ =
+      std::string("[") +
+      std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
+      std::string("] ");
   // load partition
   partitioned_graph_ = LoadPartition(dataset_name, partition_scheme);
 
@@ -88,6 +99,19 @@ bool galois::graphs::GNNGraph::IsValidForPhase(
   } else {
     return false;
   }
+}
+
+void galois::graphs::GNNGraph::AggregateSync(
+    GNNFloat* matrix_to_sync, const size_t matrix_column_size) const {
+  // set globals for the sync substrate
+  gnn_matrix_to_sync_               = matrix_to_sync;
+  gnn_matrix_to_sync_column_length_ = matrix_column_size;
+
+  // XXX bitset setting
+
+  // call sync
+  sync_substrate_->sync<writeSource, readAny, GNNSumAggregate>(
+      "GraphAggregateSync");
 }
 
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
@@ -164,31 +188,32 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
   GALOIS_LOG_VERBOSE("[{}] Reading features from disk...", host_id_);
 
   // read in dimensions of features, specifically node feature length
-  size_t num_vertices;
+  size_t num_global_vertices;
 
   std::string file_dims = galois::gnn_dataset_path + dataset_name + "-dims.txt";
   std::ifstream ifs;
   ifs.open(file_dims, std::ios::in);
-  ifs >> num_vertices >> node_feature_length_;
+  ifs >> num_global_vertices >> node_feature_length_;
   ifs.close();
 
-  GALOIS_LOG_ASSERT(num_vertices == partitioned_graph_->globalSize());
-  GALOIS_LOG_VERBOSE("[{}] N x D: {} x {}", host_id_, num_vertices,
+  GALOIS_LOG_ASSERT(num_global_vertices == partitioned_graph_->globalSize());
+  GALOIS_LOG_VERBOSE("[{}] N x D: {} x {}", host_id_, num_global_vertices,
                      node_feature_length_);
 
   // memory for all features of all nodes in graph
   // TODO read features without loading entire feature file into memory; this
   // is quite inefficient
   std::unique_ptr<GNNFloat[]> full_feature_set =
-      std::make_unique<GNNFloat[]>(num_vertices * node_feature_length_);
+      std::make_unique<GNNFloat[]>(num_global_vertices * node_feature_length_);
 
   // read in all features
   std::ifstream file_stream;
   std::string feature_file =
       galois::gnn_dataset_path + dataset_name + "-feats.bin";
   file_stream.open(feature_file, std::ios::binary | std::ios::in);
-  file_stream.read((char*)full_feature_set.get(),
-                   sizeof(GNNFloat) * num_vertices * node_feature_length_);
+  file_stream.read((char*)full_feature_set.get(), sizeof(GNNFloat) *
+                                                      num_global_vertices *
+                                                      node_feature_length_);
   file_stream.close();
 
   // allocate memory for local features
@@ -196,18 +221,19 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
                               node_feature_length_);
 
   // copy over features for local nodes only
-  size_t local_vertex = 0;
-  for (size_t i = 0; i < num_vertices; i++) {
-    if (partitioned_graph_->isLocal(i)) {
+  size_t num_kept_vertices = 0;
+  for (size_t gid = 0; gid < num_global_vertices; gid++) {
+    if (partitioned_graph_->isLocal(gid)) {
       // copy over feature vector
-      std::copy(full_feature_set.get() + i * node_feature_length_,
-                full_feature_set.get() + (i + 1) * node_feature_length_,
-                &local_node_features_[local_vertex * node_feature_length_]);
-      local_vertex++;
+      std::copy(full_feature_set.get() + gid * node_feature_length_,
+                full_feature_set.get() + (gid + 1) * node_feature_length_,
+                &local_node_features_[partitioned_graph_->getLID(gid) *
+                                      node_feature_length_]);
+      num_kept_vertices++;
     }
   }
   full_feature_set.reset();
-  GALOIS_LOG_ASSERT(local_vertex++ == partitioned_graph_->size());
+  GALOIS_LOG_ASSERT(num_kept_vertices == partitioned_graph_->size());
 }
 
 //! Helper function to read masks from file into the appropriate structures
