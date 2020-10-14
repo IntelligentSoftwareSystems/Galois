@@ -35,4 +35,7 @@ add_executable(aggregate-sync-test aggregate-sync-test.cpp)
 target_link_libraries(aggregate-sync-test galois_gnn)
 #add_test(NAME aggregate-sync-test COMMAND GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=4 ./aggregate-sync-test)
 
+add_executable(weight-sync-test weight-sync-test.cpp)
+target_link_libraries(weight-sync-test galois_gnn)
+
 # TODO multi host tests?

@@ -49,7 +49,6 @@ int main() {
       .input_rows = 7, .input_columns = 3, .output_columns = 2};
 
   // create the layer, no norm factor
-  // note layer number is 1 so that it does something in backward phase
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
       std::make_unique<galois::GraphConvolutionalLayer>(
           0, test_graph, dimension_0,

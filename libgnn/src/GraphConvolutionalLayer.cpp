@@ -115,7 +115,7 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
 
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
-  // XXX
+  WeightGradientSyncAverage();
 
   if (config_.do_dropout && layer_number_ != 0) {
     DoDropoutDerivative();

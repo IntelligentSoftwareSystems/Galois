@@ -14,6 +14,7 @@ set(sources
   src/SoftmaxLayer.cpp
   src/GraphNeuralNetwork.cpp
   src/GNNOptimizers.cpp
+  src/GluonGradientInterface.cpp
 )
 
 add_library(galois_gnn STATIC ${sources})

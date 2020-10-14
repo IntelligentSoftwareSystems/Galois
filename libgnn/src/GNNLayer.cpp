@@ -1,5 +1,6 @@
 #include "galois/Logging.h"
 #include "galois/layers/GNNLayer.h"
+#include "galois/layers/GradientSyncStructures.h"
 
 galois::GNNLayer::GNNLayer(size_t layer_num,
                            const galois::graphs::GNNGraph& graph,
@@ -18,6 +19,15 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     layer_weights_.resize(num_weight_elements);
     layer_weight_gradients_.resize(num_weight_elements, 0);
     GlorotBengioInit(&layer_weights_);
+
+    // initialize sync substrate
+    gradient_sync_interface_ =
+        std::make_unique<GluonGradientInterface>(layer_weight_gradients_);
+    gradient_sync_substrate_ = std::make_unique<
+        galois::graphs::GluonSubstrate<GluonGradientInterface>>(
+        *gradient_sync_interface_,
+        galois::runtime::getSystemNetworkInterface().ID,
+        galois::runtime::getSystemNetworkInterface().Num, false);
   }
 
   size_t num_output_elements =
@@ -123,4 +133,27 @@ void galois::GNNLayer::OptimizeLayer(BaseOptimizer* optimizer,
                                      size_t trainable_layer_number) {
   optimizer->GradientDescent(layer_weight_gradients_, &layer_weights_,
                              trainable_layer_number);
+}
+
+void galois::GNNLayer::WeightGradientSyncSum() {
+  // XXX bitset
+  gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
+      "WeightGradientsSync");
+}
+
+void galois::GNNLayer::WeightGradientSyncAverage() {
+  size_t num_hosts = galois::runtime::getSystemNetworkInterface().Num;
+  if (num_hosts > 1) {
+    // XXX bitset
+    // sum, then average by dividing all by num hosts (every host participates
+    // in sync)
+    gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
+        "WeightGradientsSyncAverage");
+    galois::do_all(
+        galois::iterate(static_cast<size_t>(0), layer_weight_gradients_.size()),
+        [&](size_t weight_index) {
+          layer_weight_gradients_[weight_index] /= num_hosts;
+        },
+        galois::loopname("WeightGradientSyncAverageDivide"));
+  }
 }

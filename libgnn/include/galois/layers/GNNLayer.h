@@ -3,6 +3,7 @@
 #include "galois/PerThreadRNG.h"
 #include "galois/GNNOptimizers.h"
 #include "galois/graphs/GNNGraph.h"
+#include "galois/layers/GluonGradientInterface.h"
 
 namespace galois {
 
@@ -141,6 +142,12 @@ protected:
   std::vector<GNNFloat> layer_weights_;
   //! Gradients used to update the weights of this layer
   std::vector<GNNFloat> layer_weight_gradients_;
+  //! Wrapper over gradient matrix to make it compatible with Gluon
+  std::unique_ptr<GluonGradientInterface> gradient_sync_interface_;
+  //! Synchronization substrate for the weight gradients
+  std::unique_ptr<galois::graphs::GluonSubstrate<GluonGradientInterface>>
+      gradient_sync_substrate_;
+
   // There is a forward and a backward as their sizes will differ and we only
   // want to allocate memory once to avoid runtime memory allocation.
   //! The output of the forward phase for this layer.
@@ -188,6 +195,12 @@ protected:
   void Activation();
   //! Calculate derivative of activation function based on config on the matrix
   void ActivationDerivative(std::vector<GNNFloat>* matrix);
+
+  //! Synchronize weight gradients with a summation
+  void WeightGradientSyncSum();
+  //! Synchronize weight gradients with a summation, then locally divide all
+  //! weights to get an average
+  void WeightGradientSyncAverage();
 };
 
 } // namespace galois
