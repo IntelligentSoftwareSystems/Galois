@@ -5,7 +5,7 @@
 galois::GNNLayer::GNNLayer(size_t layer_num,
                            const galois::graphs::GNNGraph& graph,
                            const GNNLayerDimensions& dimensions,
-                           const GNNConfig& config)
+                           const GNNLayerConfig& config)
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
   if (config_.allocate_weights) {

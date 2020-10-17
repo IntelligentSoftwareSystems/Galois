@@ -30,14 +30,14 @@ public:
                            const std::vector<size_t>& layer_column_sizes,
                            GNNOutputLayerType output_layer_type)
       : GraphNeuralNetworkConfig(num_layers, layer_types, layer_column_sizes,
-                                 output_layer_type, GNNConfig()) {}
+                                 output_layer_type, GNNLayerConfig()) {}
 
   //! Construction with a specified config for layers
   GraphNeuralNetworkConfig(size_t num_layers,
                            const std::vector<GNNLayerType>& layer_types,
                            const std::vector<size_t>& layer_column_sizes,
                            GNNOutputLayerType output_layer_type,
-                           const GNNConfig& default_layer_config)
+                           const GNNLayerConfig& default_layer_config)
       : num_intermediate_layers_(num_layers), layer_types_(layer_types),
         layer_column_sizes_(layer_column_sizes),
         output_layer_type_(output_layer_type),
@@ -71,7 +71,7 @@ public:
     return layer_column_sizes_[num_intermediate_layers_];
   }
   //! Get the default layer config of layers in this GNN
-  const GNNConfig& default_layer_config() { return default_layer_config_; }
+  const GNNLayerConfig& default_layer_config() { return default_layer_config_; }
 
 private:
   //! Number of layers to construct in the GNN not including the output
@@ -86,7 +86,7 @@ private:
   //! Output layer type
   GNNOutputLayerType output_layer_type_;
   //! Default config to use for layers
-  GNNConfig default_layer_config_;
+  GNNLayerConfig default_layer_config_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -11,12 +11,13 @@ public:
   GraphConvolutionalLayer(size_t layer_num,
                           const galois::graphs::GNNGraph& graph,
                           const GNNLayerDimensions& dimensions,
-                          const GNNConfig& config);
+                          const GNNLayerConfig& config);
 
   GraphConvolutionalLayer(size_t layer_num,
                           const galois::graphs::GNNGraph& graph,
                           const GNNLayerDimensions& dimensions)
-      : GraphConvolutionalLayer(layer_num, graph, dimensions, GNNConfig()) {}
+      : GraphConvolutionalLayer(layer_num, graph, dimensions,
+                                GNNLayerConfig()) {}
 
   // Parent functions
   const std::vector<GNNFloat>&

@@ -21,7 +21,7 @@ int main() {
       galois::GNNLayerType::kGraphConvolutional};
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
-  galois::GNNConfig layer_config;
+  galois::GNNLayerConfig layer_config;
   layer_config.do_dropout       = true;
   layer_config.do_activation    = false;
   layer_config.do_normalization = true;

@@ -19,7 +19,7 @@ int main() {
   dimension_0.input_rows     = test_graph->size();
   dimension_0.input_columns  = 3;
   dimension_0.output_columns = 2;
-  galois::GNNConfig dcon;
+  galois::GNNLayerConfig dcon;
 
   dcon.allow_aggregate_after_update = false;
   // create the layer, no norm factor

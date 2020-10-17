@@ -33,7 +33,7 @@ struct GNNLayerDimensions {
 };
 
 //! Config options for operations that can occur in a layer
-struct GNNConfig {
+struct GNNLayerConfig {
   //! True if weights should be allocated
   bool allocate_weights{true};
   //! True if dropout is to be done at beginning of forward phase
@@ -61,12 +61,12 @@ public:
   //! the input/output dimensions of the MxM that occurs in the layer; config
   //! as well
   GNNLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
-           const GNNLayerDimensions& dimensions, const GNNConfig& config);
+           const GNNLayerDimensions& dimensions, const GNNLayerConfig& config);
 
   //! Uses a default config
   GNNLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
            const GNNLayerDimensions& dimensions)
-      : GNNLayer(layer_num, graph, dimensions, GNNConfig()) {}
+      : GNNLayer(layer_num, graph, dimensions, GNNLayerConfig()) {}
 
   GNNPhase layer_phase() { return layer_phase_; }
   //! Changes this layer's phase
@@ -137,7 +137,7 @@ protected:
   //! Dimensions (input/output sizes) of this layer
   GNNLayerDimensions layer_dimensions_;
   //! Config object for certain parameters for layer
-  GNNConfig config_;
+  GNNLayerConfig config_;
   //! Weights used by this layer. Dimensions: input columns by output columns
   std::vector<GNNFloat> layer_weights_;
   //! Gradients used to update the weights of this layer

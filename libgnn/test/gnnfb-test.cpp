@@ -23,10 +23,11 @@ int main() {
       galois::GNNLayerType::kGraphConvolutional};
   // note this includes the output; last 2 must be same because softmax
   std::vector<size_t> layer_output_sizes = {4, 7, 7};
-  galois::GNNConfig dcon;
+  galois::GNNLayerConfig dcon;
   dcon.allow_aggregate_after_update = false;
-  // note GNNConfig is passed in; use a config that does not do anything extra
-  // like dropout or activation and the like so that input is easier to verify
+  // note GNNLayerConfig is passed in; use a config that does not do anything
+  // extra like dropout or activation and the like so that input is easier to
+  // verify
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
       dcon);

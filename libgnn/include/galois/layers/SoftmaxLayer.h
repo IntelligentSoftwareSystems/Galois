@@ -11,7 +11,7 @@ public:
   SoftmaxLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
                const GNNLayerDimensions& dimensions)
       : GNNLayer(layer_num, graph, dimensions,
-                 GNNConfig{.allocate_weights = false}),
+                 GNNLayerConfig{.allocate_weights = false}),
         input_loss_(dimensions.input_rows),
         ground_truth_vectors_(dimensions.input_columns),
         norm_gradient_vectors_(dimensions.input_columns),
