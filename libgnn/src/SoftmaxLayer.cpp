@@ -2,6 +2,10 @@
 #include "galois/GNNMath.h"
 #include "galois/layers/SoftmaxLayer.h"
 
+// Allocate memory and initialize
+void galois::SoftmaxLayer::Init() {
+}
+
 const std::vector<galois::GNNFloat>& galois::SoftmaxLayer::ForwardPhase(
     const std::vector<galois::GNNFloat>& input_embeddings) {
   input_loss_.assign(input_loss_.size(), 0.0);
