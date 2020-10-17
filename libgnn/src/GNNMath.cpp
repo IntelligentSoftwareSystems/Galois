@@ -68,9 +68,18 @@ void galois::GNNSoftmaxDerivative(const size_t vector_length,
       temp_vector[j] = (j == i) ? prev_output[i] * (1.0 - prev_output[i])
                                 : -prev_output[j] * prev_output[i];
     }
-    // TODO is sdot using threads? if so this is a nested parallelism problem
-    output[i] =
-        cblas_sdot(vector_length, prev_output_derivative, 1, temp_vector, 1);
+    GNNFloat sdot_result = 0;
+    // TODO use vector instructions? would need another loop to add everything
+    // together + a temp vector to store results so probably about the same?
+    for (size_t k = 0; k < vector_length; k++) {
+      sdot_result += prev_output_derivative[k] * temp_vector[k];
+    }
+    output[i] = sdot_result;
+
+    // TODO this is currently disabled because of a nested parallelism problem
+    // (cblas may use more threads)
+    // output[i] =
+    //    cblas_sdot(vector_length, prev_output_derivative, 1, temp_vector, 1);
   }
 }
 
@@ -113,6 +122,7 @@ void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
   size_t lead_dim_b =
       (trans_b == CblasNoTrans) ? output_columns : input_columns;
   // do the MM
+  // TODO roll our own sgemm rather than use 3rd party?
   cblas_sgemm(CblasRowMajor, trans_a, trans_b, input_rows, output_columns,
               input_columns, 1.0, a, lead_dim_a, b, lead_dim_b, 0.0, output,
               output_columns);

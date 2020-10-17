@@ -1,7 +1,7 @@
 #pragma once
 
 #include "galois/GNNTypes.h"
-#include <cblas.h>
+#include <mkl.h>
 
 namespace galois {
 
