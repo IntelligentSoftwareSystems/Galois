@@ -76,6 +76,8 @@ void graph_conv_layer::malloc_and_init() {
   norm_scores_grad.resize(ne);
   epsilon = 0.2; // LeakyReLU angle of negative slope
 #endif
+  dropout_ = true;
+  act_ = false;
 
   if (dropout_)
     dropout_mask = new mask_t[x * y];
