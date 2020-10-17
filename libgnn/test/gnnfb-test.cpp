@@ -23,11 +23,13 @@ int main() {
       galois::GNNLayerType::kGraphConvolutional};
   // note this includes the output; last 2 must be same because softmax
   std::vector<size_t> layer_output_sizes = {4, 7, 7};
+  galois::GNNConfig dcon;
+  dcon.allow_aggregate_after_update = false;
   // note GNNConfig is passed in; use a config that does not do anything extra
   // like dropout or activation and the like so that input is easier to verify
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
-      galois::GNNConfig{.allow_aggregate_after_update = false});
+      dcon);
   // input is 7 x 3, layers are then 3 x 4 and 4 x 7 and 7 x 7
   // middle 2 are trainable so 12 and 28
   std::vector<size_t> adam_sizes = {12, 28};
@@ -171,7 +173,7 @@ int main() {
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
   galois::GraphNeuralNetworkConfig gnn_config2(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
-      galois::GNNConfig{.allow_aggregate_after_update = false});
+      dcon);
   auto adam2 = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
   auto gnn2  = std::make_unique<galois::GraphNeuralNetwork>(
       std::move(test_graph), std::move(adam2), std::move(gnn_config2));

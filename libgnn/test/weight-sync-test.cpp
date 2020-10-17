@@ -15,15 +15,17 @@ int main() {
 
   // create same layer from convlayer-test and make sure result is the same even
   // in multi-host environment
-  galois::GNNLayerDimensions dimension_0{.input_rows     = test_graph->size(),
-                                         .input_columns  = 3,
-                                         .output_columns = 2};
+  galois::GNNLayerDimensions dimension_0;
+  dimension_0.input_rows     = test_graph->size();
+  dimension_0.input_columns  = 3;
+  dimension_0.output_columns = 2;
+  galois::GNNConfig dcon;
 
+  dcon.allow_aggregate_after_update = false;
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(
-          0, *(test_graph.get()), dimension_0,
-          galois::GNNConfig{.allow_aggregate_after_update = false});
+      std::make_unique<galois::GraphConvolutionalLayer>(0, *(test_graph.get()),
+                                                        dimension_0, dcon);
   layer_0->InitAllWeightsTo1();
 
   // backward pass checking; check the gradients out

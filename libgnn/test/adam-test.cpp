@@ -14,8 +14,12 @@ int main() {
                      num_threads);
 
   // create sample config that is easy to trace
-  galois::AdamOptimizer::AdamConfiguration config = {
-      .alpha = 1, .beta1 = 0.5, .beta2 = 0.5, .epsilon = 0};
+  galois::AdamOptimizer::AdamConfiguration config;
+  config.alpha   = 1;
+  config.beta1   = 0.5;
+  config.beta2   = 0.5;
+  config.epsilon = 0;
+
   std::vector<size_t> layer_sizes = {2, 1};
   galois::AdamOptimizer adam(config, layer_sizes, 2);
 

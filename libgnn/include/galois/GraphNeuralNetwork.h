@@ -30,11 +30,7 @@ public:
                            const std::vector<size_t>& layer_column_sizes,
                            GNNOutputLayerType output_layer_type)
       : GraphNeuralNetworkConfig(num_layers, layer_types, layer_column_sizes,
-                                 output_layer_type,
-                                 GNNConfig{.do_dropout       = true,
-                                           .dropout_rate     = 0.3,
-                                           .do_activation    = true,
-                                           .do_normalization = true}) {}
+                                 output_layer_type, GNNConfig()) {}
 
   //! Construction with a specified config for layers
   GraphNeuralNetworkConfig(size_t num_layers,

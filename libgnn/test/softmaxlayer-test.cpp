@@ -17,10 +17,10 @@ int main() {
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
 
   // input/output columns must be same in softmax
-  galois::GNNLayerDimensions dimension_0{
-      .input_rows     = 7,
-      .input_columns  = test_graph.GetNumLabelClasses(),
-      .output_columns = test_graph.GetNumLabelClasses()};
+  galois::GNNLayerDimensions dimension_0;
+  dimension_0.input_rows     = 7;
+  dimension_0.input_columns  = test_graph.GetNumLabelClasses();
+  dimension_0.output_columns = test_graph.GetNumLabelClasses();
 
   GALOIS_LOG_VERBOSE("Num output classes is {}", dimension_0.input_columns);
 
