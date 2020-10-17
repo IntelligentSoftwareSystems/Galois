@@ -1,12 +1,12 @@
 set(sources
-  src/GNNGraph.cpp
-  src/GNNLayer.cpp
   src/GNNMath.cpp
-  src/GraphConvolutionalLayer.cpp
-  src/SoftmaxLayer.cpp
-  src/GraphNeuralNetwork.cpp
   src/GNNOptimizers.cpp
-  src/GluonGradientInterface.cpp
+  src/GraphNeuralNetwork.cpp
+  src/graphs/GNNGraph.cpp
+  src/layers/GNNLayer.cpp
+  src/layers/GluonGradientInterface.cpp
+  src/layers/GraphConvolutionalLayer.cpp
+  src/layers/SoftmaxLayer.cpp
 )
 
 set(MKL_LIBRARIES ${MKL_ROOT}/lib/intel64)
