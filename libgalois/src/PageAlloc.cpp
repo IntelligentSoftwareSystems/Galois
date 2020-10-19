@@ -60,7 +60,6 @@ void* galois::substrate::allocPages(unsigned num, bool preFault) {
     void* ptr =
         trymmap(num * hugePageSize, preFault ? _MAP_HUGE_POP : _MAP_HUGE);
     if (!ptr) {
-      gDebug("Huge page alloc failed, falling back");
       ptr = trymmap(num * hugePageSize, preFault ? _MAP_POP : _MAP);
     }
 
