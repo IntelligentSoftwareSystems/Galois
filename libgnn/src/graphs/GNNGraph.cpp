@@ -6,11 +6,11 @@
 namespace {
 //! Partitions a particular dataset given some partitioning scheme
 std::unique_ptr<galois::graphs::GNNGraph::GNNDistGraph>
-LoadPartition(const std::string& dataset_name,
+LoadPartition(const std::string& input_directory,
+              const std::string& dataset_name,
               galois::graphs::GNNPartitionScheme partition_scheme) {
   // XXX input path
-  std::string input_file =
-      galois::default_gnn_dataset_path + dataset_name + ".csgr";
+  std::string input_file = input_directory + dataset_name + ".csgr";
   GALOIS_LOG_VERBOSE("Partition loading: File to read is {}", input_file);
 
   // load partition
@@ -39,6 +39,15 @@ size_t gnn_matrix_to_sync_column_length_ = 0;
 galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
                                    bool has_single_class_label) {
+  GNNGraph(galois::default_gnn_dataset_path, dataset_name, partition_scheme,
+           has_single_class_label);
+}
+
+galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
+                                   const std::string& dataset_name,
+                                   GNNPartitionScheme partition_scheme,
+                                   bool has_single_class_label)
+    : input_directory_(input_directory) {
   GALOIS_LOG_VERBOSE("[{}] Constructing partitiong for {}", host_id_,
                      dataset_name);
   // save host id
@@ -48,7 +57,8 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
       std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
       std::string("] ");
   // load partition
-  partitioned_graph_ = LoadPartition(dataset_name, partition_scheme);
+  partitioned_graph_ =
+      LoadPartition(input_directory_, dataset_name, partition_scheme);
 
   // read additional graph data
   ReadLocalLabels(dataset_name, has_single_class_label);
@@ -118,8 +128,7 @@ void galois::graphs::GNNGraph::AggregateSync(
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
   GALOIS_LOG_VERBOSE("[{}] Reading labels from disk...", host_id_);
-  std::string filename =
-      galois::default_gnn_dataset_path + dataset_name + "-labels.txt";
+  std::string filename = input_directory_ + dataset_name + "-labels.txt";
   // read file header, save num label classes while at it
   std::ifstream file_stream;
   file_stream.open(filename, std::ios::in);
@@ -191,8 +200,7 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
   // read in dimensions of features, specifically node feature length
   size_t num_global_vertices;
 
-  std::string file_dims =
-      galois::default_gnn_dataset_path + dataset_name + "-dims.txt";
+  std::string file_dims = input_directory_ + dataset_name + "-dims.txt";
   std::ifstream ifs;
   ifs.open(file_dims, std::ios::in);
   ifs >> num_global_vertices >> node_feature_length_;
@@ -210,8 +218,7 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
 
   // read in all features
   std::ifstream file_stream;
-  std::string feature_file =
-      galois::default_gnn_dataset_path + dataset_name + "-feats.bin";
+  std::string feature_file = input_directory_ + dataset_name + "-feats.bin";
   file_stream.open(feature_file, std::ios::binary | std::ios::in);
   file_stream.read((char*)full_feature_set.get(), sizeof(GNNFloat) *
                                                       num_global_vertices *
@@ -247,8 +254,8 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   size_t range_end;
 
   // read mask range
-  std::string mask_filename = galois::default_gnn_dataset_path + dataset_name +
-                              "-" + mask_type + "_mask.txt";
+  std::string mask_filename =
+      input_directory_ + dataset_name + "-" + mask_type + "_mask.txt";
   std::ifstream mask_stream;
   mask_stream.open(mask_filename, std::ios::in);
   mask_stream >> range_begin >> range_end >> std::ws;
@@ -351,8 +358,7 @@ void galois::graphs::GNNGraph::InitZeroStartGraphIndices() {
 }
 
 void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
-  std::string input_file =
-      galois::default_gnn_dataset_path + dataset_name + ".csgr";
+  std::string input_file = input_directory_ + dataset_name + ".csgr";
   GALOIS_LOG_VERBOSE("[{}] Reading entire graph: file to read is {}", host_id_,
                      input_file);
   galois::graphs::readGraph(whole_graph_, input_file);

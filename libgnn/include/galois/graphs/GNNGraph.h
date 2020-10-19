@@ -35,9 +35,11 @@ public:
   using NodeIterator = boost::counting_iterator<size_t>;
   using EdgeIterator = GNNDistGraph::edge_iterator;
 
-  //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
            bool has_single_class_label);
+  //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
+  GNNGraph(const std::string& input_directory, const std::string& dataset_name,
+           GNNPartitionScheme partition_scheme, bool has_single_class_label);
 
   //! Returns host id
   size_t host_id() const { return host_id_; }
@@ -118,6 +120,8 @@ public:
                      const size_t matrix_column_size) const;
 
 private:
+  //! Directory for input data
+  const std::string input_directory_;
   //! In a multi-host setting, this variable stores the host id that the graph
   //! is currently running on
   unsigned host_id_;
