@@ -25,4 +25,5 @@ endif()
 
 add_subdirectory(gcn)
 #add_subdirectory(sage)
-add_subdirectory(gat)
+#add_subdirectory(gat)
+add_subdirectory(distributed)

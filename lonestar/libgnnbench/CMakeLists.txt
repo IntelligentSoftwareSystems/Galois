@@ -1,4 +1,4 @@
-add_library(gnnbench STATIC src/Input.cpp)
+add_library(gnnbench STATIC src/Input.cpp src/Start.cpp)
 target_include_directories(gnnbench PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )

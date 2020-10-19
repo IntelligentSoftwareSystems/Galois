@@ -10,7 +10,7 @@ llvm::cl::opt<std::string> input_directory(
               "training (features, graph topology, masks, etc.)"),
     cll::init(galois::default_gnn_dataset_path));
 
-llvm::cl::opt<std::string> input_file(
+llvm::cl::opt<std::string> input_name(
     cll::Positional,
     cll::desc("Base name of graph: used to find csgr, features, etc."),
     cll::Required);
@@ -57,3 +57,15 @@ llvm::cl::opt<bool>
                      cll::desc("If true (on by default), normalizes vertex "
                                "features based on their degree"),
                      cll::init(true));
+
+const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
+  switch (s) {
+  case galois::graphs::GNNPartitionScheme::kOEC:
+    return "oec";
+  case galois::graphs::GNNPartitionScheme::kCVC:
+    return "cvc";
+  default:
+    GALOIS_LOG_FATAL("Invalid partitioning scheme");
+    return "";
+  }
+}
