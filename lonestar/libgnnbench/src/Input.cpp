@@ -1,3 +1,4 @@
+#include "galois/Logging.h"
 #include "GNNBench/Input.h"
 
 namespace cll = llvm::cl;
@@ -29,11 +30,11 @@ llvm::cl::opt<size_t> num_layers(
         "Number of intermediate layers in the neural network (default 2))"),
     cll::init(2));
 
-llvm::cl::list<size_t> layer_sizes(
-    "layerSizes",
-    cll::desc(
-        "Comma separated list of numbers specifying intermediate layer sizes"),
-    cll::CommaSeparated);
+llvm::cl::list<size_t>
+    layer_sizes("layerSizes",
+                cll::desc("Comma separated list of numbers specifying "
+                          "intermediate layer sizes (does not include output)"),
+                cll::CommaSeparated);
 
 llvm::cl::opt<bool> do_dropout(
     "doDropout",
@@ -58,6 +59,12 @@ llvm::cl::opt<bool>
                                "features based on their degree"),
                      cll::init(true));
 
+llvm::cl::opt<bool>
+    agg_after_update("allowAggregationAfterUpdate",
+                     cll::desc("If true (on by default), allows aggregate to "
+                               "be done after update as an optimization"),
+                     cll::init(true));
+
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
   case galois::graphs::GNNPartitionScheme::kOEC:
@@ -68,4 +75,113 @@ const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
     GALOIS_LOG_FATAL("Invalid partitioning scheme");
     return "";
   }
+}
+
+//! Initializes the vector of layer sizes from command line args + graph
+std::vector<size_t>
+CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
+  // set layer sizes for intermdiate and output layers
+  std::vector<size_t> layer_sizes_vector;
+  if (layer_sizes.size()) {
+    GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
+    for (size_t i = 0; i < num_layers; i++) {
+      layer_sizes_vector.emplace_back(layer_sizes[i]);
+    }
+    // verify user satisfies last intermediate layer needing to have same size
+    // as # label classes
+    GALOIS_LOG_ASSERT(layer_sizes_vector.back() ==
+                      gnn_graph->GetNumLabelClasses());
+  } else {
+    // default 16 for everything until last 2
+    for (size_t i = 0; i < num_layers - 1; i++) {
+      layer_sizes_vector.emplace_back(16);
+    }
+    // last 2 sizes must be equivalent to # label classes; this is the last
+    // intermediate layer
+    layer_sizes_vector.emplace_back(gnn_graph->GetNumLabelClasses());
+  }
+
+  // TODO
+  // for now only softmax layer which dictates the output size of the last
+  // intermediate layer + size of the output layer
+  // output layer at the moment required to be same as # label classes
+  layer_sizes_vector.emplace_back(gnn_graph->GetNumLabelClasses());
+
+  return layer_sizes_vector;
+}
+
+//! Setup layer config struct based on cli args
+galois::GNNLayerConfig CreateLayerConfig() {
+  galois::GNNLayerConfig layer_config;
+  layer_config.do_dropout                   = do_dropout;
+  layer_config.dropout_rate                 = dropout_rate;
+  layer_config.do_activation                = do_activation;
+  layer_config.do_normalization             = do_normalization;
+  layer_config.allow_aggregate_after_update = agg_after_update;
+  return layer_config;
+}
+
+std::unique_ptr<galois::BaseOptimizer>
+CreateOptimizer(const galois::graphs::GNNGraph* gnn_graph) {
+  std::vector<size_t> opt_sizes;
+
+  // optimizer sizes are based on intermediate layer sizes, input feats, and
+  // # label classes
+  if (layer_sizes.size()) {
+    GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
+    opt_sizes.emplace_back(gnn_graph->node_feature_length() * layer_sizes[0]);
+    // assumption here is that if it reached this point then layer sizes were
+    // already sanity checked previously (esp. last layer)
+    for (size_t i = 1; i < num_layers; i++) {
+      opt_sizes.emplace_back(layer_sizes[i] * layer_sizes[i - 1]);
+    }
+  } else {
+    // everything is size 16 until last
+    if (num_layers == 1) {
+      // single layer requires a bit of special handling
+      opt_sizes.emplace_back(gnn_graph->node_feature_length() *
+                             gnn_graph->GetNumLabelClasses());
+    } else {
+      // first
+      opt_sizes.emplace_back(gnn_graph->node_feature_length() * 16);
+      for (size_t i = 1; i < num_layers - 1; i++) {
+        opt_sizes.emplace_back(16 * 16);
+      }
+      // last
+      opt_sizes.emplace_back(16 * gnn_graph->GetNumLabelClasses());
+    }
+  }
+  GALOIS_LOG_ASSERT(opt_sizes.size() == num_layers);
+
+  // TODO only adam works right now, add the others later
+  return std::make_unique<galois::AdamOptimizer>(opt_sizes, num_layers);
+}
+
+std::unique_ptr<galois::GraphNeuralNetwork>
+InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
+  // partition/load graph
+  auto gnn_graph = std::make_unique<galois::graphs::GNNGraph>(
+      input_directory, input_name, partition_scheme, true);
+
+  // create layer types vector
+  std::vector<galois::GNNLayerType> layer_types;
+  for (size_t i = 0; i < num_layers; i++) {
+    layer_types.push_back(layer_type);
+  }
+  // sizes
+  std::vector<size_t> layer_sizes_vector =
+      CreateLayerSizesVector(gnn_graph.get());
+  // layer config object
+  galois::GNNLayerConfig layer_config = CreateLayerConfig();
+  // GNN config object
+  // TODO output type should be configurable
+  galois::GraphNeuralNetworkConfig gnn_config(
+      num_layers, layer_types, layer_sizes_vector,
+      galois::GNNOutputLayerType::kSoftmax, layer_config);
+  // optimizer
+  std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
+
+  // create the gnn
+  return std::make_unique<galois::GraphNeuralNetwork>(
+      std::move(gnn_graph), std::move(opt), std::move(gnn_config));
 }

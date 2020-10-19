@@ -1,7 +1,6 @@
 #pragma once
 
 #include "galois/GraphNeuralNetwork.h"
-#include "galois/Logging.h"
 #include "galois/graphs/GNNGraph.h"
 #include <llvm/Support/CommandLine.h>
 
@@ -23,8 +22,14 @@ extern llvm::cl::opt<bool> do_activation;
 //! Controls weight normalization based on degree
 extern llvm::cl::opt<bool> do_normalization;
 // TODO output layer type
+// TODO optimizer type
+//! Toggles an optimization that flips aggregate/update step if it would be
+//! beneficial
+extern llvm::cl::opt<bool> agg_after_update;
 
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s);
 
-//! Using command line args above, create a GNN.
-// XXX
+//! Using command line args above, create a GNN using some specified layer type
+//! as the intermediate layer.
+std::unique_ptr<galois::GraphNeuralNetwork>
+InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type);
