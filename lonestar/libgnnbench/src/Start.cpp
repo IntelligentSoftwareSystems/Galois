@@ -6,6 +6,10 @@ cll::opt<unsigned> num_threads("t", cll::desc("Number of threads (default 1)"),
                                cll::init(1));
 cll::opt<unsigned> num_runs("runs", cll::desc("Number of runs (default 1)"),
                             cll::init(1));
+cll::opt<unsigned> num_epochs("epochs",
+                              cll::desc("Number of epochs (default 50)"),
+                              cll::init(50));
+
 cll::opt<std::string>
     stat_file("statFile", cll::desc("Optional output file to print stats to"));
 

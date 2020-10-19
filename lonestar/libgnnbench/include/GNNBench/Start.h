@@ -10,6 +10,7 @@
 
 extern llvm::cl::opt<unsigned> num_threads;
 extern llvm::cl::opt<unsigned> num_runs;
+extern llvm::cl::opt<unsigned> num_epochs;
 extern llvm::cl::opt<std::string> stat_file;
 
 ////////////////////////////////////////////////////////////////////////////////
