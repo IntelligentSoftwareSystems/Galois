@@ -13,6 +13,7 @@ namespace galois {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// TODO validation and testing intervals
 //! Configuration object passed into constructor of a GraphNeuralNetwork to
 //! determine how the network gets constructed.
 class GraphNeuralNetworkConfig {
@@ -130,6 +131,10 @@ public:
 
   //! Returns the output layer
   const galois::GNNLayer* GetOutputLayer() { return gnn_layers_.back().get(); }
+
+  //! Do training for a specified # of epochs and return test accuracy at the
+  //! end of it
+  float Train(size_t num_epochs);
 
   //! Propogates the graph's feature vectors through the network to get a new
   //! vector representation.

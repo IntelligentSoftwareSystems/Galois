@@ -59,6 +59,35 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   }
 }
 
+float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
+  const size_t this_host = graph_->host_id();
+  // TODO incorporate validation/test intervals
+  for (size_t epoch = 0; epoch < num_epochs; epoch++) {
+    const std::vector<galois::GNNFloat>* predictions = DoInference();
+    GradientPropagation();
+    float train_accuracy = GetGlobalAccuracy(*predictions);
+    if (this_host == 0) {
+      galois::gPrint("Epoch ", epoch, ": Train accuracy is ", train_accuracy,
+                     "\n");
+    }
+    // TODO validation and test as necessary
+  }
+
+  // check test accuracy
+  galois::StatTimer acc_timer("FinalAccuracyTest");
+  acc_timer.start();
+  SetLayerPhases(galois::GNNPhase::kTest);
+  const std::vector<galois::GNNFloat>* predictions = DoInference();
+  float global_accuracy = GetGlobalAccuracy(*predictions);
+  acc_timer.stop();
+
+  if (this_host == 0) {
+    galois::gPrint("Final test accuracy is ", global_accuracy, "\n");
+  }
+
+  return global_accuracy;
+}
+
 const std::vector<galois::GNNFloat>* galois::GraphNeuralNetwork::DoInference() {
   // start with graph features and pass it through all layers of the network
   const std::vector<GNNFloat>* layer_input = &(graph_->GetLocalFeatures());
