@@ -226,4 +226,5 @@ add_subdirectory(scientific)
 
 if(USE_DEEPGALOIS)
   add_subdirectory(gnn)
+  add_subdirectory(libgnnbench)
 endif(USE_DEEPGALOIS)
