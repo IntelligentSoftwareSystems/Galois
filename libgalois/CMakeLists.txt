@@ -86,6 +86,7 @@ endif()
 
 target_link_libraries(galois_shmem INTERFACE pygalois)
 target_link_libraries(galois_shmem PRIVATE Threads::Threads)
+target_link_libraries(galois_shmem PUBLIC galois_support)
 
 if (CMAKE_HAVE_PTHREAD_H)
   target_compile_definitions(galois_shmem PRIVATE GALOIS_HAVE_PTHREAD)

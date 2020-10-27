@@ -79,13 +79,17 @@ public:
 
   //! Insert characters from a buffer into the serialize buffer
   void insert(const uint8_t* c, size_t bytes) {
-    bufdata.insert(bufdata.end(), c, c + bytes);
+    if (bytes > 0) {
+      bufdata.insert(bufdata.end(), c, c + bytes);
+    }
   }
 
   //! Insert characters from a buffer into the serialize buffer at a particular
   //! offset
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
-    std::copy_n(c, bytes, bufdata.begin() + offset);
+    if (bytes > 0) {
+      std::copy_n(c, bytes, bufdata.begin() + offset);
+    }
   }
 
   /**
@@ -237,7 +241,7 @@ public:
    */
   void extract(uint8_t* dst, size_t num) {
     if (num > 0) {
-      memcpy(dst, &bufdata[offset], num);
+      std::copy_n(&bufdata[offset], num, dst);
       offset += num;
     }
   }

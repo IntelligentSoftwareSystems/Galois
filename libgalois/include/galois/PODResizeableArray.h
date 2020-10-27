@@ -28,6 +28,7 @@
 #include <type_traits>
 
 #include "galois/config.h"
+#include "galois/Logging.h"
 
 namespace galois {
 
@@ -136,6 +137,9 @@ public:
       }
       data_ = static_cast<_Tp*>(
           realloc(reinterpret_cast<void*>(data_), capacity_ * sizeof(_Tp)));
+      if (!data_) {
+        GALOIS_LOG_FATAL("Out of memory for a PODResizableArray");
+      }
     }
   }
 
@@ -183,10 +187,12 @@ public:
   void insert(iterator GALOIS_USED_ONLY_IN_DEBUG(position), InputIterator first,
               InputIterator last) {
     assert(position == end());
-    size_t old_size = size_;
     size_t to_add   = last - first;
-    resize(old_size + to_add);
-    std::copy_n(first, to_add, begin() + old_size);
+    if (to_add > 0) {
+      size_t old_size = size_;
+      resize(old_size + to_add);
+      std::copy_n(first, to_add, begin() + old_size);
+    }
   }
 
   void swap(PODResizeableArray& v) {
