@@ -5,6 +5,10 @@
 #include "galois/graphs/GluonSubstrate.h"
 #include "galois/graphs/GraphAggregationSyncStructures.h"
 
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/graphs/GNNGraph.cuh"
+#endif
+
 namespace galois {
 
 // TODO remove the need to hardcode this path
@@ -47,6 +51,16 @@ public:
   //! Returns host id in brackets to use for printing things
   const std::string& host_prefix() const { return host_prefix_; }
 
+  //! Length of a node feature
+  size_t node_feature_length() const { return node_feature_length_; }
+
+  //! Return the number of label classes (i.e. number of possible outputs)
+  size_t GetNumLabelClasses() const { return num_label_classes_; };
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Graph accessors
+  //////////////////////////////////////////////////////////////////////////////
+
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
 
@@ -67,22 +81,7 @@ public:
     return partitioned_graph_->masterNodesRange().end();
   }
 
-  //! Given an LID and the current phase of GNN computation, determine if the
-  //! lid in question is valid for the current phase (i.e., it is part of
-  //! a training, validation, or test phase mask)
-  bool IsValidForPhase(const unsigned lid,
-                       const galois::GNNPhase current_phase) const;
-  //! Returns the label of some local id assuming labels are single class
-  //! labels.
-  GNNFloat GetSingleClassLabel(const unsigned lid) const {
-    assert(using_single_class_labels_);
-    return local_ground_truth_labels_[lid];
-  }
-
-  //! Return the number of label classes
-  size_t GetNumLabelClasses() const { return num_label_classes_; };
-
-  // All following functions take a local id
+  // All following functions take a local node id
   EdgeIterator EdgeBegin(GraphNode n) const {
     return partitioned_graph_->edge_begin(n);
   };
@@ -94,22 +93,25 @@ public:
   };
   GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
 
-  size_t node_feature_length() const { return node_feature_length_; }
+  //! Returns the ground truth label of some local id assuming labels are single
+  //! class labels.
+  GNNFloat GetSingleClassLabel(const unsigned lid) const {
+    assert(using_single_class_labels_);
+    return local_ground_truth_labels_[lid];
+  }
 
+  //! Return matrix of the local node features
   const std::vector<GNNFloat>& GetLocalFeatures() const {
     return local_node_features_;
   }
 
-  //! Returns a pointer to the CSR indices where the first element starts at
-  //! 0 (used with MKL)
-  const uint32_t* GetZeroBasedRowPointer() const {
-    return zero_start_graph_indices_.data();
-  }
+  //! Given an LID and the current phase of GNN computation, determine if the
+  //! lid in question is valid for the current phase (i.e., it is part of
+  //! a training, validation, or test phase mask)
+  bool IsValidForPhase(const unsigned lid,
+                       const galois::GNNPhase current_phase) const;
 
-  //! Return pointer to all edge destinations; used with MKL
-  const uint32_t* GetEdgeDestPointer() const {
-    return partitioned_graph_->edge_dst_ptr();
-  }
+  //////////////////////////////////////////////////////////////////////////////
 
   //! Given a matrix and the column size, do an aggregate sync where each row
   //! is considered a node's data and sync using the graph's Gluon
@@ -137,9 +139,6 @@ private:
   //! The entire topology of the dataset: used for things like norm factor
   //! calculation or sampling
   WholeGraph whole_graph_;
-  //! The indices pointer from the partitioned graph except with a 0
-  //! prepended to it; needed for MKL calls
-  std::vector<uint32_t> zero_start_graph_indices_;
   //! Sync substrate for the partitioned graph
   std::unique_ptr<galois::graphs::GluonSubstrate<GNNDistGraph>> sync_substrate_;
   //! True if labels are single class
@@ -173,6 +172,10 @@ private:
 
   // TODO vars for subgraphs as necessary
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Initialization
+  //////////////////////////////////////////////////////////////////////////////
+
   //! Read labels of local nodes only
   void ReadLocalLabels(const std::string& dataset_name,
                        bool has_single_class_label);
@@ -185,54 +188,21 @@ private:
                                 GNNRange* mask_range, GNNLabel* masks);
   //! Read masks of local nodes only for training, validation, and testing
   void ReadLocalMasks(const std::string& dataset_name);
-  //! Init the node start indices that have a 0 at the beginning; straight
-  //! copy of the array from the partitioned graph save for the 0 at the
-  //! first element.
-  void InitZeroStartGraphIndices();
   //! Reads the entire graph topology in (but nothing else)
   void ReadWholeGraph(const std::string& dataset_name);
   //! Initializes the norm factors using the entire graph's topology for global
   //! degree access
   void InitNormFactor();
 
-  // public:
-  //  void saveDistGraph(DGraph* a);
-  //  galois::graphs::GluonSubstrate<DGraph>* getSyncSubstrate();
-  //  float_t* get_feats_ptr() { return h_feats; }
-  //  float_t* get_feats_subg_ptr() { return h_feats_subg.data(); }
-  //  label_t* get_labels_ptr() { return h_labels; }
-  //  label_t* get_labels_subg_ptr() { return h_labels_subg.data(); }
-  //  float_t* get_norm_factors_ptr() { return normFactors.data(); }
-  //  float_t* get_norm_factors_subg_ptr() { return &normFactorsSub[0]; }
-  //
-  //  //! allocate the norm factor vector
-  //  void allocNormFactor();
-  //  void allocNormFactorSub(int subID);
-  //  //! construct norm factor vector by using data from global graph
-  //  void constructNormFactor(deepgalois::Context* globalContext);
-  //  void constructNormFactorSub(int subgraphID);
-  //
-  //  void constructSubgraphLabels(size_t m, const mask_t* masks);
-  //  void constructSubgraphFeatures(size_t m, const mask_t* masks);
-  //
-  //  //! return label for some node
-  //  //! NOTE: this is LID, not GID
-  //  label_t get_label(size_t lid) { return h_labels[lid]; }
-  //
-  //  //! returns pointer to the features of each local node
-  //  float_t* get_in_ptr();
-  //
-  //  //! allocate memory for subgraphs (don't actually build them)
-  //  void allocateSubgraphs(int num_subgraphs, unsigned max_size);
-  //
-  //  //! return if a vertex is owned by the partitioned graph this context
-  //  contains bool isOwned(unsigned gid);
-  //  //! return if part graph has provided vertex for given gid locally
-  //  bool isLocal(unsigned gid);
-  //  //! get GID of an lid for a vertex
-  //  unsigned getGID(unsigned lid);
-  //  //! get local id of a vertex given a global id for that vertex
-  //  unsigned getLID(unsigned gid);
+  //////////////////////////////////////////////////////////////////////////////
+  // GPU things
+  //////////////////////////////////////////////////////////////////////////////
+
+#ifdef GALOIS_ENABLE_GPU
+  //! This satisfies the cuda context forward declaration in host decls:
+  //! context fields
+  GNNGraphGPUAllocations gpu_memory_;
+#endif
 };
 
 } // namespace graphs

@@ -71,8 +71,6 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
           *partitioned_graph_, host_id_,
           galois::runtime::getSystemNetworkInterface().Num, false);
 
-  // create the 0 based row indices for MKL use
-  InitZeroStartGraphIndices();
   // read in entire graph topology
   ReadWholeGraph(dataset_name);
   // init norm factors using the whole graph topology
@@ -338,23 +336,6 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
     ReadLocalMasksFromFile(dataset_name, "test", &global_testing_mask_range_,
                            local_testing_mask_.data());
   }
-}
-
-void galois::graphs::GNNGraph::InitZeroStartGraphIndices() {
-  GALOIS_LOG_VERBOSE("[{}] Initializing node indices with 0 prepended",
-                     host_id_);
-  // size is num nodes + 1
-  zero_start_graph_indices_.resize(partitioned_graph_->size() + 1);
-  // first element is zero
-  zero_start_graph_indices_[0] = 0;
-  // the rest is a straight copy from partitioned graph (use edge_end to access
-  // it)
-  galois::do_all(
-      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
-      [&](size_t i) {
-        zero_start_graph_indices_[i + 1] = *(partitioned_graph_->edge_end(i));
-      },
-      galois::loopname("InitZeroStartGraphIndices"));
 }
 
 void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
