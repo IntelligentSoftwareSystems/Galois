@@ -95,8 +95,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       bps.push_back(0);
       bps.push_back(5);
     } else {
-      GALOIS_DIE("invalid input for gnn partitioning ", filename,
-                 " hardcode needed");
+      // XXX only die under certain conditions
+      //GALOIS_DIE("invalid input for gnn partitioning ", filename,
+      //           " hardcode needed");
     }
     // TODO hardcode the rest
 
