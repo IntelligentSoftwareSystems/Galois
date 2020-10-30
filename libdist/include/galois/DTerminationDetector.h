@@ -150,10 +150,8 @@ public:
 
   bool terminate() {
     bool active = (local_mdata != 0);
-    // if (active) galois::gDebug("[", net.ID, "] local work done \n");
     if (!active) {
       active = net.anyPendingSends();
-      // if (active) galois::gDebug("[", net.ID, "] pending send \n");
     }
     int snapshot_ended = 0;
     if (!active) {
