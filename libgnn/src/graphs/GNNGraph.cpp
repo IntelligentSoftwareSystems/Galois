@@ -38,10 +38,9 @@ size_t gnn_matrix_to_sync_column_length_ = 0;
 
 galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
-                                   bool has_single_class_label) {
-  GNNGraph(galois::default_gnn_dataset_path, dataset_name, partition_scheme,
-           has_single_class_label);
-}
+                                   bool has_single_class_label)
+    : GNNGraph(galois::default_gnn_dataset_path, dataset_name, partition_scheme,
+               has_single_class_label) {}
 
 galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
                                    const std::string& dataset_name,
