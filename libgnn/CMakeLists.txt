@@ -23,5 +23,27 @@ target_include_directories(galois_gnn PUBLIC
 )
 
 set_target_properties(galois_gnn PROPERTIES EXPORT_NAME galois_gnn)
-
 add_subdirectory(test)
+
+if (GALOIS_ENABLE_GPU)
+  target_compile_definitions(galois_gnn PUBLIC GALOIS_ENABLE_GPU=1)
+
+  # create the galois_gnn_gpu library to get linked into galois_gnn
+  set(gpusources
+    src/graphs/GNNGraph.cu
+  )
+  add_library(galois_gnn_gpu STATIC ${gpusources})
+  target_compile_definitions(galois_gnn_gpu PRIVATE _FORCE_INLINES)
+  target_compile_options(galois_gnn_gpu PUBLIC "$<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>")
+  set_property(TARGET galois_gnn_gpu PROPERTY CUDA_STANDARD 14)
+  target_compile_definitions(galois_gnn_gpu PUBLIC GALOIS_ENABLE_GPU=1)
+  target_include_directories(galois_gnn_gpu PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+
+  # link to gpu lib (which takes care of moderngpu and cub)
+  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support)
+
+  # gpu -> cpu lib
+  target_link_libraries(galois_gnn galois_gnn_gpu)
+endif()

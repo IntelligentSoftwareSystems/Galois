@@ -202,6 +202,9 @@ private:
   //! This satisfies the cuda context forward declaration in host decls:
   //! context fields
   GNNGraphGPUAllocations gpu_memory_;
+  //! Call this to setup GPU memory for this graph: allocates necessary GPU
+  //! memory and copies things over
+  void InitGPUMemory();
 #endif
 };
 

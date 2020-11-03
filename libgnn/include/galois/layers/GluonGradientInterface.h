@@ -15,6 +15,15 @@ namespace galois {
 //! they'll all see the same values after the first round of sync anyways)
 class GluonGradientInterface {
 public:
+  // typedefs required by GPU end to build; not actually used anywhere in this
+  // class (...at the moment)
+  // as such, dummy declarations that don't particularly make sense
+  // TODO will likely need to revisit once GPU substrate for this needs to be
+  // setup
+  using GraphNode     = uint32_t;
+  using edge_iterator = boost::counting_iterator<uint64_t>;
+  using EdgeType      = char;
+
   //! Save reference to weight gradients.
   //! Then setup mirror metadata for Gluon to use during setup.
   GluonGradientInterface(std::vector<GNNFloat>& gradients);

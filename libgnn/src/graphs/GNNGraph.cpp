@@ -47,7 +47,7 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
                                    GNNPartitionScheme partition_scheme,
                                    bool has_single_class_label)
     : input_directory_(input_directory) {
-  GALOIS_LOG_VERBOSE("[{}] Constructing partitiong for {}", host_id_,
+  GALOIS_LOG_VERBOSE("[{}] Constructing partitioning for {}", host_id_,
                      dataset_name);
   // save host id
   host_id_ = galois::runtime::getSystemNetworkInterface().ID;
@@ -74,6 +74,12 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   ReadWholeGraph(dataset_name);
   // init norm factors using the whole graph topology
   InitNormFactor();
+
+#ifdef GALOIS_ENABLE_GPU
+  // allocate/copy data structures over to GPU
+  GALOIS_LOG_VERBOSE("[{}] Initializing GPU memory", host_id_);
+  InitGPUMemory();
+#endif
 }
 
 bool galois::graphs::GNNGraph::IsValidForPhase(
@@ -364,3 +370,10 @@ void galois::graphs::GNNGraph::InitNormFactor() {
       },
       galois::loopname("InitNormFactor"));
 }
+
+#ifdef GALOIS_ENABLE_GPU
+void galois::graphs::GNNGraph::InitGPUMemory() {
+  // XXX finish up GPU memory allocation; currently just testing the build
+  gpu_memory_.SetFeatures(local_node_features_);
+}
+#endif

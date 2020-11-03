@@ -236,7 +236,6 @@ if (GALOIS_ENABLE_DIST)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
   add_subdirectory(libgluon)
-  add_subdirectory(libgnn)
 endif()
 
 # TODO(loc) prefix with GALOIS
@@ -279,6 +278,12 @@ if (GALOIS_ENABLE_GPU)
     #find_package(OpenCL REQUIRED)
   endif()
 endif()
+
+if (GALOIS_ENABLE_DIST)
+  # here because I need the GPU declarations above
+  add_subdirectory(libgnn)
+endif()
+
 add_subdirectory(libpangolin)
 
 # Applications (apps)
