@@ -14,4 +14,12 @@
     }                                                                          \
   } while (0)
 
+#define CUDA_FREE(ptr)                                                         \
+  do {                                                                         \
+    if (ptr) {                                                                 \
+      CUDA_CHECK(cudaFree(ptr));                                               \
+      ptr = nullptr;                                                           \
+    }                                                                          \
+  } while (0)
+
 #endif

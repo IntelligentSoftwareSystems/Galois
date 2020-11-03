@@ -2,6 +2,7 @@
 #include "galois/Logging.h"
 #include "galois/graphs/ReadGraph.h"
 #include "galois/graphs/GNNGraph.h"
+#include <limits>
 
 namespace {
 //! Partitions a particular dataset given some partitioning scheme
@@ -374,6 +375,48 @@ void galois::graphs::GNNGraph::InitNormFactor() {
 #ifdef GALOIS_ENABLE_GPU
 void galois::graphs::GNNGraph::InitGPUMemory() {
   // XXX finish up GPU memory allocation; currently just testing the build
-  gpu_memory_.SetFeatures(local_node_features_);
+
+  // create int casted CSR
+  uint64_t* e_index_ptr = partitioned_graph_->row_start_ptr();
+  uint32_t* e_dest_ptr  = partitioned_graph_->edge_dst_ptr();
+
+  // + 1 because first element is 0 in BLAS CSRs
+  std::vector<int> e_index(partitioned_graph_->size() + 1);
+  std::vector<int> e_dest(partitioned_graph_->sizeEdges());
+
+  // set in parallel
+  galois::do_all(
+      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size() + 1),
+      [&](size_t index) {
+        if (index != 0) {
+          if (e_index_ptr[index - 1] >
+              static_cast<size_t>(std::numeric_limits<int>::max())) {
+            GALOIS_LOG_FATAL("{} is too big a number for int arrays on GPUs",
+                             e_index_ptr[index - 1]);
+          }
+          e_index[index] = static_cast<int>(e_index_ptr[index - 1]);
+        } else {
+          e_index[index] = 0;
+        }
+      },
+      galois::loopname("GPUEdgeIndexConstruction"));
+  galois::do_all(
+      galois::iterate(static_cast<size_t>(0), partitioned_graph_->sizeEdges()),
+      [&](size_t edge) {
+        if (e_dest_ptr[edge] >
+            static_cast<size_t>(std::numeric_limits<int>::max())) {
+          GALOIS_LOG_FATAL("{} is too big a number for int arrays on GPUs",
+                           e_dest_ptr[edge]);
+        }
+
+        e_dest[edge] = static_cast<int>(e_dest_ptr[edge]);
+      },
+      galois::loopname("GPUEdgeDestConstruction"));
+
+  gpu_memory_.SetGraphTopology(e_index, e_dest);
+  e_index.clear();
+  e_dest.clear();
+
+  gpu_memory_.SetFeatures(local_node_features_, node_feature_length_);
 }
 #endif
