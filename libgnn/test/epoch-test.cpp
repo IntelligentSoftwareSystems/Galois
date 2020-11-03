@@ -14,7 +14,7 @@ int main() {
 
   // load graph
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "reddit", galois::graphs::GNNPartitionScheme::kCVC, true);
+      "cora", galois::graphs::GNNPartitionScheme::kCVC, true);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
