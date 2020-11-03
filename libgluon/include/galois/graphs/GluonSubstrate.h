@@ -3301,7 +3301,9 @@ private:
   }
 
 public:
-  void getMarshalGraph(MarshalGraph& m) {
+  void getMarshalGraph(MarshalGraph& m) { getMarshalGraph(m, true); }
+
+  void getMarshalGraph(MarshalGraph& m, bool deallocate_graph) {
     m.nnodes   = userGraph.size();
     m.nedges   = userGraph.sizeEdges();
     m.numOwned = userGraph.numMasters();
@@ -3389,7 +3391,9 @@ public:
 
     // user needs to provide method of freeing up graph (it can do nothing
     // if they wish)
-    userGraph.deallocate();
+    if (deallocate_graph) {
+      userGraph.deallocate();
+    }
   }
 #endif // het galois def
 
