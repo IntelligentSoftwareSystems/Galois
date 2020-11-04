@@ -88,6 +88,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     } else if (filename.find("reddit") != std::string::npos) {
       bps.push_back(0);
       bps.push_back(153431);
+    } else if (filename.find("citeseer") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(120);
+    } else if (filename.find("pubmed") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(60);
     } else if (filename.find("ppi") != std::string::npos) {
       bps.push_back(0);
       bps.push_back(9716);
@@ -96,7 +102,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       bps.push_back(5);
     } else {
       // XXX only die under certain conditions
-      //GALOIS_DIE("invalid input for gnn partitioning ", filename,
+      // GALOIS_DIE("invalid input for gnn partitioning ", filename,
       //           " hardcode needed");
     }
     // TODO hardcode the rest
