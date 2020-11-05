@@ -52,3 +52,12 @@ void galois::graphs::GNNGraphGPUAllocations::SetFeatures(
                         features.size() * sizeof(GNNFeature),
                         cudaMemcpyHostToDevice));
 }
+
+void galois::graphs::GNNGraphGPUAllocations::SetLabels(
+    const std::vector<GNNLabel>& ground_truth) {
+  CUDA_CHECK(cudaMalloc((void**)(&ground_truth_),
+                        ground_truth.size() * sizeof(GNNLabel)));
+  CUDA_CHECK(cudaMemcpy(ground_truth_, ground_truth.data(),
+                        ground_truth.size() * sizeof(GNNLabel),
+                        cudaMemcpyHostToDevice));
+}

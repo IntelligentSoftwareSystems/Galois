@@ -199,8 +199,7 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
 #ifdef GALOIS_ENABLE_GPU
-  //! This satisfies the cuda context forward declaration in host decls:
-  //! context fields
+  //! Object that holds all GPU allocated pointers to memory related to graphs.
   GNNGraphGPUAllocations gpu_memory_;
   //! Call this to setup GPU memory for this graph: allocates necessary GPU
   //! memory and copies things over

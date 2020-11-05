@@ -23,6 +23,9 @@ public:
   void SetFeatures(const std::vector<GNNFeature>& features,
                    unsigned num_features);
 
+  //! Copy over ground truth for the graph to GPU
+  void SetLabels(const std::vector<GNNLabel>& ground_truth);
+
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
 
@@ -41,9 +44,9 @@ private:
   int* edge_destinations_{nullptr};
   //! (Local) feature vector
   GNNFeature* feature_vector_{nullptr};
-  // TODO need these on GPU?
   //! (Local) ground truth vector
   GNNFloat* ground_truth_{nullptr};
+  // TODO need this?
   //! (Local) norm factors
   GNNFloat* norm_factors_{nullptr};
 

@@ -418,5 +418,6 @@ void galois::graphs::GNNGraph::InitGPUMemory() {
   e_dest.clear();
 
   gpu_memory_.SetFeatures(local_node_features_, node_feature_length_);
+  gpu_memory_.SetLabels(local_ground_truth_labels_);
 }
 #endif
