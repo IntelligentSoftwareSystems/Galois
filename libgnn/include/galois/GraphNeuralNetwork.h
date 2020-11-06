@@ -106,7 +106,7 @@ public:
   size_t num_intermediate_layers() { return gnn_layers_.size() - 1; }
 
   //! Returns pointer to intermediate layer i
-  const galois::GNNLayer* GetIntermediateLayer(size_t i) {
+  galois::GNNLayer* GetIntermediateLayer(size_t i) {
     if (i < gnn_layers_.size() - 1) {
       return gnn_layers_[i].get();
     } else {
@@ -130,7 +130,7 @@ public:
   }
 
   //! Returns the output layer
-  const galois::GNNLayer* GetOutputLayer() { return gnn_layers_.back().get(); }
+  galois::GNNLayer* GetOutputLayer() { return gnn_layers_.back().get(); }
 
   //! Do training for a specified # of epochs and return test accuracy at the
   //! end of it
@@ -140,9 +140,9 @@ public:
   //! vector representation.
   //! Also known as the forward phase in most literature
   //! @returns Output layer's output
-  const std::vector<GNNFloat>* DoInference();
+  const PointerWithSize<GNNFloat> DoInference();
 
-  float GetGlobalAccuracy(const std::vector<GNNFloat>& predictions);
+  float GetGlobalAccuracy(const PointerWithSize<GNNFloat> predictions);
 
   //! Backpropagate gradients from the output layer backwards through the
   //! network to update the layer weights. Also known as a backward phase in

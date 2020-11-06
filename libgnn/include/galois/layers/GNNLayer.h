@@ -80,16 +80,17 @@ public:
     }
   }
 
-  const std::vector<GNNFloat>& GetForwardOutput() const {
-    return forward_output_matrix_;
+  const PointerWithSize<GNNFloat> GetForwardOutput() {
+    return PointerWithSize(forward_output_matrix_);
   }
-  const std::vector<GNNFloat>& GetBackwardOutput() const {
-    return backward_output_matrix_;
+
+  const PointerWithSize<GNNFloat> GetBackwardOutput() {
+    return PointerWithSize(backward_output_matrix_);
   }
 
   //! Returns the weight gradients
-  const std::vector<GNNFloat>& GetLayerWeightGradients() const {
-    return layer_weight_gradients_;
+  const PointerWithSize<GNNFloat> GetLayerWeightGradients() {
+    return PointerWithSize(layer_weight_gradients_);
   }
 
   //! Returns dimensions of this layer
@@ -106,8 +107,9 @@ public:
   //! ultimately leads to an output (classfication of node labels) at the end
   //! of the GNN.
   //! @returns Output of the forward phase (i.e. input to next layer)
-  virtual const std::vector<galois::GNNFloat>&
-  ForwardPhase(const std::vector<galois::GNNFloat>& input_embeddings) = 0;
+  // XXX size of embeddings
+  virtual const PointerWithSize<galois::GNNFloat>
+  ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) = 0;
   //! Conducts the backward phase given the input to this layer; the backward
   //! phase calculates the gradients to update the weights of trainable
   //! parts of the layer (e.g., weights, trainable params for aggregate, etc.).
@@ -117,9 +119,9 @@ public:
   //! one; takes a pointer to save space by writing intermediate results to it
   //! @returns Output of the backward phase (i.e. input to previous layer); note
   //! it's a pointer because layer can mess with it
-  virtual std::vector<galois::GNNFloat>*
-  BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
-                std::vector<galois::GNNFloat>* input_gradient) = 0;
+  virtual PointerWithSize<galois::GNNFloat>
+  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+                PointerWithSize<galois::GNNFloat>* input_gradient) = 0;
 
   //! Given an optimizer, update the weights in this layer based on gradients
   //! stored in the layer
@@ -185,7 +187,7 @@ protected:
   //! Choose a set of weights from this layer's weights to keep and save to
   //! the output matrix + apply some scaling to the kept weights based on
   //! dropout rate
-  void DoDropout(const std::vector<GNNFloat>& input_to_drop,
+  void DoDropout(const PointerWithSize<GNNFloat> input_to_drop,
                  std::vector<GNNFloat>* output_matrix);
   //! Apply the derivative of dropout to the backward phase output
   void DoDropoutDerivative();
@@ -194,7 +196,7 @@ protected:
   //! matrix
   void Activation();
   //! Calculate derivative of activation function based on config on the matrix
-  void ActivationDerivative(std::vector<GNNFloat>* matrix);
+  void ActivationDerivative(PointerWithSize<GNNFloat>* matrix);
 
   //! Synchronize weight gradients with a summation
   void WeightGradientSyncSum();

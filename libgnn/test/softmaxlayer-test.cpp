@@ -38,7 +38,7 @@ int main() {
   // train mode
   auto output_layer =
       std::make_unique<galois::SoftmaxLayer>(3, test_graph, dimension_0);
-  const std::vector<galois::GNNFloat>& prediction_distribution =
+  galois::PointerWithSize<galois::GNNFloat> prediction_distribution =
       output_layer->ForwardPhase(softmax_input);
   output_layer->BackwardPhase(softmax_input, nullptr);
 
@@ -60,7 +60,7 @@ int main() {
 
   // validation mode
   output_layer->SetLayerPhase(galois::GNNPhase::kValidate);
-  const std::vector<galois::GNNFloat>& pd2 =
+  galois::PointerWithSize<galois::GNNFloat> pd2 =
       output_layer->ForwardPhase(softmax_input);
   output_layer->BackwardPhase(softmax_input, nullptr);
   // validate vertex is index 5
@@ -86,7 +86,7 @@ int main() {
 
   // test mode
   output_layer->SetLayerPhase(galois::GNNPhase::kTest);
-  const std::vector<galois::GNNFloat>& pd3 =
+  galois::PointerWithSize<galois::GNNFloat> pd3 =
       output_layer->ForwardPhase(softmax_input);
   output_layer->BackwardPhase(softmax_input, nullptr);
   // validate vertex is index 6

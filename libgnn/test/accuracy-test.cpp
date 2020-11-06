@@ -33,23 +33,23 @@ int main() {
 
   //////////////////////////////////////////////////////////////////////////////
 
-  const std::vector<galois::GNNFloat>* distributions = gnn->DoInference();
+  galois::PointerWithSize<galois::GNNFloat> distributions = gnn->DoInference();
   // accuracy will be 0.2: everything chooses the first 1 as the entire row
   // is the same
-  float pred_accuracy = gnn->GetGlobalAccuracy(*distributions);
+  float pred_accuracy = gnn->GetGlobalAccuracy(distributions);
   GALOIS_LOG_VERBOSE("{}", pred_accuracy);
   GALOIS_LOG_ASSERT(pred_accuracy == static_cast<float>(0.2));
 
   // validation mode
   gnn->SetLayerPhases(galois::GNNPhase::kValidate);
-  const std::vector<galois::GNNFloat>* dist2 = gnn->DoInference();
-  pred_accuracy                              = gnn->GetGlobalAccuracy(*dist2);
+  galois::PointerWithSize<galois::GNNFloat> dist2 = gnn->DoInference();
+  pred_accuracy = gnn->GetGlobalAccuracy(dist2);
   GALOIS_LOG_ASSERT(pred_accuracy == static_cast<float>(0.0));
 
   // test mode
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
-  const std::vector<galois::GNNFloat>* dist3 = gnn->DoInference();
-  pred_accuracy                              = gnn->GetGlobalAccuracy(*dist3);
+  galois::PointerWithSize<galois::GNNFloat> dist3 = gnn->DoInference();
+  pred_accuracy = gnn->GetGlobalAccuracy(dist3);
   GALOIS_LOG_ASSERT(pred_accuracy == static_cast<float>(0.0));
 
   // manufactured predictions to make sure it predicts things correctly based

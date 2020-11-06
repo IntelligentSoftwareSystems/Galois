@@ -44,16 +44,16 @@ int main() {
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
   for (size_t epoch = 0; epoch < 20; epoch++) {
-    const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
+    galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
     gnn->GradientPropagation();
     galois::gPrint("Epoch ", epoch, ": Accuracy is ",
-                   gnn->GetGlobalAccuracy(*predictions), "\n");
+                   gnn->GetGlobalAccuracy(predictions), "\n");
   }
 
   // check test accuracy
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
-  const std::vector<galois::GNNFloat>* predictions = gnn->DoInference();
-  galois::gPrint("Test accuracy is ", gnn->GetGlobalAccuracy(*predictions),
+  galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
+  galois::gPrint("Test accuracy is ", gnn->GetGlobalAccuracy(predictions),
                  "\n");
   main_timer.stop();
 }

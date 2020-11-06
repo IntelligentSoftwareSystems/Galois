@@ -20,11 +20,12 @@ public:
                                 GNNLayerConfig()) {}
 
   // Parent functions
-  const std::vector<GNNFloat>&
-  ForwardPhase(const std::vector<GNNFloat>& input_embeddings) final;
-  std::vector<GNNFloat>*
-  BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
-                std::vector<GNNFloat>* input_gradient) final;
+  const PointerWithSize<galois::GNNFloat>
+  ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
+
+  PointerWithSize<galois::GNNFloat>
+  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+                PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
   // 2 temporaries the size of the forward input; used for dropout and

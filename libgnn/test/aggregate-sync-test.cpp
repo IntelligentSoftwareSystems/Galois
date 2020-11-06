@@ -38,7 +38,7 @@ int main() {
                                                         dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
-  const std::vector<galois::GNNFloat>& layer_0_forward_output =
+  galois::PointerWithSize<galois::GNNFloat> layer_0_forward_output =
       layer_0->ForwardPhase(test_graph->GetLocalFeatures());
 
   //////////////////////////////////////////////////////////////////////////////
@@ -97,20 +97,21 @@ int main() {
 
   //////////////////////////////////////////////////////////////////////////////
 
-  std::vector<galois::GNNFloat> dummy_ones(test_graph->size() * 2, 1);
+  std::vector<galois::GNNFloat> dummy_ones_v(test_graph->size() * 2, 1);
+  galois::PointerWithSize<galois::GNNFloat> dummy_ones(dummy_ones_v);
   // backward pass checking
   // layer 0 means that an empty weight matrix is returned since there is no
   // point passing back anything
-  std::vector<galois::GNNFloat>* layer_0_backward_output =
+  galois::PointerWithSize<galois::GNNFloat> layer_0_backward_output =
       layer_0->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
 
   //////////////////////////////////////////////////////////////////////////////
   // sanity check layer 0 backward output; all 0 because layer 0
   //////////////////////////////////////////////////////////////////////////////
   // since norm factors aren't invovled it is possible to do full assertions
-  GALOIS_LOG_ASSERT(layer_0_backward_output->size() == test_graph->size() * 3);
-  for (size_t i = 0; i < layer_0_backward_output->size(); i++) {
-    GALOIS_LOG_ASSERT((*layer_0_backward_output)[i] == 0);
+  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == test_graph->size() * 3);
+  for (size_t i = 0; i < layer_0_backward_output.size(); i++) {
+    GALOIS_LOG_ASSERT((layer_0_backward_output)[i] == 0);
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -120,7 +121,7 @@ int main() {
       std::make_unique<galois::GraphConvolutionalLayer>(1, *(test_graph.get()),
                                                         dimension_0, l_config);
   layer_1->InitAllWeightsTo1();
-  const std::vector<galois::GNNFloat>& layer_1_forward_output =
+  galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =
       layer_1->ForwardPhase(test_graph->GetLocalFeatures());
 
   // same check for forward as before
@@ -164,8 +165,8 @@ int main() {
   }
 
   // since layer isn't 0 anymore, backward phase will actually return something
-  dummy_ones.assign(test_graph->size() * 2, 1);
-  std::vector<galois::GNNFloat>* layer_1_backward_output =
+  dummy_ones_v.assign(test_graph->size() * 2, 1);
+  galois::PointerWithSize<galois::GNNFloat> layer_1_backward_output =
       layer_1->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
 
   for (size_t row = 0; row < test_graph->size(); row++) {
@@ -193,8 +194,7 @@ int main() {
 
     // size 3 columns
     for (size_t c = 0; c < 3; c++) {
-      GALOIS_LOG_ASSERT((*layer_1_backward_output)[row * 3 + c] ==
-                        ground_truth);
+      GALOIS_LOG_ASSERT((layer_1_backward_output)[row * 3 + c] == ground_truth);
     }
   }
 

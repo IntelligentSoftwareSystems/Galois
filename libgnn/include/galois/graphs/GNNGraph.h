@@ -101,8 +101,8 @@ public:
   }
 
   //! Return matrix of the local node features
-  const std::vector<GNNFloat>& GetLocalFeatures() const {
-    return local_node_features_;
+  const PointerWithSize<GNNFloat> GetLocalFeatures() {
+    return PointerWithSize(local_node_features_);
   }
 
   //! Given an LID and the current phase of GNN computation, determine if the

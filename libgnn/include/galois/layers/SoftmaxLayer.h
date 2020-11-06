@@ -25,14 +25,13 @@ public:
   }
 
   //! Creates probability distribution of each row of input
-  const std::vector<GNNFloat>&
-  ForwardPhase(const std::vector<GNNFloat>& input_embeddings) final;
-
+  const PointerWithSize<galois::GNNFloat>
+  ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
-  std::vector<galois::GNNFloat>*
-  BackwardPhase(const std::vector<galois::GNNFloat>& prev_layer_input,
-                std::vector<GNNFloat>* input_gradient) final;
+  PointerWithSize<galois::GNNFloat>
+  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+                PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
   //! Loss for each row of the input

@@ -1,5 +1,5 @@
-//! @file convlayer-test.cpp
-//! Conv layer test with a test graph
+//! @file gpu-convlayer-test.cpp
+//! Conv layer test with a test graph on gpus
 
 #include "galois/Logging.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
@@ -17,34 +17,7 @@ int main() {
   galois::graphs::GNNGraph test_graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
 
-  galois::PointerWithSize<galois::GNNFloat> feats =
-      test_graph.GetLocalFeatures();
-  //////////////////////////////////////////////////////////////////////////////
-  // doubles as a test for reading as well
-  GALOIS_LOG_ASSERT(7 == test_graph.size());
-  GALOIS_LOG_ASSERT(21 == feats.size());
-  GALOIS_LOG_ASSERT(0.0 == feats[0]);
-  GALOIS_LOG_ASSERT(0.0 == feats[1]);
-  GALOIS_LOG_ASSERT(0.0 == feats[2]);
-  GALOIS_LOG_ASSERT(1.0 == feats[3]);
-  GALOIS_LOG_ASSERT(1.0 == feats[4]);
-  GALOIS_LOG_ASSERT(1.0 == feats[5]);
-  GALOIS_LOG_ASSERT(2.0 == feats[6]);
-  GALOIS_LOG_ASSERT(2.0 == feats[7]);
-  GALOIS_LOG_ASSERT(2.0 == feats[8]);
-  GALOIS_LOG_ASSERT(3.0 == feats[9]);
-  GALOIS_LOG_ASSERT(3.0 == feats[10]);
-  GALOIS_LOG_ASSERT(3.0 == feats[11]);
-  GALOIS_LOG_ASSERT(4.0 == feats[12]);
-  GALOIS_LOG_ASSERT(4.0 == feats[13]);
-  GALOIS_LOG_ASSERT(4.0 == feats[14]);
-  GALOIS_LOG_ASSERT(5.0 == feats[15]);
-  GALOIS_LOG_ASSERT(5.0 == feats[16]);
-  GALOIS_LOG_ASSERT(5.0 == feats[17]);
-  GALOIS_LOG_ASSERT(6.0 == feats[18]);
-  GALOIS_LOG_ASSERT(6.0 == feats[19]);
-  GALOIS_LOG_ASSERT(6.0 == feats[20]);
-  //////////////////////////////////////////////////////////////////////////////
+  std::vector<galois::GNNFloat> feats = test_graph.GetLocalFeatures();
 
   galois::GNNLayerDimensions dimension_0;
   dimension_0.input_rows     = 7;
@@ -60,7 +33,7 @@ int main() {
                                                         dimension_0, dcon);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
-  const galois::PointerWithSize<galois::GNNFloat> layer_0_forward_output =
+  const std::vector<galois::GNNFloat>& layer_0_forward_output =
       layer_0->ForwardPhase(test_graph.GetLocalFeatures());
 
   //////////////////////////////////////////////////////////////////////////////
@@ -86,13 +59,12 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
 
   // dummy 1 matrix
-  std::vector<galois::GNNFloat> dummy_ones_v(14, 1);
-  galois::PointerWithSize dummy_ones(dummy_ones_v);
+  std::vector<galois::GNNFloat> dummy_ones(14, 1);
 
   // backward pass checking
   // layer 0 means that an empty weight matrix is returned since there is no
   // point passing back anything
-  galois::PointerWithSize<galois::GNNFloat> layer_0_backward_output =
+  std::vector<galois::GNNFloat>* layer_0_backward_output =
       layer_0->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -100,30 +72,30 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   // since norm factors aren't invovled it is possible to do full assertions
   // 7 x 3
-  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 21);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[0] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[1] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[2] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[3] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[4] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[5] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[6] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[7] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[8] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[9] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[10] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[11] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[12] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[13] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[14] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[15] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[16] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[17] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[18] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[19] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[20] == 0);
+  GALOIS_LOG_ASSERT(layer_0_backward_output->size() == 21);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[0] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[1] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[2] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[3] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[4] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[5] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[6] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[7] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[8] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[9] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[10] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[11] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[12] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[13] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[14] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[15] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[16] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[17] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[18] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[19] == 0);
+  GALOIS_LOG_ASSERT((*layer_0_backward_output)[20] == 0);
 
-  galois::PointerWithSize<galois::GNNFloat> layer_0_weight_gradients =
+  const std::vector<galois::GNNFloat> layer_0_weight_gradients =
       layer_0->GetLayerWeightGradients();
   // make sure they are sane
   GALOIS_LOG_ASSERT(layer_0_weight_gradients.size() == 6);
@@ -143,7 +115,7 @@ int main() {
       std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
-  galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =
+  const std::vector<galois::GNNFloat>& layer_1_forward_output =
       layer_1->ForwardPhase(test_graph.GetLocalFeatures());
   // same check as before for sanity purposes
   GALOIS_LOG_ASSERT(layer_1_forward_output.size() == 14);
@@ -163,36 +135,36 @@ int main() {
   GALOIS_LOG_ASSERT(layer_1_forward_output[13] == 15);
 
   // since layer isn't 0 anymore, backward phase will actually return something
-  dummy_ones_v.assign(14, 1);
-  galois::PointerWithSize<galois::GNNFloat> layer_1_backward_output =
+  dummy_ones.assign(14, 1);
+  std::vector<galois::GNNFloat>* layer_1_backward_output =
       layer_1->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
   //////////////////////////////////////////////////////////////////////////////
   // check that multiplies go as expected
   //////////////////////////////////////////////////////////////////////////////
-  GALOIS_LOG_ASSERT(layer_1_backward_output.size() == 21);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[0] == 2);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[1] == 2);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[2] == 2);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[3] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[4] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[5] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[6] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[7] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[8] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[9] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[10] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[11] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[12] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[13] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[14] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[15] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[16] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[17] == 4);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[18] == 2);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[19] == 2);
-  GALOIS_LOG_ASSERT((layer_1_backward_output)[20] == 2);
+  GALOIS_LOG_ASSERT(layer_1_backward_output->size() == 21);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[0] == 2);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[1] == 2);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[2] == 2);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[3] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[4] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[5] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[6] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[7] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[8] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[9] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[10] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[11] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[12] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[13] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[14] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[15] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[16] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[17] == 4);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[18] == 2);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[19] == 2);
+  GALOIS_LOG_ASSERT((*layer_1_backward_output)[20] == 2);
 
-  galois::PointerWithSize<galois::GNNFloat> layer_1_weight_gradients =
+  const std::vector<galois::GNNFloat> layer_1_weight_gradients =
       layer_1->GetLayerWeightGradients();
   // make sure they are sane
   GALOIS_LOG_ASSERT(layer_1_weight_gradients.size() == 6);
@@ -219,7 +191,7 @@ int main() {
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_2 =
       std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph,
                                                         dimension_0, config);
-  galois::PointerWithSize<galois::GNNFloat> l2_fo =
+  const std::vector<galois::GNNFloat> l2_fo =
       layer_2->ForwardPhase(test_graph.GetLocalFeatures());
   GALOIS_LOG_ASSERT(l2_fo.size() == 14);
   GALOIS_LOG_VERBOSE("{}", l2_fo[0]);
@@ -237,31 +209,31 @@ int main() {
   GALOIS_LOG_VERBOSE("{}", l2_fo[12]);
   GALOIS_LOG_VERBOSE("{}", l2_fo[13]);
 
-  galois::PointerWithSize<galois::GNNFloat> l2_bo =
+  std::vector<galois::GNNFloat>* l2_bo =
       layer_2->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
 
-  GALOIS_LOG_ASSERT(l2_bo.size() == 21);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[0]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[1]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[2]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[3]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[4]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[5]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[6]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[7]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[8]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[9]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[10]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[11]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[12]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[13]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[14]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[15]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[16]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[17]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[18]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[19]);
-  GALOIS_LOG_VERBOSE("{}", (l2_bo)[20]);
+  GALOIS_LOG_ASSERT(l2_bo->size() == 21);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[0]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[1]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[2]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[3]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[4]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[5]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[6]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[7]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[8]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[9]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[10]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[11]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[12]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[13]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[14]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[15]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[16]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[17]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[18]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[19]);
+  GALOIS_LOG_VERBOSE("{}", (*l2_bo)[20]);
 
   return 0;
 }

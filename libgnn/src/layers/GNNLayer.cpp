@@ -61,8 +61,9 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
 
 // XXX Something is wrong with dropout; accuracy suffers, figure out what
 // it is
-void galois::GNNLayer::DoDropout(const std::vector<GNNFloat>& input_to_dropout,
-                                 std::vector<GNNFloat>* output_matrix) {
+void galois::GNNLayer::DoDropout(
+    const PointerWithSize<GNNFloat> input_to_dropout,
+    std::vector<GNNFloat>* output_matrix) {
   size_t num_elements = output_matrix->size();
   assert(num_elements == dropout_mask_.size());
   assert(num_elements == input_to_dropout.size());
@@ -114,7 +115,8 @@ void galois::GNNLayer::Activation() {
       galois::loopname("ReLU"));
 }
 
-void galois::GNNLayer::ActivationDerivative(std::vector<GNNFloat>* gradient) {
+void galois::GNNLayer::ActivationDerivative(
+    PointerWithSize<GNNFloat>* gradient) {
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
   // keep gradient if the original output is greater than 0

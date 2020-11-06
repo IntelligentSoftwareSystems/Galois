@@ -63,9 +63,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
-    const std::vector<galois::GNNFloat>* predictions = DoInference();
+    const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     GradientPropagation();
-    float train_accuracy = GetGlobalAccuracy(*predictions);
+    float train_accuracy = GetGlobalAccuracy(predictions);
     if (this_host == 0) {
       galois::gPrint("Epoch ", epoch, ": Train accuracy is ", train_accuracy,
                      "\n");
@@ -77,8 +77,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   galois::StatTimer acc_timer("FinalAccuracyTest");
   acc_timer.start();
   SetLayerPhases(galois::GNNPhase::kTest);
-  const std::vector<galois::GNNFloat>* predictions = DoInference();
-  float global_accuracy = GetGlobalAccuracy(*predictions);
+  const PointerWithSize<galois::GNNFloat> predictions = DoInference();
+  float global_accuracy = GetGlobalAccuracy(predictions);
   acc_timer.stop();
 
   if (this_host == 0) {
@@ -88,17 +88,19 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   return global_accuracy;
 }
 
-const std::vector<galois::GNNFloat>* galois::GraphNeuralNetwork::DoInference() {
+const galois::PointerWithSize<galois::GNNFloat>
+galois::GraphNeuralNetwork::DoInference() {
   // start with graph features and pass it through all layers of the network
-  const std::vector<GNNFloat>* layer_input = &(graph_->GetLocalFeatures());
+  galois::PointerWithSize<galois::GNNFloat> layer_input =
+      graph_->GetLocalFeatures();
   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
-    layer_input = &(ptr->ForwardPhase(*layer_input));
+    layer_input = ptr->ForwardPhase(layer_input);
   }
   return layer_input;
 }
 
 float galois::GraphNeuralNetwork::GetGlobalAccuracy(
-    const std::vector<GNNFloat>& predictions) {
+    const PointerWithSize<GNNFloat> predictions) {
   // check owned nodes' accuracy
   size_t num_labels = graph_->GetNumLabelClasses();
   assert((graph_->GetNumLabelClasses() * graph_->size()) == predictions.size());
@@ -143,7 +145,7 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
   // from output layer get initial gradients
   std::vector<galois::GNNFloat> dummy;
   std::unique_ptr<galois::GNNLayer>& output_layer = gnn_layers_.back();
-  std::vector<galois::GNNFloat>* current_gradients =
+  galois::PointerWithSize<galois::GNNFloat> current_gradients =
       output_layer->BackwardPhase(dummy, nullptr);
 
   // loops through intermediate layers in a backward fashion
@@ -153,16 +155,16 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
     size_t layer_index = gnn_layers_.size() - 2 - i;
 
     // get the input to the layer before this one
-    const std::vector<galois::GNNFloat>* prev_layer_input;
+    galois::PointerWithSize<galois::GNNFloat> prev_layer_input;
     if (layer_index != 0) {
-      prev_layer_input = &(gnn_layers_[layer_index - 1]->GetForwardOutput());
+      prev_layer_input = gnn_layers_[layer_index - 1]->GetForwardOutput();
     } else {
-      prev_layer_input = &(graph_->GetLocalFeatures());
+      prev_layer_input = graph_->GetLocalFeatures();
     }
 
     // backward prop and get a new set of gradients
     current_gradients = gnn_layers_[layer_index]->BackwardPhase(
-        *prev_layer_input, current_gradients);
+        prev_layer_input, &current_gradients);
     // if not output do optimization/gradient descent
     // at this point in the layer the gradients exist; use the gradients to
     // update the weights of the layer

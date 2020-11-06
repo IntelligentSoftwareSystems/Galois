@@ -21,9 +21,9 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 }
 
-const std::vector<galois::GNNFloat>&
+const galois::PointerWithSize<galois::GNNFloat>
 galois::GraphConvolutionalLayer::ForwardPhase(
-    const std::vector<galois::GNNFloat>& input_embeddings) {
+    const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
   assert(in_temp_1_.size() == input_embeddings.size());
@@ -64,9 +64,10 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   return forward_output_matrix_;
 }
 
-std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
-    const std::vector<galois::GNNFloat>& prev_layer_input,
-    std::vector<galois::GNNFloat>* input_gradient) {
+galois::PointerWithSize<galois::GNNFloat>
+galois::GraphConvolutionalLayer::BackwardPhase(
+    galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
+    galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
   assert(layer_phase_ == GNNPhase::kTrain);
   // derivative of activation
   if (config_.do_activation) {
@@ -121,7 +122,7 @@ std::vector<galois::GNNFloat>* galois::GraphConvolutionalLayer::BackwardPhase(
     DoDropoutDerivative();
   }
 
-  return &backward_output_matrix_;
+  return PointerWithSize(backward_output_matrix_);
 }
 
 void galois::GraphConvolutionalLayer::AggregateAll(

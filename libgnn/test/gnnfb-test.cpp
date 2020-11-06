@@ -46,7 +46,7 @@ int main() {
   gnn->DoInference();
 
   // check output for layers to make sure it's as expected
-  const std::vector<galois::GNNFloat>& lf0_out =
+  galois::PointerWithSize<galois::GNNFloat> lf0_out =
       gnn->GetIntermediateLayer(0)->GetForwardOutput();
   GALOIS_LOG_ASSERT(lf0_out.size() == 28);
   for (size_t i = 0; i < 4; i++) {
@@ -71,7 +71,7 @@ int main() {
     GALOIS_LOG_ASSERT(lf0_out[24 + i] == 15);
   }
 
-  const std::vector<galois::GNNFloat>& lf1_out =
+  const galois::PointerWithSize<galois::GNNFloat> lf1_out =
       gnn->GetIntermediateLayer(1)->GetForwardOutput();
   GALOIS_LOG_ASSERT(lf1_out.size() == 49);
   for (size_t i = 0; i < 7; i++) {
@@ -96,7 +96,7 @@ int main() {
     GALOIS_LOG_ASSERT(lf1_out[42 + i] == 120);
   }
 
-  const std::vector<galois::GNNFloat>& fo_out =
+  const galois::PointerWithSize<galois::GNNFloat> fo_out =
       gnn->GetOutputLayer()->GetForwardOutput();
   GALOIS_LOG_ASSERT(fo_out.size() == 49);
   // since row all same, prob distribution across row should be same
@@ -127,7 +127,7 @@ int main() {
   gnn->SetLayerPhases(galois::GNNPhase::kValidate);
   gnn->SetAllLayerWeightsTo1();
   gnn->DoInference();
-  const std::vector<galois::GNNFloat>& fo_out_val =
+  const galois::PointerWithSize<galois::GNNFloat> fo_out_val =
       gnn->GetOutputLayer()->GetForwardOutput();
   for (size_t c = 0; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {
@@ -150,7 +150,7 @@ int main() {
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
   gnn->SetAllLayerWeightsTo1();
   gnn->DoInference();
-  const std::vector<galois::GNNFloat>& fo_out_test =
+  galois::PointerWithSize<galois::GNNFloat> fo_out_test =
       gnn->GetOutputLayer()->GetForwardOutput();
   for (size_t c = 0; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {

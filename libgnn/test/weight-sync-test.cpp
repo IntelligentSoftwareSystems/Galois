@@ -29,12 +29,13 @@ int main() {
   layer_0->InitAllWeightsTo1();
 
   // backward pass checking; check the gradients out
-  std::vector<galois::GNNFloat> dummy_ones(test_graph->size() * 2, 1);
+  std::vector<galois::GNNFloat> dummy_ones_v(test_graph->size() * 2, 1);
+  galois::PointerWithSize<galois::GNNFloat> dummy_ones(dummy_ones_v);
   layer_0->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
 
   // gradient verification; average
   // host 0 has 18, 1 has 21, 2 has 12, 3 has 0s; averaged to 12.75
-  const std::vector<galois::GNNFloat>& grads =
+  const galois::PointerWithSize<galois::GNNFloat>& grads =
       layer_0->GetLayerWeightGradients();
   for (size_t i = 0; i < 6; i++) {
     GALOIS_LOG_ASSERT(grads[i] == 12.75);

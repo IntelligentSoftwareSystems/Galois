@@ -3,11 +3,11 @@
 #include "galois/layers/SoftmaxLayer.h"
 
 // Allocate memory and initialize
-void galois::SoftmaxLayer::Init() {
-}
+void galois::SoftmaxLayer::Init() {}
 
-const std::vector<galois::GNNFloat>& galois::SoftmaxLayer::ForwardPhase(
-    const std::vector<galois::GNNFloat>& input_embeddings) {
+const galois::PointerWithSize<galois::GNNFloat>
+galois::SoftmaxLayer::ForwardPhase(
+    const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
   input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
@@ -42,9 +42,9 @@ const std::vector<galois::GNNFloat>& galois::SoftmaxLayer::ForwardPhase(
   return forward_output_matrix_;
 }
 
-std::vector<galois::GNNFloat>*
-galois::SoftmaxLayer::BackwardPhase(const std::vector<galois::GNNFloat>&,
-                                    std::vector<galois::GNNFloat>*) {
+galois::PointerWithSize<galois::GNNFloat>
+galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
+                                    PointerWithSize<galois::GNNFloat>*) {
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
@@ -83,7 +83,7 @@ galois::SoftmaxLayer::BackwardPhase(const std::vector<galois::GNNFloat>&,
       // steal on as some threads may have nothing to work on
       galois::steal(), galois::loopname("SoftmaxBackward"));
 
-  return &backward_output_matrix_;
+  return PointerWithSize(backward_output_matrix_);
 }
 
 // TODO function for getting loss
