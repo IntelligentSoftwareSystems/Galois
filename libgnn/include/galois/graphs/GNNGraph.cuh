@@ -8,24 +8,18 @@ namespace graphs {
 //! Similar in nature to the CUDAContext class in existing D-IrGL
 class GNNGraphGPUAllocations {
 public:
-  // XXX getters for everything, the rest of the setters, etc.
-
   //! CUDA frees all allocated memory (i.e. non-nullptr)
   ~GNNGraphGPUAllocations();
-
   //! Copies graph topology over to GPU; using ints because cuSparse lib
   //! expects ints for the CSR arrays
   void SetGraphTopology(const std::vector<int>& edge_index,
                         const std::vector<int>& edge_dests);
-
   //! Host side function that allocates memory for the features on the vertices
   //! and copies them over to the GPU.
   void SetFeatures(const std::vector<GNNFeature>& features,
                    unsigned num_features);
-
   //! Copy over ground truth for the graph to GPU
   void SetLabels(const std::vector<GNNLabel>& ground_truth);
-
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
 

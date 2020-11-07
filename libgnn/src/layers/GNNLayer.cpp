@@ -28,6 +28,9 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         *gradient_sync_interface_,
         galois::runtime::getSystemNetworkInterface().ID,
         galois::runtime::getSystemNetworkInterface().Num, false);
+#ifdef GALOIS_ENABLE_GPU
+    gpu_memory_.InitWeightMemory(num_weight_elements);
+#endif
   }
 
   size_t num_output_elements =
@@ -35,6 +38,11 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
   forward_output_matrix_.resize(num_output_elements, 0);
   backward_output_matrix_.resize(
       layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
+#ifdef GALOIS_ENABLE_GPU
+  gpu_memory_.InitInOutMemory(num_output_elements,
+                              layer_dimensions_.input_rows *
+                                  layer_dimensions_.input_columns);
+#endif
 }
 
 void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
@@ -159,3 +167,9 @@ void galois::GNNLayer::WeightGradientSyncAverage() {
         galois::loopname("WeightGradientSyncAverageDivide"));
   }
 }
+
+#ifdef GALOIS_ENABLE_GPU
+void galois::GNNLayer::CopyLayerWeightsToGPU() {
+  gpu_memory_.CopyToWeights(layer_weights_);
+}
+#endif

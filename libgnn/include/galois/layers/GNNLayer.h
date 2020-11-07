@@ -5,6 +5,10 @@
 #include "galois/graphs/GNNGraph.h"
 #include "galois/layers/GluonGradientInterface.h"
 
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/layers/GNNLayer.cuh"
+#endif
+
 namespace galois {
 
 //! Supported layer types in the GNN
@@ -203,6 +207,13 @@ protected:
   //! Synchronize weight gradients with a summation, then locally divide all
   //! weights to get an average
   void WeightGradientSyncAverage();
+
+#ifdef GALOIS_ENABLE_GPU
+  //! Object that holds all GPU allocated pointers to memory related to layers
+  GNNLayerGPUAllocations gpu_memory_;
+  //! Copies over layer weights to GPU
+  void CopyLayerWeightsToGPU();
+#endif
 };
 
 } // namespace galois
