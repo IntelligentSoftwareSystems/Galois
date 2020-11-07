@@ -1,6 +1,10 @@
 #pragma once
 #include "galois/layers/GNNLayer.h"
 
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/layers/GraphConvolutionalLayer.cuh"
+#endif
+
 namespace galois {
 
 class GraphConvolutionalLayer : public GNNLayer {
@@ -55,6 +59,10 @@ private:
   void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output);
   //! Calculate graident via mxm with last layer's gradients (backward)
   void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output);
+
+#ifdef GALOIS_ENABLE_GPU
+  GCNGPUAllocations gpu_memory_;
+#endif
 };
 
 } // namespace galois

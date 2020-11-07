@@ -32,6 +32,7 @@ if (GALOIS_ENABLE_GPU)
   set(gpusources
     src/graphs/GNNGraph.cu
     src/layers/GNNLayer.cu
+    src/layers/GraphConvolutionalLayer.cu
   )
   add_library(galois_gnn_gpu STATIC ${gpusources})
   target_compile_definitions(galois_gnn_gpu PRIVATE _FORCE_INLINES)

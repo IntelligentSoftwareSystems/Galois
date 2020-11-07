@@ -19,6 +19,9 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   GALOIS_LOG_VERBOSE("Output elements {}", num_output_elements);
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
+#ifdef GALOIS_ENABLE_GPU
+  gpu_memory_.Allocate(num_input_elements, num_output_elements);
+#endif
 }
 
 const galois::PointerWithSize<galois::GNNFloat>
