@@ -2,40 +2,46 @@ add_executable(gnngraph-test gnngraph-test.cpp)
 target_link_libraries(gnngraph-test galois_gnn)
 add_test(NAME gnngraph-test COMMAND gnngraph-test)
 
-add_executable(convlayer-test convlayer-test.cpp)
-target_link_libraries(convlayer-test galois_gnn)
-add_test(NAME convlayer-test COMMAND convlayer-test)
-
-add_executable(softmaxlayer-test softmaxlayer-test.cpp)
-target_link_libraries(softmaxlayer-test galois_gnn)
-add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
-
-add_executable(gnnconstruct-test gnnconstruct-test.cpp)
-target_link_libraries(gnnconstruct-test galois_gnn)
-add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
-
-add_executable(gnnfb-test gnnfb-test.cpp)
-target_link_libraries(gnnfb-test galois_gnn)
-add_test(NAME gnnfb-test COMMAND gnnfb-test)
-
-add_executable(adam-test adam-test.cpp)
-target_link_libraries(adam-test galois_gnn)
-add_test(NAME adam-test COMMAND adam-test)
-
-add_executable(accuracy-test accuracy-test.cpp)
-target_link_libraries(accuracy-test galois_gnn)
-add_test(NAME accuracy-test COMMAND accuracy-test)
-
-add_executable(epoch-test epoch-test.cpp)
-target_link_libraries(epoch-test galois_gnn)
-add_test(NAME epoch-test COMMAND epoch-test)
-
-# TODO figure out how to make this test run in parallel
-add_executable(aggregate-sync-test aggregate-sync-test.cpp)
-target_link_libraries(aggregate-sync-test galois_gnn)
-#add_test(NAME aggregate-sync-test COMMAND GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=4 ./aggregate-sync-test)
-
-add_executable(weight-sync-test weight-sync-test.cpp)
-target_link_libraries(weight-sync-test galois_gnn)
+if (NOT GALOIS_ENABLE_GPU)
+  add_executable(convlayer-test convlayer-test.cpp)
+  target_link_libraries(convlayer-test galois_gnn)
+  add_test(NAME convlayer-test COMMAND convlayer-test)
+  
+  add_executable(softmaxlayer-test softmaxlayer-test.cpp)
+  target_link_libraries(softmaxlayer-test galois_gnn)
+  add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
+  
+  add_executable(gnnconstruct-test gnnconstruct-test.cpp)
+  target_link_libraries(gnnconstruct-test galois_gnn)
+  add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
+  
+  add_executable(gnnfb-test gnnfb-test.cpp)
+  target_link_libraries(gnnfb-test galois_gnn)
+  add_test(NAME gnnfb-test COMMAND gnnfb-test)
+  
+  add_executable(adam-test adam-test.cpp)
+  target_link_libraries(adam-test galois_gnn)
+  add_test(NAME adam-test COMMAND adam-test)
+  
+  add_executable(accuracy-test accuracy-test.cpp)
+  target_link_libraries(accuracy-test galois_gnn)
+  add_test(NAME accuracy-test COMMAND accuracy-test)
+  
+  add_executable(epoch-test epoch-test.cpp)
+  target_link_libraries(epoch-test galois_gnn)
+  add_test(NAME epoch-test COMMAND epoch-test)
+  
+  # TODO figure out how to make this test run in parallel
+  add_executable(aggregate-sync-test aggregate-sync-test.cpp)
+  target_link_libraries(aggregate-sync-test galois_gnn)
+  #add_test(NAME aggregate-sync-test COMMAND GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=4 ./aggregate-sync-test)
+  
+  add_executable(weight-sync-test weight-sync-test.cpp)
+  target_link_libraries(weight-sync-test galois_gnn)
+else()
+  add_executable(gpu-convlayer-test gpu-convlayer-test.cpp)
+  target_link_libraries(gpu-convlayer-test galois_gnn)
+  add_test(NAME gpu-convlayer-test COMMAND gpu-convlayer-test)
+endif()
 
 # TODO multi host tests?
