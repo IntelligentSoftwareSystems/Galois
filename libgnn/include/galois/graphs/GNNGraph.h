@@ -102,7 +102,13 @@ public:
 
   //! Return matrix of the local node features
   const PointerWithSize<GNNFloat> GetLocalFeatures() {
+#ifndef GALOIS_ENABLE_GPU
     return PointerWithSize(local_node_features_);
+#else
+    // TODO remove reliance on local_node_features
+    return PointerWithSize(gpu_memory_.feature_vector(),
+                           local_node_features_.size());
+#endif
   }
 
   //! Given an LID and the current phase of GNN computation, determine if the
@@ -121,6 +127,9 @@ public:
   void AggregateSync(GNNFloat* matrix_to_sync,
                      const size_t matrix_column_size) const;
 
+#ifdef GALOIS_ENABLE_GPU
+  const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
+#endif
 private:
   //! Directory for input data
   const std::string input_directory_;
