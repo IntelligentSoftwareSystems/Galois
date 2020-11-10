@@ -15,6 +15,11 @@ public:
   //! Copy provided data in vector to GPU weights
   void CopyToWeights(const std::vector<GNNFloat>& cpu_layer_weights);
 
+  GNNFloat* forward_output() { return forward_output_matrix_; }
+  GNNFloat* backward_output() { return backward_output_matrix_; }
+  GNNFloat* layer_weights() { return layer_weights_; }
+  GNNFloat* layer_weight_gradients() { return layer_weight_gradients_; }
+
 private:
   size_t* num_weights_{nullptr};
   GNNFloat* forward_output_matrix_{nullptr};

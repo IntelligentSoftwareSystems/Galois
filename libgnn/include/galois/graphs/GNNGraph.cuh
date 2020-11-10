@@ -20,6 +20,14 @@ public:
                    unsigned num_features);
   //! Copy over ground truth for the graph to GPU
   void SetLabels(const std::vector<GNNLabel>& ground_truth);
+
+  GNNFeature* feature_vector() { return feature_vector_; };
+  const GNNFeature* feature_vector() const { return feature_vector_; };
+  int* edge_index() { return edge_index_; }
+  const int* edge_index() const { return edge_index_; }
+  int* edge_destinations() { return edge_destinations_; }
+  const int* edge_destinations() const { return edge_destinations_; }
+
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
 
