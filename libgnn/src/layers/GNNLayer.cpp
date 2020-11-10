@@ -29,7 +29,7 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         galois::runtime::getSystemNetworkInterface().ID,
         galois::runtime::getSystemNetworkInterface().Num, false);
 #ifdef GALOIS_ENABLE_GPU
-    gpu_memory_.InitWeightMemory(num_weight_elements);
+    gpu_object_.InitWeightMemory(num_weight_elements);
 #endif
   }
 
@@ -39,9 +39,30 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
   backward_output_matrix_.resize(
       layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
 #ifdef GALOIS_ENABLE_GPU
-  gpu_memory_.InitInOutMemory(num_output_elements,
+  gpu_object_.InitInOutMemory(num_output_elements,
                               layer_dimensions_.input_rows *
                                   layer_dimensions_.input_columns);
+#endif
+
+  // initialize the PointerWithSize wrappers
+#ifndef GALOIS_ENABLE_GPU
+  p_layer_weights_ = PointerWithSize<GNNFloat>(layer_weights_);
+  p_layer_weight_gradients_ =
+      PointerWithSize<GNNFloat>(layer_weight_gradients_);
+  p_forward_output_matrix_ = PointerWithSize<GNNFloat>(forward_output_matrix_);
+  p_backward_output_matrix_ =
+      PointerWithSize<GNNFloat>(backward_output_matrix_);
+#else
+  p_layer_weights_ = PointerWithSize<GNNFloat>(gpu_object_.layer_weights(),
+                                               layer_weights_.size());
+  p_layer_weight_gradients_ = PointerWithSize<GNNFloat>(
+      gpu_object_.layer_weight_gradients(), layer_weight_gradients_.size());
+  p_forward_output_matrix_ = PointerWithSize<GNNFloat>(
+      gpu_object_.forward_output(), forward_output_matrix_.size());
+  p_backward_output_matrix_ = PointerWithSize<GNNFloat>(
+      gpu_object_.backward_output(), backward_output_matrix_.size());
+  // TODO can clear the cpu side vectors/don't use .size() since optimally they
+  // aren't initialized
 #endif
 }
 
@@ -67,11 +88,9 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
       galois::loopname("RandomInitVector"));
 }
 
-// XXX Something is wrong with dropout; accuracy suffers, figure out what
-// it is
-void galois::GNNLayer::DoDropout(
+void galois::GNNLayer::DoDropoutCPU(
     const PointerWithSize<GNNFloat> input_to_dropout,
-    std::vector<GNNFloat>* output_matrix) {
+    PointerWithSize<GNNFloat>* output_matrix) {
   size_t num_elements = output_matrix->size();
   assert(num_elements == dropout_mask_.size());
   assert(num_elements == input_to_dropout.size());
@@ -94,6 +113,17 @@ void galois::GNNLayer::DoDropout(
                               static_cast<GNNFloat>(dropout_mask_[i]) * scale;
       },
       galois::loopname("LayerDropout"));
+}
+
+void galois::GNNLayer::DoDropout(
+    const PointerWithSize<GNNFloat> input_to_dropout,
+    PointerWithSize<GNNFloat>* output_matrix) {
+  //#ifdef GALOIS_ENABLE_GPU
+  //  // XXX
+  //  DoDropoutGPU();
+  //#else
+  DoDropoutCPU(input_to_dropout, output_matrix);
+  //#endif
 }
 
 void galois::GNNLayer::DoDropoutDerivative() {
@@ -170,6 +200,6 @@ void galois::GNNLayer::WeightGradientSyncAverage() {
 
 #ifdef GALOIS_ENABLE_GPU
 void galois::GNNLayer::CopyLayerWeightsToGPU() {
-  gpu_memory_.CopyToWeights(layer_weights_);
+  gpu_object_.CopyToWeights(layer_weights_);
 }
 #endif

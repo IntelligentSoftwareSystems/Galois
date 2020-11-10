@@ -20,39 +20,57 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU
-  gpu_memory_.Allocate(num_input_elements, num_output_elements);
+  gpu_object_.Allocate(num_input_elements, num_output_elements);
 #endif
+
+  // init pointers with size
+#ifndef GALOIS_ENABLE_GPU
+  p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
+  p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
+  p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
+#else
+  p_in_temp_1_ =
+      PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), in_temp_1_.size());
+  p_in_temp_2_ =
+      PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), in_temp_2_.size());
+  p_out_temp_ =
+      PointerWithSize<GNNFloat>(gpu_object_.out_temp(), out_temp_.size());
+#endif
+  GALOIS_LOG_VERBOSE("Conv layer initialized");
 }
 
 const galois::PointerWithSize<galois::GNNFloat>
 galois::GraphConvolutionalLayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  GALOIS_LOG_VERBOSE("Calling forward phase");
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
-  assert(in_temp_1_.size() == input_embeddings.size());
-  assert(in_temp_2_.size() == input_embeddings.size());
-  assert(forward_output_matrix_.size() ==
+  assert(p_in_temp_1_.size() == input_embeddings.size());
+  assert(p_in_temp_2_.size() == input_embeddings.size());
+  assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
   if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
-    DoDropout(input_embeddings, &in_temp_1_);
-    input_data = in_temp_1_.data();
+    galois::PointerWithSize<galois::GNNFloat> drop_output(in_temp_1_);
+    DoDropout(input_embeddings, &drop_output);
+    input_data = drop_output.data();
   }
 
   // flip aggregate/update if dimensions favor it (do less work)
   if (!config_.allow_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     // aggregation and update
-    AggregateAll(layer_dimensions_.input_columns, input_data, in_temp_2_.data(),
-                 &input_column_intermediates_);
-    UpdateEmbeddings(in_temp_2_.data(), forward_output_matrix_.data());
+    AggregateAll(layer_dimensions_.input_columns, input_data,
+                 p_in_temp_2_.data(), &input_column_intermediates_);
+    UpdateEmbeddings(p_in_temp_2_.data(), p_forward_output_matrix_.data());
   } else {
     // update to aggregate
-    UpdateEmbeddings(input_data, out_temp_.data());
-    AggregateAll(layer_dimensions_.output_columns, out_temp_.data(),
-                 forward_output_matrix_.data(), &output_column_intermediates_);
+    UpdateEmbeddings(input_data, p_out_temp_.data());
+    AggregateAll(layer_dimensions_.output_columns, p_out_temp_.data(),
+                 p_forward_output_matrix_.data(),
+                 &output_column_intermediates_);
   }
 
   // TODO synchronization of aggregation functions
@@ -129,6 +147,19 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 }
 
 void galois::GraphConvolutionalLayer::AggregateAll(
+    size_t column_length, const GNNFloat* node_embeddings,
+    GNNFloat* aggregate_output,
+    [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
+        pts) {
+#ifndef GALOIS_ENABLE_GPU
+  AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
+#else
+  gpu_object_.AggregateAllGPU(graph_.GetGPUGraph(), graph_.size(),
+                              column_length, node_embeddings, aggregate_output);
+#endif
+}
+
+void galois::GraphConvolutionalLayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts) {
