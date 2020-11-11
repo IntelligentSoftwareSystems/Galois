@@ -12,6 +12,7 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            GNNFloat* output) {
   if (!cublas_is_init) {
     InitCuBLAS();
+    cublas_is_init = true;
   }
   size_t lead_dim_a = (trans_a == CUBLAS_OP_N) ? input_columns : input_rows;
   size_t lead_dim_b = (trans_b == CUBLAS_OP_N) ? output_columns : input_columns;
