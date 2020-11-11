@@ -3,6 +3,8 @@
 bool galois::cublas_is_init = false;
 cublasHandle_t galois::global_cublas_handle;
 
+void galois::InitCuBLAS() { CUBLAS_CHECK(cublasCreate(&global_cublas_handle)); }
+
 void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            const cublasOperation_t trans_b, size_t input_rows,
                            size_t input_columns, size_t output_columns,

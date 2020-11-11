@@ -45,7 +45,7 @@ if (GALOIS_ENABLE_GPU)
   )
 
   # link to gpu lib (which takes care of moderngpu and cub)
-  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support)
+  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support -lcublas)
 
   # gpu -> cpu lib
   target_link_libraries(galois_gnn galois_gnn_gpu)

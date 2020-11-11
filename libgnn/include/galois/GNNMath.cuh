@@ -9,7 +9,7 @@ extern bool cublas_is_init;
 extern cublasHandle_t global_cublas_handle;
 
 //! Initializes the cublas handle to use cublas on GPUs.
-void InitCuBLAS() { CUBLAS_CHECK(cublasCreate(&global_cublas_handle)); }
+void InitCuBLAS();
 
 //! Takes 2 *row-major* matrices and does a matrix multiply on the GPU using
 //! CuBLAS.
