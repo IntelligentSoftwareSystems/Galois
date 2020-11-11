@@ -18,8 +18,7 @@
   do {                                                                         \
     cudaError_t error = condition;                                             \
     if (error != cudaSuccess) {                                                \
-      GALOIS_LOG_ERROR("CUDA error: {}", cudaGetErrorString(error));           \
-      exit(EXIT_FAILURE);                                                      \
+      GALOIS_LOG_FATAL("CUDA error: {}", cudaGetErrorString(error));           \
     }                                                                          \
   } while (0)
 

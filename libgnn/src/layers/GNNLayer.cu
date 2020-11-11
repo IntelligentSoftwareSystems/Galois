@@ -37,4 +37,22 @@ void galois::GNNLayerGPUAllocations::CopyToWeights(
                         cudaMemcpyHostToDevice));
 }
 
+void galois::GNNLayerGPUAllocations::CopyForwardOutputToCPU(
+    std::vector<GNNFloat>* cpu_forward_output) {
+  CUDA_CHECK(cudaMemcpy(cpu_forward_output->data(), forward_output_matrix_,
+                        cpu_forward_output->size() * sizeof(GNNFloat),
+                        cudaMemcpyDeviceToHost));
+}
+
+namespace {
+__global__ void PrintVector(galois::GNNFloat* v, unsigned size) {
+  for (unsigned i = 0; i < size; i++) {
+    printf("%u %f\n", i, v[i]);
+  }
+}
+} // namespace
+
 // TODO copy from gpu function as well just in case I need to check
+void galois::GNNLayerGPUAllocations::PrintForwardOutput(size_t size) {
+  PrintVector<<<1, 1>>>(forward_output_matrix_, size);
+}

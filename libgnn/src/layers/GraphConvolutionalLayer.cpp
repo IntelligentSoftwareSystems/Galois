@@ -80,9 +80,9 @@ galois::GraphConvolutionalLayer::ForwardPhase(
     Activation();
   }
 
-  assert(forward_output_matrix_.size() ==
+  assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
-  return forward_output_matrix_;
+  return p_forward_output_matrix_;
 }
 
 galois::PointerWithSize<galois::GNNFloat>
@@ -215,7 +215,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(
     const GNNFloat* node_embeddings, GNNFloat* output) {
-
 #ifndef GALOIS_ENABLE_GPU
   // CPU version is just a call into CBlas
   galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,

@@ -82,6 +82,9 @@ public:
     if (layer_weights_.size()) {
       layer_weights_.assign(layer_weights_.size(), 1);
     }
+#ifdef GALOIS_ENABLE_GPU
+    CopyLayerWeightsToGPU();
+#endif
   }
 
   const PointerWithSize<GNNFloat> GetForwardOutput() {
@@ -130,6 +133,14 @@ public:
   //! Given an optimizer, update the weights in this layer based on gradients
   //! stored in the layer
   void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
+
+#ifdef GALOIS_ENABLE_GPU
+  //! Copies over forward output results to CPU
+  const std::vector<GNNFloat>& CopyForwardOutputFromGPU();
+  void PrintForwardOutputGPU() {
+    base_gpu_object_.PrintForwardOutput(forward_output_matrix_.size());
+  }
+#endif
 
 protected:
   //! Layer order (starts from 0); used in backward to shortcut output as layer

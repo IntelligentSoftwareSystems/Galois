@@ -9,6 +9,7 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
   if (config_.allocate_weights) {
+
     // TODO some of this does not need alloc if not used
     // dropout allocation; dropout is same as input
     dropout_mask_.resize(
@@ -18,6 +19,10 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         layer_dimensions_.input_columns * layer_dimensions_.output_columns;
     layer_weights_.resize(num_weight_elements);
     layer_weight_gradients_.resize(num_weight_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    base_gpu_object_.InitWeightMemory(num_weight_elements);
+#endif
+
     GlorotBengioInit(&layer_weights_);
 
     // initialize sync substrate
@@ -28,9 +33,6 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         *gradient_sync_interface_,
         galois::runtime::getSystemNetworkInterface().ID,
         galois::runtime::getSystemNetworkInterface().Num, false);
-#ifdef GALOIS_ENABLE_GPU
-    base_gpu_object_.InitWeightMemory(num_weight_elements);
-#endif
   }
 
   size_t num_output_elements =
@@ -77,6 +79,9 @@ void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
   for (size_t i = 0; i < vector_to_init->size(); i++) {
     (*vector_to_init)[i] = dist(rng);
   }
+#ifdef GALOIS_ENABLE_GPU
+  CopyLayerWeightsToGPU();
+#endif
 }
 
 void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
@@ -87,6 +92,9 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
         (*vector_to_init)[i] = random_init_rng_.GetRandomNumber();
       },
       galois::loopname("RandomInitVector"));
+#ifdef GALOIS_ENABLE_GPU
+  CopyLayerWeightsToGPU();
+#endif
 }
 
 void galois::GNNLayer::DoDropoutCPU(
@@ -202,5 +210,11 @@ void galois::GNNLayer::WeightGradientSyncAverage() {
 #ifdef GALOIS_ENABLE_GPU
 void galois::GNNLayer::CopyLayerWeightsToGPU() {
   base_gpu_object_.CopyToWeights(layer_weights_);
+}
+
+const std::vector<galois::GNNFloat>&
+galois::GNNLayer::CopyForwardOutputFromGPU() {
+  base_gpu_object_.CopyForwardOutputToCPU(&forward_output_matrix_);
+  return forward_output_matrix_;
 }
 #endif

@@ -14,6 +14,11 @@ public:
   void InitWeightMemory(size_t num_weights);
   //! Copy provided data in vector to GPU weights
   void CopyToWeights(const std::vector<GNNFloat>& cpu_layer_weights);
+  //! Copy GPU forward output to the provided vector (assumes vector is already
+  //! correct size)
+  void CopyForwardOutputToCPU(std::vector<GNNFloat>* cpu_forward_output);
+  //! Prints forward output matrix on gpu
+  void PrintForwardOutput(size_t num);
 
   GNNFloat* forward_output() { return forward_output_matrix_; }
   GNNFloat* backward_output() { return backward_output_matrix_; }

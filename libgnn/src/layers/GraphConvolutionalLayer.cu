@@ -65,6 +65,10 @@ __global__ void AggregateAllKernel(unsigned num_nodes, size_t column_length,
         }
       }
     }
+    //__syncthreads();
+    // if (thread_lane == 0) {
+    //  printf("Agg %d %f\n", src, aggregate_output[base_src_index]);
+    //}
   }
 }
 
