@@ -224,7 +224,7 @@ protected:
 
 #ifdef GALOIS_ENABLE_GPU
   //! Object that holds all GPU allocated pointers to memory related to layers
-  GNNLayerGPUAllocations gpu_object_;
+  GNNLayerGPUAllocations base_gpu_object_;
   //! Copies over layer weights to GPU
   void CopyLayerWeightsToGPU();
 #endif
