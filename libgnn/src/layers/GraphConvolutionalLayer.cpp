@@ -215,10 +215,19 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(
     const GNNFloat* node_embeddings, GNNFloat* output) {
+
+#ifndef GALOIS_ENABLE_GPU
+  // CPU version is just a call into CBlas
   galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
                      layer_dimensions_.input_columns,
                      layer_dimensions_.output_columns, node_embeddings,
                      layer_weights_.data(), output);
+#else
+  gpu_object_.UpdateEmbeddingsGPU(
+      layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+      layer_dimensions_.output_columns, node_embeddings,
+      base_gpu_object_.layer_weights(), output);
+#endif
 }
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(

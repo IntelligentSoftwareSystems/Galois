@@ -20,6 +20,11 @@ public:
                        const GNNFloat* node_embeddings,
                        GNNFloat* aggregate_output);
 
+  void UpdateEmbeddingsGPU(size_t num_nodes, size_t input_columns,
+                           size_t output_columns,
+                           const GNNFloat* node_embeddings,
+                           const GNNFloat* layer_weights, GNNFloat* output);
+
 private:
   GNNFloat* in_temp_1_{nullptr};
   GNNFloat* in_temp_2_{nullptr};

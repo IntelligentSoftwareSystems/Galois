@@ -1,4 +1,4 @@
-#include "galois/CUDAUtil.h"
+#include "galois/GNNMath.cuh"
 #include "galois/layers/GraphConvolutionalLayer.cuh"
 
 galois::GCNGPUAllocations::~GCNGPUAllocations() {
@@ -78,4 +78,12 @@ void galois::GCNGPUAllocations::AggregateAllGPU(
       num_nodes, column_length, gpu_graph.edge_index(),
       gpu_graph.edge_destinations(), node_embeddings, aggregate_output);
   CUDA_TEST("GPU aggregate all failure");
+}
+
+void galois::GCNGPUAllocations::UpdateEmbeddingsGPU(
+    size_t num_nodes, size_t input_columns, size_t output_columns,
+    const GNNFloat* node_embeddings, const GNNFloat* layer_weights,
+    GNNFloat* output) {
+  CBlasSGEMMGPU(CUBLAS_OP_N, CUBLAS_OP_N, num_nodes, input_columns,
+                output_columns, node_embeddings, layer_weights, output);
 }
