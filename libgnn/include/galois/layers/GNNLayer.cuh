@@ -20,6 +20,10 @@ public:
   //! Prints forward output matrix on gpu
   void PrintForwardOutput(size_t num);
 
+  //! Helper function: give a vector which is copied over to the GPU (new
+  //! memory is allocated as necessary)
+  GNNFloat* Allocate(const std::vector<GNNFloat>& v);
+
   GNNFloat* forward_output() { return forward_output_matrix_; }
   GNNFloat* backward_output() { return backward_output_matrix_; }
   GNNFloat* layer_weights() { return layer_weights_; }

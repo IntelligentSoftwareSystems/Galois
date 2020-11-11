@@ -135,6 +135,10 @@ public:
   void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
 
 #ifdef GALOIS_ENABLE_GPU
+  //! Utility function for allocating
+  PointerWithSize<GNNFloat> AllocateGPU(const std::vector<GNNFloat>& v) {
+    return PointerWithSize<GNNFloat>(base_gpu_object_.Allocate(v), v.size());
+  }
   //! Copies over forward output results to CPU
   const std::vector<GNNFloat>& CopyForwardOutputFromGPU();
   void PrintForwardOutputGPU() {

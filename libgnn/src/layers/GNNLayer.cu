@@ -44,6 +44,19 @@ void galois::GNNLayerGPUAllocations::CopyForwardOutputToCPU(
                         cudaMemcpyDeviceToHost));
 }
 
+galois::GNNFloat*
+galois::GNNLayerGPUAllocations::Allocate(const std::vector<GNNFloat>& v) {
+  // TODO keep track of these so that on destruction they can be freed
+  // accordingly; for now I'll let them leak
+  galois::GNNFloat* to_return = nullptr;
+  CUDA_CHECK(
+      cudaMalloc((void**)(&to_return), v.size() * sizeof(galois::GNNFloat)));
+  CUDA_CHECK(cudaMemcpy(to_return, v.data(),
+                        v.size() * sizeof(galois::GNNFloat),
+                        cudaMemcpyHostToDevice));
+  return to_return;
+}
+
 namespace {
 __global__ void PrintVector(galois::GNNFloat* v, unsigned size) {
   for (unsigned i = 0; i < size; i++) {
