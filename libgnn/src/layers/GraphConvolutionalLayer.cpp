@@ -103,47 +103,58 @@ galois::GraphConvolutionalLayer::BackwardPhase(
       // transposed sgemm for derivative; in_temp is output
       assert(input_gradient->size() ==
              layer_dimensions_.input_rows * layer_dimensions_.output_columns);
-      assert(in_temp_1_.size() ==
+      assert(p_in_temp_1_.size() ==
              layer_dimensions_.input_columns * layer_dimensions_.input_rows);
-      UpdateEmbeddingsDerivative(input_gradient->data(), in_temp_1_.data());
+      UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
       // derivative of aggregate is the same due to symmetric graph
-      AggregateAll(layer_dimensions_.input_columns, in_temp_1_.data(),
-                   backward_output_matrix_.data(),
+      AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
+                   p_backward_output_matrix_.data(),
                    &input_column_intermediates_);
     }
     // weight gradient calculation
+    // TODO put this in a function to put the ifdef in there
+#ifndef GALOIS_ENABLE_GPU
     galois::CBlasSGEMM(
         CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
         layer_dimensions_.input_rows, layer_dimensions_.output_columns,
         prev_layer_input.data(), input_gradient->data(),
-        layer_weight_gradients_.data());
+        p_layer_weight_gradients_.data());
+#else
+    // XXX
+#endif
   } else {
     // aggregate occurs regardless of layer being equal to 0 because it is
     // required in this case for the weight gradient calculation
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
-                 out_temp_.data(), &output_column_intermediates_);
+                 p_out_temp_.data(), &output_column_intermediates_);
     if (layer_number_ != 0) {
       // derivative for update
-      UpdateEmbeddingsDerivative(out_temp_.data(),
-                                 backward_output_matrix_.data());
+      UpdateEmbeddingsDerivative(p_out_temp_.data(),
+                                 p_backward_output_matrix_.data());
     }
+    // TODO put this in a function
+#ifndef GALOIS_ENABLE_GPU
     // weight gradient; note the use of the aggregated gradient in out_temp
     galois::CBlasSGEMM(
         CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
         layer_dimensions_.input_rows, layer_dimensions_.output_columns,
         prev_layer_input.data(), out_temp_.data(),
-        layer_weight_gradients_.data());
+        p_layer_weight_gradients_.data());
+#else
+    // XXX
+#endif
   }
 
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
+  // TODO figure out how to do this with GPUs
   WeightGradientSyncAverage();
 
   if (config_.do_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
   }
 
-  return PointerWithSize(backward_output_matrix_);
+  return p_backward_output_matrix_;
 }
 
 void galois::GraphConvolutionalLayer::AggregateAll(
@@ -231,12 +242,16 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddings(
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
     const GNNFloat* gradients, GNNFloat* output) {
-  assert(layer_weights_.size() ==
+  assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
+#ifndef GALOIS_ENABLE_GPU
   // difference is Trans for B matrix (data) to get z by y (weights is y by z
   // normally); result is x by y
   galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
                      layer_dimensions_.output_columns,
                      layer_dimensions_.input_columns, gradients,
                      layer_weights_.data(), output);
+#else
+  // XXX
+#endif
 }
