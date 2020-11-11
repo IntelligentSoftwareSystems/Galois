@@ -1,8 +1,9 @@
-#ifdef GALOIS_ENABLE_GPU
+#ifndef GALOIS_CUDA_UTIL
+#define GALOIS_CUDA_UTIL
 //! @file CUDAUtil.h
 //! Contains various utility functions for CUDA.
-#pragma once
 #include <cuda.h>
+#include <cublas_v2.h>
 #include "galois/Logging.h"
 
 // TODO check these
@@ -37,6 +38,15 @@
     if (cudaSuccess != (e = cudaGetLastError())) {                             \
       GALOIS_LOG_ERROR("{}: {}", msg, e);                                      \
       GALOIS_LOG_ERROR("{}", cudaGetErrorString(e));                           \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
+#define CUBLAS_CHECK(condition)                                                \
+  do {                                                                         \
+    cublasStatus_t status = condition;                                         \
+    if (status != CUBLAS_STATUS_SUCCESS) {                                     \
+      GALOIS_LOG_ERROR("CuBLAS error code : {}", status);                      \
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   } while (0)

@@ -30,6 +30,7 @@ if (GALOIS_ENABLE_GPU)
 
   # create the galois_gnn_gpu library to get linked into galois_gnn
   set(gpusources
+    src/GNNMath.cu
     src/graphs/GNNGraph.cu
     src/layers/GNNLayer.cu
     src/layers/GraphConvolutionalLayer.cu
