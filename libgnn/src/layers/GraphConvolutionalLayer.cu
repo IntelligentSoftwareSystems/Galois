@@ -78,6 +78,8 @@ void galois::GCNGPUAllocations::AggregateAllGPU(
     const graphs::GNNGraphGPUAllocations& gpu_graph, size_t num_nodes,
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output) {
+  CUDA_CHECK(cudaMemset(aggregate_output, 0,
+                        num_nodes * column_length * sizeof(GNNFloat)));
   AggregateAllKernel<<<(num_nodes - 1) / WARPS_PER_BLOCK + 1, BLOCK_SIZE>>>(
       num_nodes, column_length, gpu_graph.edge_index(),
       gpu_graph.edge_destinations(), node_embeddings, aggregate_output);
