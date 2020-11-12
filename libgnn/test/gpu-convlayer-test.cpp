@@ -41,7 +41,6 @@ int main() {
   // make sure it runs in a sane manner
   layer_0->ForwardPhase(test_graph.GetLocalFeatures());
   // pointer is to GPU memory: copy it over to a CPU source for verification
-  layer_0->PrintForwardOutputGPU();
   const std::vector<galois::GNNFloat>& layer_0_forward_output =
       layer_0->CopyForwardOutputFromGPU();
 
@@ -68,56 +67,58 @@ int main() {
   ////////////////////////////////////////////////////////////////////////////////
 
   // dummy 1 matrix
-  // std::vector<galois::GNNFloat> dummy_ones_v(14, 1);
-  // galois::PointerWithSize dummy_ones(dummy_ones_v);
-
-  // XXX TODO copy this over to the GPU
+  std::vector<galois::GNNFloat> dummy_ones_v(14, 1);
+  // TODO need to free the gpu pointer
+  galois::PointerWithSize<galois::GNNFloat> dummy_ones =
+      layer_0->AllocateGPU(dummy_ones_v);
 
   // backward pass checking
   // layer 0 means that an empty weight matrix is returned since there is no
   // point passing back anything
   // galois::PointerWithSize<galois::GNNFloat> layer_0_backward_output =
-  //    layer_0->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
+  layer_0->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
+  const std::vector<galois::GNNFloat>& layer_0_backward_output =
+      layer_0->CopyBackwardOutputFromGPU();
 
   //////////////////////////////////////////////////////////////////////////////
   // sanity check layer 0 backward output; all 0 because layer 0
   //////////////////////////////////////////////////////////////////////////////
   // since norm factors aren't invovled it is possible to do full assertions
   // 7 x 3
-  // GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 21);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[0] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[1] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[2] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[3] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[4] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[5] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[6] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[7] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[8] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[9] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[10] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[11] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[12] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[13] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[14] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[15] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[16] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[17] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[18] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[19] == 0);
-  // GALOIS_LOG_ASSERT((layer_0_backward_output)[20] == 0);
+  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 21);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[0] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[1] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[2] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[3] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[4] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[5] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[6] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[7] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[8] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[9] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[10] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[11] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[12] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[13] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[14] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[15] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[16] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[17] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[18] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[19] == 0);
+  GALOIS_LOG_ASSERT((layer_0_backward_output)[20] == 0);
 
-  // galois::PointerWithSize<galois::GNNFloat> layer_0_weight_gradients =
-  //    layer_0->GetLayerWeightGradients();
-  //// make sure they are sane
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients.size() == 6);
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients[0] == 21);
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients[1] == 21);
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients[2] == 21);
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients[3] == 21);
-  // GALOIS_LOG_ASSERT(layer_0_weight_gradients[4] == 21);
+  const std::vector<galois::GNNFloat>& layer_0_weight_gradients =
+      layer_0->CopyWeightGradientsFromGPU();
+  // make sure they are sane
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients.size() == 6);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[0] == 21);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[1] == 21);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[2] == 21);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[3] == 21);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[4] == 21);
 
-  // layer_0.reset();
+  layer_0.reset();
 
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -131,7 +132,6 @@ int main() {
   const std::vector<galois::GNNFloat>& layer_1_forward_output =
       layer_1->CopyForwardOutputFromGPU();
 
-  // same check as before for sanity purposes
   GALOIS_LOG_ASSERT(layer_1_forward_output.size() == 14);
   GALOIS_LOG_ASSERT(layer_1_forward_output[0] == 3);
   GALOIS_LOG_ASSERT(layer_1_forward_output[1] == 3);
@@ -149,48 +149,51 @@ int main() {
   GALOIS_LOG_ASSERT(layer_1_forward_output[13] == 15);
 
   // since layer isn't 0 anymore, backward phase will actually return something
-  // dummy_ones_v.assign(14, 1);
-  // galois::PointerWithSize<galois::GNNFloat> layer_1_backward_output =
-  //    layer_1->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
+  dummy_ones = layer_1->AllocateGPU(dummy_ones_v);
+  layer_1->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
+  const std::vector<galois::GNNFloat>& layer_1_backward_output =
+      layer_1->CopyBackwardOutputFromGPU();
   //////////////////////////////////////////////////////////////////////////////
   // check that multiplies go as expected
   //////////////////////////////////////////////////////////////////////////////
-  // GALOIS_LOG_ASSERT(layer_1_backward_output.size() == 21);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[0] == 2);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[1] == 2);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[2] == 2);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[3] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[4] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[5] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[6] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[7] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[8] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[9] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[10] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[11] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[12] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[13] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[14] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[15] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[16] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[17] == 4);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[18] == 2);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[19] == 2);
-  // GALOIS_LOG_ASSERT((layer_1_backward_output)[20] == 2);
+  GALOIS_LOG_ASSERT(layer_1_backward_output.size() == 21);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[0] == 2);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[1] == 2);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[2] == 2);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[3] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[4] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[5] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[6] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[7] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[8] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[9] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[10] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[11] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[12] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[13] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[14] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[15] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[16] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[17] == 4);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[18] == 2);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[19] == 2);
+  GALOIS_LOG_ASSERT((layer_1_backward_output)[20] == 2);
 
-  // galois::PointerWithSize<galois::GNNFloat> layer_1_weight_gradients =
-  //    layer_1->GetLayerWeightGradients();
-  //// make sure they are sane
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients.size() == 6);
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 21);
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 21);
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 21);
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 21);
-  // GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 21);
+  const std::vector<galois::GNNFloat>& layer_1_weight_gradients =
+      layer_1->CopyWeightGradientsFromGPU();
+  // make sure they are sane
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients.size() == 6);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 21);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 21);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 21);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 21);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 21);
 
-  // layer_1.reset();
+  layer_1.reset();
 
   ////////////////////////////////////////////////////////////////////////////////
+
+  // TODO get dropout and activation working
 
   // galois::GNNLayerConfig config;
   // config.do_dropout                   = true;
