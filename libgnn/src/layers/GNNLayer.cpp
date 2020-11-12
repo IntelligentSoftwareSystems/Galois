@@ -206,15 +206,3 @@ void galois::GNNLayer::WeightGradientSyncAverage() {
         galois::loopname("WeightGradientSyncAverageDivide"));
   }
 }
-
-#ifdef GALOIS_ENABLE_GPU
-void galois::GNNLayer::CopyLayerWeightsToGPU() {
-  base_gpu_object_.CopyToWeights(layer_weights_);
-}
-
-const std::vector<galois::GNNFloat>&
-galois::GNNLayer::CopyForwardOutputFromGPU() {
-  base_gpu_object_.CopyForwardOutputToCPU(&forward_output_matrix_);
-  return forward_output_matrix_;
-}
-#endif

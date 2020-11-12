@@ -17,6 +17,13 @@ public:
   //! Copy GPU forward output to the provided vector (assumes vector is already
   //! correct size)
   void CopyForwardOutputToCPU(std::vector<GNNFloat>* cpu_forward_output);
+  //! Copy GPU backward output to the provided vector (assumes vector is already
+  //! correct size)
+  void CopyBackwardOutputToCPU(std::vector<GNNFloat>* cpu_backward_output);
+  //! Copy GPU weight gradients to the provided vector (assumes vector is
+  //! already correct size)
+  void CopyWeightGradientsToCPU(std::vector<GNNFloat>* cpu_gradients);
+
   //! Prints forward output matrix on gpu
   void PrintForwardOutput(size_t num);
 

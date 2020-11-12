@@ -139,8 +139,22 @@ public:
   PointerWithSize<GNNFloat> AllocateGPU(const std::vector<GNNFloat>& v) {
     return PointerWithSize<GNNFloat>(base_gpu_object_.Allocate(v), v.size());
   }
-  //! Copies over forward output results to CPU
-  const std::vector<GNNFloat>& CopyForwardOutputFromGPU();
+  //! Copies over forward output results to CPU from GPU
+  const std::vector<GNNFloat>& CopyForwardOutputFromGPU() {
+    base_gpu_object_.CopyForwardOutputToCPU(&forward_output_matrix_);
+    return forward_output_matrix_;
+  }
+  //! Copies over backward output results to CPU from GPU
+  const std::vector<GNNFloat>& CopyBackwardOutputFromGPU() {
+    base_gpu_object_.CopyBackwardOutputToCPU(&backward_output_matrix_);
+    return backward_output_matrix_;
+  }
+  //! Copies over weight gradients to CPU from GPU
+  const std::vector<GNNFloat>& CopyWeightGradientsFromGPU() {
+    base_gpu_object_.CopyWeightGradientsToCPU(&layer_weight_gradients_);
+    return layer_weight_gradients_;
+  }
+
   void PrintForwardOutputGPU() {
     base_gpu_object_.PrintForwardOutput(forward_output_matrix_.size());
   }
@@ -241,7 +255,9 @@ protected:
   //! Object that holds all GPU allocated pointers to memory related to layers
   GNNLayerGPUAllocations base_gpu_object_;
   //! Copies over layer weights to GPU
-  void CopyLayerWeightsToGPU();
+  void CopyLayerWeightsToGPU() {
+    base_gpu_object_.CopyToWeights(layer_weights_);
+  }
 #endif
 };
 

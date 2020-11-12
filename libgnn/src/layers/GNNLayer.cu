@@ -44,6 +44,20 @@ void galois::GNNLayerGPUAllocations::CopyForwardOutputToCPU(
                         cudaMemcpyDeviceToHost));
 }
 
+void galois::GNNLayerGPUAllocations::CopyBackwardOutputToCPU(
+    std::vector<GNNFloat>* cpu_backward_output) {
+  CUDA_CHECK(cudaMemcpy(cpu_backward_output->data(), backward_output_matrix_,
+                        cpu_backward_output->size() * sizeof(GNNFloat),
+                        cudaMemcpyDeviceToHost));
+}
+
+void galois::GNNLayerGPUAllocations::CopyWeightGradientsToCPU(
+    std::vector<GNNFloat>* cpu_gradients) {
+  CUDA_CHECK(cudaMemcpy(cpu_gradients->data(), layer_weight_gradients_,
+                        cpu_gradients->size() * sizeof(GNNFloat),
+                        cudaMemcpyDeviceToHost));
+}
+
 galois::GNNFloat*
 galois::GNNLayerGPUAllocations::Allocate(const std::vector<GNNFloat>& v) {
   // TODO keep track of these so that on destruction they can be freed
