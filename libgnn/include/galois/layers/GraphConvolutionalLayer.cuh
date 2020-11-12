@@ -24,6 +24,15 @@ public:
                            size_t output_columns,
                            const GNNFloat* node_embeddings,
                            const GNNFloat* layer_weights, GNNFloat* output);
+  void UpdateEmbeddingsDerivativeGPU(size_t num_nodes, size_t input_columns,
+                                     size_t output_columns,
+                                     const GNNFloat* node_embeddings,
+                                     const GNNFloat* layer_weights,
+                                     GNNFloat* output);
+
+  void GetWeightGradientsGPU(size_t num_nodes, size_t input_columns,
+                             size_t output_columns, const GNNFloat* prev_input,
+                             const GNNFloat* gradients, GNNFloat* output);
 
 private:
   GNNFloat* in_temp_1_{nullptr};

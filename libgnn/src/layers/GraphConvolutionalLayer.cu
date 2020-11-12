@@ -91,3 +91,20 @@ void galois::GCNGPUAllocations::UpdateEmbeddingsGPU(
   CBlasSGEMMGPU(CUBLAS_OP_N, CUBLAS_OP_N, num_nodes, input_columns,
                 output_columns, node_embeddings, layer_weights, output);
 }
+
+void galois::GCNGPUAllocations::UpdateEmbeddingsDerivativeGPU(
+    size_t num_nodes, size_t input_columns, size_t output_columns,
+    const GNNFloat* gradients, const GNNFloat* layer_weights,
+    GNNFloat* output) {
+  // note output clumns/input columns are flipped due to transpose of the
+  // layer weights
+  CBlasSGEMMGPU(CUBLAS_OP_N, CUBLAS_OP_T, num_nodes, output_columns,
+                input_columns, gradients, layer_weights, output);
+}
+
+void galois::GCNGPUAllocations::GetWeightGradientsGPU(
+    size_t num_nodes, size_t input_columns, size_t output_columns,
+    const GNNFloat* prev_input, const GNNFloat* gradients, GNNFloat* output) {
+  CBlasSGEMMGPU(CUBLAS_OP_T, CUBLAS_OP_N, input_columns, num_nodes,
+                output_columns, prev_input, gradients, output);
+}

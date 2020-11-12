@@ -120,7 +120,10 @@ galois::GraphConvolutionalLayer::BackwardPhase(
         prev_layer_input.data(), input_gradient->data(),
         p_layer_weight_gradients_.data());
 #else
-    // XXX
+    gpu_object_.GetWeightGradientsGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+        layer_dimensions_.output_columns, prev_layer_input.data(),
+        input_gradient->data(), p_layer_weight_gradients_.data());
 #endif
   } else {
     // aggregate occurs regardless of layer being equal to 0 because it is
@@ -138,10 +141,13 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     galois::CBlasSGEMM(
         CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
         layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        prev_layer_input.data(), out_temp_.data(),
+        prev_layer_input.data(), p_out_temp_.data(),
         p_layer_weight_gradients_.data());
 #else
-    // XXX
+    gpu_object_.GetWeightGradientsGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+        layer_dimensions_.output_columns, prev_layer_input.data(),
+        p_out_temp_.data(), p_layer_weight_gradients_.data());
 #endif
   }
 
@@ -252,6 +258,10 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
                      layer_dimensions_.input_columns, gradients,
                      layer_weights_.data(), output);
 #else
-  // XXX
+  gpu_object_.UpdateEmbeddingsDerivativeGPU(
+      layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+      layer_dimensions_.output_columns, gradients,
+      base_gpu_object_.layer_weights(), output);
+
 #endif
 }
