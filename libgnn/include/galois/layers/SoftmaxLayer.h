@@ -31,8 +31,7 @@ public:
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
 
   PointerWithSize<galois::GNNFloat>
-  BackwardPhaseCPU(const PointerWithSize<galois::GNNFloat> prev_layer_input,
-                   PointerWithSize<galois::GNNFloat>* input_gradient);
+  BackwardPhaseCPU();
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
   PointerWithSize<galois::GNNFloat>

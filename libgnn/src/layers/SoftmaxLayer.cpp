@@ -43,18 +43,19 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
 }
 
 const galois::PointerWithSize<galois::GNNFloat>
-galois::SoftmaxLayer::ForwardPhase(
-    const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+galois::SoftmaxLayer::ForwardPhase([
+    [maybe_unused]] const galois::PointerWithSize<galois::GNNFloat>
+                                       input_embeddings) {
 #ifndef GALOIS_ENABLE_GPU
   return ForwardPhaseCPU(input_embeddings);
 #else
   // XXX
+  return PointerWithSize<GNNFloat>();
 #endif
 }
 
 galois::PointerWithSize<galois::GNNFloat>
-galois::SoftmaxLayer::BackwardPhaseCPU(const PointerWithSize<galois::GNNFloat>,
-                                       PointerWithSize<galois::GNNFloat>*) {
+galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
@@ -97,12 +98,14 @@ galois::SoftmaxLayer::BackwardPhaseCPU(const PointerWithSize<galois::GNNFloat>,
 }
 
 galois::PointerWithSize<galois::GNNFloat>
-galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat> a,
-                                    PointerWithSize<galois::GNNFloat>* b) {
+galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
+                                    PointerWithSize<galois::GNNFloat>*) {
 #ifndef GALOIS_ENABLE_GPU
-  return BackwardPhaseCPU(a, b);
+  return BackwardPhaseCPU();
 #else
+  // XXX
   // gpu_object_.BackwardPhaseGPU(
+  return PointerWithSize<GNNFloat>();
 #endif
 }
 
