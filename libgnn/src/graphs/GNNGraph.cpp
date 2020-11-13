@@ -374,8 +374,6 @@ void galois::graphs::GNNGraph::InitNormFactor() {
 
 #ifdef GALOIS_ENABLE_GPU
 void galois::graphs::GNNGraph::InitGPUMemory() {
-  // XXX finish up GPU memory allocation; currently just testing the build
-
   // create int casted CSR
   uint64_t* e_index_ptr = partitioned_graph_->row_start_ptr();
   uint32_t* e_dest_ptr  = partitioned_graph_->edge_dst_ptr();
@@ -419,5 +417,7 @@ void galois::graphs::GNNGraph::InitGPUMemory() {
 
   gpu_memory_.SetFeatures(local_node_features_, node_feature_length_);
   gpu_memory_.SetLabels(local_ground_truth_labels_);
+  gpu_memory_.SetMasks(local_training_mask_, local_validation_mask_,
+                       local_testing_mask_);
 }
 #endif

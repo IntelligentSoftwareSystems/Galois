@@ -10,7 +10,9 @@ galois::graphs::GNNGraphGPUAllocations::~GNNGraphGPUAllocations() {
   CUDA_FREE(edge_destinations_);
   CUDA_FREE(feature_vector_);
   CUDA_FREE(ground_truth_);
-  CUDA_FREE(norm_factors_);
+  CUDA_FREE(local_training_mask_);
+  CUDA_FREE(local_validation_mask_);
+  CUDA_FREE(local_testing_mask_);
 }
 
 void galois::graphs::GNNGraphGPUAllocations::SetGraphTopology(
@@ -60,4 +62,23 @@ void galois::graphs::GNNGraphGPUAllocations::SetLabels(
   CUDA_CHECK(cudaMemcpy(ground_truth_, ground_truth.data(),
                         ground_truth.size() * sizeof(GNNLabel),
                         cudaMemcpyHostToDevice));
+}
+
+void galois::graphs::GNNGraphGPUAllocations::SetMasks(
+    const std::vector<char>& train, const std::vector<char>& val,
+    const std::vector<char>& test) {
+  CUDA_CHECK(
+      cudaMalloc((void**)(&local_training_mask_), train.size() * sizeof(char)));
+  CUDA_CHECK(cudaMemcpy(local_training_mask_, train.data(),
+                        train.size() * sizeof(char), cudaMemcpyHostToDevice));
+
+  CUDA_CHECK(
+      cudaMalloc((void**)(&local_validation_mask_), val.size() * sizeof(char)));
+  CUDA_CHECK(cudaMemcpy(local_validation_mask_, val.data(),
+                        val.size() * sizeof(char), cudaMemcpyHostToDevice));
+
+  CUDA_CHECK(
+      cudaMalloc((void**)(&local_testing_mask_), test.size() * sizeof(char)));
+  CUDA_CHECK(cudaMemcpy(local_testing_mask_, test.data(),
+                        test.size() * sizeof(char), cudaMemcpyHostToDevice));
 }

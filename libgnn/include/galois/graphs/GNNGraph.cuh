@@ -20,6 +20,9 @@ public:
                    unsigned num_features);
   //! Copy over ground truth for the graph to GPU
   void SetLabels(const std::vector<GNNLabel>& ground_truth);
+  //! Copy over masks for the 3 sets to GPU
+  void SetMasks(const std::vector<char>& train, const std::vector<char>& val,
+                const std::vector<char>& test);
 
   GNNFeature* feature_vector() { return feature_vector_; };
   const GNNFeature* feature_vector() const { return feature_vector_; };
@@ -48,12 +51,10 @@ private:
   GNNFeature* feature_vector_{nullptr};
   //! (Local) ground truth vector
   GNNFloat* ground_truth_{nullptr};
-  // TODO need this?
-  //! (Local) norm factors
-  GNNFloat* norm_factors_{nullptr};
-
-  // TODO masks? other things I haven't considered yet? will determine if they
-  // are needed
+  // masks for phases
+  char* local_training_mask_{nullptr};
+  char* local_validation_mask_{nullptr};
+  char* local_testing_mask_{nullptr};
 };
 
 } // namespace graphs
