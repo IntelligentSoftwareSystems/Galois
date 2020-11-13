@@ -24,9 +24,15 @@ public:
     Init();
   }
 
+  const PointerWithSize<galois::GNNFloat>
+  ForwardPhaseCPU(const PointerWithSize<galois::GNNFloat> input_embeddings);
   //! Creates probability distribution of each row of input
   const PointerWithSize<galois::GNNFloat>
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
+
+  PointerWithSize<galois::GNNFloat>
+  BackwardPhaseCPU(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+                   PointerWithSize<galois::GNNFloat>* input_gradient);
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
   PointerWithSize<galois::GNNFloat>
