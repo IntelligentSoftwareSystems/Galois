@@ -1,5 +1,8 @@
 #pragma once
 #include "galois/layers/GNNLayer.h"
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/layers/SoftmaxLayer.cuh"
+#endif
 
 namespace galois {
 
@@ -12,10 +15,15 @@ public:
                const GNNLayerDimensions& dimensions)
       : GNNLayer(layer_num, graph, dimensions,
                  GNNLayerConfig{.allocate_weights = false}),
+#ifdef GALOIS_ENABLE_GPU
+        gpu_object_(graph.GetGPUGraph()),
+#endif
         input_loss_(dimensions.input_rows),
         ground_truth_vectors_(dimensions.input_columns),
         norm_gradient_vectors_(dimensions.input_columns),
-        softmax_temp_vectors_(dimensions.input_columns) {
+        softmax_temp_vectors_(dimensions.input_columns)
+
+  {
     output_layer_type_ = galois::GNNOutputLayerType::kSoftmax;
     // input/output columns must be equivalent in a softmax
     GALOIS_LOG_ASSERT(dimensions.input_columns == dimensions.output_columns);
@@ -30,8 +38,7 @@ public:
   const PointerWithSize<galois::GNNFloat>
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
 
-  PointerWithSize<galois::GNNFloat>
-  BackwardPhaseCPU();
+  PointerWithSize<galois::GNNFloat> BackwardPhaseCPU();
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
   PointerWithSize<galois::GNNFloat>
@@ -39,6 +46,10 @@ public:
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
+#ifdef GALOIS_ENABLE_GPU
+  SoftmaxLayerGPU gpu_object_;
+#endif
+
   //! Loss for each row of the input
   std::vector<GNNFloat> input_loss_;
   //! Each thread gets storage to allocate the ground truth vector in during

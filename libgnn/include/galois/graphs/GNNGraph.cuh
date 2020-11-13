@@ -24,12 +24,15 @@ public:
   void SetMasks(const std::vector<char>& train, const std::vector<char>& val,
                 const std::vector<char>& test);
 
-  GNNFeature* feature_vector() { return feature_vector_; };
-  const GNNFeature* feature_vector() const { return feature_vector_; };
-  int* edge_index() { return edge_index_; }
-  const int* edge_index() const { return edge_index_; }
-  int* edge_destinations() { return edge_destinations_; }
-  const int* edge_destinations() const { return edge_destinations_; }
+  GNNFeature* feature_vector() const { return feature_vector_; };
+  int* edge_index() const { return edge_index_; }
+  int* edge_destinations() const { return edge_destinations_; }
+
+  GNNFloat* ground_truth() const { return ground_truth_; }
+
+  char* local_training_mask() const { return local_training_mask_; }
+  char* local_validation_mask() const { return local_validation_mask_; }
+  char* local_testing_mask() const { return local_testing_mask_; }
 
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
