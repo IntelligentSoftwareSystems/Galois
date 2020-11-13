@@ -253,7 +253,7 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
 //! given a name, mask type, and arrays to save into
 size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
     const std::string& dataset_name, const std::string& mask_type,
-    GNNRange* mask_range, GNNLabel* masks) {
+    GNNRange* mask_range, char* masks) {
   size_t range_begin;
   size_t range_end;
 

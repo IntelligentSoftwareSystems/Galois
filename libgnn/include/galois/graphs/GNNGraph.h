@@ -160,11 +160,11 @@ private:
 
   // TODO maybe revisit this and use an actual bitset
   //! Bitset indicating which nodes are training nodes
-  std::vector<GNNLabel> local_training_mask_;
+  std::vector<char> local_training_mask_;
   //! Bitset indicating which nodes are validation nodes
-  std::vector<GNNLabel> local_validation_mask_;
+  std::vector<char> local_validation_mask_;
   //! Bitset indicating which nodes are testing nodes
-  std::vector<GNNLabel> local_testing_mask_;
+  std::vector<char> local_testing_mask_;
 
   //! Global mask range for training nodes; must convert to LIDs when using
   //! in this class
@@ -194,7 +194,7 @@ private:
   //! given a name, mask type, and arrays to save into
   size_t ReadLocalMasksFromFile(const std::string& dataset_name,
                                 const std::string& mask_type,
-                                GNNRange* mask_range, GNNLabel* masks);
+                                GNNRange* mask_range, char* masks);
   //! Read masks of local nodes only for training, validation, and testing
   void ReadLocalMasks(const std::string& dataset_name);
   //! Reads the entire graph topology in (but nothing else)
