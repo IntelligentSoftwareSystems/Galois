@@ -18,5 +18,11 @@ void CBlasSGEMMGPU(const cublasOperation_t trans_a,
                    size_t input_columns, size_t output_columns,
                    const GNNFloat* a, const GNNFloat* b, GNNFloat* output);
 
+//! Given a vector, apply a softmax on some specified # of elements and save
+//! the result to the specified output. Since this is a device function,
+//! all pointers should be to GPU memory.
+__device__ void DoSoftmax(size_t vector_length, const GNNFloat* input,
+                          GNNFloat* output);
+
 } // namespace galois
 #endif

@@ -27,3 +27,26 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            b, lead_dim_b, a, lead_dim_a, &dummy0, output,
                            output_columns));
 }
+
+__device__ void galois::DoSoftmax(size_t vector_length, const GNNFloat* input,
+                                  GNNFloat* output) {
+  // find max value
+  GNNFloat current_max = input[0];
+  for (size_t i = 1; i < vector_length; i++) {
+    if (input[i] > current_max) {
+      current_max = input[i];
+    }
+  }
+  // set output by scaling with the max
+  GNNFloat denominator = 0.0;
+  for (size_t i = 0; i < vector_length; i++) {
+    // NOTE: expf only works for single precision float; may need to change if
+    // we ever switch to double
+    output[i] = expf(input[i] - current_max);
+    denominator += output[i];
+  }
+  // denominator scale
+  for (size_t i = 0; i < vector_length; i++) {
+    output[i] /= denominator;
+  }
+}
