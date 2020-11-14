@@ -13,8 +13,9 @@ public:
         val_mask_(gpu_graph.local_validation_mask()),
         test_mask_(gpu_graph.local_testing_mask()),
         local_labels_(gpu_graph.ground_truth()) {}
-  void ForwardPhaseGPU(size_t num_nodes, size_t feature_length,
-                       const GNNFloat* input_embeddings, GNNFloat* output);
+  void ForwardPhaseGPU(galois::GNNPhase phase, size_t num_nodes,
+                       size_t feature_length, const GNNFloat* input_embeddings,
+                       GNNFloat* output);
   void BackwardPhaseGPU(GNNFloat* output);
 
 private:

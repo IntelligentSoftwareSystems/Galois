@@ -88,6 +88,10 @@ galois::GNNFloat galois::GNNCrossEntropy(const size_t vector_length,
                                          const GNNFloat* input) {
   GNNFloat loss = 0.0;
 
+  // Note that this function works if there are multiple non-zeros in the
+  // ground truth vector
+  // If there is only 1 then this function is overkill and it should break
+  // early
   for (size_t i = 0; i < vector_length; i++) {
     if (ground_truth[i] == 0.0) {
       continue;

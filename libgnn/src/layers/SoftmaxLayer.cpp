@@ -48,7 +48,7 @@ galois::SoftmaxLayer::ForwardPhase(
 #ifndef GALOIS_ENABLE_GPU
   return ForwardPhaseCPU(input_embeddings);
 #else
-  gpu_object_.ForwardPhaseGPU(graph_.size(), graph_.node_feature_length(),
+  gpu_object_.ForwardPhaseGPU(layer_phase_, graph_.size(), graph_.node_feature_length(),
                               input_embeddings.data(),
                               p_forward_output_matrix_.data());
   return p_forward_output_matrix_;
