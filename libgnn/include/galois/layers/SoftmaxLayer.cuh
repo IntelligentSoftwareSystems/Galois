@@ -23,6 +23,21 @@ private:
   char* val_mask_;
   char* test_mask_;
   GNNFloat* local_labels_;
+
+  //! Helper function that returns the correct mask based on phase it is passed
+  char* ChooseMask(galois::GNNPhase phase) {
+    switch (phase) {
+    case GNNPhase::kTrain:
+      return train_mask_;
+    case GNNPhase::kValidate:
+      return val_mask_;
+    case GNNPhase::kTest:
+      return test_mask_;
+    default:
+      GALOIS_LOG_FATAL("Invalid phase specified");
+      return nullptr;
+    }
+  }
 };
 
 } // namespace galois
