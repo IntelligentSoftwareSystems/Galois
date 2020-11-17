@@ -29,7 +29,6 @@ public:
     GALOIS_LOG_ASSERT(dimensions.input_columns == dimensions.output_columns);
     // output needs to match number of possible classes
     GALOIS_LOG_ASSERT(dimensions.input_columns == graph.GetNumLabelClasses());
-    Init();
   }
 
   const PointerWithSize<galois::GNNFloat>
@@ -64,8 +63,6 @@ private:
   //! derivative calculation; each is the size of a feature vector
   galois::substrate::PerThreadStorage<std::vector<GNNFloat>>
       softmax_temp_vectors_;
-
-  void Init();
 };
 
 } // namespace galois

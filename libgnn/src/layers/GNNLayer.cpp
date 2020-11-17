@@ -9,7 +9,6 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
   if (config_.allocate_weights) {
-
     // TODO some of this does not need alloc if not used
     // dropout allocation; dropout is same as input
     dropout_mask_.resize(

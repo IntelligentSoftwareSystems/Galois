@@ -2,9 +2,6 @@
 #include "galois/GNNMath.h"
 #include "galois/layers/SoftmaxLayer.h"
 
-// Allocate memory and initialize
-void galois::SoftmaxLayer::Init() {}
-
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::ForwardPhaseCPU(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
@@ -48,9 +45,9 @@ galois::SoftmaxLayer::ForwardPhase(
 #ifndef GALOIS_ENABLE_GPU
   return ForwardPhaseCPU(input_embeddings);
 #else
-  gpu_object_.ForwardPhaseGPU(layer_phase_, graph_.size(), graph_.node_feature_length(),
-                              input_embeddings.data(),
-                              p_forward_output_matrix_.data());
+  gpu_object_.ForwardPhaseGPU(
+      layer_phase_, graph_.size(), layer_dimensions_.input_columns,
+      input_embeddings.data(), p_forward_output_matrix_.data());
   return p_forward_output_matrix_;
 #endif
 }

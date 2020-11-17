@@ -28,16 +28,19 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            output_columns));
 }
 
+__global__ void galois::SoftmaxCrossEntropyForward(
+    char* mask, size_t num_nodes, size_t feature_length,
+    const galois::GNNFloat* input_embeddings, galois::GNNFloat* output) {
 
-__global__ void SoftmaxCrossEntropyForward(char* mask, size_t num_nodes, size_t feature_length,
-                                      const galois::GNNFloat* input_embeddings,
-                                      galois::GNNFloat* output) {
-  // XXX zero out output
+  // NOTE: assumes that output is already 0'd out as it will not overwrite the
+  // entire thing
   CUDA_KERNEL_LOOP(i, num_nodes) {
     if (mask[i] == 1) {
-      galois::DoSoftmax(feature_length, input_embeddings + feature_length * i, output + feature_length * i);
+      galois::DoSoftmax(feature_length, input_embeddings + feature_length * i,
+                        output + feature_length * i);
       // ignoring crossentropy loss calculation for now because I'm not using
-      // loss for anything + didn't bother allocating an array to store loss anyways
+      // loss for anything + didn't bother allocating an array to store loss
+      // anyways
     }
   }
 }

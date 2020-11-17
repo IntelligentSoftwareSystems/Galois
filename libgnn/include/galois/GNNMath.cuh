@@ -18,7 +18,8 @@ void CBlasSGEMMGPU(const cublasOperation_t trans_a,
                    size_t input_columns, size_t output_columns,
                    const GNNFloat* a, const GNNFloat* b, GNNFloat* output);
 
-//! Runs softmax + cross entropy on masked nodes
+//! Runs softmax + cross entropy on masked nodes. Will not overwrite all of
+//! the output, so make sure it's been zero'd out beforehand.
 __global__ void
 SoftmaxCrossEntropyForward(char* mask, size_t num_nodes, size_t feature_length,
                            const galois::GNNFloat* input_embeddings,

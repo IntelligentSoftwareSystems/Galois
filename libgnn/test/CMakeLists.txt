@@ -42,6 +42,11 @@ else()
   add_executable(gpu-convlayer-test gpu-convlayer-test.cpp)
   target_link_libraries(gpu-convlayer-test galois_gnn)
   add_test(NAME gpu-convlayer-test COMMAND gpu-convlayer-test)
+
+  add_executable(gpu-softmaxlayer-test gpu-softmaxlayer-test.cpp)
+  target_link_libraries(gpu-softmaxlayer-test galois_gnn)
+  add_test(NAME gpu-softmaxlayer-test COMMAND gpu-softmaxlayer-test)
+
 endif()
 
 # TODO multi host tests?
