@@ -9,8 +9,8 @@ void galois::AdamOptimizer::GradientDescent(
   assert(derivatives.size() == matrix->size());
 
   // grab based on layer being used
-  std::vector<GNNFloat>& first_moment  = first_moments_[layer_number];
-  std::vector<GNNFloat>& second_moment = second_moments_[layer_number];
+  PointerWithSize<GNNFloat>& first_moment  = p_first_moments_[layer_number];
+  PointerWithSize<GNNFloat>& second_moment = p_second_moments_[layer_number];
   assert(derivatives.size() == first_moment.size());
   assert(derivatives.size() == second_moment.size());
 
