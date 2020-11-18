@@ -16,13 +16,15 @@ public:
   void ForwardPhaseGPU(galois::GNNPhase phase, size_t num_nodes,
                        size_t feature_length, const GNNFloat* input_embeddings,
                        GNNFloat* output);
-  void BackwardPhaseGPU(GNNFloat* output);
+  void BackwardPhaseGPU(galois::GNNPhase phase, size_t num_nodes,
+                        size_t feature_length, const GNNFloat* predictions,
+                        GNNFloat* output_gradient);
 
 private:
   char* train_mask_;
   char* val_mask_;
   char* test_mask_;
-  GNNFloat* local_labels_;
+  GNNLabel* local_labels_;
 
   //! Helper function that returns the correct mask based on phase it is passed
   char* ChooseMask(galois::GNNPhase phase) {

@@ -28,7 +28,7 @@ public:
   int* edge_index() const { return edge_index_; }
   int* edge_destinations() const { return edge_destinations_; }
 
-  GNNFloat* ground_truth() const { return ground_truth_; }
+  GNNLabel* ground_truth() const { return ground_truth_; }
 
   char* local_training_mask() const { return local_training_mask_; }
   char* local_validation_mask() const { return local_validation_mask_; }
@@ -53,7 +53,7 @@ private:
   //! (Local) feature vector
   GNNFeature* feature_vector_{nullptr};
   //! (Local) ground truth vector
-  GNNFloat* ground_truth_{nullptr};
+  GNNLabel* ground_truth_{nullptr};
   // masks for phases
   char* local_training_mask_{nullptr};
   char* local_validation_mask_{nullptr};
