@@ -22,14 +22,13 @@ int main() {
 
   std::vector<size_t> layer_sizes = {2, 1};
   galois::AdamOptimizer adam(config, layer_sizes, 2);
-  printf("%p\n", &adam);
 
-  // std::vector<galois::GNNFloat> weights1 = {1, 1};
-  // std::vector<galois::GNNFloat> weights2 = {10};
-  // std::vector<galois::GNNFloat> grad1    = {1, 1};
-  // std::vector<galois::GNNFloat> grad2    = {10};
+  std::vector<galois::GNNFloat> weights1 = {1, 1};
+  std::vector<galois::GNNFloat> weights2 = {10};
+  std::vector<galois::GNNFloat> grad1    = {1, 1};
+  std::vector<galois::GNNFloat> grad2    = {10};
 
-  // adam.GradientDescent(grad1, &weights1, 0);
+  adam.GradientDescent(grad1, weights1, 0);
   //// check weights
   // GALOIS_LOG_ASSERT(weights1[0] == 0.0);
   // GALOIS_LOG_ASSERT(weights1[1] == 0.0);

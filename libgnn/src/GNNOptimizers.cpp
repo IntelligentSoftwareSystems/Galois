@@ -4,9 +4,9 @@
 #include <cassert>
 
 void galois::AdamOptimizer::GradientDescent(
-    const std::vector<GNNFloat>& derivatives, std::vector<GNNFloat>* matrix,
+    PointerWithSize<GNNFloat> derivatives, PointerWithSize<GNNFloat> matrix,
     size_t layer_number) {
-  assert(derivatives.size() == matrix->size());
+  assert(derivatives.size() == matrix.size());
 
   // grab based on layer being used
   PointerWithSize<GNNFloat>& first_moment  = p_first_moments_[layer_number];
@@ -14,9 +14,10 @@ void galois::AdamOptimizer::GradientDescent(
   assert(derivatives.size() == first_moment.size());
   assert(derivatives.size() == second_moment.size());
 
+#ifndef GALOIS_ENABLE_GPU
   // individual weight updates via gradients
   galois::do_all(
-      galois::iterate(static_cast<size_t>(0), matrix->size()),
+      galois::iterate(static_cast<size_t>(0), matrix.size()),
       [&](size_t i) {
         // moment estimate updates
         first_moment[i] = config_.beta1 * first_moment[i] +
@@ -30,11 +31,14 @@ void galois::AdamOptimizer::GradientDescent(
         GNNFloat bias_correct_second =
             second_moment[i] / (1.0 - beta2_power_t_[layer_number]);
         // weight update using bias corrected moments
-        (matrix->data())[i] -=
+        (matrix.data())[i] -=
             config_.alpha * bias_correct_first /
             (std::sqrt(bias_correct_second) + config_.epsilon);
       },
       galois::loopname("AdamOptimizerGradientDescent"));
+#else
+  // gpu_object_.DoAdamUpdate(first_moment.data(), second_moment.data(), );
+#endif
 
   // update the power terms for next update call
   beta1_power_t_[layer_number] *= config_.beta1;

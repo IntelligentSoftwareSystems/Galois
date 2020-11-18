@@ -49,7 +49,7 @@ else()
 
   add_executable(gpu-adam-test gpu-adam-test.cpp)
   target_link_libraries(gpu-adam-test galois_gnn)
-  #add_test(NAME gpu-adam-test COMMAND gpu-adam-test)
+  add_test(NAME gpu-adam-test COMMAND gpu-adam-test)
 endif()
 
 # TODO multi host tests?
