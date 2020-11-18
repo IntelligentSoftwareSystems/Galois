@@ -56,6 +56,9 @@ galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
 
+  // zero out output
+  backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
+
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned i) {
@@ -101,9 +104,10 @@ galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
 #ifndef GALOIS_ENABLE_GPU
   return BackwardPhaseCPU();
 #else
-  // XXX
-  // gpu_object_.BackwardPhaseGPU(
-  return PointerWithSize<GNNFloat>();
+  gpu_object_.BackwardPhaseGPU(
+      layer_phase_, graph_.size(), layer_dimensions_.input_columns,
+      p_forward_output_matrix_.data(), p_backward_output_matrix_.data());
+  return p_backward_output_matrix_;
 #endif
 }
 

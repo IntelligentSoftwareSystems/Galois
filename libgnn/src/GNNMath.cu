@@ -45,6 +45,89 @@ __global__ void galois::SoftmaxCrossEntropyForward(
   }
 }
 
+__global__ void galois::SoftmaxCrossEntropyBackward(
+    char* mask, size_t num_nodes, size_t feature_length,
+    const galois::GNNFloat* predictions, const galois::GNNLabel* ground_truth,
+    galois::GNNFloat* output_gradient) {
+  const unsigned global_thread_id =
+      BLOCK_SIZE * blockIdx.x + threadIdx.x; // global thread index
+  const unsigned warp_thread_lane =
+      threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
+  const unsigned warp_id = global_thread_id / WARP_SIZE; // global warp index
+  const unsigned warp_lane =
+      threadIdx.x / WARP_SIZE; // warp index within the CTA
+  const unsigned num_warps =
+      (BLOCK_SIZE / WARP_SIZE) * gridDim.x; // total number of active warps
+
+  // TODO: how many classes can there be? it's a set quantity at the moment
+  // copy of a particular node's prediction; put into shared memory to avoid
+  // overheads of accessing it otherwise
+  // TODO benchmark
+  __shared__ GNNFloat
+      local_node_prediction[BLOCK_SIZE / WARP_SIZE][MAX_NUM_CLASSES];
+  __shared__ GNNFloat
+      intermediate_gradient[BLOCK_SIZE / WARP_SIZE][MAX_NUM_CLASSES];
+
+  // a warp works on a single node at once
+  for (unsigned wid = warp_id; wid < num_nodes; wid += num_warps) {
+    // operate only if masked
+    if (mask[wid] == 1) {
+      unsigned base_index = wid * feature_length;
+
+      // copy over a prediction to shared memory (faster access time)
+      // TODO benchmark this to see if worth
+      for (unsigned feat_index = warp_thread_lane; feat_index < feature_length;
+           feat_index += WARP_SIZE) {
+        if (feat_index < feature_length) {
+          local_node_prediction[warp_lane][feat_index] =
+              predictions[base_index + feat_index];
+        }
+      }
+      // do not proceed until entire prediction is copied to shared memory
+      __syncthreads();
+
+      // TODO can refactor below to device functions
+      // cross entropy derivative
+      // each thread of warp takes different feature
+      for (unsigned feat_index = warp_thread_lane; feat_index < feature_length;
+           feat_index += WARP_SIZE) {
+        if (feat_index < feature_length) {
+          if (feat_index == (unsigned)ground_truth[wid]) {
+            // this thread is responsible for the truth
+            intermediate_gradient[warp_lane][feat_index] =
+                -1.0 / (local_node_prediction[warp_lane][feat_index] + 1e-10);
+          } else {
+            // all others are 0 (ground truth label = 0)
+            intermediate_gradient[warp_lane][feat_index] = 0.0;
+          }
+        }
+      }
+      __syncthreads();
+
+      // softmax derivative
+      // each thread of warp takes different feature
+      for (unsigned feat_index = warp_thread_lane; feat_index < feature_length;
+           feat_index += WARP_SIZE) {
+        if (feat_index < feature_length) {
+          GNNFloat sum  = 0.0;
+          GNNFloat self = local_node_prediction[warp_lane][feat_index];
+
+          for (unsigned j = 0; j < feature_length; j++) {
+            GNNFloat df = (j == feat_index)
+                              ? (self * (1.0 - self))
+                              : -local_node_prediction[warp_lane][j] * self;
+            sum += df * intermediate_gradient[warp_lane][j];
+          }
+
+          // each thread saves final output for the feature
+          output_gradient[base_index + feat_index] = sum;
+        }
+      }
+      __syncthreads();
+    }
+  }
+}
+
 __device__ void galois::DoSoftmax(size_t vector_length, const GNNFloat* input,
                                   GNNFloat* output) {
   // find max value

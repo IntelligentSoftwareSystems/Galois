@@ -20,10 +20,20 @@ void CBlasSGEMMGPU(const cublasOperation_t trans_a,
 
 //! Runs softmax + cross entropy on masked nodes. Will not overwrite all of
 //! the output, so make sure it's been zero'd out beforehand.
+//! At this point in time cross entropy is ignored because it only calculates a
+//! loss value which doesn't really do anything for us at the moment.
 __global__ void
 SoftmaxCrossEntropyForward(char* mask, size_t num_nodes, size_t feature_length,
                            const galois::GNNFloat* input_embeddings,
                            galois::GNNFloat* output);
+
+//! Derivative of cross entropy (to get error of prediction) then derivavtive
+//! of the softmax.
+__global__ void
+SoftmaxCrossEntropyBackward(char* mask, size_t num_nodes, size_t feature_length,
+                            const galois::GNNFloat* predictions,
+                            const galois::GNNLabel* ground_truth,
+                            galois::GNNFloat* output_gradient);
 
 //! Given a vector, apply a softmax on some specified # of elements and save
 //! the result to the specified output. Since this is a device function,

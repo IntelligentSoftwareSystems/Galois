@@ -61,8 +61,13 @@ int main() {
     GALOIS_LOG_ASSERT(prediction_distribution[i * 7 + 6] == 0.0);
   }
 
-  // XXX
-  // output_layer->BackwardPhase(p_softmax_input, nullptr);
+  output_layer->BackwardPhase(p_softmax_input, nullptr);
+  const std::vector<galois::GNNFloat>& backward_output =
+      output_layer->CopyBackwardOutputFromGPU();
+  printf("Output 1\n========\n");
+  for (galois::GNNFloat a : backward_output) {
+    printf("%f\n", a);
+  }
 
   // validation mode
   output_layer->SetLayerPhase(galois::GNNPhase::kValidate);
@@ -90,8 +95,13 @@ int main() {
     GALOIS_LOG_ASSERT(pd2[i * 7 + 6] == 0.0);
   }
 
-  // XXX
-  // output_layer->BackwardPhase(p_softmax_input, nullptr);
+  output_layer->BackwardPhase(p_softmax_input, nullptr);
+  const std::vector<galois::GNNFloat>& backward_output2 =
+      output_layer->CopyBackwardOutputFromGPU();
+  printf("Output 2\n========\n");
+  for (galois::GNNFloat a : backward_output2) {
+    printf("%f\n", a);
+  }
 
   // test mode
   output_layer->SetLayerPhase(galois::GNNPhase::kTest);
@@ -110,8 +120,13 @@ int main() {
     GALOIS_LOG_ASSERT(pd3[i * 7 + 6] == 0.0);
   }
 
-  // XXX
-  // output_layer->BackwardPhase(softmax_input, nullptr);
+  output_layer->BackwardPhase(softmax_input, nullptr);
+  const std::vector<galois::GNNFloat>& backward_output3 =
+      output_layer->CopyBackwardOutputFromGPU();
+  printf("Output 3\n========\n");
+  for (galois::GNNFloat a : backward_output3) {
+    printf("%f\n", a);
+  }
 
   // TODO in future maybe: add better test for backward phase besides just
   // running it
