@@ -9,6 +9,10 @@
 #include "galois/graphs/GNNGraph.h"
 #include "galois/layers/GNNLayer.h"
 
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/GraphNeuralNetwork.cuh"
+#endif
+
 namespace galois {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +148,8 @@ public:
 
   float GetGlobalAccuracy(const PointerWithSize<GNNFloat> predictions);
 
+  float GetGlobalAccuracyCPU(const PointerWithSize<GNNFloat> predictions);
+
   //! Backpropagate gradients from the output layer backwards through the
   //! network to update the layer weights. Also known as a backward phase in
   //! most literature
@@ -164,6 +170,10 @@ private:
   DGAccumulator<size_t> num_correct_;
   //! Used to count total number of things checked during accuracy calculation
   DGAccumulator<size_t> total_checked_;
+#ifdef GALOIS_ENABLE_GPU
+  //! Holds all GPU functions
+  GraphNeuralNetworkGPU gpu_object_;
+#endif
 };
 
 } // namespace galois

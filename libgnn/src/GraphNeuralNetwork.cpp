@@ -101,6 +101,17 @@ galois::GraphNeuralNetwork::DoInference() {
 
 float galois::GraphNeuralNetwork::GetGlobalAccuracy(
     const PointerWithSize<GNNFloat> predictions) {
+  // TODO mark as a forwarding argument?
+#ifndef GALOIS_ENABLE_GPU
+  return GetGlobalAccuracyCPU(predictions);
+#else
+  return gpu_object_.GetGlobalAccuracyGPU(graph_->GetGPUGraph(), phase_,
+                                          predictions);
+#endif
+}
+
+float galois::GraphNeuralNetwork::GetGlobalAccuracyCPU(
+    const PointerWithSize<GNNFloat> predictions) {
   // check owned nodes' accuracy
   size_t num_labels = graph_->GetNumLabelClasses();
   assert((graph_->GetNumLabelClasses() * graph_->size()) == predictions.size());
