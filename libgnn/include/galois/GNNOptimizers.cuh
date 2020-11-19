@@ -19,6 +19,17 @@ public:
   GNNFloat* first_moment(size_t i) { return first_moments_[i]; };
   GNNFloat* second_moment(size_t i) { return second_moments_[i]; };
 
+  //! Calls into a GPU kernel; needs to be done this way as this cuh is included
+  //! in a GCC build, so the kernel cannot be defined in this header.
+  void AdamUpdate(const GNNFloat* derivatives, GNNFloat* matrix_to_update,
+                  size_t matrix_size, GNNFloat* first_moment,
+                  GNNFloat* second_moment, GNNFloat alpha, GNNFloat beta1,
+                  GNNFloat beta2, GNNFloat epsilon, GNNFloat beta1t,
+                  GNNFloat beta2t);
+
+  //! Helper to copy gpu pointer to cpu vector
+  void CopyToVector(std::vector<GNNFloat>& to, PointerWithSize<GNNFloat> from);
+
 private:
   size_t num_layers_;
   std::vector<GNNFloat*> first_moments_;

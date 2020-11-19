@@ -31,13 +31,16 @@ void galois::AdamOptimizer::GradientDescent(
         GNNFloat bias_correct_second =
             second_moment[i] / (1.0 - beta2_power_t_[layer_number]);
         // weight update using bias corrected moments
-        (matrix.data())[i] -=
-            config_.alpha * bias_correct_first /
-            (std::sqrt(bias_correct_second) + config_.epsilon);
+        (matrix.data())[i] -= config_.alpha * bias_correct_first /
+                              std::sqrt(bias_correct_second + config_.epsilon);
       },
       galois::loopname("AdamOptimizerGradientDescent"));
 #else
-  // gpu_object_.DoAdamUpdate(first_moment.data(), second_moment.data(), );
+  gpu_object_.AdamUpdate(derivatives.data(), matrix.data(), matrix.size(),
+                         first_moment.data(), second_moment.data(),
+                         config_.alpha, config_.beta1, config_.beta2,
+                         config_.epsilon, beta1_power_t_[layer_number],
+                         beta2_power_t_[layer_number]);
 #endif
 
   // update the power terms for next update call

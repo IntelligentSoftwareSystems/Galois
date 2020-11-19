@@ -80,6 +80,12 @@ public:
                        PointerWithSize<GNNFloat> matrix,
                        size_t layer_number) final;
 
+#ifdef GALOIS_ENABLE_GPU
+  //! helper function for unit testing to do some vector copying
+  void CopyToVector(std::vector<GNNFloat>& to, PointerWithSize<GNNFloat> from) {
+    gpu_object_.CopyToVector(to, from);
+  }
+#endif
 private:
 #ifdef GALOIS_ENABLE_GPU
   AdamOptimizerGPU gpu_object_;
