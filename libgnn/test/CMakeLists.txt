@@ -50,6 +50,10 @@ else()
   add_executable(gpu-adam-test gpu-adam-test.cpp)
   target_link_libraries(gpu-adam-test galois_gnn)
   add_test(NAME gpu-adam-test COMMAND gpu-adam-test)
+
+  add_executable(gpu-epoch-test gpu-epoch-test.cpp)
+  target_link_libraries(gpu-epoch-test galois_gnn)
+  #add_test(NAME gpu-epoch-test COMMAND gpu-epoch-test)
 endif()
 
 # TODO multi host tests?

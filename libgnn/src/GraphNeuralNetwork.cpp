@@ -102,12 +102,12 @@ galois::GraphNeuralNetwork::DoInference() {
 float galois::GraphNeuralNetwork::GetGlobalAccuracy(
     const PointerWithSize<GNNFloat> predictions) {
   // TODO mark as a forwarding argument?
-#ifndef GALOIS_ENABLE_GPU
+  //#ifndef GALOIS_ENABLE_GPU
   return GetGlobalAccuracyCPU(predictions);
-#else
-  return gpu_object_.GetGlobalAccuracyGPU(graph_->GetGPUGraph(), phase_,
-                                          predictions);
-#endif
+  //#else
+  //  return gpu_object_.GetGlobalAccuracyGPU(graph_->GetGPUGraph(), phase_,
+  //                                          predictions);
+  //#endif
 }
 
 float galois::GraphNeuralNetwork::GetGlobalAccuracyCPU(
@@ -158,7 +158,6 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
   std::unique_ptr<galois::GNNLayer>& output_layer = gnn_layers_.back();
   galois::PointerWithSize<galois::GNNFloat> current_gradients =
       output_layer->BackwardPhase(dummy, nullptr);
-
   // loops through intermediate layers in a backward fashion
   // -1 to ignore output layer which was handled above
   for (size_t i = 0; i < gnn_layers_.size() - 1; i++) {

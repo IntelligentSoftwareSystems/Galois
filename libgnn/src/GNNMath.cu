@@ -26,6 +26,7 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            output_columns, input_rows, input_columns, &dummy1,
                            b, lead_dim_b, a, lead_dim_a, &dummy0, output,
                            output_columns));
+  CUDA_TEST("cublas sgemm failure");
 }
 
 __global__ void galois::SoftmaxCrossEntropyForward(

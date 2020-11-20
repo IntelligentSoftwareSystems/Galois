@@ -88,16 +88,16 @@ public:
   }
 
   const PointerWithSize<GNNFloat> GetForwardOutput() {
-    return PointerWithSize(forward_output_matrix_);
+    return p_forward_output_matrix_;
   }
 
   const PointerWithSize<GNNFloat> GetBackwardOutput() {
-    return PointerWithSize(backward_output_matrix_);
+    return p_backward_output_matrix_;
   }
 
   //! Returns the weight gradients
   const PointerWithSize<GNNFloat> GetLayerWeightGradients() {
-    return PointerWithSize(layer_weight_gradients_);
+    return p_layer_weight_gradients_;
   }
 
   //! Returns dimensions of this layer
