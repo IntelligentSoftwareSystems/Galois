@@ -419,5 +419,6 @@ void galois::graphs::GNNGraph::InitGPUMemory() {
   gpu_memory_.SetLabels(local_ground_truth_labels_);
   gpu_memory_.SetMasks(local_training_mask_, local_validation_mask_,
                        local_testing_mask_);
+  gpu_memory_.SetNormFactors(norm_factors_);
 }
 #endif

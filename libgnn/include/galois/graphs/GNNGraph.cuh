@@ -23,6 +23,8 @@ public:
   //! Copy over masks for the 3 sets to GPU
   void SetMasks(const std::vector<char>& train, const std::vector<char>& val,
                 const std::vector<char>& test);
+  //! Copy over norm factors
+  void SetNormFactors(const std::vector<GNNFloat> norm_factors);
 
   GNNFeature* feature_vector() const { return feature_vector_; };
   int* edge_index() const { return edge_index_; }
@@ -58,6 +60,8 @@ private:
   char* local_training_mask_{nullptr};
   char* local_validation_mask_{nullptr};
   char* local_testing_mask_{nullptr};
+  //! Norm factors used during aggregation
+  GNNFloat* norm_factors_;
 };
 
 } // namespace graphs

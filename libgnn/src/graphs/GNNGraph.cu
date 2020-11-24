@@ -82,3 +82,12 @@ void galois::graphs::GNNGraphGPUAllocations::SetMasks(
   CUDA_CHECK(cudaMemcpy(local_testing_mask_, test.data(),
                         test.size() * sizeof(char), cudaMemcpyHostToDevice));
 }
+
+void galois::graphs::GNNGraphGPUAllocations::SetNormFactors(
+    const std::vector<GNNFloat> norm_factors) {
+  CUDA_CHECK(cudaMalloc((void**)(&norm_factors_),
+                        norm_factors.size() * sizeof(GNNFloat)));
+  CUDA_CHECK(cudaMemcpy(norm_factors_, norm_factors.data(),
+                        norm_factors.size() * sizeof(GNNFloat),
+                        cudaMemcpyHostToDevice));
+}
