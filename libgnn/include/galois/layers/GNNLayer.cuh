@@ -29,6 +29,10 @@ public:
   //! Prints forward output matrix on gpu
   void PrintForwardOutput(size_t num);
 
+  //! Does dropout on the GPU; saves non-dropped weights to output
+  void DoDropoutGPU(const PointerWithSize<GNNFloat> input_to_dropout,
+                    PointerWithSize<GNNFloat> output, float dropout_rate);
+
   //! Helper function: give a vector which is copied over to the GPU (new
   //! memory is allocated as necessary)
   GNNFloat* Allocate(const std::vector<GNNFloat>& v);
@@ -44,7 +48,8 @@ private:
   GNNFloat* backward_output_matrix_{nullptr};
   GNNFloat* layer_weights_{nullptr};
   GNNFloat* layer_weight_gradients_{nullptr};
-  GNNFloat* dropout_mask_{nullptr};
+  GNNFloat* rng_results_{nullptr};
+  char* dropout_mask_{nullptr};
 };
 
 } // namespace galois

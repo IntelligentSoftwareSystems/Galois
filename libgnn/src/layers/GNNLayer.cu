@@ -1,4 +1,5 @@
 #include "galois/CUDAUtil.h"
+#include "galois/GNNMath.cuh"
 #include "galois/layers/GNNLayer.cuh"
 
 galois::GNNLayerGPUAllocations::~GNNLayerGPUAllocations() {
@@ -32,8 +33,11 @@ void galois::GNNLayerGPUAllocations::InitWeightMemory(size_t num_weights) {
 
 void galois::GNNLayerGPUAllocations::InitDropoutMemory(size_t dropout_size) {
   CUDA_CHECK(
-      cudaMalloc((void**)(&dropout_mask_), dropout_size * sizeof(GNNFloat)));
-  CUDA_CHECK(cudaMemset(dropout_mask_, 0, dropout_size * sizeof(GNNFloat)));
+      cudaMalloc((void**)(&rng_results_), dropout_size * sizeof(GNNFloat)));
+  CUDA_CHECK(cudaMemset(rng_results_, 0, dropout_size * sizeof(GNNFloat)));
+
+  CUDA_CHECK(cudaMalloc((void**)(&dropout_mask_), dropout_size * sizeof(char)));
+  CUDA_CHECK(cudaMemset(dropout_mask_, 0, dropout_size * sizeof(char)));
 }
 
 void galois::GNNLayerGPUAllocations::CopyToWeights(
@@ -62,6 +66,35 @@ void galois::GNNLayerGPUAllocations::CopyWeightGradientsToCPU(
   CUDA_CHECK(cudaMemcpy(cpu_gradients->data(), layer_weight_gradients_,
                         cpu_gradients->size() * sizeof(GNNFloat),
                         cudaMemcpyDeviceToHost));
+}
+
+namespace {
+
+__global__ void
+DoDropoutImpl(size_t input_size, const galois::GNNFloat* input_to_dropout,
+              galois::GNNFloat* output, const galois::GNNFloat* rng_vector,
+              char* dropout_mask, float dropout_rate, galois::GNNFloat scale) {
+  CUDA_KERNEL_LOOP(i, input_size) {
+    // convert the rng floats into a mask
+    dropout_mask[i] = rng_vector[i] > dropout_rate ? 1 : 0;
+    // use mask to keep/drop weights
+    output[i] = input_to_dropout[i] * dropout_mask[i] * scale;
+  }
+}
+
+} // namespace
+
+void galois::GNNLayerGPUAllocations::DoDropoutGPU(
+    const PointerWithSize<GNNFloat> input_to_dropout,
+    PointerWithSize<GNNFloat> output, float dropout_rate) {
+  // RNG which weights to dropout
+  galois::CuRANDUniformRNG(rng_results_, input_to_dropout.size());
+  GNNFloat scale = 1. / (1. - dropout_rate);
+  // GPU dropout kernel
+  DoDropoutImpl<<<CUDA_GET_BLOCKS(input_to_dropout.size()), CUDA_NUM_THREADS>>>(
+      input_to_dropout.size(), input_to_dropout.data(), output.data(),
+      rng_results_, dropout_mask_, dropout_rate, scale);
+  CUDA_TEST("Dropout on GPU failure");
 }
 
 galois::GNNFloat*

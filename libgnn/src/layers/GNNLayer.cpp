@@ -128,12 +128,12 @@ void galois::GNNLayer::DoDropoutCPU(
 void galois::GNNLayer::DoDropout(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
-  //#ifdef GALOIS_ENABLE_GPU
-  //  // XXX
-  //  DoDropoutGPU();
-  //#else
+#ifdef GALOIS_ENABLE_GPU
+  base_gpu_object_.DoDropoutGPU(input_to_dropout, *output_matrix,
+                                config_.dropout_rate);
+#else
   DoDropoutCPU(input_to_dropout, output_matrix);
-  //#endif
+#endif
 }
 
 void galois::GNNLayer::DoDropoutDerivative() {

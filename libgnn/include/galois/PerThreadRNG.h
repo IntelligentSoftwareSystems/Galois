@@ -26,6 +26,8 @@ public:
   }
   //! Return true or false based on some dropout rate
   bool DoBernoulli(float dropout_rate) {
+    // TODO can the random number be 0? what is the behavior of 0 > 0?
+    // same with 1 > 1.....
     return (GetRandomNumber() > dropout_rate) ? 1 : 0;
   }
 

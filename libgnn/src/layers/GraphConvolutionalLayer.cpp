@@ -53,9 +53,8 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
   if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
-    galois::PointerWithSize<galois::GNNFloat> drop_output(in_temp_1_);
-    DoDropout(input_embeddings, &drop_output);
-    input_data = drop_output.data();
+    DoDropout(input_embeddings, &p_in_temp_1_);
+    input_data = p_in_temp_1_.data();
   }
 
   // flip aggregate/update if dimensions favor it (do less work)
