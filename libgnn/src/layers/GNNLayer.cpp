@@ -20,6 +20,8 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     layer_weight_gradients_.resize(num_weight_elements, 0);
 #ifdef GALOIS_ENABLE_GPU
     base_gpu_object_.InitWeightMemory(num_weight_elements);
+    base_gpu_object_.InitDropoutMemory(layer_dimensions_.input_rows *
+                                       layer_dimensions_.input_columns);
 #endif
 
     GlorotBengioInit(&layer_weights_);

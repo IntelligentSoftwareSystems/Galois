@@ -30,6 +30,12 @@ void galois::GNNLayerGPUAllocations::InitWeightMemory(size_t num_weights) {
                         num_weights * sizeof(GNNFloat)));
 }
 
+void galois::GNNLayerGPUAllocations::InitDropoutMemory(size_t dropout_size) {
+  CUDA_CHECK(
+      cudaMalloc((void**)(&dropout_mask_), dropout_size * sizeof(GNNFloat)));
+  CUDA_CHECK(cudaMemset(dropout_mask_, 0, dropout_size * sizeof(GNNFloat)));
+}
+
 void galois::GNNLayerGPUAllocations::CopyToWeights(
     const std::vector<GNNFloat>& cpu_layer_weights) {
   CUDA_CHECK(cudaMemcpy(layer_weights_, cpu_layer_weights.data(),

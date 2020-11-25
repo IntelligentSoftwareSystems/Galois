@@ -12,6 +12,8 @@ public:
   void InitInOutMemory(size_t forward_size, size_t backward_size);
   //! Initializes memory for weight and weight gradients on GPU
   void InitWeightMemory(size_t num_weights);
+  //! Initializes memory for dropout
+  void InitDropoutMemory(size_t dropout_size);
   //! Copy provided data in vector to GPU weights
   void CopyToWeights(const std::vector<GNNFloat>& cpu_layer_weights);
   //! Copy GPU forward output to the provided vector (assumes vector is already
@@ -42,6 +44,7 @@ private:
   GNNFloat* backward_output_matrix_{nullptr};
   GNNFloat* layer_weights_{nullptr};
   GNNFloat* layer_weight_gradients_{nullptr};
+  GNNFloat* dropout_mask_{nullptr};
 };
 
 } // namespace galois
