@@ -78,7 +78,16 @@ DoDropoutImpl(size_t input_size, const galois::GNNFloat* input_to_dropout,
     // convert the rng floats into a mask
     dropout_mask[i] = rng_vector[i] > dropout_rate ? 1 : 0;
     // use mask to keep/drop weights
-    output[i] = input_to_dropout[i] * dropout_mask[i] * scale;
+    output[i] = input_to_dropout[i] * (float)dropout_mask[i] * scale;
+  }
+}
+
+__global__ void DoDropoutDerivativeImpl(size_t input_size,
+                                        galois::GNNFloat* input,
+                                        char* dropout_mask,
+                                        galois::GNNFloat scale) {
+  CUDA_KERNEL_LOOP(i, input_size) {
+    input[i] = input[i] * (float)dropout_mask[i] * scale;
   }
 }
 
@@ -95,6 +104,13 @@ void galois::GNNLayerGPUAllocations::DoDropoutGPU(
       input_to_dropout.size(), input_to_dropout.data(), output.data(),
       rng_results_, dropout_mask_, dropout_rate, scale);
   CUDA_TEST("Dropout on GPU failure");
+}
+
+void galois::GNNLayerGPUAllocations::DoDropoutDerivativeGPU(size_t input_size,
+                                                            GNNFloat scale) {
+  DoDropoutDerivativeImpl<<<CUDA_GET_BLOCKS(input_size), CUDA_NUM_THREADS>>>(
+      input_size, backward_output_matrix_, dropout_mask_, scale);
+  CUDA_TEST("Dropout derivative on GPU failure");
 }
 
 galois::GNNFloat*

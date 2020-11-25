@@ -128,11 +128,11 @@ void galois::GNNLayer::DoDropoutCPU(
 void galois::GNNLayer::DoDropout(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
-#ifdef GALOIS_ENABLE_GPU
+#ifndef GALOIS_ENABLE_GPU
+  DoDropoutCPU(input_to_dropout, output_matrix);
+#else
   base_gpu_object_.DoDropoutGPU(input_to_dropout, *output_matrix,
                                 config_.dropout_rate);
-#else
-  DoDropoutCPU(input_to_dropout, output_matrix);
 #endif
 }
 
@@ -140,6 +140,7 @@ void galois::GNNLayer::DoDropoutDerivative() {
   assert(backward_output_matrix_.size() == dropout_mask_.size());
   GNNFloat scale = 1. / (1. - config_.dropout_rate);
 
+#ifndef GALOIS_ENABLE_GPU
   // use dropout mask to figure out derivative
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), backward_output_matrix_.size()),
@@ -149,6 +150,10 @@ void galois::GNNLayer::DoDropoutDerivative() {
                                      scale;
       },
       galois::loopname("LayerDropoutDerivative"));
+#else
+  base_gpu_object_.DoDropoutDerivativeGPU(p_backward_output_matrix_.size(),
+                                          scale);
+#endif
 }
 
 void galois::GNNLayer::Activation() {

@@ -14,7 +14,7 @@ int main() {
 
   // load graph
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "reddit", galois::graphs::GNNPartitionScheme::kCVC, true);
+      "cora", galois::graphs::GNNPartitionScheme::kCVC, true);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
@@ -22,7 +22,7 @@ int main() {
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
   galois::GNNLayerConfig layer_config;
-  layer_config.do_dropout       = false;
+  layer_config.do_dropout       = true;
   layer_config.do_activation    = false;
   layer_config.do_normalization = true;
   // XXX Activation kills accuracy compared to old code, esp. for cora
@@ -46,7 +46,7 @@ int main() {
   // increasing
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
-  for (size_t epoch = 0; epoch < 20; epoch++) {
+  for (size_t epoch = 0; epoch < 100; epoch++) {
     galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
     if (cpu_pred.size() != predictions.size()) {
       cpu_pred.resize(predictions.size());

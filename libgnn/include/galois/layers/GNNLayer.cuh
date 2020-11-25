@@ -32,6 +32,8 @@ public:
   //! Does dropout on the GPU; saves non-dropped weights to output
   void DoDropoutGPU(const PointerWithSize<GNNFloat> input_to_dropout,
                     PointerWithSize<GNNFloat> output, float dropout_rate);
+  //! Does dropout derivative on the backward output matrix of the gpu
+  void DoDropoutDerivativeGPU(size_t input_size, GNNFloat scale);
 
   //! Helper function: give a vector which is copied over to the GPU (new
   //! memory is allocated as necessary)
