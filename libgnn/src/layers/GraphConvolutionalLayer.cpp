@@ -172,7 +172,8 @@ void galois::GraphConvolutionalLayer::AggregateAll(
   AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
 #else
   gpu_object_.AggregateAllGPU(graph_.GetGPUGraph(), graph_.size(),
-                              column_length, node_embeddings, aggregate_output);
+                              column_length, node_embeddings, aggregate_output,
+                              config_.do_normalization);
 #endif
 }
 

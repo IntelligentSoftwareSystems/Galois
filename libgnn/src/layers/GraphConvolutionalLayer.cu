@@ -23,6 +23,7 @@ namespace {
 __global__ void AggregateAllKernel(unsigned num_nodes, size_t column_length,
                                    const int* edge_index,
                                    const int* edge_destination,
+                                   const galois::GNNFloat* norm_factors,
                                    const galois::GNNFloat* node_embeddings,
                                    galois::GNNFloat* aggregate_output) {
   const unsigned thread_id =
@@ -41,6 +42,13 @@ __global__ void AggregateAllKernel(unsigned num_nodes, size_t column_length,
 
   // each warp works on a source: threads in warp split the feature
   for (int src = warp_id; src < static_cast<int>(num_nodes); src += num_warps) {
+    galois::GNNFloat src_norm    = 0.0;
+    galois::GNNFloat norm_to_use = 1.0;
+
+    if (norm_factors != nullptr) {
+      src_norm = norm_factors[src];
+    }
+
     if (thread_lane < 2) {
       edge_begin_end[warp_lane][thread_lane] = edge_index[src + thread_lane];
     }
@@ -56,19 +64,20 @@ __global__ void AggregateAllKernel(unsigned num_nodes, size_t column_length,
       int dst                 = edge_destination[offset];
       unsigned base_dst_index = dst * column_length;
 
+      if (norm_factors != nullptr) {
+        // note that otherwise it's 1.0, so a no-op when it comes to multiply
+        norm_to_use = src_norm * norm_factors[dst];
+      }
+
       // NOTE: this is where warp diverges
       // the feature aggregation is split among thread in a warp
       for (int i = 0; i < column_length; i += WARP_SIZE) {
         if ((thread_lane + i) < column_length) {
           aggregate_output[base_src_index + thread_lane + i] +=
-              node_embeddings[base_dst_index + thread_lane + i];
+              node_embeddings[base_dst_index + thread_lane + i] * norm_to_use;
         }
       }
     }
-    //__syncthreads();
-    // if (thread_lane == 0) {
-    //  printf("Agg %d %f\n", src, aggregate_output[base_src_index]);
-    //}
   }
 }
 
@@ -77,12 +86,20 @@ __global__ void AggregateAllKernel(unsigned num_nodes, size_t column_length,
 void galois::GCNGPUAllocations::AggregateAllGPU(
     const graphs::GNNGraphGPUAllocations& gpu_graph, size_t num_nodes,
     size_t column_length, const GNNFloat* node_embeddings,
-    GNNFloat* aggregate_output) {
+    GNNFloat* aggregate_output, bool use_norm) {
   CUDA_CHECK(cudaMemset(aggregate_output, 0,
                         num_nodes * column_length * sizeof(GNNFloat)));
-  AggregateAllKernel<<<(num_nodes - 1) / WARPS_PER_BLOCK + 1, BLOCK_SIZE>>>(
-      num_nodes, column_length, gpu_graph.edge_index(),
-      gpu_graph.edge_destinations(), node_embeddings, aggregate_output);
+  if (use_norm) {
+    AggregateAllKernel<<<(num_nodes - 1) / WARPS_PER_BLOCK + 1, BLOCK_SIZE>>>(
+        num_nodes, column_length, gpu_graph.edge_index(),
+        gpu_graph.edge_destinations(), gpu_graph.norm_factors(),
+        node_embeddings, aggregate_output);
+  } else {
+    AggregateAllKernel<<<(num_nodes - 1) / WARPS_PER_BLOCK + 1, BLOCK_SIZE>>>(
+        num_nodes, column_length, gpu_graph.edge_index(),
+        gpu_graph.edge_destinations(), nullptr, node_embeddings,
+        aggregate_output);
+  }
   CUDA_TEST("GPU aggregate all failure");
 }
 

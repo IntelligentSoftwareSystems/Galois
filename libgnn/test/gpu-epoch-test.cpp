@@ -46,7 +46,7 @@ int main() {
   // increasing
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
-  for (size_t epoch = 0; epoch < 50; epoch++) {
+  for (size_t epoch = 0; epoch < 20; epoch++) {
     galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
     if (cpu_pred.size() != predictions.size()) {
       cpu_pred.resize(predictions.size());

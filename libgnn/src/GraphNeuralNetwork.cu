@@ -21,6 +21,7 @@ float galois::GraphNeuralNetworkGPU::GetGlobalAccuracyGPU(
   }
 
   // run accuracy check kernel on GPU
+  // TODO finish this implementation
 
   return 0.0;
 }

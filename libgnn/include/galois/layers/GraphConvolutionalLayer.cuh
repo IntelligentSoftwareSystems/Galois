@@ -18,7 +18,7 @@ public:
   void AggregateAllGPU(const graphs::GNNGraphGPUAllocations& gpu_graph,
                        size_t num_nodes, size_t column_length,
                        const GNNFloat* node_embeddings,
-                       GNNFloat* aggregate_output);
+                       GNNFloat* aggregate_output, bool use_norm);
 
   void UpdateEmbeddingsGPU(size_t num_nodes, size_t input_columns,
                            size_t output_columns,

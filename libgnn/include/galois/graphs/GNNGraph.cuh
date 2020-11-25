@@ -29,12 +29,11 @@ public:
   GNNFeature* feature_vector() const { return feature_vector_; };
   int* edge_index() const { return edge_index_; }
   int* edge_destinations() const { return edge_destinations_; }
-
   GNNLabel* ground_truth() const { return ground_truth_; }
-
   char* local_training_mask() const { return local_training_mask_; }
   char* local_validation_mask() const { return local_validation_mask_; }
   char* local_testing_mask() const { return local_testing_mask_; }
+  GNNFloat* norm_factors() const { return norm_factors_; }
 
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
