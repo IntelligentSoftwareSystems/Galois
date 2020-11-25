@@ -16,6 +16,15 @@ void galois::InitCuRAND() {
   galois::curand_is_init = true;
 }
 
+void galois::CuRANDUniformRNG(GNNFloat* array_to_fill, size_t num_elements) {
+  // TODO how much overhead does this check have?
+  if (!galois::curand_is_init) {
+    galois::InitCuRAND();
+  }
+  CURAND_CHECK(curandGenerateUniform(galois::global_curand_generator,
+                                     array_to_fill, num_elements));
+}
+
 void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            const cublasOperation_t trans_b, size_t input_rows,
                            size_t input_columns, size_t output_columns,

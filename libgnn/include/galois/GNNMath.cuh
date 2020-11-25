@@ -15,6 +15,9 @@ void InitCuBLAS();
 //! Initializes the curand RNG
 void InitCuRAND();
 
+//! Initializes an array with random numbers (0.0, 1.0]
+void CuRANDUniformRNG(GNNFloat* array_to_fill, size_t num_elements);
+
 //! Takes 2 *row-major* matrices and does a matrix multiply on the GPU using
 //! CuBLAS.
 void CBlasSGEMMGPU(const cublasOperation_t trans_a,
