@@ -2,8 +2,19 @@
 
 bool galois::cublas_is_init = false;
 cublasHandle_t galois::global_cublas_handle;
+bool galois::curand_is_init = false;
+curandGenerator_t galois::global_curand_generator;
 
-void galois::InitCuBLAS() { CUBLAS_CHECK(cublasCreate(&global_cublas_handle)); }
+void galois::InitCuBLAS() {
+  CUBLAS_CHECK(cublasCreate(&global_cublas_handle));
+  galois::cublas_is_init = true;
+}
+
+void galois::InitCuRAND() {
+  CURAND_CHECK(curandCreateGenerator(&galois::global_curand_generator,
+                                     CURAND_RNG_PSEUDO_DEFAULT));
+  galois::curand_is_init = true;
+}
 
 void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            const cublasOperation_t trans_b, size_t input_rows,
@@ -12,7 +23,6 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            GNNFloat* output) {
   if (!cublas_is_init) {
     InitCuBLAS();
-    cublas_is_init = true;
   }
   size_t lead_dim_a = (trans_a == CUBLAS_OP_N) ? input_columns : input_rows;
   size_t lead_dim_b = (trans_b == CUBLAS_OP_N) ? output_columns : input_columns;

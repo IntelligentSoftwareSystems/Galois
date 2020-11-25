@@ -7,9 +7,13 @@ namespace galois {
 
 extern bool cublas_is_init;
 extern cublasHandle_t global_cublas_handle;
+extern bool curand_is_init;
+extern curandGenerator_t global_curand_generator;
 
 //! Initializes the cublas handle to use cublas on GPUs.
 void InitCuBLAS();
+//! Initializes the curand RNG
+void InitCuRAND();
 
 //! Takes 2 *row-major* matrices and does a matrix multiply on the GPU using
 //! CuBLAS.

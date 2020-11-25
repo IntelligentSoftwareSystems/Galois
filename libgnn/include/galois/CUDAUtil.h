@@ -6,6 +6,7 @@
 //! https://github.com/BVLC/caffe/blob/master/include/caffe/util/device_alternate.hpp
 #include <cuda.h>
 #include <cublas_v2.h>
+#include <curand.h>
 #include "galois/Logging.h"
 
 // TODO check these too and make sure they make sense
@@ -67,6 +68,16 @@ inline int CUDA_GET_BLOCKS(const int N) {
     cublasStatus_t status = condition;                                         \
     if (status != CUBLAS_STATUS_SUCCESS) {                                     \
       GALOIS_LOG_ERROR("CuBLAS error code : {}", status);                      \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
+//! Wrap a CuRAND call with this to check if it threw any errors
+#define CURAND_CHECK(condition)                                                \
+  do {                                                                         \
+    curandStatus_t status = condition;                                         \
+    if (status != CURAND_STATUS_SUCCESS) {                                     \
+      GALOIS_LOG_ERROR("CuRAND error code : {}", status);                      \
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   } while (0)

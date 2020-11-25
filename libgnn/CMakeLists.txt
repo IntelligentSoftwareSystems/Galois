@@ -47,8 +47,8 @@ if (GALOIS_ENABLE_GPU)
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
-  # link to gpu lib (which takes care of moderngpu and cub)
-  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support -lcublas)
+  # link to gpu lib (which takes care of moderngpu and cub) as well as cu libs
+  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support -lcublas -lcurand)
 
   # gpu -> cpu lib
   target_link_libraries(galois_gnn galois_gnn_gpu)
