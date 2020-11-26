@@ -489,11 +489,11 @@ int main(int argc, char** argv) {
     toProcess = toProcessNew;
     toProcessNew.clear();
   } // end while
-  std::cout<<"Coarsening time(s): "<<Ctime<<"\n";
-  std::cout<<"Partitiong time(s): "<<Ptime<<"\n";
-  std::cout<<"Refinement time(s): "<<Rtime<<"\n";
+  std::cout<<"Coarsening time(s):,"<<Ctime<<"\n";
+  std::cout<<"Partitiong time(s):,"<<Ptime<<"\n";
+  std::cout<<"Refinement time(s):,"<<Rtime<<"\n";
   std::cout<<"\n";
-  std::cout<<"Edge Cut "<<computingCut(graph)<<"\n\n";
+  std::cout<<"Edge Cut,"<<computingCut(graph)<<"\n\n";
 
   galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
   galois::runtime::reportStat_Single("BiPart", "zero-one",
