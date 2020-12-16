@@ -10,7 +10,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
-      galois::iterate(graph_.begin(), graph_.end()),
+      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned i) {
         if (graph_.IsValidForPhase(i, layer_phase_)) {
           // do softmax
@@ -60,7 +60,7 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
   backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
 
   galois::do_all(
-      galois::iterate(graph_.begin(), graph_.end()),
+      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned i) {
         if (graph_.IsValidForPhase(i, layer_phase_)) {
           // create ground truth vector for this LID

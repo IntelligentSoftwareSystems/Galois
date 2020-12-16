@@ -89,6 +89,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
   assert(layer_phase_ == GNNPhase::kTrain);
+
   // derivative of activation
   if (config_.do_activation) {
     ActivationDerivative(input_gradient);
@@ -153,7 +154,8 @@ galois::GraphConvolutionalLayer::BackwardPhase(
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
   // TODO figure out how to do this with GPUs
-  WeightGradientSyncAverage();
+  // WeightGradientSyncAverage();
+  WeightGradientSyncSum();
 
   if (config_.do_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
