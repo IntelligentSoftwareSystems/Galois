@@ -46,6 +46,8 @@ void adam::update(const vec_t& dW, vec_t& W) {
       },
       galois::chunk_size<256>(), galois::steal(),
       galois::loopname("adam_update"));
+  // TODO/NOTE: this is incorrect: adam parameters should not be shared
+  // among layers, but this is making it shared
   b1_t *= b1;
   b2_t *= b2;
 }

@@ -49,7 +49,7 @@ protected:
   vec_t& get(const vec_t& key) {
     static_assert(Index < N, "index out of range");
     if (E_[Index][&key].empty())
-      E_[Index][&key].resize(key.size(), float_t());
+      E_[Index][&key].resize(key.size(), float_t(0));
     return E_[Index][&key];
   }
   std::unordered_map<const vec_t*, vec_t> E_[N];
