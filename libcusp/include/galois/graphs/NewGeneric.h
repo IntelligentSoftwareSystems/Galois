@@ -100,6 +100,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     } else if (filename.find("tester") != std::string::npos) {
       bps.push_back(0);
       bps.push_back(5);
+    } else if (filename.find("ogbn-arxiv") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(169251);
+    } else if (filename.find("ogbn-products") != std::string::npos) {
+      bps.push_back(0);
+      bps.push_back(196614);
     } else {
       // XXX only die under certain conditions
       // GALOIS_DIE("invalid input for gnn partitioning ", filename,
