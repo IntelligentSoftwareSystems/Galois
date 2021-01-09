@@ -132,7 +132,13 @@ void galois::graphs::GNNGraph::AggregateSync(
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
   GALOIS_LOG_VERBOSE("[{}] Reading labels from disk...", host_id_);
-  std::string filename = input_directory_ + dataset_name + "-labels.txt";
+  std::string filename;
+  if (has_single_class_label) {
+    filename = input_directory_ + dataset_name + "-labels.txt";
+  } else {
+    filename = input_directory_ + dataset_name + "-mlabels.txt";
+  }
+
   // read file header, save num label classes while at it
   std::ifstream file_stream;
   file_stream.open(filename, std::ios::in);

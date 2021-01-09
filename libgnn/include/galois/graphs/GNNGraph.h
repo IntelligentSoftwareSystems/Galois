@@ -100,6 +100,14 @@ public:
     return local_ground_truth_labels_[lid];
   }
 
+  //! Returns pointer to start of ground truth vector for some local id assuming
+  //! labels are multi-class.
+  const GNNLabel* GetMultiClassLabel(const unsigned lid) const {
+    assert(!using_single_class_labels_);
+    return static_cast<const GNNLabel*>(local_ground_truth_labels_.data() +
+                                        (lid * num_label_classes_));
+  }
+
   //! Return matrix of the local node features
   const PointerWithSize<GNNFloat> GetLocalFeatures() {
 #ifndef GALOIS_ENABLE_GPU

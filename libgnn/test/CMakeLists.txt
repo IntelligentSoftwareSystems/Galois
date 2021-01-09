@@ -38,6 +38,9 @@ if (NOT GALOIS_ENABLE_GPU)
   
   add_executable(weight-sync-test weight-sync-test.cpp)
   target_link_libraries(weight-sync-test galois_gnn)
+
+  add_executable(multilabel-read multilabel-read.cpp)
+  target_link_libraries(multilabel-read galois_gnn)
 else()
   add_executable(gpu-convlayer-test gpu-convlayer-test.cpp)
   target_link_libraries(gpu-convlayer-test galois_gnn)
