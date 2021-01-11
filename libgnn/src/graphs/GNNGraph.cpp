@@ -2,6 +2,7 @@
 #include "galois/Logging.h"
 #include "galois/graphs/ReadGraph.h"
 #include "galois/graphs/GNNGraph.h"
+#include "galois/GNNMath.h"
 #include <limits>
 
 namespace {
@@ -376,6 +377,160 @@ void galois::graphs::GNNGraph::InitNormFactor() {
         }
       },
       galois::loopname("InitNormFactor"));
+}
+
+float galois::graphs::GNNGraph::GetGlobalAccuracy(
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+  // No GPU version yet, but this is where it would be
+  return GetGlobalAccuracyCPU(predictions, phase);
+}
+
+float galois::graphs::GNNGraph::GetGlobalAccuracyCPU(
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+  if (is_single_class_label()) {
+    return GetGlobalAccuracyCPUSingle(predictions, phase);
+  } else {
+    return GetGlobalAccuracyCPUMulti(predictions, phase);
+  }
+}
+
+float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+  // check owned nodes' accuracy
+  assert((num_label_classes_ * size()) == predictions.size());
+  num_correct_.reset();
+  total_checked_.reset();
+
+  galois::do_all(
+      galois::iterate(begin_owned(), end_owned()),
+      [&](const unsigned lid) {
+        if (IsValidForPhase(lid, phase)) {
+          total_checked_ += 1;
+          // get prediction by getting max
+          size_t predicted_label = galois::MaxIndex(
+              num_label_classes_, &(predictions[lid * num_label_classes_]));
+          // check against ground truth and track accordingly
+          // TODO static cast used here is dangerous
+          if (predicted_label ==
+              static_cast<size_t>(GetSingleClassLabel(lid))) {
+            num_correct_ += 1;
+          }
+        }
+      },
+      // steal on as some threads may have nothing to work on
+      galois::steal(), galois::loopname("GlobalAccuracy"));
+
+  size_t global_correct = num_correct_.reduce();
+  size_t global_checked = total_checked_.reduce();
+
+  GALOIS_LOG_VERBOSE("Accuracy: {} / {}", global_correct, global_checked);
+
+  return static_cast<float>(global_correct) /
+         static_cast<float>(global_checked);
+}
+
+float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+
+  const GNNLabel* full_ground_truth = GetMultiClassLabel(0);
+  assert(predictions.size() == (num_label_classes_ * size()));
+
+  size_t global_true_positive  = 0;
+  size_t global_true_negative  = 0;
+  size_t global_false_positive = 0;
+  size_t global_false_negative = 0;
+  size_t global_f1_score       = 0;
+
+  // per class check
+  for (size_t label_class = 0; label_class < num_label_classes_;
+       label_class++) {
+    local_true_positive_.reset();
+    local_true_negative_.reset();
+    local_false_positive_.reset();
+    local_false_negative_.reset();
+
+    // loop through all *owned* nodes (do not want to overcount)
+    galois::do_all(
+        galois::iterate(begin_owned(), end_owned()),
+        [&](const unsigned lid) {
+          if (IsValidForPhase(lid, phase)) {
+            size_t label_index  = lid * num_label_classes_ + label_class;
+            GNNLabel true_label = full_ground_truth[label_index];
+            GNNLabel prediction_is_positive =
+                (predictions[label_index] > 0.5) ? 1 : 0;
+
+            if (true_label && prediction_is_positive) {
+              local_true_positive_ += 1;
+            } else if (true_label && !prediction_is_positive) {
+              local_false_negative_ += 1;
+            } else if (!true_label && prediction_is_positive) {
+              local_false_positive_ += 1;
+            } else if (!true_label && !prediction_is_positive) {
+              local_true_negative_ += 1;
+            } else {
+              // all cases should be covered with clauses above, so it should
+              // NEVER get here; adding it here just for sanity purposes
+              GALOIS_LOG_FATAL(
+                  "Logic error with true label and prediction label");
+            }
+          }
+          total_checked_ += 1;
+        },
+        galois::steal(), galois::loopname("GlobalMultiAccuracy"));
+
+    // reduce from accumulators across all hosts for this particular class
+    size_t class_true_positives  = local_true_positive_.reduce();
+    size_t class_false_positives = local_false_positive_.reduce();
+    size_t class_true_negatives  = local_true_negative_.reduce();
+    size_t class_false_negatives = local_false_negative_.reduce();
+
+    // add to global counts
+    global_true_positive += class_true_positives;
+    global_false_positive += class_false_positives;
+    global_true_negative += class_true_negatives;
+    global_false_negative += class_false_negatives;
+
+    // calculate precision, recall, and f1 score for this class
+    // ternery op used to avoid division by 0
+    double class_precision =
+        (class_true_positives + class_true_negatives) > 0
+            ? static_cast<double>(class_true_positives) /
+                  (class_true_positives + class_false_positives)
+            : 0.0;
+    double class_recall =
+        (class_true_positives + class_false_negatives) > 0
+            ? static_cast<double>(class_true_positives) /
+                  (class_true_positives + class_false_negatives)
+            : 0.0;
+    double class_f1_score = (class_precision + class_recall) > 0
+                                ? (2.0 * (class_precision * class_recall)) /
+                                      (class_precision + class_recall)
+                                : 0.0;
+
+    global_f1_score += class_f1_score;
+  } // end label class loop
+
+  // double global_f1_macro_score = global_f1_score / num_label_classes_;
+
+  // micro = considers all classes for precision/recall
+  double global_micro_precision =
+      (global_true_positive + global_true_negative) > 0
+          ? static_cast<double>(global_true_positive) /
+                (global_true_positive + global_false_positive)
+          : 0.0;
+  double global_micro_recall =
+      (global_true_positive + global_false_negative) > 0
+          ? static_cast<double>(global_true_positive) /
+                (global_true_positive + global_false_negative)
+          : 0.0;
+
+  double global_f1_micro_score =
+      (global_micro_precision + global_micro_recall) > 0
+          ? (2.0 * (global_micro_precision * global_micro_recall)) /
+                (global_micro_precision + global_micro_recall)
+          : 0.0;
+
+  return global_f1_micro_score;
 }
 
 #ifdef GALOIS_ENABLE_GPU

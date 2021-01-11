@@ -14,21 +14,13 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
 
-  GALOIS_LOG_VERBOSE("reddit with multilabel, oec");
-  galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kOEC,
-                           false);
+  // multi level reading tested in another test
   GALOIS_LOG_VERBOSE("reddit with single label, oec");
   galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kOEC,
                            true);
-  GALOIS_LOG_VERBOSE("reddit with multilabel, cvc");
-  galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kCVC,
-                           false);
   GALOIS_LOG_VERBOSE("reddit with single label, cvc");
   galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kCVC,
                            true);
 
-  // TODO fix citeseer and goec
-  // galois::graphs::GNNGraph("citeseer",
-  // galois::graphs::GNNPartitionScheme::kOEC, false);
   return 0;
 }

@@ -55,7 +55,9 @@ public:
   size_t node_feature_length() const { return node_feature_length_; }
 
   //! Return the number of label classes (i.e. number of possible outputs)
-  size_t GetNumLabelClasses() const { return num_label_classes_; };
+  size_t GetNumLabelClasses() const { return num_label_classes_; }
+
+  bool is_single_class_label() const { return using_single_class_labels_; }
 
   //////////////////////////////////////////////////////////////////////////////
   // Graph accessors
@@ -92,6 +94,9 @@ public:
     return partitioned_graph_->getEdgeDst(ei);
   };
   GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
+
+  float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions,
+                          GNNPhase phase);
 
   //! Returns the ground truth label of some local id assuming labels are single
   //! class labels.
@@ -139,6 +144,13 @@ public:
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
 #endif
 private:
+  float GetGlobalAccuracyCPU(PointerWithSize<GNNFloat> predictions,
+                             GNNPhase phase);
+  float GetGlobalAccuracyCPUSingle(PointerWithSize<GNNFloat> predictions,
+                                   GNNPhase phase);
+  float GetGlobalAccuracyCPUMulti(PointerWithSize<GNNFloat> predictions,
+                                  GNNPhase phase);
+
   //! Directory for input data
   const std::string input_directory_;
   //! In a multi-host setting, this variable stores the host id that the graph
@@ -222,6 +234,15 @@ private:
   //! memory and copies things over
   void InitGPUMemory();
 #endif
+  //! Used to track accurate predictions during accuracy calculation
+  DGAccumulator<size_t> num_correct_;
+  //! Used to count total number of things checked during accuracy calculation
+  DGAccumulator<size_t> total_checked_;
+  // Below are used for multi-class accuracy
+  DGAccumulator<size_t> local_true_positive_;
+  DGAccumulator<size_t> local_true_negative_;
+  DGAccumulator<size_t> local_false_positive_;
+  DGAccumulator<size_t> local_false_negative_;
 };
 
 } // namespace graphs

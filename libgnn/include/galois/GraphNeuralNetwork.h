@@ -146,9 +146,9 @@ public:
   //! @returns Output layer's output
   const PointerWithSize<GNNFloat> DoInference();
 
+  //! Returns classification accuracy for single class label or micro F1 score
+  //! for multi-class predictions; this calls into GNNGraph's accuracy call
   float GetGlobalAccuracy(const PointerWithSize<GNNFloat> predictions);
-
-  float GetGlobalAccuracyCPU(const PointerWithSize<GNNFloat> predictions);
 
   //! Backpropagate gradients from the output layer backwards through the
   //! network to update the layer weights. Also known as a backward phase in
@@ -166,10 +166,7 @@ private:
   std::vector<std::unique_ptr<galois::GNNLayer>> gnn_layers_;
   //! Current phase of the GNN: train, validation, test
   GNNPhase phase_{GNNPhase::kTrain};
-  //! Used to track accurate predictions during accuracy calculation
-  DGAccumulator<size_t> num_correct_;
-  //! Used to count total number of things checked during accuracy calculation
-  DGAccumulator<size_t> total_checked_;
+
 #ifdef GALOIS_ENABLE_GPU
   //! Holds all GPU functions
   GraphNeuralNetworkGPU gpu_object_;

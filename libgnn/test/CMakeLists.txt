@@ -41,6 +41,11 @@ if (NOT GALOIS_ENABLE_GPU)
 
   add_executable(multilabel-read multilabel-read.cpp)
   target_link_libraries(multilabel-read galois_gnn)
+  add_test(NAME multilabel-read COMMAND multilabel-read)
+
+  add_executable(f1-test f1-test.cpp)
+  target_link_libraries(f1-test galois_gnn)
+  add_test(NAME f1-test COMMAND f1-test)
 else()
   add_executable(gpu-convlayer-test gpu-convlayer-test.cpp)
   target_link_libraries(gpu-convlayer-test galois_gnn)
