@@ -59,6 +59,20 @@ llvm::cl::opt<bool>
                                "features based on their degree"),
                      cll::init(true));
 
+llvm::cl::opt<galois::GNNOutputLayerType> output_layer_type(
+    "outputLayer", cll::desc("Type of output layer"),
+    cll::values(clEnumValN(galois::GNNOutputLayerType::kSoftmax, "softmax",
+                           "Softmax (default)"),
+                clEnumValN(galois::GNNOutputLayerType::kSigmoid, "sigmoid",
+                           "Sigmoid")),
+    cll::init(galois::GNNOutputLayerType::kSoftmax));
+
+llvm::cl::opt<bool>
+    multiclass_labels("multiclassLabels",
+                      cll::desc("If true (off by default), use multi-class "
+                                "ground truth; required for some inputs"),
+                      cll::init(false));
+
 llvm::cl::opt<bool>
     agg_after_update("allowAggregationAfterUpdate",
                      cll::desc("If true (on by default), allows aggregate to "
@@ -161,7 +175,7 @@ std::unique_ptr<galois::GraphNeuralNetwork>
 InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
   // partition/load graph
   auto gnn_graph = std::make_unique<galois::graphs::GNNGraph>(
-      input_directory, input_name, partition_scheme, true);
+      input_directory, input_name, partition_scheme, !multiclass_labels);
 
   // create layer types vector
   std::vector<galois::GNNLayerType> layer_types;
@@ -174,10 +188,9 @@ InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
   // layer config object
   galois::GNNLayerConfig layer_config = CreateLayerConfig();
   // GNN config object
-  // TODO output type should be configurable
-  galois::GraphNeuralNetworkConfig gnn_config(
-      num_layers, layer_types, layer_sizes_vector,
-      galois::GNNOutputLayerType::kSoftmax, layer_config);
+  galois::GraphNeuralNetworkConfig gnn_config(num_layers, layer_types,
+                                              layer_sizes_vector,
+                                              output_layer_type, layer_config);
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
 

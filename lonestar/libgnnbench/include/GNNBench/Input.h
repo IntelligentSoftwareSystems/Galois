@@ -21,7 +21,10 @@ extern llvm::cl::opt<bool> do_activation;
 // TODO activation layer type once more are supported
 //! Controls weight normalization based on degree
 extern llvm::cl::opt<bool> do_normalization;
-// TODO output layer type
+//! Output layer type
+extern llvm::cl::opt<galois::GNNOutputLayerType> output_layer_type;
+//! If true, use multiclass ground truth
+extern llvm::cl::opt<bool> multiclass_labels;
 // TODO optimizer type
 //! Toggles an optimization that flips aggregate/update step if it would be
 //! beneficial
