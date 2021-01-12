@@ -22,13 +22,6 @@ namespace galois {
 //! determine how the network gets constructed.
 class GraphNeuralNetworkConfig {
 public:
-  // default move, no copy
-  GraphNeuralNetworkConfig()                                = delete;
-  GraphNeuralNetworkConfig(const GraphNeuralNetworkConfig&) = delete;
-  GraphNeuralNetworkConfig& operator=(const GraphNeuralNetworkConfig&) = delete;
-  GraphNeuralNetworkConfig(GraphNeuralNetworkConfig&&) = default;
-  GraphNeuralNetworkConfig& operator=(GraphNeuralNetworkConfig&&) = default;
-
   //! Construction without a config for layers specified; uses a default
   GraphNeuralNetworkConfig(size_t num_layers,
                            const std::vector<GNNLayerType>& layer_types,

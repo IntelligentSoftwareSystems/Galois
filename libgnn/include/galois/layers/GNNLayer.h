@@ -20,9 +20,8 @@ enum class GNNLayerType {
   // TODO SAGE and GAT
 };
 
-// TODO Sigmoid
 //! Supported output layer types in the GNN
-enum class GNNOutputLayerType { kInvalid, kSoftmax };
+enum class GNNOutputLayerType { kInvalid, kSoftmax, kSigmoid };
 
 //! Struct holding the dimensions of a layer. Assumption is that a layer takes
 //! a matrix and outputs another matrix with a different # of columns (e.g.

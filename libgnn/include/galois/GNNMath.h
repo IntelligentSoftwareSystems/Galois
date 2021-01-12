@@ -28,10 +28,17 @@ void GNNSoftmaxDerivative(const size_t vector_length,
 galois::GNNFloat GNNCrossEntropy(const size_t vector_length,
                                  const GNNFloat* ground_truth,
                                  const GNNFloat* input);
+
 //! Derivative of cross entropy; gradients saved into an output vector.
+template <typename TruthType>
 void GNNCrossEntropyDerivative(const size_t vector_length,
-                               const GNNFloat* ground_truth,
-                               const GNNFloat* input, GNNFloat* gradients);
+                               const TruthType* ground_truth,
+                               const GNNFloat* input, GNNFloat* gradients) {
+  for (size_t i = 0; i < vector_length; i++) {
+    gradients[i] = -(ground_truth[i]) / (input[i] + static_cast<float>(1e-10));
+  }
+}
+
 //! Calls into a library BLAS call to do matrix muliply; uses default alpha/beta
 void CBlasSGEMM(const CBLAS_TRANSPOSE trans_a, const CBLAS_TRANSPOSE trans_b,
                 size_t input_rows, size_t input_columns, size_t output_columns,

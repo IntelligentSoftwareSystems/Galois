@@ -81,6 +81,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // performance critical
     std::vector<uint32_t> bps;
 
+    // TODO(loc) avoid this entirely and load it from file...
     // if through all possible GNN outputs
     if (filename.find("cora") != std::string::npos) {
       bps.push_back(0);
@@ -106,12 +107,20 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     } else if (filename.find("ogbn-products") != std::string::npos) {
       bps.push_back(0);
       bps.push_back(196615);
+    } else if (filename.find("yelp") != std::string::npos) {
+      // this is entire graph: yelp's mask isn't contiguous
+      bps.push_back(0);
+      bps.push_back(716847);
+    } else if (filename.find("amazon") != std::string::npos) {
+      // this is entire graph: amazon's mask isn't contiguous
+      bps.push_back(0);
+      bps.push_back(1569960);
     } else {
-      // XXX only die under certain conditions
+      // TODO(loc) only die under certain conditions; don't die if something
+      // is missing
       // GALOIS_DIE("invalid input for gnn partitioning ", filename,
       //           " hardcode needed");
     }
-    // TODO hardcode the rest
 
     return bps;
   }

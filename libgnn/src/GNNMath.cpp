@@ -107,15 +107,6 @@ galois::GNNFloat galois::GNNCrossEntropy(const size_t vector_length,
   return loss;
 }
 
-void galois::GNNCrossEntropyDerivative(const size_t vector_length,
-                                       const GNNFloat* ground_truth,
-                                       const GNNFloat* input,
-                                       GNNFloat* gradients) {
-  for (size_t i = 0; i < vector_length; i++) {
-    gradients[i] = -(ground_truth[i]) / (input[i] + static_cast<float>(1e-10));
-  }
-}
-
 void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
                         const CBLAS_TRANSPOSE trans_b, size_t input_rows,
                         size_t input_columns, size_t output_columns,

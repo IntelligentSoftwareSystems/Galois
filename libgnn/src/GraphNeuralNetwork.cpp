@@ -2,6 +2,7 @@
 #include "galois/GraphNeuralNetwork.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
 #include "galois/layers/SoftmaxLayer.h"
+#include "galois/layers/SigmoidLayer.h"
 
 galois::GraphNeuralNetwork::GraphNeuralNetwork(
     std::unique_ptr<galois::graphs::GNNGraph> graph,
@@ -54,8 +55,21 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     gnn_layers_.push_back(std::move(std::make_unique<SoftmaxLayer>(
         config_.num_intermediate_layers(), *graph_, output_dims)));
     break;
+  case (GNNOutputLayerType::kSigmoid):
+    gnn_layers_.push_back(std::move(std::make_unique<SigmoidLayer>(
+        config_.num_intermediate_layers(), *graph_, output_dims)));
+    break;
   default:
     GALOIS_LOG_FATAL("Invalid layer type during network construction");
+  }
+
+  // sanity checking multi-class + output layer
+  if (!graph_->is_single_class_label() &&
+      (config_.output_layer_type() != GNNOutputLayerType::kSigmoid)) {
+    GALOIS_LOG_WARN(
+        "Using a non-sigmoid output layer with a multi-class label!");
+    // if debug mode just kill program
+    assert(false);
   }
 }
 

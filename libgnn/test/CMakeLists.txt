@@ -30,12 +30,16 @@ if (NOT GALOIS_ENABLE_GPU)
   add_executable(epoch-test epoch-test.cpp)
   target_link_libraries(epoch-test galois_gnn)
   add_test(NAME epoch-test COMMAND epoch-test)
-  
+
+  add_executable(multilabel-epoch-test multilabel-epoch-test.cpp)
+  target_link_libraries(multilabel-epoch-test galois_gnn)
+  add_test(NAME multilabel-epoch-test COMMAND multilabel-epoch-test)
+
   # TODO figure out how to make this test run in parallel
   add_executable(aggregate-sync-test aggregate-sync-test.cpp)
   target_link_libraries(aggregate-sync-test galois_gnn)
   #add_test(NAME aggregate-sync-test COMMAND GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=4 ./aggregate-sync-test)
-  
+
   add_executable(weight-sync-test weight-sync-test.cpp)
   target_link_libraries(weight-sync-test galois_gnn)
 
