@@ -38,35 +38,22 @@ namespace cll = llvm::cl;
 static cll::opt<std::string>
     inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-static cll::opt<std::string> sourcesToUse("sourcesToUse",
-                                          cll::desc("Whitespace separated list "
-                                                    "of sources in a file to "
-                                                    "use in BC"),
-                                          cll::init(""));
-
-static cll::opt<unsigned int>
-    numOfSources("numOfSources",
-                 cll::desc("Number of sources to compute BC on (default all)"),
-                 cll::init(0));
-
-static llvm::cl::opt<unsigned int>
-    iterLimit("numOfOutSources",
-              llvm::cl::desc("Number of sources WITH EDGES "
-                             " to compute BC on (default is all); does "
-                             "not work with Level BC"),
-              llvm::cl::init(0));
-
-static cll::opt<bool>
-    singleSourceBC("singleSource",
-                   cll::desc("Level: Use for single source BC (default off)"),
-                   cll::init(false));
-
-static cll::opt<uint64_t>
-    startSource("startNode",
-                cll::desc("Level/Outer: Starting source node used for "
-                          "betweeness-centrality (default 0); works with "
-                          "singleSource flag only"),
-                cll::init(0));
+static cll::opt<std::string>
+    startNodesFile("startNodesFile",
+                   cll::desc("File containing whitespace separated list of "
+                             "source nodes; if set, -startNodes is ignored"));
+static cll::opt<std::string> startNodesString(
+    "startNodes",
+    cll::desc("String containing whitespace separated list of source nodes "
+              "(default value \"0\"); ignore if -startNodesFile is used"),
+    cll::init("0"));
+static cll::opt<uint32_t> numStartNodes(
+    "numStartNodes",
+    cll::desc("Number of source nodes for computing betweenness centrality "
+              "(default value 1); if -startNodes or -startNodesFile contain "
+              "more sources, then betweenness centrality is recomputed for "
+              "each set of -numStartNodes"),
+    cll::init(1));
 
 static cll::opt<bool>
     output("output", cll::desc("Output BC (Level/Async) (default: false)"),
@@ -107,6 +94,36 @@ int main(int argc, char** argv) {
   galois::StatTimer totalTime("TimerTotal");
   totalTime.start();
 
+  std::vector<uint32_t> startNodes;
+  if (!startNodesFile.getValue().empty()) {
+    std::ifstream file(startNodesFile);
+    if (!file.good()) {
+      std::cerr << "Failed to open file: " << startNodesFile << "\n";
+      abort();
+    }
+    startNodes.insert(startNodes.end(), std::istream_iterator<uint64_t>{file},
+                      std::istream_iterator<uint64_t>{});
+  } else {
+    std::istringstream str(startNodesString);
+    startNodes.insert(startNodes.end(), std::istream_iterator<uint64_t>{str},
+                      std::istream_iterator<uint64_t>{});
+  }
+
+  if (numStartNodes > startNodes.size()) {
+    galois::gWarn(numStartNodes, " source nodes are not specified; using ",
+                  startNodes.size(), " source nodes instead");
+    numStartNodes = startNodes.size();
+  }
+
+  if ((startNodes.size() % numStartNodes) != 0) {
+    galois::gWarn(
+        "Ignoring the last ", (startNodes.size() % numStartNodes),
+        " source nodes because -numStartNodes does not divide the number of "
+        "source nodes specified using -startNodes or -startNodesFile");
+    size_t truncate = (startNodes.size() / numStartNodes) * numStartNodes;
+    startNodes.resize(truncate);
+  }
+
   if (algo == AutoAlgo) {
     galois::graphs::FileGraph degreeGraph;
     degreeGraph.fromFile(inputFile);
@@ -121,24 +138,27 @@ int main(int argc, char** argv) {
     galois::gInfo("Choosing ", ALGO_NAMES[algo], " algorithm");
   }
 
-  switch (algo) {
-  case Level:
-    // see LevelStructs.h
-    galois::gInfo("Running level BC");
-    doLevelBC();
-    break;
-  case Async:
-    // see AsyncStructs.h
-    galois::gInfo("Running async BC");
-    doAsyncBC();
-    break;
-  case Outer:
-    // see OuterStructs.h
-    galois::gInfo("Running outer BC");
-    doOuterBC();
-    break;
-  default:
-    GALOIS_DIE("Unknown BC algorithm type");
+  for (size_t i = 0, end = startNodes.size(); i < end; i += numStartNodes) {
+    std::vector<uint32_t> startNodesBatch(
+        startNodes.begin() + i, startNodes.begin() + i + numStartNodes);
+    switch (algo) {
+    case Level:
+      galois::gInfo("Running level BC");
+      doLevelBC(startNodesBatch);
+      break;
+    case Async:
+      // see AsyncStructs.h
+      galois::gInfo("Running async BC");
+      doAsyncBC(startNodesBatch);
+      break;
+    case Outer:
+      // see OuterStructs.h
+      galois::gInfo("Running outer BC");
+      doOuterBC(startNodesBatch);
+      break;
+    default:
+      GALOIS_DIE("Unknown BC algorithm type");
+    }
   }
 
   totalTime.stop();

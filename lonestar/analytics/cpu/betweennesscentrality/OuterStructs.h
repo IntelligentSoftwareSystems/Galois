@@ -289,51 +289,32 @@ struct HasOut {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void doOuterBC() {
+void doOuterBC(const std::vector<uint32_t>& startNodes) {
   OuterGraph g;
   galois::graphs::readGraph(g, inputFile);
+  galois::gInfo("Graph construction complete");
 
-  BCOuter bcOuter(g);
+  for (auto startNode : startNodes) {
+    if (startNode >= g.size()) {
+      std::cerr << "Failed to set start node: " << startNode << "\n";
+      abort();
+    }
+  }
 
   size_t NumNodes = g.size();
 
   // preallocate pages for use in algorithm
-  galois::reportPageAlloc("MeminfoPre");
   galois::preAlloc(galois::getActiveThreads() * NumNodes / 1650);
-  galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoPre");
 
-  // vector of sources to process; initialized if doing outSources
-  std::vector<OuterGNode> v;
-  // preprocessing: find the nodes with out edges we will process and skip
-  // over nodes with no out edges; only done if numOfSources isn't specified
-  if (numOfSources == 0) {
-    // find first node with out edges
-    boost::filter_iterator<HasOut, OuterGraph::iterator> begin =
-        boost::make_filter_iterator(HasOut(&g), g.begin(), g.end());
-    boost::filter_iterator<HasOut, OuterGraph::iterator> end =
-        boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
-    // adjustedEnd = last node we will process based on how many iterations
-    // (i.e. sources) we want to do
-    boost::filter_iterator<HasOut, OuterGraph::iterator> adjustedEnd =
-        iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
+  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
-    size_t iterations = std::distance(begin, adjustedEnd);
-    galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startSource,
-                   " Iterations: ", iterations, "\n");
-    // vector of nodes we want to process
-    v.insert(v.end(), begin, adjustedEnd);
-  }
+  BCOuter bcOuter(g);
 
   // execute algorithm
   galois::StatTimer execTime("Timer_0");
   execTime.start();
-  // either run a contiguous chunk of sources from beginning or run using
-  // sources with outgoing edges only
-  if (numOfSources > 0) {
-    bcOuter.runAll(numOfSources);
-  } else {
-    bcOuter.run(v);
-  }
+  bcOuter.run(startNodes);
   execTime.stop();
 
   bcOuter.printBCValues(0, std::min(10UL, NumNodes), std::cout, 6);
