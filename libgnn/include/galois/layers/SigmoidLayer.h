@@ -14,7 +14,7 @@ public:
                const GNNLayerDimensions& dimensions)
       : GNNLayer(layer_num, graph, dimensions,
                  GNNLayerConfig{.allocate_weights = false}),
-        // input_loss_(dimensions.input_rows),
+        input_loss_(dimensions.input_rows),
         norm_gradient_vectors_(dimensions.input_columns) {
     output_layer_type_ = galois::GNNOutputLayerType::kSigmoid;
     // input/output columns must be equivalent
@@ -36,13 +36,10 @@ public:
 private:
   const PointerWithSize<galois::GNNFloat>
   ForwardPhaseCPU(const PointerWithSize<galois::GNNFloat> input_embeddings);
-
   PointerWithSize<galois::GNNFloat> BackwardPhaseCPU();
 
-  //! Loss for each row of the input; unused for now because loss doesn't
-  //! need to be calculated for correctness
-  // std::vector<GNNFloat> input_loss_;
-
+  //! Loss for each row of the input
+  std::vector<GNNFloat> input_loss_;
   //! Each thread gets storage to allocate the gradients during backward
   //! prop; each is the size of a feature vector
   galois::substrate::PerThreadStorage<std::vector<GNNFloat>>

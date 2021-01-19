@@ -7,10 +7,11 @@
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SigmoidLayer::ForwardPhaseCPU(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
-  // loss is ignored for now anyways
-  // input_loss_.assign(input_loss_.size(), 0.0);
+  input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
+  galois::GAccumulator<double> total_loss;
+  total_loss.reset();
 
   galois::do_all(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
@@ -21,13 +22,21 @@ galois::SigmoidLayer::ForwardPhaseCPU(
           for (unsigned index = 0; index < feature_length; index++) {
             forward_output_matrix_[node_offset + index] =
                 1.0 / (1.0 + expf(-input_embeddings[node_offset + index]));
+            // if (local_node == 0) {
+            //  galois::gPrint(forward_output_matrix_[node_offset + index],
+            //  "\n");
+            //}
           }
-          // TODO(loc) calculate loss (it's not even being used/not required
-          // for correctness so I'm ignoring it for now)
+
+          input_loss_[local_node] = GNNCrossEntropy(
+              feature_length, graph_.GetMultiClassLabel(local_node),
+              &forward_output_matrix_[node_offset]);
+          total_loss += input_loss_[local_node];
         }
       },
       galois::steal(), galois::loopname("SigmoidForward"));
 
+  galois::gPrint("Total loss is ", total_loss.reduce(), "\n");
   return forward_output_matrix_;
 }
 

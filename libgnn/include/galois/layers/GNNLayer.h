@@ -75,6 +75,8 @@ public:
   //! Changes this layer's phase
   void SetLayerPhase(GNNPhase new_phase) { layer_phase_ = new_phase; }
 
+  void DisableActivation() { config_.do_activation = false; }
+
   //! Initializes all layer weights to 1. This is used as a debug function for
   //! testing.
   void InitAllWeightsTo1() {

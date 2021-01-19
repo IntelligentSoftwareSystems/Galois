@@ -1,4 +1,3 @@
-#include <cmath>
 #include <algorithm>
 #include <immintrin.h>
 #include "galois/GNNMath.h"
@@ -81,30 +80,6 @@ void galois::GNNSoftmaxDerivative(const size_t vector_length,
     // output[i] =
     //    cblas_sdot(vector_length, prev_output_derivative, 1, temp_vector, 1);
   }
-}
-
-galois::GNNFloat galois::GNNCrossEntropy(const size_t vector_length,
-                                         const GNNFloat* ground_truth,
-                                         const GNNFloat* input) {
-  GNNFloat loss = 0.0;
-
-  // Note that this function works if there are multiple non-zeros in the
-  // ground truth vector
-  // If there is only 1 then this function is overkill and it should break
-  // early
-  for (size_t i = 0; i < vector_length; i++) {
-    if (ground_truth[i] == 0.0) {
-      continue;
-    }
-
-    if (input[i] == 0.0) {
-      loss -= ground_truth[i] * std::log(static_cast<GNNFloat>(1e-10));
-    } else {
-      loss -= ground_truth[i] * std::log(input[i]);
-    }
-  }
-
-  return loss;
 }
 
 void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,

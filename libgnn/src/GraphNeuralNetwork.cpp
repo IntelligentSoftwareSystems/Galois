@@ -36,6 +36,10 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     case GNNLayerType::kGraphConvolutional:
       gnn_layers_.push_back(std::move(std::make_unique<GraphConvolutionalLayer>(
           i, *graph_, layer_dims, config_.default_layer_config())));
+      if (i == config_.num_intermediate_layers() - 1) {
+        // last layer before output layer should never have activation
+        gnn_layers_.back()->DisableActivation();
+      }
       break;
     default:
       GALOIS_LOG_FATAL("Invalid layer type during network construction");
