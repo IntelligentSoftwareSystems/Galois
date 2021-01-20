@@ -124,9 +124,6 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   Ctime += (T.get()/1000.0f);
   Ptime += (T2.get()/1000.0f);
   Rtime += (T3.get()/1000.0f);
-  //std::cout << "coarsen:," << T.get() << "\n";
-  //std::cout << "clustering:," << T2.get() << '\n';
-  //std::cout << "Refinement:," << T3.get() << "\n";
 
   execTime.stop();
 }
@@ -500,22 +497,23 @@ int main(int argc, char** argv) {
                                      computingBalance(graph));
 
   totalTime.stop();
-
   if (output) {
 
-    std::vector<uint32_t> parts(graph.size() - graph.hedges);
-    std::vector<uint64_t> IDs(graph.size() - graph.hedges);
+    std::vector<std::vector<uint64_t> >parts(numPartitions);
 
     for (GNode n = graph.hedges; n < graph.size(); n++) {
-      parts[n - graph.hedges] = graph.getData(n).getPart();
-      IDs[n - graph.hedges]   = n - graph.hedges + 1;
+      unsigned p = graph.getData(n).getPart();
+      parts[p].push_back(n - graph.hedges + 1);
     }
 
     std::ofstream outputFile(outfile.c_str());
 
-    for (size_t i = 0; i < parts.size(); i++)
-      outputFile << IDs[i] << " " << parts[i] << "\n";
-
+    for (unsigned i = 0; i < numPartitions; i++) {
+      outputFile << i+1 << " ";
+      for (auto v : parts[i]) 
+        outputFile << v << " "; 
+      outputFile << "\n";
+    }
     outputFile.close();
   }
   return 0;
