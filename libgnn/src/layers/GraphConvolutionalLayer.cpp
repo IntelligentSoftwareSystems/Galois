@@ -112,12 +112,13 @@ galois::GraphConvolutionalLayer::BackwardPhase(
                    &input_column_intermediates_);
     }
     // weight gradient calculation
-    // TODO put this in a function to put the ifdef in there
+    // TODO(loc) put this in a function to put the ifdef in there
 #ifndef GALOIS_ENABLE_GPU
+    // temp 2 holds aggregated feature vectors from forward phase
     galois::CBlasSGEMM(
         CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
         layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        prev_layer_input.data(), input_gradient->data(),
+        p_in_temp_2_.data(), input_gradient->data(),
         p_layer_weight_gradients_.data());
 #else
     gpu_object_.GetWeightGradientsGPU(
@@ -189,7 +190,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
       [&](size_t src) {
         size_t index_to_src_feature = src * column_length;
         // zero out src feature first
-        // TODO can init to self as well
+        // TODO(loc) can init to self as well to add to self
         for (size_t i = 0; i < column_length; i++) {
           aggregate_output[index_to_src_feature + i] = 0;
         }
@@ -225,6 +226,18 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
                               &aggregate_output[index_to_src_feature]);
           }
         }
+
+        // GNNFloat* intermediate = pts->getLocal()->data();
+        // GNNFloat norm_scale = source_norm * source_norm;
+        // for (size_t i = 0; i < column_length; i++) {
+        //  intermediate[i] =
+        //      norm_scale * node_embeddings[index_to_src_feature + i];
+        //}
+        //// add self
+        // galois::VectorAdd(column_length,
+        //                  &aggregate_output[index_to_src_feature],
+        //                  intermediate,
+        //                  &aggregate_output[index_to_src_feature]);
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
 

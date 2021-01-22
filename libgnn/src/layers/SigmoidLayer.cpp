@@ -20,17 +20,21 @@ galois::SigmoidLayer::ForwardPhaseCPU(
           size_t node_offset = feature_length * local_node;
           // sigmoid the values for this node
           for (unsigned index = 0; index < feature_length; index++) {
-            forward_output_matrix_[node_offset + index] =
-                1.0 / (1.0 + expf(-input_embeddings[node_offset + index]));
-            // if (local_node == 0) {
-            //  galois::gPrint(forward_output_matrix_[node_offset + index],
-            //  "\n");
-            //}
+            // splitting in half is done for numerical stability of log
+            if (input_embeddings[node_offset + index] >= 0) {
+              forward_output_matrix_[node_offset + index] =
+                  1.0 / (1.0 + expf(-input_embeddings[node_offset + index]));
+            } else {
+              forward_output_matrix_[node_offset + index] =
+                  expf(input_embeddings[node_offset + index]) /
+                  (1.0 + expf(input_embeddings[node_offset + index]));
+            }
           }
 
           input_loss_[local_node] = GNNCrossEntropy(
               feature_length, graph_.GetMultiClassLabel(local_node),
               &forward_output_matrix_[node_offset]);
+          // TODO(loc) normalize the loss
           total_loss += input_loss_[local_node];
         }
       },
@@ -63,18 +67,12 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
           // derivative cross entropy into norm grad
           const GNNLabel* ground_truth = graph_.GetMultiClassLabel(local_node);
           size_t node_offset           = feature_length * local_node;
-          std::vector<GNNFloat>* norm_gradient =
-              norm_gradient_vectors_.getLocal();
-          GNNCrossEntropyDerivative(feature_length, ground_truth,
-                                    &(forward_output_matrix_[node_offset]),
-                                    norm_gradient->data());
-
-          // sigmoid derivative
+          // sigmoid-cross-entropy derivative: turns out all it is is simple
+          // subtraction
           for (unsigned index = 0; index < feature_length; index++) {
             backward_output_matrix_[node_offset + index] =
-                (*norm_gradient)[index] *
-                forward_output_matrix_[node_offset + index] *
-                (1.0 - forward_output_matrix_[node_offset + index]);
+                forward_output_matrix_[node_offset + index] -
+                ground_truth[index];
           }
         }
       },
