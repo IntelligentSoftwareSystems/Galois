@@ -123,7 +123,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 #else
     gpu_object_.GetWeightGradientsGPU(
         layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-        layer_dimensions_.output_columns, prev_layer_input.data(),
+        layer_dimensions_.output_columns, p_in_temp_2_.data(),
         input_gradient->data(), p_layer_weight_gradients_.data());
 #endif
   } else {

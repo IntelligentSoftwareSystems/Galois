@@ -49,7 +49,8 @@ galois::SigmoidLayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
 #ifdef GALOIS_ENABLE_GPU
   // TODO(loc) when GPU needs it
-  return 0;
+  printf("%p\n", input_embeddings.data());
+  return p_layer_weights_;
 #else
   return ForwardPhaseCPU(input_embeddings);
 #endif
@@ -86,7 +87,7 @@ galois::SigmoidLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
                                     PointerWithSize<galois::GNNFloat>*) {
 #ifdef GALOIS_ENABLE_GPU
   // TODO(loc) when GPU needs it
-  return 0;
+  return p_layer_weights_;
 #else
   return BackwardPhaseCPU();
 #endif
