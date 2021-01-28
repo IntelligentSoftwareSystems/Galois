@@ -1,5 +1,9 @@
-//! @file convlayer-test.cpp
+//! @file softmaxlayer-test.cpp
 //! Softmax layer test with a test graph
+//! No automated ground truth checking; when this was written it was compared
+//! manually with pytorch
+//! TODO add in automated checking eventually; for now this just makes sure it
+//! runs
 
 #include "galois/Logging.h"
 #include "galois/GNNMath.h"
@@ -117,7 +121,4 @@ int main() {
     GALOIS_LOG_ASSERT(pd3[i * 7 + 5] == 0.0);
     GALOIS_LOG_ASSERT(pd3[i * 7 + 6] == 0.0);
   }
-
-  // TODO in future maybe: add better test for backward phase besides just
-  // running it
 }

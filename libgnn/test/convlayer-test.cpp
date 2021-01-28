@@ -127,11 +127,11 @@ int main() {
       layer_0->GetLayerWeightGradients();
   // make sure they are sane
   GALOIS_LOG_ASSERT(layer_0_weight_gradients.size() == 6);
-  GALOIS_LOG_ASSERT(layer_0_weight_gradients[0] == 21);
-  GALOIS_LOG_ASSERT(layer_0_weight_gradients[1] == 21);
-  GALOIS_LOG_ASSERT(layer_0_weight_gradients[2] == 21);
-  GALOIS_LOG_ASSERT(layer_0_weight_gradients[3] == 21);
-  GALOIS_LOG_ASSERT(layer_0_weight_gradients[4] == 21);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[0] == 36);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[1] == 36);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[2] == 36);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[3] == 36);
+  GALOIS_LOG_ASSERT(layer_0_weight_gradients[4] == 36);
 
   layer_0.reset();
 
@@ -196,11 +196,11 @@ int main() {
       layer_1->GetLayerWeightGradients();
   // make sure they are sane
   GALOIS_LOG_ASSERT(layer_1_weight_gradients.size() == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 21);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 21);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 21);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 21);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 21);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 36);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 36);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 36);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 36);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 36);
 
   layer_1.reset();
 

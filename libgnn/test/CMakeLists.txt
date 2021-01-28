@@ -11,6 +11,10 @@ if (NOT GALOIS_ENABLE_GPU)
   target_link_libraries(softmaxlayer-test galois_gnn)
   add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
   
+  add_executable(sigmoidlayer-test sigmoidlayer-test.cpp)
+  target_link_libraries(sigmoidlayer-test galois_gnn)
+  add_test(NAME sigmoidlayer-test COMMAND sigmoidlayer-test)
+
   add_executable(gnnconstruct-test gnnconstruct-test.cpp)
   target_link_libraries(gnnconstruct-test galois_gnn)
   add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
