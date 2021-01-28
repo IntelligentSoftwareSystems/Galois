@@ -66,7 +66,9 @@ galois::GraphConvolutionalLayer::ForwardPhase(
     UpdateEmbeddings(p_in_temp_2_.data(), p_forward_output_matrix_.data());
   } else {
     // update to aggregate
+    // FW
     UpdateEmbeddings(input_data, p_out_temp_.data());
+    // A(FW)
     AggregateAll(layer_dimensions_.output_columns, p_out_temp_.data(),
                  p_forward_output_matrix_.data(),
                  &output_column_intermediates_);
@@ -95,6 +97,8 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     ActivationDerivative(input_gradient);
   }
 
+  // AFW = O
+
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
   if (!config_.allow_aggregate_after_update ||
@@ -105,11 +109,15 @@ galois::GraphConvolutionalLayer::BackwardPhase(
              layer_dimensions_.input_rows * layer_dimensions_.output_columns);
       assert(p_in_temp_1_.size() ==
              layer_dimensions_.input_columns * layer_dimensions_.input_rows);
+      // pintemp1 contains (AF)'
       UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
+      // pback contains F'
       // derivative of aggregate is the same due to symmetric graph
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
                    p_backward_output_matrix_.data(),
                    &input_column_intermediates_);
+      // TODO if training A, then A' compute here if layer # is 0
+      // dot product of edges that exist in A
     }
     // weight gradient calculation
     // TODO(loc) put this in a function to put the ifdef in there
@@ -127,16 +135,21 @@ galois::GraphConvolutionalLayer::BackwardPhase(
         input_gradient->data(), p_layer_weight_gradients_.data());
 #endif
   } else {
+    // TODO at this point, out_temp contains memoized FW
+    // can use it to get A' = O' (FW)^T
     // aggregate occurs regardless of layer being equal to 0 because it is
     // required in this case for the weight gradient calculation
+    // this is (FW)'
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
                  p_out_temp_.data(), &output_column_intermediates_);
     if (layer_number_ != 0) {
       // derivative for update
+      // backout = F'
       UpdateEmbeddingsDerivative(p_out_temp_.data(),
                                  p_backward_output_matrix_.data());
     }
     // TODO put this in a function
+    // W' = F^T (FW)'
 #ifndef GALOIS_ENABLE_GPU
     // weight gradient; note the use of the aggregated gradient in out_temp
     galois::CBlasSGEMM(

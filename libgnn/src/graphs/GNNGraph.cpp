@@ -146,6 +146,7 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
   size_t num_nodes;
   file_stream >> num_nodes >> num_label_classes_ >> std::ws;
   assert(num_nodes == partitioned_graph_->globalSize());
+  galois::gPrint("Number of label classes is ", num_label_classes_, "\n");
 
   // allocate memory for labels
   if (has_single_class_label) {
@@ -454,7 +455,8 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
         galois::iterate(begin_owned(), end_owned()),
         [&](const unsigned lid) {
           if (IsValidForPhase(lid, phase)) {
-            size_t label_index  = lid * num_label_classes_ + label_class;
+            size_t label_index = lid * num_label_classes_ + label_class;
+
             GNNLabel true_label = full_ground_truth[label_index];
             GNNLabel prediction_is_positive =
                 (predictions[label_index] > 0.5) ? 1 : 0;
@@ -509,6 +511,9 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
 
     global_f1_score += class_f1_score;
   } // end label class loop
+
+  // GALOIS_LOG_WARN("{} {} {} {}", global_true_positive, global_true_negative,
+  // global_false_positive, global_false_negative);
 
   // double global_f1_macro_score = global_f1_score / num_label_classes_;
 
