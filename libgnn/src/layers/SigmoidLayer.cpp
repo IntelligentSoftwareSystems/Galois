@@ -17,6 +17,11 @@ galois::SigmoidLayer::ForwardPhaseCPU(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
+          if (IsSampledLayer()) {
+            if (!graph_.IsInSampledGraph(local_node))
+              return;
+          }
+
           size_t node_offset = feature_length * local_node;
           // sigmoid the values for this node
           for (unsigned index = 0; index < feature_length; index++) {
@@ -65,6 +70,11 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
+          if (IsSampledLayer()) {
+            if (!graph_.IsInSampledGraph(local_node))
+              return;
+          }
+
           // derivative cross entropy into norm grad
           const GNNLabel* ground_truth = graph_.GetMultiClassLabel(local_node);
           size_t node_offset           = feature_length * local_node;

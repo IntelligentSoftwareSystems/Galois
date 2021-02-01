@@ -150,6 +150,11 @@ public:
   //! to indicate subgraph presence)
   void UniformNodeSample();
 
+  //! Makes a node "sampled"; used for debugging/testing
+  void SetSampledNode(size_t node) { partitioned_graph_->getData(node) = 1; }
+  //! Makes a node "not sampled"; used for debugging/testing
+  void UnsetSampledNode(size_t node) { partitioned_graph_->getData(node) = 0; }
+
   //! Returns true if a particular node is currently considered "in" a sampled
   //! graph
   bool IsInSampledGraph(const NodeIterator& ni) const {

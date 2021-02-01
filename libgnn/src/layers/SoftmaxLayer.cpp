@@ -12,6 +12,11 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   galois::do_all(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned i) {
+        if (IsSampledLayer()) {
+          if (!graph_.IsInSampledGraph(i))
+            return;
+        }
+
         if (graph_.IsValidForPhase(i, layer_phase_)) {
           // do softmax
           GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
@@ -63,6 +68,11 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
       [&](const unsigned i) {
         if (graph_.IsValidForPhase(i, layer_phase_)) {
+          if (IsSampledLayer()) {
+            if (!graph_.IsInSampledGraph(i))
+              return;
+          }
+
           // create ground truth vector for this LID
           // TODO maybe make this part of the graph class instead of recreating
           // every time
