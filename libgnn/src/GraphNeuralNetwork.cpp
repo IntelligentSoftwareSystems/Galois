@@ -75,12 +75,29 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     // if debug mode just kill program
     assert(false);
   }
+
+  // flip sampling
+  if (config_.do_sampling()) {
+    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+      ptr->EnableSampling();
+    }
+  }
 }
 
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
+  if (config_.do_sampling()) {
+    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+      assert(ptr->IsSampledLayer());
+    }
+  }
+
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
+    if (config_.do_sampling()) {
+      // subgraph sample every epoch
+      graph_->UniformNodeSample();
+    }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     GradientPropagation();
     float train_accuracy = GetGlobalAccuracy(predictions);

@@ -130,6 +130,16 @@ void galois::graphs::GNNGraph::AggregateSync(
       "GraphAggregateSync");
 }
 
+void galois::graphs::GNNGraph::UniformNodeSample() {
+  galois::do_all(
+      galois::iterate(begin_owned(), end_owned()), [&](const NodeIterator& x) {
+        partitioned_graph_->getData(*x) = sample_rng_.DoBernoulli(0.5);
+      });
+  // TODO(loc) GPU
+  // TODO(loc) sync the flags across all machines to have same sample on all of
+  // them
+}
+
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
   GALOIS_LOG_VERBOSE("[{}] Reading labels from disk...", host_id_);

@@ -48,9 +48,11 @@ struct GNNLayerConfig {
   bool do_activation{false};
   //! True if normalization is to occur during multiplies
   bool do_normalization{false};
-  //! If this is true, aggregate may occur after multiply if # of input columns
+  //! If this is false, aggregate may occur after multiply if # of input columns
   //! is higher than output columns to do less work in aggregation
-  bool allow_aggregate_after_update{true};
+  bool disable_aggregate_after_update{false};
+  //! Graph sampling flag in use or not
+  bool do_sampling{false};
   // TODO activation type; for now default is softmax
 };
 
@@ -134,6 +136,10 @@ public:
   //! Given an optimizer, update the weights in this layer based on gradients
   //! stored in the layer
   void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
+
+  //! Flip sampling switch on
+  void EnableSampling() { config_.do_sampling = true; }
+  bool IsSampledLayer() { return config_.do_sampling; }
 
 #ifdef GALOIS_ENABLE_GPU
   //! Utility function for allocating

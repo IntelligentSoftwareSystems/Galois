@@ -52,7 +52,7 @@ int main() {
   dimension_0.output_columns = 2;
 
   galois::GNNLayerConfig dcon;
-  dcon.allow_aggregate_after_update = false;
+  dcon.disable_aggregate_after_update = false;
 
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
@@ -207,10 +207,10 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
 
   galois::GNNLayerConfig config;
-  config.do_dropout                   = true;
-  config.do_activation                = true;
-  config.do_normalization             = true;
-  config.allow_aggregate_after_update = false;
+  config.do_dropout                     = true;
+  config.do_activation                  = true;
+  config.do_normalization               = true;
+  config.disable_aggregate_after_update = false;
 
   // finally, just make sure dropout and activation run without crashes
   // (verification requires floating point accuracy or setting a seed which I

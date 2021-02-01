@@ -24,7 +24,7 @@ int main() {
   // note this includes the output; last 2 must be same because softmax
   std::vector<size_t> layer_output_sizes = {4, 7, 7};
   galois::GNNLayerConfig dcon;
-  dcon.allow_aggregate_after_update = false;
+  dcon.disable_aggregate_after_update = false;
   // note GNNLayerConfig is passed in; use a config that does not do anything
   // extra like dropout or activation and the like so that input is easier to
   // verify

@@ -73,11 +73,11 @@ llvm::cl::opt<bool>
                                 "ground truth; required for some inputs"),
                       cll::init(false));
 
-llvm::cl::opt<bool>
-    agg_after_update("allowAggregationAfterUpdate",
-                     cll::desc("If true (on by default), allows aggregate to "
-                               "be done after update as an optimization"),
-                     cll::init(true));
+llvm::cl::opt<bool> disable_agg_after_update(
+    "disableAggregationAfterUpdate",
+    cll::desc("If true (off by default), disables aggregate "
+              "after update optimization"),
+    cll::init(false));
 
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
@@ -127,11 +127,11 @@ CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
 //! Setup layer config struct based on cli args
 galois::GNNLayerConfig CreateLayerConfig() {
   galois::GNNLayerConfig layer_config;
-  layer_config.do_dropout                   = do_dropout;
-  layer_config.dropout_rate                 = dropout_rate;
-  layer_config.do_activation                = do_activation;
-  layer_config.do_normalization             = do_normalization;
-  layer_config.allow_aggregate_after_update = agg_after_update;
+  layer_config.do_dropout                     = do_dropout;
+  layer_config.dropout_rate                   = dropout_rate;
+  layer_config.do_activation                  = do_activation;
+  layer_config.do_normalization               = do_normalization;
+  layer_config.disable_aggregate_after_update = disable_agg_after_update;
   return layer_config;
 }
 

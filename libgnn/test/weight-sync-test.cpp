@@ -21,7 +21,7 @@ int main() {
   dimension_0.output_columns = 2;
   galois::GNNLayerConfig dcon;
 
-  dcon.allow_aggregate_after_update = false;
+  dcon.disable_aggregate_after_update = false;
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
       std::make_unique<galois::GraphConvolutionalLayer>(0, *(test_graph.get()),

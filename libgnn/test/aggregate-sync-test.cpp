@@ -30,7 +30,7 @@ int main() {
   dimension_0.input_columns  = 3;
   dimension_0.output_columns = 2;
   galois::GNNLayerConfig l_config;
-  l_config.allow_aggregate_after_update = false;
+  l_config.disable_aggregate_after_update = false;
 
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =

@@ -28,7 +28,7 @@ extern llvm::cl::opt<bool> multiclass_labels;
 // TODO optimizer type
 //! Toggles an optimization that flips aggregate/update step if it would be
 //! beneficial
-extern llvm::cl::opt<bool> agg_after_update;
+extern llvm::cl::opt<bool> disable_agg_after_update;
 
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s);
 

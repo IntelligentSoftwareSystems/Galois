@@ -58,7 +58,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   }
 
   // flip aggregate/update if dimensions favor it (do less work)
-  if (!config_.allow_aggregate_after_update ||
+  if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     // aggregation and update
     AggregateAll(layer_dimensions_.input_columns, input_data,
@@ -101,7 +101,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
-  if (!config_.allow_aggregate_after_update ||
+  if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     if (layer_number_ != 0) {
       // transposed sgemm for derivative; in_temp is output

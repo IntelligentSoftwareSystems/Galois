@@ -1,6 +1,7 @@
 #pragma once
 
 #include "galois/GNNTypes.h"
+#include "galois/PerThreadRNG.h"
 #include "galois/graphs/CuSPPartitioner.h"
 #include "galois/graphs/GluonSubstrate.h"
 #include "galois/graphs/GraphAggregationSyncStructures.h"
@@ -140,16 +141,62 @@ public:
   void AggregateSync(GNNFloat* matrix_to_sync,
                      const size_t matrix_column_size) const;
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Sampling related
+  //////////////////////////////////////////////////////////////////////////////
+
+  //! Loops through all master nodes and determines if it is "on" or "off"
+  //! (the meaning of on and off depends on how it is used; for now, it is used
+  //! to indicate subgraph presence)
+  void UniformNodeSample();
+
+  //! Returns true if a particular node is currently considered "in" a sampled
+  //! graph
+  bool IsInSampledGraph(const NodeIterator& ni) const {
+    // TODO(loc) GPU
+    return partitioned_graph_->getData(*ni);
+  }
+
 #ifdef GALOIS_ENABLE_GPU
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
 #endif
 private:
+  //////////////////////////////////////////////////////////////////////////////
+  // Initialization
+  //////////////////////////////////////////////////////////////////////////////
+
+  //! Read labels of local nodes only
+  void ReadLocalLabels(const std::string& dataset_name,
+                       bool has_single_class_label);
+  //! Read features of local nodes only
+  void ReadLocalFeatures(const std::string& dataset_str);
+  //! Helper function to read masks from file into the appropriate structures
+  //! given a name, mask type, and arrays to save into
+  size_t ReadLocalMasksFromFile(const std::string& dataset_name,
+                                const std::string& mask_type,
+                                GNNRange* mask_range, char* masks);
+  //! Read masks of local nodes only for training, validation, and testing
+  void ReadLocalMasks(const std::string& dataset_name);
+  //! Reads the entire graph topology in (but nothing else)
+  void ReadWholeGraph(const std::string& dataset_name);
+  //! Initializes the norm factors using the entire graph's topology for global
+  //! degree access
+  void InitNormFactor();
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Accuracy
+  //////////////////////////////////////////////////////////////////////////////
+
   float GetGlobalAccuracyCPU(PointerWithSize<GNNFloat> predictions,
                              GNNPhase phase);
   float GetGlobalAccuracyCPUSingle(PointerWithSize<GNNFloat> predictions,
                                    GNNPhase phase);
   float GetGlobalAccuracyCPUMulti(PointerWithSize<GNNFloat> predictions,
                                   GNNPhase phase);
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Vars
+  //////////////////////////////////////////////////////////////////////////////
 
   //! Directory for input data
   const std::string input_directory_;
@@ -199,29 +246,10 @@ private:
   //! Normalization constant based on structure of the graph (degrees)
   std::vector<GNNFloat> norm_factors_;
 
+  //! RNG for subgraph sampling
+  galois::PerThreadRNG sample_rng_;
+
   // TODO vars for subgraphs as necessary
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Initialization
-  //////////////////////////////////////////////////////////////////////////////
-
-  //! Read labels of local nodes only
-  void ReadLocalLabels(const std::string& dataset_name,
-                       bool has_single_class_label);
-  //! Read features of local nodes only
-  void ReadLocalFeatures(const std::string& dataset_str);
-  //! Helper function to read masks from file into the appropriate structures
-  //! given a name, mask type, and arrays to save into
-  size_t ReadLocalMasksFromFile(const std::string& dataset_name,
-                                const std::string& mask_type,
-                                GNNRange* mask_range, char* masks);
-  //! Read masks of local nodes only for training, validation, and testing
-  void ReadLocalMasks(const std::string& dataset_name);
-  //! Reads the entire graph topology in (but nothing else)
-  void ReadWholeGraph(const std::string& dataset_name);
-  //! Initializes the norm factors using the entire graph's topology for global
-  //! degree access
-  void InitNormFactor();
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things

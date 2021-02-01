@@ -23,22 +23,44 @@ namespace galois {
 class GraphNeuralNetworkConfig {
 public:
   //! Construction without a config for layers specified; uses a default
+  //! also no sampling specified
   GraphNeuralNetworkConfig(size_t num_layers,
                            const std::vector<GNNLayerType>& layer_types,
                            const std::vector<size_t>& layer_column_sizes,
                            GNNOutputLayerType output_layer_type)
       : GraphNeuralNetworkConfig(num_layers, layer_types, layer_column_sizes,
-                                 output_layer_type, GNNLayerConfig()) {}
+                                 output_layer_type, false, GNNLayerConfig()) {}
+
+  //! Construction without a config for layers specified
+  GraphNeuralNetworkConfig(size_t num_layers,
+                           const std::vector<GNNLayerType>& layer_types,
+                           const std::vector<size_t>& layer_column_sizes,
+                           GNNOutputLayerType output_layer_type,
+                           bool do_sampling)
+      : GraphNeuralNetworkConfig(num_layers, layer_types, layer_column_sizes,
+                                 output_layer_type, do_sampling,
+                                 GNNLayerConfig()) {}
+
+  //! Construction without sampling specified
+  GraphNeuralNetworkConfig(size_t num_layers,
+                           const std::vector<GNNLayerType>& layer_types,
+                           const std::vector<size_t>& layer_column_sizes,
+                           GNNOutputLayerType output_layer_type,
+                           const GNNLayerConfig& default_layer_config)
+      : GraphNeuralNetworkConfig(num_layers, layer_types, layer_column_sizes,
+                                 output_layer_type, false,
+                                 default_layer_config) {}
 
   //! Construction with a specified config for layers
   GraphNeuralNetworkConfig(size_t num_layers,
                            const std::vector<GNNLayerType>& layer_types,
                            const std::vector<size_t>& layer_column_sizes,
                            GNNOutputLayerType output_layer_type,
+                           bool do_sampling,
                            const GNNLayerConfig& default_layer_config)
       : num_intermediate_layers_(num_layers), layer_types_(layer_types),
         layer_column_sizes_(layer_column_sizes),
-        output_layer_type_(output_layer_type),
+        output_layer_type_(output_layer_type), do_sampling_(do_sampling),
         default_layer_config_(default_layer_config) {
     // Do sanity checks on inputs
     // should have a type for each layer
@@ -51,25 +73,30 @@ public:
   }
 
   //! # layers NOT including output layer
-  size_t num_intermediate_layers() { return num_intermediate_layers_; }
+  size_t num_intermediate_layers() const { return num_intermediate_layers_; }
   //! Get intermediate layer i
-  GNNLayerType intermediate_layer_type(size_t i) {
+  GNNLayerType intermediate_layer_type(size_t i) const {
     assert(i < num_intermediate_layers_);
     return layer_types_[i];
   }
   //! Get intermediate layer i's size
-  size_t intermediate_layer_size(size_t i) {
+  size_t intermediate_layer_size(size_t i) const {
     assert(i < num_intermediate_layers_);
     return layer_column_sizes_[i];
   }
   //! Type of output layer
-  GNNOutputLayerType output_layer_type() { return output_layer_type_; }
+  GNNOutputLayerType output_layer_type() const { return output_layer_type_; }
   //! Size of output layer is last element of layer column sizes
-  size_t output_layer_size() {
+  size_t output_layer_size() const {
     return layer_column_sizes_[num_intermediate_layers_];
   }
+
+  bool do_sampling() const { return do_sampling_; }
+
   //! Get the default layer config of layers in this GNN
-  const GNNLayerConfig& default_layer_config() { return default_layer_config_; }
+  const GNNLayerConfig& default_layer_config() const {
+    return default_layer_config_;
+  }
 
 private:
   //! Number of layers to construct in the GNN not including the output
@@ -83,6 +110,8 @@ private:
   std::vector<size_t> layer_column_sizes_;
   //! Output layer type
   GNNOutputLayerType output_layer_type_;
+  //! Graph sampling
+  bool do_sampling_;
   //! Default config to use for layers
   GNNLayerConfig default_layer_config_;
 };
