@@ -96,8 +96,11 @@ public:
   };
   GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
 
+  // Get accuracy: sampling is by default false
   float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions,
                           GNNPhase phase);
+  float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions, GNNPhase phase,
+                          bool sampling);
 
   //! Returns the ground truth label of some local id assuming labels are single
   //! class labels.
@@ -161,6 +164,10 @@ public:
     // TODO(loc) GPU
     return partitioned_graph_->getData(*ni);
   }
+  bool IsInSampledGraph(size_t node_id) const {
+    // TODO(loc) GPU
+    return partitioned_graph_->getData(node_id);
+  }
 
 #ifdef GALOIS_ENABLE_GPU
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
@@ -193,11 +200,11 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
   float GetGlobalAccuracyCPU(PointerWithSize<GNNFloat> predictions,
-                             GNNPhase phase);
+                             GNNPhase phase, bool sampling);
   float GetGlobalAccuracyCPUSingle(PointerWithSize<GNNFloat> predictions,
-                                   GNNPhase phase);
+                                   GNNPhase phase, bool sampling);
   float GetGlobalAccuracyCPUMulti(PointerWithSize<GNNFloat> predictions,
-                                  GNNPhase phase);
+                                  GNNPhase phase, bool sampling);
 
   //////////////////////////////////////////////////////////////////////////////
   // Vars

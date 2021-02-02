@@ -10,8 +10,8 @@ galois::SigmoidLayer::ForwardPhaseCPU(
   input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
-  galois::GAccumulator<double> total_loss;
-  total_loss.reset();
+  node_count_.reset();
+  float_accumulator_.reset();
 
   galois::do_all(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
@@ -21,6 +21,8 @@ galois::SigmoidLayer::ForwardPhaseCPU(
             if (!graph_.IsInSampledGraph(local_node))
               return;
           }
+
+          node_count_ += 1;
 
           size_t node_offset = feature_length * local_node;
           // sigmoid the values for this node
@@ -40,12 +42,13 @@ galois::SigmoidLayer::ForwardPhaseCPU(
               feature_length, graph_.GetMultiClassLabel(local_node),
               &forward_output_matrix_[node_offset]);
           // TODO(loc) normalize the loss
-          total_loss += input_loss_[local_node];
+          float_accumulator_ += input_loss_[local_node];
         }
       },
       galois::steal(), galois::loopname("SigmoidForward"));
 
-  galois::gPrint("Total loss is ", total_loss.reduce(), "\n");
+  galois::gPrint("Average loss is ",
+                 float_accumulator_.reduce() / node_count_.reduce(), "\n");
   return forward_output_matrix_;
 }
 

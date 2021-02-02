@@ -221,6 +221,10 @@ protected:
   galois::GNNOutputLayerType output_layer_type_{
       galois::GNNOutputLayerType::kInvalid};
 
+  // Used mainly for accuracy tracking
+  galois::DGAccumulator<uint32_t> node_count_;
+  galois::DGAccumulator<float> float_accumulator_;
+
   //////////////////////////////////////////////////////////////////////////////
 
   //! Init based from following paper

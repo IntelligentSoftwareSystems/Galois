@@ -8,6 +8,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
+  // TODO(loc) once needed for accuracy debugging, print out loss
 
   galois::do_all(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),

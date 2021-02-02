@@ -86,11 +86,11 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
-  if (config_.do_sampling()) {
-    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
-      assert(ptr->IsSampledLayer());
-    }
-  }
+  // if (config_.do_sampling()) {
+  //   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+  //     assert(ptr->IsSampledLayer());
+  //   }
+  // }
 
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
@@ -136,7 +136,7 @@ galois::GraphNeuralNetwork::DoInference() {
 
 float galois::GraphNeuralNetwork::GetGlobalAccuracy(
     PointerWithSize<GNNFloat> predictions) {
-  return graph_->GetGlobalAccuracy(predictions, phase_);
+  return graph_->GetGlobalAccuracy(predictions, phase_, config_.do_sampling());
 }
 
 void galois::GraphNeuralNetwork::GradientPropagation() {

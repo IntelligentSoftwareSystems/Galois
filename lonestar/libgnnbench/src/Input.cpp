@@ -79,6 +79,12 @@ llvm::cl::opt<bool> disable_agg_after_update(
               "after update optimization"),
     cll::init(false));
 
+llvm::cl::opt<bool>
+    do_graph_sampling("doGraphSampling",
+                      cll::desc("If true (off by default), sample nodes for "
+                                "use every epoch at a 50\% drop rate"),
+                      cll::init(false));
+
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
   case galois::graphs::GNNPartitionScheme::kOEC:
@@ -188,9 +194,9 @@ InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
   // layer config object
   galois::GNNLayerConfig layer_config = CreateLayerConfig();
   // GNN config object
-  galois::GraphNeuralNetworkConfig gnn_config(num_layers, layer_types,
-                                              layer_sizes_vector,
-                                              output_layer_type, layer_config);
+  galois::GraphNeuralNetworkConfig gnn_config(
+      num_layers, layer_types, layer_sizes_vector, output_layer_type,
+      do_graph_sampling, layer_config);
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
 

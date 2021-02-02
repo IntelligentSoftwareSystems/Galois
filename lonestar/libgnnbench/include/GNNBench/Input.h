@@ -29,6 +29,8 @@ extern llvm::cl::opt<bool> multiclass_labels;
 //! Toggles an optimization that flips aggregate/update step if it would be
 //! beneficial
 extern llvm::cl::opt<bool> disable_agg_after_update;
+//! Random sampling of nodes every epoch
+extern llvm::cl::opt<bool> do_graph_sampling;
 
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s);
 

@@ -171,6 +171,8 @@ public:
   //! Returns classification accuracy for single class label or micro F1 score
   //! for multi-class predictions; this calls into GNNGraph's accuracy call
   float GetGlobalAccuracy(const PointerWithSize<GNNFloat> predictions);
+  float GetGlobalAccuracy(const PointerWithSize<GNNFloat> predictions,
+                          bool sampling);
 
   //! Backpropagate gradients from the output layer backwards through the
   //! network to update the layer weights. Also known as a backward phase in

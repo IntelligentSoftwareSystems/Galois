@@ -393,20 +393,26 @@ void galois::graphs::GNNGraph::InitNormFactor() {
 float galois::graphs::GNNGraph::GetGlobalAccuracy(
     PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
   // No GPU version yet, but this is where it would be
-  return GetGlobalAccuracyCPU(predictions, phase);
+  return GetGlobalAccuracy(predictions, phase, false);
+}
+
+float galois::graphs::GNNGraph::GetGlobalAccuracy(
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
+  // No GPU version yet, but this is where it would be
+  return GetGlobalAccuracyCPU(predictions, phase, sampling);
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPU(
-    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
   if (is_single_class_label()) {
-    return GetGlobalAccuracyCPUSingle(predictions, phase);
+    return GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
   } else {
-    return GetGlobalAccuracyCPUMulti(predictions, phase);
+    return GetGlobalAccuracyCPUMulti(predictions, phase, sampling);
   }
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
-    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
   // check owned nodes' accuracy
   assert((num_label_classes_ * size()) == predictions.size());
   num_correct_.reset();
@@ -416,6 +422,12 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
       galois::iterate(begin_owned(), end_owned()),
       [&](const unsigned lid) {
         if (IsValidForPhase(lid, phase)) {
+          if (sampling) {
+            if (!IsInSampledGraph(lid)) {
+              return;
+            }
+          }
+
           total_checked_ += 1;
           // get prediction by getting max
           size_t predicted_label = galois::MaxIndex(
@@ -441,7 +453,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
-    PointerWithSize<GNNFloat> predictions, GNNPhase phase) {
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
 
   const GNNLabel* full_ground_truth = GetMultiClassLabel(0);
   assert(predictions.size() == (num_label_classes_ * size()));
@@ -465,6 +477,12 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
         galois::iterate(begin_owned(), end_owned()),
         [&](const unsigned lid) {
           if (IsValidForPhase(lid, phase)) {
+            if (sampling) {
+              if (!IsInSampledGraph(lid)) {
+                return;
+              }
+            }
+
             size_t label_index = lid * num_label_classes_ + label_class;
 
             GNNLabel true_label = full_ground_truth[label_index];
