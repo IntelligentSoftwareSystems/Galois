@@ -150,8 +150,10 @@ public:
 
   //! Loops through all master nodes and determines if it is "on" or "off"
   //! (the meaning of on and off depends on how it is used; for now, it is used
-  //! to indicate subgraph presence)
+  //! to indicate subgraph presence); droprate controls chance of being dropped
+  //! (e.g. if 0.8, a node is 80% likely to not be included in subgraph)
   void UniformNodeSample();
+  void UniformNodeSample(float droprate);
 
   //! Makes a node "sampled"; used for debugging/testing
   void SetSampledNode(size_t node) { partitioned_graph_->getData(node) = 1; }

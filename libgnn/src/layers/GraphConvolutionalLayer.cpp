@@ -211,7 +211,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         if (IsSampledLayer()) {
           // check if node is part of sampled graph; ignore after 0'ing if not
           // sampled
-          if (!graph_.IsInSampledGraph(src))
+          if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(src))
             return;
         }
 
@@ -225,7 +225,8 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           size_t dst = graph_.EdgeDestination(e);
           if (IsSampledLayer()) {
             // ignore non-sampled nodes
-            if (!graph_.IsInSampledGraph(dst))
+            if (layer_phase_ == GNNPhase::kTrain &&
+                !graph_.IsInSampledGraph(dst))
               continue;
           }
 

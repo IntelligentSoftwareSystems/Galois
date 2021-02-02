@@ -18,7 +18,8 @@ galois::SigmoidLayer::ForwardPhaseCPU(
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
           if (IsSampledLayer()) {
-            if (!graph_.IsInSampledGraph(local_node))
+            if (layer_phase_ == GNNPhase::kTrain &&
+                !graph_.IsInSampledGraph(local_node))
               return;
           }
 
@@ -74,7 +75,8 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
           if (IsSampledLayer()) {
-            if (!graph_.IsInSampledGraph(local_node))
+            if (layer_phase_ == GNNPhase::kTrain &&
+                !graph_.IsInSampledGraph(local_node))
               return;
           }
 

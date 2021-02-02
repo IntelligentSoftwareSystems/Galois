@@ -130,10 +130,12 @@ void galois::graphs::GNNGraph::AggregateSync(
       "GraphAggregateSync");
 }
 
-void galois::graphs::GNNGraph::UniformNodeSample() {
+void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.8); }
+
+void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
   galois::do_all(
       galois::iterate(begin_owned(), end_owned()), [&](const NodeIterator& x) {
-        partitioned_graph_->getData(*x) = sample_rng_.DoBernoulli(0.5);
+        partitioned_graph_->getData(*x) = sample_rng_.DoBernoulli(droprate);
       });
   // TODO(loc) GPU
   // TODO(loc) sync the flags across all machines to have same sample on all of
@@ -423,7 +425,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
       [&](const unsigned lid) {
         if (IsValidForPhase(lid, phase)) {
           if (sampling) {
-            if (!IsInSampledGraph(lid)) {
+            if (phase == GNNPhase::kTrain && !IsInSampledGraph(lid)) {
               return;
             }
           }
@@ -478,7 +480,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
         [&](const unsigned lid) {
           if (IsValidForPhase(lid, phase)) {
             if (sampling) {
-              if (!IsInSampledGraph(lid)) {
+              if (phase == GNNPhase::kTrain && !IsInSampledGraph(lid)) {
                 return;
               }
             }
