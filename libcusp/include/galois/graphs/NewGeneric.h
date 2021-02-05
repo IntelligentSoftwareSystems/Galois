@@ -115,6 +115,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // this is entire graph: amazon's mask isn't contiguous
       bps.push_back(0);
       bps.push_back(1569960);
+    } else if (filename.find("ogbn-proteins") != std::string::npos) {
+      // this is entire graph: amazon's mask isn't contiguous
+      bps.push_back(0);
+      bps.push_back(86618);
     } else {
       // TODO(loc) only die under certain conditions; don't die if something
       // is missing
