@@ -208,11 +208,19 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           aggregate_output[index_to_src_feature + i] = 0;
         }
 
-        if (IsSampledLayer()) {
-          // check if node is part of sampled graph; ignore after 0'ing if not
-          // sampled
-          if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(src))
-            return;
+        if (layer_phase_ == GNNPhase::kTrain) {
+          if (IsInductiveLayer()) {
+            // if inductive, all non-training nodes do not exist
+            if (!graph_.IsValidForPhase(src, GNNPhase::kTrain))
+              return;
+          }
+
+          if (IsSampledLayer()) {
+            // check if node is part of sampled graph; ignore after 0'ing if not
+            // sampled
+            if (!graph_.IsInSampledGraph(src))
+              return;
+          }
         }
 
         GNNFloat source_norm = 0.0;
@@ -223,11 +231,20 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         // loop through all destinations to grab the feature to aggregate
         for (auto e = graph_.EdgeBegin(src); e != graph_.EdgeEnd(src); e++) {
           size_t dst = graph_.EdgeDestination(e);
-          if (IsSampledLayer()) {
-            // ignore non-sampled nodes
-            if (layer_phase_ == GNNPhase::kTrain &&
-                !graph_.IsInSampledGraph(dst))
-              continue;
+
+          if (layer_phase_ == GNNPhase::kTrain) {
+            if (IsInductiveLayer()) {
+              // if inductive, all non-training nodes do not exist
+              if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
+                return;
+            }
+
+            if (IsSampledLayer()) {
+              // ignore non-sampled nodes
+              if (layer_phase_ == GNNPhase::kTrain &&
+                  !graph_.IsInSampledGraph(dst))
+                continue;
+            }
           }
 
           size_t index_to_dst_feature = dst * column_length;

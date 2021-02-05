@@ -53,6 +53,8 @@ struct GNNLayerConfig {
   bool disable_aggregate_after_update{false};
   //! Graph sampling flag in use or not
   bool do_sampling{false};
+  //! Inductive layer means for aggregation all non-training nodes are ignored
+  bool inductive_training_{false};
   // TODO activation type; for now default is softmax
 };
 
@@ -139,7 +141,8 @@ public:
 
   //! Flip sampling switch on
   void EnableSampling() { config_.do_sampling = true; }
-  bool IsSampledLayer() { return config_.do_sampling; }
+  bool IsSampledLayer() const { return config_.do_sampling; }
+  bool IsInductiveLayer() const { return config_.inductive_training_; }
 
 #ifdef GALOIS_ENABLE_GPU
   //! Utility function for allocating

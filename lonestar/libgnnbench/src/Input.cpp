@@ -85,6 +85,12 @@ llvm::cl::opt<bool>
                                 "use every epoch at a 50\% drop rate"),
                       cll::init(false));
 
+llvm::cl::opt<bool>
+    do_inductive_training("doInductiveTraining",
+                          cll::desc("If true (off by default), during training "
+                                    "all non-train nodes are ignored"),
+                          cll::init(false));
+
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
   case galois::graphs::GNNPartitionScheme::kOEC:
@@ -138,6 +144,7 @@ galois::GNNLayerConfig CreateLayerConfig() {
   layer_config.do_activation                  = do_activation;
   layer_config.do_normalization               = do_normalization;
   layer_config.disable_aggregate_after_update = disable_agg_after_update;
+  layer_config.inductive_training_            = do_inductive_training;
   return layer_config;
 }
 
