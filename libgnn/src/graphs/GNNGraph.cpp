@@ -130,7 +130,7 @@ void galois::graphs::GNNGraph::AggregateSync(
       "GraphAggregateSync");
 }
 
-void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.8); }
+void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.5); }
 
 void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
   galois::do_all(
@@ -374,6 +374,11 @@ void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
 void galois::graphs::GNNGraph::InitNormFactor() {
   GALOIS_LOG_VERBOSE("[{}] Initializing norm factors", host_id_);
   norm_factors_.resize(partitioned_graph_->size(), 0.0);
+  CalculateFullNormFactor();
+}
+
+void galois::graphs::GNNGraph::CalculateFullNormFactor() {
+  norm_factors_.assign(partitioned_graph_->size(), 0.0);
 
   // get the norm factor contribution for each node based on the GLOBAL graph
   galois::do_all(
@@ -389,7 +394,70 @@ void galois::graphs::GNNGraph::InitNormFactor() {
               1.0 / std::sqrt(static_cast<float>(global_degree));
         }
       },
-      galois::loopname("InitNormFactor"));
+      galois::loopname("CalculateFullNormFactor"));
+}
+
+void galois::graphs::GNNGraph::CalculateSpecialNormFactor(bool is_sampled,
+                                                          bool is_inductive) {
+  if (galois::runtime::getSystemNetworkInterface().Num > 1) {
+    GALOIS_LOG_FATAL("cannot run special norm factor in dist setting yet");
+  }
+
+  norm_factors_.assign(partitioned_graph_->size(), 0.0);
+
+  // get the norm factor contribution for each node based on the GLOBAL graph
+  galois::do_all(
+      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
+      [&](size_t local_id) {
+        // ignore node if not valid
+        if (is_sampled && is_inductive) {
+          if (!IsValidForPhase(local_id, GNNPhase::kTrain) ||
+              !IsInSampledGraph(local_id)) {
+            return;
+          }
+        } else if (is_sampled) {
+          if (!IsInSampledGraph(local_id)) {
+            return;
+          }
+        } else if (is_inductive) {
+          if (!IsValidForPhase(local_id, GNNPhase::kTrain)) {
+            return;
+          }
+        }
+
+        size_t degree = 0;
+
+        // TODO(loc) make this work in a distributed setting; assuming
+        // whole graph is present on single host at the moment
+        for (EdgeIterator e = EdgeBegin(local_id); e != EdgeEnd(local_id);
+             e++) {
+          size_t dest = EdgeDestination(e);
+          if (is_sampled && is_inductive) {
+            if (!IsValidForPhase(dest, GNNPhase::kTrain) ||
+                !IsInSampledGraph(dest)) {
+              continue;
+            }
+          } else if (is_sampled) {
+            if (!IsInSampledGraph(dest)) {
+              continue;
+            }
+          } else if (is_inductive) {
+            if (!IsValidForPhase(dest, GNNPhase::kTrain)) {
+              continue;
+            }
+          } else {
+            GALOIS_LOG_WARN(
+                "Why is special norm factor called if not sampled/inductive?");
+          }
+          degree += 1;
+        }
+
+        // only set if non-zero
+        if (degree != 0) {
+          norm_factors_[local_id] = 1.0 / std::sqrt(static_cast<float>(degree));
+        }
+      },
+      galois::loopname("CalculateSpecialNormFactor"));
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracy(

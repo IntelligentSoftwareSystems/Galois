@@ -58,9 +58,9 @@ public:
                            GNNOutputLayerType output_layer_type,
                            bool do_sampling,
                            const GNNLayerConfig& default_layer_config)
-      : num_intermediate_layers_(num_layers), layer_types_(layer_types),
-        layer_column_sizes_(layer_column_sizes),
-        output_layer_type_(output_layer_type), do_sampling_(do_sampling),
+      : do_sampling_(do_sampling), num_intermediate_layers_(num_layers),
+        layer_types_(layer_types), layer_column_sizes_(layer_column_sizes),
+        output_layer_type_(output_layer_type),
         default_layer_config_(default_layer_config) {
     // Do sanity checks on inputs
     // should have a type for each layer
@@ -98,6 +98,12 @@ public:
     return default_layer_config_;
   }
 
+  // public because they are independent of other settings
+  //! Graph sampling
+  bool do_sampling_{false};
+  //! Inductive = training ignores test/val set
+  bool inductive_training_{false};
+
 private:
   //! Number of layers to construct in the GNN not including the output
   //! layer
@@ -110,8 +116,6 @@ private:
   std::vector<size_t> layer_column_sizes_;
   //! Output layer type
   GNNOutputLayerType output_layer_type_;
-  //! Graph sampling
-  bool do_sampling_;
   //! Default config to use for layers
   GNNLayerConfig default_layer_config_;
 };

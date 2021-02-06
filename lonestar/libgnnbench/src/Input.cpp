@@ -204,6 +204,7 @@ InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
   galois::GraphNeuralNetworkConfig gnn_config(
       num_layers, layer_types, layer_sizes_vector, output_layer_type,
       do_graph_sampling, layer_config);
+  gnn_config.inductive_training_ = do_inductive_training;
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
 

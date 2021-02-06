@@ -92,11 +92,16 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   //   }
   // }
 
+  if (config_.inductive_training_) {
+    graph_->CalculateSpecialNormFactor(false, true);
+  }
+
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     if (config_.do_sampling()) {
       // subgraph sample every epoch
       graph_->UniformNodeSample();
+      graph_->CalculateSpecialNormFactor(true, config_.inductive_training_);
     }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     GradientPropagation();
@@ -107,7 +112,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     }
     // TODO validation and test as necessary
   }
-
+  graph_->CalculateFullNormFactor();
   // check test accuracy
   galois::StatTimer acc_timer("FinalAccuracyTest");
   acc_timer.start();

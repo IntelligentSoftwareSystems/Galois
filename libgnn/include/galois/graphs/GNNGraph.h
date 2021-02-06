@@ -171,9 +171,16 @@ public:
     return partitioned_graph_->getData(node_id);
   }
 
+  //! Calculate norm factor considering the entire graph
+  void CalculateFullNormFactor();
+  //! Calculate norm factor considering sampled nodes and/or training nodes
+  //! only (inductive)
+  void CalculateSpecialNormFactor(bool is_sampled, bool is_inductive);
+
 #ifdef GALOIS_ENABLE_GPU
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
 #endif
+
 private:
   //////////////////////////////////////////////////////////////////////////////
   // Initialization
