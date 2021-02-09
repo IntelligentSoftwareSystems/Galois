@@ -19,9 +19,11 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     layer_weights_.resize(num_weight_elements);
     layer_weight_gradients_.resize(num_weight_elements, 0);
 #ifdef GALOIS_ENABLE_GPU
-    base_gpu_object_.InitWeightMemory(num_weight_elements);
-    base_gpu_object_.InitDropoutMemory(layer_dimensions_.input_rows *
-                                       layer_dimensions_.input_columns);
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      base_gpu_object_.InitWeightMemory(num_weight_elements);
+      base_gpu_object_.InitDropoutMemory(layer_dimensions_.input_rows *
+                                         layer_dimensions_.input_columns);
+    }
 #endif
 
     GlorotBengioInit(&layer_weights_);
@@ -42,31 +44,35 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
   backward_output_matrix_.resize(
       layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
 #ifdef GALOIS_ENABLE_GPU
-  base_gpu_object_.InitInOutMemory(num_output_elements,
-                                   layer_dimensions_.input_rows *
-                                       layer_dimensions_.input_columns);
-#endif
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.InitInOutMemory(num_output_elements,
+                                     layer_dimensions_.input_rows *
+                                         layer_dimensions_.input_columns);
 
-  // initialize the PointerWithSize wrappers
-#ifndef GALOIS_ENABLE_GPU
-  p_layer_weights_ = PointerWithSize<GNNFloat>(layer_weights_);
-  p_layer_weight_gradients_ =
-      PointerWithSize<GNNFloat>(layer_weight_gradients_);
-  p_forward_output_matrix_ = PointerWithSize<GNNFloat>(forward_output_matrix_);
-  p_backward_output_matrix_ =
-      PointerWithSize<GNNFloat>(backward_output_matrix_);
-#else
-  p_layer_weights_ = PointerWithSize<GNNFloat>(base_gpu_object_.layer_weights(),
-                                               layer_weights_.size());
-  p_layer_weight_gradients_ =
-      PointerWithSize<GNNFloat>(base_gpu_object_.layer_weight_gradients(),
-                                layer_weight_gradients_.size());
-  p_forward_output_matrix_ = PointerWithSize<GNNFloat>(
-      base_gpu_object_.forward_output(), forward_output_matrix_.size());
-  p_backward_output_matrix_ = PointerWithSize<GNNFloat>(
-      base_gpu_object_.backward_output(), backward_output_matrix_.size());
-  // TODO can clear the cpu side vectors/don't use .size() since optimally they
-  // aren't initialized
+    // initialize the PointerWithSize wrappers
+    p_layer_weights_ = PointerWithSize<GNNFloat>(
+        base_gpu_object_.layer_weights(), layer_weights_.size());
+    p_layer_weight_gradients_ =
+        PointerWithSize<GNNFloat>(base_gpu_object_.layer_weight_gradients(),
+                                  layer_weight_gradients_.size());
+    p_forward_output_matrix_ = PointerWithSize<GNNFloat>(
+        base_gpu_object_.forward_output(), forward_output_matrix_.size());
+    p_backward_output_matrix_ = PointerWithSize<GNNFloat>(
+        base_gpu_object_.backward_output(), backward_output_matrix_.size());
+    // TODO can clear the cpu side vectors/don't use .size() since optimally
+    // they aren't initialized
+  } else {
+#endif
+    // initialize the PointerWithSize wrappers
+    p_layer_weights_ = PointerWithSize<GNNFloat>(layer_weights_);
+    p_layer_weight_gradients_ =
+        PointerWithSize<GNNFloat>(layer_weight_gradients_);
+    p_forward_output_matrix_ =
+        PointerWithSize<GNNFloat>(forward_output_matrix_);
+    p_backward_output_matrix_ =
+        PointerWithSize<GNNFloat>(backward_output_matrix_);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 
@@ -81,7 +87,9 @@ void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
     (*vector_to_init)[i] = dist(rng);
   }
 #ifdef GALOIS_ENABLE_GPU
-  CopyLayerWeightsToGPU();
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    CopyLayerWeightsToGPU();
+  }
 #endif
 }
 
@@ -94,7 +102,9 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
       },
       galois::loopname("RandomInitVector"));
 #ifdef GALOIS_ENABLE_GPU
-  CopyLayerWeightsToGPU();
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    CopyLayerWeightsToGPU();
+  }
 #endif
 }
 
@@ -128,11 +138,15 @@ void galois::GNNLayer::DoDropoutCPU(
 void galois::GNNLayer::DoDropout(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
-#ifndef GALOIS_ENABLE_GPU
-  DoDropoutCPU(input_to_dropout, output_matrix);
-#else
-  base_gpu_object_.DoDropoutGPU(input_to_dropout, *output_matrix,
-                                config_.dropout_rate);
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.DoDropoutGPU(input_to_dropout, *output_matrix,
+                                  config_.dropout_rate);
+  } else {
+#endif
+    DoDropoutCPU(input_to_dropout, output_matrix);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 
@@ -140,19 +154,23 @@ void galois::GNNLayer::DoDropoutDerivative() {
   assert(backward_output_matrix_.size() == dropout_mask_.size());
   GNNFloat scale = 1. / (1. - config_.dropout_rate);
 
-#ifndef GALOIS_ENABLE_GPU
-  // use dropout mask to figure out derivative
-  galois::do_all(
-      galois::iterate(static_cast<size_t>(0), backward_output_matrix_.size()),
-      [&](size_t i) {
-        backward_output_matrix_[i] = backward_output_matrix_[i] *
-                                     static_cast<GNNFloat>(dropout_mask_[i]) *
-                                     scale;
-      },
-      galois::loopname("LayerDropoutDerivative"));
-#else
-  base_gpu_object_.DoDropoutDerivativeGPU(p_backward_output_matrix_.size(),
-                                          scale);
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.DoDropoutDerivativeGPU(p_backward_output_matrix_.size(),
+                                            scale);
+  } else {
+#endif
+    // use dropout mask to figure out derivative
+    galois::do_all(
+        galois::iterate(static_cast<size_t>(0), backward_output_matrix_.size()),
+        [&](size_t i) {
+          backward_output_matrix_[i] = backward_output_matrix_[i] *
+                                       static_cast<GNNFloat>(dropout_mask_[i]) *
+                                       scale;
+        },
+        galois::loopname("LayerDropoutDerivative"));
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 

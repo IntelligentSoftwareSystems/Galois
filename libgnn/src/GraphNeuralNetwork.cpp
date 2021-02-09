@@ -14,6 +14,11 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   // this will be the # of rows for each layer
   size_t max_rows = graph_->size();
 
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    graph_->ResizeLayerVector(config_.num_intermediate_layers());
+  }
+#endif
   // create the intermediate layers
   for (size_t i = 0; i < config_.num_intermediate_layers(); i++) {
     GNNLayerType layer_type = config_.intermediate_layer_type(i);
@@ -36,6 +41,13 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     case GNNLayerType::kGraphConvolutional:
       gnn_layers_.push_back(std::move(std::make_unique<GraphConvolutionalLayer>(
           i, *graph_, layer_dims, config_.default_layer_config())));
+#ifdef GALOIS_ENABLE_GPU
+      if (device_personality == DevicePersonality::GPU_CUDA) {
+        graph_->InitLayerVectorMetaObjects(
+            i, galois::runtime::getSystemNetworkInterface().Num,
+            layer_dims.input_columns, layer_dims.output_columns);
+      }
+#endif
       if (i == config_.num_intermediate_layers() - 1) {
         // last layer before output layer should never have activation
         gnn_layers_.back()->DisableActivation();
@@ -86,11 +98,16 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
-  // if (config_.do_sampling()) {
-  //   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
-  //     assert(ptr->IsSampledLayer());
-  //   }
-  // }
+  std::vector<GNNFloat> cpu_pred;
+  float train_accuracy{0.f};
+
+  /*
+  if (config_.do_sampling()) {
+    for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
+      assert(ptr->IsSampledLayer());
+    }
+  }
+  */
 
   if (config_.inductive_training_) {
     graph_->CalculateSpecialNormFactor(false, true);
@@ -105,7 +122,22 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     GradientPropagation();
-    float train_accuracy = GetGlobalAccuracy(predictions);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      if (cpu_pred.size() != predictions.size()) {
+        cpu_pred.resize(predictions.size());
+      }
+
+      AdamOptimizer* adam = static_cast<AdamOptimizer*>(optimizer_.get());
+      adam->CopyToVector(cpu_pred, predictions);
+      train_accuracy = GetGlobalAccuracy(cpu_pred);
+    } else {
+#endif
+      train_accuracy = GetGlobalAccuracy(predictions);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
+
     if (this_host == 0) {
       galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                      train_accuracy, "\n");
@@ -118,7 +150,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   acc_timer.start();
   SetLayerPhases(galois::GNNPhase::kTest);
   const PointerWithSize<galois::GNNFloat> predictions = DoInference();
-  float global_accuracy = GetGlobalAccuracy(predictions);
+  float global_accuracy{0.0};
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    AdamOptimizer* adam = static_cast<AdamOptimizer*>(optimizer_.get());
+    adam->CopyToVector(cpu_pred, predictions);
+    global_accuracy = GetGlobalAccuracy(cpu_pred);
+  } else {
+#endif
+    global_accuracy = GetGlobalAccuracy(predictions);
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
   acc_timer.stop();
 
   if (this_host == 0) {
@@ -136,6 +179,7 @@ galois::GraphNeuralNetwork::DoInference() {
   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
     layer_input = ptr->ForwardPhase(layer_input);
   }
+
   return layer_input;
 }
 

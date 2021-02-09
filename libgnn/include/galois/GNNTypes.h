@@ -6,6 +6,11 @@
 #include <cstddef>
 #include <vector>
 
+#ifdef GALOIS_ENABLE_GPU
+enum class DevicePersonality { CPU, GPU_CUDA };
+extern DevicePersonality device_personality;
+#endif
+
 namespace galois {
 //! Floating point type to use throughout GNN compute; typedef'd so it's easier
 //! to flip later

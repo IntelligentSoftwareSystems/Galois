@@ -119,13 +119,14 @@ public:
 
   //! Return matrix of the local node features
   const PointerWithSize<GNNFloat> GetLocalFeatures() {
-#ifndef GALOIS_ENABLE_GPU
-    return PointerWithSize(local_node_features_);
-#else
-    // TODO remove reliance on local_node_features
-    return PointerWithSize(gpu_memory_.feature_vector(),
-                           local_node_features_.size());
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      // TODO remove reliance on local_node_features
+      return PointerWithSize(gpu_memory_.feature_vector(),
+                             local_node_features_.size());
+    }
 #endif
+    return PointerWithSize(local_node_features_);
   }
 
   //! Given an LID and the current phase of GNN computation, determine if the
@@ -178,7 +179,23 @@ public:
   void CalculateSpecialNormFactor(bool is_sampled, bool is_inductive);
 
 #ifdef GALOIS_ENABLE_GPU
+  void AggregateSync(GNNFloat* matrix_to_sync, const size_t matrix_column_size,
+                     const unsigned layer_number) const;
+
+  void InitLayerVectorMetaObjects(size_t layer_number, unsigned num_hosts,
+                                  size_t infl_in_size, size_t infl_out_size);
+
+  void ResizeLayerVector(size_t num_layers);
+
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
+
+  void GetMarshalGraph(MarshalGraph& m) const {
+    sync_substrate_->getMarshalGraph(m, false);
+  }
+
+  void GetPartitionedGraphInfo(PartitionedGraphInfo& g_info) const {
+    sync_substrate_->getPartitionedGraphInfo(g_info);
+  }
 #endif
 
 private:
@@ -277,6 +294,7 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
 #ifdef GALOIS_ENABLE_GPU
+  struct CUDA_Context* cuda_ctx_;
   //! Object that holds all GPU allocated pointers to memory related to graphs.
   GNNGraphGPUAllocations gpu_memory_;
   //! Call this to setup GPU memory for this graph: allocates necessary GPU

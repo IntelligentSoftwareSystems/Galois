@@ -13,6 +13,7 @@ int main() {
   GALOIS_LOG_VERBOSE("[{}] Using {} threads",
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
+  device_personality = DevicePersonality::GPU_CUDA;
   // load test graph
   galois::graphs::GNNGraph test_graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
@@ -31,8 +32,16 @@ int main() {
   dimension_0.output_columns = 2;
 
   galois::GNNLayerConfig dcon;
-  dcon.allow_aggregate_after_update = false;
+  dcon.disable_aggregate_after_update = false;
 
+  unsigned num_layers = 2;
+  test_graph.ResizeLayerVector(num_layers);
+  test_graph.InitLayerVectorMetaObjects(
+      0, galois::runtime::getSystemNetworkInterface().Num,
+      dimension_0.input_columns, dimension_0.output_columns);
+  test_graph.InitLayerVectorMetaObjects(
+      1, galois::runtime::getSystemNetworkInterface().Num,
+      dimension_0.input_columns, dimension_0.output_columns);
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
       std::make_unique<galois::GraphConvolutionalLayer>(0, test_graph,

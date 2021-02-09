@@ -32,6 +32,7 @@
 #include <cuda.h>
 #include "gg.h"
 #include "galois/cuda/HostDecls.h"
+#include "galois/cuda/DynamicBitset.h"
 
 struct CUDA_Context_Shared {
   unsigned int* num_nodes;         // per host
@@ -170,6 +171,34 @@ size_t mem_usage_CUDA_common(MarshalGraph& g, unsigned num_hosts) {
   return mem_usage;
 }
 
+size_t mem_usage_CUDA_common(PartitionedGraphInfo& g_info, unsigned num_hosts) {
+  size_t mem_usage       = 0;
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
+  mem_usage += num_hosts * sizeof(unsigned int);
+  mem_usage += num_hosts * sizeof(Shared<unsigned int>);
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (g_info.num_master_nodes[h] > 0) {
+      mem_usage += g_info.num_master_nodes[h] * sizeof(unsigned int);
+    }
+    if (g_info.num_master_nodes[h] > max_shared_size) {
+      max_shared_size = g_info.num_master_nodes[h];
+    }
+  }
+  mem_usage += num_hosts * sizeof(unsigned int);
+  mem_usage += num_hosts * sizeof(Shared<unsigned int>);
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (g_info.num_mirror_nodes[h] > 0) {
+      mem_usage += g_info.num_mirror_nodes[h] * sizeof(unsigned int);
+    }
+    if (g_info.num_mirror_nodes[h] > max_shared_size) {
+      max_shared_size = g_info.num_mirror_nodes[h];
+    }
+  }
+  mem_usage += max_shared_size * sizeof(unsigned int);
+  mem_usage += ((max_shared_size + 63) / 64) * sizeof(unsigned long long int);
+  return mem_usage;
+}
+
 template <typename Type>
 void load_graph_CUDA_field(struct CUDA_Context_Common* ctx,
                            struct CUDA_Context_Field<Type>* field,
@@ -191,6 +220,44 @@ void load_graph_CUDA_field(struct CUDA_Context_Common* ctx,
   field->is_updated.cpu_wr_ptr()->alloc(ctx->gg.nnodes);
 }
 
+//! Set up cuda context for vector communication.
+//! A vector of the vector is represented as a flattened 1D vector.
+//! Users can either allocate data on this function or not.
+//! The data could be a pointer which had been allocated at outside.
+template <typename Type>
+void load_graph_CUDA_field_inflating(struct CUDA_Context_Common* ctx,
+                                     struct CUDA_Context_Field<Type>* field,
+                                     unsigned num_hosts, unsigned nnodes,
+                                     size_t infl_size) {
+  load_graph_CUDA_field_inflating<Type>(ctx, field, num_hosts, nnodes,
+                                        infl_size, true);
+}
+
+template <typename Type>
+void load_graph_CUDA_field_inflating(struct CUDA_Context_Common* ctx,
+                                     struct CUDA_Context_Field<Type>* field,
+                                     unsigned num_hosts, unsigned nnodes,
+                                     size_t infl_size, bool data_alloc) {
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (ctx->master.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->master.num_nodes[h];
+    }
+  }
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (ctx->mirror.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->mirror.num_nodes[h];
+    }
+  }
+  field->is_updated.alloc(1);
+  field->is_updated.cpu_wr_ptr()->alloc(nnodes);
+
+  if (data_alloc) {
+    field->data.alloc(nnodes * infl_size);
+  }
+  field->shared_data.alloc(max_shared_size * infl_size);
+}
+
 template <typename Type>
 size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type>* field,
                             MarshalGraph& g, unsigned num_hosts) {
@@ -210,4 +277,55 @@ size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type>* field,
   mem_usage += max_shared_size * sizeof(Type);
   mem_usage += ((g.nnodes + 63) / 64) * sizeof(unsigned long long int);
   return mem_usage;
+}
+
+void load_graph_CUDA_common(struct CUDA_Context_Common* ctx,
+                            PartitionedGraphInfo& g_info, unsigned num_hosts) {
+  ctx->numOwned          = g_info.numOwned;
+  ctx->beginMaster       = g_info.beginMaster;
+  ctx->numNodesWithEdges = g_info.numNodesWithEdges;
+  assert(ctx->id == g_info.id);
+
+  size_t mem_usage =
+      ((g_info.nnodes + 1) + g_info.nedges) * sizeof(index_type) +
+      (g_info.nnodes) * sizeof(node_data_type);
+
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
+  ctx->master.num_nodes =
+      (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
+  memcpy(ctx->master.num_nodes, g_info.num_master_nodes,
+         sizeof(unsigned int) * num_hosts);
+  ctx->master.nodes = (DeviceOnly<unsigned int>*)calloc(
+      num_hosts, sizeof(Shared<unsigned int>));
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (ctx->master.num_nodes[h] > 0) {
+      ctx->master.nodes[h].alloc(ctx->master.num_nodes[h]);
+      ctx->master.nodes[h].copy_to_gpu(g_info.master_nodes[h],
+                                       ctx->master.num_nodes[h]);
+    }
+    if (ctx->master.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->master.num_nodes[h];
+    }
+  }
+  ctx->mirror.num_nodes =
+      (unsigned int*)calloc(num_hosts, sizeof(unsigned int));
+  memcpy(ctx->mirror.num_nodes, g_info.num_mirror_nodes,
+         sizeof(unsigned int) * num_hosts);
+  ctx->mirror.nodes = (DeviceOnly<unsigned int>*)calloc(
+      num_hosts, sizeof(Shared<unsigned int>));
+  for (uint32_t h = 0; h < num_hosts; ++h) {
+    if (ctx->mirror.num_nodes[h] > 0) {
+      ctx->mirror.nodes[h].alloc(ctx->mirror.num_nodes[h]);
+      ctx->mirror.nodes[h].copy_to_gpu(g_info.mirror_nodes[h],
+                                       ctx->mirror.num_nodes[h]);
+    }
+    if (ctx->mirror.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->mirror.num_nodes[h];
+    }
+  }
+  ctx->offsets.alloc(max_shared_size);
+  ctx->is_updated.alloc(1);
+  ctx->is_updated.cpu_wr_ptr()->alloc(max_shared_size);
+  // printf("[%u] load_graph_GPU: %u owned nodes of total %u resident, %lu
+  // edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 }

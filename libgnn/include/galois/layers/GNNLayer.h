@@ -88,7 +88,9 @@ public:
       layer_weights_.assign(layer_weights_.size(), 1);
     }
 #ifdef GALOIS_ENABLE_GPU
-    CopyLayerWeightsToGPU();
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      CopyLayerWeightsToGPU();
+    }
 #endif
   }
 

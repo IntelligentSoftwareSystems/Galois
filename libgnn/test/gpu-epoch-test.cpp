@@ -11,6 +11,7 @@ int main() {
       56 / galois::runtime::getSystemNetworkInterface().Num);
   // size_t num_threads = galois::setActiveThreads(1);
   GALOIS_LOG_VERBOSE("Num threads is {}", num_threads);
+  device_personality = DevicePersonality::GPU_CUDA;
 
   // load graph
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(

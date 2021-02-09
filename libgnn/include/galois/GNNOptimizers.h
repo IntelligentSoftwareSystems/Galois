@@ -54,24 +54,28 @@ public:
         beta2_power_t_(num_trainable_layers_, config.beta2) {
     // >= because only prefix will be considered otherwise
     assert(trainable_layer_sizes.size() >= num_trainable_layers_);
-#ifndef GALOIS_ENABLE_GPU
-    // allocate vectors based on # of trainable layers
-    for (size_t i = 0; i < num_trainable_layers_; i++) {
-      first_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
-      second_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
-      // Pointer with size construction
-      p_first_moments_.emplace_back(first_moments_.back());
-      p_second_moments_.emplace_back(second_moments_.back());
-    }
-    assert(first_moments_.size() == num_trainable_layers_);
-    assert(second_moments_.size() == num_trainable_layers_);
-#else
-    // pointer with size initialization with GPU pointers
-    for (size_t i = 0; i < num_trainable_layers_; i++) {
-      p_first_moments_.emplace_back(gpu_object_.first_moment(i),
-                                    trainable_layer_sizes[i]);
-      p_second_moments_.emplace_back(gpu_object_.second_moment(i),
-                                     trainable_layer_sizes[i]);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      // pointer with size initialization with GPU pointers
+      for (size_t i = 0; i < num_trainable_layers_; i++) {
+        p_first_moments_.emplace_back(gpu_object_.first_moment(i),
+                                      trainable_layer_sizes[i]);
+        p_second_moments_.emplace_back(gpu_object_.second_moment(i),
+                                       trainable_layer_sizes[i]);
+      }
+    } else {
+#endif
+      // allocate vectors based on # of trainable layers
+      for (size_t i = 0; i < num_trainable_layers_; i++) {
+        first_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
+        second_moments_.emplace_back(trainable_layer_sizes[i], 0.0);
+        // Pointer with size construction
+        p_first_moments_.emplace_back(first_moments_.back());
+        p_second_moments_.emplace_back(second_moments_.back());
+      }
+      assert(first_moments_.size() == num_trainable_layers_);
+      assert(second_moments_.size() == num_trainable_layers_);
+#ifdef GALOIS_ENABLE_GPU
     }
 #endif
   }

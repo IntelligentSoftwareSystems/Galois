@@ -202,6 +202,17 @@ public:
     return ptrs[0];
 #endif
   }
+
+  void set_data(T* src, size_t src_nmemb) { set_data(src, src_nmemb, 1); }
+
+  void set_data(T* src, size_t src_nmemb, int device) {
+    if (this->nmemb == 0) {
+      alloc(src_nmemb);
+      nmemb = src_nmemb;
+    }
+    assert(this->nmemb == src_nmemb);
+    ptrs[device] = src;
+  }
 };
 
 template <typename T>

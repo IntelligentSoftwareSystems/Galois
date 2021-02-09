@@ -35,6 +35,45 @@ typedef unsigned int node_data_type;
 typedef unsigned int edge_data_type;
 #endif
 
+struct PartitionedGraphInfo {
+  size_t nnodes;
+  size_t nedges;
+  unsigned int numOwned;    // Number of nodes owned (masters) by this host
+  unsigned int beginMaster; // local id of the beginning of master nodes
+  unsigned int numNodesWithEdges; // Number of nodes (masters + mirrors) that
+                                  // have outgoing edges
+  int id;
+  unsigned numHosts;
+  unsigned int* num_master_nodes;
+  unsigned int** master_nodes;
+  unsigned int* num_mirror_nodes;
+  unsigned int** mirror_nodes;
+
+  PartitionedGraphInfo()
+      : nnodes(0), nedges(0), numOwned(0), beginMaster(0), numNodesWithEdges(0),
+        id(-1), numHosts(0), num_master_nodes(nullptr), master_nodes(nullptr),
+        num_mirror_nodes(nullptr), mirror_nodes(nullptr) {}
+
+  ~PartitionedGraphInfo() {
+    if (!num_master_nodes)
+      free(num_master_nodes);
+    if (!master_nodes) {
+      for (unsigned i = 0; i < numHosts; ++i) {
+        free(master_nodes[i]);
+      }
+      free(master_nodes);
+    }
+    if (!num_mirror_nodes)
+      free(num_mirror_nodes);
+    if (!mirror_nodes) {
+      for (unsigned i = 0; i < numHosts; ++i) {
+        free(mirror_nodes[i]);
+      }
+      free(mirror_nodes);
+    }
+  }
+};
+
 struct MarshalGraph {
   size_t nnodes;
   size_t nedges;
@@ -55,9 +94,10 @@ struct MarshalGraph {
 
   MarshalGraph()
       : nnodes(0), nedges(0), numOwned(0), beginMaster(0), numNodesWithEdges(0),
-        id(-1), numHosts(0), row_start(NULL), edge_dst(NULL), node_data(NULL),
-        edge_data(NULL), num_master_nodes(NULL), master_nodes(NULL),
-        num_mirror_nodes(NULL), mirror_nodes(NULL) {}
+        id(-1), numHosts(0), row_start(nullptr), edge_dst(nullptr),
+        node_data(nullptr), edge_data(nullptr), num_master_nodes(nullptr),
+        master_nodes(nullptr), num_mirror_nodes(nullptr),
+        mirror_nodes(nullptr) {}
 
   ~MarshalGraph() {
     if (!row_start)

@@ -35,6 +35,10 @@ namespace galois {
 namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
+#ifdef GALOIS_ENABLE_GPU
+struct CUDA_Context* cuda_ctx_for_sync;
+unsigned layer_number_to_sync;
+#endif
 } // namespace graphs
 } // namespace galois
 
@@ -78,9 +82,21 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   InitNormFactor();
 
 #ifdef GALOIS_ENABLE_GPU
-  // allocate/copy data structures over to GPU
-  GALOIS_LOG_VERBOSE("[{}] Initializing GPU memory", host_id_);
-  InitGPUMemory();
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    // allocate/copy data structures over to GPU
+    GALOIS_LOG_VERBOSE("[{}] Initializing GPU memory", host_id_);
+    InitGPUMemory();
+
+    // initialize CUDA context
+    cuda_ctx_ = get_CUDA_context(host_id_);
+    if (!init_CUDA_context(cuda_ctx_, ::gpudevice)) {
+      GALOIS_DIE("Failed to initialize CUDA context");
+    }
+    PartitionedGraphInfo g_info;
+    GetPartitionedGraphInfo(g_info);
+    load_graph_CUDA_GNN(cuda_ctx_, g_info,
+                        galois::runtime::getSystemNetworkInterface().Num);
+  }
 #endif
 }
 
@@ -124,13 +140,44 @@ void galois::graphs::GNNGraph::AggregateSync(
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
 
   // XXX bitset setting
-
   // call sync
   sync_substrate_->sync<writeSource, readAny, GNNSumAggregate>(
       "GraphAggregateSync");
 }
 
-void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.5); }
+#ifdef GALOIS_ENABLE_GPU
+void galois::graphs::GNNGraph::AggregateSync(
+    GNNFloat* matrix_to_sync, const size_t matrix_column_size,
+    const unsigned layer_number) const {
+  size_t layer_input_mtx_column_size =
+      getLayerInputMatrixColumnSize(cuda_ctx_, layer_number);
+  size_t layer_output_mtx_column_size =
+      getLayerOutputMatrixColumnSize(cuda_ctx_, layer_number);
+  // set globals for the sync substrate
+  gnn_matrix_to_sync_               = matrix_to_sync;
+  gnn_matrix_to_sync_column_length_ = matrix_column_size;
+  cuda_ctx_for_sync                 = cuda_ctx_;
+  layer_number_to_sync              = layer_number;
+  // XXX bitset setting
+  // call sync
+  cudaSetLayerInputOutput(cuda_ctx_, matrix_to_sync, matrix_column_size, size(),
+                          layer_number);
+
+  if (gnn_matrix_to_sync_column_length_ == layer_input_mtx_column_size) {
+    sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_input>(
+        "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+  } else if (gnn_matrix_to_sync_column_length_ ==
+             layer_output_mtx_column_size) {
+    sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_output>(
+        "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+  } else {
+    GALOIS_LOG_FATAL("Column size of the synchronized matrix does not"
+                     " match to the column size of the CUDA context");
+  }
+}
+#endif
+
+void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.8); }
 
 void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
   galois::do_all(
@@ -684,5 +731,16 @@ void galois::graphs::GNNGraph::InitGPUMemory() {
   gpu_memory_.SetMasks(local_training_mask_, local_validation_mask_,
                        local_testing_mask_);
   gpu_memory_.SetNormFactors(norm_factors_);
+}
+
+void galois::graphs::GNNGraph::InitLayerVectorMetaObjects(
+    size_t layer_number, unsigned num_hosts, size_t infl_in_size,
+    size_t infl_out_size) {
+  init_CUDA_layer_vector_meta_obj(cuda_ctx_, layer_number, num_hosts, size(),
+                                  infl_in_size, infl_out_size);
+}
+
+void galois::graphs::GNNGraph::ResizeLayerVector(size_t num_layers) {
+  resize_CUDA_layer_vector(cuda_ctx_, num_layers);
 }
 #endif

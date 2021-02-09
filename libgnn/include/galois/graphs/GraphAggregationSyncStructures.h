@@ -2,18 +2,28 @@
 // gets synchronized
 #include "galois/GNNTypes.h"
 #include "galois/BufferWrapper.h"
+#ifdef GALOIS_ENABLE_GPU
+#include "galois/GNNCudaContextHostDecls.h"
+#endif
 
 namespace galois {
 namespace graphs {
 
 extern GNNFloat* gnn_matrix_to_sync_;
 extern size_t gnn_matrix_to_sync_column_length_;
+#ifdef GALOIS_ENABLE_GPU
+extern struct CUDA_Context* cuda_ctx_for_sync;
+extern unsigned layer_number_to_sync;
+#endif
 
 struct GNNSumAggregate {
   using ValTy = galois::BufferWrapper<GNNFloat>;
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
+    // It should be a CPU synchronizing substrate.
+    // If the GPU flag is turned off, then personality does not exist.
+    // assert(device_personality == DevicePersonality::CPU);
     ValTy extracted_vec(
         &gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_],
         gnn_matrix_to_sync_column_length_);
@@ -51,16 +61,24 @@ struct GNNSumAggregate {
     return false;
   }
   static bool extract_batch(unsigned, uint8_t*) { return false; }
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
-    return false;
-  }
-  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
   static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) {
     return false;
   }
   static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
+    return false;
+  }
+  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 };
 
+#ifdef GALOIS_ENABLE_GPU
+GALOIS_SYNC_STRUCTURE_GNN_LAYER(layer_input, cuda_ctx_for_sync,
+                                gnn_matrix_to_sync_column_length_,
+                                layer_number_to_sync);
+GALOIS_SYNC_STRUCTURE_GNN_LAYER(layer_output, cuda_ctx_for_sync,
+                                gnn_matrix_to_sync_column_length_,
+                                layer_number_to_sync);
+#endif
 } // namespace graphs
 } // namespace galois

@@ -13,7 +13,7 @@ int main() {
   GALOIS_LOG_VERBOSE("[{}] Using {} threads",
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
-
+  device_personality = DevicePersonality::GPU_CUDA;
   // create sample config that is easy to trace
   galois::AdamOptimizer::AdamConfiguration config;
   config.alpha   = 1;

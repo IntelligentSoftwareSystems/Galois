@@ -4,6 +4,10 @@
 #include "galois/graphs/GNNGraph.h"
 #include <llvm/Support/CommandLine.h>
 
+#ifdef GALOIS_ENABLE_GPU
+extern int gpudevice;
+#endif
+
 //! Directory where all files used for GNN training are found
 extern llvm::cl::opt<std::string> input_directory;
 //! Base graph name (used to find the csgr, features, masks, etc.)

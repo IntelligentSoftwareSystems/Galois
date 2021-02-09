@@ -1981,4 +1981,103 @@ public:
     }                                                                          \
   }
 
+#ifdef GALOIS_ENABLE_GPU
+#define GALOIS_SYNC_STRUCTURE_GNN_LAYER(fieldname, cuda_ctx_for_sync,          \
+                                        gnn_matrix_to_sync_column_length_,     \
+                                        layer_number_to_sync)                  \
+  struct GNNSumAggregate_##fieldname {                                         \
+    using ValTy = GNNFloat;                                                    \
+                                                                               \
+    static ValTy extract(uint32_t, char&) { return 0.f; }                      \
+                                                                               \
+    static bool reduce(uint32_t, char&, ValTy) { return false; }               \
+                                                                               \
+    static void reset(uint32_t, char&) {}                                      \
+                                                                               \
+    static void setVal(uint32_t, char&, ValTy) {}                              \
+                                                                               \
+    static bool extract_batch(unsigned from_id, uint8_t* buf,                  \
+                              size_t* buf_size, DataCommMode* mode) {          \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_get_node_##fieldname##_matrix_cuda(                              \
+            cuda_ctx_for_sync, from_id, buf, buf_size, mode,                   \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool extract_batch(unsigned from_id, uint8_t* buf) {                \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_get_node_##fieldname##_matrix_cuda(                              \
+            cuda_ctx_for_sync, from_id, buf,                                   \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool reduce_batch(unsigned from_id, uint8_t* buf,                   \
+                             DataCommMode mode) {                              \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_aggregate_node_##fieldname##_matrix_cuda(                        \
+            cuda_ctx_for_sync, from_id, buf, mode,                             \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool reduce_mirror_batch(unsigned from_id, uint8_t* buf,            \
+                                    DataCommMode mode) {                       \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_aggregate_mirror_node_##fieldname##_matrix_cuda(                 \
+            cuda_ctx_for_sync, from_id, buf, mode,                             \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool setVal_batch(unsigned from_id, uint8_t* buf,                   \
+                             DataCommMode mode) {                              \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_set_mirror_node_##fieldname##_matrix_cuda(                       \
+            cuda_ctx_for_sync, from_id, buf, mode,                             \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* buf,            \
+                                    size_t* buf_size, DataCommMode* mode) {    \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_get_reset_node_##fieldname##_matrix_cuda(                        \
+            cuda_ctx_for_sync, from_id, buf, buf_size, mode,                   \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+                                                                               \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* buf) {          \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
+        batch_get_reset_node_##fieldname##_matrix_cuda(                        \
+            cuda_ctx_for_sync, from_id, buf,                                   \
+            gnn_matrix_to_sync_column_length_, layer_number_to_sync);          \
+        return true;                                                           \
+      }                                                                        \
+      assert(device_personality == DevicePersonality::CPU);                    \
+      return false;                                                            \
+    }                                                                          \
+  };
+#endif
+
 #endif // header guard

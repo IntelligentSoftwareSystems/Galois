@@ -48,14 +48,15 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
-#ifndef GALOIS_ENABLE_GPU
-  return ForwardPhaseCPU(input_embeddings);
-#else
-  gpu_object_.ForwardPhaseGPU(
-      layer_phase_, graph_.size(), layer_dimensions_.input_columns,
-      input_embeddings.data(), p_forward_output_matrix_.data());
-  return p_forward_output_matrix_;
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.ForwardPhaseGPU(
+        layer_phase_, graph_.size(), layer_dimensions_.input_columns,
+        input_embeddings.data(), p_forward_output_matrix_.data());
+    return p_forward_output_matrix_;
+  }
 #endif
+  return ForwardPhaseCPU(input_embeddings);
 }
 
 galois::PointerWithSize<galois::GNNFloat>
@@ -112,14 +113,15 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
 galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
                                     PointerWithSize<galois::GNNFloat>*) {
-#ifndef GALOIS_ENABLE_GPU
-  return BackwardPhaseCPU();
-#else
-  gpu_object_.BackwardPhaseGPU(
-      layer_phase_, graph_.size(), layer_dimensions_.input_columns,
-      p_forward_output_matrix_.data(), p_backward_output_matrix_.data());
-  return p_backward_output_matrix_;
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.BackwardPhaseGPU(
+        layer_phase_, graph_.size(), layer_dimensions_.input_columns,
+        p_forward_output_matrix_.data(), p_backward_output_matrix_.data());
+    return p_backward_output_matrix_;
+  }
 #endif
+  return BackwardPhaseCPU();
 }
 
 // TODO function for getting loss

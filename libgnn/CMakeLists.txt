@@ -14,6 +14,7 @@ set(MKL_LIBRARIES ${MKL_ROOT}/lib/intel64)
 set(INTEL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
 
 add_library(galois_gnn STATIC ${sources})
+
 target_link_directories(galois_gnn PUBLIC ${MKL_LIBRARIES})
 target_link_libraries(galois_gnn galois_shmem)
 target_link_libraries(galois_gnn ${INTEL_LIBS})
@@ -38,6 +39,8 @@ if (GALOIS_ENABLE_GPU)
     src/layers/SoftmaxLayer.cu
     src/GraphNeuralNetwork.cu
     src/GNNOptimizers.cu
+    src/GNNCudaContext.cu
+    src/CUDAUtil.cu
   )
   add_library(galois_gnn_gpu STATIC ${gpusources})
   target_compile_definitions(galois_gnn_gpu PRIVATE _FORCE_INLINES)
@@ -49,7 +52,7 @@ if (GALOIS_ENABLE_GPU)
   )
 
   # link to gpu lib (which takes care of moderngpu and cub) as well as cu libs
-  target_link_libraries(galois_gnn_gpu Galois::gpu galois_support -lcublas -lcurand)
+  target_link_libraries(galois_gnn_gpu galois_gluon Galois::gpu galois_support -lcublas -lcurand)
 
   # gpu -> cpu lib
   target_link_libraries(galois_gnn galois_gnn_gpu)

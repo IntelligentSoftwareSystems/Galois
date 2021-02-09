@@ -20,22 +20,24 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU
-  gpu_object_.Allocate(num_input_elements, num_output_elements);
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.Allocate(num_input_elements, num_output_elements);
+    // init pointers with size
+    p_in_temp_1_ =
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), in_temp_1_.size());
+    p_in_temp_2_ =
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), in_temp_2_.size());
+    p_out_temp_ =
+        PointerWithSize<GNNFloat>(gpu_object_.out_temp(), out_temp_.size());
+  } else {
+#endif
+    p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
+    p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
+    p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 
-  // init pointers with size
-#ifndef GALOIS_ENABLE_GPU
-  p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
-  p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
-  p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
-#else
-  p_in_temp_1_ =
-      PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), in_temp_1_.size());
-  p_in_temp_2_ =
-      PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), in_temp_2_.size());
-  p_out_temp_ =
-      PointerWithSize<GNNFloat>(gpu_object_.out_temp(), out_temp_.size());
-#endif
   GALOIS_LOG_VERBOSE("Conv layer initialized");
 }
 
@@ -121,18 +123,22 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     }
     // weight gradient calculation
     // TODO(loc) put this in a function to put the ifdef in there
-#ifndef GALOIS_ENABLE_GPU
-    // temp 2 holds aggregated feature vectors from forward phase
-    galois::CBlasSGEMM(
-        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        p_in_temp_2_.data(), input_gradient->data(),
-        p_layer_weight_gradients_.data());
-#else
-    gpu_object_.GetWeightGradientsGPU(
-        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-        layer_dimensions_.output_columns, p_in_temp_2_.data(),
-        input_gradient->data(), p_layer_weight_gradients_.data());
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.GetWeightGradientsGPU(
+          layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+          layer_dimensions_.output_columns, p_in_temp_2_.data(),
+          input_gradient->data(), p_layer_weight_gradients_.data());
+    } else {
+#endif
+      // temp 2 holds aggregated feature vectors from forward phase
+      galois::CBlasSGEMM(
+          CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+          p_in_temp_2_.data(), input_gradient->data(),
+          p_layer_weight_gradients_.data());
+#ifdef GALOIS_ENABLE_GPU
+    }
 #endif
   } else {
     // TODO at this point, out_temp contains memoized FW
@@ -150,18 +156,21 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     }
     // TODO put this in a function
     // W' = F^T (FW)'
-#ifndef GALOIS_ENABLE_GPU
-    // weight gradient; note the use of the aggregated gradient in out_temp
-    galois::CBlasSGEMM(
-        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        prev_layer_input.data(), p_out_temp_.data(),
-        p_layer_weight_gradients_.data());
-#else
-    gpu_object_.GetWeightGradientsGPU(
-        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-        layer_dimensions_.output_columns, prev_layer_input.data(),
-        p_out_temp_.data(), p_layer_weight_gradients_.data());
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.GetWeightGradientsGPU(
+          layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+          layer_dimensions_.output_columns, prev_layer_input.data(),
+          p_out_temp_.data(), p_layer_weight_gradients_.data());
+    } else {
+#endif
+      galois::CBlasSGEMM(
+          CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+          prev_layer_input.data(), p_out_temp_.data(),
+          p_layer_weight_gradients_.data());
+#ifdef GALOIS_ENABLE_GPU
+    }
 #endif
   }
 
@@ -183,12 +192,17 @@ void galois::GraphConvolutionalLayer::AggregateAll(
     GNNFloat* aggregate_output,
     [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
         pts) {
-#ifndef GALOIS_ENABLE_GPU
-  AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
-#else
-  gpu_object_.AggregateAllGPU(graph_.GetGPUGraph(), graph_.size(),
-                              column_length, node_embeddings, aggregate_output,
-                              config_.do_normalization);
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.AggregateAllGPU(graph_.GetGPUGraph(), graph_.size(),
+                                column_length, node_embeddings,
+                                aggregate_output, config_.do_normalization);
+    graph_.AggregateSync(aggregate_output, column_length, layer_number_);
+  } else {
+#endif
+    AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 
@@ -284,24 +298,27 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         //                  &aggregate_output[index_to_src_feature]);
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
-
   // aggregate sync
   graph_.AggregateSync(aggregate_output, column_length);
 }
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(
     const GNNFloat* node_embeddings, GNNFloat* output) {
-#ifndef GALOIS_ENABLE_GPU
-  // CPU version is just a call into CBlas
-  galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
-                     layer_dimensions_.input_columns,
-                     layer_dimensions_.output_columns, node_embeddings,
-                     layer_weights_.data(), output);
-#else
-  gpu_object_.UpdateEmbeddingsGPU(
-      layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-      layer_dimensions_.output_columns, node_embeddings,
-      base_gpu_object_.layer_weights(), output);
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.UpdateEmbeddingsGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+        layer_dimensions_.output_columns, node_embeddings,
+        base_gpu_object_.layer_weights(), output);
+  } else {
+#endif
+    // CPU version is just a call into CBlas
+    galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
+                       layer_dimensions_.input_columns,
+                       layer_dimensions_.output_columns, node_embeddings,
+                       layer_weights_.data(), output);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 
@@ -309,18 +326,21 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
     const GNNFloat* gradients, GNNFloat* output) {
   assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
-#ifndef GALOIS_ENABLE_GPU
-  // difference is Trans for B matrix (data) to get z by y (weights is y by z
-  // normally); result is x by y
-  galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
-                     layer_dimensions_.output_columns,
-                     layer_dimensions_.input_columns, gradients,
-                     layer_weights_.data(), output);
-#else
-  gpu_object_.UpdateEmbeddingsDerivativeGPU(
-      layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-      layer_dimensions_.output_columns, gradients,
-      base_gpu_object_.layer_weights(), output);
-
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.UpdateEmbeddingsDerivativeGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+        layer_dimensions_.output_columns, gradients,
+        base_gpu_object_.layer_weights(), output);
+  } else {
+#endif
+    // difference is Trans for B matrix (data) to get z by y (weights is y by z
+    // normally); result is x by y
+    galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
+                       layer_dimensions_.output_columns,
+                       layer_dimensions_.input_columns, gradients,
+                       layer_weights_.data(), output);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
