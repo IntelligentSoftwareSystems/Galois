@@ -177,8 +177,6 @@ void galois::graphs::GNNGraph::AggregateSync(
 }
 #endif
 
-void galois::graphs::GNNGraph::UniformNodeSample() { UniformNodeSample(0.8); }
-
 void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
   galois::do_all(
       galois::iterate(begin_owned(), end_owned()), [&](const NodeIterator& x) {
@@ -187,6 +185,74 @@ void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
   // TODO(loc) GPU
   // TODO(loc) sync the flags across all machines to have same sample on all of
   // them
+}
+
+// TODO(loc) does not work in a distributed setting: assumes the partitioned
+// graph is the entire graph
+void galois::graphs::GNNGraph::GraphSAINTSample(size_t num_roots,
+                                                size_t walk_depth) {
+  // reset sample
+  galois::do_all(galois::iterate(begin(), end()),
+                 [&](size_t n) { partitioned_graph_->getData(n) = 0; });
+
+  galois::on_each([&](size_t thread_id, size_t num_threads) {
+    size_t my_start = 0;
+    size_t my_end   = 0;
+    std::tie(my_start, my_end) =
+        galois::block_range(size_t{0}, num_roots, thread_id, num_threads);
+    size_t thread_roots = my_end - my_start;
+    size_t train_range  = global_training_mask_range_.size;
+    // init RNG
+    drand48_data seed_struct;
+    srand48_r(sample_rng_.GetRandomNumber() * thread_id * num_threads,
+              &seed_struct);
+
+    for (size_t root_num = 0; root_num < thread_roots; root_num++) {
+      // pick a random training node root at random (with replacement);
+      size_t root = 0;
+      while (true) {
+        long int rand_num;
+        lrand48_r(&seed_struct, &rand_num);
+        root = global_training_mask_range_.begin + (rand_num % train_range);
+        if (IsValidForPhase(root, GNNPhase::kTrain)) {
+          break;
+        }
+      }
+      // mark this root as sampled
+      SetSampledNode(root);
+      assert(IsInSampledGraph(root));
+
+      // sample more nodes based on depth of the walk
+      for (size_t current_depth = 0; current_depth < walk_depth;
+           current_depth++) {
+        // pick random edge, mark sampled, swap roots
+        EdgeIterator first_edge = EdgeBegin(root);
+        size_t num_edges        = std::distance(first_edge, EdgeEnd(root));
+        if (num_edges == 0) {
+          break;
+        }
+
+        // must select training neighbor: if it doesn't, then ignore and
+        // continue
+        // To prevent infinite loop in case node has NO training neighbor,
+        // this implementation will not loop until one is found and will
+        // not find full depth if it doesn't find any training nodes randomly
+        long int rand_num;
+        lrand48_r(&seed_struct, &rand_num);
+        EdgeIterator selected_edge = first_edge + (rand_num % num_edges);
+        size_t candidate_dest      = EdgeDestination(selected_edge);
+
+        // TODO(loc) another possibility is to just pick it anyways regardless
+        // but don't mark it as sampled, though this would lead to disconnected
+        // graph
+        if (IsValidForPhase(candidate_dest, GNNPhase::kTrain)) {
+          SetSampledNode(candidate_dest);
+          assert(IsInSampledGraph(candidate_dest));
+          root = candidate_dest;
+        }
+      }
+    }
+  });
 }
 
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
@@ -432,9 +498,10 @@ void galois::graphs::GNNGraph::CalculateFullNormFactor() {
       galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
       [&](size_t local_id) {
         // translate lid into gid to get global degree
-        size_t global_id     = partitioned_graph_->getGID(local_id);
+        size_t global_id = partitioned_graph_->getGID(local_id);
+        // +1 because simulated self edge
         size_t global_degree = whole_graph_.edge_end(global_id) -
-                               whole_graph_.edge_begin(global_id);
+                               whole_graph_.edge_begin(global_id) + 1;
         // only set if non-zero
         if (global_degree != 0) {
           norm_factors_[local_id] =

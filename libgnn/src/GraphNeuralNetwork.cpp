@@ -1,6 +1,7 @@
 #include "galois/GNNMath.h"
 #include "galois/GraphNeuralNetwork.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
+#include "galois/layers/DenseLayer.h"
 #include "galois/layers/SoftmaxLayer.h"
 #include "galois/layers/SigmoidLayer.h"
 
@@ -48,13 +49,21 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
             layer_dims.input_columns, layer_dims.output_columns);
       }
 #endif
-      if (i == config_.num_intermediate_layers() - 1) {
-        // last layer before output layer should never have activation
-        gnn_layers_.back()->DisableActivation();
-      }
+      break;
+    case GNNLayerType::kDense:
+      gnn_layers_.push_back(std::move(std::make_unique<DenseLayer>(
+          i, *graph_, layer_dims, config_.default_layer_config())));
+#ifdef GALOIS_ENABLE_GPU
+      // TODO(loc/hochan) dense layer gpu
+#endif
       break;
     default:
       GALOIS_LOG_FATAL("Invalid layer type during network construction");
+    }
+
+    if (i == config_.num_intermediate_layers() - 1) {
+      // last layer before output layer should never have activation
+      gnn_layers_.back()->DisableActivation();
     }
   }
 
@@ -117,7 +126,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     if (config_.do_sampling()) {
       // subgraph sample every epoch
-      graph_->UniformNodeSample();
+      // graph_->UniformNodeSample();
+      graph_->GraphSAINTSample();
       graph_->CalculateSpecialNormFactor(true, config_.inductive_training_);
     }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();

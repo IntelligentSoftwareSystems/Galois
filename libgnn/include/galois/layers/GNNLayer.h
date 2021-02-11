@@ -16,8 +16,10 @@ enum class GNNLayerType {
   //! Invalid placeholder
   kInvalid,
   //! GCN
-  kGraphConvolutional
-  // TODO SAGE and GAT
+  kGraphConvolutional,
+  //! Dense linear xform layer
+  kDense
+  // TODO GAT
 };
 
 //! Supported output layer types in the GNN
@@ -39,15 +41,14 @@ struct GNNLayerDimensions {
 struct GNNLayerConfig {
   //! True if weights should be allocated
   bool allocate_weights{true};
-  //! True if dropout is to be done at beginning of forward phase
-  bool do_dropout{false};
+  //! Turns off dropout of weights if enabled
+  bool disable_dropout{false};
   //! Rate at which to drop things if dropout is on
   float dropout_rate{0.5};
-  //! True if some activation function is to be called done at end of forward
-  //! phase
-  bool do_activation{false};
-  //! True if normalization is to occur during multiplies
-  bool do_normalization{false};
+  //! True to disable activation function for intermediate layers
+  bool disable_activation{false};
+  //! True if normalization is disabled to occur during multiplies
+  bool disable_normalization{false};
   //! If this is false, aggregate may occur after multiply if # of input columns
   //! is higher than output columns to do less work in aggregation
   bool disable_aggregate_after_update{false};
@@ -79,7 +80,7 @@ public:
   //! Changes this layer's phase
   void SetLayerPhase(GNNPhase new_phase) { layer_phase_ = new_phase; }
 
-  void DisableActivation() { config_.do_activation = false; }
+  void DisableActivation() { config_.disable_activation = true; }
 
   //! Initializes all layer weights to 1. This is used as a debug function for
   //! testing.

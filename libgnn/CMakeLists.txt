@@ -6,6 +6,7 @@ set(sources
   src/layers/GNNLayer.cpp
   src/layers/GluonGradientInterface.cpp
   src/layers/GraphConvolutionalLayer.cpp
+  src/layers/DenseLayer.cpp
   src/layers/SigmoidLayer.cpp
   src/layers/SoftmaxLayer.cpp
 )

@@ -153,8 +153,12 @@ public:
   //! (the meaning of on and off depends on how it is used; for now, it is used
   //! to indicate subgraph presence); droprate controls chance of being dropped
   //! (e.g. if 0.8, a node is 80% likely to not be included in subgraph)
-  void UniformNodeSample();
+  void UniformNodeSample() { UniformNodeSample(0.5); }
   void UniformNodeSample(float droprate);
+
+  //! Use the sampling method present in GraphSAINT
+  void GraphSAINTSample() { GraphSAINTSample(3000, 2); };
+  void GraphSAINTSample(size_t num_roots, size_t walk_depth);
 
   //! Makes a node "sampled"; used for debugging/testing
   void SetSampledNode(size_t node) { partitioned_graph_->getData(node) = 1; }

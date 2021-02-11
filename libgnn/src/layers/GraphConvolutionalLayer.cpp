@@ -54,7 +54,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
   // first, dropout
-  if (config_.do_dropout && (layer_phase_ == GNNPhase::kTrain)) {
+  if (!config_.disable_dropout && (layer_phase_ == GNNPhase::kTrain)) {
     DoDropout(input_embeddings, &p_in_temp_1_);
     input_data = p_in_temp_1_.data();
   }
@@ -78,7 +78,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
 
   // TODO synchronization of aggregation functions
 
-  if (config_.do_activation) {
+  if (!config_.disable_activation) {
     GALOIS_LOG_VERBOSE("Doing activation");
     Activation();
   }
@@ -95,7 +95,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
   assert(layer_phase_ == GNNPhase::kTrain);
 
   // derivative of activation
-  if (config_.do_activation) {
+  if (!config_.disable_activation) {
     ActivationDerivative(input_gradient);
   }
 
@@ -180,7 +180,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
   // WeightGradientSyncAverage();
   WeightGradientSyncSum();
 
-  if (config_.do_dropout && layer_number_ != 0) {
+  if (!config_.disable_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
   }
 
@@ -194,9 +194,9 @@ void galois::GraphConvolutionalLayer::AggregateAll(
         pts) {
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    gpu_object_.AggregateAllGPU(graph_.GetGPUGraph(), graph_.size(),
-                                column_length, node_embeddings,
-                                aggregate_output, config_.do_normalization);
+    gpu_object_.AggregateAllGPU(
+        graph_.GetGPUGraph(), graph_.size(), column_length, node_embeddings,
+        aggregate_output, !config_.disable_normalization);
     graph_.AggregateSync(aggregate_output, column_length, layer_number_);
   } else {
 #endif
@@ -217,7 +217,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
       [&](size_t src) {
         size_t index_to_src_feature = src * column_length;
         // zero out src feature first
-        // TODO(loc) can init to self as well to add to self
         for (size_t i = 0; i < column_length; i++) {
           aggregate_output[index_to_src_feature + i] = 0;
         }
@@ -238,8 +237,14 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         }
 
         GNNFloat source_norm = 0.0;
-        if (config_.do_normalization) {
+        if (!config_.disable_normalization) {
           source_norm = graph_.NormFactor(src);
+        }
+
+        // init to self
+        for (size_t i = 0; i < column_length; i++) {
+          aggregate_output[index_to_src_feature + i] =
+              node_embeddings[index_to_src_feature + i];
         }
 
         // loop through all destinations to grab the feature to aggregate
@@ -263,7 +268,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
           size_t index_to_dst_feature = dst * column_length;
 
-          if (config_.do_normalization) {
+          if (!config_.disable_normalization) {
             GNNFloat norm_scale = source_norm * graph_.NormFactor(dst);
             // scale the value on the destination by the combined norm term
             assert(pts->getLocal()->size() == column_length);
@@ -288,14 +293,14 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         // GNNFloat* intermediate = pts->getLocal()->data();
         // GNNFloat norm_scale = source_norm * source_norm;
         // for (size_t i = 0; i < column_length; i++) {
-        //  intermediate[i] =
-        //      norm_scale * node_embeddings[index_to_src_feature + i];
-        //}
-        //// add self
+        //   intermediate[i] =
+        //       norm_scale * node_embeddings[index_to_src_feature + i];
+        // }
+        // // add self
         // galois::VectorAdd(column_length,
-        //                  &aggregate_output[index_to_src_feature],
-        //                  intermediate,
-        //                  &aggregate_output[index_to_src_feature]);
+        //                   &aggregate_output[index_to_src_feature],
+        //                   intermediate,
+        //                   &aggregate_output[index_to_src_feature]);
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
