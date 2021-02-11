@@ -242,9 +242,11 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         }
 
         // init to self
-        for (size_t i = 0; i < column_length; i++) {
-          aggregate_output[index_to_src_feature + i] =
-              node_embeddings[index_to_src_feature + i];
+        if (!config_.disable_self_aggregate) {
+          for (size_t i = 0; i < column_length; i++) {
+            aggregate_output[index_to_src_feature + i] =
+                node_embeddings[index_to_src_feature + i];
+          }
         }
 
         // loop through all destinations to grab the feature to aggregate

@@ -22,9 +22,9 @@ int main() {
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
   galois::GNNLayerConfig layer_config;
-  layer_config.do_dropout       = true;
-  layer_config.do_activation    = false;
-  layer_config.do_normalization = true;
+  layer_config.disable_dropout       = false;
+  layer_config.disable_activation    = false;
+  layer_config.disable_normalization = false;
   // XXX Activation kills accuracy compared to old code, esp. for cora
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSigmoid,

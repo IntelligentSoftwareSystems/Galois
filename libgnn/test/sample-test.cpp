@@ -27,6 +27,7 @@ int main() {
 
   galois::GNNLayerConfig dcon;
   dcon.disable_aggregate_after_update = false;
+  dcon.DebugConfig();
 
   // choose a few sample nodes
   test_graph.SetSampledNode(0);

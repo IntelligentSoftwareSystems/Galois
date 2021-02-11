@@ -92,6 +92,11 @@ llvm::cl::opt<bool> disable_agg_after_update(
               "after update optimization"),
     cll::init(false));
 
+llvm::cl::opt<bool> disable_self_aggregate(
+    "disableSelfAggregation",
+    cll::desc("If true (off by default), disables aggregate of self feature"),
+    cll::init(false));
+
 llvm::cl::opt<bool>
     do_graph_sampling("doGraphSampling",
                       cll::desc("If true (off by default), sample nodes for "
@@ -176,6 +181,7 @@ galois::GNNLayerConfig CreateLayerConfig() {
   layer_config.disable_activation             = disable_activation;
   layer_config.disable_normalization          = disable_normalization;
   layer_config.disable_aggregate_after_update = disable_agg_after_update;
+  layer_config.disable_self_aggregate         = disable_self_aggregate;
   layer_config.inductive_training_            = do_inductive_training;
   return layer_config;
 }

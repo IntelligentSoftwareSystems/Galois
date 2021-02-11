@@ -52,11 +52,21 @@ struct GNNLayerConfig {
   //! If this is false, aggregate may occur after multiply if # of input columns
   //! is higher than output columns to do less work in aggregation
   bool disable_aggregate_after_update{false};
+  //! On to not aggregate self vector during aggregation
+  bool disable_self_aggregate{false};
   //! Graph sampling flag in use or not
   bool do_sampling{false};
   //! Inductive layer means for aggregation all non-training nodes are ignored
   bool inductive_training_{false};
   // TODO activation type; for now default is softmax
+
+  //! Sets settings such that testing is easy
+  void DebugConfig() {
+    disable_activation     = true;
+    disable_normalization  = true;
+    disable_dropout        = true;
+    disable_self_aggregate = true;
+  }
 };
 
 // Tried to avoid inheritance, but keeping track of heterogeneous layers

@@ -25,6 +25,7 @@ int main() {
   std::vector<size_t> layer_output_sizes = {4, 7, 7};
   galois::GNNLayerConfig dcon;
   dcon.disable_aggregate_after_update = false;
+  dcon.DebugConfig();
   // note GNNLayerConfig is passed in; use a config that does not do anything
   // extra like dropout or activation and the like so that input is easier to
   // verify

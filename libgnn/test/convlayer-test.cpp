@@ -53,6 +53,7 @@ int main() {
 
   galois::GNNLayerConfig dcon;
   dcon.disable_aggregate_after_update = false;
+  dcon.DebugConfig();
 
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
@@ -69,9 +70,11 @@ int main() {
   // since norm factors aren't invovled it is possible to do full assertions
   // 7 x 2
   GALOIS_LOG_ASSERT(layer_0_forward_output.size() == 14);
-  GALOIS_LOG_ASSERT(layer_0_forward_output[0] == 3);
+  GALOIS_LOG_VASSERT(layer_0_forward_output[0] == 3, "{} should be 3",
+                     layer_0_forward_output[0]);
   GALOIS_LOG_ASSERT(layer_0_forward_output[1] == 3);
-  GALOIS_LOG_ASSERT(layer_0_forward_output[2] == 6);
+  GALOIS_LOG_VASSERT(layer_0_forward_output[2] == 6, "{} should be 6",
+                     layer_0_forward_output[2]);
   GALOIS_LOG_ASSERT(layer_0_forward_output[3] == 6);
   GALOIS_LOG_ASSERT(layer_0_forward_output[4] == 12);
   GALOIS_LOG_ASSERT(layer_0_forward_output[5] == 12);
@@ -207,9 +210,9 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
 
   galois::GNNLayerConfig config;
-  config.do_dropout                     = true;
-  config.do_activation                  = true;
-  config.do_normalization               = true;
+  config.disable_dropout                = false;
+  config.disable_activation             = false;
+  config.disable_normalization          = false;
   config.disable_aggregate_after_update = false;
 
   // finally, just make sure dropout and activation run without crashes
