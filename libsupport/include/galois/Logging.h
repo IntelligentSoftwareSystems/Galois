@@ -111,4 +111,13 @@ void LogLine(LogLevel level, const char* file_name, int line_no, F fmt_string,
     }                                                                          \
   } while (0)
 
+#define GALOIS_LOG_VASSERT(cond, fmt_string, ...)                              \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      ::galois::LogLine(::galois::LogLevel::Error, __FILE__, __LINE__,         \
+                        FMT_STRING(fmt_string), ##__VA_ARGS__);                \
+      ::std::abort();                                                          \
+    }                                                                          \
+  } while (0)
+
 #endif
