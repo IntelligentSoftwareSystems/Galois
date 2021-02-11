@@ -30,16 +30,29 @@ llvm::cl::opt<size_t> num_layers(
         "Number of intermediate layers in the neural network (default 2))"),
     cll::init(2));
 
-llvm::cl::list<size_t>
-    layer_sizes("layerSizes",
-                cll::desc("Comma separated list of numbers specifying "
-                          "intermediate layer sizes (does not include output)"),
-                cll::CommaSeparated);
+llvm::cl::list<size_t> layer_sizes(
+    "layerSizes",
+    cll::desc(
+        "Comma separated list of numbers specifying "
+        "intermediate layer sizes (does not include output); default sizes are "
+        "16 until last layer which is the size of the # of labels"),
+    cll::CommaSeparated);
 
-llvm::cl::opt<bool> do_dropout(
-    "doDropout",
-    cll::desc("If true (on by default), does dropout of input during training"),
-    cll::init(true));
+llvm::cl::list<galois::GNNLayerType> cl_layer_types(
+    "layerTypes",
+    cll::desc("Comma separated list of layer types specifying "
+              "intermediate layers (does not include output)"),
+    cll::values(clEnumValN(galois::GNNLayerType::kGraphConvolutional, "gcn",
+                           "Graph Convolutional Layer (default)"),
+                clEnumValN(galois::GNNLayerType::kDense, "dense",
+                           "Dense Layer")),
+    cll::CommaSeparated);
+
+llvm::cl::opt<bool>
+    disable_dropout("disableDropout",
+                    cll::desc("If true (off by default), disables dropout of "
+                              "layer weights during training"),
+                    cll::init(false));
 
 llvm::cl::opt<float> dropout_rate(
     "dropoutRate",
@@ -47,17 +60,17 @@ llvm::cl::opt<float> dropout_rate(
               "0.1, then 10 percent chance of dropping) (default 0.5)"),
     cll::init(0.5));
 
-llvm::cl::opt<bool>
-    do_activation("doActivation",
-                  cll::desc("If true (off by default), does activation at the "
-                            "end of an intermediate layer"),
-                  cll::init(false));
+llvm::cl::opt<bool> disable_activation(
+    "disableActivation",
+    cll::desc("If true (off by default), disable activation at the "
+              "end of an intermediate layers"),
+    cll::init(false));
 
-llvm::cl::opt<bool>
-    do_normalization("doNormalization",
-                     cll::desc("If true (on by default), normalizes vertex "
-                               "features based on their degree"),
-                     cll::init(true));
+llvm::cl::opt<bool> disable_normalization(
+    "disableNormalization",
+    cll::desc("If true (off by default), disable normalizing vertex "
+              "features based on their degree"),
+    cll::init(false));
 
 llvm::cl::opt<galois::GNNOutputLayerType> output_layer_type(
     "outputLayer", cll::desc("Type of output layer"),
@@ -104,6 +117,25 @@ const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
 }
 
 //! Initializes the vector of layer sizes from command line args + graph
+std::vector<galois::GNNLayerType> CreateLayerTypesVector() {
+  std::vector<galois::GNNLayerType> layer_types;
+  if (!cl_layer_types.size()) {
+    // default is all GCN layers
+    for (size_t i = 0; i < num_layers; i++) {
+      layer_types.emplace_back(galois::GNNLayerType::kGraphConvolutional);
+    }
+  } else {
+    GALOIS_LOG_VASSERT(cl_layer_types.size() == num_layers,
+                       "Number layer types should be {} not {}", num_layers,
+                       cl_layer_types.size());
+    for (size_t i = 0; i < num_layers; i++) {
+      layer_types.emplace_back(cl_layer_types[i]);
+    }
+  }
+  return layer_types;
+}
+
+//! Initializes the vector of layer sizes from command line args + graph
 std::vector<size_t>
 CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
   // set layer sizes for intermdiate and output layers
@@ -139,10 +171,10 @@ CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
 //! Setup layer config struct based on cli args
 galois::GNNLayerConfig CreateLayerConfig() {
   galois::GNNLayerConfig layer_config;
-  layer_config.do_dropout                     = do_dropout;
+  layer_config.disable_dropout                = disable_dropout;
   layer_config.dropout_rate                   = dropout_rate;
-  layer_config.do_activation                  = do_activation;
-  layer_config.do_normalization               = do_normalization;
+  layer_config.disable_activation             = disable_activation;
+  layer_config.disable_normalization          = disable_normalization;
   layer_config.disable_aggregate_after_update = disable_agg_after_update;
   layer_config.inductive_training_            = do_inductive_training;
   return layer_config;
@@ -184,17 +216,13 @@ CreateOptimizer(const galois::graphs::GNNGraph* gnn_graph) {
   return std::make_unique<galois::AdamOptimizer>(opt_sizes, num_layers);
 }
 
-std::unique_ptr<galois::GraphNeuralNetwork>
-InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type) {
+std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   // partition/load graph
   auto gnn_graph = std::make_unique<galois::graphs::GNNGraph>(
       input_directory, input_name, partition_scheme, !multiclass_labels);
 
   // create layer types vector
-  std::vector<galois::GNNLayerType> layer_types;
-  for (size_t i = 0; i < num_layers; i++) {
-    layer_types.push_back(layer_type);
-  }
+  std::vector<galois::GNNLayerType> layer_types = CreateLayerTypesVector();
   // sizes
   std::vector<size_t> layer_sizes_vector =
       CreateLayerSizesVector(gnn_graph.get());

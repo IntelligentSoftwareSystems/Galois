@@ -19,5 +19,4 @@ const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s);
 
 //! Using command line args above, create a GNN using some specified layer type
 //! as the intermediate layer.
-std::unique_ptr<galois::GraphNeuralNetwork>
-InitializeGraphNeuralNetwork(galois::GNNLayerType layer_type);
+std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork();
