@@ -4,6 +4,7 @@
 #include "galois/layers/DenseLayer.h"
 #include "galois/layers/SoftmaxLayer.h"
 #include "galois/layers/SigmoidLayer.h"
+#include "galois/layers/SAGELayer.h"
 
 galois::GraphNeuralNetwork::GraphNeuralNetwork(
     std::unique_ptr<galois::graphs::GNNGraph> graph,
@@ -48,6 +49,13 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
             i, galois::runtime::getSystemNetworkInterface().Num,
             layer_dims.input_columns, layer_dims.output_columns);
       }
+#endif
+      break;
+    case GNNLayerType::kSAGE:
+      gnn_layers_.push_back(std::move(std::make_unique<SAGELayer>(
+          i, *graph_, layer_dims, config_.default_layer_config())));
+#ifdef GALOIS_ENABLE_GPU
+      // TODO(loc/hochan) sage layer gpu
 #endif
       break;
     case GNNLayerType::kDense:

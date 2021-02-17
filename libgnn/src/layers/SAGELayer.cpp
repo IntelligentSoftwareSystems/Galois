@@ -1,10 +1,12 @@
 #include "galois/Logging.h"
 #include "galois/GNNMath.h"
-#include "galois/layers/GraphConvolutionalLayer.h"
+#include "galois/layers/SAGELayer.h"
 
-galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
-    size_t layer_num, const galois::graphs::GNNGraph& graph,
-    const GNNLayerDimensions& dimensions, const GNNLayerConfig& config)
+galois::SAGELayer::SAGELayer(size_t layer_num,
+                             const galois::graphs::GNNGraph& graph,
+                             const GNNLayerDimensions& dimensions,
+                             const GNNLayerConfig& config,
+                             const SAGELayerConfig&)
     : GNNLayer(layer_num, graph, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
@@ -20,6 +22,7 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU
+  // TODO
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.Allocate(num_input_elements, num_output_elements);
     // init pointers with size
@@ -35,14 +38,14 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
     p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
 #ifdef GALOIS_ENABLE_GPU
+    // TODO concat
   }
 #endif
 
-  GALOIS_LOG_VERBOSE("Conv layer initialized");
+  GALOIS_LOG_VERBOSE("SAGE layer initialized");
 }
 
-const galois::PointerWithSize<galois::GNNFloat>
-galois::GraphConvolutionalLayer::ForwardPhase(
+const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
   GALOIS_LOG_VERBOSE("Calling forward phase");
   assert(input_embeddings.size() ==
@@ -88,8 +91,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   return p_forward_output_matrix_;
 }
 
-galois::PointerWithSize<galois::GNNFloat>
-galois::GraphConvolutionalLayer::BackwardPhase(
+galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
   assert(layer_phase_ == GNNPhase::kTrain);
@@ -117,7 +119,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
       // derivative of aggregate is the same due to symmetric graph
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
                    p_backward_output_matrix_.data(),
-                   &input_column_intermediates_);
+                   &input_column_intermediates_, true);
       // TODO if training A, then A' compute here if layer # is 0
       // dot product of edges that exist in A
     }
@@ -147,7 +149,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     // required in this case for the weight gradient calculation
     // this is (FW)'
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
-                 p_out_temp_.data(), &output_column_intermediates_);
+                 p_out_temp_.data(), &output_column_intermediates_, true);
     if (layer_number_ != 0) {
       // derivative for update
       // backout = F'
@@ -187,11 +189,20 @@ galois::GraphConvolutionalLayer::BackwardPhase(
   return p_backward_output_matrix_;
 }
 
-void galois::GraphConvolutionalLayer::AggregateAll(
+void galois::SAGELayer::AggregateAll(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
     [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
         pts) {
+  AggregateAll(column_length, node_embeddings, aggregate_output, pts, false);
+}
+
+void galois::SAGELayer::AggregateAll(
+    size_t column_length, const GNNFloat* node_embeddings,
+    GNNFloat* aggregate_output,
+    [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
+        pts,
+    bool is_backward) {
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.AggregateAllGPU(
@@ -200,16 +211,18 @@ void galois::GraphConvolutionalLayer::AggregateAll(
     graph_.AggregateSync(aggregate_output, column_length, layer_number_);
   } else {
 #endif
-    AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
+    AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts,
+                    is_backward);
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
 }
 
-void galois::GraphConvolutionalLayer::AggregateAllCPU(
+void galois::SAGELayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
-    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts) {
+    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts,
+    bool is_backward) {
   size_t num_nodes = graph_.size();
 
   galois::do_all(
@@ -238,16 +251,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
-          source_norm = graph_.NormFactor(src);
-        }
-
-        // init to self
-        if (!config_.disable_self_aggregate) {
-          for (size_t i = 0; i < column_length; i++) {
-            aggregate_output[index_to_src_feature + i] =
-                node_embeddings[index_to_src_feature + i] * source_norm *
-                source_norm;
-          }
+          source_norm = graph_.DegreeNorm(src);
         }
 
         // loop through all destinations to grab the feature to aggregate
@@ -272,7 +276,13 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           size_t index_to_dst_feature = dst * column_length;
 
           if (!config_.disable_normalization) {
-            GNNFloat norm_scale = source_norm * graph_.NormFactor(dst);
+            GNNFloat norm_scale;
+            if (!is_backward) {
+              norm_scale = source_norm;
+            } else {
+              norm_scale = graph_.DegreeNorm(dst);
+            }
+
             // scale the value on the destination by the combined norm term
             assert(pts->getLocal()->size() == column_length);
             GNNFloat* intermediate = pts->getLocal()->data();
@@ -292,26 +302,14 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
                               &aggregate_output[index_to_src_feature]);
           }
         }
-
-        // GNNFloat* intermediate = pts->getLocal()->data();
-        // GNNFloat norm_scale = source_norm * source_norm;
-        // for (size_t i = 0; i < column_length; i++) {
-        //   intermediate[i] =
-        //       norm_scale * node_embeddings[index_to_src_feature + i];
-        // }
-        // // add self
-        // galois::VectorAdd(column_length,
-        //                   &aggregate_output[index_to_src_feature],
-        //                   intermediate,
-        //                   &aggregate_output[index_to_src_feature]);
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
   graph_.AggregateSync(aggregate_output, column_length);
 }
 
-void galois::GraphConvolutionalLayer::UpdateEmbeddings(
-    const GNNFloat* node_embeddings, GNNFloat* output) {
+void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
+                                         GNNFloat* output) {
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.UpdateEmbeddingsGPU(
@@ -330,8 +328,8 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddings(
 #endif
 }
 
-void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
-    const GNNFloat* gradients, GNNFloat* output) {
+void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
+                                                   GNNFloat* output) {
   assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU

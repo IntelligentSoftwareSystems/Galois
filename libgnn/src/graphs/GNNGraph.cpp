@@ -487,6 +487,7 @@ void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
 void galois::graphs::GNNGraph::InitNormFactor() {
   GALOIS_LOG_VERBOSE("[{}] Initializing norm factors", host_id_);
   norm_factors_.resize(partitioned_graph_->size(), 0.0);
+  degree_norm_.resize(partitioned_graph_->size(), 0.0);
   CalculateFullNormFactor();
 }
 
@@ -506,6 +507,7 @@ void galois::graphs::GNNGraph::CalculateFullNormFactor() {
         if (global_degree != 0) {
           norm_factors_[local_id] =
               1.0 / std::sqrt(static_cast<float>(global_degree));
+          degree_norm_[local_id] = 1.0 / static_cast<float>(global_degree);
         }
       },
       galois::loopname("CalculateFullNormFactor"));
@@ -569,6 +571,7 @@ void galois::graphs::GNNGraph::CalculateSpecialNormFactor(bool is_sampled,
         // only set if non-zero
         if (degree != 0) {
           norm_factors_[local_id] = 1.0 / std::sqrt(static_cast<float>(degree));
+          degree_norm_[local_id]  = 1.0 / static_cast<float>(degree);
         }
       },
       galois::loopname("CalculateSpecialNormFactor"));

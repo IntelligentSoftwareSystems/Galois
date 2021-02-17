@@ -17,6 +17,8 @@ enum class GNNLayerType {
   kInvalid,
   //! GCN
   kGraphConvolutional,
+  //! Sage layer: same as GCN except with mean aggregation and concat
+  kSAGE,
   //! Dense linear xform layer
   kDense
   // TODO GAT

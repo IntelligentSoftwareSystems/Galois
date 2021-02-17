@@ -9,6 +9,7 @@ set(sources
   src/layers/DenseLayer.cpp
   src/layers/SigmoidLayer.cpp
   src/layers/SoftmaxLayer.cpp
+  src/layers/SAGELayer.cpp
 )
 
 set(MKL_LIBRARIES ${MKL_ROOT}/lib/intel64)

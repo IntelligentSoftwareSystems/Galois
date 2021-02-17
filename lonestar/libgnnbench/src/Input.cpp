@@ -44,6 +44,8 @@ llvm::cl::list<galois::GNNLayerType> cl_layer_types(
               "intermediate layers (does not include output)"),
     cll::values(clEnumValN(galois::GNNLayerType::kGraphConvolutional, "gcn",
                            "Graph Convolutional Layer (default)"),
+                clEnumValN(galois::GNNLayerType::kSAGE, "sage",
+                           "SAGE layer (GCN with concat + mean)"),
                 clEnumValN(galois::GNNLayerType::kDense, "dense",
                            "Dense Layer")),
     cll::CommaSeparated);

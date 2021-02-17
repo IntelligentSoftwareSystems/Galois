@@ -95,6 +95,9 @@ public:
     return partitioned_graph_->getEdgeDst(ei);
   };
   GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
+  //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
+  //! inductive graph, etc); calculated whenever norm factor is calculated
+  GNNFloat DegreeNorm(GraphNode n) const { return degree_norm_[n]; }
 
   // Get accuracy: sampling is by default false
   float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions,
@@ -287,6 +290,9 @@ private:
 
   //! Normalization constant based on structure of the graph (degrees)
   std::vector<GNNFloat> norm_factors_;
+  //! Normalization constant based on degrees (unlike nomral norm factors
+  //! it's only division without a square root)
+  std::vector<GNNFloat> degree_norm_;
 
   //! RNG for subgraph sampling
   galois::PerThreadRNG sample_rng_;
