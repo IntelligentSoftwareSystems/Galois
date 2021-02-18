@@ -6,10 +6,24 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
                              const galois::graphs::GNNGraph& graph,
                              const GNNLayerDimensions& dimensions,
                              const GNNLayerConfig& config,
-                             const SAGELayerConfig&)
-    : GNNLayer(layer_num, graph, dimensions, config),
+                             const SAGELayerConfig& sage_config)
+    : GNNLayer(layer_num, graph, dimensions, config), sage_config_(sage_config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
+  if (!sage_config_.disable_concat) {
+    // there are now 2 weight matrices used: one for self, one for aggregation
+    // abstractly it's one matrix: W = W1 | W2
+    size_t num_weight_elements =
+        layer_dimensions_.input_columns * layer_dimensions_.output_columns;
+    layer_weights_2_.resize(num_weight_elements);
+    layer_weight_gradients_2_.resize(num_weight_elements, 0);
+    GlorotBengioInit(&layer_weights_2_);
+    // update the pointers to them as well as realloc will require it
+    p_layer_weights_2_ = PointerWithSize<GNNFloat>(layer_weights_2_);
+    p_layer_weight_gradients_2_ =
+        PointerWithSize<GNNFloat>(layer_weight_gradients_2_);
+  }
+
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
   in_temp_1_.resize(num_input_elements, 0);
@@ -20,9 +34,9 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
   GALOIS_LOG_VERBOSE("Output elements {}", num_output_elements);
   out_temp_.resize(num_output_elements, 0);
-  layer_type_ = galois::GNNLayerType::kGraphConvolutional;
+  layer_type_ = galois::GNNLayerType::kSAGE;
 #ifdef GALOIS_ENABLE_GPU
-  // TODO
+  // TODO(loc/hochan) GPU SAGE
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.Allocate(num_input_elements, num_output_elements);
     // init pointers with size
@@ -38,11 +52,24 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
     p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
 #ifdef GALOIS_ENABLE_GPU
-    // TODO concat
+    // TODO concat parameters
   }
 #endif
 
   GALOIS_LOG_VERBOSE("SAGE layer initialized");
+}
+
+void MatrixAdd(size_t num_nodes, galois::PointerWithSize<galois::GNNFloat> in,
+               galois::PointerWithSize<galois::GNNFloat>* out) {
+  assert(in.size() == out->size());
+  assert((in.size() % num_nodes) == 0);
+  size_t column_size = in.size() / num_nodes;
+  // split matrix to threads
+  galois::do_all(galois::iterate(size_t{0}, num_nodes), [&](size_t node) {
+    size_t my_offset = node * column_size;
+    galois::VectorAdd(column_size, &(in[my_offset]),
+                      &((out->data())[my_offset]), &(out->data()[my_offset]));
+  });
 }
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
@@ -62,6 +89,9 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     input_data = p_in_temp_1_.data();
   }
 
+  // O = FW1 + AFW2 is what is done if concat is on: below is the AFW2 part
+  // which is done regardless
+
   // flip aggregate/update if dimensions favor it (do less work)
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
@@ -79,7 +109,14 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
                  &output_column_intermediates_);
   }
 
-  // TODO synchronization of aggregation functions
+  if (!sage_config_.disable_concat) {
+    // FW1 is unaffected by the agg/update flip, so can to it
+    // separately
+    SelfFeatureUpdateEmbeddings(input_data, p_out_temp_.data());
+    // add result to the output matrix: FW1 + AFW2
+    MatrixAdd(layer_dimensions_.input_rows, p_out_temp_,
+              &p_forward_output_matrix_);
+  }
 
   if (!config_.disable_activation) {
     GALOIS_LOG_VERBOSE("Doing activation");
@@ -176,10 +213,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
 #endif
   }
 
-  // sync weight gradients; note aggregation sync occurs in the function call
-  // already
-  // TODO figure out how to do this with GPUs
-  // WeightGradientSyncAverage();
   WeightGradientSyncSum();
 
   if (!config_.disable_dropout && layer_number_ != 0) {
@@ -311,6 +344,7 @@ void galois::SAGELayer::AggregateAllCPU(
 void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
                                          GNNFloat* output) {
 #ifdef GALOIS_ENABLE_GPU
+  // TODO self change
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.UpdateEmbeddingsGPU(
         layer_dimensions_.input_rows, layer_dimensions_.input_columns,
@@ -325,6 +359,21 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
                        layer_weights_.data(), output);
 #ifdef GALOIS_ENABLE_GPU
   }
+#endif
+}
+
+void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
+    const GNNFloat* node_embeddings, GNNFloat* output) {
+#ifdef GALOIS_ENABLE_GPU
+  // TODO self change
+#endif
+  // note use of layer weights 2 differentiates this from above
+  galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
+                     layer_dimensions_.input_columns,
+                     layer_dimensions_.output_columns, node_embeddings,
+                     layer_weights_2_.data(), output);
+#ifdef GALOIS_ENABLE_GPU
+}
 #endif
 }
 

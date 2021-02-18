@@ -8,9 +8,11 @@
 namespace galois {
 
 struct SAGELayerConfig {
-  // TODO(loc) relevant options here
-  bool todo;
+  bool disable_concat{false};
 };
+
+// TODO(loc) move common functionality with GCN layer to common parent class
+// (e.g. inits): cleans up Dense code a bit as well
 
 //! Same as GCN layer except for the following:
 //! - Mean aggregation; no symmetric norm with sqrts used (this
@@ -35,6 +37,12 @@ public:
       : SAGELayer(layer_num, graph, dimensions, GNNLayerConfig(),
                   SAGELayerConfig()) {}
 
+  void InitSelfWeightsTo1() {
+    if (layer_weights_2_.size()) {
+      layer_weights_2_.assign(layer_weights_2_.size(), 1);
+    }
+  }
+
   // Parent functions
   const PointerWithSize<galois::GNNFloat>
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
@@ -44,27 +52,6 @@ public:
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
-  // 2 temporaries the size of the forward input; used for dropout and
-  // aggregation (if either are required)
-  std::vector<GNNFloat> in_temp_1_;
-  std::vector<GNNFloat> in_temp_2_;
-  // Temporary matrix the size of the output of the forward pass; used if
-  // an intermediate op occurs before writing to the final output matrix
-  std::vector<GNNFloat> out_temp_;
-
-  // Pointer with size versions
-  PointerWithSize<GNNFloat> p_in_temp_1_;
-  PointerWithSize<GNNFloat> p_in_temp_2_;
-  PointerWithSize<GNNFloat> p_out_temp_;
-
-  // Each thread has a vector of size # input columns or # output columns for
-  // storing intermediate results during aggregation.
-  // The one used depeneds on if aggregation occurs before or after the mxm.
-  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>
-      input_column_intermediates_;
-  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>
-      output_column_intermediates_;
-
   //! CPU aggregation
   void AggregateAllCPU(
       size_t column_length, const GNNFloat* node_embeddings,
@@ -87,8 +74,41 @@ private:
 
   //! Do embedding update via mxm with this layer's weights (forward)
   void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output);
+  //! Same as above but uses the second set of weights (self feature weights)
+  void SelfFeatureUpdateEmbeddings(const GNNFloat* node_embeddings,
+                                   GNNFloat* output);
   //! Calculate graident via mxm with last layer's gradients (backward)
   void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output);
+
+  //! SAGE config params
+  SAGELayerConfig sage_config_;
+
+  // second set of weights for the concat that may occur
+  std::vector<GNNFloat> layer_weights_2_;
+  std::vector<GNNFloat> layer_weight_gradients_2_;
+  PointerWithSize<GNNFloat> p_layer_weights_2_;
+  PointerWithSize<GNNFloat> p_layer_weight_gradients_2_;
+
+  // 2 temporaries the size of the forward input; used for dropout and
+  // aggregation (if either are required)
+  std::vector<GNNFloat> in_temp_1_;
+  std::vector<GNNFloat> in_temp_2_;
+  // Temporary matrix the size of the output of the forward pass; used if
+  // an intermediate op occurs before writing to the final output matrix
+  std::vector<GNNFloat> out_temp_;
+
+  // Pointer with size versions
+  PointerWithSize<GNNFloat> p_in_temp_1_;
+  PointerWithSize<GNNFloat> p_in_temp_2_;
+  PointerWithSize<GNNFloat> p_out_temp_;
+
+  // Each thread has a vector of size # input columns or # output columns for
+  // storing intermediate results during aggregation.
+  // The one used depeneds on if aggregation occurs before or after the mxm.
+  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>
+      input_column_intermediates_;
+  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>
+      output_column_intermediates_;
 
 #ifdef GALOIS_ENABLE_GPU
   // TODO(loc/hochan)
