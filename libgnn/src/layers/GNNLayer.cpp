@@ -202,12 +202,6 @@ void galois::GNNLayer::ActivationDerivative(
       galois::loopname("ReLU-Derivative"));
 }
 
-void galois::GNNLayer::OptimizeLayer(BaseOptimizer* optimizer,
-                                     size_t trainable_layer_number) {
-  optimizer->GradientDescent(p_layer_weight_gradients_, p_layer_weights_,
-                             trainable_layer_number);
-}
-
 void galois::GNNLayer::WeightGradientSyncSum() {
   // XXX bitset
   gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(

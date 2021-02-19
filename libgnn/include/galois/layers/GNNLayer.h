@@ -152,7 +152,11 @@ public:
 
   //! Given an optimizer, update the weights in this layer based on gradients
   //! stored in the layer
-  void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
+  virtual void OptimizeLayer(BaseOptimizer* optimizer,
+                             size_t trainable_layer_number) {
+    optimizer->GradientDescent(p_layer_weight_gradients_, p_layer_weights_,
+                               trainable_layer_number);
+  }
 
   //! Flip sampling switch on
   void EnableSampling() { config_.do_sampling = true; }
