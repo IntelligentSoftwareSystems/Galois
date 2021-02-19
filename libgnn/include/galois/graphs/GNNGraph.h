@@ -136,7 +136,13 @@ public:
   //! lid in question is valid for the current phase (i.e., it is part of
   //! a training, validation, or test phase mask)
   bool IsValidForPhase(const unsigned lid,
-                       const galois::GNNPhase current_phase) const;
+                       const galois::GNNPhase current_phase) const {
+    if (!incomplete_masks_) {
+      return IsValidForPhaseCompleteRange(lid, current_phase);
+    } else {
+      return IsValidForPhaseMasked(lid, current_phase);
+    }
+  }
 
   //////////////////////////////////////////////////////////////////////////////
 
@@ -228,6 +234,15 @@ private:
   //! degree access
   void InitNormFactor();
 
+  //! Used if ranges for a mask are complete (if in range, it's part of mask).
+  bool IsValidForPhaseCompleteRange(const unsigned lid,
+                                    const galois::GNNPhase current_phase) const;
+
+  //! Used if ranges for a mask are incomplete, meaning I actually have to
+  //! check the mask.
+  bool IsValidForPhaseMasked(const unsigned lid,
+                             const galois::GNNPhase current_phase) const;
+
   //////////////////////////////////////////////////////////////////////////////
   // Accuracy
   //////////////////////////////////////////////////////////////////////////////
@@ -287,6 +302,10 @@ private:
   //! Global mask range for testing nodes; must convert to LIDs when using
   //! in this class
   GNNRange global_testing_mask_range_;
+
+  //! If true, then node splits of train/val/test aren't complete (i.e.
+  //! falling in range != part of that set)
+  bool incomplete_masks_{false};
 
   //! Normalization constant based on structure of the graph (degrees)
   std::vector<GNNFloat> norm_factors_;

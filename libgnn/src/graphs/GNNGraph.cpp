@@ -100,8 +100,9 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
 #endif
 }
 
-bool galois::graphs::GNNGraph::IsValidForPhase(
+bool galois::graphs::GNNGraph::IsValidForPhaseCompleteRange(
     const unsigned lid, const galois::GNNPhase current_phase) const {
+  // only use ranges if they're complete
   // convert to gid first
   size_t gid = partitioned_graph_->getGID(lid);
 
@@ -123,14 +124,36 @@ bool galois::graphs::GNNGraph::IsValidForPhase(
   }
 
   // if within range, it is valid
-  // TODO there is an assumption here that ranges are contiguous; may not
-  // necessarily be the case in all inputs in which case using the mask is safer
-  // (but less cache efficient)
+  // there is an assumption here that ranges are contiguous; may not
+  // necessarily be the case in all inputs in which case using the mask is
+  // required (but less cache efficient)
   if (range_to_use->begin <= gid && gid < range_to_use->end) {
     return true;
   } else {
     return false;
   }
+}
+
+bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
+    const unsigned lid, const galois::GNNPhase current_phase) const {
+  // select mask to use based on phase
+  const std::vector<char>* mask_to_use;
+  switch (current_phase) {
+  case GNNPhase::kTrain:
+    mask_to_use = &local_training_mask_;
+    break;
+  case GNNPhase::kValidate:
+    mask_to_use = &local_validation_mask_;
+    break;
+  case GNNPhase::kTest:
+    mask_to_use = &local_testing_mask_;
+    break;
+  default:
+    GALOIS_LOG_FATAL("Invalid phase used");
+    mask_to_use = nullptr;
+  }
+
+  return (*mask_to_use)[lid];
 }
 
 void galois::graphs::GNNGraph::AggregateSync(
@@ -424,6 +447,16 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
     cur_line_num++;
   }
   mask_stream.close();
+
+  if (local_sample_count != mask_range->size) {
+    // overlapping masks: need to actually check the masks rather than use
+    // ranges
+    if (!incomplete_masks_) {
+      galois::gInfo(
+          "Masks are not contained in range: must actually check mask");
+    }
+    incomplete_masks_ = true;
+  }
 
   return local_sample_count;
 }
