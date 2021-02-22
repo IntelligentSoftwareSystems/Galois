@@ -54,7 +54,7 @@ static cll::opt<scheduleMode> schedulingMode(
                 clEnumVal(MDEG, "MDEG"), clEnumVal(DEG, "DEG"),
                 clEnumVal(MWD, "MWD"), clEnumVal(HIS, "HIS"),
                 clEnumVal(RAND, "random")),
-    cll::init(PLD));
+    cll::init(RAND));
 
 static cll::opt<bool>
     mtxInput("mtxinput",
@@ -84,8 +84,8 @@ static cll::opt<unsigned> numPartitions(cll::Positional,
                                         cll::init(2));
 static cll::opt<double> imbalance(
     "balance",
-    cll::desc("Fraction deviated from mean partition size (default 0.01)"),
-    cll::init(0.01));
+    cll::desc("Percentage deviated from mean partition size (default 5)"),
+    cll::init(5.0));
 
 //! Flag that forces user to be aware that they should be passing in a
 //! hMetis graph.
@@ -119,7 +119,7 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
 
   galois::StatTimer T3("Refine");
   T3.start();
-  refine(mcg, K);
+  refine(mcg, K, imbalance);
   T3.stop();
   Ctime += (T.get()/1000.0f);
   Ptime += (T2.get()/1000.0f);
@@ -148,15 +148,17 @@ int computingCut(GGraph& g) {
 }
 
 int computingBalance(GGraph& g) {
-  int zero = 0, one = 0;
+  int max = 0;
+  std::vector<int> parts(numPartitions, 0);
   for (size_t c = g.hedges; c < g.size(); c++) {
-    int part = g.getData(c).getPart();
-    if (part == 0)
-      zero++;
-    else
-      one++;
+    unsigned pp = g.getData(c).getPart();
+    parts[pp]++;
   }
-  return std::abs(zero - one);
+  for (unsigned i = 0; i <numPartitions; i++) {
+    if (parts[i] > max)
+      max = parts[i];
+  }
+  return max;
 }
 // printGraphBeg(*graph)
 
@@ -330,7 +332,7 @@ int main(int argc, char** argv) {
   std::vector<std::vector<GNode>> nodesvec(k);
   // std::array<std::vector<GNode>, 100> hedgesvec;
 
-  for (int level = 1; level < num; level++) {
+  for (int level = 0; level < num; level++) {
 
     for (int i = 0; i < k; i++)
       nodesvec[i].clear();
@@ -493,8 +495,8 @@ int main(int argc, char** argv) {
   std::cout<<"Edge Cut,"<<computingCut(graph)<<"\n\n";
 
   galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
-  galois::runtime::reportStat_Single("BiPart", "zero-one",
-                                     computingBalance(graph));
+  //galois::runtime::reportStat_Single("BiPart", "zero-one",
+  //                                   computingBalance(graph));
 
   totalTime.stop();
   if (output) {
