@@ -20,7 +20,9 @@ enum class GNNLayerType {
   //! Sage layer: same as GCN except with mean aggregation and concat
   kSAGE,
   //! Dense linear xform layer
-  kDense
+  kDense,
+  //! L2 normalization layer
+  kL2Norm
   // TODO GAT
 };
 
@@ -129,6 +131,7 @@ public:
   galois::GNNOutputLayerType output_layer_type() const {
     return output_layer_type_;
   }
+  size_t layer_number() const { return layer_number_; }
 
   //! Conducts the forward phase given the input to this layer which
   //! ultimately leads to an output (classfication of node labels) at the end

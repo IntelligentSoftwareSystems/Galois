@@ -6,7 +6,11 @@ if (NOT GALOIS_ENABLE_GPU)
   add_executable(convlayer-test convlayer-test.cpp)
   target_link_libraries(convlayer-test galois_gnn)
   add_test(NAME convlayer-test COMMAND convlayer-test)
-  
+
+  add_executable(l2norm-layer-test l2norm-layer-test.cpp)
+  target_link_libraries(l2norm-layer-test galois_gnn)
+  add_test(NAME l2norm-layer-test COMMAND l2norm-layer-test)
+
   add_executable(softmaxlayer-test softmaxlayer-test.cpp)
   target_link_libraries(softmaxlayer-test galois_gnn)
   add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
