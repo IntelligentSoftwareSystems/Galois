@@ -100,6 +100,15 @@ galois::GraphConvolutionalLayer::BackwardPhase(
   }
 
   // AFW = O
+  galois::PointerWithSize<galois::GNNFloat> input_data;
+  if (!config_.disable_dropout) {
+    // dropout result is currently stored in temp 1
+    // needs to be used before it gets overwritten
+    input_data = p_in_temp_1_;
+  } else {
+    // no dropout = use vanilla input
+    input_data = prev_layer_input;
+  }
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
@@ -160,15 +169,15 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
           layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-          layer_dimensions_.output_columns, prev_layer_input.data(),
+          layer_dimensions_.output_columns, input_data.data(),
           p_out_temp_.data(), p_layer_weight_gradients_.data());
     } else {
 #endif
-      galois::CBlasSGEMM(
-          CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-          prev_layer_input.data(), p_out_temp_.data(),
-          p_layer_weight_gradients_.data());
+      galois::CBlasSGEMM(CblasTrans, CblasNoTrans,
+                         layer_dimensions_.input_columns,
+                         layer_dimensions_.input_rows,
+                         layer_dimensions_.output_columns, input_data.data(),
+                         p_out_temp_.data(), p_layer_weight_gradients_.data());
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif

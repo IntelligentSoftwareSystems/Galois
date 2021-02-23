@@ -67,10 +67,20 @@ galois::PointerWithSize<galois::GNNFloat> galois::DenseLayer::BackwardPhase(
                                p_backward_output_matrix_.data());
   }
 
+  galois::PointerWithSize<galois::GNNFloat> input_data;
+  if (!config_.disable_dropout) {
+    // dropout result is currently stored in temp 1
+    // needs to be used before it gets overwritten
+    input_data = p_in_temp_1_;
+  } else {
+    // no dropout = use vanilla input
+    input_data = prev_layer_input;
+  }
+
   // W' = F^T (FW)'
   galois::CBlasSGEMM(CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
                      layer_dimensions_.input_rows,
-                     layer_dimensions_.output_columns, prev_layer_input.data(),
+                     layer_dimensions_.output_columns, input_data.data(),
                      input_gradient->data(), p_layer_weight_gradients_.data());
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
