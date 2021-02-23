@@ -44,10 +44,17 @@ static const char* url = "breadth_first_search";
 
 static cll::opt<std::string>
     inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int>
-    startNode("startNode",
-              cll::desc("Node to start search from (default value 0)"),
-              cll::init(0));
+static cll::opt<std::string> startNodesFile(
+    "startNodesFile",
+    cll::desc("File containing whitespace separated list of source "
+              "nodes for computing betweenness centrality; "
+              "if set, -startNode is ignored"));
+static cll::opt<std::string> startNodesString(
+    "startNodes",
+    cll::desc("String containing whitespace separated list of source nodes for "
+              "computing betweenness centrality (default value '0'); ignore if "
+              "-startNodesFile is used"),
+    cll::init("0"));
 static cll::opt<unsigned int>
     reportNode("reportNode",
                cll::desc("Node to report distance to (default value 1)"),
@@ -322,29 +329,41 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url, &inputFile);
 
   galois::StatTimer totalTime("TimerTotal");
+  galois::StatTimer execTime("Timer_0");
   totalTime.start();
 
   Graph graph;
-  GNode source;
-  GNode report;
-
   std::cout << "Reading from file: " << inputFile << "\n";
   galois::graphs::readGraph(graph, inputFile);
   std::cout << "Read " << graph.size() << " nodes, " << graph.sizeEdges()
             << " edges\n";
 
-  if (startNode >= graph.size() || reportNode >= graph.size()) {
-    std::cerr << "failed to set report: " << reportNode
-              << " or failed to set source: " << startNode << "\n";
+  if (reportNode >= graph.size()) {
+    std::cerr << "Failed to set report node: " << reportNode << "\n";
     abort();
   }
 
-  auto it = graph.begin();
-  std::advance(it, startNode.getValue());
-  source = *it;
-  it     = graph.begin();
-  std::advance(it, reportNode.getValue());
-  report = *it;
+  std::vector<uint32_t> startNodes;
+  if (!startNodesFile.getValue().empty()) {
+    std::ifstream file(startNodesFile);
+    if (!file.good()) {
+      std::cerr << "Failed to open file: " << startNodesFile << "\n";
+      abort();
+    }
+    startNodes.insert(startNodes.end(), std::istream_iterator<uint64_t>{file},
+                      std::istream_iterator<uint64_t>{});
+  } else {
+    std::istringstream str(startNodesString);
+    startNodes.insert(startNodes.end(), std::istream_iterator<uint64_t>{str},
+                      std::istream_iterator<uint64_t>{});
+  }
+
+  for (auto startNode : startNodes) {
+    if (startNode >= graph.size()) {
+      std::cerr << "Failed to set start node: " << startNode << "\n";
+      abort();
+    }
+  }
 
   size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());
   galois::preAlloc(8 * numThreads +
@@ -352,30 +371,40 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::do_all(galois::iterate(graph),
-                 [&graph](GNode n) { graph.getData(n) = BFS::DIST_INFINITY; });
-  graph.getData(source) = 0;
-
   std::cout << "Running " << ALGO_NAMES[algo] << " algorithm with "
             << (bool(execution) ? "PARALLEL" : "SERIAL") << " execution\n";
 
-  galois::StatTimer execTime("Timer_0");
-  execTime.start();
+  auto it = graph.begin();
+  std::advance(it, reportNode.getValue());
+  GNode report = *it;
 
-  if (execution == SERIAL) {
-    runAlgo<false>(graph, source);
-  } else if (execution == PARALLEL) {
-    runAlgo<true>(graph, source);
-  } else {
-    std::cerr << "ERROR: unknown type of execution passed to -exec\n";
+  for (auto startNode : startNodes) {
+    it = graph.begin();
+    std::advance(it, startNode);
+    GNode source = *it;
+
+    galois::do_all(galois::iterate(graph), [&graph](GNode n) {
+      graph.getData(n) = BFS::DIST_INFINITY;
+    });
+    graph.getData(source) = 0;
+
+    execTime.start();
+
+    if (execution == SERIAL) {
+      runAlgo<false>(graph, source);
+    } else if (execution == PARALLEL) {
+      runAlgo<true>(graph, source);
+    } else {
+      std::cerr << "ERROR: unknown type of execution passed to -exec\n";
+    }
+
+    execTime.stop();
+
+    std::cout << "Node " << reportNode << " has distance "
+              << graph.getData(report) << " from source " << startNode << "\n";
   }
 
-  execTime.stop();
-
   galois::reportPageAlloc("MeminfoPost");
-
-  std::cout << "Node " << reportNode << " has distance "
-            << graph.getData(report) << "\n";
 
   // Sanity checking code
   galois::GReduceMax<uint64_t> maxDistance;
@@ -402,11 +431,17 @@ int main(int argc, char** argv) {
   uint64_t rMaxDistance = maxDistance.reduce();
   uint64_t rDistanceSum = distanceSum.reduce();
   uint64_t rVisitedNode = visitedNode.reduce();
-  galois::gInfo("# visited nodes is ", rVisitedNode);
-  galois::gInfo("Max distance is ", rMaxDistance);
-  galois::gInfo("Sum of visited distances is ", rDistanceSum);
+  galois::gInfo("# visited nodes from source ", startNodes.back(), " is ",
+                rVisitedNode);
+  galois::gInfo("Max distance from source ", startNodes.back(), " is ",
+                rMaxDistance);
+  galois::gInfo("Sum of visited distances from source ", startNodes.back(),
+                " is ", rDistanceSum);
 
   if (!skipVerify) {
+    auto it = graph.begin();
+    std::advance(it, startNodes.back());
+    GNode source = *it;
     if (BFS::verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {

@@ -367,14 +367,13 @@ void AsyncSanity(AsyncGraph& graph) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //! runs asynchronous BC
-void doAsyncBC() {
+void doAsyncBC(const std::vector<uint32_t>& startNodes) {
   if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
   } else {
     galois::gInfo("Running in serial mode");
   }
 
-  galois::gInfo("Constructing async BC graph");
   // create bidirectional graph
   AsyncGraph bcGraph;
 
@@ -400,8 +399,7 @@ void doAsyncBC() {
   bcGraph.constructIncomingEdges();
 
   graphConstructTimer.stop();
-
-  BetweenessCentralityAsync bcExecutor(bcGraph);
+  galois::gInfo("Graph construction complete");
 
   unsigned nnodes = bcGraph.size();
   uint64_t nedges = bcGraph.sizeEdges();
@@ -411,8 +409,13 @@ void doAsyncBC() {
                 "graph");
   galois::runtime::reportStat_Single("BCAsync", "ChunkSize", ASYNC_CHUNK_SIZE);
 
-  galois::reportPageAlloc("MemAllocPre");
-  galois::gInfo("Going to pre-allocate pages");
+  for (auto startNode : startNodes) {
+    if (startNode >= bcGraph.size()) {
+      std::cerr << "Failed to set start node: " << startNode << "\n";
+      abort();
+    }
+  }
+
   galois::preAlloc(
       std::min(static_cast<uint64_t>(
                    std::min(galois::getActiveThreads(), 100U) *
@@ -420,8 +423,9 @@ void doAsyncBC() {
                    std::max((nedges / 30000000), uint64_t{5}) * 2.5),
                uint64_t{1500}) +
       5);
-  galois::gInfo("Pre-allocation complete");
-  galois::reportPageAlloc("MemAllocMid");
+  galois::reportPageAlloc("MemAllocPre");
+
+  BetweenessCentralityAsync bcExecutor(bcGraph);
 
   // reset everything in preparation for run
   galois::do_all(galois::iterate(0u, nnodes),
@@ -429,49 +433,15 @@ void doAsyncBC() {
   galois::do_all(galois::iterate(UINT64_C(0), nedges),
                  [&](auto i) { bcGraph.getEdgeData(i).reset(); });
 
-  // reading in list of sources to operate on if provided
-  std::ifstream sourceFile;
-  std::vector<uint64_t> sourceVector;
-  if (sourcesToUse != "") {
-    sourceFile.open(sourcesToUse);
-    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
-                            std::istream_iterator<uint64_t>{});
-    sourceVector = t;
-    sourceFile.close();
-  }
-
-  if (numOfSources == 0) {
-    numOfSources = nnodes;
-  }
-
-  // if user does specifes a certain number of out sources (i.e. only sources
-  // with outgoing edges), we need to loop over the entire node set to look for
-  // good sources to use
-  uint32_t goodSource = 0;
-  if (iterLimit != 0) {
-    numOfSources = nnodes;
-  }
-
-  // only use at most the number of sources in the passed in source file (if
-  // such a file was actually pass in)
-  if (sourceVector.size() != 0) {
-    if (numOfSources > sourceVector.size()) {
-      numOfSources = sourceVector.size();
-    }
-  }
-
   galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
   galois::InsertBag<uint32_t> backwardPhaseWL;
 
-  galois::gInfo("Beginning execution");
+  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
   galois::StatTimer execTime("Timer_0");
   execTime.start();
-  for (uint32_t i = 0; i < numOfSources; ++i) {
-    uint32_t sourceToUse = i;
-    if (sourceVector.size() != 0) {
-      sourceToUse = sourceVector[i];
-    }
+  for (auto startNode : startNodes) {
+    uint32_t sourceToUse = startNode;
 
     // ignore nodes with no neighbors
     if (!std::distance(bcGraph.edge_begin(sourceToUse),
@@ -483,7 +453,6 @@ void doAsyncBC() {
     forwardPhaseWL.push_back(ForwardPhaseWorkItem(sourceToUse, 0));
     NodeType& active = bcGraph.getData(sourceToUse);
     active.initAsSource();
-    galois::gDebug("Source is ", sourceToUse);
 
     bcExecutor.dagConstruction(forwardPhaseWL);
     forwardPhaseWL.clear();
@@ -496,16 +465,8 @@ void doAsyncBC() {
     active.bc = backupSrcBC; // current source BC should not get updated
 
     backwardPhaseWL.clear();
-
-    // break out once number of sources user specified to do (if any) has been
-    // reached
-    goodSource++;
-    if (iterLimit != 0 && goodSource >= iterLimit)
-      break;
   }
   execTime.stop();
-
-  galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
   galois::reportPageAlloc("MemAllocPost");
 

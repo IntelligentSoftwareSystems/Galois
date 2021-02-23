@@ -221,17 +221,12 @@ void LevelSanity(LevelGraph& graph) {
 /* Running */
 /******************************************************************************/
 
-void doLevelBC() {
-  // reading in list of sources to operate on if provided
-  std::ifstream sourceFile;
-  std::vector<uint64_t> sourceVector;
-
+void doLevelBC(const std::vector<uint32_t>& startNodes) {
   // some initial stat reporting
   galois::gInfo("Worklist chunk size of ", LEVEL_CHUNK_SIZE,
                 ": best size may depend on input.");
   galois::runtime::reportStat_Single(REGION_NAME, "ChunkSize",
                                      LEVEL_CHUNK_SIZE);
-  galois::reportPageAlloc("MemAllocPre");
 
   // LevelGraph construction
   galois::StatTimer graphConstructTimer("TimerConstructGraph", "BFS");
@@ -241,6 +236,13 @@ void doLevelBC() {
   graphConstructTimer.stop();
   galois::gInfo("Graph construction complete");
 
+  for (auto startNode : startNodes) {
+    if (startNode >= graph.size()) {
+      std::cerr << "Failed to set start node: " << startNode << "\n";
+      abort();
+    }
+  }
+
   // preallocate pages in memory so allocation doesn't occur during compute
   galois::StatTimer preallocTime("PreAllocTime", REGION_NAME);
   preallocTime.start();
@@ -248,64 +250,26 @@ void doLevelBC() {
       std::max(size_t{galois::getActiveThreads()} * (graph.size() / 2000000),
                std::max(10U, galois::getActiveThreads()) * size_t{10}));
   preallocTime.stop();
-  galois::reportPageAlloc("MemAllocMid");
-
-  // If particular set of sources was specified, use them
-  if (sourcesToUse != "") {
-    sourceFile.open(sourcesToUse);
-    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
-                            std::istream_iterator<uint64_t>{});
-    sourceVector = t;
-    sourceFile.close();
-  }
-
-  // determine how many sources to loop over based on command line args
-  uint64_t loop_end = 1;
-  bool sSources     = false;
-  if (!singleSourceBC) {
-    if (!numOfSources) {
-      loop_end = graph.size();
-    } else {
-      loop_end = numOfSources;
-    }
-
-    // if provided a file of sources to work with, use that
-    if (sourceVector.size() != 0) {
-      if (loop_end > sourceVector.size()) {
-        loop_end = sourceVector.size();
-      }
-      sSources = true;
-    }
-  }
+  galois::reportPageAlloc("MemAllocPre");
 
   // graph initialization, then main loop
   LevelInitializeGraph(graph);
 
-  galois::gInfo("Beginning main computation");
-  galois::StatTimer execTime("Timer_0");
+  std::cout << "Running " << ALGO_NAMES[algo] << " algorithm\n";
 
+  galois::StatTimer execTime("Timer_0");
+  execTime.start();
   // loop over all specified sources for SSSP/Brandes calculation
-  for (uint64_t i = 0; i < loop_end; i++) {
-    if (singleSourceBC) {
-      // only 1 source; specified start source in command line
-      assert(loop_end == 1);
-      galois::gDebug("This is single source node BC");
-      levelCurrentSrcNode = startSource;
-    } else if (sSources) {
-      levelCurrentSrcNode = sourceVector[i];
-    } else {
-      // all sources
-      levelCurrentSrcNode = i;
-    }
+  for (auto startNode : startNodes) {
+    levelCurrentSrcNode = startNode;
 
     // here begins main computation
-    execTime.start();
     LevelInitializeIteration(graph);
     // worklist; last one will be empty
     galois::gstl::Vector<LevelWorklistType> worklists = LevelSSSP(graph);
     LevelBackwardBrandes(graph, worklists);
-    execTime.stop();
   }
+  execTime.stop();
 
   galois::reportPageAlloc("MemAllocPost");
 
