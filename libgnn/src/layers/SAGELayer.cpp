@@ -22,6 +22,9 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     p_layer_weights_2_ = PointerWithSize<GNNFloat>(layer_weights_2_);
     p_layer_weight_gradients_2_ =
         PointerWithSize<GNNFloat>(layer_weight_gradients_2_);
+    // initialize the optimizer
+    std::vector<size_t> weight_size = {num_weight_elements};
+    second_weight_optimizer_ = std::make_unique<AdamOptimizer>(weight_size, 1);
   }
 
   size_t num_input_elements =
@@ -112,10 +115,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   if (!sage_config_.disable_concat) {
     // FW1 is unaffected by the agg/update flip, so can to it
     // separately
-    SelfFeatureUpdateEmbeddings(input_data, p_out_temp_.data());
-    // add result to the output matrix: FW1 + AFW2
-    MatrixAdd(layer_dimensions_.input_rows, p_out_temp_,
-              &p_forward_output_matrix_);
+    SelfFeatureUpdateEmbeddings(input_data, p_forward_output_matrix_.data());
   }
 
   if (!config_.disable_activation) {
@@ -125,6 +125,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
 
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
+
   return p_forward_output_matrix_;
 }
 
@@ -138,7 +139,29 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     ActivationDerivative(input_gradient);
   }
 
+  // if dropout was used, use the dropout matrix for the input
+  galois::PointerWithSize<galois::GNNFloat> input_to_use;
+  if (!config_.disable_dropout) {
+    // dropout result is currently stored in temp 1
+    // needs to be used before it gets overwritten
+    input_to_use = p_in_temp_1_;
+  } else {
+    // no dropout = use vanilla input
+    input_to_use = prev_layer_input;
+  }
+
   // AFW = O
+  if (!sage_config_.disable_concat) {
+    // Fw1 + AFW2 = O; self feature has own weight matrix and makes own
+    // contribution to gradients which is handled in this block
+    // !!!! do this early because p_in_temp may get overwritten later
+    // if update occurs before aggregate !!!
+    galois::CBlasSGEMM(
+        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+        input_to_use.data(), input_gradient->data(),
+        p_layer_weight_gradients_2_.data());
+  }
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
@@ -157,8 +180,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
                    p_backward_output_matrix_.data(),
                    &input_column_intermediates_, true);
-      // TODO if training A, then A' compute here if layer # is 0
-      // dot product of edges that exist in A
     }
     // weight gradient calculation
     // TODO(loc) put this in a function to put the ifdef in there
@@ -180,8 +201,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
 #endif
   } else {
-    // TODO at this point, out_temp contains memoized FW
-    // can use it to get A' = O' (FW)^T
     // aggregate occurs regardless of layer being equal to 0 because it is
     // required in this case for the weight gradient calculation
     // this is (FW)'
@@ -195,24 +214,35 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
     // TODO put this in a function
     // W' = F^T (FW)'
+    // input to use is not overwritten in this branch so it's safe to use
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
           layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-          layer_dimensions_.output_columns, prev_layer_input.data(),
+          layer_dimensions_.output_columns, input_to_use.data(),
           p_out_temp_.data(), p_layer_weight_gradients_.data());
     } else {
 #endif
-      galois::CBlasSGEMM(
-          CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-          prev_layer_input.data(), p_out_temp_.data(),
-          p_layer_weight_gradients_.data());
+      galois::CBlasSGEMM(CblasTrans, CblasNoTrans,
+                         layer_dimensions_.input_columns,
+                         layer_dimensions_.input_rows,
+                         layer_dimensions_.output_columns, input_to_use.data(),
+                         p_out_temp_.data(), p_layer_weight_gradients_.data());
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
   }
 
+  if (!sage_config_.disable_concat) {
+    if (layer_number_ != 0) {
+      // deal with feature gradients for the self feature here
+      // this function will sum directly into the backward matrix
+      SelfFeatureUpdateEmbeddingsDerivative(input_gradient->data(),
+                                            p_backward_output_matrix_.data());
+    }
+  }
+
+  // TODO(loc) sync both weight matrices
   WeightGradientSyncSum();
 
   if (!config_.disable_dropout && layer_number_ != 0) {
@@ -371,7 +401,7 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
   galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
                      layer_dimensions_.input_columns,
                      layer_dimensions_.output_columns, node_embeddings,
-                     layer_weights_2_.data(), output);
+                     layer_weights_2_.data(), output, true);
 #ifdef GALOIS_ENABLE_GPU
 }
 #endif
@@ -398,4 +428,32 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+}
+
+void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
+    const GNNFloat* gradients, GNNFloat* output) {
+  assert(p_layer_weights_.size() ==
+         layer_dimensions_.input_columns * layer_dimensions_.output_columns);
+#ifdef GALOIS_ENABLE_GPU
+  // TODO gpu self
+#endif
+  // difference is Trans for B matrix (data) to get z by y (weights is y by z
+  // normally); result is x by y
+  // true at end -> accumulate
+  galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
+                     layer_dimensions_.output_columns,
+                     layer_dimensions_.input_columns, gradients,
+                     layer_weights_2_.data(), output, true);
+#ifdef GALOIS_ENABLE_GPU
+#endif
+}
+
+void galois::SAGELayer::OptimizeLayer(BaseOptimizer* optimizer,
+                                      size_t trainable_layer_number) {
+  optimizer->GradientDescent(p_layer_weight_gradients_, p_layer_weights_,
+                             trainable_layer_number);
+  if (!sage_config_.disable_concat) {
+    second_weight_optimizer_->GradientDescent(p_layer_weight_gradients_2_,
+                                              p_layer_weights_2_, 0);
+  }
 }

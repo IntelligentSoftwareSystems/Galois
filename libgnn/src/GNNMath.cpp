@@ -87,6 +87,15 @@ void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
                         size_t input_columns, size_t output_columns,
                         const GNNFloat* a, const GNNFloat* b,
                         GNNFloat* output) {
+  CBlasSGEMM(trans_a, trans_b, input_rows, input_columns, output_columns, a, b,
+             output, false);
+}
+
+void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
+                        const CBLAS_TRANSPOSE trans_b, size_t input_rows,
+                        size_t input_columns, size_t output_columns,
+                        const GNNFloat* a, const GNNFloat* b, GNNFloat* output,
+                        bool accumulate) {
   // set lead dimension based on cblas spec w.r.t. transpose setting
   size_t lead_dim_a = (trans_a == CblasNoTrans) ? input_columns : input_rows;
   size_t lead_dim_b =
@@ -94,6 +103,6 @@ void galois::CBlasSGEMM(const CBLAS_TRANSPOSE trans_a,
   // do the MM
   // TODO roll our own sgemm rather than use 3rd party?
   cblas_sgemm(CblasRowMajor, trans_a, trans_b, input_rows, output_columns,
-              input_columns, 1.0, a, lead_dim_a, b, lead_dim_b, 0.0, output,
-              output_columns);
+              input_columns, 1.0, a, lead_dim_a, b, lead_dim_b,
+              accumulate ? 1.0 : 0.0, output, output_columns);
 }

@@ -1,10 +1,11 @@
 #include "galois/GNNMath.h"
 #include "galois/GraphNeuralNetwork.h"
-#include "galois/layers/GraphConvolutionalLayer.h"
 #include "galois/layers/DenseLayer.h"
-#include "galois/layers/SoftmaxLayer.h"
-#include "galois/layers/SigmoidLayer.h"
+#include "galois/layers/GraphConvolutionalLayer.h"
+#include "galois/layers/L2NormLayer.h"
 #include "galois/layers/SAGELayer.h"
+#include "galois/layers/SigmoidLayer.h"
+#include "galois/layers/SoftmaxLayer.h"
 
 galois::GraphNeuralNetwork::GraphNeuralNetwork(
     std::unique_ptr<galois::graphs::GNNGraph> graph,
@@ -58,6 +59,13 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       // TODO(loc/hochan) sage layer gpu
 #endif
       break;
+    case GNNLayerType::kL2Norm:
+      gnn_layers_.push_back(std::move(std::make_unique<L2NormLayer>(
+          i, *graph_, layer_dims, config_.default_layer_config())));
+#ifdef GALOIS_ENABLE_GPU
+      // TODO(loc/hochan) l2 layer gpu
+#endif
+      break;
     case GNNLayerType::kDense:
       gnn_layers_.push_back(std::move(std::make_unique<DenseLayer>(
           i, *graph_, layer_dims, config_.default_layer_config())));
@@ -68,10 +76,18 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     default:
       GALOIS_LOG_FATAL("Invalid layer type during network construction");
     }
+  }
 
-    if (i == config_.num_intermediate_layers() - 1) {
-      // last layer before output layer should never have activation
-      gnn_layers_.back()->DisableActivation();
+  // loop backward and find last GCN/SAGE (main) layer to disable activation
+  for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
+       back_iter++) {
+    GNNLayerType layer_type = (*back_iter)->layer_type();
+    if (layer_type == GNNLayerType::kGraphConvolutional ||
+        layer_type == GNNLayerType::kSAGE) {
+      galois::gDebug("Disabling activation on layer ",
+                     (*back_iter)->layer_number(), "\n");
+      (*back_iter)->DisableActivation();
+      break;
     }
   }
 

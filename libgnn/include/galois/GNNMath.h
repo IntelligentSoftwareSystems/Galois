@@ -82,4 +82,9 @@ void CBlasSGEMM(const CBLAS_TRANSPOSE trans_a, const CBLAS_TRANSPOSE trans_b,
                 size_t input_rows, size_t input_columns, size_t output_columns,
                 const GNNFloat* a, const GNNFloat* b, GNNFloat* output);
 
+void CBlasSGEMM(const CBLAS_TRANSPOSE trans_a, const CBLAS_TRANSPOSE trans_b,
+                size_t input_rows, size_t input_columns, size_t output_columns,
+                const GNNFloat* a, const GNNFloat* b, GNNFloat* output,
+                bool accumulate);
+
 } // namespace galois

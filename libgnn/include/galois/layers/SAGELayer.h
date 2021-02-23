@@ -43,6 +43,11 @@ public:
     }
   }
 
+  //! Returns the 2nd set of weight gradients
+  const PointerWithSize<GNNFloat> GetLayerWeightGradients2() {
+    return p_layer_weight_gradients_2_;
+  }
+
   // Parent functions
   const PointerWithSize<galois::GNNFloat>
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
@@ -79,9 +84,17 @@ private:
                                    GNNFloat* output);
   //! Calculate graident via mxm with last layer's gradients (backward)
   void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output);
+  //! Same as above but uses the second set of weights (self feature weights)
+  void SelfFeatureUpdateEmbeddingsDerivative(const GNNFloat* gradients,
+                                             GNNFloat* output);
+
+  //! override parent function: optimizes the second set of weights as well
+  void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
 
   //! SAGE config params
   SAGELayerConfig sage_config_;
+  //! Need own optimizer for the 2nd weight matrix
+  std::unique_ptr<AdamOptimizer> second_weight_optimizer_;
 
   // second set of weights for the concat that may occur
   std::vector<GNNFloat> layer_weights_2_;
