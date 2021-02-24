@@ -44,6 +44,8 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
 const galois::PointerWithSize<galois::GNNFloat>
 galois::GraphConvolutionalLayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  galois::StatTimer timer("ForwardPhase", kRegionName);
+  timer.start();
   GALOIS_LOG_VERBOSE("Calling forward phase");
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
@@ -85,6 +87,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
 
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
+  timer.stop();
   return p_forward_output_matrix_;
 }
 
@@ -92,6 +95,9 @@ galois::PointerWithSize<galois::GNNFloat>
 galois::GraphConvolutionalLayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
+  galois::StatTimer timer("BackwardPhase", kRegionName);
+  timer.start();
+
   assert(layer_phase_ == GNNPhase::kTrain);
 
   // derivative of activation
@@ -193,6 +199,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     DoDropoutDerivative();
   }
 
+  timer.stop();
   return p_backward_output_matrix_;
 }
 
@@ -201,6 +208,9 @@ void galois::GraphConvolutionalLayer::AggregateAll(
     GNNFloat* aggregate_output,
     [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
         pts) {
+  galois::StatTimer timer("Aggregate", kRegionName);
+  timer.start();
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.AggregateAllGPU(
@@ -213,12 +223,13 @@ void galois::GraphConvolutionalLayer::AggregateAll(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }
 
 void galois::GraphConvolutionalLayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
-    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts) {
+    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*) {
   size_t num_nodes = graph_.size();
 
   galois::do_all(
@@ -282,17 +293,10 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
           if (!config_.disable_normalization) {
             GNNFloat norm_scale = source_norm * graph_.NormFactor(dst);
-            // scale the value on the destination by the combined norm term
-            assert(pts->getLocal()->size() == column_length);
-            GNNFloat* intermediate = pts->getLocal()->data();
-            for (size_t i = 0; i < column_length; i++) {
-              intermediate[i] =
-                  norm_scale * node_embeddings[index_to_dst_feature + i];
-            }
-            // add intermediate instead of original feature
-            galois::VectorAdd(
+            galois::VectorMulAdd(
                 column_length, &aggregate_output[index_to_src_feature],
-                intermediate, &aggregate_output[index_to_src_feature]);
+                &node_embeddings[index_to_dst_feature], norm_scale,
+                &aggregate_output[index_to_src_feature]);
           } else {
             // add dst feature to aggregate output
             galois::VectorAdd(column_length,
@@ -301,18 +305,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
                               &aggregate_output[index_to_src_feature]);
           }
         }
-
-        // GNNFloat* intermediate = pts->getLocal()->data();
-        // GNNFloat norm_scale = source_norm * source_norm;
-        // for (size_t i = 0; i < column_length; i++) {
-        //   intermediate[i] =
-        //       norm_scale * node_embeddings[index_to_src_feature + i];
-        // }
-        // // add self
-        // galois::VectorAdd(column_length,
-        //                   &aggregate_output[index_to_src_feature],
-        //                   intermediate,
-        //                   &aggregate_output[index_to_src_feature]);
       },
       galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
@@ -321,6 +313,9 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(
     const GNNFloat* node_embeddings, GNNFloat* output) {
+  galois::StatTimer timer("ForwardXform", kRegionName);
+  timer.start();
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.UpdateEmbeddingsGPU(
@@ -337,10 +332,14 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddings(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
     const GNNFloat* gradients, GNNFloat* output) {
+  galois::StatTimer timer("BackwardXform", kRegionName);
+  timer.start();
+
   assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
@@ -360,4 +359,5 @@ void galois::GraphConvolutionalLayer::UpdateEmbeddingsDerivative(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }

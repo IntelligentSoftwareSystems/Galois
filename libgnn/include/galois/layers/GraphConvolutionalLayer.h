@@ -32,6 +32,7 @@ public:
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
+  static const constexpr char* kRegionName = "GCNLayer";
   // 2 temporaries the size of the forward input; used for dropout and
   // aggregation (if either are required)
   std::vector<GNNFloat> in_temp_1_;
@@ -71,7 +72,6 @@ private:
   void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output);
   //! Calculate graident via mxm with last layer's gradients (backward)
   void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output);
-
 #ifdef GALOIS_ENABLE_GPU
   GCNGPUAllocations gpu_object_;
 #endif
