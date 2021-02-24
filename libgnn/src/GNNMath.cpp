@@ -35,9 +35,45 @@ void galois::VectorAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
     output[i] = a[i] + b[i];
   }
 #else
+  galois::gWarn("No vectorization support on this machine! Falling back to "
+                "simple for loop");
   // no vector -> trivial loop add
   for (size_t i = 0; i < length; ++i) {
     output[i] = a[i] + b[i];
+  }
+#endif
+}
+
+void galois::VectorMulAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
+                          const GNNFloat b_scale, GNNFloat* output) {
+#ifdef __AVX2__
+  constexpr size_t vectorization_length =
+      8; // for 32-bit floating point in AVX2; TODO AVX512
+  // can only do up to a particular multiple due to alignment
+  // create scale vector for b
+  __m128 scale_vec_half = _mm_set_ps(b_scale, b_scale, b_scale, b_scale);
+  __m256 scale_vec_main = _mm256_castps128_ps256(scale_vec_half);
+  scale_vec_main = _mm256_insertf128_ps(scale_vec_main, scale_vec_half, 1);
+
+  const size_t aligned_end = length - length % vectorization_length;
+  // do add via vector ops
+  for (size_t i = 0; i < aligned_end; i += vectorization_length) {
+    _mm256_storeu_ps(
+        &output[i],
+        _mm256_add_ps(_mm256_loadu_ps(&a[i]),
+                      _mm256_mul_ps(scale_vec_main, _mm256_loadu_ps(&b[i]))));
+  }
+
+  // handle the rest
+  for (size_t i = aligned_end; i < length; ++i) {
+    output[i] = a[i] + b[i] * b_scale;
+  }
+#else
+  galois::gWarn("No vectorization support on this machine! Falling back to "
+                "simple for loop");
+  // no vector -> trivial loop add
+  for (size_t i = 0; i < length; ++i) {
+    output[i] = a[i] + b[i] * b_scale;
   }
 #endif
 }

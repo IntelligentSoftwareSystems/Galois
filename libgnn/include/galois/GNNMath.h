@@ -13,6 +13,10 @@ size_t MaxIndex(const size_t length, const GNNFloat* vector);
 //! Can be called in parallel sections as its sigle threaded code
 void VectorAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
                GNNFloat* output);
+//! Given 2 float array pointers, do element wise addition of length elements
+//! while scaling the second vector with a multiplier
+void VectorMulAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
+                  const GNNFloat b_scale, GNNFloat* output);
 
 //! Does a softmax operation on the input vector and saves result to output
 //! vector; single threaded so it can be called in a parallel section
