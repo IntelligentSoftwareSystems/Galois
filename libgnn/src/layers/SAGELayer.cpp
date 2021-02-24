@@ -284,7 +284,7 @@ void galois::SAGELayer::AggregateAll(
 void galois::SAGELayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
-    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts,
+    galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
     bool is_backward) {
   size_t num_nodes = graph_.size();
 
@@ -346,17 +346,10 @@ void galois::SAGELayer::AggregateAllCPU(
               norm_scale = graph_.DegreeNorm(dst);
             }
 
-            // scale the value on the destination by the combined norm term
-            assert(pts->getLocal()->size() == column_length);
-            GNNFloat* intermediate = pts->getLocal()->data();
-            for (size_t i = 0; i < column_length; i++) {
-              intermediate[i] =
-                  norm_scale * node_embeddings[index_to_dst_feature + i];
-            }
-            // add intermediate instead of original feature
-            galois::VectorAdd(
+            galois::VectorMulAdd(
                 column_length, &aggregate_output[index_to_src_feature],
-                intermediate, &aggregate_output[index_to_src_feature]);
+                &node_embeddings[index_to_dst_feature], norm_scale,
+                &aggregate_output[index_to_src_feature]);
           } else {
             // add dst feature to aggregate output
             galois::VectorAdd(column_length,
