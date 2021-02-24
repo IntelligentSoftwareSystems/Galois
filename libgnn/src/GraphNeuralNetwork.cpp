@@ -148,6 +148,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
+    const std::string t_name = "Epoch" + std::to_string(epoch);
+    galois::StatTimer epoch_timer(t_name.c_str(), "GraphNeuralNetwork");
+    epoch_timer.start();
     if (config_.do_sampling()) {
       // subgraph sample every epoch
       // graph_->UniformNodeSample();
@@ -176,6 +179,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                      train_accuracy, "\n");
     }
+    epoch_timer.stop();
     // TODO validation and test as necessary
   }
   graph_->CalculateFullNormFactor();
