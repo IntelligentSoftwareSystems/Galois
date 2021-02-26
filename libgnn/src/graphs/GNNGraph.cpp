@@ -330,6 +330,12 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
         label_stream >> cur_bit;
 
         if (has_single_class_label) {
+          // no label
+          if (cur_bit == = -1) {
+            local_ground_truth_labels_[cur_lid] = num_label_classes_;
+            break;
+          }
+
           // in single class, only 1 bit is set in bitset; that represents the
           // class to take
           if (cur_bit != 0) {

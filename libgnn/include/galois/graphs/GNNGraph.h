@@ -109,7 +109,12 @@ public:
   //! class labels.
   GNNFloat GetSingleClassLabel(const unsigned lid) const {
     assert(using_single_class_labels_);
-    return local_ground_truth_labels_[lid];
+    if (local_ground_truth_labels_[lid] != num_label_classes_) {
+      return local_ground_truth_labels_[lid];
+    } else {
+      GALOIS_LOG_FATAL(
+          "should not get the label of a node that has no ground truth");
+    }
   }
 
   //! Returns pointer to start of ground truth vector for some local id assuming
