@@ -23,6 +23,9 @@ LoadPartition(const std::string& input_directory,
   case galois::graphs::GNNPartitionScheme::kCVC:
     return galois::cuspPartitionGraph<GnnCVC, char, void>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
+  case galois::graphs::GNNPartitionScheme::kOCVC:
+    return galois::cuspPartitionGraph<GenericCVC, char, void>(
+        input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   default:
     GALOIS_LOG_FATAL("Error: partition scheme specified is invalid");
     return nullptr;
@@ -74,7 +77,8 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   sync_substrate_ =
       std::make_unique<galois::graphs::GluonSubstrate<GNNDistGraph>>(
           *partitioned_graph_, host_id_,
-          galois::runtime::getSystemNetworkInterface().Num, false);
+          galois::runtime::getSystemNetworkInterface().Num, false,
+          partitioned_graph_->cartesianGrid());
 
   // read in entire graph topology
   ReadWholeGraph(dataset_name);
@@ -163,7 +167,6 @@ void galois::graphs::GNNGraph::AggregateSync(
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
 
   // XXX bitset setting
-  // call sync
   sync_substrate_->sync<writeSource, readAny, GNNSumAggregate>(
       "GraphAggregateSync");
 }

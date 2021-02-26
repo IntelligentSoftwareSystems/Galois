@@ -28,7 +28,7 @@ struct GNNRange {
 namespace graphs {
 
 //! Possible partitioning schemes for the GNN graph
-enum class GNNPartitionScheme { kOEC, kCVC };
+enum class GNNPartitionScheme { kOEC, kCVC, kOCVC };
 
 //! XXX
 class GNNGraph {

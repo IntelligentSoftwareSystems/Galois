@@ -981,6 +981,11 @@ class GnnCVC : public galois::graphs::CustomMasterAssignment {
   //! Returns the grid column ID of the specified host
   unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
+  //! Find the row of a particular node
+  unsigned getRowOfNode(uint64_t gid) const {
+    return gridRowID(retrieveMaster(gid));
+  }
+
   //! Find the column of a particular node
   unsigned getColumnOfNode(uint64_t gid) const {
     return gridColumnID(retrieveMaster(gid));
@@ -1009,9 +1014,10 @@ public:
 
   uint32_t retrieveMaster(uint32_t gid) const { return _globalHostMap[gid]; }
 
-  uint32_t getEdgeOwner(uint32_t, uint32_t dst, uint64_t) const {
-    int i = getColumnOfNode(dst);
-    return _h_offset + i;
+  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t) const {
+    unsigned blockedRowOffset   = getRowOfNode(src) * numColumnHosts;
+    unsigned cyclicColumnOffset = getColumnOfNode(dst);
+    return blockedRowOffset + cyclicColumnOffset;
   }
 
   bool noCommunication() { return false; }

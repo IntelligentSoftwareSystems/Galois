@@ -21,7 +21,9 @@ llvm::cl::opt<galois::graphs::GNNPartitionScheme> partition_scheme(
     cll::values(clEnumValN(galois::graphs::GNNPartitionScheme::kOEC, "oec",
                            "Outgoing Edge-Cut (default)"),
                 clEnumValN(galois::graphs::GNNPartitionScheme::kCVC, "cvc",
-                           "Cartesian Vertex-Cut")),
+                           "Cartesian Vertex-Cut"),
+                clEnumValN(galois::graphs::GNNPartitionScheme::kOCVC, "ocvc",
+                           "Original Cartesian Vertex-Cut")),
     cll::init(galois::graphs::GNNPartitionScheme::kOEC));
 
 llvm::cl::opt<size_t> num_layers(
@@ -118,6 +120,8 @@ const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
     return "oec";
   case galois::graphs::GNNPartitionScheme::kCVC:
     return "cvc";
+  case galois::graphs::GNNPartitionScheme::kOCVC:
+    return "ocvc";
   default:
     GALOIS_LOG_FATAL("Invalid partitioning scheme");
     return "";
