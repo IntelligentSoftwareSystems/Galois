@@ -323,7 +323,7 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
       uint32_t cur_lid = partitioned_graph_->getLID(cur_gid);
       // read line as bitset of 0s and 1s
       std::istringstream label_stream(read_line);
-      unsigned cur_bit;
+      int cur_bit;
       // bitset size is # of label classes
       for (size_t cur_class = 0; cur_class < num_label_classes_; ++cur_class) {
         // read a bit
@@ -331,7 +331,7 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
 
         if (has_single_class_label) {
           // no label
-          if (cur_bit == = -1) {
+          if (cur_bit == -1) {
             local_ground_truth_labels_[cur_lid] = num_label_classes_;
             break;
           }
