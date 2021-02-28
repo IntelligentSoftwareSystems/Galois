@@ -103,6 +103,10 @@ public:
   bool do_sampling_{false};
   //! Inductive = training ignores test/val set
   bool inductive_training_{false};
+  //! Interval to run validation set on network at; 0 = no run
+  unsigned validation_interval_{0};
+  //! Interval to run testing set on network at; 0 = no run
+  unsigned test_interval_{0};
 
 private:
   //! Number of layers to construct in the GNN not including the output
@@ -198,6 +202,8 @@ private:
 #ifdef GALOIS_ENABLE_GPU
   //! Holds all GPU functions
   GraphNeuralNetworkGPU gpu_object_;
+  // Used to copy predictions from gpu over
+  std::vector<GNNFloat> cpu_pred_;
 #endif
 };
 

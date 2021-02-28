@@ -15,11 +15,7 @@ int main(int argc, char* argv[]) {
 
   galois::StatTimer compute_timer("Timer_0");
   compute_timer.start();
-
-  galois::StatTimer train_timer("TrainingTime");
-  train_timer.start();
   gnn->Train(num_epochs);
-  train_timer.stop();
   compute_timer.stop();
 
   return 0;

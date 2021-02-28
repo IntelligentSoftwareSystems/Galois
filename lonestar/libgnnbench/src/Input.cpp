@@ -114,6 +114,16 @@ llvm::cl::opt<bool>
                                     "all non-train nodes are ignored"),
                           cll::init(false));
 
+llvm::cl::opt<unsigned>
+    val_interval("valInterval",
+                 cll::desc("# of epochs to test validation set (default 0)"),
+                 cll::init(0));
+
+llvm::cl::opt<unsigned>
+    test_interval("testInterval",
+                  cll::desc("# of epochs to test test set (default 0)"),
+                  cll::init(0));
+
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
   case galois::graphs::GNNPartitionScheme::kOEC:
@@ -245,7 +255,9 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   galois::GraphNeuralNetworkConfig gnn_config(
       num_layers, layer_types, layer_sizes_vector, output_layer_type,
       do_graph_sampling, layer_config);
-  gnn_config.inductive_training_ = do_inductive_training;
+  gnn_config.inductive_training_  = do_inductive_training;
+  gnn_config.validation_interval_ = val_interval;
+  gnn_config.test_interval_       = test_interval;
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
 

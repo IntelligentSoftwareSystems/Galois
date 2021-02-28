@@ -131,7 +131,6 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
-  std::vector<GNNFloat> cpu_pred;
   float train_accuracy{0.f};
 
   /*
@@ -142,68 +141,113 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   }
   */
 
+  bool altered_norm_factor =
+      config_.inductive_training_ || config_.do_sampling();
+
   if (config_.inductive_training_) {
     graph_->CalculateSpecialNormFactor(false, true);
   }
 
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
-    const std::string t_name = "Epoch" + std::to_string(epoch);
+    const std::string t_name     = "TrainEpoch" + std::to_string(epoch);
+    const std::string t_name_acc = t_name + "Accuracy";
     galois::StatTimer epoch_timer(t_name.c_str(), "GraphNeuralNetwork");
     epoch_timer.start();
     if (config_.do_sampling()) {
       // subgraph sample every epoch
-      // graph_->UniformNodeSample();
       graph_->GraphSAINTSample();
       graph_->CalculateSpecialNormFactor(true, config_.inductive_training_);
     }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     GradientPropagation();
-#ifdef GALOIS_ENABLE_GPU
-    if (device_personality == DevicePersonality::GPU_CUDA) {
-      if (cpu_pred.size() != predictions.size()) {
-        cpu_pred.resize(predictions.size());
-      }
+    epoch_timer.stop();
 
-      AdamOptimizer* adam = static_cast<AdamOptimizer*>(optimizer_.get());
-      adam->CopyToVector(cpu_pred, predictions);
-      train_accuracy = GetGlobalAccuracy(cpu_pred);
-    } else {
-#endif
-      train_accuracy = GetGlobalAccuracy(predictions);
-#ifdef GALOIS_ENABLE_GPU
-    }
-#endif
+    train_accuracy = GetGlobalAccuracy(predictions);
 
     if (this_host == 0) {
       galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                      train_accuracy, "\n");
+      galois::runtime::reportStat_Single("GraphNeuralNetwork", t_name_acc,
+                                         train_accuracy);
     }
-    epoch_timer.stop();
-    // TODO validation and test as necessary
+
+    bool do_validate = config_.validation_interval_
+                           ? epoch % config_.validation_interval_ == 0
+                           : false;
+    bool do_test =
+        config_.test_interval_ ? epoch % config_.test_interval_ == 0 : false;
+
+    // get real norm factor back if altered by sampling or inductive training
+    if ((do_validate || do_test) && altered_norm_factor) {
+      graph_->CalculateFullNormFactor();
+    }
+
+    if (do_validate) {
+      const std::string v_name     = "ValEpoch" + std::to_string(epoch);
+      const std::string v_name_acc = v_name + "Accuracy";
+      galois::StatTimer val_epoch_timer(v_name.c_str(), "GraphNeuralNetwork");
+
+      val_epoch_timer.start();
+      SetLayerPhases(galois::GNNPhase::kValidate);
+      const PointerWithSize<galois::GNNFloat> val_pred = DoInference();
+      val_epoch_timer.stop();
+
+      float val_acc = GetGlobalAccuracy(val_pred);
+      if (this_host == 0) {
+        galois::gPrint("Epoch ", epoch, ": Validation accuracy is ", val_acc,
+                       "\n");
+        galois::runtime::reportStat_Single("GraphNeuralNetwork", v_name_acc,
+                                           val_acc);
+      }
+    }
+
+    if (do_test) {
+      const std::string test_name     = "TestEpoch" + std::to_string(epoch);
+      const std::string test_name_acc = test_name + "Accuracy";
+      galois::StatTimer test_epoch_timer(test_name.c_str(),
+                                         "GraphNeuralNetwork");
+
+      test_epoch_timer.start();
+      SetLayerPhases(galois::GNNPhase::kTest);
+      const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
+      test_epoch_timer.stop();
+
+      float test_acc = GetGlobalAccuracy(test_pred);
+      if (this_host == 0) {
+        galois::gPrint("Epoch ", epoch, ": Test accuracy is ", test_acc, "\n");
+        galois::runtime::reportStat_Single("GraphNeuralNetwork", test_name_acc,
+                                           test_acc);
+      }
+    }
+
+    if (do_validate || do_test) {
+      // revert to training phase for next epoch
+      SetLayerPhases(galois::GNNPhase::kTrain);
+      // get back inductive norm factor as necessary; sampling norm is handled
+      // at beginning of every iteration
+      if (config_.inductive_training_ && !config_.do_sampling()) {
+        graph_->CalculateSpecialNormFactor(false, true);
+      }
+    }
   }
-  graph_->CalculateFullNormFactor();
+
+  if (altered_norm_factor) {
+    graph_->CalculateFullNormFactor();
+  }
+
   // check test accuracy
-  galois::StatTimer acc_timer("FinalAccuracyTest");
-  acc_timer.start();
+  galois::StatTimer test_timer("FinalTestRun", "GraphNeuralNetwork");
+  test_timer.start();
   SetLayerPhases(galois::GNNPhase::kTest);
   const PointerWithSize<galois::GNNFloat> predictions = DoInference();
-  float global_accuracy{0.0};
-#ifdef GALOIS_ENABLE_GPU
-  if (device_personality == DevicePersonality::GPU_CUDA) {
-    AdamOptimizer* adam = static_cast<AdamOptimizer*>(optimizer_.get());
-    adam->CopyToVector(cpu_pred, predictions);
-    global_accuracy = GetGlobalAccuracy(cpu_pred);
-  } else {
-#endif
-    global_accuracy = GetGlobalAccuracy(predictions);
-#ifdef GALOIS_ENABLE_GPU
-  }
-#endif
-  acc_timer.stop();
+  float global_accuracy = GetGlobalAccuracy(predictions);
+  test_timer.stop();
 
   if (this_host == 0) {
     galois::gPrint("Final test accuracy is ", global_accuracy, "\n");
+    galois::runtime::reportStat_Single("GraphNeuralNetwork",
+                                       "FinalTestAccuracy", global_accuracy);
   }
 
   return global_accuracy;
@@ -223,7 +267,23 @@ galois::GraphNeuralNetwork::DoInference() {
 
 float galois::GraphNeuralNetwork::GetGlobalAccuracy(
     PointerWithSize<GNNFloat> predictions) {
-  return graph_->GetGlobalAccuracy(predictions, phase_, config_.do_sampling());
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    if (cpu_pred_.size() != predictions.size()) {
+      cpu_pred_.resize(predictions.size());
+    }
+
+    // TODO get rid of CPU copy here if possible
+    AdamOptimizer* adam = static_cast<AdamOptimizer*>(optimizer_.get());
+    adam->CopyToVector(cpu_pred_, predictions);
+    return graph_->GetGlobalAccuracy(cpu_pred_, phase_, config_.do_sampling());
+  } else {
+#endif
+    return graph_->GetGlobalAccuracy(predictions, phase_,
+                                     config_.do_sampling());
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
 }
 
 void galois::GraphNeuralNetwork::GradientPropagation() {
