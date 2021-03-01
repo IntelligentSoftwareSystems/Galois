@@ -80,7 +80,7 @@ void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
   float max = std::sqrt(6.0) / std::sqrt(layer_dimensions_.output_columns +
                                          layer_dimensions_.input_columns);
   // TODO this seed should be configurable
-  std::default_random_engine rng(1);
+  std::default_random_engine rng(1 + layer_number_);
   std::uniform_real_distribution<GNNFloat> dist(-max, max);
 
   for (size_t i = 0; i < vector_to_init->size(); i++) {
@@ -236,5 +236,27 @@ void galois::GNNLayer::WeightGradientSyncAverage() {
           layer_weight_gradients_[weight_index] /= num_hosts;
         },
         galois::loopname("WeightGradientSyncAverageDivide"));
+  }
+}
+
+void galois::GNNLayer::SyncInitialWeights() {
+  if (galois::runtime::getSystemNetworkInterface().Num == 1) {
+    return;
+  }
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(loc/hochan)
+  GALOIS_LOG_FATAL("Need to implement GPU version of this");
+#endif
+  // copy weights over to gradients
+  for (size_t i = 0; i < layer_weights_.size(); i++) {
+    layer_weight_gradients_[i] = layer_weights_[i];
+  }
+  // sync "gradients" with a set only (reduction ignored)
+  gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSet>(
+      "InitialSync");
+  // copy "gradients" (actually weights) back to weight matrix
+  for (size_t i = 0; i < layer_weights_.size(); i++) {
+    layer_weights_[i]          = layer_weight_gradients_[i];
+    layer_weight_gradients_[i] = 0;
   }
 }

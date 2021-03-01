@@ -225,6 +225,9 @@ protected:
   PointerWithSize<GNNFloat> p_forward_output_matrix_;
   PointerWithSize<GNNFloat> p_backward_output_matrix_;
 
+  //! Synchronizes all weights (used in distributed setting)
+  void SyncInitialWeights();
+
   //! Wrapper over gradient matrix to make it compatible with Gluon
   std::unique_ptr<GluonGradientInterface> gradient_sync_interface_;
   //! Synchronization substrate for the weight gradients
