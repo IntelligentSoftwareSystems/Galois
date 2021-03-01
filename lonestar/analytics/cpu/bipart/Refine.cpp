@@ -539,7 +539,7 @@ void refine(MetisGraph* coarseGraph, unsigned K, double imbalance) {
   float tol   = 0.0f;
   bool flag   = isPT(K);
   if (flag) {
-    ratio = (50.0f + (double) imbalance)/(50.0f - (double) imbalance);
+    ratio = (50.0f + (double)imbalance) / (50.0f - (double)imbalance);
     tol   = std::max(ratio, 1 - ratio) - 1;
   } else {
     ratio = ((float)((K + 1) / 2)) / ((float)(K / 2)); // change if needed

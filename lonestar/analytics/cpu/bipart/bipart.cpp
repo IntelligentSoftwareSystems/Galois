@@ -121,9 +121,9 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   T3.start();
   refine(mcg, K, imbalance);
   T3.stop();
-  Ctime += (T.get()/1000.0f);
-  Ptime += (T2.get()/1000.0f);
-  Rtime += (T3.get()/1000.0f);
+  Ctime += (T.get() / 1000.0f);
+  Ptime += (T2.get() / 1000.0f);
+  Rtime += (T3.get() / 1000.0f);
 
   execTime.stop();
 }
@@ -154,7 +154,7 @@ int computingBalance(GGraph& g) {
     unsigned pp = g.getData(c).getPart();
     parts[pp]++;
   }
-  for (unsigned i = 0; i <numPartitions; i++) {
+  for (unsigned i = 0; i < numPartitions; i++) {
     if (parts[i] > max)
       max = parts[i];
   }
@@ -415,13 +415,13 @@ int main(int argc, char** argv) {
             galois::steal(), galois::loopname("populate edge ids"));
 
         uint64_t num_edges_acc = 0;
-        //galois::do_all(
-          //  galois::iterate(uint32_t{0}, totalnodes),
-            for(uint32_t c = 0;c<totalnodes;c++) {
-              pre_edges[c] = edges_ids[c].size();
-              num_edges_acc += pre_edges[c];
-            }
-            //galois::steal(), galois::loopname("set pre edges"));
+        // galois::do_all(
+        //  galois::iterate(uint32_t{0}, totalnodes),
+        for (uint32_t c = 0; c < totalnodes; c++) {
+          pre_edges[c] = edges_ids[c].size();
+          num_edges_acc += pre_edges[c];
+        }
+        // galois::steal(), galois::loopname("set pre edges"));
 
         edges = num_edges_acc;
 
@@ -488,20 +488,20 @@ int main(int argc, char** argv) {
     toProcess = toProcessNew;
     toProcessNew.clear();
   } // end while
-  std::cout<<"Coarsening time(s):,"<<Ctime<<"\n";
-  std::cout<<"Partitiong time(s):,"<<Ptime<<"\n";
-  std::cout<<"Refinement time(s):,"<<Rtime<<"\n";
-  std::cout<<"\n";
-  std::cout<<"Edge Cut,"<<computingCut(graph)<<"\n\n";
+  std::cout << "Coarsening time(s):," << Ctime << "\n";
+  std::cout << "Partitiong time(s):," << Ptime << "\n";
+  std::cout << "Refinement time(s):," << Rtime << "\n";
+  std::cout << "\n";
+  std::cout << "Edge Cut," << computingCut(graph) << "\n\n";
 
   galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
-  //galois::runtime::reportStat_Single("BiPart", "zero-one",
+  // galois::runtime::reportStat_Single("BiPart", "zero-one",
   //                                   computingBalance(graph));
 
   totalTime.stop();
   if (output) {
 
-    std::vector<std::vector<uint64_t> >parts(numPartitions);
+    std::vector<std::vector<uint64_t>> parts(numPartitions);
 
     for (GNode n = graph.hedges; n < graph.size(); n++) {
       unsigned p = graph.getData(n).getPart();
@@ -511,9 +511,9 @@ int main(int argc, char** argv) {
     std::ofstream outputFile(outfile.c_str());
 
     for (unsigned i = 0; i < numPartitions; i++) {
-      outputFile << i+1 << " ";
-      for (auto v : parts[i]) 
-        outputFile << v << " "; 
+      outputFile << i + 1 << " ";
+      for (auto v : parts[i])
+        outputFile << v << " ";
       outputFile << "\n";
     }
     outputFile.close();
