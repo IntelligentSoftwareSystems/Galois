@@ -28,8 +28,8 @@ typedef uint32_t EdgeTy;
 
 struct GGraph
     : public galois::graphs::LC_CSR_Graph<MetisNode, EdgeTy>::with_no_lockable<
-        true>::type::with_numa_alloc<true>::type {
-    	//false>::type::with_numa_alloc<true>::type {
+          true>::type::with_numa_alloc<true>::type {
+  // false>::type::with_numa_alloc<true>::type {
   size_t hedges;
   size_t hnodes;
 };
@@ -80,17 +80,16 @@ public:
   galois::CopyableAtomic<int> netval;
   galois::CopyableAtomic<int> degree;
   /*std::atomic<int> FS;
-	std::atomic<int> TE;
-	std::atomic<int> netnum;
-	std::atomic<int> netrand;
-	std::atomic<int> netval;
-	std::atomic<int> degree;
-*/	uint32_t index;
-	bool notAlone;
-	
-	void initPartition() { pd.locked = false; }
-	
-	
+    std::atomic<int> TE;
+    std::atomic<int> netnum;
+    std::atomic<int> netrand;
+    std::atomic<int> netval;
+    std::atomic<int> degree;
+*/ uint32_t index;
+  bool notAlone;
+
+  void initPartition() { pd.locked = false; }
+
   // int num;
   explicit MetisNode(int weight) : _weight(weight) {
     initCoarsen();
