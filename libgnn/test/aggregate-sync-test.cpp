@@ -6,8 +6,7 @@ int main() {
   galois::DistMemSys G;
 
   if (galois::runtime::getSystemNetworkInterface().Num == 1) {
-    GALOIS_LOG_ERROR("This test should be run with multiple hosts/processes");
-    exit(1);
+    GALOIS_LOG_WARN("This test should be run with multiple hosts/processes!");
   }
 
   auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
@@ -233,9 +232,25 @@ int main() {
   layer_0 = std::make_unique<galois::GraphConvolutionalLayer>(
       0, *(test_graph_2.get()), dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
+
   // make sure it runs in a sane manner
+  // galois::PointerWithSize<galois::GNNFloat> layer_0_forward_output =
   layer_0_forward_output =
       layer_0->ForwardPhase(test_graph_2->GetLocalFeatures());
+
+  for (size_t row = 0; row < test_graph_2->size(); row++) {
+    // row -> GID
+    size_t global_row = test_graph_2->GetGID(row);
+
+    if (global_row == 1) {
+      galois::gPrint(test_graph_2->host_prefix(), "GID ", global_row, " local ",
+                     row, " value ", layer_0_forward_output[row * 2], "\n");
+    }
+    if (global_row == 4) {
+      galois::gPrint(test_graph_2->host_prefix(), "GID ", global_row, " local ",
+                     row, " value ", layer_0_forward_output[row * 2], "\n");
+    }
+  }
 
   for (size_t row = 0; row < test_graph_2->size(); row++) {
     // row -> GID
@@ -325,10 +340,10 @@ int main() {
     }
   }
 
-  // since layer isn't 0 anymore, backward phase will actually return something
-  dummy_ones_v.assign(test_graph_2->size() * 2, 1);
+  std::vector<galois::GNNFloat> dummy_ones_v2(test_graph_2->size() * 2, 1);
+  galois::PointerWithSize<galois::GNNFloat> dummy_ones2(dummy_ones_v2);
   layer_1_backward_output =
-      layer_1->BackwardPhase(test_graph_2->GetLocalFeatures(), &dummy_ones);
+      layer_1->BackwardPhase(test_graph_2->GetLocalFeatures(), &dummy_ones2);
 
   for (size_t row = 0; row < test_graph_2->size(); row++) {
     // row -> GID

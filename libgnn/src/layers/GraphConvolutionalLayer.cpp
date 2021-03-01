@@ -230,7 +230,9 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*) {
-  size_t num_nodes = graph_.size();
+  size_t num_nodes   = graph_.size();
+  size_t last_master = *(graph_.end_owned());
+  assert(0 == *(graph_.begin_owned()));
 
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), num_nodes),
@@ -263,10 +265,13 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
         // init to self
         if (!config_.disable_self_aggregate) {
-          for (size_t i = 0; i < column_length; i++) {
-            aggregate_output[index_to_src_feature + i] =
-                node_embeddings[index_to_src_feature + i] * source_norm *
-                source_norm;
+          // only aggregate self once on master
+          if (src < last_master) {
+            for (size_t i = 0; i < column_length; i++) {
+              aggregate_output[index_to_src_feature + i] =
+                  node_embeddings[index_to_src_feature + i] * source_norm *
+                  source_norm;
+            }
           }
         }
 

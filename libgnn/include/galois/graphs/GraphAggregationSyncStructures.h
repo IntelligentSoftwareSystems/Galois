@@ -17,16 +17,18 @@ extern unsigned layer_number_to_sync;
 #endif
 
 struct GNNSumAggregate {
-  using ValTy = galois::BufferWrapper<GNNFloat>;
+  using ValTy = galois::gstl::Vector<GNNFloat>;
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
     // It should be a CPU synchronizing substrate.
     // If the GPU flag is turned off, then personality does not exist.
     // assert(device_personality == DevicePersonality::CPU);
-    ValTy extracted_vec(
-        &gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_],
-        gnn_matrix_to_sync_column_length_);
+    ValTy extracted_vec(gnn_matrix_to_sync_column_length_);
+    for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      extracted_vec[i] =
+          gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i];
+    }
     // move constructor should kick in here to avoid return copy
     return extracted_vec;
   }
@@ -43,8 +45,15 @@ struct GNNSumAggregate {
     return true;
   }
 
-  //! do nothing (waste of a write)
+  //! No-op: readAny = overwritten anyways
   static void reset(uint32_t, char&) {}
+  // Reset is here in case anyone wants to bring it back
+  // static void reset(uint32_t node_id, char&) {
+  //  for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+  //    gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i] =
+  //    0;
+  //  }
+  //}
 
   //! element wise set
   static void setVal(uint32_t node_id, char&, ValTy y) {
