@@ -29,7 +29,6 @@
 #include <unordered_set>
 #include <unordered_map>
 
-
 int TOTALW;
 int LIMIT;
 bool FLAG = false;
