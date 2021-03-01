@@ -29,7 +29,6 @@
 #include <unordered_set>
 #include <unordered_map>
 
-constexpr static const unsigned CHUNK_SIZE = 512U;
 
 int TOTALW;
 int LIMIT;
