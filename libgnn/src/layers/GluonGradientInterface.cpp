@@ -44,6 +44,6 @@ galois::GluonGradientInterface::GluonGradientInterface(
     }
   }
 
-  galois::gInfo("[", my_host, "] Weight gradients: this host owns ",
-                begin_master_, " to ", end_master_);
+  galois::gDebug("[", my_host, "] Weight gradients: this host owns ",
+                 begin_master_, " to ", end_master_);
 }

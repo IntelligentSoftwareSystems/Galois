@@ -119,6 +119,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // this is entire graph: amazon's mask isn't contiguous
       bps.push_back(0);
       bps.push_back(86618);
+    } else if (filename.find("ogbn-papers100M") != std::string::npos) {
+      // this is entire graph: amazon's mask isn't contiguous
+      bps.push_back(602);
+      bps.push_back(111052523);
     } else {
       // TODO(loc) only die under certain conditions; don't die if something
       // is missing
@@ -224,9 +228,8 @@ public:
     Tgraph_construct.start();
 
     if (readFromFile) {
-      galois::gPrint("[", base_DistGraph::id,
-                     "] Reading local graph from file ", localGraphFileName,
-                     "\n");
+      galois::gDebug("[", base_DistGraph::id,
+                     "] Reading local graph from file ", localGraphFileName);
       base_DistGraph::read_local_graph_from_file(localGraphFileName);
       Tgraph_construct.stop();
       return;
@@ -312,7 +315,7 @@ public:
 
     // phase 0
 
-    galois::gPrint("[", base_DistGraph::id, "] Starting graph reading.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Starting graph reading.");
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
     bufGraph.resetReadCounters();
     galois::StatTimer graphReadTimer("GraphReading", GRNAME);
@@ -321,18 +324,16 @@ public:
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
-    galois::gPrint("[", base_DistGraph::id, "] Reading graph complete.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Reading graph complete.");
 
     if (graphPartitioner->masterAssignPhase()) {
       // loop over all nodes, determine where neighbors are, assign masters
       galois::StatTimer phase0Timer("Phase0", GRNAME);
-      galois::gPrint("[", base_DistGraph::id,
-                     "] Starting master assignment.\n");
+      galois::gDebug("[", base_DistGraph::id, "] Starting master assignment.");
       phase0Timer.start();
       phase0(bufGraph, cuspAsync, stateRounds);
       phase0Timer.stop();
-      galois::gPrint("[", base_DistGraph::id,
-                     "] Master assignment complete.\n");
+      galois::gDebug("[", base_DistGraph::id, "] Master assignment complete.");
     }
 
     galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
@@ -447,13 +448,14 @@ public:
     base_DistGraph::initializeSpecificRanges();
 
     Tgraph_construct.stop();
-    galois::gPrint("[", base_DistGraph::id, "] Graph construction complete.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Graph construction complete.");
 
     // report state rounds
     if (base_DistGraph::id == 0) {
       galois::runtime::reportStat_Single(GRNAME, "CuSPStateRounds",
                                          (uint32_t)stateRounds);
     }
+    galois::gPrint("[", base_DistGraph::id, "] Dist graph constructed\n");
   }
 
 private:
@@ -1363,7 +1365,7 @@ private:
 
     if (async) {
       if (base_DistGraph::id == 0) {
-        galois::gPrint("Using asynchronous master determination sends.\n");
+        galois::gDebug("Using asynchronous master determination sends.");
       }
 
       hostFinished.resize(base_DistGraph::numHosts);
@@ -1381,8 +1383,8 @@ private:
 #endif
 
     if (base_DistGraph::id == 0) {
-      galois::gPrint("Number of BSP sync rounds in master assignment: ",
-                     stateRounds, "\n");
+      galois::gDebug("Number of BSP sync rounds in master assignment: ",
+                     stateRounds);
     }
 
     // galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
@@ -1484,9 +1486,9 @@ private:
       base_DistGraph::increment_evilPhase();
     }
 
-    galois::gPrint("[", base_DistGraph::id,
+    galois::gDebug("[", base_DistGraph::id,
                    "] Local master assignment "
-                   "complete.\n");
+                   "complete.");
 
     // one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
@@ -1498,7 +1500,7 @@ private:
     recvMastersToOwners();
     p0master2ownerTimer.stop();
 
-    galois::gPrint("[", base_DistGraph::id, "] Received my master mappings.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Received my master mappings.");
 
     base_DistGraph::increment_evilPhase();
 
@@ -1543,11 +1545,10 @@ private:
     inspectionTimer.stop();
 
     uint64_t allBytesRead = bufGraph.getBytesRead();
-    galois::gPrint(
-        "[", base_DistGraph::id,
-        "] Edge inspection time: ", inspectionTimer.get_usec() / 1000000.0f,
-        " seconds to read ", allBytesRead, " bytes (",
-        allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
+    galois::gDebug("[", base_DistGraph::id, "] Edge inspection time: ",
+                   inspectionTimer.get_usec() / 1000000.0f, " seconds to read ",
+                   allBytesRead, " bytes (",
+                   allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)");
 
     // get incoming mirrors ready for creation
     uint32_t additionalMirrorCount = incomingMirrors.count();
@@ -1646,7 +1647,7 @@ private:
   void edgeCutLoad(GraphTy& graph,
                    galois::graphs::BufferedGraph<EdgeTy>& bGraph) {
     if (base_DistGraph::id == 0) {
-      galois::gPrint("Loading edge-data while creating edges\n");
+      galois::gDebug("Loading edge-data while creating edges");
     }
 
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
@@ -1677,10 +1678,10 @@ private:
         galois::steal(), galois::no_stats());
 
     timer.stop();
-    galois::gPrint("[", base_DistGraph::id,
+    galois::gDebug("[", base_DistGraph::id,
                    "] Edge loading time: ", timer.get_usec() / 1000000.0f,
                    " seconds to read ", bGraph.getBytesRead(), " bytes (",
-                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
+                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)");
   }
 
   /**
@@ -1698,7 +1699,7 @@ private:
   void edgeCutLoad(GraphTy& graph,
                    galois::graphs::BufferedGraph<EdgeTy>& bGraph) {
     if (base_DistGraph::id == 0) {
-      galois::gPrint("Loading edge-data while creating edges\n");
+      galois::gDebug("Loading edge-data while creating edges");
     }
 
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
@@ -1728,10 +1729,10 @@ private:
         galois::steal(), galois::no_stats());
 
     timer.stop();
-    galois::gPrint("[", base_DistGraph::id,
+    galois::gDebug("[", base_DistGraph::id,
                    "] Edge loading time: ", timer.get_usec() / 1000000.0f,
                    " seconds to read ", bGraph.getBytesRead(), " bytes (",
-                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
+                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)");
   }
 
   /**
@@ -1764,11 +1765,10 @@ private:
     inspectionTimer.stop();
     // report edge inspection time
     uint64_t allBytesRead = bufGraph.getBytesRead();
-    galois::gPrint(
-        "[", base_DistGraph::id,
-        "] Edge inspection time: ", inspectionTimer.get_usec() / 1000000.0f,
-        " seconds to read ", allBytesRead, " bytes (",
-        allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
+    galois::gDebug("[", base_DistGraph::id, "] Edge inspection time: ",
+                   inspectionTimer.get_usec() / 1000000.0f, " seconds to read ",
+                   allBytesRead, " bytes (",
+                   allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)");
 
     // old inspection barrier
     // galois::runtime::getHostBarrier().wait();
@@ -2138,7 +2138,7 @@ private:
     galois::runtime::reportStat_Tsum(
         GRNAME, std::string("EdgeInspectionBytesSent"), bytesSent.reduce());
 
-    galois::gPrint("[", base_DistGraph::id, "] Inspection sends complete.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Inspection sends complete.");
   }
 
   /**
@@ -2218,8 +2218,7 @@ private:
       }
     }
 
-    galois::gPrint("[", base_DistGraph::id,
-                   "] Inspection receives complete.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Inspection receives complete.");
   }
 
   /**
@@ -2246,7 +2245,7 @@ private:
     inspectIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
     finalizeInspection(prefixSumOfEdges);
 
-    galois::gPrint("[", base_DistGraph::id, "] Inspection mapping complete.\n");
+    galois::gDebug("[", base_DistGraph::id, "] Inspection mapping complete.");
     return prefixSumOfEdges;
   }
 
@@ -2598,9 +2597,9 @@ private:
                  galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
     if (base_DistGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
-        fprintf(stderr, "Loading void edge-data while creating edges.\n");
+        galois::gDebug("Loading void edge-data while creating edges.");
       } else {
-        fprintf(stderr, "Loading edge-data while creating edges.\n");
+        galois::gDebug(stderr, "Loading edge-data while creating edges.");
       }
     }
 
@@ -2625,10 +2624,10 @@ private:
 
     loadEdgeTimer.stop();
 
-    galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ",
+    galois::gDebug("[", base_DistGraph::id, "] Edge loading time: ",
                    loadEdgeTimer.get_usec() / 1000000.0f, " seconds to read ",
                    bufBytesRead, " bytes (",
-                   bufBytesRead / (float)loadEdgeTimer.get_usec(), " MBPS)\n");
+                   bufBytesRead / (float)loadEdgeTimer.get_usec(), " MBPS)");
   }
 
   // Edge type is not void. (i.e. edge data exists)

@@ -166,7 +166,7 @@ void galois::graphs::GNNGraph::AggregateSync(
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
 
-  // XXX bitset setting
+  // TODO(loc) bitset setting
   sync_substrate_->sync<writeSource, readAny, GNNSumAggregate>(
       "GraphAggregateSync");
 }
@@ -184,7 +184,7 @@ void galois::graphs::GNNGraph::AggregateSync(
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
   cuda_ctx_for_sync                 = cuda_ctx_;
   layer_number_to_sync              = layer_number;
-  // XXX bitset setting
+  // TODO bitset setting
   // call sync
   cudaSetLayerInputOutput(cuda_ctx_, matrix_to_sync, matrix_column_size, size(),
                           layer_number);
@@ -297,7 +297,9 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
   size_t num_nodes;
   file_stream >> num_nodes >> num_label_classes_ >> std::ws;
   assert(num_nodes == partitioned_graph_->globalSize());
-  galois::gPrint("Number of label classes is ", num_label_classes_, "\n");
+  if (host_id_ == 0) {
+    galois::gInfo("Number of label classes is ", num_label_classes_);
+  }
 
   // allocate memory for labels
   if (has_single_class_label) {

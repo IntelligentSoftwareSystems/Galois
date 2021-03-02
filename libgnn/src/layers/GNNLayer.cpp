@@ -244,7 +244,7 @@ void galois::GNNLayer::ActivationDerivative(
 }
 
 void galois::GNNLayer::WeightGradientSyncSum() {
-  // XXX bitset
+  // TODO bitset
   gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
       "WeightGradientsSync");
 }
@@ -252,7 +252,7 @@ void galois::GNNLayer::WeightGradientSyncSum() {
 void galois::GNNLayer::WeightGradientSyncAverage() {
   size_t num_hosts = galois::runtime::getSystemNetworkInterface().Num;
   if (num_hosts > 1) {
-    // XXX bitset
+    // TODO bitset
     // sum, then average by dividing all by num hosts (every host participates
     // in sync)
     gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(

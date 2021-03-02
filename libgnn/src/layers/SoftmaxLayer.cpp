@@ -8,7 +8,12 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
-  // TODO(loc) once needed for accuracy debugging, print out loss
+#ifndef NDEBUG
+  galois::DGAccumulator<GNNFloat> loss_accum;
+  galois::DGAccumulator<size_t> handled;
+  loss_accum.reset();
+  handled.reset();
+#endif
 
   galois::do_all(
       galois::iterate(graph_.begin_owned(), graph_.end_owned()),
@@ -22,7 +27,6 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           // do softmax
           GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
                      &forward_output_matrix_[feature_length * i]);
-
           // create ground truth vector for this LID
           std::vector<GNNFloat>* ground_truth_vec =
               ground_truth_vectors_.getLocal();
@@ -36,11 +40,20 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           input_loss_[i] =
               GNNCrossEntropy(feature_length, ground_truth_vec->data(),
                               &forward_output_matrix_[feature_length * i]);
+#ifndef NDEBUG
+          loss_accum += input_loss_[i];
+          handled += 1;
+#endif
         }
       },
       // TODO chunk size?
       // steal on as some threads may have nothing to work on
       galois::steal(), galois::loopname("SoftmaxForward"));
+#ifndef NDEBUG
+  GNNFloat reduced_loss = loss_accum.reduce();
+  size_t t              = handled.reduce();
+  galois::gPrint("Loss is ", reduced_loss / t, "\n");
+#endif
 
   return forward_output_matrix_;
 }

@@ -60,16 +60,16 @@ enum MASTERS_DISTRIBUTION {
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
  */
-template <typename NodeTy, typename EdgeTy,
-          typename NodeIndexTy=uint32_t,
-          typename EdgeIndexTy=uint64_t>
+template <typename NodeTy, typename EdgeTy, typename NodeIndexTy = uint32_t,
+          typename EdgeIndexTy = uint64_t>
 class DistGraph {
 private:
   //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
-  using GraphTy = galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true, false,
-                  false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+  using GraphTy =
+      galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true, false, false, EdgeTy,
+                                   NodeIndexTy, EdgeIndexTy>;
 
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
@@ -393,10 +393,10 @@ protected:
     galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
         GRNAME, "MasterDistTime", timer.get());
 
-    galois::gPrint(
+    galois::gDebug(
         "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
         " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
-        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)\n");
+        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)");
     return numNodes_to_divide;
   }
 
@@ -866,9 +866,7 @@ public:
   /**
    * Deallocates underlying LC CSR Graph
    */
-  void deallocate() {
-    graph.deallocate();
-  }
+  void deallocate() { graph.deallocate(); }
 
   /**
    * Sort the underlying LC_CSR_Graph by ID (destinations)
@@ -882,10 +880,10 @@ public:
         galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
   }
 
-////////////////////////////////////////////////////////////////////////////////
-// what follows are GNN functions; some are not great (e.g. expose arrays)
-// TODO figure out better way to do this
-////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
+  // what follows are GNN functions; some are not great (e.g. expose arrays)
+  // TODO figure out better way to do this
+  ////////////////////////////////////////////////////////////////////////////////
   EdgeIndexTy* row_start_ptr() { return graph.row_start_ptr(); }
   NodeIndexTy* edge_dst_ptr() { return graph.edge_dst_ptr(); }
 };
