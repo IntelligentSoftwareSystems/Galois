@@ -79,7 +79,6 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
 void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
   float max = std::sqrt(6.0) / std::sqrt(layer_dimensions_.output_columns +
                                          layer_dimensions_.input_columns);
-  // TODO this seed should be configurable
   std::default_random_engine rng(1 + layer_number_);
   std::uniform_real_distribution<GNNFloat> dist(-max, max);
 
@@ -87,6 +86,34 @@ void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
     (*vector_to_init)[i] = dist(rng);
   }
 #ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    CopyLayerWeightsToGPU();
+  }
+#endif
+}
+
+void galois::GNNLayer::PairGlorotBengioInit(std::vector<GNNFloat>* vector1,
+                                            std::vector<GNNFloat>* vector2) {
+  // multiplied by 2 here because 2 pieces are 1 unit
+  float max =
+      std::sqrt(6.0) / std::sqrt((2 * layer_dimensions_.output_columns) +
+                                 layer_dimensions_.input_columns);
+  assert(vector1->size() ==
+         (layer_dimensions_.input_columns * layer_dimensions_.output_columns));
+  assert(vector2->size() ==
+         (layer_dimensions_.input_columns * layer_dimensions_.output_columns));
+  std::default_random_engine rng(1 + layer_number_);
+  std::uniform_real_distribution<GNNFloat> dist(-max, max);
+
+  for (size_t i = 0; i < vector1->size(); i++) {
+    (*vector1)[i] = dist(rng);
+  }
+  for (size_t i = 0; i < vector2->size(); i++) {
+    (*vector2)[i] = dist(rng);
+  }
+#ifdef GALOIS_ENABLE_GPU
+  // TODO
+  GALOIS_LOG_FATAL("TODO: copy both not 1");
   if (device_personality == DevicePersonality::GPU_CUDA) {
     CopyLayerWeightsToGPU();
   }

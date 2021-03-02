@@ -263,6 +263,10 @@ protected:
   //! Code inspired DGL and TinyDNN
   void GlorotBengioInit(std::vector<GNNFloat>* vector_to_init);
 
+  //! Init 2 things as one unit; used for SAGE
+  void PairGlorotBengioInit(std::vector<GNNFloat>* vector1,
+                            std::vector<GNNFloat>* vector2);
+
   //! Randomly init a float vector using the class's random init RNG
   void RandomInitVector(std::vector<GNNFloat>* vector_to_init);
 

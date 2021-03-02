@@ -17,7 +17,10 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
         layer_dimensions_.input_columns * layer_dimensions_.output_columns;
     layer_weights_2_.resize(num_weight_elements);
     layer_weight_gradients_2_.resize(num_weight_elements, 0);
-    GlorotBengioInit(&layer_weights_2_);
+
+    // reinit both weight matrices as one unit
+    PairGlorotBengioInit(&layer_weights_, &layer_weights_2_);
+
     // update the pointers to them as well as realloc will require it
     p_layer_weights_2_ = PointerWithSize<GNNFloat>(layer_weights_2_);
     p_layer_weight_gradients_2_ =
