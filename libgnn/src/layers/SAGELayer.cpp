@@ -28,6 +28,15 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     // initialize the optimizer
     std::vector<size_t> weight_size = {num_weight_elements};
     second_weight_optimizer_ = std::make_unique<AdamOptimizer>(weight_size, 1);
+
+    // initialize sync substrate for second set
+    gradient_sync_interface_2_ =
+        std::make_unique<GluonGradientInterface>(layer_weight_gradients_2_);
+    gradient_sync_substrate_2_ = std::make_unique<
+        galois::graphs::GluonSubstrate<GluonGradientInterface>>(
+        *gradient_sync_interface_2_,
+        galois::runtime::getSystemNetworkInterface().ID,
+        galois::runtime::getSystemNetworkInterface().Num, false);
   }
 
   size_t num_input_elements =
@@ -165,6 +174,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
         input_to_use.data(), input_gradient->data(),
         p_layer_weight_gradients_2_.data());
   }
+  WeightGradientSyncSum2();
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
@@ -245,7 +255,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
   }
 
-  // TODO(loc) sync both weight matrices
   WeightGradientSyncSum();
 
   if (!config_.disable_dropout && layer_number_ != 0) {

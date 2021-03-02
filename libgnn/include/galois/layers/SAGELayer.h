@@ -1,5 +1,6 @@
 #pragma once
 #include "galois/layers/GNNLayer.h"
+#include "galois/layers/GradientSyncStructures.h"
 
 #ifdef GALOIS_ENABLE_GPU
 // TODO(loc/hochan)
@@ -91,6 +92,14 @@ private:
   //! override parent function: optimizes the second set of weights as well
   void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
 
+  //! Sync second set of weight gradients
+  void WeightGradientSyncSum2() {
+    // TODO bitset
+    gradient_sync_substrate_2_
+        ->sync<writeAny, readAny, WeightGradientSummation>(
+            "WeightGradients2Sync");
+  }
+
   //! SAGE config params
   SAGELayerConfig sage_config_;
   //! Need own optimizer for the 2nd weight matrix
@@ -101,6 +110,12 @@ private:
   std::vector<GNNFloat> layer_weight_gradients_2_;
   PointerWithSize<GNNFloat> p_layer_weights_2_;
   PointerWithSize<GNNFloat> p_layer_weight_gradients_2_;
+
+  //! Wrapper over 2nd gradient matrix to make it compatible with Gluon
+  std::unique_ptr<GluonGradientInterface> gradient_sync_interface_2_;
+  //! Synchronization substrate for the 2nd weight gradients
+  std::unique_ptr<galois::graphs::GluonSubstrate<GluonGradientInterface>>
+      gradient_sync_substrate_2_;
 
   // 2 temporaries the size of the forward input; used for dropout and
   // aggregation (if either are required)
