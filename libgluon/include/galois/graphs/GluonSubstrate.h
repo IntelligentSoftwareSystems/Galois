@@ -82,6 +82,8 @@ namespace graphs {
 template <typename GraphTy>
 class GluonSubstrate : public galois::runtime::GlobalObject {
 private:
+  bool is_a_graph_{false};
+
   //! Synchronization type
   enum SyncType {
     syncReduce,   //!< Reduction sync
@@ -340,16 +342,18 @@ private:
    */
   void reportProxyStats(uint64_t global_total_mirror_nodes,
                         uint64_t GALOIS_UNUSED(global_total_owned_nodes)) {
-    float replication_factor =
-        (float)(global_total_mirror_nodes + userGraph.globalSize()) /
-        (float)userGraph.globalSize();
-    galois::runtime::reportStat_Single(RNAME, "ReplicationFactor",
-                                       replication_factor);
+    if (is_a_graph_) {
+      float replication_factor =
+          (float)(global_total_mirror_nodes + userGraph.globalSize()) /
+          (float)userGraph.globalSize();
+      galois::runtime::reportStat_Single(RNAME, "ReplicationFactor",
+                                         replication_factor);
 
-    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
-        RNAME, "TotalNodes", userGraph.globalSize());
-    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
-        RNAME, "TotalGlobalMirrorNodes", global_total_mirror_nodes);
+      galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
+          RNAME, "TotalNodes", userGraph.globalSize());
+      galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(
+          RNAME, "TotalGlobalMirrorNodes", global_total_mirror_nodes);
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -431,12 +435,13 @@ public:
         substrateDataMode(_enforcedDataMode), numHosts(numHosts), num_run(0),
         num_round(0), currentBVFlag(nullptr),
         mirrorNodes(userGraph.getMirrorNodes()) {
+    is_a_graph_ = _userGraph.is_a_graph();
     if (cartesianGrid.first != 0 && cartesianGrid.second != 0) {
       GALOIS_ASSERT(cartesianGrid.first * cartesianGrid.second == numHosts,
                     "Cartesian split doesn't equal number of hosts");
       if (id == 0) {
-        galois::gInfo("Gluon optimizing communication for 2-D cartesian cut: ",
-                      cartesianGrid.first, " x ", cartesianGrid.second);
+        galois::gDebug("Gluon optimizing communication for 2-D cartesian cut: ",
+                       cartesianGrid.first, " x ", cartesianGrid.second);
       }
       isCartCut = true;
     } else {

@@ -59,6 +59,8 @@ public:
   unsigned getEdgeData(uint32_t) const { return 0; }
   void deallocate() const {};
 
+  bool is_a_graph() const { return false; }
+
 private:
   //! Reference to gradients that can get synchronized
   std::vector<GNNFloat>& gradients_;

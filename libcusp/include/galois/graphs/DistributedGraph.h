@@ -886,6 +886,9 @@ public:
   ////////////////////////////////////////////////////////////////////////////////
   EdgeIndexTy* row_start_ptr() { return graph.row_start_ptr(); }
   NodeIndexTy* edge_dst_ptr() { return graph.edge_dst_ptr(); }
+
+  //! Used by substrate to determine if some stats are to be reported
+  bool is_a_graph() const { return true; }
 };
 
 template <typename NodeTy, typename EdgeTy, typename NodeIndexTy,
