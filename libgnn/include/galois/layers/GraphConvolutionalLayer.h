@@ -67,6 +67,11 @@ private:
   AggregateAll(size_t column_length, const GNNFloat* node_embeddings,
                GNNFloat* aggregate_output,
                galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts);
+  void
+  AggregateAll(size_t column_length, const GNNFloat* node_embeddings,
+               GNNFloat* aggregate_output,
+               galois::substrate::PerThreadStorage<std::vector<GNNFloat>>* pts,
+               bool is_backward);
 
   //! Do embedding update via mxm with this layer's weights (forward)
   void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output);

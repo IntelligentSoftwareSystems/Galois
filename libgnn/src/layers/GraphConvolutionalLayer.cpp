@@ -132,7 +132,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
       // derivative of aggregate is the same due to symmetric graph
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
                    p_backward_output_matrix_.data(),
-                   &input_column_intermediates_);
+                   &input_column_intermediates_, true);
       // TODO if training A, then A' compute here if layer # is 0
       // dot product of edges that exist in A
     }
@@ -162,7 +162,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     // required in this case for the weight gradient calculation
     // this is (FW)'
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
-                 p_out_temp_.data(), &output_column_intermediates_);
+                 p_out_temp_.data(), &output_column_intermediates_, true);
     if (layer_number_ != 0) {
       // derivative for update
       // backout = F'
@@ -208,7 +208,22 @@ void galois::GraphConvolutionalLayer::AggregateAll(
     GNNFloat* aggregate_output,
     [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
         pts) {
-  galois::StatTimer timer("Aggregate", kRegionName);
+  AggregateAll(column_length, node_embeddings, aggregate_output, pts, false);
+}
+
+void galois::GraphConvolutionalLayer::AggregateAll(
+    size_t column_length, const GNNFloat* node_embeddings,
+    GNNFloat* aggregate_output,
+    [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
+        pts,
+    bool is_backward) {
+  std::string agg_timer_name = "Aggregate";
+  if (!is_backward) {
+    agg_timer_name += "Forward";
+  } else {
+    agg_timer_name += "Backward";
+  }
+  galois::StatTimer timer(agg_timer_name.c_str(), kRegionName);
   timer.start();
 
 #ifdef GALOIS_ENABLE_GPU
@@ -311,7 +326,8 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           }
         }
       },
-      galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
+      galois::chunk_size<1>(), galois::steal(),
+      galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
   graph_.AggregateSync(aggregate_output, column_length);
 }

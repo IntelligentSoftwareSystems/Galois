@@ -147,12 +147,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   if (config_.inductive_training_) {
     graph_->CalculateSpecialNormFactor(false, true);
   }
+  galois::StatTimer epoch_timer("TrainingTime", "GraphNeuralNetwork");
+  galois::StatTimer validation_timer("ValidationTime", "GraphNeuralNetwork");
+  galois::StatTimer epoch_test_timer("TestTime", "GraphNeuralNetwork");
 
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
-    const std::string t_name     = "TrainEpoch" + std::to_string(epoch);
-    const std::string t_name_acc = t_name + "Accuracy";
-    galois::StatTimer epoch_timer(t_name.c_str(), "GraphNeuralNetwork");
     epoch_timer.start();
     if (config_.do_sampling()) {
       // subgraph sample every epoch
@@ -166,6 +166,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     train_accuracy = GetGlobalAccuracy(predictions);
 
     if (this_host == 0) {
+      const std::string t_name_acc =
+          "TrainEpoch" + std::to_string(epoch) + "Accuracy";
       galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                      train_accuracy, "\n");
       galois::runtime::reportStat_Single("GraphNeuralNetwork", t_name_acc,
@@ -184,44 +186,43 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     }
 
     if (do_validate) {
-      const std::string v_name     = "ValEpoch" + std::to_string(epoch);
-      const std::string v_name_acc = v_name + "Accuracy";
-      galois::StatTimer val_epoch_timer(v_name.c_str(), "GraphNeuralNetwork");
-
-      val_epoch_timer.start();
+      validation_timer.start();
       SetLayerPhases(galois::GNNPhase::kValidate);
       const PointerWithSize<galois::GNNFloat> val_pred = DoInference();
-      val_epoch_timer.stop();
+      validation_timer.stop();
 
       float val_acc = GetGlobalAccuracy(val_pred);
       if (this_host == 0) {
         galois::gPrint("Epoch ", epoch, ": Validation accuracy is ", val_acc,
                        "\n");
+        const std::string v_name_acc =
+            "ValEpoch" + std::to_string(epoch) + "Accuracy";
         galois::runtime::reportStat_Single("GraphNeuralNetwork", v_name_acc,
                                            val_acc);
       }
     }
 
     if (do_test) {
-      const std::string test_name     = "TestEpoch" + std::to_string(epoch);
-      const std::string test_name_acc = test_name + "Accuracy";
-      galois::StatTimer test_epoch_timer(test_name.c_str(),
-                                         "GraphNeuralNetwork");
-
-      test_epoch_timer.start();
+      epoch_test_timer.start();
       SetLayerPhases(galois::GNNPhase::kTest);
       const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
-      test_epoch_timer.stop();
+      epoch_test_timer.stop();
 
       float test_acc = GetGlobalAccuracy(test_pred);
       if (this_host == 0) {
         galois::gPrint("Epoch ", epoch, ": Test accuracy is ", test_acc, "\n");
+        const std::string test_name_acc =
+            "TestEpoch" + std::to_string(epoch) + "Accuracy";
         galois::runtime::reportStat_Single("GraphNeuralNetwork", test_name_acc,
                                            test_acc);
       }
     }
 
     if (do_validate || do_test) {
+      // report the training time elapsed at this point in time
+      galois::runtime::reportStat_Single(
+          "GraphNeuralNetwork", "ElapsedTrainTimeEpoch" + std::to_string(epoch),
+          epoch_timer.get());
       // revert to training phase for next epoch
       SetLayerPhases(galois::GNNPhase::kTrain);
       // get back inductive norm factor as necessary; sampling norm is handled
@@ -231,6 +232,10 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
   }
+
+  uint64_t average_epoch_time = epoch_timer.get() / num_epochs;
+  galois::runtime::reportStat_Tavg("GraphNeuralNetwork", "AverageEpochTime",
+                                   average_epoch_time);
 
   if (altered_norm_factor) {
     graph_->CalculateFullNormFactor();

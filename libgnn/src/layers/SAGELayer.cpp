@@ -89,7 +89,9 @@ void MatrixAdd(size_t num_nodes, galois::PointerWithSize<galois::GNNFloat> in,
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
-  GALOIS_LOG_VERBOSE("Calling forward phase");
+  galois::StatTimer timer("ForwardPhase", kRegionName);
+  timer.start();
+
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
   assert(p_in_temp_1_.size() == input_embeddings.size());
@@ -138,12 +140,17 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
 
+  timer.stop();
+
   return p_forward_output_matrix_;
 }
 
 galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
+  galois::StatTimer timer("BackwardPhase", kRegionName);
+  timer.start();
+
   assert(layer_phase_ == GNNPhase::kTrain);
 
   // derivative of activation
@@ -261,6 +268,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     DoDropoutDerivative();
   }
 
+  timer.stop();
   return p_backward_output_matrix_;
 }
 
@@ -278,6 +286,15 @@ void galois::SAGELayer::AggregateAll(
     [[maybe_unused]] galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*
         pts,
     bool is_backward) {
+  std::string agg_timer_name = "Aggregate";
+  if (!is_backward) {
+    agg_timer_name += "Forward";
+  } else {
+    agg_timer_name += "Backward";
+  }
+  galois::StatTimer timer(agg_timer_name.c_str(), kRegionName);
+  timer.start();
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.AggregateAllGPU(
@@ -291,6 +308,7 @@ void galois::SAGELayer::AggregateAll(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }
 
 void galois::SAGELayer::AggregateAllCPU(
@@ -371,13 +389,16 @@ void galois::SAGELayer::AggregateAllCPU(
           }
         }
       },
-      galois::steal(), galois::loopname("ConvolutionalAggregateAll"));
+      galois::chunk_size<1>(), galois::steal(),
+      galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
   graph_.AggregateSync(aggregate_output, column_length);
 }
 
 void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
                                          GNNFloat* output) {
+  galois::StatTimer timer("ForwardXForm", kRegionName);
+  timer.start();
 #ifdef GALOIS_ENABLE_GPU
   // TODO self change
   if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -395,10 +416,13 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }
 
 void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
     const GNNFloat* node_embeddings, GNNFloat* output) {
+  galois::StatTimer timer("SelfForwardXForm", kRegionName);
+  timer.start();
 #ifdef GALOIS_ENABLE_GPU
   // TODO self change
 #endif
@@ -410,10 +434,14 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
 #ifdef GALOIS_ENABLE_GPU
 }
 #endif
+timer.stop();
 }
 
 void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
                                                    GNNFloat* output) {
+  galois::StatTimer timer("BackwardXForm", kRegionName);
+  timer.start();
+
   assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
@@ -433,10 +461,14 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  timer.stop();
 }
 
 void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
     const GNNFloat* gradients, GNNFloat* output) {
+  galois::StatTimer timer("SelfBackwardXForm", kRegionName);
+  timer.start();
+
   assert(p_layer_weights_.size() ==
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
@@ -451,6 +483,7 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
                      layer_weights_2_.data(), output, true);
 #ifdef GALOIS_ENABLE_GPU
 #endif
+  timer.stop();
 }
 
 void galois::SAGELayer::OptimizeLayer(BaseOptimizer* optimizer,

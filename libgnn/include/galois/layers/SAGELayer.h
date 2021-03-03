@@ -58,6 +58,7 @@ public:
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:
+  static const constexpr char* kRegionName = "SAGELayer";
   //! CPU aggregation
   void AggregateAllCPU(
       size_t column_length, const GNNFloat* node_embeddings,
