@@ -43,7 +43,7 @@ int main() {
   // increasing
   galois::StatTimer main_timer("Timer_0");
   main_timer.start();
-  for (size_t epoch = 0; epoch < 100; epoch++) {
+  for (size_t epoch = 0; epoch < 25; epoch++) {
     galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
     gnn->GradientPropagation();
     galois::gPrint("Epoch ", epoch, ": Accuracy is ",

@@ -14,12 +14,12 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
 
-  // multi level reading tested in another test
+  // note multi level reading tested in another test
   GALOIS_LOG_VERBOSE("reddit with single label, oec");
-  galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kOEC,
+  galois::graphs::GNNGraph("cora", galois::graphs::GNNPartitionScheme::kOEC,
                            true);
   GALOIS_LOG_VERBOSE("reddit with single label, cvc");
-  galois::graphs::GNNGraph("reddit", galois::graphs::GNNPartitionScheme::kCVC,
+  galois::graphs::GNNGraph("cora", galois::graphs::GNNPartitionScheme::kCVC,
                            true);
 
   return 0;

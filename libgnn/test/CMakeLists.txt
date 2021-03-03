@@ -2,6 +2,15 @@ add_executable(gnngraph-test gnngraph-test.cpp)
 target_link_libraries(gnngraph-test galois_gnn)
 add_test(NAME gnngraph-test COMMAND gnngraph-test)
 
+# multihost testing things
+set(hosts)
+set(host 12)
+while (${host} GREATER 1)
+  list(APPEND hosts ${host})
+  math(EXPR host "${host} - 1")
+endwhile()
+list(APPEND hosts "1")
+
 if (NOT GALOIS_ENABLE_GPU)
   add_executable(convlayer-test convlayer-test.cpp)
   target_link_libraries(convlayer-test galois_gnn)
@@ -47,13 +56,16 @@ if (NOT GALOIS_ENABLE_GPU)
   target_link_libraries(multilabel-epoch-test galois_gnn)
   add_test(NAME multilabel-epoch-test COMMAND multilabel-epoch-test)
 
-  # TODO figure out how to make this test run in parallel
   add_executable(aggregate-sync-test aggregate-sync-test.cpp)
   target_link_libraries(aggregate-sync-test galois_gnn)
-  #add_test(NAME aggregate-sync-test COMMAND GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=4 ./aggregate-sync-test)
+  foreach(host_count ${hosts})
+    add_test(NAME run-aggsync-${host_count} COMMAND mpiexec --bind-to none -n ${host_count} aggregate-sync-test)
+    set_tests_properties(run-aggsync-${host_count} PROPERTIES ENVIRONMENT "GALOIS_DO_NOT_BIND_THREADS=1")
+  endforeach()
 
   add_executable(weight-sync-test weight-sync-test.cpp)
   target_link_libraries(weight-sync-test galois_gnn)
+  # TODO multi host tests
 
   add_executable(multilabel-read multilabel-read.cpp)
   target_link_libraries(multilabel-read galois_gnn)
