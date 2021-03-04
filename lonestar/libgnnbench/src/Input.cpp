@@ -169,6 +169,15 @@ CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
     }
     // verify user satisfies last intermediate layer needing to have same size
     // as # label classes
+    if (layer_sizes_vector.back() != gnn_graph->GetNumLabelClasses()) {
+      galois::gWarn(
+          "Size of last layer (", layer_sizes_vector.back(),
+          ") is not equal to # label classes: forcefully changing it to ",
+          gnn_graph->GetNumLabelClasses());
+      layer_sizes_vector.back()   = gnn_graph->GetNumLabelClasses();
+      layer_sizes[num_layers - 1] = gnn_graph->GetNumLabelClasses();
+    }
+
     GALOIS_LOG_ASSERT(layer_sizes_vector.back() ==
                       gnn_graph->GetNumLabelClasses());
   } else {
