@@ -94,12 +94,7 @@ private:
   void OptimizeLayer(BaseOptimizer* optimizer, size_t trainable_layer_number);
 
   //! Sync second set of weight gradients
-  void WeightGradientSyncSum2() {
-    // TODO bitset
-    gradient_sync_substrate_2_
-        ->sync<writeAny, readAny, WeightGradientSummation>(
-            "WeightGradients2Sync");
-  }
+  void WeightGradientSyncSum2();
 
   //! SAGE config params
   SAGELayerConfig sage_config_;

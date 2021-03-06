@@ -11,8 +11,10 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
   in_temp_1_.resize(num_input_elements, 0);
-  // TODO temp2 does not need to be initialized in all circumstances
-  in_temp_2_.resize(num_input_elements, 0);
+  if (config_.disable_aggregate_after_update ||
+      layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    in_temp_2_.resize(num_input_elements, 0);
+  }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
@@ -50,7 +52,6 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
   assert(p_in_temp_1_.size() == input_embeddings.size());
-  assert(p_in_temp_2_.size() == input_embeddings.size());
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
   // pointer to input to operate on
@@ -78,8 +79,6 @@ galois::GraphConvolutionalLayer::ForwardPhase(
                  &output_column_intermediates_);
   }
 
-  // TODO synchronization of aggregation functions
-
   if (!config_.disable_activation) {
     GALOIS_LOG_VERBOSE("Doing activation");
     Activation();
@@ -88,6 +87,7 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
   timer.stop();
+
   return p_forward_output_matrix_;
 }
 
@@ -138,6 +138,7 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     }
     // weight gradient calculation
     // TODO(loc) put this in a function to put the ifdef in there
+    MaskGradientNonMasters(input_gradient);
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
@@ -169,8 +170,9 @@ galois::GraphConvolutionalLayer::BackwardPhase(
       UpdateEmbeddingsDerivative(p_out_temp_.data(),
                                  p_backward_output_matrix_.data());
     }
-    // TODO put this in a function
     // W' = F^T (FW)'
+    MaskGradientNonMasters(&p_out_temp_);
+    // TODO put this in a function
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
@@ -191,8 +193,6 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
-  // TODO figure out how to do this with GPUs
-  // WeightGradientSyncAverage();
   WeightGradientSyncSum();
 
   if (!config_.disable_dropout && layer_number_ != 0) {

@@ -63,9 +63,12 @@ if (NOT GALOIS_ENABLE_GPU)
     set_tests_properties(run-aggsync-${host_count} PROPERTIES ENVIRONMENT "GALOIS_DO_NOT_BIND_THREADS=1")
   endforeach()
 
-  add_executable(weight-sync-test weight-sync-test.cpp)
-  target_link_libraries(weight-sync-test galois_gnn)
-  # TODO multi host tests
+  add_executable(back-conv-test back-conv-test.cpp)
+  target_link_libraries(back-conv-test galois_gnn)
+  foreach(host_count ${hosts})
+    add_test(NAME run-back-conv-${host_count} COMMAND mpiexec --bind-to none -n ${host_count} back-conv-test)
+    set_tests_properties(run-back-conv-${host_count} PROPERTIES ENVIRONMENT "GALOIS_DO_NOT_BIND_THREADS=1")
+  endforeach()
 
   add_executable(multilabel-read multilabel-read.cpp)
   target_link_libraries(multilabel-read galois_gnn)

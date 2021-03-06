@@ -16,7 +16,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
 #endif
 
   galois::do_all(
-      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
+      galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned i) {
         if (IsSampledLayer()) {
           if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i))
@@ -80,7 +80,7 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
   backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
 
   galois::do_all(
-      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
+      galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned i) {
         if (graph_.IsValidForPhase(i, layer_phase_)) {
           if (IsSampledLayer()) {

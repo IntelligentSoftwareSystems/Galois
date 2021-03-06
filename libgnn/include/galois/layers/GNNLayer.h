@@ -281,6 +281,8 @@ protected:
                  PointerWithSize<GNNFloat>* output_matrix);
   //! Apply the derivative of dropout to the backward phase output
   void DoDropoutDerivative();
+  void ReconstructDropoutMatrix(const PointerWithSize<GNNFloat> input_to_drop,
+                                PointerWithSize<GNNFloat>* output_matrix);
 
   //! Does some activation function based on configuration on forward output
   //! matrix
@@ -290,9 +292,6 @@ protected:
 
   //! Synchronize weight gradients with a summation
   void WeightGradientSyncSum();
-  //! Synchronize weight gradients with a summation, then locally divide all
-  //! weights to get an average
-  void WeightGradientSyncAverage();
 
 #ifdef GALOIS_ENABLE_GPU
   //! Object that holds all GPU allocated pointers to memory related to layers
@@ -302,6 +301,8 @@ protected:
     base_gpu_object_.CopyToWeights(layer_weights_);
   }
 #endif
+
+  void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients);
 };
 
 } // namespace galois

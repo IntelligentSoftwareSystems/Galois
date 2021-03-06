@@ -42,8 +42,11 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
   in_temp_1_.resize(num_input_elements, 0);
-  // TODO temp2 does not need to be initialized in all circumstances
-  in_temp_2_.resize(num_input_elements, 0);
+  // only need to allocate if input <= output because not used otherwise
+  if (config_.disable_aggregate_after_update ||
+      layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    in_temp_2_.resize(num_input_elements, 0);
+  }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
@@ -74,17 +77,27 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   GALOIS_LOG_VERBOSE("SAGE layer initialized");
 }
 
-void MatrixAdd(size_t num_nodes, galois::PointerWithSize<galois::GNNFloat> in,
-               galois::PointerWithSize<galois::GNNFloat>* out) {
-  assert(in.size() == out->size());
-  assert((in.size() % num_nodes) == 0);
-  size_t column_size = in.size() / num_nodes;
-  // split matrix to threads
-  galois::do_all(galois::iterate(size_t{0}, num_nodes), [&](size_t node) {
-    size_t my_offset = node * column_size;
-    galois::VectorAdd(column_size, &(in[my_offset]),
-                      &((out->data())[my_offset]), &(out->data()[my_offset]));
-  });
+void galois::SAGELayer::WeightGradientSyncSum2() {
+  galois::StatTimer t("Sync_WeightGradientsSum2", kRegionName);
+  t.start();
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(hochan) collectives here rather than gluon sync if possible like the
+  // CPU code
+  GALOIS_LOG_FATAL("implement me");
+#else
+  // TODO(loc) remove this limitation later; can just do a loop over the weight
+  // matrix
+  if (p_layer_weight_gradients_2_.size() >
+      size_t{std::numeric_limits<int>::max()}) {
+    GALOIS_LOG_FATAL("Weight sync code does not handle size larger than max "
+                     "int at the moment");
+  }
+  MPI_Allreduce(MPI_IN_PLACE,
+                static_cast<void*>(p_layer_weight_gradients_2_.data()),
+                static_cast<int>(p_layer_weight_gradients_2_.size()), MPI_FLOAT,
+                MPI_SUM, MPI_COMM_WORLD);
+#endif
+  t.stop();
 }
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
@@ -95,7 +108,6 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
   assert(p_in_temp_1_.size() == input_embeddings.size());
-  assert(p_in_temp_2_.size() == input_embeddings.size());
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
   // pointer to input to operate on
@@ -170,30 +182,21 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   }
 
   // AFW = O
-  if (!sage_config_.disable_concat) {
-    // Fw1 + AFW2 = O; self feature has own weight matrix and makes own
-    // contribution to gradients which is handled in this block
-    // !!!! do this early because p_in_temp may get overwritten later
-    // if update occurs before aggregate !!!
-    galois::CBlasSGEMM(
-        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        input_to_use.data(), input_gradient->data(),
-        p_layer_weight_gradients_2_.data());
-  }
-  WeightGradientSyncSum2();
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     if (layer_number_ != 0) {
+      // ---unmasked---
       // transposed sgemm for derivative; in_temp is output
       assert(input_gradient->size() ==
              layer_dimensions_.input_rows * layer_dimensions_.output_columns);
       assert(p_in_temp_1_.size() ==
              layer_dimensions_.input_columns * layer_dimensions_.input_rows);
       // pintemp1 contains (AF)'
+      // overwrites the dropout matrix that was in ptemp1 (needed for second
+      // weight matrix)
       UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
       // pback contains F'
       // derivative of aggregate is the same due to symmetric graph
@@ -203,6 +206,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
     // weight gradient calculation
     // TODO(loc) put this in a function to put the ifdef in there
+    // ---masked---
+    MaskGradientNonMasters(input_gradient);
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
@@ -224,6 +229,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // aggregate occurs regardless of layer being equal to 0 because it is
     // required in this case for the weight gradient calculation
     // this is (FW)'
+    // --unmasked--
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
                  p_out_temp_.data(), &output_column_intermediates_, true);
     if (layer_number_ != 0) {
@@ -235,6 +241,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // TODO put this in a function
     // W' = F^T (FW)'
     // input to use is not overwritten in this branch so it's safe to use
+    // --- masked ---, uses ptemp1
+    MaskGradientNonMasters(&p_out_temp_);
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
@@ -254,6 +262,39 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   }
 
   if (!sage_config_.disable_concat) {
+    // Fw1 + AFW2 = O; self feature has own weight matrix and makes own
+    // contribution to gradients which is handled in this block
+    // second weight matrix: reconstruct the dropout matrix if it was
+    // overwritten into temp1
+    if (config_.disable_aggregate_after_update ||
+        layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+      if (!config_.disable_dropout) {
+        // input gradients have already been masked; need to reconstruct the
+        // dropout matrix which we can do since we saved the dropout mask
+        // save it into ptemp1
+        ReconstructDropoutMatrix(prev_layer_input, &p_in_temp_1_);
+        // !!!NOTE!!!
+        // If you're using dropout in the distributed setting you've already
+        // thrown consistency out the window anyways because distributed RNG
+        // will make it so each host does something different
+        // Therefore, this op above is nothing more than a feeble attempt
+        // at getting *some* notion of consistency
+      }
+    } else {
+      // mask original input gradients since this path masks the aggregated
+      // gradients only
+      MaskGradientNonMasters(input_gradient);
+      // in dropout case, ptemp1 (contained in input to use) still contains the
+      // dropout matrix so no need to recompute
+    }
+
+    galois::CBlasSGEMM(
+        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+        input_to_use.data(), input_gradient->data(),
+        p_layer_weight_gradients_2_.data());
+    WeightGradientSyncSum2();
+
     if (layer_number_ != 0) {
       // deal with feature gradients for the self feature here
       // this function will sum directly into the backward matrix

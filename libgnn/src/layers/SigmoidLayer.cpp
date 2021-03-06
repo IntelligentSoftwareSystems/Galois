@@ -14,7 +14,7 @@ galois::SigmoidLayer::ForwardPhaseCPU(
   float_accumulator_.reset();
 
   galois::do_all(
-      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
+      galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
           if (IsSampledLayer()) {
@@ -71,7 +71,7 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
   backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
 
   galois::do_all(
-      galois::iterate(graph_.begin_owned(), graph_.end_owned()),
+      galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned local_node) {
         if (graph_.IsValidForPhase(local_node, layer_phase_)) {
           if (IsSampledLayer()) {

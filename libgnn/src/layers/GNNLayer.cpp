@@ -180,6 +180,33 @@ void galois::GNNLayer::DoDropout(
   timer.stop();
 }
 
+void galois::GNNLayer::ReconstructDropoutMatrix(
+    const PointerWithSize<GNNFloat> input_to_dropout,
+    PointerWithSize<GNNFloat>* output_matrix) {
+  galois::StatTimer timer("ReconstructDropoutMatrix", "GNNLayer");
+  timer.start();
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    // TODO(hochan)
+    GALOIS_LOG_FATAL("Implement me");
+  } else {
+#endif
+    // reuse the dropout mask from a previous dropout call
+    size_t num_elements = output_matrix->size();
+    GNNFloat scale      = 1. / (1. - config_.dropout_rate);
+    galois::do_all(
+        galois::iterate(static_cast<size_t>(0), num_elements),
+        [&](size_t i) {
+          (*output_matrix)[i] = input_to_dropout[i] *
+                                static_cast<GNNFloat>(dropout_mask_[i]) * scale;
+        },
+        galois::loopname("ReconstructDropout"));
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
+  timer.stop();
+}
+
 void galois::GNNLayer::DoDropoutDerivative() {
   galois::StatTimer timer("BackwardDropout", "GNNLayer");
   timer.start();
@@ -244,26 +271,30 @@ void galois::GNNLayer::ActivationDerivative(
 }
 
 void galois::GNNLayer::WeightGradientSyncSum() {
-  // TODO bitset
+  galois::StatTimer t("Sync_WeightGradientsSum", "GNNLayer");
+  t.start();
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(hochan) collectives here rather than gluon sync if possible like the
+  // CPU code
+  // preferably without needing to do a gpu->cpu copy
+  galois::gWarn(
+      "GPU still using inefficient point to point comms for weight sync");
   gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
       "WeightGradientsSync");
-}
-
-void galois::GNNLayer::WeightGradientSyncAverage() {
-  size_t num_hosts = galois::runtime::getSystemNetworkInterface().Num;
-  if (num_hosts > 1) {
-    // TODO bitset
-    // sum, then average by dividing all by num hosts (every host participates
-    // in sync)
-    gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
-        "WeightGradientsSyncAverage");
-    galois::do_all(
-        galois::iterate(static_cast<size_t>(0), layer_weight_gradients_.size()),
-        [&](size_t weight_index) {
-          layer_weight_gradients_[weight_index] /= num_hosts;
-        },
-        galois::loopname("WeightGradientSyncAverageDivide"));
+#else
+  // TODO(loc) remove this limitation later; can just do a loop over the weight
+  // matrix
+  if (p_layer_weight_gradients_.size() >
+      size_t{std::numeric_limits<int>::max()}) {
+    GALOIS_LOG_FATAL("Weight sync code does not handle size larger than max "
+                     "int at the moment");
   }
+  MPI_Allreduce(MPI_IN_PLACE,
+                static_cast<void*>(p_layer_weight_gradients_.data()),
+                static_cast<int>(p_layer_weight_gradients_.size()), MPI_FLOAT,
+                MPI_SUM, MPI_COMM_WORLD);
+#endif
+  t.stop();
 }
 
 void galois::GNNLayer::SyncInitialWeights() {
@@ -271,7 +302,7 @@ void galois::GNNLayer::SyncInitialWeights() {
     return;
   }
 #ifdef GALOIS_ENABLE_GPU
-  // TODO(loc/hochan)
+  // TODO(loc/hochan); not required at the moment however
   GALOIS_LOG_FATAL("Need to implement GPU version of this");
 #endif
   // copy weights over to gradients
@@ -286,4 +317,26 @@ void galois::GNNLayer::SyncInitialWeights() {
     layer_weights_[i]          = layer_weight_gradients_[i];
     layer_weight_gradients_[i] = 0;
   }
+}
+
+void galois::GNNLayer::MaskGradientNonMasters(
+    PointerWithSize<GNNFloat>* gradient) {
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(hochan) mask away the **non** masters on gpu
+  GALOIS_LOG_FATAL("implement this");
+#else
+  assert(*(graph_.begin_owned()) == 0);
+  size_t start_node = *(graph_.end_owned());
+  size_t end_node   = graph_.size();
+  size_t row_index  = layer_dimensions_.output_columns;
+  galois::do_all(
+      galois::iterate(start_node, end_node),
+      [&](size_t non_master) {
+        // TODO(loc) use a std function for this for max efficiency
+        for (size_t i = 0; i < row_index; i++) {
+          (*gradient)[non_master * row_index + i] = 0;
+        }
+      },
+      galois::loopname("MaskGradientNonMasters"));
+#endif
 }

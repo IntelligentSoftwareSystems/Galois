@@ -67,14 +67,16 @@ public:
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
 
+  bool is_local(size_t gid) const { return partitioned_graph_->isLocal(gid); }
+  size_t GetLID(size_t gid) const { return partitioned_graph_->getLID(gid); }
+  size_t GetGID(size_t lid) const { return partitioned_graph_->getGID(lid); }
+
   //! Node begin for all local nodes
   NodeIterator begin() const {
     return partitioned_graph_->allNodesRange().begin();
   }
   //! Node end for all local nodes
   NodeIterator end() const { return partitioned_graph_->allNodesRange().end(); }
-  //! Return GID of some local node
-  size_t GetGID(unsigned lid) const { return partitioned_graph_->getGID(lid); }
 
   NodeIterator begin_owned() const {
     return partitioned_graph_->masterNodesRange().begin();
