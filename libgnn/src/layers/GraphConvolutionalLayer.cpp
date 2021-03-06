@@ -273,6 +273,8 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           }
         }
 
+        graphs::bitset_graph_aggregate.set(src);
+
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
           source_norm = graph_.NormFactor(src);

@@ -8,6 +8,8 @@
 
 namespace galois {
 
+extern galois::DynamicBitSet graphs::bitset_graph_aggregate;
+
 struct SAGELayerConfig {
   bool disable_concat{false};
 };

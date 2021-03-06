@@ -7,6 +7,8 @@
 
 namespace galois {
 
+extern galois::DynamicBitSet graphs::bitset_graph_aggregate;
+
 class GraphConvolutionalLayer : public GNNLayer {
 public:
   //! Initializes the variables of the base class and also allocates additional

@@ -11,6 +11,7 @@ namespace graphs {
 
 extern GNNFloat* gnn_matrix_to_sync_;
 extern size_t gnn_matrix_to_sync_column_length_;
+extern galois::DynamicBitSet bitset_graph_aggregate;
 #ifdef GALOIS_ENABLE_GPU
 extern struct CUDA_Context* cuda_ctx_for_sync;
 extern unsigned layer_number_to_sync;
@@ -89,5 +90,7 @@ GALOIS_SYNC_STRUCTURE_GNN_LAYER(layer_output, cuda_ctx_for_sync,
                                 gnn_matrix_to_sync_column_length_,
                                 layer_number_to_sync);
 #endif
+
+GALOIS_SYNC_STRUCTURE_BITSET(graph_aggregate);
 } // namespace graphs
 } // namespace galois

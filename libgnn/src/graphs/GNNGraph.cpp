@@ -38,6 +38,7 @@ namespace galois {
 namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
+galois::DynamicBitSet bitset_graph_aggregate;
 #ifdef GALOIS_ENABLE_GPU
 struct CUDA_Context* cuda_ctx_for_sync;
 unsigned layer_number_to_sync;
@@ -79,6 +80,7 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
           *partitioned_graph_, host_id_,
           galois::runtime::getSystemNetworkInterface().Num, false,
           partitioned_graph_->cartesianGrid());
+  bitset_graph_aggregate.resize(partitioned_graph_->size());
 
   // read in entire graph topology
   ReadWholeGraph(dataset_name);
@@ -165,10 +167,9 @@ void galois::graphs::GNNGraph::AggregateSync(
   // set globals for the sync substrate
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
-
-  // TODO(loc) bitset setting
-  sync_substrate_->sync<writeSource, readAny, GNNSumAggregate>(
-      "GraphAggregateSync");
+  sync_substrate_
+      ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
+          "GraphAggregateSync");
 }
 
 #ifdef GALOIS_ENABLE_GPU
