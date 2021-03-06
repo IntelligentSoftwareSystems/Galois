@@ -383,7 +383,6 @@ void galois::SAGELayer::AggregateAllCPU(
           }
         }
 
-        graphs::bitset_graph_aggregate.set(src);
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
@@ -392,6 +391,7 @@ void galois::SAGELayer::AggregateAllCPU(
 
         // loop through all destinations to grab the feature to aggregate
         for (auto e = graph_.EdgeBegin(src); e != graph_.EdgeEnd(src); e++) {
+          graphs::bitset_graph_aggregate.set(src);
           size_t dst = graph_.EdgeDestination(e);
 
           if (layer_phase_ == GNNPhase::kTrain) {

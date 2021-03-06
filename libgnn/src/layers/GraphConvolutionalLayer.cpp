@@ -273,7 +273,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           }
         }
 
-        graphs::bitset_graph_aggregate.set(src);
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
@@ -282,6 +281,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
         // init to self
         if (!config_.disable_self_aggregate) {
+          graphs::bitset_graph_aggregate.set(src);
           // only aggregate self once on master
           if (src < last_master) {
             for (size_t i = 0; i < column_length; i++) {
@@ -295,6 +295,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         // loop through all destinations to grab the feature to aggregate
         for (auto e = graph_.EdgeBegin(src); e != graph_.EdgeEnd(src); e++) {
           size_t dst = graph_.EdgeDestination(e);
+          graphs::bitset_graph_aggregate.set(src);
 
           if (layer_phase_ == GNNPhase::kTrain) {
             if (IsInductiveLayer()) {
