@@ -9,6 +9,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
 #ifndef NDEBUG
+  //#ifdef NDEBUG
   galois::DGAccumulator<GNNFloat> loss_accum;
   galois::DGAccumulator<size_t> handled;
   loss_accum.reset();
@@ -41,6 +42,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
               GNNCrossEntropy(feature_length, ground_truth_vec->data(),
                               &forward_output_matrix_[feature_length * i]);
 #ifndef NDEBUG
+          //#ifdef NDEBUG
           loss_accum += input_loss_[i];
           handled += 1;
 #endif
@@ -50,6 +52,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       // steal on as some threads may have nothing to work on
       galois::steal(), galois::loopname("SoftmaxForward"));
 #ifndef NDEBUG
+  //#ifdef NDEBUG
   GNNFloat reduced_loss = loss_accum.reduce();
   size_t t              = handled.reduce();
   galois::gPrint("Loss is ", reduced_loss / t, "\n");
@@ -81,43 +84,33 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
 
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
-      [&](const unsigned i) {
-        if (graph_.IsValidForPhase(i, layer_phase_)) {
+      [&](const unsigned node) {
+        if (graph_.IsValidForPhase(node, layer_phase_)) {
           if (IsSampledLayer()) {
-            if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i))
+            if (layer_phase_ == GNNPhase::kTrain &&
+                !graph_.IsInSampledGraph(node))
               return;
           }
 
-          // create ground truth vector for this LID
-          // TODO maybe make this part of the graph class instead of recreating
-          // every time
-          std::vector<GNNFloat>* ground_truth_vec =
-              ground_truth_vectors_.getLocal();
-          assert(ground_truth_vec->size() == feature_length);
-          ground_truth_vec->assign(ground_truth_vec->size(), 0.0);
-          // single class label is an index; set the correct one
-          (*ground_truth_vec)[static_cast<size_t>(
-              graph_.GetSingleClassLabel(i))] = 1.0;
-
-          // derivative cross entropy into norm grad
-          std::vector<GNNFloat>* norm_gradient =
-              norm_gradient_vectors_.getLocal();
-          GNNCrossEntropyDerivative(
-              feature_length, ground_truth_vec->data(),
-              &(forward_output_matrix_[i * feature_length]),
-              norm_gradient->data());
-
-          // use norm grad with softmax deritave, save and return
-          std::vector<GNNFloat>* softmax_temp =
-              softmax_temp_vectors_.getLocal();
-          GNNSoftmaxDerivative(feature_length,
-                               &(forward_output_matrix_[i * feature_length]),
-                               norm_gradient->data(), softmax_temp->data(),
-                               &(backward_output_matrix_[i * feature_length]));
+          size_t correct = graph_.GetSingleClassLabel(node);
+          // See here for explanation for why this works
+          // https://gombru.github.io/2018/05/23/cross_entropy_loss/
+          // Derivation of full combined derivative isn't there, but some
+          // emperical inspection tells me this is likely correct
+          // TODO(loc) work it out myself
+          for (size_t idx = 0; idx < feature_length; idx++) {
+            if (idx == correct) {
+              // positive class
+              backward_output_matrix_[node * feature_length + idx] =
+                  forward_output_matrix_[node * feature_length + idx] - 1;
+            } else {
+              // negative class
+              backward_output_matrix_[node * feature_length + idx] =
+                  forward_output_matrix_[node * feature_length + idx];
+            }
+          }
         }
       },
-      // TODO chunk size?
-      // steal on as some threads may have nothing to work on
       galois::steal(), galois::loopname("SoftmaxBackward"));
 
   return PointerWithSize(backward_output_matrix_);

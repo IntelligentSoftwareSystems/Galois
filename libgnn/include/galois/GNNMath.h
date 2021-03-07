@@ -29,6 +29,7 @@ void GNNSoftmaxDerivative(const size_t vector_length,
                           const GNNFloat* prev_output,
                           const GNNFloat* prev_output_derivative,
                           GNNFloat* temp_vector, GNNFloat* output);
+
 //! Performs cross entropy given a ground truth and input and returns the loss
 //! value.
 template <typename TruthType>
@@ -36,12 +37,12 @@ galois::GNNFloat GNNCrossEntropy(const size_t vector_length,
                                  const TruthType* ground_truth,
                                  const GNNFloat* input) {
   GNNFloat loss = 0.0;
-
   // Note that this function works if there are multiple non-zeros in the
   // ground truth vector
   // If there is only 1 then this function is overkill and it should break
-  // early (i.e. single class)
-  // Multiclass = fine
+  // early (i.e. single class); in one-hot vector setting for instance
+  // Multiclass = fine: in fact this is meant for multiclass but also
+  // works for single
   for (size_t i = 0; i < vector_length; i++) {
     if (ground_truth[i] == 0.0) {
       if (input[i] == 1.0) {
@@ -60,24 +61,28 @@ galois::GNNFloat GNNCrossEntropy(const size_t vector_length,
 
   return loss;
 }
-
 //! Derivative of cross entropy; gradients saved into an output vector.
 template <typename TruthType>
 void GNNCrossEntropyDerivative(const size_t vector_length,
                                const TruthType* ground_truth,
                                const GNNFloat* input, GNNFloat* gradients) {
+  // TODO(loc) delete this function once I fully understand why it wasn't
+  // working
+  GALOIS_LOG_FATAL(
+      "DO NOT USE THIS FUNCTION; NOT CORRECT IN ALL CIRCUMSTANCES");
   for (size_t i = 0; i < vector_length; i++) {
-    // TODO(loc) assumption: binary classifier, make explicit in function name
-    if (ground_truth[i]) {
-      gradients[i] = -1.0 / (input[i] + static_cast<float>(1e-10));
-    } else {
-      if (input[i] == 1.0) {
-        // opposite
-        gradients[i] = 1.0 / static_cast<float>(1e-10);
-      } else {
-        gradients[i] = 1.0 / (1.0 - input[i]);
-      }
-    }
+    gradients[i] = -ground_truth[i] / (input[i] + static_cast<float>(1e-10));
+    // if (ground_truth[i]) {
+    //  gradients[i] = -1.0 / (input[i] + static_cast<float>(1e-10));
+    //}
+    // else {
+    //  if (input[i] == 1.0) {
+    //    // opposite
+    //    gradients[i] = 1.0 / static_cast<float>(1e-10);
+    //  } else {
+    //    gradients[i] = 1.0 / (1.0 - input[i]);
+    //  }
+    //}
   }
 }
 

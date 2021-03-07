@@ -98,6 +98,11 @@ void galois::GNNSoftmaxDerivative(const size_t vector_length,
                                   const GNNFloat* prev_output,
                                   const GNNFloat* prev_output_derivative,
                                   GNNFloat* temp_vector, GNNFloat* output) {
+  // TODO(loc) remove this function, unnecessary as cross/softmax derivatives
+  // can be merged as currently done in Softmax code
+  // will do so in a separate commit
+  GALOIS_LOG_FATAL("Should not need this function anymore with simplified "
+                   "combined derivatives in each layer");
   for (size_t i = 0; i < vector_length; i++) {
     for (size_t j = 0; j < vector_length; j++) {
       temp_vector[j] = (j == i) ? prev_output[i] * (1.0 - prev_output[i])

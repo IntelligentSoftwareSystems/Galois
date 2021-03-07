@@ -383,7 +383,6 @@ void galois::SAGELayer::AggregateAllCPU(
           }
         }
 
-
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
           source_norm = graph_.DegreeNorm(src);
