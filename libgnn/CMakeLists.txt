@@ -5,7 +5,6 @@ set(sources
   src/graphs/GNNGraph.cpp
   src/layers/DenseLayer.cpp
   src/layers/GNNLayer.cpp
-  src/layers/GluonGradientInterface.cpp
   src/layers/GraphConvolutionalLayer.cpp
   src/layers/L2NormLayer.cpp
   src/layers/SAGELayer.cpp

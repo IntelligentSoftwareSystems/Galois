@@ -362,6 +362,9 @@ void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
 
   file_stream.close();
 
+  galois::gInfo(host_prefix_, "Read ", found_local_vertices, " labels (",
+                local_ground_truth_labels_.size() * double{4} / (1 << 30),
+                " GB)");
   GALOIS_LOG_ASSERT(found_local_vertices == partitioned_graph_->size());
 }
 
@@ -414,6 +417,10 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
     }
   }
   full_feature_set.reset();
+
+  galois::gInfo(
+      host_prefix_, "Read ", local_node_features_.size(), " features (",
+      local_ground_truth_labels_.size() * double{4} / (1 << 30), " GB)");
   GALOIS_LOG_ASSERT(num_kept_vertices == partitioned_graph_->size());
 }
 
@@ -438,19 +445,23 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   mask_range->end   = range_end;
   mask_range->size  = range_end - range_begin;
 
-  size_t cur_line_num       = 0;
+  size_t cur_line_num = 0;
+  // valid nodes on this host
   size_t local_sample_count = 0;
+  // this tracks TOTAL # of valid nodes in this group (not necessarily valid
+  // ones on this host)
+  size_t valid_count = 0;
   std::string line;
   // each line is a number signifying if mask is set for the vertex
   while (std::getline(mask_stream, line)) {
     std::istringstream mask_stream(line);
     // only examine vertices/lines in range
     if (cur_line_num >= range_begin && cur_line_num < range_end) {
-      // only bother if node is local
-      if (partitioned_graph_->isLocal(cur_line_num)) {
-        unsigned mask = 0;
-        mask_stream >> mask;
-        if (mask == 1) {
+      unsigned mask = 0;
+      mask_stream >> mask;
+      if (mask == 1) {
+        valid_count++;
+        if (partitioned_graph_->isLocal(cur_line_num)) {
           masks[partitioned_graph_->getLID(cur_line_num)] = 1;
           local_sample_count++;
         }
@@ -460,7 +471,7 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   }
   mask_stream.close();
 
-  if (local_sample_count != mask_range->size) {
+  if (valid_count != mask_range->size) {
     // overlapping masks: need to actually check the masks rather than use
     // ranges
     if (!incomplete_masks_) {
@@ -470,7 +481,7 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
     incomplete_masks_ = true;
   }
 
-  return local_sample_count;
+  return valid_count;
 }
 
 void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
@@ -513,12 +524,20 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
     }
   } else {
     // XXX i can get local sample counts from here if i need it
-    ReadLocalMasksFromFile(dataset_name, "train", &global_training_mask_range_,
-                           local_training_mask_.data());
-    ReadLocalMasksFromFile(dataset_name, "val", &global_validation_mask_range_,
-                           local_validation_mask_.data());
-    ReadLocalMasksFromFile(dataset_name, "test", &global_testing_mask_range_,
-                           local_testing_mask_.data());
+    size_t valid_train = ReadLocalMasksFromFile(dataset_name, "train",
+                                                &global_training_mask_range_,
+                                                local_training_mask_.data());
+    size_t valid_val   = ReadLocalMasksFromFile(dataset_name, "val",
+                                              &global_validation_mask_range_,
+                                              local_validation_mask_.data());
+    size_t valid_test  = ReadLocalMasksFromFile(dataset_name, "test",
+                                               &global_testing_mask_range_,
+                                               local_testing_mask_.data());
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::gInfo("Valid # training nodes is ", valid_train);
+      galois::gInfo("Valid # validation nodes is ", valid_val);
+      galois::gInfo("Valid # test nodes is ", valid_test);
+    }
   }
 }
 

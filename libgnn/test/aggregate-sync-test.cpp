@@ -96,7 +96,9 @@ int main() {
 
     // size 2 columns
     for (size_t c = 0; c < 2; c++) {
-      GALOIS_LOG_ASSERT(layer_0_forward_output[row * 2 + c] == ground_truth);
+      GALOIS_LOG_VASSERT(layer_0_forward_output[row * 2 + c] == ground_truth,
+                         "should be {} not {}", ground_truth,
+                         layer_0_forward_output[row * 2 + c]);
     }
   }
 
@@ -111,13 +113,10 @@ int main() {
       layer_0->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
 
   //////////////////////////////////////////////////////////////////////////////
-  // sanity check layer 0 backward output; all 0 because layer 0
+  // sanity check layer 0 backward output: empty
   //////////////////////////////////////////////////////////////////////////////
-  // since norm factors aren't invovled it is possible to do full assertions
-  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == test_graph->size() * 3);
-  for (size_t i = 0; i < layer_0_backward_output.size(); i++) {
-    GALOIS_LOG_ASSERT((layer_0_backward_output)[i] == 0);
-  }
+
+  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 0);
 
   //////////////////////////////////////////////////////////////////////////////
   // layer 1 to check backward output

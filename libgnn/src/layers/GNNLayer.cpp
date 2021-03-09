@@ -9,14 +9,22 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
   if (config_.allocate_weights) {
-    // TODO some of this does not need alloc if not used
     // dropout allocation; dropout is same as input
-    dropout_mask_.resize(
-        layer_dimensions_.input_rows * layer_dimensions_.input_columns, false);
+    if (!config_.disable_dropout) {
+      dropout_mask_.resize(layer_dimensions_.input_rows *
+                               layer_dimensions_.input_columns,
+                           false);
+    }
     // allocate memory based on layer dimensions
     size_t num_weight_elements =
         layer_dimensions_.input_columns * layer_dimensions_.output_columns;
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", layer weights ", num_weight_elements, " (",
+                  FloatElementsToGB(num_weight_elements), " GB)");
     layer_weights_.resize(num_weight_elements);
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", layer gradients ", num_weight_elements, " (",
+                  FloatElementsToGB(num_weight_elements), " GB)");
     layer_weight_gradients_.resize(num_weight_elements, 0);
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -27,22 +35,25 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
 #endif
 
     GlorotBengioInit(&layer_weights_);
-
-    // initialize sync substrate
-    gradient_sync_interface_ =
-        std::make_unique<GluonGradientInterface>(layer_weight_gradients_);
-    gradient_sync_substrate_ = std::make_unique<
-        galois::graphs::GluonSubstrate<GluonGradientInterface>>(
-        *gradient_sync_interface_,
-        galois::runtime::getSystemNetworkInterface().ID,
-        galois::runtime::getSystemNetworkInterface().Num, false);
   }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
+  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                ", forward output matrix ", num_output_elements, " (",
+                FloatElementsToGB(num_output_elements), " GB)");
   forward_output_matrix_.resize(num_output_elements, 0);
-  backward_output_matrix_.resize(
-      layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
+  if (layer_number_ != 0) {
+    galois::gInfo(
+        graph_.host_prefix(), "Creating layer ", layer_number_,
+        ", backward output matrix ",
+        layer_dimensions_.input_rows * layer_dimensions_.input_columns, " (",
+        FloatElementsToGB(layer_dimensions_.input_rows *
+                          layer_dimensions_.input_columns),
+        " GB)");
+    backward_output_matrix_.resize(
+        layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
+  }
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.InitInOutMemory(num_output_elements,
@@ -277,10 +288,6 @@ void galois::GNNLayer::WeightGradientSyncSum() {
   // TODO(hochan) collectives here rather than gluon sync if possible like the
   // CPU code
   // preferably without needing to do a gpu->cpu copy
-  galois::gWarn(
-      "GPU still using inefficient point to point comms for weight sync");
-  gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSummation>(
-      "WeightGradientsSync");
 #else
   // TODO(loc) remove this limitation later; can just do a loop over the weight
   // matrix
@@ -295,28 +302,6 @@ void galois::GNNLayer::WeightGradientSyncSum() {
                 MPI_SUM, MPI_COMM_WORLD);
 #endif
   t.stop();
-}
-
-void galois::GNNLayer::SyncInitialWeights() {
-  if (galois::runtime::getSystemNetworkInterface().Num == 1) {
-    return;
-  }
-#ifdef GALOIS_ENABLE_GPU
-  // TODO(loc/hochan); not required at the moment however
-  GALOIS_LOG_FATAL("Need to implement GPU version of this");
-#endif
-  // copy weights over to gradients
-  for (size_t i = 0; i < layer_weights_.size(); i++) {
-    layer_weight_gradients_[i] = layer_weights_[i];
-  }
-  // sync "gradients" with a set only (reduction ignored)
-  gradient_sync_substrate_->sync<writeAny, readAny, WeightGradientSet>(
-      "InitialSync");
-  // copy "gradients" (actually weights) back to weight matrix
-  for (size_t i = 0; i < layer_weights_.size(); i++) {
-    layer_weights_[i]          = layer_weight_gradients_[i];
-    layer_weight_gradients_[i] = 0;
-  }
 }
 
 void galois::GNNLayer::MaskGradientNonMasters(

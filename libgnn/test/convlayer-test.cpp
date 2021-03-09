@@ -103,28 +103,7 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   // since norm factors aren't invovled it is possible to do full assertions
   // 7 x 3
-  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 21);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[0] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[1] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[2] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[3] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[4] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[5] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[6] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[7] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[8] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[9] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[10] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[11] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[12] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[13] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[14] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[15] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[16] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[17] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[18] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[19] == 0);
-  GALOIS_LOG_ASSERT((layer_0_backward_output)[20] == 0);
+  GALOIS_LOG_ASSERT(layer_0_backward_output.size() == 0);
 
   galois::PointerWithSize<galois::GNNFloat> layer_0_weight_gradients =
       layer_0->GetLayerWeightGradients();

@@ -109,12 +109,6 @@ private:
   PointerWithSize<GNNFloat> p_layer_weights_2_;
   PointerWithSize<GNNFloat> p_layer_weight_gradients_2_;
 
-  //! Wrapper over 2nd gradient matrix to make it compatible with Gluon
-  std::unique_ptr<GluonGradientInterface> gradient_sync_interface_2_;
-  //! Synchronization substrate for the 2nd weight gradients
-  std::unique_ptr<galois::graphs::GluonSubstrate<GluonGradientInterface>>
-      gradient_sync_substrate_2_;
-
   // 2 temporaries the size of the forward input; used for dropout and
   // aggregation (if either are required)
   std::vector<GNNFloat> in_temp_1_;

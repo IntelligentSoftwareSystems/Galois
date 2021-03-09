@@ -10,15 +10,23 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
       output_column_intermediates_(dimensions.output_columns) {
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
+  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                ", GCN input temp var 1 ", num_input_elements, " (",
+                FloatElementsToGB(num_input_elements), " GB)");
   in_temp_1_.resize(num_input_elements, 0);
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", GCN input temp var 2 ", num_input_elements, " (",
+                  FloatElementsToGB(num_input_elements), " GB)");
     in_temp_2_.resize(num_input_elements, 0);
   }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
-  GALOIS_LOG_VERBOSE("Output elements {}", num_output_elements);
+  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                ", GCN output temp var ", num_output_elements, " (",
+                FloatElementsToGB(num_output_elements), " GB)");
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU

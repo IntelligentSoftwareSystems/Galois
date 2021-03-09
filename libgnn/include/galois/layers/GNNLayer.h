@@ -3,7 +3,6 @@
 #include "galois/PerThreadRNG.h"
 #include "galois/GNNOptimizers.h"
 #include "galois/graphs/GNNGraph.h"
-#include "galois/layers/GluonGradientInterface.h"
 
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/layers/GNNLayer.cuh"
@@ -225,15 +224,6 @@ protected:
   PointerWithSize<GNNFloat> p_forward_output_matrix_;
   PointerWithSize<GNNFloat> p_backward_output_matrix_;
 
-  //! Synchronizes all weights (used in distributed setting)
-  void SyncInitialWeights();
-
-  //! Wrapper over gradient matrix to make it compatible with Gluon
-  std::unique_ptr<GluonGradientInterface> gradient_sync_interface_;
-  //! Synchronization substrate for the weight gradients
-  std::unique_ptr<galois::graphs::GluonSubstrate<GluonGradientInterface>>
-      gradient_sync_substrate_;
-
   //! RNG for matrix initialization
   PerThreadRNG random_init_rng_{-5.0, 5.0};
   //! RNG for dropout
@@ -303,6 +293,11 @@ protected:
 #endif
 
   void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients);
+
+  //! Does some math to get GB used by some # of floats
+  double FloatElementsToGB(size_t num_of_floats) const {
+    return num_of_floats * double{4} / (1 << 30);
+  }
 };
 
 } // namespace galois

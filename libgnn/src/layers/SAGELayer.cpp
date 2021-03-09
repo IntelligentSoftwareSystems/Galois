@@ -15,7 +15,13 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     // abstractly it's one matrix: W = W1 | W2
     size_t num_weight_elements =
         layer_dimensions_.input_columns * layer_dimensions_.output_columns;
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", SAGE second layer weights ", num_weight_elements, " (",
+                  FloatElementsToGB(num_weight_elements), " GB)");
     layer_weights_2_.resize(num_weight_elements);
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", SAGE second layer gradients ", num_weight_elements, " (",
+                  FloatElementsToGB(num_weight_elements), " GB)");
     layer_weight_gradients_2_.resize(num_weight_elements, 0);
 
     // reinit both weight matrices as one unit
@@ -28,29 +34,28 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     // initialize the optimizer
     std::vector<size_t> weight_size = {num_weight_elements};
     second_weight_optimizer_ = std::make_unique<AdamOptimizer>(weight_size, 1);
-
-    // initialize sync substrate for second set
-    gradient_sync_interface_2_ =
-        std::make_unique<GluonGradientInterface>(layer_weight_gradients_2_);
-    gradient_sync_substrate_2_ = std::make_unique<
-        galois::graphs::GluonSubstrate<GluonGradientInterface>>(
-        *gradient_sync_interface_2_,
-        galois::runtime::getSystemNetworkInterface().ID,
-        galois::runtime::getSystemNetworkInterface().Num, false);
   }
 
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
+  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                ", SAGE input temp var 1 ", num_input_elements, " (",
+                FloatElementsToGB(num_input_elements), " GB)");
   in_temp_1_.resize(num_input_elements, 0);
   // only need to allocate if input <= output because not used otherwise
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", SAGE input temp var 2 ", num_input_elements, " (",
+                  FloatElementsToGB(num_input_elements), " GB)");
     in_temp_2_.resize(num_input_elements, 0);
   }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
-  GALOIS_LOG_VERBOSE("Output elements {}", num_output_elements);
+  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                ", SAGE output temp var ", num_output_elements, " (",
+                FloatElementsToGB(num_output_elements), " GB)");
   out_temp_.resize(num_output_elements, 0);
   layer_type_ = galois::GNNLayerType::kSAGE;
 #ifdef GALOIS_ENABLE_GPU
