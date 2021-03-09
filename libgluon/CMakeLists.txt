@@ -18,7 +18,7 @@ target_include_directories(galois_gluon PUBLIC
 )
 
 if (GALOIS_COMM_STATS)
-  target_compile_definitions(galois_gluon PRIVATE GALOIS_COMM_STATS=1)
+  target_compile_definitions(galois_gluon PUBLIC GALOIS_COMM_STATS=1)
 endif()
 
 if (GALOIS_USE_BARE_MPI)
