@@ -4,18 +4,25 @@
 
 galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     size_t layer_num, const galois::graphs::GNNGraph& graph,
+    PointerWithSize<GNNFloat>* backward_output_matrix,
     const GNNLayerDimensions& dimensions, const GNNLayerConfig& config)
-    : GNNLayer(layer_num, graph, dimensions, config),
+    : GNNLayer(layer_num, graph, backward_output_matrix, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
-  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                ", GCN input temp var 1 ", num_input_elements, " (",
-                FloatElementsToGB(num_input_elements), " GB)");
-  in_temp_1_.resize(num_input_elements, 0);
-  if (config_.disable_aggregate_after_update ||
+  if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", GCN input temp var 1 ", num_input_elements, " (",
+                  FloatElementsToGB(num_input_elements), " GB)");
+    in_temp_1_.resize(num_input_elements, 0);
+  }
+
+  // only on in dropout case + if in temp is smaller than out temp
+  if (!config_.disable_dropout &&
+      (config_.disable_aggregate_after_update ||
+       layer_dimensions_.input_columns <= layer_dimensions_.output_columns)) {
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", GCN input temp var 2 ", num_input_elements, " (",
                   FloatElementsToGB(num_input_elements), " GB)");
@@ -24,10 +31,17 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
-  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                ", GCN output temp var ", num_output_elements, " (",
-                FloatElementsToGB(num_output_elements), " GB)");
-  out_temp_.resize(num_output_elements, 0);
+
+  // only needed if out temp would be smaller than intemp
+  if (!config_.disable_aggregate_after_update &&
+      layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
+    // xform matrix first to work with a smaller output size
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", GCN output temp var ", num_output_elements, " (",
+                  FloatElementsToGB(num_output_elements), " GB)");
+    out_temp_.resize(num_output_elements, 0);
+  }
+
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -59,24 +73,27 @@ galois::GraphConvolutionalLayer::ForwardPhase(
   GALOIS_LOG_VERBOSE("Calling forward phase");
   assert(input_embeddings.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
-  assert(p_in_temp_1_.size() == input_embeddings.size());
   assert(p_forward_output_matrix_.size() ==
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
+  GNNFloat* agg_data;
   // first, dropout
   if (!config_.disable_dropout && (layer_phase_ == GNNPhase::kTrain)) {
     DoDropout(input_embeddings, &p_in_temp_1_);
     input_data = p_in_temp_1_.data();
+    agg_data   = p_in_temp_2_.data();
+  } else {
+    agg_data = p_in_temp_1_.data();
   }
 
   // flip aggregate/update if dimensions favor it (do less work)
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     // aggregation and update
-    AggregateAll(layer_dimensions_.input_columns, input_data,
-                 p_in_temp_2_.data(), &input_column_intermediates_);
-    UpdateEmbeddings(p_in_temp_2_.data(), p_forward_output_matrix_.data());
+    AggregateAll(layer_dimensions_.input_columns, input_data, agg_data,
+                 &input_column_intermediates_);
+    UpdateEmbeddings(agg_data, p_forward_output_matrix_.data());
   } else {
     // update to aggregate
     // FW
@@ -115,43 +132,34 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 
   // AFW = O
   galois::PointerWithSize<galois::GNNFloat> input_data;
+  galois::PointerWithSize<galois::GNNFloat> agg_data;
   if (!config_.disable_dropout) {
     // dropout result is currently stored in temp 1
     // needs to be used before it gets overwritten
     input_data = p_in_temp_1_;
+    agg_data   = p_in_temp_2_;
   } else {
     // no dropout = use vanilla input
     input_data = prev_layer_input;
+    agg_data   = p_in_temp_1_;
   }
+
+  // NOTE: PREV LAYER INPUT AND BACKWARDOUTPUT ARE THE SAME MEMORY LOCATION;
+  // BEWARE OF DEPENDENCIES
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
-    if (layer_number_ != 0) {
-      // transposed sgemm for derivative; in_temp is output
-      assert(input_gradient->size() ==
-             layer_dimensions_.input_rows * layer_dimensions_.output_columns);
-      assert(p_in_temp_1_.size() ==
-             layer_dimensions_.input_columns * layer_dimensions_.input_rows);
-      // pintemp1 contains (AF)'
-      UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
-      // pback contains F'
-      // derivative of aggregate is the same due to symmetric graph
-      AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
-                   p_backward_output_matrix_.data(),
-                   &input_column_intermediates_, true);
-      // TODO if training A, then A' compute here if layer # is 0
-      // dot product of edges that exist in A
-    }
-    // weight gradient calculation
-    // TODO(loc) put this in a function to put the ifdef in there
-    MaskGradientNonMasters(input_gradient);
+    // aggdata can == p_intemp1; in other words, need to use before overwrite
+    // mask it, then use it
+    MaskInputNonMasters(&agg_data);
+
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
           layer_dimensions_.input_rows, layer_dimensions_.input_columns,
-          layer_dimensions_.output_columns, p_in_temp_2_.data(),
+          layer_dimensions_.output_columns, agg_data.data(),
           input_gradient->data(), p_layer_weight_gradients_.data());
     } else {
 #endif
@@ -159,11 +167,26 @@ galois::GraphConvolutionalLayer::BackwardPhase(
       galois::CBlasSGEMM(
           CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
           layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-          p_in_temp_2_.data(), input_gradient->data(),
+          agg_data.data(), input_gradient->data(),
           p_layer_weight_gradients_.data());
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
+
+    // gradient isn't masked here; only temp1, which has already been
+    // overwritten = fine
+    if (layer_number_ != 0) {
+      // transposed sgemm for derivative; in_temp is output
+      assert(input_gradient->size() ==
+             layer_dimensions_.input_rows * layer_dimensions_.output_columns);
+      // pintemp1 contains (AF)'
+      UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
+      // pback contains F'
+      // derivative of aggregate is the same due to symmetric graph
+      AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
+                   p_backward_output_matrix_.data(),
+                   &input_column_intermediates_, true);
+    }
   } else {
     // TODO at this point, out_temp contains memoized FW
     // can use it to get A' = O' (FW)^T
@@ -172,15 +195,19 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     // this is (FW)'
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
                  p_out_temp_.data(), &output_column_intermediates_, true);
+
+    // done after above because input_data = p_backward_output_matrix in some
+    // cases; use first before overwriting here if layer # doesn't = 0, it means
+    // I can mess with the input data itself instad of masking the gradients I
+    // can mask the input
     if (layer_number_ != 0) {
-      // derivative for update
-      // backout = F'
-      UpdateEmbeddingsDerivative(p_out_temp_.data(),
-                                 p_backward_output_matrix_.data());
+      MaskInputNonMasters(&input_data);
+    } else {
+      // if 0 then no input to mask: mask the gradient
+      // this is fine because gradient won't be used to get feature gradients
+      MaskGradientNonMasters(&p_out_temp_);
     }
-    // W' = F^T (FW)'
-    MaskGradientNonMasters(&p_out_temp_);
-    // TODO put this in a function
+
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       gpu_object_.GetWeightGradientsGPU(
@@ -197,6 +224,13 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
+
+    if (layer_number_ != 0) {
+      // can now overwrite p_backward without issue; since input gradient
+      // is untouched if layer number isn't 0 this will be correct
+      UpdateEmbeddingsDerivative(p_out_temp_.data(),
+                                 p_backward_output_matrix_.data());
+    }
   }
 
   // sync weight gradients; note aggregation sync occurs in the function call

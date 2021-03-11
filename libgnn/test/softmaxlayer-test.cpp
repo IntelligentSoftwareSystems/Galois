@@ -39,9 +39,12 @@ int main() {
   softmax_input[40] = 1;
   softmax_input[48] = 1;
 
+  std::vector<galois::GNNFloat> back_matrix(49);
+  galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
+
   // train mode
-  auto output_layer =
-      std::make_unique<galois::SoftmaxLayer>(3, test_graph, dimension_0);
+  auto output_layer = std::make_unique<galois::SoftmaxLayer>(
+      3, test_graph, &p_back, dimension_0);
   galois::PointerWithSize<galois::GNNFloat> prediction_distribution =
       output_layer->ForwardPhase(softmax_input);
 

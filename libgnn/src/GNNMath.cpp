@@ -3,6 +3,12 @@
 #include "galois/GNNMath.h"
 #include "galois/Logging.h"
 
+void galois::VectorZero(size_t length, GNNFloat* a) {
+  for (size_t i = 0; i < length; i++) {
+    a[i] = 0;
+  }
+}
+
 size_t galois::MaxIndex(const size_t length, const GNNFloat* vector) {
   size_t index     = 0;
   GNNFloat cur_max = vector[0];

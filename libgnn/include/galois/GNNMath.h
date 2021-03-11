@@ -7,6 +7,9 @@
 
 namespace galois {
 
+//! zeros out a vector of some length
+void VectorZero(size_t length, GNNFloat* a);
+
 //! Find max index in a vector of some length
 size_t MaxIndex(const size_t length, const GNNFloat* vector);
 //! Given 2 float array pointers, do element wise addition of length elements

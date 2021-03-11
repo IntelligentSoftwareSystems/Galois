@@ -60,14 +60,18 @@ int main() {
 
   galois::GNNLayerConfig dcon;
   dcon.DebugConfig();
+  dcon.disable_aggregate_after_update = true;
 
   // dummy 1 matrix
   std::vector<galois::GNNFloat> dummy_ones_v(test_graph.size() * 2, 1);
   galois::PointerWithSize dummy_ones(dummy_ones_v);
 
+  std::vector<galois::GNNFloat> back_matrix(test_graph.size() * 3);
+  galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
+
   // create layer 1 for testing backward prop actually giving weights back
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph,
+      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =

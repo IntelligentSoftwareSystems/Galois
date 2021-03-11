@@ -44,6 +44,9 @@ struct GNNLayerDimensions {
 struct GNNLayerConfig {
   //! True if weights should be allocated
   bool allocate_weights{true};
+  //! If true, disable allocation of the output matrix (used for output layers
+  //! which can overwrite the input, i.e. passthrough)
+  bool disable_output{false};
   //! Turns off dropout of weights if enabled
   bool disable_dropout{false};
   //! Rate at which to drop things if dropout is on
@@ -77,17 +80,19 @@ struct GNNLayerConfig {
 //! Base class for layers in a graph neural network
 class GNNLayer {
 public:
-  GNNLayer() = delete;
   //! Creation of a layer needs the # of the layer, the graph to train on, and
   //! the input/output dimensions of the MxM that occurs in the layer; config
   //! as well
   GNNLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+           PointerWithSize<GNNFloat>* backward_output_matrix,
            const GNNLayerDimensions& dimensions, const GNNLayerConfig& config);
 
   //! Uses a default config
   GNNLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+           PointerWithSize<GNNFloat>* backward_output_matrix,
            const GNNLayerDimensions& dimensions)
-      : GNNLayer(layer_num, graph, dimensions, GNNLayerConfig()) {}
+      : GNNLayer(layer_num, graph, backward_output_matrix, dimensions,
+                 GNNLayerConfig()) {}
 
   GNNPhase layer_phase() { return layer_phase_; }
   //! Changes this layer's phase
@@ -213,8 +218,6 @@ protected:
   // want to allocate memory once to avoid runtime memory allocation.
   //! The output of the forward phase for this layer.
   std::vector<GNNFloat> forward_output_matrix_;
-  //! The output of the backward phase for this layer.
-  std::vector<GNNFloat> backward_output_matrix_;
 
   // These are wrapper around the pointer for the data associated with
   // any GNN layer: takes a CPU or GPU pointer depending on configuration
@@ -223,6 +226,7 @@ protected:
   PointerWithSize<GNNFloat> p_layer_weight_gradients_;
   PointerWithSize<GNNFloat> p_forward_output_matrix_;
   PointerWithSize<GNNFloat> p_backward_output_matrix_;
+  galois::DynamicBitSet activation_memo_;
 
   //! RNG for matrix initialization
   PerThreadRNG random_init_rng_{-5.0, 5.0};
@@ -292,6 +296,9 @@ protected:
   }
 #endif
 
+  //! Mask a input size'd matrix's rows that correspond to mirrors
+  void MaskInputNonMasters(PointerWithSize<GNNFloat>* input);
+  //! Mask a gradient size'd matrix's rows that correspond to mirrors
   void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients);
 
   //! Does some math to get GB used by some # of floats

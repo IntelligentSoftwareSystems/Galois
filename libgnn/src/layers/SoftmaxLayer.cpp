@@ -79,8 +79,8 @@ galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
 
-  // zero out output
-  backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
+  galois::do_all(galois::iterate(size_t{0}, p_backward_output_matrix_.size()),
+                 [&](size_t i) { p_backward_output_matrix_[i] = 0; });
 
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
@@ -101,11 +101,11 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
           for (size_t idx = 0; idx < feature_length; idx++) {
             if (idx == correct) {
               // positive class
-              backward_output_matrix_[node * feature_length + idx] =
+              p_backward_output_matrix_[node * feature_length + idx] =
                   forward_output_matrix_[node * feature_length + idx] - 1;
             } else {
               // negative class
-              backward_output_matrix_[node * feature_length + idx] =
+              p_backward_output_matrix_[node * feature_length + idx] =
                   forward_output_matrix_[node * feature_length + idx];
             }
           }
@@ -113,7 +113,7 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
       },
       galois::steal(), galois::loopname("SoftmaxBackward"));
 
-  return PointerWithSize(backward_output_matrix_);
+  return p_backward_output_matrix_;
 }
 
 galois::PointerWithSize<galois::GNNFloat>

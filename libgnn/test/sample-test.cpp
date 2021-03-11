@@ -40,8 +40,11 @@ int main() {
 
   //////////////////////////////////////////////////////////////////////////////
 
+  std::vector<galois::GNNFloat> back_matrix(21);
+  galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
+
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph,
+      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   layer_1->EnableSampling();
@@ -139,8 +142,11 @@ int main() {
   softmax_input[40] = 1;
   softmax_input[48] = 1;
 
-  auto output_layer =
-      std::make_unique<galois::SoftmaxLayer>(3, test_graph, dimension_out);
+  std::vector<galois::GNNFloat> back_matrix_2(49);
+  galois::PointerWithSize<galois::GNNFloat> p_back_2(back_matrix_2);
+
+  auto output_layer = std::make_unique<galois::SoftmaxLayer>(
+      3, test_graph, &p_back_2, dimension_out);
   output_layer->EnableSampling();
   galois::PointerWithSize<galois::GNNFloat> prediction_distribution =
       output_layer->ForwardPhase(softmax_input);
@@ -183,8 +189,8 @@ int main() {
   galois::graphs::GNNGraph multi_graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, false);
 
-  auto sigmoid_layer =
-      std::make_unique<galois::SigmoidLayer>(3, multi_graph, dimension_out);
+  auto sigmoid_layer = std::make_unique<galois::SigmoidLayer>(
+      3, multi_graph, &p_back_2, dimension_out);
   sigmoid_layer->EnableSampling();
   // reuse softmax input; only thing interested in is checking for 0s
   prediction_distribution = sigmoid_layer->ForwardPhase(softmax_input);

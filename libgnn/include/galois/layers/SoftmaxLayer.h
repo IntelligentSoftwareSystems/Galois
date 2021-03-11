@@ -12,8 +12,10 @@ namespace galois {
 class SoftmaxLayer : public GNNLayer {
 public:
   SoftmaxLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+
+               PointerWithSize<GNNFloat>* backward_output_matrix,
                const GNNLayerDimensions& dimensions)
-      : GNNLayer(layer_num, graph, dimensions,
+      : GNNLayer(layer_num, graph, backward_output_matrix, dimensions,
                  GNNLayerConfig{.allocate_weights = false}),
 #ifdef GALOIS_ENABLE_GPU
         gpu_object_(graph.GetGPUGraph()),

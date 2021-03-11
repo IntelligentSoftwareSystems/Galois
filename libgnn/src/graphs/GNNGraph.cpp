@@ -418,9 +418,9 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
   }
   full_feature_set.reset();
 
-  galois::gInfo(
-      host_prefix_, "Read ", local_node_features_.size(), " features (",
-      local_node_features_.size() * double{4} / (1 << 30), " GB)");
+  galois::gInfo(host_prefix_, "Read ", local_node_features_.size(),
+                " features (",
+                local_node_features_.size() * double{4} / (1 << 30), " GB)");
   GALOIS_LOG_ASSERT(num_kept_vertices == partitioned_graph_->size());
 }
 

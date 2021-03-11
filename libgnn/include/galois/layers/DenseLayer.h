@@ -10,12 +10,15 @@ public:
   //! memory for temporary matrices. Also initializes sync substrate for the
   //! weight matrix
   DenseLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+             PointerWithSize<GNNFloat>* backward_output_matrix,
              const GNNLayerDimensions& dimensions,
              const GNNLayerConfig& config);
 
   DenseLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+             PointerWithSize<GNNFloat>* backward_output_matrix,
              const GNNLayerDimensions& dimensions)
-      : DenseLayer(layer_num, graph, dimensions, GNNLayerConfig()) {}
+      : DenseLayer(layer_num, graph, backward_output_matrix, dimensions,
+                   GNNLayerConfig()) {}
 
   // Parent functions
   const PointerWithSize<galois::GNNFloat>

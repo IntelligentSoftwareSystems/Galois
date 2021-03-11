@@ -2,11 +2,11 @@
 #include "galois/GNNMath.h"
 #include "galois/layers/DenseLayer.h"
 
-galois::DenseLayer::DenseLayer(size_t layer_num,
-                               const galois::graphs::GNNGraph& graph,
-                               const GNNLayerDimensions& dimensions,
-                               const GNNLayerConfig& config)
-    : GNNLayer(layer_num, graph, dimensions, config),
+galois::DenseLayer::DenseLayer(
+    size_t layer_num, const galois::graphs::GNNGraph& graph,
+    PointerWithSize<GNNFloat>* backward_output_matrix,
+    const GNNLayerDimensions& dimensions, const GNNLayerConfig& config)
+    : GNNLayer(layer_num, graph, backward_output_matrix, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
   size_t num_input_elements =

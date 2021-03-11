@@ -4,6 +4,7 @@
 
 galois::GNNLayer::GNNLayer(size_t layer_num,
                            const galois::graphs::GNNGraph& graph,
+                           PointerWithSize<GNNFloat>* backward_output_matrix,
                            const GNNLayerDimensions& dimensions,
                            const GNNLayerConfig& config)
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
@@ -37,23 +38,29 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     GlorotBengioInit(&layer_weights_);
   }
 
-  size_t num_output_elements =
-      layer_dimensions_.input_rows * layer_dimensions_.output_columns;
-  galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                ", forward output matrix ", num_output_elements, " (",
-                FloatElementsToGB(num_output_elements), " GB)");
-  forward_output_matrix_.resize(num_output_elements, 0);
-  if (layer_number_ != 0) {
-    galois::gInfo(
-        graph_.host_prefix(), "Creating layer ", layer_number_,
-        ", backward output matrix ",
-        layer_dimensions_.input_rows * layer_dimensions_.input_columns, " (",
-        FloatElementsToGB(layer_dimensions_.input_rows *
-                          layer_dimensions_.input_columns),
-        " GB)");
-    backward_output_matrix_.resize(
-        layer_dimensions_.input_rows * layer_dimensions_.input_columns, 0);
+  if (!config_.disable_output) {
+    size_t num_output_elements =
+        layer_dimensions_.input_rows * layer_dimensions_.output_columns;
+    galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
+                  ", forward output matrix ", num_output_elements, " (",
+                  FloatElementsToGB(num_output_elements), " GB)");
+    forward_output_matrix_.resize(num_output_elements, 0);
   }
+
+  if (layer_number_ != 0) {
+    GALOIS_LOG_VASSERT(
+        backward_output_matrix->size() ==
+            layer_dimensions_.input_rows * layer_dimensions_.input_columns,
+        "backward output size {} should equal input size {}",
+        backward_output_matrix->size(),
+        layer_dimensions_.input_rows * layer_dimensions_.input_columns);
+  } else {
+    GALOIS_LOG_VASSERT(backward_output_matrix->data() == nullptr,
+                       "layer 0 should null ptr backward output");
+    GALOIS_LOG_VASSERT(backward_output_matrix->size() == 0,
+                       "layer 0 should size 0 backward output");
+  }
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.InitInOutMemory(num_output_elements,
@@ -68,8 +75,7 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
                                   layer_weight_gradients_.size());
     p_forward_output_matrix_ = PointerWithSize<GNNFloat>(
         base_gpu_object_.forward_output(), forward_output_matrix_.size());
-    p_backward_output_matrix_ = PointerWithSize<GNNFloat>(
-        base_gpu_object_.backward_output(), backward_output_matrix_.size());
+    p_backward_output_matrix_ = *backward_output_matrix;
     // TODO can clear the cpu side vectors/don't use .size() since optimally
     // they aren't initialized
   } else {
@@ -80,8 +86,7 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
         PointerWithSize<GNNFloat>(layer_weight_gradients_);
     p_forward_output_matrix_ =
         PointerWithSize<GNNFloat>(forward_output_matrix_);
-    p_backward_output_matrix_ =
-        PointerWithSize<GNNFloat>(backward_output_matrix_);
+    p_backward_output_matrix_ = *backward_output_matrix;
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
@@ -221,7 +226,7 @@ void galois::GNNLayer::ReconstructDropoutMatrix(
 void galois::GNNLayer::DoDropoutDerivative() {
   galois::StatTimer timer("BackwardDropout", "GNNLayer");
   timer.start();
-  assert(backward_output_matrix_.size() == dropout_mask_.size());
+  assert(p_backward_output_matrix_.size() == dropout_mask_.size());
   GNNFloat scale = 1. / (1. - config_.dropout_rate);
 
 #ifdef GALOIS_ENABLE_GPU
@@ -232,11 +237,12 @@ void galois::GNNLayer::DoDropoutDerivative() {
 #endif
     // use dropout mask to figure out derivative
     galois::do_all(
-        galois::iterate(static_cast<size_t>(0), backward_output_matrix_.size()),
+        galois::iterate(static_cast<size_t>(0),
+                        p_backward_output_matrix_.size()),
         [&](size_t i) {
-          backward_output_matrix_[i] = backward_output_matrix_[i] *
-                                       static_cast<GNNFloat>(dropout_mask_[i]) *
-                                       scale;
+          p_backward_output_matrix_[i] =
+              p_backward_output_matrix_[i] *
+              static_cast<GNNFloat>(dropout_mask_[i]) * scale;
         },
         galois::loopname("LayerDropoutDerivative"));
 #ifdef GALOIS_ENABLE_GPU
@@ -249,13 +255,22 @@ void galois::GNNLayer::Activation() {
   galois::StatTimer timer("ForwardActivation", "GNNLayer");
   timer.start();
 
+  if (activation_memo_.size() == 0) {
+    activation_memo_.resize(forward_output_matrix_.size());
+  }
+  activation_memo_.reset();
+
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), forward_output_matrix_.size()),
       [&](size_t i) {
-        forward_output_matrix_[i] =
-            std::max(forward_output_matrix_.at(i), static_cast<GNNFloat>(0));
+        if (forward_output_matrix_[i] > 0.0) {
+          // do nothing, keep value; set the memo though
+          activation_memo_.set(i);
+        } else {
+          forward_output_matrix_[i] = 0;
+        }
       },
       galois::loopname("ReLU"));
   timer.stop();
@@ -268,14 +283,14 @@ void galois::GNNLayer::ActivationDerivative(
 
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
-  // keep gradient if the original output is greater than 0
+  // keep gradient if the original output was greater than 0
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), gradient->size()),
       [&](size_t i) {
-        (*gradient)[i] =
-            (forward_output_matrix_.at(i) > static_cast<GNNFloat>(0))
-                ? (*gradient)[i]
-                : static_cast<GNNFloat>(0);
+        // it was <= 0 before; set back to 0
+        if (!activation_memo_.test(i)) {
+          (*gradient)[i] = 0;
+        }
       },
       galois::loopname("ReLU-Derivative"));
   timer.stop();
@@ -302,6 +317,28 @@ void galois::GNNLayer::WeightGradientSyncSum() {
                 MPI_SUM, MPI_COMM_WORLD);
 #endif
   t.stop();
+}
+
+void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(hochan) mask away the **non** masters on gpu
+  GALOIS_LOG_FATAL("implement this");
+#else
+  assert(*(graph_.begin_owned()) == 0);
+  size_t start_node = *(graph_.end_owned());
+  size_t end_node   = graph_.size();
+  size_t row_index  = layer_dimensions_.input_columns;
+  assert((row_index * layer_dimensions_.input_rows) == input->size());
+  galois::do_all(
+      galois::iterate(start_node, end_node),
+      [&](size_t non_master) {
+        // TODO(loc) use a std function for this for max efficiency
+        for (size_t i = 0; i < row_index; i++) {
+          (*input)[non_master * row_index + i] = 0;
+        }
+      },
+      galois::loopname("MaskInputNonMasters"));
+#endif
 }
 
 void galois::GNNLayer::MaskGradientNonMasters(

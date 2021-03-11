@@ -35,8 +35,11 @@ int main() {
   l2_input[12] = 4;
   l2_input[13] = 3;
 
-  auto l2_layer =
-      std::make_unique<galois::L2NormLayer>(2, test_graph, dimension_0);
+  std::vector<galois::GNNFloat> back_matrix(14);
+  galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
+
+  auto l2_layer = std::make_unique<galois::L2NormLayer>(2, test_graph, &p_back,
+                                                        dimension_0);
   galois::PointerWithSize<galois::GNNFloat> normed =
       l2_layer->ForwardPhase(l2_input);
 

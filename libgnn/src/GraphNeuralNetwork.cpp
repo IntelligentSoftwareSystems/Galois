@@ -22,6 +22,9 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     graph_->ResizeLayerVector(config_.num_intermediate_layers());
   }
 #endif
+  // used for chaining layers together; begins as nullptr
+  PointerWithSize<GNNFloat> prev_output_layer(nullptr, 0);
+
   // create the intermediate layers
   for (size_t i = 0; i < config_.num_intermediate_layers(); i++) {
     GNNLayerType layer_type = config_.intermediate_layer_type(i);
@@ -43,7 +46,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     switch (layer_type) {
     case GNNLayerType::kGraphConvolutional:
       gnn_layers_.push_back(std::move(std::make_unique<GraphConvolutionalLayer>(
-          i, *graph_, layer_dims, config_.default_layer_config())));
+          i, *graph_, &prev_output_layer, layer_dims,
+          config_.default_layer_config())));
 #ifdef GALOIS_ENABLE_GPU
       if (device_personality == DevicePersonality::GPU_CUDA) {
         graph_->InitLayerVectorMetaObjects(
@@ -54,21 +58,24 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       break;
     case GNNLayerType::kSAGE:
       gnn_layers_.push_back(std::move(std::make_unique<SAGELayer>(
-          i, *graph_, layer_dims, config_.default_layer_config())));
+          i, *graph_, &prev_output_layer, layer_dims,
+          config_.default_layer_config())));
 #ifdef GALOIS_ENABLE_GPU
       // TODO(loc/hochan) sage layer gpu
 #endif
       break;
     case GNNLayerType::kL2Norm:
       gnn_layers_.push_back(std::move(std::make_unique<L2NormLayer>(
-          i, *graph_, layer_dims, config_.default_layer_config())));
+          i, *graph_, &prev_output_layer, layer_dims,
+          config_.default_layer_config())));
 #ifdef GALOIS_ENABLE_GPU
       // TODO(loc/hochan) l2 layer gpu
 #endif
       break;
     case GNNLayerType::kDense:
       gnn_layers_.push_back(std::move(std::make_unique<DenseLayer>(
-          i, *graph_, layer_dims, config_.default_layer_config())));
+          i, *graph_, &prev_output_layer, layer_dims,
+          config_.default_layer_config())));
 #ifdef GALOIS_ENABLE_GPU
       // TODO(loc/hochan) dense layer gpu
 #endif
@@ -76,6 +83,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     default:
       GALOIS_LOG_FATAL("Invalid layer type during network construction");
     }
+    // update output layer for next layer
+    prev_output_layer = gnn_layers_.back()->GetForwardOutput();
   }
 
   // loop backward and find last GCN/SAGE (main) layer to disable activation
@@ -102,11 +111,13 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   switch (config_.output_layer_type()) {
   case (GNNOutputLayerType::kSoftmax):
     gnn_layers_.push_back(std::move(std::make_unique<SoftmaxLayer>(
-        config_.num_intermediate_layers(), *graph_, output_dims)));
+        config_.num_intermediate_layers(), *graph_, &prev_output_layer,
+        output_dims)));
     break;
   case (GNNOutputLayerType::kSigmoid):
     gnn_layers_.push_back(std::move(std::make_unique<SigmoidLayer>(
-        config_.num_intermediate_layers(), *graph_, output_dims)));
+        config_.num_intermediate_layers(), *graph_, &prev_output_layer,
+        output_dims)));
     break;
   default:
     GALOIS_LOG_FATAL("Invalid layer type during network construction");

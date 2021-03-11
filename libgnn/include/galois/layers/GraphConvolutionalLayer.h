@@ -16,14 +16,16 @@ public:
   //! weight matrix
   GraphConvolutionalLayer(size_t layer_num,
                           const galois::graphs::GNNGraph& graph,
+                          PointerWithSize<GNNFloat>* backward_output_matrix,
                           const GNNLayerDimensions& dimensions,
                           const GNNLayerConfig& config);
 
   GraphConvolutionalLayer(size_t layer_num,
                           const galois::graphs::GNNGraph& graph,
+                          PointerWithSize<GNNFloat>* backward_output_matrix,
                           const GNNLayerDimensions& dimensions)
-      : GraphConvolutionalLayer(layer_num, graph, dimensions,
-                                GNNLayerConfig()) {}
+      : GraphConvolutionalLayer(layer_num, graph, backward_output_matrix,
+                                dimensions, GNNLayerConfig()) {}
 
   // Parent functions
   const PointerWithSize<galois::GNNFloat>

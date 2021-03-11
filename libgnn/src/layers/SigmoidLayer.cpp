@@ -68,7 +68,8 @@ galois::SigmoidLayer::ForwardPhase(
 galois::PointerWithSize<galois::GNNFloat>
 galois::SigmoidLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
-  backward_output_matrix_.assign(backward_output_matrix_.size(), 0);
+  galois::do_all(galois::iterate(size_t{0}, p_backward_output_matrix_.size()),
+                 [&](size_t i) { p_backward_output_matrix_[i] = 0; });
 
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
@@ -86,7 +87,7 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
           // sigmoid-cross-entropy derivative: turns out all it is is simple
           // subtraction
           for (unsigned index = 0; index < feature_length; index++) {
-            backward_output_matrix_[node_offset + index] =
+            p_backward_output_matrix_[node_offset + index] =
                 forward_output_matrix_[node_offset + index] -
                 ground_truth[index];
           }
@@ -94,7 +95,7 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
       },
       galois::steal(), galois::loopname("SigmoidBackward"));
 
-  return backward_output_matrix_;
+  return p_backward_output_matrix_;
 }
 
 galois::PointerWithSize<galois::GNNFloat>

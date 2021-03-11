@@ -28,17 +28,22 @@ public:
   //! memory for temporary matrices. Also initializes sync substrate for the
   //! weight matrix
   SAGELayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+
+            PointerWithSize<GNNFloat>* backward_output_matrix,
             const GNNLayerDimensions& dimensions, const GNNLayerConfig& config,
             const SAGELayerConfig& sage_config);
 
   SAGELayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+            PointerWithSize<GNNFloat>* backward_output_matrix,
             const GNNLayerDimensions& dimensions, const GNNLayerConfig& config)
-      : SAGELayer(layer_num, graph, dimensions, config, SAGELayerConfig()) {}
+      : SAGELayer(layer_num, graph, backward_output_matrix, dimensions, config,
+                  SAGELayerConfig()) {}
 
   SAGELayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+            PointerWithSize<GNNFloat>* backward_output_matrix,
             const GNNLayerDimensions& dimensions)
-      : SAGELayer(layer_num, graph, dimensions, GNNLayerConfig(),
-                  SAGELayerConfig()) {}
+      : SAGELayer(layer_num, graph, backward_output_matrix, dimensions,
+                  GNNLayerConfig(), SAGELayerConfig()) {}
 
   void InitSelfWeightsTo1() {
     if (layer_weights_2_.size()) {

@@ -62,7 +62,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::L2NormLayer::BackwardPhase(
 galois::PointerWithSize<galois::GNNFloat> galois::L2NormLayer::BackwardPhaseCPU(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
-  backward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
+  galois::do_all(galois::iterate(size_t{0}, p_backward_output_matrix_.size()),
+                 [&](size_t i) { p_backward_output_matrix_[i] = 0; });
   const size_t feature_length = layer_dimensions_.input_columns;
 
   // derivative of some x_1 is sum of gradient w.r.t. x_1 for all elements of
@@ -108,7 +109,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::L2NormLayer::BackwardPhaseCPU(
 
           for (size_t row_index = row_offset;
                row_index < (row_offset + feature_length); row_index++) {
-            backward_output_matrix_[row_index] =
+            p_backward_output_matrix_[row_index] =
                 denominator *
                 (prev_layer_input[row_index] * mult_with_input +
                  (*input_gradient)[row_index] * running_square_sum);
@@ -117,5 +118,5 @@ galois::PointerWithSize<galois::GNNFloat> galois::L2NormLayer::BackwardPhaseCPU(
       },
       galois::loopname("L2Backward"));
 
-  return PointerWithSize(backward_output_matrix_);
+  return p_backward_output_matrix_;
 }

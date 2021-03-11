@@ -11,13 +11,16 @@ namespace galois {
 class L2NormLayer : public GNNLayer {
 public:
   L2NormLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+
+              PointerWithSize<GNNFloat>* backward_output_matrix,
               const GNNLayerDimensions& dimensions)
-      : L2NormLayer(layer_num, graph, dimensions,
+      : L2NormLayer(layer_num, graph, backward_output_matrix, dimensions,
                     GNNLayerConfig{.allocate_weights = false}) {}
   L2NormLayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
+              PointerWithSize<GNNFloat>* backward_output_matrix,
               const GNNLayerDimensions& dimensions,
               const GNNLayerConfig& config)
-      : GNNLayer(layer_num, graph, dimensions, config) {
+      : GNNLayer(layer_num, graph, backward_output_matrix, dimensions, config) {
     layer_type_ = galois::GNNLayerType::kL2Norm;
     // input/output columns must be equivalent in a softmax
     GALOIS_LOG_ASSERT(dimensions.input_columns == dimensions.output_columns);
