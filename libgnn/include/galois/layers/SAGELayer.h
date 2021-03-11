@@ -61,7 +61,7 @@ public:
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings) final;
 
   PointerWithSize<galois::GNNFloat>
-  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:

@@ -43,7 +43,7 @@ public:
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
   PointerWithSize<galois::GNNFloat>
-  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:

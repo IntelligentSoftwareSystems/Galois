@@ -31,7 +31,7 @@ public:
   ForwardPhase(const PointerWithSize<galois::GNNFloat> input_embeddings);
 
   PointerWithSize<galois::GNNFloat>
-  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
                 PointerWithSize<galois::GNNFloat>* input_gradient);
 
 private:
@@ -39,7 +39,7 @@ private:
   ForwardPhaseCPU(const PointerWithSize<galois::GNNFloat> input_embeddings);
 
   PointerWithSize<galois::GNNFloat>
-  BackwardPhaseCPU(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhaseCPU(PointerWithSize<galois::GNNFloat> prev_layer_input,
                    PointerWithSize<galois::GNNFloat>* input_gradient);
 
   //! No op

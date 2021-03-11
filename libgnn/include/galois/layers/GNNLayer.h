@@ -154,7 +154,7 @@ public:
   //! @returns Output of the backward phase (i.e. input to previous layer); note
   //! it's a pointer because layer can mess with it
   virtual PointerWithSize<galois::GNNFloat>
-  BackwardPhase(const PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
                 PointerWithSize<galois::GNNFloat>* input_gradient) = 0;
 
   //! Given an optimizer, update the weights in this layer based on gradients

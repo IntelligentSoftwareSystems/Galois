@@ -117,7 +117,7 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
 }
 
 galois::PointerWithSize<galois::GNNFloat>
-galois::SoftmaxLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
+galois::SoftmaxLayer::BackwardPhase(PointerWithSize<galois::GNNFloat>,
                                     PointerWithSize<galois::GNNFloat>*) {
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {

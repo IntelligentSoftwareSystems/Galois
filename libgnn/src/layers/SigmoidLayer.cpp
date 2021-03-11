@@ -99,7 +99,7 @@ galois::SigmoidLayer::BackwardPhaseCPU() {
 }
 
 galois::PointerWithSize<galois::GNNFloat>
-galois::SigmoidLayer::BackwardPhase(const PointerWithSize<galois::GNNFloat>,
+galois::SigmoidLayer::BackwardPhase(PointerWithSize<galois::GNNFloat>,
                                     PointerWithSize<galois::GNNFloat>*) {
 #ifdef GALOIS_ENABLE_GPU
   // TODO(loc) when GPU needs it

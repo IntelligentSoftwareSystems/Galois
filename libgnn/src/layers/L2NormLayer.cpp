@@ -51,7 +51,7 @@ galois::L2NormLayer::ForwardPhaseCPU(
 }
 
 galois::PointerWithSize<galois::GNNFloat> galois::L2NormLayer::BackwardPhase(
-    const PointerWithSize<galois::GNNFloat> prev_layer_input,
+    PointerWithSize<galois::GNNFloat> prev_layer_input,
     PointerWithSize<galois::GNNFloat>* input_gradient) {
 #ifdef GALOIS_ENABLE_GPU
   // TODO
