@@ -48,13 +48,6 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> prediction_distribution =
       output_layer->ForwardPhase(softmax_input);
 
-  galois::PointerWithSize<galois::GNNFloat> asdf =
-      output_layer->BackwardPhase(softmax_input, nullptr);
-  printf("Output 1\n========\n");
-  for (unsigned i = 0; i < asdf.size(); i++) {
-    printf("%f\n", asdf[i]);
-  }
-
   // assert that predictions are as expected
   for (size_t i = 0; i < 5; i++) {
     GALOIS_LOG_ASSERT(galois::MaxIndex(7, &(prediction_distribution[i * 7])) ==
@@ -71,15 +64,19 @@ int main() {
     GALOIS_LOG_ASSERT(prediction_distribution[i * 7 + 6] == 0.0);
   }
 
+  // NOTE: checked before backward because backward overwrites this matrix
+
+  galois::PointerWithSize<galois::GNNFloat> asdf =
+      output_layer->BackwardPhase(softmax_input, nullptr);
+  printf("Output 1\n========\n");
+  for (unsigned i = 0; i < asdf.size(); i++) {
+    printf("%f\n", asdf[i]);
+  }
+
   // validation mode
   output_layer->SetLayerPhase(galois::GNNPhase::kValidate);
   galois::PointerWithSize<galois::GNNFloat> pd2 =
       output_layer->ForwardPhase(softmax_input);
-  asdf = output_layer->BackwardPhase(softmax_input, nullptr);
-  printf("Output 2\n========\n");
-  for (unsigned i = 0; i < asdf.size(); i++) {
-    printf("%f\n", asdf[i]);
-  }
 
   // validate vertex is index 5
   GALOIS_LOG_ASSERT(galois::MaxIndex(7, &(pd2[5 * 7])) == 5);
@@ -102,16 +99,16 @@ int main() {
     GALOIS_LOG_ASSERT(pd2[i * 7 + 6] == 0.0);
   }
 
-  // test mode
-  output_layer->SetLayerPhase(galois::GNNPhase::kTest);
-  galois::PointerWithSize<galois::GNNFloat> pd3 =
-      output_layer->ForwardPhase(softmax_input);
   asdf = output_layer->BackwardPhase(softmax_input, nullptr);
-  printf("Output 3\n========\n");
+  printf("Output 2\n========\n");
   for (unsigned i = 0; i < asdf.size(); i++) {
     printf("%f\n", asdf[i]);
   }
 
+  // test mode
+  output_layer->SetLayerPhase(galois::GNNPhase::kTest);
+  galois::PointerWithSize<galois::GNNFloat> pd3 =
+      output_layer->ForwardPhase(softmax_input);
   // validate vertex is index 6
   GALOIS_LOG_ASSERT(galois::MaxIndex(7, &(pd3[6 * 7])) == 6);
   // all but last are empty distributions
@@ -123,5 +120,11 @@ int main() {
     GALOIS_LOG_ASSERT(pd3[i * 7 + 4] == 0.0);
     GALOIS_LOG_ASSERT(pd3[i * 7 + 5] == 0.0);
     GALOIS_LOG_ASSERT(pd3[i * 7 + 6] == 0.0);
+  }
+
+  asdf = output_layer->BackwardPhase(softmax_input, nullptr);
+  printf("Output 3\n========\n");
+  for (unsigned i = 0; i < asdf.size(); i++) {
+    printf("%f\n", asdf[i]);
   }
 }

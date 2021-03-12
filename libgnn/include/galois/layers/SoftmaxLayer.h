@@ -15,8 +15,9 @@ public:
 
                PointerWithSize<GNNFloat>* backward_output_matrix,
                const GNNLayerDimensions& dimensions)
-      : GNNLayer(layer_num, graph, backward_output_matrix, dimensions,
-                 GNNLayerConfig{.allocate_weights = false}),
+      : GNNLayer(
+            layer_num, graph, backward_output_matrix, dimensions,
+            GNNLayerConfig{.allocate_weights = false, .disable_output = true}),
 #ifdef GALOIS_ENABLE_GPU
         gpu_object_(graph.GetGPUGraph()),
 #endif
@@ -43,7 +44,7 @@ public:
   //! Get gradients to fix distribution such that it leans more towards single
   //! class ground truth.
   PointerWithSize<galois::GNNFloat>
-  BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
+  BackwardPhase(PointerWithSize<galois::GNNFloat> in_out,
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
 private:

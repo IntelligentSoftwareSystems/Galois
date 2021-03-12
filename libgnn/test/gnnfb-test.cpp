@@ -44,7 +44,7 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   // forward phase
   //////////////////////////////////////////////////////////////////////////////
-  gnn->DoInference();
+  const galois::PointerWithSize<galois::GNNFloat> fo_out = gnn->DoInference();
 
   // check output for layers to make sure it's as expected
   galois::PointerWithSize<galois::GNNFloat> lf0_out =
@@ -72,33 +72,36 @@ int main() {
     GALOIS_LOG_ASSERT(lf0_out[24 + i] == 15);
   }
 
-  const galois::PointerWithSize<galois::GNNFloat> lf1_out =
-      gnn->GetIntermediateLayer(1)->GetForwardOutput();
-  GALOIS_LOG_ASSERT(lf1_out.size() == 49);
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[0 + i] == 24);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[7 + i] == 60);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[14 + i] == 96);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[21 + i] == 144);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[28 + i] == 192);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[35 + i] == 156);
-  }
-  for (size_t i = 0; i < 7; i++) {
-    GALOIS_LOG_ASSERT(lf1_out[42 + i] == 120);
-  }
+  // Disabled: this test worked in past because forward outputs were all
+  // separate matrices, but due to space saving measures this forward output
+  // gets messed with by the softmax call
 
-  const galois::PointerWithSize<galois::GNNFloat> fo_out =
-      gnn->GetOutputLayer()->GetForwardOutput();
+  // const galois::PointerWithSize<galois::GNNFloat> lf1_out =
+  //    gnn->GetIntermediateLayer(1)->GetForwardOutput();
+  // GALOIS_LOG_ASSERT(lf1_out.size() == 49);
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_VASSERT(lf1_out[0 + i] == 24, "{} vs {} (correct)", lf1_out[0 +
+  //  i], 24);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[7 + i] == 60);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[14 + i] == 96);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[21 + i] == 144);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[28 + i] == 192);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[35 + i] == 156);
+  //}
+  // for (size_t i = 0; i < 7; i++) {
+  //  GALOIS_LOG_ASSERT(lf1_out[42 + i] == 120);
+  //}
+
   GALOIS_LOG_ASSERT(fo_out.size() == 49);
   // since row all same, prob distribution across row should be same
   for (size_t c = 0; c < 49; c += 7) {
@@ -127,9 +130,8 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   gnn->SetLayerPhases(galois::GNNPhase::kValidate);
   gnn->SetAllLayerWeightsTo1();
-  gnn->DoInference();
   const galois::PointerWithSize<galois::GNNFloat> fo_out_val =
-      gnn->GetOutputLayer()->GetForwardOutput();
+      gnn->DoInference();
   for (size_t c = 0; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {
       GALOIS_LOG_ASSERT(fo_out_val[c + i] == fo_out_val[c + i + 1]);
@@ -150,9 +152,7 @@ int main() {
   // all but last should be 0s
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
   gnn->SetAllLayerWeightsTo1();
-  gnn->DoInference();
-  galois::PointerWithSize<galois::GNNFloat> fo_out_test =
-      gnn->GetOutputLayer()->GetForwardOutput();
+  galois::PointerWithSize<galois::GNNFloat> fo_out_test = gnn->DoInference();
   for (size_t c = 0; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {
       GALOIS_LOG_ASSERT(fo_out_test[c + i] == fo_out_test[c + i + 1]);

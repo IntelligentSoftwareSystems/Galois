@@ -5,8 +5,8 @@
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::ForwardPhaseCPU(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  // note: p_backward == input_embeddings
   input_loss_.assign(input_loss_.size(), 0.0);
-  forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
 #ifndef NDEBUG
   //#ifdef NDEBUG
@@ -20,14 +20,17 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned i) {
         if (IsSampledLayer()) {
-          if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i))
+          if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i)) {
+            VectorZero(feature_length,
+                       &p_backward_output_matrix_[i * feature_length]);
             return;
+          }
         }
 
         if (graph_.IsValidForPhase(i, layer_phase_)) {
           // do softmax
           GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
-                     &forward_output_matrix_[feature_length * i]);
+                     &p_backward_output_matrix_[feature_length * i]);
           // create ground truth vector for this LID
           std::vector<GNNFloat>* ground_truth_vec =
               ground_truth_vectors_.getLocal();
@@ -40,12 +43,15 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           // calculate loss for this LID (note not all i will be filled)
           input_loss_[i] =
               GNNCrossEntropy(feature_length, ground_truth_vec->data(),
-                              &forward_output_matrix_[feature_length * i]);
+                              &p_backward_output_matrix_[feature_length * i]);
 #ifndef NDEBUG
           //#ifdef NDEBUG
           loss_accum += input_loss_[i];
           handled += 1;
 #endif
+        } else {
+          VectorZero(feature_length,
+                     &p_backward_output_matrix_[i * feature_length]);
         }
       },
       // TODO chunk size?
@@ -58,7 +64,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   galois::gPrint("Loss is ", reduced_loss / t, "\n");
 #endif
 
-  return forward_output_matrix_;
+  return p_backward_output_matrix_;
 }
 
 const galois::PointerWithSize<galois::GNNFloat>
@@ -78,9 +84,6 @@ galois::SoftmaxLayer::ForwardPhase(
 galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
-
-  galois::do_all(galois::iterate(size_t{0}, p_backward_output_matrix_.size()),
-                 [&](size_t i) { p_backward_output_matrix_[i] = 0; });
 
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
@@ -102,11 +105,11 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
             if (idx == correct) {
               // positive class
               p_backward_output_matrix_[node * feature_length + idx] =
-                  forward_output_matrix_[node * feature_length + idx] - 1;
+                  p_backward_output_matrix_[node * feature_length + idx] - 1;
             } else {
               // negative class
               p_backward_output_matrix_[node * feature_length + idx] =
-                  forward_output_matrix_[node * feature_length + idx];
+                  p_backward_output_matrix_[node * feature_length + idx];
             }
           }
         }
@@ -123,7 +126,7 @@ galois::SoftmaxLayer::BackwardPhase(PointerWithSize<galois::GNNFloat>,
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.BackwardPhaseGPU(
         layer_phase_, graph_.size(), layer_dimensions_.input_columns,
-        p_forward_output_matrix_.data(), p_backward_output_matrix_.data());
+        p_backward_output_matrix_.data(), p_backward_output_matrix_.data());
     return p_backward_output_matrix_;
   }
 #endif

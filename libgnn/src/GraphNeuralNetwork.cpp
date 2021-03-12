@@ -171,10 +171,11 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       graph_->CalculateSpecialNormFactor(true, config_.inductive_training_);
     }
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
+    // have to get accuracy here because gradient prop destroys the predictions
+    // matrix
+    train_accuracy = GetGlobalAccuracy(predictions);
     GradientPropagation();
     epoch_timer.stop();
-
-    train_accuracy = GetGlobalAccuracy(predictions);
 
     if (this_host == 0) {
       const std::string t_name_acc =
