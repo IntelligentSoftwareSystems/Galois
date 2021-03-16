@@ -18,6 +18,7 @@
  */
 
 #include "galois/Galois.h"
+#include "galois/worklists/AdaptiveObim.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/Reduction.h"
 #include "galois/PriorityQueue.h"
@@ -59,6 +60,7 @@ enum Algo {
   deltaTile = 0,
   deltaStep,
   deltaStepBarrier,
+  deltaStepAdaptive,
   serDeltaTile,
   serDelta,
   dijkstraTile,
@@ -69,15 +71,17 @@ enum Algo {
 };
 
 const char* const ALGO_NAMES[] = {
-    "deltaTile", "deltaStep",    "deltaStepBarrier", "serDeltaTile",
-    "serDelta",  "dijkstraTile", "dijkstra",         "topo",
-    "topoTile",  "Auto"};
+    "deltaTile",         "deltaStep",    "deltaStepBarrier",
+    "deltaStepAdaptive", "serDeltaTile", "serDelta",
+    "dijkstraTile",      "dijkstra",     "topo",
+    "topoTile",          "Auto"};
 
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm (default value auto):"),
     cll::values(clEnumVal(deltaTile, "deltaTile"),
                 clEnumVal(deltaStep, "deltaStep"),
                 clEnumVal(deltaStepBarrier, "deltaStepBarrier"),
+                clEnumVal(deltaStepAdaptive, "deltaStepAdaptive"),
                 clEnumVal(serDeltaTile, "serDeltaTile"),
                 clEnumVal(serDelta, "serDelta"),
                 clEnumVal(dijkstraTile, "dijkstraTile"),
@@ -111,9 +115,9 @@ using TileRangeFn          = SSSP::TileRangeFn;
 namespace gwl = galois::worklists;
 using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
 using OBIM    = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>;
-using OBIM_Barrier =
-    gwl::OrderedByIntegerMetric<UpdateRequestIndexer,
-                                PSchunk>::with_barrier<true>::type;
+using OBIM_Adaptive =
+    gwl::AdaptiveOrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>;
+using OBIM_Barrier = OBIM::with_barrier<true>::type;
 
 template <typename T, typename OBIMTy = OBIM, typename P, typename R>
 void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
@@ -448,6 +452,11 @@ int main(int argc, char** argv) {
     break;
   case topoTile:
     topoTileAlgo(graph, source);
+    break;
+
+  case deltaStepAdaptive:
+    deltaStepAlgo<UpdateRequest, OBIM_Adaptive>(graph, source, ReqPushWrap(),
+                                                OutEdgeRangeFn{graph});
     break;
 
   case deltaStepBarrier:
