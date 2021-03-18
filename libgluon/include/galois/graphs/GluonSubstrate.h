@@ -2317,6 +2317,10 @@ private:
       getSendBuffer<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(loopName, x,
                                                                   b, elem_size);
 
+      if (b.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        GALOIS_LOG_FATAL("send buff limit limit reached: {}", b.size());
+      }
+
       if ((!async) || (b.size() > 0)) {
         size_t syncTypePhase = 0;
         if (async && (syncType == syncBroadcast))
