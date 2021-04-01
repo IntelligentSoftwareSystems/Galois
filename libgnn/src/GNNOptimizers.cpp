@@ -41,7 +41,7 @@ void galois::AdamOptimizer::GradientDescent(
           // weight update using bias corrected moments
           (matrix.data())[i] -=
               config_.alpha * bias_correct_first /
-              std::sqrt(bias_correct_second + config_.epsilon);
+              (std::sqrt(bias_correct_second) + config_.epsilon);
         },
         galois::loopname("AdamOptimizerGradientDescent"));
 #ifdef GALOIS_ENABLE_GPU
