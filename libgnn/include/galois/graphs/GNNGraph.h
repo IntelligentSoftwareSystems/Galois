@@ -33,7 +33,7 @@ enum class GNNPartitionScheme { kOEC, kCVC, kOCVC };
 //! XXX
 class GNNGraph {
 public:
-  using GNNDistGraph = galois::graphs::DistGraph<char, void>;
+  using GNNDistGraph = galois::graphs::DistGraph<char, char>;
   using WholeGraph   = galois::graphs::LC_CSR_Graph<char, void>;
   using GraphNode    = GNNDistGraph::GraphNode;
   // defined as such because dist graph range objects used long unsigned
@@ -86,20 +86,61 @@ public:
     return partitioned_graph_->masterNodesRange().end();
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  // out edges
+  //////////////////////////////////////////////////////////////////////////////
   // All following functions take a local node id
-  EdgeIterator EdgeBegin(GraphNode n) const {
+  EdgeIterator edge_begin(GraphNode n) const {
     return partitioned_graph_->edge_begin(n);
   };
-  EdgeIterator EdgeEnd(GraphNode n) const {
+  EdgeIterator edge_end(GraphNode n) const {
     return partitioned_graph_->edge_end(n);
   };
-  GraphNode EdgeDestination(EdgeIterator ei) const {
+  GraphNode GetEdgeDest(EdgeIterator ei) const {
     return partitioned_graph_->getEdgeDst(ei);
   };
-  GNNFloat NormFactor(GraphNode n) const { return norm_factors_[n]; }
+  char IsEdgeSampled(EdgeIterator ei) const {
+    return partitioned_graph_->getEdgeData(ei);
+  };
+  //! Set the flag on the edge to 1; makes it sampled
+  void MakeEdgeSampled(EdgeIterator ei) {
+    partitioned_graph_->getEdgeData(ei) = 1;
+  };
+  //! Set the flag on the edge to 0; makes it not sampled
+  void MakeEdgeUnsampled(EdgeIterator ei) {
+    partitioned_graph_->getEdgeData(ei) = 0;
+  };
+  galois::runtime::iterable<
+      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
+  edges(GraphNode N) {
+    return partitioned_graph_->edges(N);
+  }
+  //////////////////////////////////////////////////////////////////////////////
+  // in edges
+  //////////////////////////////////////////////////////////////////////////////
+  EdgeIterator in_edge_begin(GraphNode n) const {
+    return partitioned_graph_->in_edge_begin(n);
+  }
+  EdgeIterator in_edge_end(GraphNode n) const {
+    return partitioned_graph_->in_edge_end(n);
+  }
+  GraphNode GetInEdgeDest(EdgeIterator ei) const {
+    return partitioned_graph_->GetInEdgeDest(ei);
+  };
+  char IsInEdgeSampled(EdgeIterator ei) const {
+    return partitioned_graph_->GetInEdgeData(ei);
+  };
+  galois::runtime::iterable<
+      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
+  in_edges(GraphNode N) {
+    return partitioned_graph_->in_edges(N);
+  }
+  //////////////////////////////////////////////////////////////////////////////
+
+  GNNFloat GetNormFactor(GraphNode n) const { return norm_factors_[n]; }
   //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
   //! inductive graph, etc); calculated whenever norm factor is calculated
-  GNNFloat DegreeNorm(GraphNode n) const { return degree_norm_[n]; }
+  GNNFloat GetDegreeNorm(GraphNode n) const { return degree_norm_[n]; }
 
   // Get accuracy: sampling is by default false
   float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions,

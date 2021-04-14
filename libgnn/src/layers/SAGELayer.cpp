@@ -412,13 +412,13 @@ void galois::SAGELayer::AggregateAllCPU(
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
-          source_norm = graph_.DegreeNorm(src);
+          source_norm = graph_.GetDegreeNorm(src);
         }
 
         // loop through all destinations to grab the feature to aggregate
-        for (auto e = graph_.EdgeBegin(src); e != graph_.EdgeEnd(src); e++) {
+        for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src); e++) {
           graphs::bitset_graph_aggregate.set(src);
-          size_t dst = graph_.EdgeDestination(e);
+          size_t dst = graph_.GetEdgeDest(e);
 
           if (layer_phase_ == GNNPhase::kTrain) {
             if (IsInductiveLayer()) {
@@ -442,7 +442,7 @@ void galois::SAGELayer::AggregateAllCPU(
             if (!is_backward) {
               norm_scale = source_norm;
             } else {
-              norm_scale = graph_.DegreeNorm(dst);
+              norm_scale = graph_.GetDegreeNorm(dst);
             }
 
             galois::VectorMulAdd(

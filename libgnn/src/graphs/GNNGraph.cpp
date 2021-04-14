@@ -18,13 +18,13 @@ LoadPartition(const std::string& input_directory,
   // load partition
   switch (partition_scheme) {
   case galois::graphs::GNNPartitionScheme::kOEC:
-    return galois::cuspPartitionGraph<GnnOEC, char, void>(
+    return galois::cuspPartitionGraph<GnnOEC, char, char>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kCVC:
-    return galois::cuspPartitionGraph<GnnCVC, char, void>(
+    return galois::cuspPartitionGraph<GnnCVC, char, char>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kOCVC:
-    return galois::cuspPartitionGraph<GenericCVC, char, void>(
+    return galois::cuspPartitionGraph<GenericCVC, char, char>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   default:
     GALOIS_LOG_FATAL("Error: partition scheme specified is invalid");
@@ -68,6 +68,8 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   // load partition
   partitioned_graph_ =
       LoadPartition(input_directory_, dataset_name, partition_scheme);
+  // reverse edges
+  partitioned_graph_->ConstructIncomingEdges();
 
   // read additional graph data
   ReadLocalLabels(dataset_name, has_single_class_label);
@@ -253,8 +255,8 @@ void galois::graphs::GNNGraph::GraphSAINTSample(size_t num_roots,
       for (size_t current_depth = 0; current_depth < walk_depth;
            current_depth++) {
         // pick random edge, mark sampled, swap roots
-        EdgeIterator first_edge = EdgeBegin(root);
-        size_t num_edges        = std::distance(first_edge, EdgeEnd(root));
+        EdgeIterator first_edge = edge_begin(root);
+        size_t num_edges        = std::distance(first_edge, edge_end(root));
         if (num_edges == 0) {
           break;
         }
@@ -267,7 +269,7 @@ void galois::graphs::GNNGraph::GraphSAINTSample(size_t num_roots,
         long int rand_num;
         lrand48_r(&seed_struct, &rand_num);
         EdgeIterator selected_edge = first_edge + (rand_num % num_edges);
-        size_t candidate_dest      = EdgeDestination(selected_edge);
+        size_t candidate_dest      = GetEdgeDest(selected_edge);
 
         // TODO(loc) another possibility is to just pick it anyways regardless
         // but don't mark it as sampled, though this would lead to disconnected
@@ -609,9 +611,9 @@ void galois::graphs::GNNGraph::CalculateSpecialNormFactor(bool is_sampled,
 
         // TODO(loc) make this work in a distributed setting; assuming
         // whole graph is present on single host at the moment
-        for (EdgeIterator e = EdgeBegin(local_id); e != EdgeEnd(local_id);
+        for (EdgeIterator e = edge_begin(local_id); e != edge_end(local_id);
              e++) {
-          size_t dest = EdgeDestination(e);
+          size_t dest = GetEdgeDest(e);
           if (is_sampled && is_inductive) {
             if (!IsValidForPhase(dest, GNNPhase::kTrain) ||
                 !IsInSampledGraph(dest)) {

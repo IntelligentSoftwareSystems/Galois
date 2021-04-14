@@ -14,11 +14,11 @@ int main() {
 
   // print edges for sanity
   for (size_t node = 0; node < test_graph->size(); node++) {
-    for (auto e = test_graph->EdgeBegin(node); e != test_graph->EdgeEnd(node);
+    for (auto e = test_graph->edge_begin(node); e != test_graph->edge_end(node);
          e++) {
       galois::gPrint(test_graph->host_prefix(), "Edge ",
                      test_graph->GetGID(node), " ",
-                     test_graph->GetGID(test_graph->EdgeDestination(e)), "\n");
+                     test_graph->GetGID(test_graph->GetEdgeDest(e)), "\n");
     }
   }
   for (auto own = test_graph->begin_owned(); own != test_graph->end_owned();
@@ -210,11 +210,11 @@ int main() {
       "tester", galois::graphs::GNNPartitionScheme::kCVC, true);
   // print edges for sanity
   for (size_t node = 0; node < test_graph_2->size(); node++) {
-    for (auto e = test_graph_2->EdgeBegin(node);
-         e != test_graph_2->EdgeEnd(node); e++) {
-      galois::gPrint(
-          test_graph_2->host_prefix(), "Edge ", test_graph_2->GetGID(node), " ",
-          test_graph_2->GetGID(test_graph_2->EdgeDestination(e)), "\n");
+    for (auto e = test_graph_2->edge_begin(node);
+         e != test_graph_2->edge_end(node); e++) {
+      galois::gPrint(test_graph_2->host_prefix(), "Edge ",
+                     test_graph_2->GetGID(node), " ",
+                     test_graph_2->GetGID(test_graph_2->GetEdgeDest(e)), "\n");
     }
   }
   for (auto own = test_graph_2->begin_owned(); own != test_graph_2->end_owned();

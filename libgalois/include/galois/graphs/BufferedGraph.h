@@ -180,7 +180,7 @@ private:
       typename std::enable_if<!std::is_void<EdgeType>::value>::type* = nullptr>
   void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart,
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
-                    uint64_t numGlobalEdges) {
+                    uint64_t numGlobalEdges, uint64_t file_data_size) {
     if (numEdgesToLoad == 0) {
       return;
     }
@@ -193,30 +193,39 @@ private:
       GALOIS_DIE("Failed to allocate memory for edge data buffer.");
     }
 
-    // position after nodes + edges
-    uint64_t baseReadPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
-                                (sizeof(uint32_t) * numGlobalEdges);
+    if (file_data_size == sizeof(EdgeDataType)) {
+      // position after nodes + edges
+      uint64_t baseReadPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
+                                  (sizeof(uint32_t) * numGlobalEdges);
 
-    // version 1 padding TODO make version agnostic
-    if (numGlobalEdges % 2) {
-      baseReadPosition += sizeof(uint32_t);
+      // version 1 padding TODO make version agnostic
+      if (numGlobalEdges % 2) {
+        baseReadPosition += sizeof(uint32_t);
+      }
+
+      // jump to first byte of edge data
+      uint64_t readPosition =
+          baseReadPosition + (sizeof(EdgeDataType) * edgeStart);
+      graphFile.seekg(readPosition);
+      uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
+      uint64_t bytesRead      = 0;
+
+      while (numBytesToLoad > 0) {
+        graphFile.read(((char*)this->edgeDataBuffer) + bytesRead,
+                       numBytesToLoad);
+        size_t numRead = graphFile.gcount();
+        numBytesToLoad -= numRead;
+        bytesRead += numRead;
+      }
+
+      assert(numBytesToLoad == 0);
+    } else {
+      // file on disk does not match edge data type: fill in the buffer
+      // with 0s instead
+      galois::gInfo("File on disk does not have appropriate edge data to read; "
+                    "filling with 0s");
+      memset(edgeDataBuffer, 0, sizeof(EdgeDataType) * numEdgesToLoad);
     }
-
-    // jump to first byte of edge data
-    uint64_t readPosition =
-        baseReadPosition + (sizeof(EdgeDataType) * edgeStart);
-    graphFile.seekg(readPosition);
-    uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
-    uint64_t bytesRead      = 0;
-
-    while (numBytesToLoad > 0) {
-      graphFile.read(((char*)this->edgeDataBuffer) + bytesRead, numBytesToLoad);
-      size_t numRead = graphFile.gcount();
-      numBytesToLoad -= numRead;
-      bytesRead += numRead;
-    }
-
-    assert(numBytesToLoad == 0);
   }
 
   /**
@@ -230,7 +239,8 @@ private:
   template <
       typename EdgeType,
       typename std::enable_if<std::is_void<EdgeType>::value>::type* = nullptr>
-  void loadEdgeData(std::ifstream&, uint64_t, uint64_t, uint64_t, uint64_t) {
+  void loadEdgeData(std::ifstream&, uint64_t, uint64_t, uint64_t, uint64_t,
+                    uint64_t) {
     // do nothing (edge data is void, i.e. no edge data)
   }
 
@@ -322,7 +332,7 @@ public:
     loadEdgeDest(graphFile, 0, globalEdgeSize, globalSize);
     // may or may not do something depending on EdgeDataType
     loadEdgeData<EdgeDataType>(graphFile, 0, globalEdgeSize, globalSize,
-                               globalEdgeSize);
+                               globalEdgeSize, header[1]);
     graphLoaded = true;
 
     graphFile.close();
@@ -350,6 +360,8 @@ public:
     }
 
     std::ifstream graphFile(filename.c_str());
+    uint64_t header[4];
+    graphFile.read(((char*)header), sizeof(uint64_t) * 4);
 
     globalSize     = numGlobalNodes;
     globalEdgeSize = numGlobalEdges;
@@ -364,7 +376,7 @@ public:
 
     // may or may not do something depending on EdgeDataType
     loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges,
-                               numGlobalNodes, numGlobalEdges);
+                               numGlobalNodes, numGlobalEdges, header[1]);
     graphLoaded = true;
 
     graphFile.close();

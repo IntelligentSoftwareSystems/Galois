@@ -50,31 +50,35 @@ namespace graphs {
  */
 template <typename NodeTy, typename EdgeTy, bool EdgeDataByValue = false,
           bool HasNoLockable = false, bool UseNumaAlloc = false,
-          bool HasOutOfLineLockable = false, typename FileEdgeTy = EdgeTy>
+          bool HasOutOfLineLockable = false, typename FileEdgeTy = EdgeTy,
+          typename NodeIndexTy = uint32_t, typename EdgeIndexTy = uint64_t>
 class LC_CSR_CSC_Graph
     : public LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
-                          HasOutOfLineLockable, FileEdgeTy> {
+                          HasOutOfLineLockable, FileEdgeTy, NodeIndexTy,
+                          EdgeIndexTy> {
   // typedef to make it easier to read
   //! Typedef referring to base LC_CSR_Graph
-  using BaseGraph = LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
-                                 HasOutOfLineLockable, FileEdgeTy>;
+  using BaseGraph =
+      LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
+                   HasOutOfLineLockable, FileEdgeTy, NodeIndexTy, EdgeIndexTy>;
   //! Typedef referring to this class itself
   using ThisGraph =
       LC_CSR_CSC_Graph<NodeTy, EdgeTy, EdgeDataByValue, HasNoLockable,
-                       UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy>;
+                       UseNumaAlloc, HasOutOfLineLockable, FileEdgeTy,
+                       NodeIndexTy, EdgeIndexTy>;
 
 public:
   //! Graph node typedef
-  using GraphNode = uint32_t;
+  using GraphNode = NodeIndexTy;
 
 protected:
-  // retypedefs of base class
+  // redefinitions of base class typedefs
   //! large array for edge data
   using EdgeData = LargeArray<EdgeTy>;
   //! large array for edge destinations
-  using EdgeDst = LargeArray<uint32_t>;
+  using EdgeDst = LargeArray<NodeIndexTy>;
   //! large array for edge index data
-  using EdgeIndData = LargeArray<uint64_t>;
+  using EdgeIndData = LargeArray<EdgeIndexTy>;
 
 public:
   //! iterator for edges
@@ -85,7 +89,7 @@ public:
 
 protected:
   //! edge index data for the reverse edges
-  EdgeIndData inEdgeIndData;
+  EdgeIndData in_edge_ind_data_;
   //! edge destination data for the reverse edges
   EdgeDst inEdgeDst;
   //! Edge data of inedges can be a value copy of the outedges (i.e. in and
@@ -162,9 +166,9 @@ protected:
     }
 
     // copy over the new tranposed edge index data
-    inEdgeIndData.allocateInterleaved(BaseGraph::numNodes);
+    in_edge_ind_data_.allocateInterleaved(BaseGraph::numNodes);
     galois::do_all(galois::iterate(UINT64_C(0), BaseGraph::numNodes),
-                   [&](uint64_t n) { inEdgeIndData[n] = dataBuffer[n]; });
+                   [&](uint64_t n) { in_edge_ind_data_[n] = dataBuffer[n]; });
   }
 
   /**
@@ -179,8 +183,9 @@ protected:
     // saving an edge for a node
     if (BaseGraph::numNodes >= 1) {
       dataBuffer[0] = 0;
-      galois::do_all(galois::iterate(UINT64_C(1), BaseGraph::numNodes),
-                     [&](uint64_t n) { dataBuffer[n] = inEdgeIndData[n - 1]; });
+      galois::do_all(
+          galois::iterate(UINT64_C(1), BaseGraph::numNodes),
+          [&](uint64_t n) { dataBuffer[n] = in_edge_ind_data_[n - 1]; });
     }
 
     // allocate edge dests and data
@@ -212,13 +217,6 @@ protected:
   }
 
 public:
-  //! default constructor
-  LC_CSR_CSC_Graph() = default;
-  //! default move constructor
-  LC_CSR_CSC_Graph(LC_CSR_CSC_Graph&& rhs) = default;
-  //! default = operator
-  LC_CSR_CSC_Graph& operator=(LC_CSR_CSC_Graph&&) = default;
-
   /////////////////////////////////////////////////////////////////////////////
   // Construction functions
   /////////////////////////////////////////////////////////////////////////////
@@ -254,7 +252,7 @@ public:
    * @returns Iterator to first in edge of node N
    */
   edge_iterator in_raw_begin(GraphNode N) const {
-    return edge_iterator((N == 0) ? 0 : inEdgeIndData[N - 1]);
+    return edge_iterator((N == 0) ? 0 : in_edge_ind_data_[N - 1]);
   }
 
   /**
@@ -265,7 +263,7 @@ public:
    * node N+1)
    */
   edge_iterator in_raw_end(GraphNode N) const {
-    return edge_iterator(inEdgeIndData[N]);
+    return edge_iterator(in_edge_ind_data_[N]);
   }
 
   /**
@@ -389,7 +387,7 @@ public:
   /**
    * @returns the prefix sum of in-edges
    */
-  const EdgeIndData& getInEdgePrefixSum() const { return inEdgeIndData; }
+  const EdgeIndData& getInEdgePrefixSum() const { return in_edge_ind_data_; }
 
   /////////////////////////////////////////////////////////////////////////////
   // Utility

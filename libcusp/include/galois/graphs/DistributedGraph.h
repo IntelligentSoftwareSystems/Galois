@@ -31,6 +31,7 @@
 #include <fstream>
 
 #include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/LC_CSR_CSC_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
@@ -68,8 +69,8 @@ private:
   constexpr static const char* const GRNAME = "dGraph";
 
   using GraphTy =
-      galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true, false, false, EdgeTy,
-                                   NodeIndexTy, EdgeIndexTy>;
+      galois::graphs::LC_CSR_CSC_Graph<NodeTy, EdgeTy, false, true, false,
+                                       false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
 
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
@@ -744,6 +745,46 @@ public:
 
     return IDs;
   }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // for in edges
+  //////////////////////////////////////////////////////////////////////////////
+
+  //! Construct the transpose graph for the partitioned graph
+  void ConstructIncomingEdges() { graph.constructIncomingEdges(); }
+
+  /**
+   * Get the edge data for a particular edge in the graph.
+   *
+   * @param ni edge to get the data of
+   * @param mflag access flag for edge data
+   * @returns The edge data for the requested edge
+   */
+  typename GraphTy::edge_data_reference
+  GetInEdgeData(edge_iterator ni,
+                galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
+    return graph.getInEdgeData(ni, mflag);
+  }
+
+  GraphNode GetInEdgeDest(edge_iterator ni) { return graph.getInEdgeDst(ni); }
+
+  edge_iterator in_edge_begin(GraphNode N) {
+    return graph.in_edge_begin(N, galois::MethodFlag::UNPROTECTED);
+  }
+
+  edge_iterator in_edge_end(GraphNode N) {
+    return graph.in_edge_end(N, galois::MethodFlag::UNPROTECTED);
+  }
+
+  galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>>
+  in_edges(GraphNode N) {
+    return galois::graphs::internal::make_no_deref_range(in_edge_begin(N),
+                                                         in_edge_end(N));
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // end in edges
+  //////////////////////////////////////////////////////////////////////////////
 
 protected:
   /**

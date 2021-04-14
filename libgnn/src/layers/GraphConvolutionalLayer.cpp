@@ -317,7 +317,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
-          source_norm = graph_.NormFactor(src);
+          source_norm = graph_.GetNormFactor(src);
         }
 
         // init to self
@@ -334,8 +334,8 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         }
 
         // loop through all destinations to grab the feature to aggregate
-        for (auto e = graph_.EdgeBegin(src); e != graph_.EdgeEnd(src); e++) {
-          size_t dst = graph_.EdgeDestination(e);
+        for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src); e++) {
+          size_t dst = graph_.GetEdgeDest(e);
           graphs::bitset_graph_aggregate.set(src);
 
           if (layer_phase_ == GNNPhase::kTrain) {
@@ -356,7 +356,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           size_t index_to_dst_feature = dst * column_length;
 
           if (!config_.disable_normalization) {
-            GNNFloat norm_scale = source_norm * graph_.NormFactor(dst);
+            GNNFloat norm_scale = source_norm * graph_.GetNormFactor(dst);
             galois::VectorMulAdd(
                 column_length, &aggregate_output[index_to_src_feature],
                 &node_embeddings[index_to_dst_feature], norm_scale,

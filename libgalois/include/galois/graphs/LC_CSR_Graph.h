@@ -344,8 +344,9 @@ public:
   uint64_t operator[](uint64_t n) { return *(edge_end(n)); }
 
   template <typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
-  LC_CSR_Graph(NodeIndexTy _numNodes, EdgeIndexTy _numEdges, EdgeNumFnTy edgeNum,
-               EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
+  LC_CSR_Graph(NodeIndexTy _numNodes, EdgeIndexTy _numEdges,
+               EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst,
+               EdgeDataFnTy _edgeData)
       : numNodes(_numNodes), numEdges(_numEdges) {
     if (UseNumaAlloc) {
       //! [numaallocex]
@@ -717,8 +718,8 @@ public:
   }
 
   template <bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, EdgeIndexTy e_new,
-                    EdgeIndexTy e,
+  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData,
+                    EdgeIndexTy e_new, EdgeIndexTy e,
                     typename std::enable_if<is_non_void>::type* = 0) {
     edgeData_new[e_new] = edgeData[e];
   }
@@ -815,7 +816,7 @@ public:
                      std::vector<uint64_t>& prefix_sum,
                      std::vector<std::vector<uint32_t>>& edges_id,
                      std::vector<std::vector<EdgeTy>>& edges_data) {
-    //allocateFrom(numNodes, numEdges);
+    // allocateFrom(numNodes, numEdges);
     /*
      * Deallocate if reusing the graph
      */
@@ -823,24 +824,25 @@ public:
     constructNodes();
 
     galois::do_all(galois::iterate((NodeIndexTy)0, numNodes),
-                  [&](NodeIndexTy n) { edgeIndData[n] = prefix_sum[n]; });
+                   [&](NodeIndexTy n) { edgeIndData[n] = prefix_sum[n]; });
     galois::do_all(galois::iterate((NodeIndexTy)0, numNodes),
-    [&](NodeIndexTy n) {
-      if (n == 0) {
-        if (edgeIndData[n] > 0) {
-          std::copy(edges_id[n].begin(), edges_id[n].end(), edgeDst.begin());
-          std::copy(edges_data[n].begin(), edges_data[n].end(),
-                    edgeData.begin());
-        }
-      } else {
-        if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
-          std::copy(edges_id[n].begin(), edges_id[n].end(),
-                    edgeDst.begin() + edgeIndData[n - 1]);
-          std::copy(edges_data[n].begin(), edges_data[n].end(),
-                    edgeData.begin() + edgeIndData[n - 1]);
-        }
-      }
-    });
+                   [&](NodeIndexTy n) {
+                     if (n == 0) {
+                       if (edgeIndData[n] > 0) {
+                         std::copy(edges_id[n].begin(), edges_id[n].end(),
+                                   edgeDst.begin());
+                         std::copy(edges_data[n].begin(), edges_data[n].end(),
+                                   edgeData.begin());
+                       }
+                     } else {
+                       if (edgeIndData[n] - edgeIndData[n - 1] > 0) {
+                         std::copy(edges_id[n].begin(), edges_id[n].end(),
+                                   edgeDst.begin() + edgeIndData[n - 1]);
+                         std::copy(edges_data[n].begin(), edges_data[n].end(),
+                                   edgeData.begin() + edgeIndData[n - 1]);
+                       }
+                     }
+                   });
 
     initializeLocalRanges();
   }
@@ -874,10 +876,10 @@ public:
     initializeLocalRanges();
   }
 
-////////////////////////////////////////////////////////////////////////////////
-// Warning: the below code is NOT compatible with NodeIndexTy/EdgeIndexTy;
-// do NOT use with them
-////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
+  // Warning: the below code is NOT compatible with NodeIndexTy/EdgeIndexTy;
+  // do NOT use with them
+  ////////////////////////////////////////////////////////////////////////////////
 
   /**
    * Reads the GR files directly into in-memory
@@ -1030,10 +1032,9 @@ public:
       this->setLocalRange(*r.first, *r.second);
     });
   }
-////////////////////////////////////////////////////////////////////////////////
-// End warning section
-////////////////////////////////////////////////////////////////////////////////
-
+  ////////////////////////////////////////////////////////////////////////////////
+  // End warning section
+  ////////////////////////////////////////////////////////////////////////////////
 };
 
 } // namespace galois::graphs
