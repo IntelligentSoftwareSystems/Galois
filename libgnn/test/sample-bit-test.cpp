@@ -61,6 +61,8 @@ int main() {
       } else {
         GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 0));
       }
+      GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 1));
+      GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 2));
     }
 
     // in edges for this node: if destination (i.e., source) is
@@ -70,6 +72,80 @@ int main() {
         GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 0));
       } else {
         GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 0));
+      }
+      GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 1));
+      GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 2));
+    }
+  }
+
+  // odd layer 1, even layer 2
+  for (size_t node = 0; node < graph.size(); node++) {
+    if (node % 2 == 1) {
+      for (auto ei : graph.edges(node)) {
+        graph.MakeEdgeSampled(ei, 1);
+      }
+    } else {
+      for (auto ei : graph.edges(node)) {
+        graph.MakeEdgeSampled(ei, 2);
+      }
+    }
+  }
+
+  for (size_t node = 0; node < graph.size(); node++) {
+    for (auto ei : graph.edges(node)) {
+      if (node % 2 == 1) {
+        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 0));
+        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 1));
+        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 2));
+      } else {
+        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 0));
+        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 1));
+        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 2));
+      }
+    }
+
+    // in edges for this node: if destination (i.e., source) is
+    // odd, then it should not be sampled
+    for (auto ei : graph.in_edges(node)) {
+      if ((graph.GetInEdgeDest(ei) % 2) == 1) {
+        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 0));
+        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 1));
+        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 2));
+      } else {
+        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 0));
+        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 1));
+        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 2));
+      }
+    }
+  }
+
+  // odd layer 1, even layer 2; set in edge
+  for (size_t node = 0; node < graph.size(); node++) {
+    if (node % 2 == 1) {
+      for (auto ei : graph.in_edges(node)) {
+        graph.MakeInEdgeUnsampled(ei, 1);
+      }
+    } else {
+      for (auto ei : graph.in_edges(node)) {
+        graph.MakeInEdgeSampled(ei, 1);
+      }
+    }
+  }
+
+  for (size_t node = 0; node < graph.size(); node++) {
+    for (auto ei : graph.in_edges(node)) {
+      if (node % 2 == 1) {
+        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 1));
+      } else {
+        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 1));
+      }
+    }
+
+    for (auto ei : graph.edges(node)) {
+      if ((graph.GetEdgeDest(ei) % 2) == 1) {
+        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 1));
+      } else {
+        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 1));
       }
     }
   }

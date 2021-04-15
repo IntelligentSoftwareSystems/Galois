@@ -143,6 +143,14 @@ public:
     return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
                               [layer_num];
   };
+  //! Set the flag on the edge to 1; makes it sampled
+  void MakeInEdgeSampled(EdgeIterator ei, size_t layer_num) {
+    edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 1;
+  };
+  //! Set the flag on the edge to 0; makes it not sampled
+  void MakeInEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
+    edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 0;
+  };
   galois::runtime::iterable<
       galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
   in_edges(GraphNode N) {
