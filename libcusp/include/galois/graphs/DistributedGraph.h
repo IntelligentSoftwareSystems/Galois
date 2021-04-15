@@ -782,6 +782,11 @@ public:
                                                          in_edge_end(N));
   }
 
+  //! Return corresponding out-edge index for an in-edge
+  size_t InEdgeToOutEdge(edge_iterator ni) const {
+    return graph.InEdgeToOutEdge(ni);
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // end in edges
   //////////////////////////////////////////////////////////////////////////////

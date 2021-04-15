@@ -99,6 +99,7 @@ protected:
       typename std::conditional<EdgeDataByValue, EdgeData, EdgeIndData>::type;
   //! The data for the reverse edges
   EdgeDataRep inEdgeData;
+  EdgeIndData in_edge_to_out_edge_;
 
   //! redefinition of the edge sort iterator in LC_CSR_Graph
   using edge_sort_iterator =
@@ -127,19 +128,11 @@ protected:
     BaseGraph::edgeDataCopy(inEdgeData, BaseGraph::edgeData, e_new, e);
   }
 
-  /**
-   * Save a pointer to an outedge (i.e. map an in-edge to an out-edge). Done
-   * to share edge data.
-   *
-   * @param e_new position of out-edge to save
-   * @param e position of in-edge
-   */
+  //! Do nothing; getting edge data will be done via pointer
   template <bool A                             = EdgeDataByValue,
             typename std::enable_if<!A>::type* = nullptr>
-  void createEdgeData(const uint64_t e_new, const uint64_t e) {
-    if (!std::is_void<EdgeTy>::value) {
-      inEdgeData[e_new] = e;
-    }
+  void createEdgeData(const uint64_t, const uint64_t) {
+    // do nothing
   }
 
   /**
@@ -194,6 +187,7 @@ protected:
     if (!std::is_void<EdgeTy>::value) {
       inEdgeData.allocateInterleaved(BaseGraph::numEdges);
     }
+    in_edge_to_out_edge_.allocateInterleaved(BaseGraph::numEdges);
 
     galois::do_all(
         galois::iterate(UINT64_C(0), BaseGraph::numNodes), [&](uint64_t src) {
@@ -211,6 +205,7 @@ protected:
             inEdgeDst[e_new] = src;
             // edge data to "new" array
             createEdgeData(e_new, e);
+            in_edge_to_out_edge_[e_new] = e;
             e++;
           }
         });
@@ -365,7 +360,7 @@ public:
             typename std::enable_if<!A>::type* = nullptr>
   edge_data_reference
   getInEdgeData(edge_iterator ni, MethodFlag = MethodFlag::UNPROTECTED) const {
-    return BaseGraph::edgeData[inEdgeData[*ni]];
+    return BaseGraph::edgeData[in_edge_to_out_edge_[*ni]];
   }
 
   /**
@@ -381,7 +376,13 @@ public:
             typename std::enable_if<!A>::type* = nullptr>
   edge_data_reference getInEdgeData(edge_iterator ni,
                                     MethodFlag = MethodFlag::UNPROTECTED) {
-    return BaseGraph::edgeData[inEdgeData[*ni]];
+    return BaseGraph::edgeData[in_edge_to_out_edge_[*ni]];
+  }
+
+  //! Returns corresponding index for the out-edge corresponding to
+  //! an in-edge.
+  size_t InEdgeToOutEdge(edge_iterator ni) const {
+    return in_edge_to_out_edge_[*ni];
   }
 
   /**
