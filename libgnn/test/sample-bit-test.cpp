@@ -15,31 +15,32 @@ int main() {
 
   galois::graphs::GNNGraph graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  graph.InitializeEdgeData(3);
 
   // first, assert all edges are not sampled (should come with all 0s)
   for (size_t node = 0; node < graph.size(); node++) {
     for (auto ei : graph.edges(node)) {
-      GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei));
+      GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 0));
     }
     for (auto ei : graph.in_edges(node)) {
-      GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei));
+      GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 0));
     }
   }
 
   // make all edges sampled; it should set the in-edges as well
   for (size_t node = 0; node < graph.size(); node++) {
     for (auto ei : graph.edges(node)) {
-      graph.MakeEdgeSampled(ei);
+      graph.MakeEdgeSampled(ei, 0);
     }
   }
 
   // all edges (including ins) should be sampled
   for (size_t node = 0; node < graph.size(); node++) {
     for (auto ei : graph.edges(node)) {
-      GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei));
+      GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 0));
     }
     for (auto ei : graph.in_edges(node)) {
-      GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei));
+      GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 0));
     }
   }
 
@@ -47,7 +48,7 @@ int main() {
   for (size_t node = 0; node < graph.size(); node++) {
     if (node % 2 == 1) {
       for (auto ei : graph.edges(node)) {
-        graph.MakeEdgeUnsampled(ei);
+        graph.MakeEdgeUnsampled(ei, 0);
       }
     }
   }
@@ -56,9 +57,9 @@ int main() {
   for (size_t node = 0; node < graph.size(); node++) {
     for (auto ei : graph.edges(node)) {
       if (node % 2 == 1) {
-        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei));
+        GALOIS_LOG_ASSERT(!graph.IsEdgeSampled(ei, 0));
       } else {
-        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei));
+        GALOIS_LOG_ASSERT(graph.IsEdgeSampled(ei, 0));
       }
     }
 
@@ -66,9 +67,9 @@ int main() {
     // odd, then it should not be sampled
     for (auto ei : graph.in_edges(node)) {
       if ((graph.GetInEdgeDest(ei) % 2) == 1) {
-        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei));
+        GALOIS_LOG_ASSERT(!graph.IsInEdgeSampled(ei, 0));
       } else {
-        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei));
+        GALOIS_LOG_ASSERT(graph.IsInEdgeSampled(ei, 0));
       }
     }
   }

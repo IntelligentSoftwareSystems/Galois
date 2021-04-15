@@ -18,13 +18,13 @@ LoadPartition(const std::string& input_directory,
   // load partition
   switch (partition_scheme) {
   case galois::graphs::GNNPartitionScheme::kOEC:
-    return galois::cuspPartitionGraph<GnnOEC, char, char>(
+    return galois::cuspPartitionGraph<GnnOEC, char, void>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kCVC:
-    return galois::cuspPartitionGraph<GnnCVC, char, char>(
+    return galois::cuspPartitionGraph<GnnCVC, char, void>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kOCVC:
-    return galois::cuspPartitionGraph<GenericCVC, char, char>(
+    return galois::cuspPartitionGraph<GenericCVC, char, void>(
         input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
   default:
     GALOIS_LOG_FATAL("Error: partition scheme specified is invalid");

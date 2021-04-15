@@ -33,7 +33,7 @@ enum class GNNPartitionScheme { kOEC, kCVC, kOCVC };
 //! XXX
 class GNNGraph {
 public:
-  using GNNDistGraph = galois::graphs::DistGraph<char, char>;
+  using GNNDistGraph = galois::graphs::DistGraph<char, void>;
   using WholeGraph   = galois::graphs::LC_CSR_Graph<char, void>;
   using GraphNode    = GNNDistGraph::GraphNode;
   // defined as such because dist graph range objects used long unsigned
@@ -87,8 +87,19 @@ public:
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  // out edges
+  // Edges
   //////////////////////////////////////////////////////////////////////////////
+
+  void InitializeEdgeData() { InitializeEdgeData(1); }
+
+  void InitializeEdgeData(size_t num_layers) {
+    edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Out Edges
+  //////////////////////////////////////////////////////////////////////////////
+
   // All following functions take a local node id
   EdgeIterator edge_begin(GraphNode n) const {
     return partitioned_graph_->edge_begin(n);
@@ -99,22 +110,23 @@ public:
   GraphNode GetEdgeDest(EdgeIterator ei) const {
     return partitioned_graph_->getEdgeDst(ei);
   };
-  char IsEdgeSampled(EdgeIterator ei) const {
-    return partitioned_graph_->getEdgeData(ei);
+  bool IsEdgeSampled(EdgeIterator ei, size_t layer_num) const {
+    return edge_sample_status_[*ei][layer_num];
   };
   //! Set the flag on the edge to 1; makes it sampled
-  void MakeEdgeSampled(EdgeIterator ei) {
-    partitioned_graph_->getEdgeData(ei) = 1;
+  void MakeEdgeSampled(EdgeIterator ei, size_t layer_num) {
+    edge_sample_status_[*ei][layer_num] = 1;
   };
   //! Set the flag on the edge to 0; makes it not sampled
-  void MakeEdgeUnsampled(EdgeIterator ei) {
-    partitioned_graph_->getEdgeData(ei) = 0;
+  void MakeEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
+    edge_sample_status_[*ei][layer_num] = 0;
   };
   galois::runtime::iterable<
       galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
   edges(GraphNode N) {
     return partitioned_graph_->edges(N);
   }
+
   //////////////////////////////////////////////////////////////////////////////
   // in edges
   //////////////////////////////////////////////////////////////////////////////
@@ -127,8 +139,9 @@ public:
   GraphNode GetInEdgeDest(EdgeIterator ei) const {
     return partitioned_graph_->GetInEdgeDest(ei);
   };
-  char IsInEdgeSampled(EdgeIterator ei) const {
-    return partitioned_graph_->GetInEdgeData(ei);
+  bool IsInEdgeSampled(EdgeIterator ei, size_t layer_num) const {
+    return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
+                              [layer_num];
   };
   galois::runtime::iterable<
       galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
@@ -332,6 +345,9 @@ private:
   std::vector<GNNLabel> local_ground_truth_labels_;
   //! Feature vectors for nodes in partitioned graph
   std::vector<GNNFeature> local_node_features_;
+  //! Sample data on edges: each edge gets a small bitset to mark
+  //! if it's been sampled for a particular layer
+  galois::LargeArray<std::vector<bool>> edge_sample_status_;
 
   // TODO maybe revisit this and use an actual bitset
   //! Bitset indicating which nodes are training nodes
