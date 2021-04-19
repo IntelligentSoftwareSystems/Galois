@@ -99,6 +99,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       break;
     }
   }
+  // output layer not included; it will never involve sampling
+  graph_->InitializeEdgeData(gnn_layers_.size());
 
   // create the output layer
   GNNLayerDimensions output_dims = {
@@ -158,6 +160,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   if (config_.inductive_training_) {
     graph_->CalculateSpecialNormFactor(false, true);
   }
+
   galois::StatTimer epoch_timer("TrainingTime", "GraphNeuralNetwork");
   galois::StatTimer validation_timer("ValidationTime", "GraphNeuralNetwork");
   galois::StatTimer epoch_test_timer("TestTime", "GraphNeuralNetwork");
@@ -165,11 +168,25 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     epoch_timer.start();
+
     if (config_.do_sampling()) {
-      // subgraph sample every epoch
-      graph_->GraphSAINTSample();
-      graph_->CalculateSpecialNormFactor(true, config_.inductive_training_);
+      graph_->SetupNeighborhoodSample();
+      size_t num_sampled_layers = 0;
+
+      // work backwards on GCN/SAGE layers
+      // loop backward and find last GCN/SAGE (main) layer to disable activation
+      for (auto back_iter = gnn_layers_.rbegin();
+           back_iter != gnn_layers_.rend(); back_iter++) {
+        GNNLayerType layer_type = (*back_iter)->layer_type();
+        if (layer_type == GNNLayerType::kGraphConvolutional ||
+            layer_type == GNNLayerType::kSAGE) {
+          graph_->SampleEdges((*back_iter)->layer_number(), 5);
+          num_sampled_layers++;
+        }
+      }
+      galois::gDebug("Number of sampled layers is ", num_sampled_layers);
     }
+
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     // have to get accuracy here because gradient prop destroys the predictions
     // matrix

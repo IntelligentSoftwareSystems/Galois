@@ -17,6 +17,46 @@ extern struct CUDA_Context* cuda_ctx_for_sync;
 extern unsigned layer_number_to_sync;
 #endif
 
+struct SampleFlagSync {
+  using ValTy = char;
+
+  //! return a vector of floats to sync
+  static ValTy extract(uint32_t, char& i) { return i; }
+
+  //! reduction is addition in this case; add received vector to
+  //! own vector
+  static bool reduce(uint32_t, char& i, ValTy y) {
+    if (y > i) {
+      i = y;
+      assert(i == 1);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  //! No-op: readAny = overwritten anyways
+  static void reset(uint32_t, char&) {}
+
+  //! element wise set
+  static void setVal(uint32_t, char& i, ValTy y) { i = y; }
+
+  // GPU options TODO for GPU
+  static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
+    return false;
+  }
+  static bool extract_batch(unsigned, uint8_t*) { return false; }
+  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+  static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) {
+    return false;
+  }
+  static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
+    return false;
+  }
+  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
+};
+
 struct GNNSumAggregate {
   using ValTy = galois::gstl::Vector<GNNFloat>;
 

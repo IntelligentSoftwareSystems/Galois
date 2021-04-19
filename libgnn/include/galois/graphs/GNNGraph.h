@@ -156,6 +156,16 @@ public:
   in_edges(GraphNode N) {
     return partitioned_graph_->in_edges(N);
   }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // neighborhood sampling
+  //////////////////////////////////////////////////////////////////////////////
+
+  //! Set seed nodes, i.e., nodes that are being predicted on
+  void SetupNeighborhoodSample();
+  //! Sample neighbors of nodes that are marked as ready for sampling
+  void SampleEdges(size_t sample_layer_num, size_t num_to_sample);
+
   //////////////////////////////////////////////////////////////////////////////
 
   GNNFloat GetNormFactor(GraphNode n) const { return norm_factors_[n]; }
@@ -247,10 +257,12 @@ public:
   //! graph
   bool IsInSampledGraph(const NodeIterator& ni) const {
     // TODO(loc) GPU
+    assert(*ni < size());
     return partitioned_graph_->getData(*ni);
   }
   bool IsInSampledGraph(size_t node_id) const {
     // TODO(loc) GPU
+    assert(node_id < size());
     return partitioned_graph_->getData(node_id);
   }
 
@@ -353,9 +365,16 @@ private:
   std::vector<GNNLabel> local_ground_truth_labels_;
   //! Feature vectors for nodes in partitioned graph
   std::vector<GNNFeature> local_node_features_;
+
+  //////////////////////////////////////////////////////////////////////////////
+
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;
+
+  galois::DynamicBitSet new_sampled_nodes_;
+
+  //////////////////////////////////////////////////////////////////////////////
 
   // TODO maybe revisit this and use an actual bitset
   //! Bitset indicating which nodes are training nodes

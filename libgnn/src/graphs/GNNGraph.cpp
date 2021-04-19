@@ -819,6 +819,76 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
   return global_f1_micro_score;
 }
 
+void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
+  new_sampled_nodes_.resize(size());
+  new_sampled_nodes_.reset();
+
+  // for now, if training node, it goes into seed node
+  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
+    if (IsValidForPhase(*x, GNNPhase::kTrain)) {
+      SetSampledNode(*x);
+    } else {
+      UnsetSampledNode(*x);
+    }
+  });
+  // clear all sampled edges
+  galois::do_all(galois::iterate(size_t{0}, partitioned_graph_->sizeEdges()),
+                 [&](size_t edge_id) {
+                   std::fill(edge_sample_status_[edge_id].begin(),
+                             edge_sample_status_[edge_id].end(), 0);
+                 });
+}
+
+void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
+                                           size_t num_to_sample) {
+  galois::GAccumulator<size_t> sampled;
+  galois::GAccumulator<size_t> total;
+  sampled.reset();
+  total.reset();
+  galois::do_all(
+      galois::iterate(begin(), end()),
+      [&](const NodeIterator& x) {
+        // only operate on if sampled
+        if (partitioned_graph_->getData(*x)) {
+          // chance of not uniformly choosing an edge of this node num_to_sample
+          // times (degree norm is 1 / degree)
+          // XXX in-degree prob, not out degree
+          double probability_of_reject =
+              std::pow(1 - GetDegreeNorm(*x), num_to_sample);
+          // loop through in-edges, turn "on" edge with some probability
+          for (auto edge_iter : partitioned_graph_->in_edges(*x)) {
+            if (sample_rng_.DoBernoulli(probability_of_reject)) {
+              // if here, it means edge accepted; set sampled on, mark source
+              // as part of next set
+              MakeInEdgeSampled(edge_iter, sample_layer_num);
+              new_sampled_nodes_.set(
+                  partitioned_graph_->GetInEdgeDest(edge_iter));
+              sampled += 1;
+            }
+            total += 1;
+          }
+        }
+      },
+      galois::steal(), galois::loopname("NeighborhoodSample"));
+
+  galois::gPrint("Num sampled edges is ", sampled.reduce(), " out of ",
+                 total.reduce(), "\n");
+
+  std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
+
+  // update nodes, then communicate update to all hosts so that they can
+  // continue the exploration
+  galois::do_all(
+      galois::iterate(new_nodes),
+      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
+      galois::loopname("NeighborhoodSampleSet"));
+
+  // XXX(loc) bitset; can readAny be weaker?
+  sync_substrate_->sync<writeSource, readAny, SampleFlagSync>("SampleSync");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 #ifdef GALOIS_ENABLE_GPU
 void galois::graphs::GNNGraph::InitGPUMemory() {
   // create int casted CSR

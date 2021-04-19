@@ -384,11 +384,16 @@ void galois::SAGELayer::AggregateAllCPU(
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
     bool is_backward) {
+
   size_t num_nodes = graph_.size();
 
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), num_nodes),
       [&](size_t src) {
+        // TODO(loc) this is currently a hack: the sync substrate blows
+        // up if not the entire bitset is set for sync call like in
+        // edge sampling
+        graphs::bitset_graph_aggregate.set(src);
         size_t index_to_src_feature = src * column_length;
         // zero out src feature first
         for (size_t i = 0; i < column_length; i++) {
@@ -403,10 +408,10 @@ void galois::SAGELayer::AggregateAllCPU(
           }
 
           if (IsSampledLayer()) {
-            // check if node is part of sampled graph; ignore after 0'ing if not
-            // sampled
-            if (!graph_.IsInSampledGraph(src))
+            // check if node is part of sampled graph
+            if (!graph_.IsInSampledGraph(src)) {
               return;
+            }
           }
         }
 
@@ -415,46 +420,94 @@ void galois::SAGELayer::AggregateAllCPU(
           source_norm = graph_.GetDegreeNorm(src);
         }
 
-        // loop through all destinations to grab the feature to aggregate
-        for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src); e++) {
-          graphs::bitset_graph_aggregate.set(src);
-          size_t dst = graph_.GetEdgeDest(e);
+        if (!is_backward) {
+          // loop through all destinations to grab the feature to aggregate
+          for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src);
+               e++) {
+            // graphs::bitset_graph_aggregate.set(src);
+            size_t dst = graph_.GetEdgeDest(e);
 
-          if (layer_phase_ == GNNPhase::kTrain) {
-            if (IsInductiveLayer()) {
-              // if inductive, all non-training nodes do not exist
-              if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-                return;
+            if (layer_phase_ == GNNPhase::kTrain) {
+              if (IsInductiveLayer()) {
+                // if inductive, all non-training nodes do not exist
+                if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
+                  return;
+              }
+
+              if (IsSampledLayer()) {
+                if (!graph_.IsEdgeSampled(e, layer_number_)) {
+                  continue;
+                }
+                // ignore non-sampled nodes
+                if (layer_phase_ == GNNPhase::kTrain &&
+                    !graph_.IsInSampledGraph(dst))
+                  continue;
+              }
             }
 
-            if (IsSampledLayer()) {
-              // ignore non-sampled nodes
-              if (layer_phase_ == GNNPhase::kTrain &&
-                  !graph_.IsInSampledGraph(dst))
-                continue;
+            size_t index_to_dst_feature = dst * column_length;
+
+            if (!config_.disable_normalization) {
+              GNNFloat norm_scale;
+              if (!is_backward) {
+                norm_scale = source_norm;
+              } else {
+                norm_scale = graph_.GetDegreeNorm(dst);
+              }
+
+              galois::VectorMulAdd(
+                  column_length, &aggregate_output[index_to_src_feature],
+                  &node_embeddings[index_to_dst_feature], norm_scale,
+                  &aggregate_output[index_to_src_feature]);
+            } else {
+              // add dst feature to aggregate output
+              galois::VectorAdd(column_length,
+                                &aggregate_output[index_to_src_feature],
+                                &node_embeddings[index_to_dst_feature],
+                                &aggregate_output[index_to_src_feature]);
             }
           }
+        } else {
+          // loop through all destinations to grab the feature to aggregate
+          for (auto e = graph_.in_edge_begin(src); e != graph_.in_edge_end(src);
+               e++) {
+            // graphs::bitset_graph_aggregate.set(src);
+            size_t dst = graph_.GetInEdgeDest(e);
 
-          size_t index_to_dst_feature = dst * column_length;
+            if (layer_phase_ == GNNPhase::kTrain) {
+              if (IsInductiveLayer()) {
+                // if inductive, all non-training nodes do not exist
+                if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
+                  return;
+              }
 
-          if (!config_.disable_normalization) {
-            GNNFloat norm_scale;
-            if (!is_backward) {
-              norm_scale = source_norm;
-            } else {
-              norm_scale = graph_.GetDegreeNorm(dst);
+              if (IsSampledLayer()) {
+                if (!graph_.IsInEdgeSampled(e, layer_number_)) {
+                  continue;
+                }
+                // ignore non-sampled nodes
+                if (layer_phase_ == GNNPhase::kTrain &&
+                    !graph_.IsInSampledGraph(dst))
+                  continue;
+              }
             }
 
-            galois::VectorMulAdd(
-                column_length, &aggregate_output[index_to_src_feature],
-                &node_embeddings[index_to_dst_feature], norm_scale,
-                &aggregate_output[index_to_src_feature]);
-          } else {
-            // add dst feature to aggregate output
-            galois::VectorAdd(column_length,
-                              &aggregate_output[index_to_src_feature],
-                              &node_embeddings[index_to_dst_feature],
-                              &aggregate_output[index_to_src_feature]);
+            size_t index_to_dst_feature = dst * column_length;
+
+            if (!config_.disable_normalization) {
+              GNNFloat norm_scale = graph_.GetDegreeNorm(dst);
+
+              galois::VectorMulAdd(
+                  column_length, &aggregate_output[index_to_src_feature],
+                  &node_embeddings[index_to_dst_feature], norm_scale,
+                  &aggregate_output[index_to_src_feature]);
+            } else {
+              // add dst feature to aggregate output
+              galois::VectorAdd(column_length,
+                                &aggregate_output[index_to_src_feature],
+                                &node_embeddings[index_to_dst_feature],
+                                &aggregate_output[index_to_src_feature]);
+            }
           }
         }
       },

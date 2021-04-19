@@ -308,6 +308,9 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           }
 
           if (IsSampledLayer()) {
+            // XXX(loc)
+            GALOIS_LOG_WARN(
+                "Edge sampling not yet implemented for GCN; only SAGE");
             // check if node is part of sampled graph; ignore after 0'ing if not
             // sampled
             if (!graph_.IsInSampledGraph(src))
