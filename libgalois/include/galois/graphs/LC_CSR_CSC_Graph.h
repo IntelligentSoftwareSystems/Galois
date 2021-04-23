@@ -91,7 +91,7 @@ protected:
   //! edge index data for the reverse edges
   EdgeIndData in_edge_ind_data_;
   //! edge destination data for the reverse edges
-  EdgeDst inEdgeDst;
+  EdgeDst in_edge_dst_;
   //! Edge data of inedges can be a value copy of the outedges (i.e. in and
   //! out edges have separate edge values) or inedges can refer to the same
   //! data as its corresponding outedge; this is what this typedef is for
@@ -108,12 +108,12 @@ protected:
 
   //! beginning iterator to an edge sorter for in-edges
   edge_sort_iterator in_edge_sort_begin(GraphNode N) {
-    return edge_sort_iterator(*in_raw_begin(N), &inEdgeDst, &inEdgeData);
+    return edge_sort_iterator(*in_raw_begin(N), &in_edge_dst_, &inEdgeData);
   }
 
   //! ending iterator to an edge sorter for in-edges
   edge_sort_iterator in_edge_sort_end(GraphNode N) {
-    return edge_sort_iterator(*in_raw_end(N), &inEdgeDst, &inEdgeData);
+    return edge_sort_iterator(*in_raw_end(N), &in_edge_dst_, &inEdgeData);
   }
 
   /**
@@ -182,7 +182,7 @@ protected:
     }
 
     // allocate edge dests and data
-    inEdgeDst.allocateInterleaved(BaseGraph::numEdges);
+    in_edge_dst_.allocateInterleaved(BaseGraph::numEdges);
 
     if (!std::is_void<EdgeTy>::value) {
       inEdgeData.allocateInterleaved(BaseGraph::numEdges);
@@ -202,7 +202,7 @@ protected:
             // location to save edge
             auto e_new = __sync_fetch_and_add(&(dataBuffer[dst]), 1);
             // save src as destination
-            inEdgeDst[e_new] = src;
+            in_edge_dst_[e_new] = src;
             // edge data to "new" array
             createEdgeData(e_new, e);
             in_edge_to_out_edge_[e_new] = e;
@@ -212,6 +212,34 @@ protected:
   }
 
 public:
+  /////////////////////////////////////////////////////////////////////////////
+  // Manual construction functions
+  /////////////////////////////////////////////////////////////////////////////
+
+  // no edge data support at the moment for these functions because not required
+  // for the current use case
+
+  //! Reallocate memory for the CSC part of the graph
+  void CSCAllocate() {
+    // assumes nodes and edges set from CSR version of this call
+    in_edge_dst_.deallocate();
+    in_edge_ind_data_.deallocate();
+
+    if (UseNumaAlloc) {
+      in_edge_ind_data_.allocateBlocked(BaseGraph::numNodes);
+      in_edge_dst_.allocateBlocked(BaseGraph::numEdges);
+    } else {
+      in_edge_ind_data_.allocateInterleaved(BaseGraph::numNodes);
+      in_edge_dst_.allocateInterleaved(BaseGraph::numEdges);
+    }
+  }
+  //! Construct the in edge for some edge index by setting the destination
+  void ConstructInEdge(EdgeIndexTy e, NodeIndexTy dst) {
+    in_edge_dst_[e] = dst;
+  }
+  //! In-edge index setting
+  void FixEndInEdge(NodeIndexTy n, EdgeIndexTy e) { in_edge_ind_data_[n] = e; }
+
   /////////////////////////////////////////////////////////////////////////////
   // Construction functions
   /////////////////////////////////////////////////////////////////////////////
@@ -274,7 +302,7 @@ public:
     if (!HasNoLockable && galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = in_raw_begin(N), ee = in_raw_end(N); ii != ee;
            ++ii) {
-        BaseGraph::acquireNode(inEdgeDst[*ii], mflag);
+        BaseGraph::acquireNode(in_edge_dst_[*ii], mflag);
       }
     }
     return in_raw_begin(N);
@@ -313,7 +341,7 @@ public:
    * @param ni edge id
    * @returns destination for that in edge
    */
-  GraphNode getInEdgeDst(edge_iterator ni) const { return inEdgeDst[*ni]; }
+  GraphNode getInEdgeDst(edge_iterator ni) const { return in_edge_dst_[*ni]; }
 
   /**
    * Given an edge id for in edge, get the data associated with that edge.
