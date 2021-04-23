@@ -52,6 +52,24 @@ void galois::VectorAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
 
 void galois::VectorMulAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
                           const GNNFloat b_scale, GNNFloat* output) {
+#ifdef __AVX512F__
+  // 512
+  constexpr size_t vectorization_length = 16;
+  const size_t aligned_end = length - length % vectorization_length;
+  __m512 scale_vec_main = _mm512_set_ps(
+      b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale,
+      b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale);
+  for (size_t i = 0; i < aligned_end; i += vectorization_length) {
+    _mm512_storeu_ps(
+        &output[i],
+        _mm512_add_ps(_mm512_loadu_ps(&a[i]),
+                      _mm512_mul_ps(scale_vec_main, _mm512_loadu_ps(&b[i]))));
+  }
+  // handle the rest
+  for (size_t i = aligned_end; i < length; ++i) {
+    output[i] = a[i] + b[i] * b_scale;
+  }
+#else
 #ifdef __AVX2__
   constexpr size_t vectorization_length =
       8; // for 32-bit floating point in AVX2; TODO AVX512
@@ -81,6 +99,7 @@ void galois::VectorMulAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
   for (size_t i = 0; i < length; ++i) {
     output[i] = a[i] + b[i] * b_scale;
   }
+#endif
 #endif
 }
 
