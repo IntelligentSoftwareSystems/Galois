@@ -76,7 +76,8 @@ Here are the dependencies for the optional features:
 - Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
-- CUDA (>= 8.0) if you want to build GPU or distributed heterogeneous applications
+- CUDA (>= 8.0 and < 11.0) if you want to build GPU or distributed heterogeneous applications.
+  Note that versions >= 11.0 use an incompatible CUB module and will fail to execute.
 - Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
