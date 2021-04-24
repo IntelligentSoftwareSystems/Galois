@@ -13,7 +13,7 @@ set(sources
 )
 
 set(MKL_LIBRARIES ${MKL_ROOT}/lib/intel64)
-set(INTEL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
+set(INTEL_LIBS "-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5")
 
 add_library(galois_gnn STATIC ${sources})
 
