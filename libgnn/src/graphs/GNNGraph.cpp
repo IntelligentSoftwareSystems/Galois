@@ -126,6 +126,9 @@ bool galois::graphs::GNNGraph::IsValidForPhaseCompleteRange(
   case GNNPhase::kTest:
     range_to_use = &global_testing_mask_range_;
     break;
+  case GNNPhase::kOther:
+    GALOIS_LOG_FATAL("no range for other");
+    break;
   default:
     GALOIS_LOG_FATAL("Invalid phase used");
     range_to_use = nullptr;
@@ -155,6 +158,12 @@ bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
     break;
   case GNNPhase::kTest:
     mask_to_use = &local_testing_mask_;
+    break;
+  case GNNPhase::kOther:
+    if (valid_other_ == 0) {
+      return false;
+    }
+    mask_to_use = &other_mask_;
     break;
   default:
     GALOIS_LOG_FATAL("Invalid phase used");
@@ -486,6 +495,25 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   return valid_count;
 }
 
+size_t galois::graphs::GNNGraph::FindOtherMask() {
+  galois::GAccumulator<size_t> other_accum;
+  other_accum.reset();
+  other_mask_.resize(partitioned_graph_->size());
+
+  galois::do_all(
+      galois::iterate(size_t{0}, partitioned_graph_->size()),
+      [&](size_t local_id) {
+        if (!IsValidForPhase(local_id, GNNPhase::kTrain) &&
+            !IsValidForPhase(local_id, GNNPhase::kValidate) &&
+            !IsValidForPhase(local_id, GNNPhase::kTest)) {
+          other_mask_[local_id] = 1;
+          other_accum += 1;
+        }
+      },
+      galois::loopname("FindOtherMask"));
+  return other_accum.reduce();
+}
+
 void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   // allocate the memory for the local masks
   local_training_mask_.resize(partitioned_graph_->size());
@@ -535,10 +563,13 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
     size_t valid_test  = ReadLocalMasksFromFile(dataset_name, "test",
                                                &global_testing_mask_range_,
                                                local_testing_mask_.data());
+    valid_other_       = FindOtherMask();
+    // the "other" set of nodes that don't fall into any classification
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::gInfo("Valid # training nodes is ", valid_train);
       galois::gInfo("Valid # validation nodes is ", valid_val);
       galois::gInfo("Valid # test nodes is ", valid_test);
+      galois::gInfo("Valid # other nodes is ", valid_other_);
     }
   }
 }
@@ -665,26 +696,30 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPU(
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
-    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
+    PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool) {
   // check owned nodes' accuracy
   assert((num_label_classes_ * size()) == predictions.size());
   num_correct_.reset();
   total_checked_.reset();
 
   galois::do_all(
+      // will only loop over sampled nodes if sampling is on
       galois::iterate(begin_owned(), end_owned()),
-      [&](const unsigned lid) {
-        if (IsValidForPhase(lid, phase)) {
-          if (sampling) {
-            if (phase == GNNPhase::kTrain && !IsInSampledGraph(lid)) {
-              return;
-            }
-          }
+      // this is possibly the subgraph id
+      [&](const unsigned node_id) {
+        unsigned lid = node_id;
+        if (use_subgraph_) {
+          // convert SID over to LID
+          lid = subgraph_->SIDToLID(node_id);
+        }
 
+        if (IsValidForPhase(lid, phase)) {
           total_checked_ += 1;
           // get prediction by getting max
+          // note the use of node_id here: lid only used to check original
+          // labels
           size_t predicted_label = galois::MaxIndex(
-              num_label_classes_, &(predictions[lid * num_label_classes_]));
+              num_label_classes_, &(predictions[node_id * num_label_classes_]));
           // check against ground truth and track accordingly
           // TODO static cast used here is dangerous
           if (predicted_label ==
@@ -699,7 +734,8 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
 
-  GALOIS_LOG_VERBOSE("Accuracy: {} / {}", global_correct, global_checked);
+  GALOIS_LOG_WARN("Sub: {}, Accuracy: {} / {}", use_subgraph_, global_correct,
+                  global_checked);
 
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
@@ -819,6 +855,15 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
   return global_f1_micro_score;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers) {
+  subgraph_ = std::make_unique<GNNSubgraph>(partitioned_graph_->size());
+  edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers);
+  sampled_out_degrees_.create(partitioned_graph_->size(), 0);
+  sampled_in_degrees_.create(partitioned_graph_->size(), 0);
+}
+
 void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
   new_sampled_nodes_.resize(size());
   new_sampled_nodes_.reset();
@@ -839,8 +884,54 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
                  });
 }
 
+void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
+  use_subgraph_ = false;
+
+  galois::GAccumulator<size_t> sampled;
+  galois::GAccumulator<size_t> total;
+  sampled.reset();
+  total.reset();
+
+  galois::do_all(
+      galois::iterate(begin(), end()),
+      [&](const NodeIterator& x) {
+        // only operate on if sampled
+        if (partitioned_graph_->getData(*x)) {
+          // marks ALL edges of nodes that connect to train/other nodes
+          for (auto edge_iter : partitioned_graph_->edges(*x)) {
+            if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                GNNPhase::kTrain) ||
+                IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                GNNPhase::kOther)) {
+              MakeEdgeSampled(edge_iter, agg_layer_num);
+              new_sampled_nodes_.set(partitioned_graph_->getEdgeDst(edge_iter));
+              sampled += 1;
+            }
+            total += 1;
+          }
+        }
+      },
+      galois::steal(), galois::loopname("ChooseAllEdges"));
+
+  galois::gPrint("Num sampled edges is ", sampled.reduce(), " out of ",
+                 total.reduce(), "\n");
+
+  std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
+  // update nodes, then communicate update to all hosts so that they can
+  // continue the exploration
+  galois::do_all(
+      galois::iterate(new_nodes),
+      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
+      galois::loopname("NeighborhoodSampleSet"));
+
+  // XXX(loc) bitset; can readAny be weaker?
+  sync_substrate_->sync<writeSource, readAny, SampleFlagSync>("SampleSync");
+}
+
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                                            size_t num_to_sample) {
+  use_subgraph_ = false;
+
   galois::GAccumulator<size_t> sampled;
   galois::GAccumulator<size_t> total;
   sampled.reset();
@@ -852,18 +943,24 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
         if (partitioned_graph_->getData(*x)) {
           // chance of not uniformly choosing an edge of this node num_to_sample
           // times (degree norm is 1 / degree)
-          // XXX in-degree prob, not out degree
           double probability_of_reject =
               std::pow(1 - GetDegreeNorm(*x), num_to_sample);
-          // loop through in-edges, turn "on" edge with some probability
-          for (auto edge_iter : partitioned_graph_->in_edges(*x)) {
+          // loop through edges, turn "on" edge with some probability
+          for (auto edge_iter : partitioned_graph_->edges(*x)) {
             if (sample_rng_.DoBernoulli(probability_of_reject)) {
-              // if here, it means edge accepted; set sampled on, mark source
-              // as part of next set
-              MakeInEdgeSampled(edge_iter, sample_layer_num);
-              new_sampled_nodes_.set(
-                  partitioned_graph_->GetInEdgeDest(edge_iter));
-              sampled += 1;
+              // only take if node is training node or a node not classified
+              // into train/test/val
+              if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                  GNNPhase::kTrain) ||
+                  IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                  GNNPhase::kOther)) {
+                // if here, it means edge accepted; set sampled on, mark source
+                // as part of next set
+                MakeEdgeSampled(edge_iter, sample_layer_num);
+                new_sampled_nodes_.set(
+                    partitioned_graph_->getEdgeDst(edge_iter));
+                sampled += 1;
+              }
             }
             total += 1;
           }
@@ -871,8 +968,8 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
       },
       galois::steal(), galois::loopname("NeighborhoodSample"));
 
-  galois::gPrint("Num sampled edges is ", sampled.reduce(), " out of ",
-                 total.reduce(), "\n");
+  galois::gDebug("Num sampled edges for layer ", sample_layer_num, " is ",
+                 sampled.reduce(), " out of ", total.reduce());
 
   std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
 

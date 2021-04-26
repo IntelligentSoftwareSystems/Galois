@@ -30,7 +30,6 @@ namespace graphs {
 //! Possible partitioning schemes for the GNN graph
 enum class GNNPartitionScheme { kOEC, kCVC, kOCVC };
 
-//! XXX
 class GNNGraph {
 public:
   using GNNDistGraph = galois::graphs::DistGraph<char, void>;
@@ -66,6 +65,14 @@ public:
 
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
+  //! Returns # of nodes in the *graph that is currently active*.
+  size_t active_size() const {
+    if (!use_subgraph_) {
+      return partitioned_graph_->size();
+    } else {
+      return subgraph_->size();
+    }
+  }
 
   bool is_local(size_t gid) const { return partitioned_graph_->isLocal(gid); }
   size_t GetLID(size_t gid) const { return partitioned_graph_->getLID(gid); }
@@ -73,28 +80,44 @@ public:
 
   //! Node begin for all local nodes
   NodeIterator begin() const {
-    return partitioned_graph_->allNodesRange().begin();
+    if (!use_subgraph_) {
+      return partitioned_graph_->allNodesRange().begin();
+    } else {
+      return subgraph_->begin();
+    }
   }
   //! Node end for all local nodes
-  NodeIterator end() const { return partitioned_graph_->allNodesRange().end(); }
+  NodeIterator end() const {
+    if (!use_subgraph_) {
+      return partitioned_graph_->allNodesRange().end();
+    } else {
+      return subgraph_->end();
+    }
+  }
 
   NodeIterator begin_owned() const {
-    return partitioned_graph_->masterNodesRange().begin();
+    if (!use_subgraph_) {
+      return partitioned_graph_->masterNodesRange().begin();
+    } else {
+      return subgraph_->begin_owned();
+    }
   }
 
   NodeIterator end_owned() const {
-    return partitioned_graph_->masterNodesRange().end();
+    if (!use_subgraph_) {
+      return partitioned_graph_->masterNodesRange().end();
+    } else {
+      return subgraph_->end_owned();
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////
   // Edges
   //////////////////////////////////////////////////////////////////////////////
 
-  void InitializeEdgeData() { InitializeEdgeData(1); }
-
-  void InitializeEdgeData(size_t num_layers) {
-    edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers);
-  }
+  void InitializeSamplingData() { InitializeSamplingData(1); }
+  //! Initialize data required to do graph sampling
+  void InitializeSamplingData(size_t num_layers);
 
   //////////////////////////////////////////////////////////////////////////////
   // Out Edges
@@ -102,17 +125,64 @@ public:
 
   // All following functions take a local node id
   EdgeIterator edge_begin(GraphNode n) const {
-    return partitioned_graph_->edge_begin(n);
+    if (!use_subgraph_) {
+      return partitioned_graph_->edge_begin(n);
+    } else {
+      return subgraph_->edge_begin(n);
+    }
   };
+
   EdgeIterator edge_end(GraphNode n) const {
-    return partitioned_graph_->edge_end(n);
+    if (!use_subgraph_) {
+      return partitioned_graph_->edge_end(n);
+    } else {
+      return subgraph_->edge_end(n);
+    }
   };
   GraphNode GetEdgeDest(EdgeIterator ei) const {
-    return partitioned_graph_->getEdgeDst(ei);
+    if (!use_subgraph_) {
+      return partitioned_graph_->getEdgeDst(ei);
+    } else {
+      return subgraph_->GetEdgeDest(ei);
+    }
+  };
+  galois::runtime::iterable<
+      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
+  edges(GraphNode N) const {
+    if (!use_subgraph_) {
+      return partitioned_graph_->edges(N);
+    } else {
+      return subgraph_->edges(N);
+    }
+  }
+
+  bool IsEdgeSampledAny(EdgeIterator ei) const {
+    for (bool b : edge_sample_status_[*ei]) {
+      if (b)
+        return true;
+    }
+    return false;
+  }
+  bool IsEdgeSampled(uint32_t ei, size_t layer_num) const {
+    if (!use_subgraph_) {
+      return edge_sample_status_[ei][layer_num];
+    } else {
+      GALOIS_LOG_FATAL("This shouldn't be called with subgraph");
+      return false;
+    }
   };
   bool IsEdgeSampled(EdgeIterator ei, size_t layer_num) const {
+    if (!use_subgraph_) {
+      return edge_sample_status_[*ei][layer_num];
+    } else {
+      return subgraph_->OutEdgeSampled(ei, layer_num, *this);
+    }
+  };
+  //! Always use original graph's edge iterator here
+  bool IsEdgeSampledOriginalGraph(EdgeIterator ei, size_t layer_num) const {
     return edge_sample_status_[*ei][layer_num];
   };
+
   //! Set the flag on the edge to 1; makes it sampled
   void MakeEdgeSampled(EdgeIterator ei, size_t layer_num) {
     edge_sample_status_[*ei][layer_num] = 1;
@@ -121,28 +191,62 @@ public:
   void MakeEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
     edge_sample_status_[*ei][layer_num] = 0;
   };
-  galois::runtime::iterable<
-      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
-  edges(GraphNode N) {
-    return partitioned_graph_->edges(N);
-  }
 
   //////////////////////////////////////////////////////////////////////////////
   // in edges
   //////////////////////////////////////////////////////////////////////////////
   EdgeIterator in_edge_begin(GraphNode n) const {
-    return partitioned_graph_->in_edge_begin(n);
+    if (!use_subgraph_) {
+      return partitioned_graph_->in_edge_begin(n);
+    } else {
+      return subgraph_->in_edge_begin(n);
+    }
   }
   EdgeIterator in_edge_end(GraphNode n) const {
-    return partitioned_graph_->in_edge_end(n);
+    if (!use_subgraph_) {
+      return partitioned_graph_->in_edge_end(n);
+    } else {
+      return subgraph_->in_edge_end(n);
+    }
+  }
+  galois::runtime::iterable<
+      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
+  in_edges(GraphNode N) const {
+    if (!use_subgraph_) {
+      return partitioned_graph_->in_edges(N);
+    } else {
+      return subgraph_->in_edges(N);
+    }
   }
   GraphNode GetInEdgeDest(EdgeIterator ei) const {
-    return partitioned_graph_->GetInEdgeDest(ei);
+    if (!use_subgraph_) {
+      return partitioned_graph_->GetInEdgeDest(ei);
+    } else {
+      return subgraph_->GetInEdgeDest(ei);
+    }
+  };
+
+  EdgeIterator InEdgeToOutEdge(EdgeIterator in_edge_iter) const {
+    return partitioned_graph_->InEdgeToOutEdge(in_edge_iter);
+  }
+
+  bool IsInEdgeSampledAny(EdgeIterator ei) const {
+    for (bool b :
+         edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]) {
+      if (b)
+        return true;
+    }
+    return false;
   };
   bool IsInEdgeSampled(EdgeIterator ei, size_t layer_num) const {
-    return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
-                              [layer_num];
+    if (!use_subgraph_) {
+      return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
+                                [layer_num];
+    } else {
+      return subgraph_->InEdgeSampled(ei, layer_num, *this);
+    }
   };
+
   //! Set the flag on the edge to 1; makes it sampled
   void MakeInEdgeSampled(EdgeIterator ei, size_t layer_num) {
     edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 1;
@@ -151,11 +255,6 @@ public:
   void MakeInEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
     edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 0;
   };
-  galois::runtime::iterable<
-      galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
-  in_edges(GraphNode N) {
-    return partitioned_graph_->in_edges(N);
-  }
 
   //////////////////////////////////////////////////////////////////////////////
   // neighborhood sampling
@@ -163,15 +262,42 @@ public:
 
   //! Set seed nodes, i.e., nodes that are being predicted on
   void SetupNeighborhoodSample();
+
+  //! Choose all edges from sampled nodes
+  void SampleAllEdges(size_t agg_layer_num);
   //! Sample neighbors of nodes that are marked as ready for sampling
   void SampleEdges(size_t sample_layer_num, size_t num_to_sample);
+
+  //! Construct the subgraph from sampled edges and corresponding nodes
+  size_t ConstructSampledSubgraph() {
+    // false first so that the build process can use functions to access the
+    // real graph
+    use_subgraph_             = false;
+    size_t num_subgraph_nodes = subgraph_->BuildSubgraph(*this);
+    // after this, this graph is a subgraph
+    use_subgraph_ = true;
+    return num_subgraph_nodes;
+  }
+
+  void EnableSubgraph() { use_subgraph_ = true; }
+
+  void DisableSubgraph() { use_subgraph_ = false; }
 
   //////////////////////////////////////////////////////////////////////////////
 
   GNNFloat GetNormFactor(GraphNode n) const { return norm_factors_[n]; }
   //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
   //! inductive graph, etc); calculated whenever norm factor is calculated
-  GNNFloat GetDegreeNorm(GraphNode n) const { return degree_norm_[n]; }
+  GNNFloat GetDegreeNorm(GraphNode n) const {
+    if (!use_subgraph_) {
+      return degree_norm_[n];
+    } else {
+      // XXX does not work in distributed case, fix there
+      // XXX also need to account for current layer number in sampling
+      // case because degrees in each layer differ
+      return 1.0 / subgraph_->GetLocalDegree(n);
+    }
+  }
 
   // Get accuracy: sampling is by default false
   float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions,
@@ -183,11 +309,19 @@ public:
   //! class labels.
   GNNFloat GetSingleClassLabel(const unsigned lid) const {
     assert(using_single_class_labels_);
-    if (local_ground_truth_labels_[lid] != num_label_classes_) {
-      return local_ground_truth_labels_[lid];
+    unsigned to_use = lid;
+    if (use_subgraph_) {
+      to_use = subgraph_->SIDToLID(lid);
+    }
+
+    if (local_ground_truth_labels_[to_use] != num_label_classes_) {
+      // galois::gPrint(lid, " ", to_use, " ",
+      // (int)local_ground_truth_labels_[to_use], "\n");
+      return local_ground_truth_labels_[to_use];
     } else {
       GALOIS_LOG_FATAL(
-          "should not get the label of a node that has no ground truth");
+          "should not get the label of a node that has no ground truth {}",
+          to_use);
     }
   }
 
@@ -208,7 +342,12 @@ public:
                              local_node_features_.size());
     }
 #endif
-    return PointerWithSize(local_node_features_);
+    if (!use_subgraph_) {
+      return PointerWithSize(local_node_features_);
+    } else {
+      return PointerWithSize(subgraph_->GetLocalFeatures().data(),
+                             subgraph_->GetLocalFeatures().size());
+    }
   }
 
   //! Given an LID and the current phase of GNN computation, determine if the
@@ -216,10 +355,16 @@ public:
   //! a training, validation, or test phase mask)
   bool IsValidForPhase(const unsigned lid,
                        const galois::GNNPhase current_phase) const {
-    if (!incomplete_masks_) {
-      return IsValidForPhaseCompleteRange(lid, current_phase);
+    // XXX maybe just map this all over to subgraph, though in that case
+    // issue is that subgraph doesn't necessarily know about test/val
+    unsigned to_use = lid;
+    if (use_subgraph_) {
+      to_use = subgraph_->SIDToLID(lid);
+    }
+    if (!incomplete_masks_ && current_phase != GNNPhase::kOther) {
+      return IsValidForPhaseCompleteRange(to_use, current_phase);
     } else {
-      return IsValidForPhaseMasked(lid, current_phase);
+      return IsValidForPhaseMasked(to_use, current_phase);
     }
   }
 
@@ -293,6 +438,10 @@ public:
 #endif
 
 private:
+// included like this to avoid cyclic dependency issues + not used anywhere but
+// in this class anyways
+#include "galois/graphs/GNNSubgraph.h"
+
   //////////////////////////////////////////////////////////////////////////////
   // Initialization
   //////////////////////////////////////////////////////////////////////////////
@@ -307,6 +456,8 @@ private:
   size_t ReadLocalMasksFromFile(const std::string& dataset_name,
                                 const std::string& mask_type,
                                 GNNRange* mask_range, char* masks);
+  //! Finds nodes that aren't part of the 3 main GNN phase classifications
+  size_t FindOtherMask();
   //! Read masks of local nodes only for training, validation, and testing
   void ReadLocalMasks(const std::string& dataset_name);
   //! Reads the entire graph topology in (but nothing else)
@@ -368,10 +519,15 @@ private:
 
   //////////////////////////////////////////////////////////////////////////////
 
+  std::unique_ptr<GNNSubgraph> subgraph_;
+  // Degrees for sampled subgraph
+  galois::LargeArray<uint32_t> sampled_out_degrees_;
+  galois::LargeArray<uint32_t> sampled_in_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;
-
+  //! Indicates newly sampled nodes (for distributed synchronization of sampling
+  //! status
   galois::DynamicBitSet new_sampled_nodes_;
 
   //////////////////////////////////////////////////////////////////////////////
@@ -383,6 +539,9 @@ private:
   std::vector<char> local_validation_mask_;
   //! Bitset indicating which nodes are testing nodes
   std::vector<char> local_testing_mask_;
+  size_t valid_other_{0};
+  //! Bitset indicating which nodes don't fall anywhere
+  std::vector<char> other_mask_;
 
   //! Global mask range for training nodes; must convert to LIDs when using
   //! in this class
@@ -408,6 +567,7 @@ private:
   galois::PerThreadRNG sample_rng_;
 
   // TODO vars for subgraphs as necessary
+  bool use_subgraph_{false};
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things

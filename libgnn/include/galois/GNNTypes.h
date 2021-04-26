@@ -25,7 +25,7 @@ using GPUNodeIndex = uint32_t;
 using GPUEdgeIndex = uint64_t;
 
 //! Phase of GNN computation
-enum class GNNPhase { kTrain, kValidate, kTest };
+enum class GNNPhase { kTrain, kValidate, kTest, kOther };
 
 //! Vector like wrapper over a pointer and size; exists solely to pass around
 //! raw pointers with size (because vectors are a no-go due to the code

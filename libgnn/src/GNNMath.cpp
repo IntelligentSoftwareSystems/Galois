@@ -56,7 +56,7 @@ void galois::VectorMulAdd(size_t length, const GNNFloat* a, const GNNFloat* b,
   // 512
   constexpr size_t vectorization_length = 16;
   const size_t aligned_end = length - length % vectorization_length;
-  __m512 scale_vec_main = _mm512_set_ps(
+  __m512 scale_vec_main    = _mm512_set_ps(
       b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale,
       b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale, b_scale);
   for (size_t i = 0; i < aligned_end; i += vectorization_length) {
