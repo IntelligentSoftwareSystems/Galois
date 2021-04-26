@@ -28,7 +28,6 @@ public:
   //! memory for temporary matrices. Also initializes sync substrate for the
   //! weight matrix
   SAGELayer(size_t layer_num, const galois::graphs::GNNGraph& graph,
-
             PointerWithSize<GNNFloat>* backward_output_matrix,
             const GNNLayerDimensions& dimensions, const GNNLayerConfig& config,
             const SAGELayerConfig& sage_config);
@@ -44,6 +43,14 @@ public:
             const GNNLayerDimensions& dimensions)
       : SAGELayer(layer_num, graph, backward_output_matrix, dimensions,
                   GNNLayerConfig(), SAGELayerConfig()) {}
+
+  void ResizeRows(size_t new_row_count) {
+    galois::gDebug("Resizing SAGE layer for sampled graph from ",
+                   layer_dimensions_.input_rows);
+    GNNLayer::ResizeRows(new_row_count);
+    galois::gDebug("To ", layer_dimensions_.input_rows);
+    // TODO(loc) resize input matrices if space is reason for doing this
+  }
 
   void InitSelfWeightsTo1() {
     if (layer_weights_2_.size()) {

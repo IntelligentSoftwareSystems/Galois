@@ -125,10 +125,11 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   galois::StatTimer timer("ForwardPhase", kRegionName);
   timer.start();
 
-  assert(input_embeddings.size() ==
+  assert(input_embeddings.size() >=
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
-  assert(p_forward_output_matrix_.size() ==
+  assert(p_forward_output_matrix_.size() >=
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
+
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
   GNNFloat* agg_data;
@@ -172,7 +173,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     Activation();
   }
 
-  assert(p_forward_output_matrix_.size() ==
+  assert(p_forward_output_matrix_.size() >=
          (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
 
   timer.stop();
@@ -272,7 +273,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     if (layer_number_ != 0) {
       // ---unmasked---
       // transposed sgemm for derivative; in_temp is output
-      assert(input_gradient->size() ==
+      assert(input_gradient->size() >=
              layer_dimensions_.input_rows * layer_dimensions_.output_columns);
       // pintemp1 contains (AF)'
       // overwrites the dropout matrix that was in ptemp1 (needed for second
@@ -365,9 +366,14 @@ void galois::SAGELayer::AggregateAll(
 
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    gpu_object_.AggregateAllGPU(
-        graph_.GetGPUGraph(), graph_.size(), column_length, node_embeddings,
-        aggregate_output, !config_.disable_normalization);
+    if (!IsSampledLayer()) {
+      gpu_object_.AggregateAllGPU(
+          graph_.GetGPUGraph(), graph_.size(), column_length, node_embeddings,
+          aggregate_output, !config_.disable_normalization);
+    } else {
+      // TODO(hochan)
+      GALOIS_LOG_FATAL("SAMPLING IMPLEMENTATION");
+    }
     graph_.AggregateSync(aggregate_output, column_length, layer_number_);
   } else {
 #endif
@@ -385,10 +391,8 @@ void galois::SAGELayer::AggregateAllCPU(
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
     bool is_backward) {
 
-  size_t num_nodes = graph_.size();
-
   galois::do_all(
-      galois::iterate(static_cast<size_t>(0), num_nodes),
+      galois::iterate(graph_.begin(), graph_.end()),
       [&](size_t src) {
         // TODO(loc) this is currently a hack: the sync substrate blows
         // up if not the entire bitset is set for sync call like in
@@ -400,20 +404,14 @@ void galois::SAGELayer::AggregateAllCPU(
           aggregate_output[index_to_src_feature + i] = 0;
         }
 
-        if (layer_phase_ == GNNPhase::kTrain) {
-          if (IsInductiveLayer()) {
-            // if inductive, all non-training nodes do not exist
-            if (!graph_.IsValidForPhase(src, GNNPhase::kTrain))
-              return;
-          }
-
-          if (IsSampledLayer()) {
-            // check if node is part of sampled graph
-            if (!graph_.IsInSampledGraph(src)) {
-              return;
-            }
-          }
-        }
+        // if (layer_phase_ == GNNPhase::kTrain) {
+        //  // XXX
+        //  if (IsInductiveLayer()) {
+        //    // if inductive, all non-training nodes do not exist
+        //    if (!graph_.IsValidForPhase(src, GNNPhase::kTrain))
+        //      return;
+        //  }
+        //}
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
@@ -426,22 +424,19 @@ void galois::SAGELayer::AggregateAllCPU(
                e++) {
             // graphs::bitset_graph_aggregate.set(src);
             size_t dst = graph_.GetEdgeDest(e);
+            // galois::gPrint("(", src, " ", dst, ")\n");
 
             if (layer_phase_ == GNNPhase::kTrain) {
-              if (IsInductiveLayer()) {
-                // if inductive, all non-training nodes do not exist
-                if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-                  return;
-              }
-
+              //// XXX
+              // if (IsInductiveLayer()) {
+              //  // if inductive, all non-training nodes do not exist
+              //  if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
+              //    return;
+              //}
               if (IsSampledLayer()) {
                 if (!graph_.IsEdgeSampled(e, layer_number_)) {
                   continue;
                 }
-                // ignore non-sampled nodes
-                if (layer_phase_ == GNNPhase::kTrain &&
-                    !graph_.IsInSampledGraph(dst))
-                  continue;
               }
             }
 
@@ -475,20 +470,16 @@ void galois::SAGELayer::AggregateAllCPU(
             size_t dst = graph_.GetInEdgeDest(e);
 
             if (layer_phase_ == GNNPhase::kTrain) {
-              if (IsInductiveLayer()) {
-                // if inductive, all non-training nodes do not exist
-                if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-                  return;
-              }
-
+              // XXX
+              // if (IsInductiveLayer()) {
+              //  // if inductive, all non-training nodes do not exist
+              //  if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
+              //    return;
+              //}
               if (IsSampledLayer()) {
                 if (!graph_.IsInEdgeSampled(e, layer_number_)) {
                   continue;
                 }
-                // ignore non-sampled nodes
-                if (layer_phase_ == GNNPhase::kTrain &&
-                    !graph_.IsInSampledGraph(dst))
-                  continue;
               }
             }
 
@@ -530,6 +521,9 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
         base_gpu_object_.layer_weights(), output);
   } else {
 #endif
+    galois::gPrint(layer_dimensions_.input_rows, " ",
+                   layer_dimensions_.input_columns, " ",
+                   layer_dimensions_.output_columns, "\n");
     // CPU version is just a call into CBlas
     galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
                        layer_dimensions_.input_columns,
@@ -564,7 +558,7 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
   galois::StatTimer timer("BackwardXForm", kRegionName);
   timer.start();
 
-  assert(p_layer_weights_.size() ==
+  assert(p_layer_weights_.size() >=
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -591,7 +585,7 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
   galois::StatTimer timer("SelfBackwardXForm", kRegionName);
   timer.start();
 
-  assert(p_layer_weights_.size() ==
+  assert(p_layer_weights_.size() >=
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
   // TODO gpu self

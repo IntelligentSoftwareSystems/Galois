@@ -94,6 +94,12 @@ public:
       : GNNLayer(layer_num, graph, backward_output_matrix, dimensions,
                  GNNLayerConfig()) {}
 
+  virtual void ResizeRows(size_t new_row_count) {
+    layer_dimensions_.input_rows = new_row_count;
+    // TODO(loc) output matrix should be resized if space becomes an issue,
+    // else just use first S rows (S = subgraph size)
+  }
+
   GNNPhase layer_phase() { return layer_phase_; }
   //! Changes this layer's phase
   void SetLayerPhase(GNNPhase new_phase) { layer_phase_ = new_phase; }

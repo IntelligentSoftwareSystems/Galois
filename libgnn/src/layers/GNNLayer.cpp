@@ -154,9 +154,8 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
 void galois::GNNLayer::DoDropoutCPU(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
-  size_t num_elements = output_matrix->size();
-  assert(num_elements == dropout_mask_.size());
-  assert(num_elements == input_to_dropout.size());
+  size_t num_elements =
+      layer_dimensions_.input_rows * layer_dimensions_.input_columns;
 
   // determine which parts to drop
   galois::do_all(
@@ -263,7 +262,9 @@ void galois::GNNLayer::Activation() {
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
   galois::do_all(
-      galois::iterate(static_cast<size_t>(0), forward_output_matrix_.size()),
+      galois::iterate(static_cast<size_t>(0),
+                      layer_dimensions_.input_rows *
+                          layer_dimensions_.output_columns),
       [&](size_t i) {
         if (forward_output_matrix_[i] > 0.0) {
           // do nothing, keep value; set the memo though
@@ -285,7 +286,9 @@ void galois::GNNLayer::ActivationDerivative(
   // and act accordingly
   // keep gradient if the original output was greater than 0
   galois::do_all(
-      galois::iterate(static_cast<size_t>(0), gradient->size()),
+      galois::iterate(static_cast<size_t>(0),
+                      layer_dimensions_.input_rows *
+                          layer_dimensions_.output_columns),
       [&](size_t i) {
         // it was <= 0 before; set back to 0
         if (!activation_memo_.test(i)) {
@@ -326,9 +329,9 @@ void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
 #else
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
-  size_t end_node   = graph_.size();
+  size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.input_columns;
-  assert((row_index * layer_dimensions_.input_rows) == input->size());
+  assert((row_index * layer_dimensions_.input_rows) <= input->size());
   galois::do_all(
       galois::iterate(start_node, end_node),
       [&](size_t non_master) {
@@ -349,7 +352,7 @@ void galois::GNNLayer::MaskGradientNonMasters(
 #else
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
-  size_t end_node   = graph_.size();
+  size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.output_columns;
   galois::do_all(
       galois::iterate(start_node, end_node),
