@@ -109,7 +109,7 @@ public:
   //! tag (tag) and some data (buf)
   //! on the receiver, buf will be returned on a receiveTagged(tag)
   //! buf is invalidated by this operation
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf,
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer&& buf,
                           int type = 0) = 0;
 
   //! Send a message to all hosts.  A message is simply a
@@ -123,9 +123,6 @@ public:
   template <typename... Args>
   void broadcastSimple(void (*recv)(uint32_t, Args...), Args... param);
 
-  //! Receive and dispatch messages
-  void handleReceives();
-
   //! Wrapper to reset the mem usage tracker's stats
   inline void resetMemUsage() { memUsageTracker.resetMemUsage(); }
 
@@ -134,8 +131,7 @@ public:
 
   //! Receive a tagged message
   virtual std::optional<std::pair<uint32_t, RecvBuffer>>
-  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg,
-                int type = 0) = 0;
+  recieveTagged(uint32_t tag, int type = 0) = 0;
 
   //! move send buffers out to network
   virtual void flush() = 0;
@@ -195,9 +191,6 @@ NetworkInterface& makeNetworkLCI();
 //! @warning Should not be called within a parallel region; assumes only one
 //! thread is calling it
 substrate::Barrier& getHostBarrier();
-//! Returns a fence that ensures all pending messages are delivered, acting
-//! like a memory-barrier
-substrate::Barrier& getHostFence();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -220,7 +213,7 @@ void NetworkInterface::sendSimple(uint32_t dest,
   SendBuffer buf;
   gSerialize(buf, (uintptr_t)recv, param...,
              (uintptr_t)genericLandingPad<Args...>);
-  sendTagged(dest, 0, buf);
+  sendTagged(dest, 0, std::move(buf));
 }
 
 template <typename... Args>

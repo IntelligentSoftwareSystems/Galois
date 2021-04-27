@@ -49,30 +49,48 @@
 namespace galois {
 namespace runtime {
 
+struct BufferHeader {
+  enum class BufferType { kSingleMessage, kMultipleMessages, kPartialMessage };
+  BufferType type{BufferType::kSingleMessage};
+  uint8_t num_segments{1};
+  uint8_t segment_id{0};
+  uint8_t segment_tag{0};
+};
+
 class DeSerializeBuffer; // forward declaration for friend declaration
 
 /**
  * Buffer for serialization of data. Mainly used during network communication.
  */
 class SerializeBuffer {
+  static constexpr size_t kHeaderSize = sizeof(BufferHeader);
+
   //! Access to a deserialize buffer
   friend DeSerializeBuffer;
 
   //! type of data buffer
   // using vTy = std::vector<uint8_t>;
-  using vTy = galois::PODResizeableArray<uint8_t>;
+  using vTy       = galois::PODResizeableArray<uint8_t>;
+  using size_type = vTy::size_type;
+
   //! the actual data stored in this buffer
   vTy bufdata;
 
 public:
   //! default constructor
-  SerializeBuffer() = default;
+  SerializeBuffer() {
+    BufferHeader header;
+    insert(reinterpret_cast<uint8_t*>(&header), kHeaderSize);
+  }
+
   //! disabled copy constructor
   SerializeBuffer(SerializeBuffer&& rhs) = default;
-  //! Creates a buffer from another buffer
-  //! @param d buffer to create from
-  //! @param len amount of copy from buffer d
-  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d + len) {}
+
+  SerializeBuffer& operator=(SerializeBuffer&& rhs) {
+    auto buf = std::move(rhs);
+    bufdata  = std::move(buf.get());
+    return *this;
+  }
 
   //! Push a character onto the serialize buffer
   inline void push(const char c) { bufdata.push_back(c); }
@@ -87,25 +105,19 @@ public:
   //! Insert characters from a buffer into the serialize buffer at a particular
   //! offset
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
+    offset += kHeaderSize;
+    assert((offset + bytes) <= bufdata.size());
     if (bytes > 0) {
       std::copy_n(c, bytes, bufdata.begin() + offset);
     }
   }
 
-  /**
-   * Reserve space at the end for inserting new data into the serialize
-   * buffer
-   *
-   * @param bytes number of bytes to reserve at the end
-   * @returns offset to the end of the buffer before new space was reserved
-   */
-  size_t encomber(size_t bytes) {
-    size_t retval = bufdata.size();
-    bufdata.resize(retval + bytes);
-    return retval;
-  }
+  //! Returns an iterator to the beginning of the data in this serialize buffer
+  vTy::const_iterator begin() const { return bufdata.cbegin(); }
+  //! Returns an iterator to the end of the data in this serialize buffer
+  vTy::const_iterator end() const { return bufdata.cend(); }
 
-  void resize(size_t bytes) { bufdata.resize(bytes); }
+  void resize(size_t bytes) { bufdata.resize(kHeaderSize + bytes); }
 
   /**
    * Reserve more space in the serialize buffer.
@@ -115,34 +127,17 @@ public:
   void reserve(size_t s) { bufdata.reserve(bufdata.size() + s); }
 
   //! Returns a pointer to the data stored in this serialize buffer
-  const uint8_t* linearData() const { return bufdata.data(); }
+  const uint8_t* linearData() const { return bufdata.data() + kHeaderSize; }
   //! Returns vector of data stored in this serialize buffer
-  vTy& getVec() { return bufdata; }
+  vTy& get() { return bufdata; }
 
-  //! Returns an iterator to the beginning of the data in this serialize buffer
-  vTy::const_iterator begin() const { return bufdata.cbegin(); }
-  //! Returns an iterator to the end of the data in this serialize buffer
-  vTy::const_iterator end() const { return bufdata.cend(); }
-
-  using size_type = vTy::size_type;
+  //! Get a pointer to the remaining data of the deserialize buffer
+  //! (as determined by offset)
+  const uint8_t* data() const { return bufdata.data() + kHeaderSize; }
+  uint8_t* data() { return bufdata.data() + kHeaderSize; }
 
   //! Returns the size of the serialize buffer
-  size_type size() const { return bufdata.size(); }
-
-  //! Utility print function for the serialize buffer
-  //! @param o stream to print to
-  void print(std::ostream& o) const {
-    o << "<{" << std::hex;
-    for (auto& i : bufdata)
-      o << (unsigned int)i << " ";
-    o << std::dec << "}>";
-  }
-
-  //! Operator that calls the print function of the serialize buffer
-  friend std::ostream& operator<<(std::ostream& os, const SerializeBuffer& b) {
-    b.print(os);
-    return os;
-  }
+  size_type size() const { return bufdata.size() - kHeaderSize; }
 };
 
 /**
@@ -150,50 +145,54 @@ public:
  * communication.
  */
 class DeSerializeBuffer {
+  static constexpr size_t kHeaderSize = sizeof(BufferHeader);
   //! Access to serialize buffer
   friend SerializeBuffer;
   //! type of data buffer
   // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
   //! the actual data stored in this buffer
-  vTy bufdata;
-  int offset;
+  vTy bufdata{kHeaderSize};
+  size_t offset{kHeaderSize};
 
 public:
   //! Constructor initializes offset into buffer to 0
-  DeSerializeBuffer() : offset(0) {}
+  DeSerializeBuffer() : offset(kHeaderSize) {}
   //! Disable copy constructor
   DeSerializeBuffer(DeSerializeBuffer&&) = default;
   //! Move constructor
   //! @param v vector to act as deserialize buffer
   //! @param start offset to start saving data into
   DeSerializeBuffer(vTy&& v, uint32_t start = 0)
-      : bufdata(std::move(v)), offset(start) {}
+      : bufdata(std::move(v)), offset(start + kHeaderSize) {
+    assert(bufdata.size() >= offset);
+  }
 
   //! Constructor that takes an existing vector to use as the deserialize
   //! buffer
   explicit DeSerializeBuffer(vTy& data) {
     bufdata.swap(data);
-    offset = 0;
+    offset = kHeaderSize;
   }
 
   /**
    * Initializes the deserialize buffer with a certain size
    * @param [in] count size to initialize buffer to
    */
-  explicit DeSerializeBuffer(int count) : bufdata(count), offset(0) {}
+  explicit DeSerializeBuffer(int count)
+      : bufdata(count + kHeaderSize), offset(kHeaderSize) {}
 
   /**
    * Initializes the deserialize buffer using vector initialization from
    * 2 iterators.
    */
   template <typename Iter>
-  DeSerializeBuffer(Iter b, Iter e) : bufdata(b, e), offset{0} {}
+  DeSerializeBuffer(Iter b, Iter e) : bufdata(b, e), offset{kHeaderSize} {}
 
   /**
    * Initialize a deserialize buffer from a serialize buffer
    */
-  explicit DeSerializeBuffer(SerializeBuffer&& buf) : offset(0) {
+  explicit DeSerializeBuffer(SerializeBuffer&& buf) : offset(kHeaderSize) {
     bufdata.swap(buf.bufdata);
   }
 
@@ -207,31 +206,15 @@ public:
    * @param count new size of buffer
    */
   void reset(int count) {
-    offset = 0;
-    bufdata.resize(count);
+    offset = kHeaderSize;
+    bufdata.resize(count + kHeaderSize);
   }
-
-  //! Gets the current offset into the deserialize buffer
-  unsigned getOffset() const { return offset; }
-  //! Sets the offset into the deserialize buffer
-  void setOffset(unsigned off) {
-    assert(off <= size());
-    offset = off;
-  }
-
-  //! Gets the size of the deserialize buffer
-  unsigned size() const { return bufdata.size(); }
-
-  //! Returns true if the deserialize buffer is empty
-  //! @returns true if the deserialize buffer is empty
-  bool empty() const { return bufdata.empty(); }
 
   //! Get the next character in the deserialize buffer
   unsigned char pop() { return bufdata.at(offset++); }
 
-  //! Clears the last x bytes of the deserialize buffer, resizing it as well
-  //! @param x How many bytes from the end to clear
-  void pop_back(unsigned x) { bufdata.resize(bufdata.size() - x); }
+  //! Gets the size of the deserialize buffer
+  unsigned size() const { return bufdata.size() - offset; }
 
   /**
    * Extracts a certain amount of data from the deserialize buffer
@@ -240,6 +223,8 @@ public:
    * @param num Amount of data to get from deserialize buffer
    */
   void extract(uint8_t* dst, size_t num) {
+    assert(offset >= kHeaderSize);
+    assert((offset + num) <= bufdata.size());
     if (num > 0) {
       std::copy_n(&bufdata[offset], num, dst);
       offset += num;
@@ -248,37 +233,13 @@ public:
 
   //! Get the underlying vector storing the data of the deserialize
   //! buffer
-  vTy& getVec() { return bufdata; }
+  vTy& get() { return bufdata; }
 
   //! Get a pointer to the underlying data of the deserialize buffer
-  void* linearData() { return &bufdata[0]; }
+  void* linearData() { return &bufdata[offset]; }
 
-  //! Get a pointer to the remaining data of the deserialize buffer
-  //! (as determined by offset)
-  const uint8_t* r_linearData() const { return &bufdata[offset]; }
-  //! Get the remaining size of the deserialize buffer (as determined
-  //! by offset)
-  size_t r_size() const { return bufdata.size() - offset; }
-
-  //! Checks if the current location in the deserialize buffer is aligned
-  //! to some size a
-  bool atAlignment(size_t a) { return (uintptr_t)r_linearData() % a == 0; }
-
-  //! Utility print of deserialize buffer
-  //! @param o stream to print to
-  void print(std::ostream& o) const {
-    o << "<{(" << offset << ") " << std::hex;
-    for (auto ii = bufdata.begin(), ee = bufdata.end(); ii != ee; ++ii)
-      o << (unsigned int)*ii << " ";
-    o << std::dec << "}>";
-  }
-
-  //! Operator for printing deserialize buffer
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const DeSerializeBuffer& buf) {
-    buf.print(os);
-    return os;
-  }
+  const uint8_t* data() const { return &bufdata[offset]; }
+  uint8_t* data() { return &bufdata[offset]; }
 };
 
 namespace internal {
@@ -411,7 +372,7 @@ inline size_t gSizedObj(const SerializeBuffer& data) { return data.size(); }
  *
  * @returns size of the deserialize buffer passed into it
  */
-inline size_t gSizedObj(const DeSerializeBuffer& rbuf) { return rbuf.r_size(); }
+inline size_t gSizedObj(const DeSerializeBuffer& rbuf) { return rbuf.size(); }
 
 /**
  * Returns the size of the passed in insert bag.
@@ -682,7 +643,7 @@ inline void gSerializeObj(SerializeBuffer& buf,
  * @param [in] data serialize buffer to get data from
  */
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
-  buf.insert(data.linearData(), data.size());
+  buf.insert(data.data(), data.size());
 }
 
 /**
@@ -693,7 +654,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
  */
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   //  buf.reserve(rbuf.r_size());
-  buf.insert(rbuf.r_linearData(), rbuf.r_size());
+  buf.insert(rbuf.data(), rbuf.size());
 }
 
 /**
@@ -757,8 +718,10 @@ gSerializeLazySeq(SerializeBuffer& buf, unsigned num, Seq*) {
                 "Not POD Sequence");
   typename Seq::size_type size = num;
   internal::gSerializeObj(buf, size);
-  size_t tsize = sizeof(typename Seq::value_type);
-  return LazyRef<typename Seq::value_type>{buf.encomber(tsize * num)};
+  size_t tsize    = sizeof(typename Seq::value_type);
+  size_t cur_size = buf.size();
+  buf.resize(cur_size + (tsize * num));
+  return LazyRef<typename Seq::value_type>{cur_size};
 }
 
 /**
@@ -980,18 +943,10 @@ void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
 template <typename Seq>
 void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
   typedef typename Seq::value_type T;
-  //  seq.clear();
   typename Seq::size_type size;
   gDeserializeObj(buf, size);
-  // If the alignment is right, cast to a T array and insert
-  if (buf.atAlignment(alignof(T))) {
-    T* src = (T*)buf.r_linearData();
-    seq.assign(src, &src[size]);
-    buf.setOffset(buf.getOffset() + size * sizeof(T));
-  } else {
-    seq.resize(size);
-    buf.extract((uint8_t*)seq.data(), size * sizeof(T));
-  }
+  seq.resize(size);
+  buf.extract((uint8_t*)seq.data(), size * sizeof(T));
 }
 
 /**
@@ -1025,7 +980,7 @@ template <typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, galois::BufferWrapper<T>& bf) {
   if (is_memory_copyable<T>::value) {
     // manual deserialization here
-    size_t buffer_size;
+    size_t buffer_size{0};
     gDeserializeObj(buf, buffer_size);
     bf.resize(buffer_size);
     buf.extract((uint8_t*)bf.get_vec_data(), buffer_size * sizeof(T));
@@ -1097,9 +1052,10 @@ inline void gDeserialize(DeSerializeBuffer&) {}
  * @param data Object to save data in the iterator type into
  */
 template <typename Iter, typename T>
-auto gDeserializeRaw(Iter iter, T& data) -> decltype(
-    std::declval<typename std::enable_if<is_memory_copyable<T>::value>::type>(),
-    Iter()) {
+auto gDeserializeRaw(Iter iter, T& data)
+    -> decltype(std::declval<typename std::enable_if<
+                    is_memory_copyable<T>::value>::type>(),
+                Iter()) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = *iter++;

@@ -260,14 +260,14 @@ private:
       for (unsigned d = 0; d < DecomposeFactor; ++d) {
         galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
       }
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -330,14 +330,14 @@ private:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -447,14 +447,14 @@ protected:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;

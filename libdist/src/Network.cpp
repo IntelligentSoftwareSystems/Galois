@@ -93,7 +93,7 @@ void NetworkInterface::sendMsg(uint32_t dest,
                                void (*recv)(uint32_t, RecvBuffer&),
                                SendBuffer& buf) {
   gSerialize(buf, recv);
-  sendTagged(dest, 0, buf);
+  sendTagged(dest, 0, std::move(buf));
 }
 
 void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&),
@@ -104,27 +104,11 @@ void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&),
     if (x != ID) {
       SendBuffer b;
       gSerialize(b, fp, buf, (uintptr_t)&bcastLandingPad);
-      sendTagged(x, 0, b);
+      sendTagged(x, 0, std::move(b));
     } else if (self) {
-      RecvBuffer rb(buf.begin(), buf.end());
+      RecvBuffer rb = RecvBuffer(std::move(buf.get()));
       recv(ID, rb);
     }
-  }
-}
-
-void NetworkInterface::handleReceives() {
-  std::unique_lock<substrate::SimpleLock> lg;
-  auto opt = recieveTagged(0, &lg);
-  while (opt) {
-    uint32_t src    = std::get<0>(*opt);
-    RecvBuffer& buf = std::get<1>(*opt);
-    uintptr_t fp    = 0;
-    gDeserializeRaw(buf.r_linearData() + buf.r_size() - sizeof(uintptr_t), fp);
-    buf.pop_back(sizeof(uintptr_t));
-    assert(fp);
-    auto f = (void (*)(uint32_t, RecvBuffer&))fp;
-    f(src, buf);
-    opt = recieveTagged(0, &lg);
   }
 }
 

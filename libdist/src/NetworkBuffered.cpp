@@ -67,6 +67,12 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   // using vTy = std::vector<uint8_t>;
   using vTy = galois::PODResizeableArray<uint8_t>;
 
+  static constexpr size_t kHeaderSize     = sizeof(BufferHeader);
+  static constexpr uint8_t kMaxSegmentTag = std::numeric_limits<uint8_t>::max();
+  static constexpr size_t kMaxBufferSize =
+      static_cast<size_t>(std::numeric_limits<int>::max());
+  static constexpr size_t kMaxDataSize = kMaxBufferSize - kHeaderSize;
+
   /**
    * Receive buffers for the buffered network interface
    */
@@ -76,6 +82,38 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     SimpleLock qlock;
     // tag of head of queue
     std::atomic<uint32_t> dataPresent;
+
+    struct PartialMessages {
+      uint8_t num_segments{0};
+      std::vector<vTy> segments;
+    };
+    std::unordered_map<uint8_t, PartialMessages> partial_messages_map_;
+
+    std::optional<vTy> CombinePartialMessages(const BufferHeader& header,
+                                              vTy&& vec) {
+      auto& partial_messages = partial_messages_map_[header.segment_tag];
+      if (partial_messages.num_segments == 0) {
+        partial_messages.segments.resize(header.num_segments);
+      }
+
+      partial_messages.segments[header.segment_id] = std::move(vec);
+      ++partial_messages.num_segments;
+
+      if (partial_messages.num_segments != header.num_segments) {
+        assert(partial_messages.num_segments < header.num_segments);
+        assert(partial_messages.segments.size() == header.num_segments);
+        return std::nullopt;
+      }
+
+      std::vector<vTy>& segments = partial_messages.segments;
+      vTy message                = std::move(segments[0]);
+      for (size_t i = 1, end = segments.size(); i < end; ++i) {
+        message.insert(message.end(), segments[i].begin() + kHeaderSize,
+                       segments[i].end());
+      }
+      partial_messages_map_.erase(header.segment_tag);
+      return std::make_optional(std::move(message));
+    }
 
     bool sizeAtLeast(size_t n, uint32_t tag) {
       size_t tot = -frontOffset;
@@ -163,30 +201,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::optional<RecvBuffer> popMsg(uint32_t tag,
                                      std::atomic<size_t>& inflightRecvs) {
       std::lock_guard<SimpleLock> lg(qlock);
-#ifndef NO_AGG
-      uint32_t len = getLenFromFront(tag);
-      //      assert(len);
-      if (len == ~0U || len == 0)
-        return std::optional<RecvBuffer>();
-      if (!sizeAtLeast(sizeof(uint32_t) + len, tag))
-        return std::optional<RecvBuffer>();
-      erase(4, inflightRecvs);
-
-      // Try just using the buffer
-      if (auto r = popVec(len, inflightRecvs)) {
-        auto start = r->size() - len;
-        //        std::cerr << "FP " << r->size() << " " << len << " " << start
-        //        << "\n";
-        return std::optional<RecvBuffer>(RecvBuffer(std::move(*r), start));
-      }
-
-      RecvBuffer buf(len);
-      // FIXME: This is slows things down 25%
-      copyOut((char*)buf.linearData(), len);
-      erase(len, inflightRecvs);
-      // std::cerr << "p " << tag << " " << len << "\n";
-      return std::optional<RecvBuffer>(std::move(buf));
-#else
       if (data.empty() || data.front().tag != tag)
         return std::optional<RecvBuffer>();
 
@@ -201,31 +215,28 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
 
       return std::optional<RecvBuffer>(RecvBuffer(std::move(vec), 0));
-#endif
     }
 
     // Worker thread interface
-    void add(NetworkIO::message m) {
+    bool add(NetworkIO::message m) {
+      BufferHeader* header = reinterpret_cast<BufferHeader*>(m.data.data());
+      if (header->type == BufferHeader::BufferType::kPartialMessage) {
+        std::optional<vTy> segment =
+            CombinePartialMessages(*header, std::move(m.data));
+        if (!segment) {
+          return false;
+        }
+
+        m.data = std::move(*segment);
+      }
       std::lock_guard<SimpleLock> lg(qlock);
       if (data.empty()) {
         galois::runtime::trace("ADD LATEST ", m.tag);
         dataPresent = m.tag;
       }
 
-      // std::cerr << m.data.size() << " " <<
-      //              std::count(m.data.begin(), m.data.end(), 0) << "\n";
-      // for (auto x : m.data) {
-      //   std::cerr << (int) x << " ";
-      // }
-      // std::cerr << "\n";
-      // std::cerr << "A " << m.host << " " << m.tag << " " << m.data.size() <<
-      // "\n";
-
       data.push_back(std::move(m));
-
-      assert(data.back().data.size() !=
-             (unsigned int)std::count(data.back().data.begin(),
-                                      data.back().data.end(), 0));
+      return true;
     }
 
     bool hasData(uint32_t tag) { return dataPresent == tag; }
@@ -245,7 +256,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     struct msg {
       uint32_t tag;
       vTy data;
-      msg(uint32_t t, vTy& _data) : tag(t), data(std::move(_data)) {}
+      msg(uint32_t t, vTy&& _data) : tag(t), data(std::move(_data)) {}
     };
 
     std::deque<msg> messages;
@@ -254,6 +265,43 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     //! @todo FIXME track time since some epoch in an atomic.
     std::chrono::high_resolution_clock::time_point time;
     SimpleLock lock, timelock;
+    uint8_t segment_tag_{0};
+
+    void IncrementSegmentTag() {
+      if (segment_tag_ == kMaxSegmentTag) {
+        segment_tag_ = 0;
+      } else {
+        ++segment_tag_;
+      }
+    }
+
+    std::vector<NetworkIO::message> Split(uint32_t host, uint32_t tag,
+                                          vTy&& vec) {
+      std::vector<vTy> segments;
+      segments.emplace_back(std::move(vec));
+      auto begin = segments[0].begin();
+      for (size_t i = kMaxBufferSize, end = segments[0].size(); i < end;
+           i += kMaxDataSize) {
+        vTy segment(kHeaderSize);
+        size_t segment_end = std::min(end, i + kMaxDataSize);
+        segment.insert(segment.end(), begin + i, begin + segment_end);
+        segments.emplace_back(std::move(segment));
+      }
+      segments[0].resize(kMaxBufferSize);
+
+      std::vector<NetworkIO::message> msg;
+      for (size_t i = 0; i < segments.size(); ++i) {
+        auto& segment        = segments[i];
+        BufferHeader* header = reinterpret_cast<BufferHeader*>(segment.data());
+        header->type         = BufferHeader::BufferType::kPartialMessage;
+        header->num_segments = segments.size();
+        header->segment_id   = i;
+        header->segment_tag  = segment_tag_;
+        msg.emplace_back(host, tag, std::move(segment));
+      }
+      IncrementSegmentTag();
+      return msg;
+    }
 
   public:
     unsigned long statSendTimeout;
@@ -269,103 +317,35 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
     }
 
-    bool ready() {
-#ifndef NO_AGG
-      if (numBytes == 0)
-        return false;
-      if (urgent) {
-        ++statSendUrgent;
-        return true;
-      }
-      if (numBytes > COMM_MIN) {
-        ++statSendOverflow;
-        return true;
-      }
-      auto n = std::chrono::high_resolution_clock::now();
-      decltype(n) mytime;
-      {
-        std::lock_guard<SimpleLock> lg(timelock);
-        mytime = time;
-      }
-      auto elapsed =
-          std::chrono::duration_cast<std::chrono::microseconds>(n - mytime);
-      if (elapsed.count() > COMM_DELAY) {
-        ++statSendTimeout;
-        return true;
-      }
-      return false;
-#else
-      return messages.size() > 0;
-#endif
-    }
+    bool ready() { return messages.size() > 0; }
 
-    std::pair<uint32_t, vTy>
-    assemble(std::atomic<size_t>& GALOIS_UNUSED(inflightSends)) {
+    std::vector<NetworkIO::message> assemble(uint32_t host) {
       std::unique_lock<SimpleLock> lg(lock);
-      if (messages.empty())
-        return std::make_pair(~0, vTy());
-#ifndef NO_AGG
-      // compute message size
-      uint32_t len = 0;
-      int num      = 0;
-      uint32_t tag = messages.front().tag;
-      for (auto& m : messages) {
-        if (m.tag != tag) {
-          break;
-        } else {
-          // do not let it go over the integer limit because MPI_Isend cannot
-          // deal with it
-          if ((m.data.size() + sizeof(uint32_t) + len + num) >
-              static_cast<size_t>(std::numeric_limits<int>::max())) {
-            break;
-          }
-          len += m.data.size();
-          num += sizeof(uint32_t);
-        }
-      }
-      lg.unlock();
-      // construct message
-      vTy vec;
-      vec.reserve(len + num);
-      // go out of our way to avoid locking out senders when making messages
-      lg.lock();
-      do {
-        auto& m = messages.front();
-        lg.unlock();
-        union {
-          uint32_t a;
-          uint8_t b[sizeof(uint32_t)];
-        } foo;
-        foo.a = m.data.size();
-        vec.insert(vec.end(), &foo.b[0], &foo.b[sizeof(uint32_t)]);
-        vec.insert(vec.end(), m.data.begin(), m.data.end());
-        if (urgent)
-          --urgent;
-        lg.lock();
-        messages.pop_front();
-        --inflightSends;
-      } while (vec.size() < len + num);
-      ++inflightSends;
-      numBytes -= len;
-#else
+      assert(!messages.empty());
       uint32_t tag = messages.front().tag;
       vTy vec(std::move(messages.front().data));
       messages.pop_front();
-#endif
-      return std::make_pair(tag, std::move(vec));
+
+      if (vec.size() > kMaxBufferSize) {
+        return Split(host, tag, std::move(vec));
+      }
+
+      BufferHeader* header = reinterpret_cast<BufferHeader*>(vec.data());
+      header->type         = BufferHeader::BufferType::kSingleMessage;
+      std::vector<NetworkIO::message> msgs;
+      msgs.emplace_back(host, tag, std::move(vec));
+      return msgs;
     }
 
-    void add(uint32_t tag, vTy& b) {
+    void add(uint32_t tag, vTy&& b) {
       std::lock_guard<SimpleLock> lg(lock);
       if (messages.empty()) {
         std::lock_guard<SimpleLock> lg(timelock);
         time = std::chrono::high_resolution_clock::now();
       }
-      unsigned oldNumBytes = numBytes;
+      assert(b.size() >= kHeaderSize);
       numBytes += b.size();
-      galois::runtime::trace("BufferedAdd", oldNumBytes, numBytes, tag,
-                             galois::runtime::printVec(b));
-      messages.emplace_back(tag, b);
+      messages.emplace_back(tag, std::move(b));
     }
   }; // end send buffer class
 
@@ -402,24 +382,26 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         // handle send queue i
         auto& sd = sendData[i];
         if (sd.ready()) {
-          NetworkIO::message msg;
-          msg.host                    = i;
-          std::tie(msg.tag, msg.data) = sd.assemble(inflightSends);
-          galois::runtime::trace("BufferedSending", msg.host, msg.tag,
-                                 galois::runtime::printVec(msg.data));
-          ++statSendEnqueued;
-          netio->enqueue(std::move(msg));
+          std::vector<NetworkIO::message> msgs = sd.assemble(i);
+          if (msgs.size() > 1) {
+            inflightSends += msgs.size() - 1;
+          }
+
+          for (auto& msg : msgs) {
+            ++statSendEnqueued;
+            netio->enqueue(std::move(msg));
+          }
         }
+
         // handle receive
         NetworkIO::message rdata = netio->dequeue();
         if (rdata.data.size()) {
           ++statRecvDequeued;
-          assert(rdata.data.size() !=
-                 (unsigned int)std::count(rdata.data.begin(), rdata.data.end(),
-                                          0));
-          galois::runtime::trace("BufferedRecieving", rdata.host, rdata.tag,
-                                 galois::runtime::printVec(rdata.data));
-          recvData[rdata.host].add(std::move(rdata));
+          uint32_t h               = rdata.host;
+          bool not_partial_segment = recvData[h].add(std::move(rdata));
+          if (!not_partial_segment) {
+            --inflightRecvs;
+          }
         }
       }
     }
@@ -454,22 +436,19 @@ public:
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;
 
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf,
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer&& buf,
                           int phase) {
-    ++inflightSends;
     tag += phase;
     statSendNum += 1;
-    statSendBytes += buf.size();
-    galois::runtime::trace("sendTagged", dest, tag,
-                           galois::runtime::printVec(buf.getVec()));
+    statSendBytes += buf.size() + kHeaderSize;
+    memUsageTracker.incrementMemUsage(buf.size() + kHeaderSize);
+    ++inflightSends;
     auto& sd = sendData[dest];
-    sd.add(tag, buf.getVec());
+    sd.add(tag, std::move(buf.get()));
   }
 
   virtual std::optional<std::pair<uint32_t, RecvBuffer>>
-  recieveTagged(uint32_t tag,
-                std::unique_lock<galois::substrate::SimpleLock>* rlg,
-                int phase) {
+  recieveTagged(uint32_t tag, int phase) {
     tag += phase;
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
@@ -480,12 +459,8 @@ public:
           auto buf = rq.popMsg(tag, inflightRecvs);
           if (buf) {
             ++statRecvNum;
-            statRecvBytes += buf->size();
-            memUsageTracker.decrementMemUsage(buf->size());
-            if (rlg)
-              *rlg = std::move(lg);
-            galois::runtime::trace("recvTagged", h, tag,
-                                   galois::runtime::printVec(buf->getVec()));
+            statRecvBytes += buf->size() + kHeaderSize;
+            memUsageTracker.decrementMemUsage(buf->size() + kHeaderSize);
             anyReceivedMessages = true;
             return std::optional<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));

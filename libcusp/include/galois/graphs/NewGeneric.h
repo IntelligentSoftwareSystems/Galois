@@ -625,16 +625,16 @@ private:
       if (h != base_DistGraph::id) {
         galois::runtime::gSerialize(bitsetBuffer, syncNodes[h]);
         bytesSent += bitsetBuffer.size();
-        net.sendTagged(h, galois::runtime::evilPhase, bitsetBuffer);
+        net.sendTagged(h, galois::runtime::evilPhase, std::move(bitsetBuffer));
       }
     }
 
     // Step 5: recv bitset to other hosts; this indicates which local nodes each
     // other host needs to be informed of updates of
     for (unsigned h = 0; h < net.Num - 1; h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       uint32_t sendingHost = p->first;
       // deserialize into neighbor bitsets
@@ -724,7 +724,7 @@ private:
 
         // note the +1 on evil phase; load messages send using a different
         // phase to avoid conflicts
-        net.sendTagged(h, base_DistGraph::evilPhasePlus1(), b);
+        net.sendTagged(h, base_DistGraph::evilPhasePlus1(), std::move(b));
       }
     }
     sendTimer.stop();
@@ -744,13 +744,13 @@ private:
                      std::vector<uint64_t>& edgeLoads,
                      galois::DynamicBitSet& loadsClear) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-    decltype(net.recieveTagged(base_DistGraph::evilPhasePlus1(), nullptr)) p;
+    decltype(net.recieveTagged(base_DistGraph::evilPhasePlus1())) p;
 
     galois::StatTimer recvTimer("Phase0AsyncRecvLoadTime", GRNAME);
     recvTimer.start();
     do {
       // note the +1
-      p = net.recieveTagged(base_DistGraph::evilPhasePlus1(), nullptr);
+      p = net.recieveTagged(base_DistGraph::evilPhasePlus1());
 
       if (p) {
         unsigned messageType = (unsigned)-1;
@@ -945,13 +945,13 @@ private:
         galois::runtime::gSerialize(b, mastersToSend);
       }
       bytesSent += b.size();
-      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
+      net.sendTagged(targetHost, galois::runtime::evilPhase, std::move(b));
     } else {
       // send empty no-op message, tag 0
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, 0u);
       bytesSent += b.size();
-      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
+      net.sendTagged(targetHost, galois::runtime::evilPhase, std::move(b));
     }
     sendOffsetsTimer.stop();
 
@@ -1020,9 +1020,9 @@ private:
         bytesSent += b.size();
         // assumes phase is 0 or 1
         if (phase == 1) {
-          net.sendTagged(h, base_DistGraph::evilPhasePlus1(), b);
+          net.sendTagged(h, base_DistGraph::evilPhasePlus1(), std::move(b));
         } else if (phase == 0) {
-          net.sendTagged(h, galois::runtime::evilPhase, b);
+          net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
         } else {
           GALOIS_DIE("unexpected phase: ", phase);
         }
@@ -1067,9 +1067,9 @@ private:
                         std::vector<uint32_t>& receivedMasters) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+    decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
     do {
-      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      p = net.recieveTagged(galois::runtime::evilPhase);
     } while (!p);
 
     uint32_t sendingHost = p->first;
@@ -1109,11 +1109,11 @@ private:
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
       galois::DynamicBitSet& hostFinished) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+    decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
 
     // repeat loop until no message
     do {
-      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      p = net.recieveTagged(galois::runtime::evilPhase);
       if (p) {
         uint32_t sendingHost = p->first;
         unsigned messageType = (unsigned)-1;
@@ -2131,8 +2131,7 @@ private:
       bytesSent.update(b.size());
 
       // send buffer and free memory
-      net.sendTagged(h, galois::runtime::evilPhase, b);
-      b.getVec().clear();
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
 
     galois::runtime::reportStat_Tsum(
@@ -2156,9 +2155,9 @@ private:
 
     for (unsigned h = 0; h < net.Num - 1; h++) {
       // expect data from comm partner back
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
       uint32_t sendingHost = p->first;
@@ -2739,16 +2738,15 @@ private:
                   bytesSent.update(b.size());
                   maxBytesSent.update(b.size());
 
-                  net.sendTagged(h, galois::runtime::evilPhase, b);
-                  b.getVec().clear();
-                  b.getVec().reserve(edgePartitionSendBufSize * 1.25);
+                  net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+                  b = galois::runtime::SerializeBuffer();
+                  b.reserve(edgePartitionSendBufSize * 1.25);
                 }
               }
             }
 
             // overlap receives
-            auto buffer =
-                net.recieveTagged(galois::runtime::evilPhase, nullptr);
+            auto buffer = net.recieveTagged(galois::runtime::evilPhase);
             this->processReceivedEdgeBuffer(buffer, graph, receivedNodes);
           },
 #if MORE_DIST_STATS
@@ -2771,8 +2769,8 @@ private:
           bytesSent.update(sendBuffer.size());
           maxBytesSent.update(sendBuffer.size());
 
-          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
-          sendBuffer.getVec().clear();
+          net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
+          sendBuffer = galois::runtime::SerializeBuffer();
         }
       }
     }
@@ -2885,16 +2883,15 @@ private:
                   bytesSent.update(b.size());
                   maxBytesSent.update(b.size());
 
-                  net.sendTagged(h, galois::runtime::evilPhase, b);
-                  b.getVec().clear();
-                  b.getVec().reserve(edgePartitionSendBufSize * 1.25);
+                  net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+                  b = galois::runtime::SerializeBuffer();
+                  b.reserve(edgePartitionSendBufSize * 1.25);
                 }
               }
             }
 
             // overlap receives
-            auto buffer =
-                net.recieveTagged(galois::runtime::evilPhase, nullptr);
+            auto buffer = net.recieveTagged(galois::runtime::evilPhase);
             this->processReceivedEdgeBuffer(buffer, graph, receivedNodes);
           },
 #if MORE_DIST_STATS
@@ -2917,8 +2914,7 @@ private:
           bytesSent.update(sendBuffer.size());
           maxBytesSent.update(sendBuffer.size());
 
-          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
-          sendBuffer.getVec().clear();
+          net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
         }
       }
     }
@@ -2940,7 +2936,7 @@ private:
       GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
     if (buffer) {
       auto& rb = buffer->second;
-      while (rb.r_size() > 0) {
+      while (rb.size() > 0) {
         uint64_t n;
         std::vector<uint64_t> gdst_vec;
         galois::runtime::gDeserialize(rb, n);
@@ -2966,8 +2962,8 @@ private:
 
     // receive edges for all mirror nodes
     while (receivedNodes < nodesToReceive) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      p = net.recieveTagged(galois::runtime::evilPhase);
       processReceivedEdgeBuffer(p, graph, receivedNodes);
     }
   }

@@ -133,7 +133,7 @@ private:
 
       galois::runtime::SendBuffer b;
       gSerialize(b, mirrorEdges[x]);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
+      net.sendTagged(x, galois::runtime::evilPhase, std::move(b));
     }
 
     // receive the mirror edges
@@ -141,9 +141,9 @@ private:
       if (x == id)
         continue;
 
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
       galois::runtime::gDeserialize(p->second, masterEdges[p->first]);
@@ -169,7 +169,7 @@ private:
 
       galois::runtime::SendBuffer b;
       gSerialize(b, totalMirrorEdges, totalOwnedEdges);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
+      net.sendTagged(x, galois::runtime::evilPhase, std::move(b));
     }
 
     // receive
@@ -177,9 +177,9 @@ private:
       if (x == id)
         continue;
 
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
       uint64_t totalMirrorFromOther;
@@ -1097,9 +1097,9 @@ private:
   template <typename FnTy, SyncType syncType>
   inline bool extractBatchWrapper(unsigned x, galois::runtime::SendBuffer& b) {
     if (syncType == syncReduce) {
-      return FnTy::extract_reset_batch(x, b.getVec().data());
+      return FnTy::extract_reset_batch(x, b.data());
     } else {
-      return FnTy::extract_batch(x, b.getVec().data());
+      return FnTy::extract_batch(x, b.data());
     }
   }
 
@@ -1125,9 +1125,9 @@ private:
   inline bool extractBatchWrapper(unsigned x, galois::runtime::SendBuffer& b,
                                   size_t& s, DataCommMode& data_mode) {
     if (syncType == syncReduce) {
-      return FnTy::extract_reset_batch(x, b.getVec().data(), &s, &data_mode);
+      return FnTy::extract_reset_batch(x, b.data(), &s, &data_mode);
     } else {
-      return FnTy::extract_batch(x, b.getVec().data(), &s, &data_mode);
+      return FnTy::extract_batch(x, b.data(), &s, &data_mode);
     }
   }
 
@@ -1243,12 +1243,12 @@ private:
   template <typename FnTy, SyncType syncType, bool async>
   inline bool setBatchWrapper(unsigned x, galois::runtime::RecvBuffer& b) {
     if (syncType == syncReduce) {
-      return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset());
+      return FnTy::reduce_batch(x, b.data());
     } else {
       if (async) {
-        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset());
+        return FnTy::reduce_mirror_batch(x, b.data());
       } else {
-        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset());
+        return FnTy::setVal_batch(x, b.data());
       }
     }
   }
@@ -1273,15 +1273,12 @@ private:
   inline bool setBatchWrapper(unsigned x, galois::runtime::RecvBuffer& b,
                               DataCommMode& data_mode) {
     if (syncType == syncReduce) {
-      return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset(),
-                                data_mode);
+      return FnTy::reduce_batch(x, b.data(), data_mode);
     } else {
       if (async) {
-        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset(),
-                                         data_mode);
+        return FnTy::reduce_mirror_batch(x, b.data(), data_mode);
       } else {
-        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(),
-                                  data_mode);
+        return FnTy::setVal_batch(x, b.data(), data_mode);
       }
     }
   }
@@ -1723,7 +1720,8 @@ private:
         size_t syncTypePhase = 0;
         if (async && (syncType == syncBroadcast))
           syncTypePhase = 1;
-        net.sendTagged(x, galois::runtime::evilPhase, b, syncTypePhase);
+        net.sendTagged(x, galois::runtime::evilPhase, std::move(b),
+                       syncTypePhase);
         ++numMessages;
       }
     }
@@ -1958,11 +1956,9 @@ private:
       size_t syncTypePhase = 0;
       if (syncType == syncBroadcast)
         syncTypePhase = 1;
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr,
-                                 syncTypePhase)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, syncTypePhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr,
-                              syncTypePhase);
+        p = net.recieveTagged(galois::runtime::evilPhase, syncTypePhase);
 
         if (p) {
           syncRecvApply<syncType, SyncFnTy, BitsetFnTy, async>(
@@ -1977,9 +1973,9 @@ private:
           continue;
 
         Twait.start();
-        decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+        decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
         do {
-          p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          p = net.recieveTagged(galois::runtime::evilPhase);
         } while (!p);
         Twait.stop();
 

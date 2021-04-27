@@ -182,8 +182,8 @@ public:
     statSendBytes += buf.size();
     // int count = 0;
 #ifndef GALOIS_SUPPORT_ASYNC
-    if (buf.getVec().size() < 8192) {
-      while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag,
+    if (buf.get().size() < 8192) {
+      while (lc_sendm(buf.get().data(), buf.get().size(), dest, tag,
                       lc_p2p_ep[phase]) != LC_OK) {
         sched_yield();
       }
@@ -191,7 +191,7 @@ public:
 #endif
     {
       pendingReq* msg =
-          new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
+          new pendingReq(dest, tag, phase, buf.get(), inflightSends);
       while (lc_sendl(msg->buf.data(), msg->buf.size(), dest, tag,
                       lc_p2p_ep[phase], free_req, msg) != LC_OK) {
         sched_yield();

@@ -105,8 +105,8 @@ void DistStatManager::combineAtHost_0_helper(void) {
       SendBuffer b;
       gSerialize(b, hTotalMap.region(i), hTotalMap.category(i),
                  hTotalMap.stat(i).totalTy());
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
-                                             syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+                                             std::move(b), syncTypePhase);
     }
   }
 
@@ -126,8 +126,8 @@ void DistStatManager::combineAtHost_0_helper(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
-                                             syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+                                             std::move(b), syncTypePhase);
     }
   }
 }
@@ -151,8 +151,8 @@ void DistStatManager::combineAtHost_0_helper2(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
-                                             syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+                                             std::move(b), syncTypePhase);
     }
   }
 
@@ -172,8 +172,8 @@ void DistStatManager::combineAtHost_0_helper2(void) {
     } else {
       SendBuffer b;
       gSerialize(b, ln, cat, thrdTotal, totalTy, thrdVals);
-      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase, b,
-                                             syncTypePhase);
+      getSystemNetworkInterface().sendTagged(0, galois::runtime::evilPhase,
+                                             std::move(b), syncTypePhase);
     }
   }
 }
@@ -182,10 +182,10 @@ void DistStatManager::receiveAtHost_0_helper(void) {
   size_t syncTypePhase = 0;
   {
     decltype(getSystemNetworkInterface().recieveTagged(
-        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+        galois::runtime::evilPhase, syncTypePhase)) p;
     do {
       p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
-                                                    nullptr, syncTypePhase);
+                                                    syncTypePhase);
 
       if (p) {
         RecvBuffer& b = p->second;
@@ -203,10 +203,10 @@ void DistStatManager::receiveAtHost_0_helper(void) {
   ++syncTypePhase;
   {
     decltype(getSystemNetworkInterface().recieveTagged(
-        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+        galois::runtime::evilPhase, syncTypePhase)) p;
     do {
       p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
-                                                    nullptr, syncTypePhase);
+                                                    syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
@@ -230,10 +230,10 @@ void DistStatManager::receiveAtHost_0_helper2(void) {
   size_t syncTypePhase = 0;
   {
     decltype(getSystemNetworkInterface().recieveTagged(
-        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+        galois::runtime::evilPhase, syncTypePhase)) p;
     do {
       p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
-                                                    nullptr, syncTypePhase);
+                                                    syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
@@ -255,10 +255,10 @@ void DistStatManager::receiveAtHost_0_helper2(void) {
   ++syncTypePhase;
   {
     decltype(getSystemNetworkInterface().recieveTagged(
-        galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
+        galois::runtime::evilPhase, syncTypePhase)) p;
     do {
       p = getSystemNetworkInterface().recieveTagged(galois::runtime::evilPhase,
-                                                    nullptr, syncTypePhase);
+                                                    syncTypePhase);
 
       if (p) {
         uint32_t hostID = p->first;
