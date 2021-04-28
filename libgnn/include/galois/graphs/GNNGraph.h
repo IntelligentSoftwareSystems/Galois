@@ -377,13 +377,20 @@ public:
 
   //////////////////////////////////////////////////////////////////////////////
 
+  // TODO(loc) Should not be a default version of this to avoid potential
+  // issues later
+  void AggregateSync(GNNFloat* matrix_to_sync,
+                     const size_t matrix_column_size) const {
+    AggregateSync(matrix_to_sync, matrix_column_size, false);
+  };
+
   //! Given a matrix and the column size, do an aggregate sync where each row
   //! is considered a node's data and sync using the graph's Gluon
   //! substrate
   //! Note that it's const because the only thing being used is the graph
   //! topology of this object; the thing modified is the passed in matrix
-  void AggregateSync(GNNFloat* matrix_to_sync,
-                     const size_t matrix_column_size) const;
+  void AggregateSync(GNNFloat* matrix_to_sync, const size_t matrix_column_size,
+                     bool is_backward) const;
 
   //////////////////////////////////////////////////////////////////////////////
   // Sampling related

@@ -173,14 +173,20 @@ bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
   return (*mask_to_use)[lid];
 }
 
-void galois::graphs::GNNGraph::AggregateSync(
-    GNNFloat* matrix_to_sync, const size_t matrix_column_size) const {
+void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
+                                             const size_t matrix_column_size,
+                                             bool is_backward) const {
   // set globals for the sync substrate
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
-  sync_substrate_
-      ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
-          "GraphAggregateSync");
+  if (!is_backward) {
+    sync_substrate_
+        ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
+            "GraphAggregateSync");
+  } else {
+    sync_substrate_->sync<writeDestination, readAny, GNNSumAggregate,
+                          Bitset_graph_aggregate>("BackwardGraphAggregateSync");
+  }
 }
 
 #ifdef GALOIS_ENABLE_GPU

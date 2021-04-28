@@ -841,6 +841,48 @@ private:
     }
   }
 
+  // only difference is val_vec doesn't get resized ever (it's the single array
+  // from the hack call
+  template <bool async, SyncType syncType, typename VecType>
+  void
+  serializeMessageVecHack(std::string loopName, DataCommMode data_mode,
+                          size_t bit_set_count, std::vector<size_t>& indices,
+                          galois::PODResizeableArray<unsigned int>& offsets,
+                          galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
+                          galois::runtime::SendBuffer& b) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
+                                    get_run_identifier(loopName));
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tserialize(
+        serialize_timer_str.c_str(), RNAME);
+    if (data_mode == noData) {
+      if (!async) {
+        Tserialize.start();
+        gSerialize(b, data_mode);
+        Tserialize.stop();
+      }
+    } else if (data_mode == gidsData) {
+      offsets.resize(bit_set_count);
+      convertLIDToGID<syncType>(loopName, indices, offsets);
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+      Tserialize.stop();
+    } else if (data_mode == offsetsData) {
+      offsets.resize(bit_set_count);
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+      Tserialize.stop();
+    } else if (data_mode == bitsetData) {
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, bit_set_comm, val_vec);
+      Tserialize.stop();
+    } else { // onlyData
+      Tserialize.start();
+      gSerialize(b, data_mode, val_vec);
+      Tserialize.stop();
+    }
+  }
+
   /**
    * Given the data mode, deserialize the rest of a message in a Receive Buffer.
    *
@@ -2030,20 +2072,24 @@ private:
 
         // Vector of vectors is in val_vec
         // val vec over to contiguous array of #s
-        size_t num_nodes    = val_vec.size();
-        size_t feature_size = val_vec[0].size();
-        single_array.resize(num_nodes * feature_size);
-        galois::do_all(
-            galois::iterate(size_t{0}, num_nodes),
-            [&](size_t node) {
-              std::memcpy(&(single_array.data()[node * feature_size]),
-                          val_vec[node].data(), feature_size * sizeof(float));
-            },
-            galois::loopname("GluonSerializeManyVecToOne"));
+        size_t num_nodes    = bit_set_count;
+        size_t feature_size = 0;
+        if (bit_set_count != 0) {
+          feature_size = val_vec[0].size();
+          single_array.resize(num_nodes * feature_size);
+          galois::do_all(
+              galois::iterate(size_t{0}, num_nodes),
+              [&](size_t index) {
+                std::memcpy(&(single_array.data()[index * feature_size]),
+                            val_vec[index].data(),
+                            feature_size * sizeof(float));
+              },
+              galois::loopname("GluonSerializeManyVecToOne"));
+        }
 
-        serializeMessage<async, syncType>(loopName, data_mode, bit_set_count,
-                                          indices, offsets, bit_set_comm,
-                                          single_array, b);
+        serializeMessageVecHack<async, syncType>(
+            loopName, data_mode, bit_set_count, indices, offsets, bit_set_comm,
+            single_array, b);
         gSerialize(b, feature_size);
       } else {
         // TODO(loc/hochan) vector gpu hack for gnns

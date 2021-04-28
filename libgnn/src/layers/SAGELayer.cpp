@@ -394,24 +394,11 @@ void galois::SAGELayer::AggregateAllCPU(
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
       [&](size_t src) {
-        // TODO(loc) this is currently a hack: the sync substrate blows
-        // up if not the entire bitset is set for sync call like in
-        // edge sampling
-        graphs::bitset_graph_aggregate.set(src);
         size_t index_to_src_feature = src * column_length;
         // zero out src feature first
         for (size_t i = 0; i < column_length; i++) {
           aggregate_output[index_to_src_feature + i] = 0;
         }
-
-        // if (layer_phase_ == GNNPhase::kTrain) {
-        //  // XXX
-        //  if (IsInductiveLayer()) {
-        //    // if inductive, all non-training nodes do not exist
-        //    if (!graph_.IsValidForPhase(src, GNNPhase::kTrain))
-        //      return;
-        //  }
-        //}
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
@@ -422,17 +409,13 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src);
                e++) {
-            // graphs::bitset_graph_aggregate.set(src);
+            // XXX set LID
+            graphs::bitset_graph_aggregate.set(src);
             size_t dst = graph_.GetEdgeDest(e);
             // galois::gPrint("(", src, " ", dst, ")\n");
 
             if (layer_phase_ == GNNPhase::kTrain) {
-              //// XXX
-              // if (IsInductiveLayer()) {
-              //  // if inductive, all non-training nodes do not exist
-              //  if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-              //    return;
-              //}
+              // XXX
               if (IsSampledLayer()) {
                 if (!graph_.IsEdgeSampled(e, layer_number_)) {
                   continue;
@@ -467,16 +450,12 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.in_edge_begin(src); e != graph_.in_edge_end(src);
                e++) {
-            // graphs::bitset_graph_aggregate.set(src);
+            // XXX LID not SID
+            graphs::bitset_graph_aggregate.set(src);
             size_t dst = graph_.GetInEdgeDest(e);
 
             if (layer_phase_ == GNNPhase::kTrain) {
               // XXX
-              // if (IsInductiveLayer()) {
-              //  // if inductive, all non-training nodes do not exist
-              //  if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-              //    return;
-              //}
               if (IsSampledLayer()) {
                 if (!graph_.IsInEdgeSampled(e, layer_number_)) {
                   continue;
@@ -507,7 +486,7 @@ void galois::SAGELayer::AggregateAllCPU(
       galois::chunk_size<1>(), galois::steal(),
       galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
-  graph_.AggregateSync(aggregate_output, column_length);
+  graph_.AggregateSync(aggregate_output, column_length, is_backward);
 }
 
 void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
