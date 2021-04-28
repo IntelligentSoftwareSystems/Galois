@@ -58,6 +58,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
   timer.stop();
 }
 
+// TODO optimize further?
 void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
     const GNNGraph& gnn_graph) {
   galois::StatTimer timer("DegreeCounting", kRegionName);
@@ -98,6 +99,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
   timer.stop();
 }
 
+// TODO optimize further?
 void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
     const GNNGraph& gnn_graph) {
   galois::StatTimer timer("EdgeConstruction", kRegionName);
@@ -111,6 +113,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
 
   // allocate then set node endpoints
   num_subgraph_edges_ = subgraph_out_degrees_.back();
+  underlying_graph_.DeallocateOnly();
   underlying_graph_.allocateFrom(num_subgraph_nodes_, num_subgraph_edges_);
   underlying_graph_.CSCAllocate();
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),

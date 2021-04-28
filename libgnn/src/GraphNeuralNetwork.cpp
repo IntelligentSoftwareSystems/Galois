@@ -28,6 +28,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 #endif
   // used for chaining layers together; begins as nullptr
   PointerWithSize<GNNFloat> prev_output_layer(nullptr, 0);
+  num_graph_user_layers_ = 0;
 
   // create the intermediate layers
   for (size_t i = 0; i < config_.num_intermediate_layers(); i++) {
@@ -52,6 +53,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       gnn_layers_.push_back(std::move(std::make_unique<GraphConvolutionalLayer>(
           i, *graph_, &prev_output_layer, layer_dims,
           config_.default_layer_config())));
+      gnn_layers_.back()->SetGraphUserLayerNumber(num_graph_user_layers_++);
 #ifdef GALOIS_ENABLE_GPU
       if (device_personality == DevicePersonality::GPU_CUDA) {
         graph_->InitLayerVectorMetaObjects(
@@ -64,6 +66,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       gnn_layers_.push_back(std::move(std::make_unique<SAGELayer>(
           i, *graph_, &prev_output_layer, layer_dims,
           config_.default_layer_config())));
+      gnn_layers_.back()->SetGraphUserLayerNumber(num_graph_user_layers_++);
 #ifdef GALOIS_ENABLE_GPU
       // TODO(loc/hochan) sage layer gpu
 #endif
@@ -105,7 +108,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   }
   if (config_.do_sampling() || config_.inductive_training_) {
     // output layer not included; it will never involve sampling
-    graph_->InitializeSamplingData(gnn_layers_.size());
+    graph_->InitializeSamplingData(num_graph_user_layers_,
+                                   config_.inductive_training_);
   }
 
   // create the output layer
@@ -160,7 +164,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
       if (layer_type == GNNLayerType::kGraphConvolutional ||
           layer_type == GNNLayerType::kSAGE) {
-        graph_->SampleAllEdges((*back_iter)->layer_number());
+        graph_->SampleAllEdges((*back_iter)->graph_user_layer_number());
       }
     }
     // resize layer matrices
@@ -197,7 +201,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         GNNLayerType layer_type = (*back_iter)->layer_type();
         if (layer_type == GNNLayerType::kGraphConvolutional ||
             layer_type == GNNLayerType::kSAGE) {
-          graph_->SampleEdges((*back_iter)->layer_number(), 30);
+          graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 5);
           num_sampled_layers++;
         }
       }

@@ -606,6 +606,14 @@ public:
     edgeData.destroy();
   }
 
+  //! No destroy, only deallocate
+  void DeallocateOnly() {
+    nodeData.deallocate();
+    edgeIndData.deallocate();
+    edgeDst.deallocate();
+    edgeData.deallocate();
+  }
+
   void constructEdge(EdgeIndexTy e, NodeIndexTy dst,
                      const typename EdgeData::value_type& val) {
     edgeData.set(e, val);

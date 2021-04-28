@@ -415,7 +415,7 @@ void galois::SAGELayer::AggregateAllCPU(
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
-          source_norm = graph_.GetDegreeNorm(src);
+          source_norm = graph_.GetDegreeNorm(src, graph_user_layer_number_);
         }
 
         if (!is_backward) {
@@ -447,7 +447,8 @@ void galois::SAGELayer::AggregateAllCPU(
               if (!is_backward) {
                 norm_scale = source_norm;
               } else {
-                norm_scale = graph_.GetDegreeNorm(dst);
+                norm_scale =
+                    graph_.GetDegreeNorm(dst, graph_user_layer_number_);
               }
 
               galois::VectorMulAdd(
@@ -486,7 +487,8 @@ void galois::SAGELayer::AggregateAllCPU(
             size_t index_to_dst_feature = dst * column_length;
 
             if (!config_.disable_normalization) {
-              GNNFloat norm_scale = graph_.GetDegreeNorm(dst);
+              GNNFloat norm_scale =
+                  graph_.GetDegreeNorm(dst, graph_user_layer_number_);
 
               galois::VectorMulAdd(
                   column_length, &aggregate_output[index_to_src_feature],

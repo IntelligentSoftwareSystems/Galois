@@ -115,9 +115,9 @@ public:
   // Edges
   //////////////////////////////////////////////////////////////////////////////
 
-  void InitializeSamplingData() { InitializeSamplingData(1); }
+  void InitializeSamplingData() { InitializeSamplingData(1, false); }
   //! Initialize data required to do graph sampling
-  void InitializeSamplingData(size_t num_layers);
+  void InitializeSamplingData(size_t num_layers, bool is_inductive);
 
   //////////////////////////////////////////////////////////////////////////////
   // Out Edges
@@ -286,16 +286,23 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   GNNFloat GetNormFactor(GraphNode n) const { return norm_factors_[n]; }
+
   //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
   //! inductive graph, etc); calculated whenever norm factor is calculated
-  GNNFloat GetDegreeNorm(GraphNode n) const {
-    if (!use_subgraph_) {
-      return degree_norm_[n];
+  GNNFloat GetGlobalDegreeNorm(GraphNode n) const { return degree_norm_[n]; }
+
+  //! Get degree of subgraph for particular layer
+  GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
+    if (use_subgraph_) {
+      if (!subgraph_is_inductive_) {
+        // case because degrees in each layer differ
+        return 1.0 / sampled_out_degrees_[graph_user_layer_num]
+                                         [subgraph_->SIDToLID(n)];
+      } else {
+        return 1.0 / sampled_out_degrees_[0][subgraph_->SIDToLID(n)];
+      }
     } else {
-      // XXX does not work in distributed case, fix there
-      // XXX also need to account for current layer number in sampling
-      // case because degrees in each layer differ
-      return 1.0 / subgraph_->GetLocalDegree(n);
+      return degree_norm_[n];
     }
   }
 
@@ -521,8 +528,7 @@ private:
 
   std::unique_ptr<GNNSubgraph> subgraph_;
   // Degrees for sampled subgraph
-  galois::LargeArray<uint32_t> sampled_out_degrees_;
-  galois::LargeArray<uint32_t> sampled_in_degrees_;
+  std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;
@@ -568,6 +574,7 @@ private:
 
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
+  bool subgraph_is_inductive_{false};
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things

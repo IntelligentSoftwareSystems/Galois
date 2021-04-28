@@ -198,6 +198,8 @@ private:
   std::vector<std::unique_ptr<galois::GNNLayer>> gnn_layers_;
   //! Current phase of the GNN: train, validation, test
   GNNPhase phase_{GNNPhase::kTrain};
+  //! Number of layers that use the graph (e.g. SAGE, GCN)
+  size_t num_graph_user_layers_;
 
 #ifdef GALOIS_ENABLE_GPU
   //! Holds all GPU functions

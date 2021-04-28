@@ -104,6 +104,8 @@ private:
 
   static const constexpr char* kRegionName = "GNNSubgraph";
 
+  bool inductive_subgraph_{false};
+
   // name is self explanatory
   LC_CSR_CSC_Graph<char, void> underlying_graph_;
   // size vars

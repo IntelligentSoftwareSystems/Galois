@@ -142,6 +142,7 @@ public:
     return output_layer_type_;
   }
   size_t layer_number() const { return layer_number_; }
+  size_t graph_user_layer_number() const { return graph_user_layer_number_; }
 
   //! Conducts the forward phase given the input to this layer which
   //! ultimately leads to an output (classfication of node labels) at the end
@@ -175,6 +176,9 @@ public:
   void EnableSampling() { config_.do_sampling = true; }
   bool IsSampledLayer() const { return config_.do_sampling; }
   bool IsInductiveLayer() const { return config_.inductive_training_; }
+  //! Sets the graph user layer number; important for sampling as this index
+  //! determines which index to use when checking for sampled edges
+  void SetGraphUserLayerNumber(size_t num) { graph_user_layer_number_ = num; }
 
 #ifdef GALOIS_ENABLE_GPU
   //! Utility function for allocating
@@ -207,6 +211,8 @@ protected:
   //! 0 does not need to do some things that other layers need to do
   // XXX be more specific
   size_t layer_number_;
+  //! Graph layer number: only layers that use the graph are numbered
+  size_t graph_user_layer_number_;
   //! Pointer to the graph being trained by this layer.
   //! This is owned by the creator of this layer, so no need to free it when
   //! this layer is destroyed.

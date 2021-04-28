@@ -857,11 +857,26 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers) {
+void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
+                                                      bool is_inductive) {
   subgraph_ = std::make_unique<GNNSubgraph>(partitioned_graph_->size());
-  edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers);
-  sampled_out_degrees_.create(partitioned_graph_->size(), 0);
-  sampled_in_degrees_.create(partitioned_graph_->size(), 0);
+  edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers, 0);
+  // this is to hold the *global* degree of a sampled graph; yes, memory wise
+  // this is slightly problematic possibly, but each layer is its own
+  // subgraph
+  if (!is_inductive) {
+    sampled_out_degrees_.resize(num_layers);
+    for (galois::LargeArray<uint32_t>& array : sampled_out_degrees_) {
+      array.create(partitioned_graph_->size());
+    }
+  } else {
+    // TODO(loc) optimize possible: inductive setting means # nodes always
+    // only training/other nodes, so can allocate only what is required
+    // Allocating full size is inefficient
+    sampled_out_degrees_.resize(1);
+    sampled_out_degrees_[0].create(partitioned_graph_->size());
+    subgraph_is_inductive_ = true;
+  }
 }
 
 void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
@@ -882,9 +897,17 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
                    std::fill(edge_sample_status_[edge_id].begin(),
                              edge_sample_status_[edge_id].end(), 0);
                  });
+  // reset all degrees
+  galois::do_all(
+      galois::iterate(sampled_out_degrees_),
+      [&](galois::LargeArray<uint32_t>& array) {
+        std::fill(array.begin(), array.end(), 0);
+      },
+      galois::chunk_size<1>());
 }
 
 void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
+  assert(subgraph_is_inductive_);
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;
@@ -894,18 +917,27 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
 
   galois::do_all(
       galois::iterate(begin(), end()),
-      [&](const NodeIterator& x) {
+      [&](const NodeIterator& src_iter) {
         // only operate on if sampled
-        if (partitioned_graph_->getData(*x)) {
+        if (partitioned_graph_->getData(*src_iter)) {
           // marks ALL edges of nodes that connect to train/other nodes
-          for (auto edge_iter : partitioned_graph_->edges(*x)) {
+          for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
             if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
                                 GNNPhase::kTrain) ||
                 IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
                                 GNNPhase::kOther)) {
               MakeEdgeSampled(edge_iter, agg_layer_num);
-              new_sampled_nodes_.set(partitioned_graph_->getEdgeDst(edge_iter));
+              if (!IsInSampledGraph(
+                      partitioned_graph_->getEdgeDst(edge_iter))) {
+                new_sampled_nodes_.set(
+                    partitioned_graph_->getEdgeDst(edge_iter));
+              }
               sampled += 1;
+              // only count once for last layer (last layer is where all
+              // relevant nodes will be included)
+              if (agg_layer_num == 0) {
+                sampled_out_degrees_[0][*src_iter]++;
+              }
             }
             total += 1;
           }
@@ -930,6 +962,7 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
 
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                                            size_t num_to_sample) {
+  assert(!subgraph_is_inductive_);
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;
@@ -938,15 +971,16 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   total.reset();
   galois::do_all(
       galois::iterate(begin(), end()),
-      [&](const NodeIterator& x) {
+      [&](const NodeIterator& src_iter) {
         // only operate on if sampled
-        if (partitioned_graph_->getData(*x)) {
+        if (partitioned_graph_->getData(*src_iter)) {
           // chance of not uniformly choosing an edge of this node num_to_sample
           // times (degree norm is 1 / degree)
+          // XXX training degree + other norm, not global
           double probability_of_reject =
-              std::pow(1 - GetDegreeNorm(*x), num_to_sample);
+              std::pow(1 - GetGlobalDegreeNorm(*src_iter), num_to_sample);
           // loop through edges, turn "on" edge with some probability
-          for (auto edge_iter : partitioned_graph_->edges(*x)) {
+          for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
             if (sample_rng_.DoBernoulli(probability_of_reject)) {
               // only take if node is training node or a node not classified
               // into train/test/val
@@ -957,13 +991,20 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 // if here, it means edge accepted; set sampled on, mark source
                 // as part of next set
                 MakeEdgeSampled(edge_iter, sample_layer_num);
-                new_sampled_nodes_.set(
-                    partitioned_graph_->getEdgeDst(edge_iter));
+                if (!IsInSampledGraph(
+                        partitioned_graph_->getEdgeDst(edge_iter))) {
+                  new_sampled_nodes_.set(
+                      partitioned_graph_->getEdgeDst(edge_iter));
+                }
+                // degree increment
+                sampled_out_degrees_[sample_layer_num][*src_iter]++;
                 sampled += 1;
               }
             }
             total += 1;
           }
+          // galois::gDebug(*src_iter, " with degree ",
+          // sampled_out_degrees_[sample_layer_num][*src_iter]);
         }
       },
       galois::steal(), galois::loopname("NeighborhoodSample"));
