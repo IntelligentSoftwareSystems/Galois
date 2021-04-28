@@ -15,7 +15,7 @@ int main() {
 
   galois::graphs::GNNGraph graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
-  graph.InitializeSamplingData(3);
+  graph.InitializeSamplingData(3, false);
 
   // first, assert all edges are not sampled (should come with all 0s)
   for (size_t node = 0; node < graph.size(); node++) {
