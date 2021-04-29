@@ -3,6 +3,7 @@
 #include "galois/graphs/ReadGraph.h"
 #include "galois/graphs/GNNGraph.h"
 #include "galois/GNNMath.h"
+#include "galois/graphs/DegreeSyncStructures.h"
 #include <limits>
 
 namespace {
@@ -34,11 +35,15 @@ LoadPartition(const std::string& input_directory,
 
 } // end namespace
 
+// Sync structure variables; global to get around sync structure
+// limitations at the moment
 namespace galois {
 namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
 galois::DynamicBitSet bitset_graph_aggregate;
+uint32_t* gnn_degree_vec_1_;
+uint32_t* gnn_degree_vec_2_;
 #ifdef GALOIS_ENABLE_GPU
 struct CUDA_Context* cuda_ctx_for_sync;
 unsigned layer_number_to_sync;
@@ -84,9 +89,7 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
           partitioned_graph_->cartesianGrid());
   bitset_graph_aggregate.resize(partitioned_graph_->size());
 
-  // read in entire graph topology
-  ReadWholeGraph(dataset_name);
-  // init norm factors using the whole graph topology
+  // init norm factors (involves a sync call)
   InitNormFactor();
 
 #ifdef GALOIS_ENABLE_GPU
@@ -580,104 +583,37 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   }
 }
 
-void galois::graphs::GNNGraph::ReadWholeGraph(const std::string& dataset_name) {
-  std::string input_file = input_directory_ + dataset_name + ".csgr";
-  GALOIS_LOG_VERBOSE("[{}] Reading entire graph: file to read is {}", host_id_,
-                     input_file);
-  galois::graphs::readGraph(whole_graph_, input_file);
-}
-
 void galois::graphs::GNNGraph::InitNormFactor() {
   GALOIS_LOG_VERBOSE("[{}] Initializing norm factors", host_id_);
-  norm_factors_.resize(partitioned_graph_->size(), 0.0);
-  degree_norm_.resize(partitioned_graph_->size(), 0.0);
+  global_degrees_.resize(partitioned_graph_->size(), 0.0);
+  global_train_degrees_.resize(partitioned_graph_->size(), 0.0);
   CalculateFullNormFactor();
 }
 
 void galois::graphs::GNNGraph::CalculateFullNormFactor() {
-  norm_factors_.assign(partitioned_graph_->size(), 0.0);
+  // TODO(loc) reset all degrees if this is called multiple times?
 
   // get the norm factor contribution for each node based on the GLOBAL graph
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
-      [&](size_t local_id) {
-        // translate lid into gid to get global degree
-        size_t global_id = partitioned_graph_->getGID(local_id);
-        // +1 because simulated self edge
-        size_t global_degree = whole_graph_.edge_end(global_id) -
-                               whole_graph_.edge_begin(global_id) + 1;
-        // only set if non-zero
-        if (global_degree != 0) {
-          norm_factors_[local_id] =
-              1.0 / std::sqrt(static_cast<float>(global_degree));
-          degree_norm_[local_id] = 1.0 / static_cast<float>(global_degree);
+      [&](size_t src) {
+        for (auto edge_iter = partitioned_graph_->edge_begin(src);
+             edge_iter != partitioned_graph_->edge_end(src); edge_iter++) {
+          // count degrees for all + train/other
+          size_t dest = GetEdgeDest(edge_iter);
+          if (IsValidForPhase(dest, GNNPhase::kTrain) ||
+              IsValidForPhase(dest, GNNPhase::kOther)) {
+            global_train_degrees_[src] += 1;
+          }
+          global_degrees_[src] += 1;
         }
       },
-      galois::loopname("CalculateFullNormFactor"));
-}
-
-void galois::graphs::GNNGraph::CalculateSpecialNormFactor(bool is_sampled,
-                                                          bool is_inductive) {
-  if (galois::runtime::getSystemNetworkInterface().Num > 1) {
-    GALOIS_LOG_FATAL("cannot run special norm factor in dist setting yet");
-  }
-
-  norm_factors_.assign(partitioned_graph_->size(), 0.0);
-
-  // get the norm factor contribution for each node based on the GLOBAL graph
-  galois::do_all(
-      galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
-      [&](size_t local_id) {
-        // ignore node if not valid
-        if (is_sampled && is_inductive) {
-          if (!IsValidForPhase(local_id, GNNPhase::kTrain) ||
-              !IsInSampledGraph(local_id)) {
-            return;
-          }
-        } else if (is_sampled) {
-          if (!IsInSampledGraph(local_id)) {
-            return;
-          }
-        } else if (is_inductive) {
-          if (!IsValidForPhase(local_id, GNNPhase::kTrain)) {
-            return;
-          }
-        }
-
-        size_t degree = 0;
-
-        // TODO(loc) make this work in a distributed setting; assuming
-        // whole graph is present on single host at the moment
-        for (EdgeIterator e = edge_begin(local_id); e != edge_end(local_id);
-             e++) {
-          size_t dest = GetEdgeDest(e);
-          if (is_sampled && is_inductive) {
-            if (!IsValidForPhase(dest, GNNPhase::kTrain) ||
-                !IsInSampledGraph(dest)) {
-              continue;
-            }
-          } else if (is_sampled) {
-            if (!IsInSampledGraph(dest)) {
-              continue;
-            }
-          } else if (is_inductive) {
-            if (!IsValidForPhase(dest, GNNPhase::kTrain)) {
-              continue;
-            }
-          } else {
-            GALOIS_LOG_WARN(
-                "Why is special norm factor called if not sampled/inductive?");
-          }
-          degree += 1;
-        }
-
-        // only set if non-zero
-        if (degree != 0) {
-          norm_factors_[local_id] = 1.0 / std::sqrt(static_cast<float>(degree));
-          degree_norm_[local_id]  = 1.0 / static_cast<float>(degree);
-        }
-      },
-      galois::loopname("CalculateSpecialNormFactor"));
+      galois::loopname("CalculateLocalDegrees"));
+  // degree sync
+  gnn_degree_vec_1_ = global_train_degrees_.data();
+  gnn_degree_vec_2_ = global_degrees_.data();
+  sync_substrate_->sync<writeSource, readAny, InitialDegreeSync>(
+      "InitialDegreeSync");
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracy(

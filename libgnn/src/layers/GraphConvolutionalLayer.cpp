@@ -320,7 +320,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
 
         GNNFloat source_norm = 0.0;
         if (!config_.disable_normalization) {
-          source_norm = graph_.GetNormFactor(src);
+          source_norm = graph_.GetGCNNormFactor(src);
         }
 
         // init to self
@@ -359,7 +359,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           size_t index_to_dst_feature = dst * column_length;
 
           if (!config_.disable_normalization) {
-            GNNFloat norm_scale = source_norm * graph_.GetNormFactor(dst);
+            GNNFloat norm_scale = source_norm * graph_.GetGCNNormFactor(dst);
             galois::VectorMulAdd(
                 column_length, &aggregate_output[index_to_src_feature],
                 &node_embeddings[index_to_dst_feature], norm_scale,

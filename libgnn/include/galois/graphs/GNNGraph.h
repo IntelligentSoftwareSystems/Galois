@@ -285,24 +285,42 @@ public:
 
   //////////////////////////////////////////////////////////////////////////////
 
-  GNNFloat GetNormFactor(GraphNode n) const { return norm_factors_[n]; }
+  GNNFloat GetGCNNormFactor(GraphNode lid) const {
+    if (global_degrees_[lid]) {
+      return 1.0 / std::sqrt(static_cast<float>(global_degrees_[lid]) + 1);
+    } else {
+      return 0.0;
+    }
+  }
 
   //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
   //! inductive graph, etc); calculated whenever norm factor is calculated
-  GNNFloat GetGlobalDegreeNorm(GraphNode n) const { return degree_norm_[n]; }
+  GNNFloat GetGlobalDegreeNorm(GraphNode n) const {
+    if (global_degrees_[n]) {
+      return 1.0 / global_degrees_[n];
+    } else {
+      return 0.0;
+    }
+  }
 
-  //! Get degree of subgraph for particular layer
+  //! Get degree norm of subgraph for particular layer (i.e. includes training)
   GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
     if (use_subgraph_) {
+      size_t degree;
       if (!subgraph_is_inductive_) {
         // case because degrees in each layer differ
-        return 1.0 / sampled_out_degrees_[graph_user_layer_num]
-                                         [subgraph_->SIDToLID(n)];
+        degree =
+            sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
       } else {
-        return 1.0 / sampled_out_degrees_[0][subgraph_->SIDToLID(n)];
+        degree = sampled_out_degrees_[0][subgraph_->SIDToLID(n)];
+      }
+      if (degree) {
+        return 1.0 / degree;
+      } else {
+        return 0;
       }
     } else {
-      return degree_norm_[n];
+      return GetGlobalDegreeNorm(n);
     }
   }
 
@@ -427,9 +445,6 @@ public:
 
   //! Calculate norm factor considering the entire graph
   void CalculateFullNormFactor();
-  //! Calculate norm factor considering sampled nodes and/or training nodes
-  //! only (inductive)
-  void CalculateSpecialNormFactor(bool is_sampled, bool is_inductive);
 
 #ifdef GALOIS_ENABLE_GPU
   void AggregateSync(GNNFloat* matrix_to_sync, const size_t matrix_column_size,
@@ -518,9 +533,6 @@ private:
   size_t node_feature_length_{0};
   //! Partitioned graph
   std::unique_ptr<GNNDistGraph> partitioned_graph_;
-  //! The entire topology of the dataset: used for things like norm factor
-  //! calculation or sampling
-  WholeGraph whole_graph_;
   //! Sync substrate for the partitioned graph
   std::unique_ptr<galois::graphs::GluonSubstrate<GNNDistGraph>> sync_substrate_;
   //! True if labels are single class
@@ -570,14 +582,13 @@ private:
   //! falling in range != part of that set)
   bool incomplete_masks_{false};
 
-  //! Normalization constant based on structure of the graph (degrees)
-  std::vector<GNNFloat> norm_factors_;
-  //! Normalization constant based on degrees (unlike nomral norm factors
-  //! it's only division without a square root)
-  std::vector<GNNFloat> degree_norm_;
-
   //! RNG for subgraph sampling
   galois::PerThreadRNG sample_rng_;
+
+  // TODO LargeArray instead of vector?
+  //! Degrees: needed since graph is distributed
+  std::vector<uint32_t> global_degrees_;
+  std::vector<uint32_t> global_train_degrees_;
 
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};

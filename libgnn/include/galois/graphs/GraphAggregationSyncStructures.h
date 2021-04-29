@@ -1,7 +1,6 @@
 // defined in GNNGraph.cpp; set in order to control which matrix
 // gets synchronized
 #include "galois/GNNTypes.h"
-#include "galois/BufferWrapper.h"
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/GNNCudaContextHostDecls.h"
 #endif
