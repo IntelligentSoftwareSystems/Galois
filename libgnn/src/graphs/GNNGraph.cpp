@@ -812,11 +812,6 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
       array.create(partitioned_graph_->size());
     }
   } else {
-    // TODO(loc) optimize possible: inductive setting means # nodes always
-    // only training/other nodes, so can allocate only what is required
-    // Allocating full size is inefficient
-    sampled_out_degrees_.resize(1);
-    sampled_out_degrees_[0].create(partitioned_graph_->size());
     subgraph_is_inductive_ = true;
   }
 }
@@ -840,12 +835,14 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
                              edge_sample_status_[edge_id].end(), 0);
                  });
   // reset all degrees
-  galois::do_all(
-      galois::iterate(sampled_out_degrees_),
-      [&](galois::LargeArray<uint32_t>& array) {
-        std::fill(array.begin(), array.end(), 0);
-      },
-      galois::chunk_size<1>());
+  if (!subgraph_is_inductive_) {
+    galois::do_all(
+        galois::iterate(sampled_out_degrees_),
+        [&](galois::LargeArray<uint32_t>& array) {
+          std::fill(array.begin(), array.end(), 0);
+        },
+        galois::chunk_size<1>());
+  }
 }
 
 void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
@@ -875,11 +872,6 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
                     partitioned_graph_->getEdgeDst(edge_iter));
               }
               sampled += 1;
-              // only count once for last layer (last layer is where all
-              // relevant nodes will be included)
-              if (agg_layer_num == 0) {
-                sampled_out_degrees_[0][*src_iter]++;
-              }
             }
             total += 1;
           }
@@ -945,8 +937,6 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
             }
             total += 1;
           }
-          // galois::gDebug(*src_iter, " with degree ",
-          // sampled_out_degrees_[sample_layer_num][*src_iter]);
         }
       },
       galois::steal(), galois::loopname("NeighborhoodSample"));

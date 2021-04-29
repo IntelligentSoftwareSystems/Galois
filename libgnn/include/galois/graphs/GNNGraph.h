@@ -293,11 +293,17 @@ public:
     }
   }
 
-  //! Degree norm (1 / degree) of current functional graph (e.g., sampled,
-  //! inductive graph, etc); calculated whenever norm factor is calculated
   GNNFloat GetGlobalDegreeNorm(GraphNode n) const {
     if (global_degrees_[n]) {
       return 1.0 / global_degrees_[n];
+    } else {
+      return 0.0;
+    }
+  }
+
+  GNNFloat GetGlobalTrainDegreeNorm(GraphNode n) const {
+    if (global_train_degrees_[n]) {
+      return 1.0 / global_train_degrees_[n];
     } else {
       return 0.0;
     }
@@ -312,7 +318,7 @@ public:
         degree =
             sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
       } else {
-        degree = sampled_out_degrees_[0][subgraph_->SIDToLID(n)];
+        degree = global_train_degrees_[subgraph_->SIDToLID(n)];
       }
       if (degree) {
         return 1.0 / degree;
