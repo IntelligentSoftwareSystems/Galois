@@ -35,6 +35,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
     if (gnn_graph.IsInSampledGraph(local_node_id)) {
       // TODO should bound check the SID to max uint32_t
       // note: if SID is max uint32t, then it's not valid
+      // galois::gInfo(local_node_id, " maps to ", current_sid);
       lid_to_subgraph_id_[local_node_id] = current_sid++;
     }
   }
@@ -47,6 +48,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
     if (gnn_graph.IsInSampledGraph(local_node_id)) {
       // TODO should bound check the SID to max uint32_t
       // note: if SID is max uint32t, then it's not valid
+      // galois::gInfo(local_node_id, " maps to ", current_sid);
       lid_to_subgraph_id_[local_node_id] = current_sid++;
     }
   }
@@ -144,7 +146,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
             if (gnn_graph.IsEdgeSampledAny(out_edge_iter)) {
               subedge_to_original_edge_[out_location] = *out_edge_iter;
               underlying_graph_.constructEdge(
-                  out_location++, gnn_graph.GetEdgeDest(out_edge_iter));
+                  out_location++,
+                  lid_to_subgraph_id_[gnn_graph.GetEdgeDest(out_edge_iter)]);
             }
           }
 
@@ -153,7 +156,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
               in_subedge_to_original_edge_[in_location] =
                   *(gnn_graph.InEdgeToOutEdge(in_edge_iter));
               underlying_graph_.ConstructInEdge(
-                  in_location++, gnn_graph.GetInEdgeDest(in_edge_iter));
+                  in_location++,
+                  lid_to_subgraph_id_[gnn_graph.GetInEdgeDest(in_edge_iter)]);
             }
           }
           assert(out_location == subgraph_out_degrees_[subgraph_id]);
