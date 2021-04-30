@@ -35,6 +35,7 @@ public:
   }
 
   uint32_t SIDToLID(uint32_t sid) const { return subgraph_id_to_lid_[sid]; }
+  uint32_t LIDToSID(uint32_t lid) const { return lid_to_subgraph_id_[lid]; }
 
   //////////////////////////////////////////////////////////////////////////////
   // Edge iteration and destination
@@ -90,6 +91,10 @@ public:
   }
 
   //////////////////////////////////////////////////////////////////////////////
+
+  galois::LargeArray<uint32_t>* GetLIDToSIDPointer() {
+    return &lid_to_subgraph_id_;
+  }
 
 private:
   //! Creates subgraph ID mapping from the number of sampled nodes from the

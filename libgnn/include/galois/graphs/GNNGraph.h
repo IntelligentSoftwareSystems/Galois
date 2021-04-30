@@ -280,8 +280,42 @@ public:
   }
 
   void EnableSubgraph() { use_subgraph_ = true; }
-
   void DisableSubgraph() { use_subgraph_ = false; }
+  bool IsSubgraphOn() const { return use_subgraph_; }
+
+  //! Converts an id to an lid for the graph if subgraphs are in use
+  uint32_t ConvertToLID(GraphNode sid) const {
+    if (use_subgraph_) {
+      return subgraph_->SIDToLID(sid);
+    } else {
+      return sid;
+    }
+  }
+  //! Converts an LID to an SID if subgraphs are in use
+  uint32_t ConvertToSID(GraphNode lid) const {
+    if (use_subgraph_) {
+      return subgraph_->LIDToSID(lid);
+    } else {
+      return lid;
+    }
+  }
+  //! Converts SID to GID if subgraphs in use (else just return GID)
+  uint32_t SIDToGID(GraphNode sid) const {
+    if (use_subgraph_) {
+      return GetGID(subgraph_->SIDToLID(sid));
+    } else {
+      return GetGID(sid);
+    }
+  }
+  //! Returns a pointer to the LID to SID map from the subgraph if subgraphs
+  //! are in use
+  galois::LargeArray<uint32_t>* GetLIDToSIDPointer() {
+    if (use_subgraph_) {
+      return subgraph_->GetLIDToSIDPointer();
+    } else {
+      return nullptr;
+    }
+  }
 
   //////////////////////////////////////////////////////////////////////////////
 
