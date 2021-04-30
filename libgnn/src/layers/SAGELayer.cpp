@@ -390,7 +390,6 @@ void galois::SAGELayer::AggregateAllCPU(
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
     bool is_backward) {
-
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
       [&](size_t src) {
@@ -409,10 +408,8 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src);
                e++) {
-            // XXX set LID
-            graphs::bitset_graph_aggregate.set(src);
+            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
             size_t dst = graph_.GetEdgeDest(e);
-            // galois::gPrint("(", src, " ", dst, ")\n");
 
             if (layer_phase_ == GNNPhase::kTrain) {
               // XXX
@@ -450,8 +447,7 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.in_edge_begin(src); e != graph_.in_edge_end(src);
                e++) {
-            // XXX LID not SID
-            graphs::bitset_graph_aggregate.set(src);
+            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
             size_t dst = graph_.GetInEdgeDest(e);
 
             if (layer_phase_ == GNNPhase::kTrain) {
@@ -485,6 +481,7 @@ void galois::SAGELayer::AggregateAllCPU(
       },
       galois::chunk_size<1>(), galois::steal(),
       galois::loopname("ConvolutionalAggregateAll"));
+
   // aggregate sync
   graph_.AggregateSync(aggregate_output, column_length, is_backward);
 }

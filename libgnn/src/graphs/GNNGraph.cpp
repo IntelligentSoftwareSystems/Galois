@@ -42,6 +42,7 @@ namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
 galois::DynamicBitSet bitset_graph_aggregate;
+galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_ = nullptr;
 uint32_t* gnn_degree_vec_1_;
 uint32_t* gnn_degree_vec_2_;
 #ifdef GALOIS_ENABLE_GPU
@@ -179,16 +180,31 @@ bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
 void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
                                              const size_t matrix_column_size,
                                              bool is_backward) const {
-  // set globals for the sync substrate
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
-  if (!is_backward) {
-    sync_substrate_
-        ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
-            "GraphAggregateSync");
+  if (!use_subgraph_) {
+    // set globals for the sync substrate
+    if (!is_backward) {
+      sync_substrate_
+          ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
+              "GraphAggregateSync");
+    } else {
+      sync_substrate_->sync<writeDestination, readAny, GNNSumAggregate,
+                            Bitset_graph_aggregate>(
+          "BackwardGraphAggregateSync");
+    }
   } else {
-    sync_substrate_->sync<writeDestination, readAny, GNNSumAggregate,
-                          Bitset_graph_aggregate>("BackwardGraphAggregateSync");
+    // setup the SID to LID map for the sync substrate to use (SID != LID)
+    gnn_lid_to_sid_pointer_ = subgraph_->GetLIDToSIDPointer();
+
+    if (!is_backward) {
+      sync_substrate_->sync<writeSource, readAny, GNNSampleSumAggregate,
+                            Bitset_graph_aggregate>("GraphAggregateSync");
+    } else {
+      sync_substrate_->sync<writeDestination, readAny, GNNSampleSumAggregate,
+                            Bitset_graph_aggregate>(
+          "BackwardGraphAggregateSync");
+    }
   }
 }
 
