@@ -8,13 +8,12 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   // note: p_backward == input_embeddings
   input_loss_.assign(input_loss_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
-  //#ifndef NDEBUG
-  //#ifdef NDEBUG
+#ifndef NDEBUG
   galois::DGAccumulator<GNNFloat> loss_accum;
   galois::DGAccumulator<size_t> handled;
   loss_accum.reset();
   handled.reset();
-  //#endif
+#endif
 
   galois::do_all(
       galois::iterate(graph_.begin(), graph_.end()),
@@ -44,11 +43,10 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           input_loss_[i] =
               GNNCrossEntropy(feature_length, ground_truth_vec->data(),
                               &p_backward_output_matrix_[feature_length * i]);
-          //#ifndef NDEBUG
-          //#ifdef NDEBUG
+#ifndef NDEBUG
           loss_accum += input_loss_[i];
           handled += 1;
-          //#endif
+#endif
         } else {
           VectorZero(feature_length,
                      &p_backward_output_matrix_[i * feature_length]);
@@ -57,14 +55,11 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       // TODO chunk size?
       // steal on as some threads may have nothing to work on
       galois::steal(), galois::loopname("SoftmaxForward"));
-  //#ifndef NDEBUG
-  //#ifdef NDEBUG
-
+#ifndef NDEBUG
   GNNFloat reduced_loss = loss_accum.reduce();
   size_t t              = handled.reduce();
   galois::gPrint("Loss is ", reduced_loss / t, " ", reduced_loss, " ", t, "\n");
-
-  //#endif
+#endif
 
   return p_backward_output_matrix_;
 }

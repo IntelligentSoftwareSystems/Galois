@@ -269,15 +269,7 @@ public:
   void SampleEdges(size_t sample_layer_num, size_t num_to_sample);
 
   //! Construct the subgraph from sampled edges and corresponding nodes
-  size_t ConstructSampledSubgraph() {
-    // false first so that the build process can use functions to access the
-    // real graph
-    use_subgraph_             = false;
-    size_t num_subgraph_nodes = subgraph_->BuildSubgraph(*this);
-    // after this, this graph is a subgraph
-    use_subgraph_ = true;
-    return num_subgraph_nodes;
-  }
+  size_t ConstructSampledSubgraph();
 
   void EnableSubgraph() { use_subgraph_ = true; }
   void DisableSubgraph() { use_subgraph_ = false; }
@@ -380,8 +372,6 @@ public:
     }
 
     if (local_ground_truth_labels_[to_use] != num_label_classes_) {
-      // galois::gPrint(lid, " ", to_use, " ",
-      // (int)local_ground_truth_labels_[to_use], "\n");
       return local_ground_truth_labels_[to_use];
     } else {
       GALOIS_LOG_FATAL(

@@ -128,8 +128,8 @@ private:
   //! is for static)
   galois::gstl::Vector<uint32_t> subgraph_id_to_lid_;
   // intermediate degrees used for edge construction
-  galois::gstl::Vector<uint32_t> subgraph_out_degrees_;
-  galois::gstl::Vector<uint32_t> subgraph_in_degrees_;
+  galois::gstl::Vector<uint32_t> local_subgraph_out_degrees_;
+  galois::gstl::Vector<uint32_t> local_subgraph_in_degrees_;
   //! Maps from subgraph out-edge id to original graph edge id (used to check if
   //! edge exists in particular layer)
   galois::gstl::Vector<uint32_t> subedge_to_original_edge_;

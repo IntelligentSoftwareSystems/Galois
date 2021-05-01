@@ -41,10 +41,16 @@ namespace galois {
 namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
+//! For synchronization of graph aggregations
 galois::DynamicBitSet bitset_graph_aggregate;
 galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_ = nullptr;
 uint32_t* gnn_degree_vec_1_;
 uint32_t* gnn_degree_vec_2_;
+
+//! For synchronization of sampled degrees
+galois::DynamicBitSet bitset_sampled_degrees_;
+std::vector<galois::LargeArray<uint32_t>>* gnn_sampled_out_degrees_;
+
 #ifdef GALOIS_ENABLE_GPU
 struct CUDA_Context* cuda_ctx_for_sync;
 unsigned layer_number_to_sync;
@@ -692,8 +698,9 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
 
-  GALOIS_LOG_WARN("Sub: {}, Accuracy: {} / {}", use_subgraph_, global_correct,
-                  global_checked);
+  // GALOIS_LOG_WARN("Sub: {}, Accuracy: {} / {}", use_subgraph_,
+  // global_correct,
+  //                global_checked);
 
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
@@ -833,6 +840,7 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
 }
 
 void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
+  use_subgraph_ = false;
   new_sampled_nodes_.resize(size());
   new_sampled_nodes_.reset();
 
@@ -859,6 +867,8 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
         },
         galois::chunk_size<1>());
   }
+  bitset_sampled_degrees_.resize(partitioned_graph_->size());
+  bitset_sampled_degrees_.reset();
 }
 
 void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
@@ -874,7 +884,7 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
       galois::iterate(begin(), end()),
       [&](const NodeIterator& src_iter) {
         // only operate on if sampled
-        if (partitioned_graph_->getData(*src_iter)) {
+        if (IsInSampledGraph(src_iter)) {
           // marks ALL edges of nodes that connect to train/other nodes
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
             if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
@@ -895,8 +905,8 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
       },
       galois::steal(), galois::loopname("ChooseAllEdges"));
 
-  galois::gPrint("Num sampled edges is ", sampled.reduce(), " out of ",
-                 total.reduce(), "\n");
+  galois::gPrint("Num sampled edges in inductive graph is ", sampled.reduce(),
+                 " out of ", total.reduce(), "\n");
 
   std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
   // update nodes, then communicate update to all hosts so that they can
@@ -917,13 +927,16 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
 
   galois::GAccumulator<size_t> sampled;
   galois::GAccumulator<size_t> total;
+  // galois::GAccumulator<size_t> total_nodes;
   sampled.reset();
   total.reset();
+  // total_nodes.reset();
+
   galois::do_all(
       galois::iterate(begin(), end()),
       [&](const NodeIterator& src_iter) {
         // only operate on if sampled
-        if (partitioned_graph_->getData(*src_iter)) {
+        if (IsInSampledGraph(src_iter)) {
           // chance of not uniformly choosing an edge of this node num_to_sample
           // times (degree norm is 1 / degree)
           // XXX training degree + other norm, not global
@@ -946,6 +959,7 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                   new_sampled_nodes_.set(
                       partitioned_graph_->getEdgeDst(edge_iter));
                 }
+                bitset_sampled_degrees_.set(*src_iter);
                 // degree increment
                 sampled_out_degrees_[sample_layer_num][*src_iter]++;
                 sampled += 1;
@@ -953,10 +967,13 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
             }
             total += 1;
           }
+          // total_nodes += 1;
         }
       },
       galois::steal(), galois::loopname("NeighborhoodSample"));
 
+  // galois::gInfo(host_prefix(), "sampled nodes for layer ", sample_layer_num,
+  // " is ", total_nodes.reduce());
   galois::gDebug("Num sampled edges for layer ", sample_layer_num, " is ",
                  sampled.reduce(), " out of ", total.reduce());
 
@@ -971,6 +988,22 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
 
   // XXX(loc) bitset; can readAny be weaker?
   sync_substrate_->sync<writeSource, readAny, SampleFlagSync>("SampleSync");
+}
+
+//! Construct the subgraph from sampled edges and corresponding nodes
+size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
+  // false first so that the build process can use functions to access the
+  // real graph
+  use_subgraph_            = false;
+  gnn_sampled_out_degrees_ = &sampled_out_degrees_;
+  // first, sync the degres of the sampled edges across all hosts
+  sync_substrate_
+      ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
+          "SubgraphDegree");
+  size_t num_subgraph_nodes = subgraph_->BuildSubgraph(*this);
+  // after this, this graph is a subgraph
+  use_subgraph_ = true;
+  return num_subgraph_nodes;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

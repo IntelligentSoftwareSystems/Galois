@@ -499,9 +499,10 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
         base_gpu_object_.layer_weights(), output);
   } else {
 #endif
-    galois::gPrint(layer_dimensions_.input_rows, " ",
+    galois::gDebug("Layer ", graph_user_layer_number_, " ",
+                   layer_dimensions_.input_rows, " ",
                    layer_dimensions_.input_columns, " ",
-                   layer_dimensions_.output_columns, "\n");
+                   layer_dimensions_.output_columns);
     // CPU version is just a call into CBlas
     galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
                        layer_dimensions_.input_columns,

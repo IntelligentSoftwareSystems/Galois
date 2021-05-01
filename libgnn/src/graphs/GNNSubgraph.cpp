@@ -6,6 +6,9 @@ galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(GNNGraph& gnn_graph) {
   galois::StatTimer timer("BuildSubgraph", kRegionName);
   timer.start();
   CreateLocalToSubgraphMapping(gnn_graph);
+  if (num_subgraph_nodes_ == 0) {
+    return 0;
+  }
   DegreeCounting(gnn_graph);
   EdgeCreation(gnn_graph);
   NodeFeatureCreation(gnn_graph);
@@ -52,7 +55,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
       lid_to_subgraph_id_[local_node_id] = current_sid++;
     }
   }
-  galois::gDebug("Numbered sampled nodes for subgraph construction is ",
+  galois::gDebug("Number of sampled nodes for subgraph construction is ",
                  current_sid);
 
   num_subgraph_nodes_ = current_sid;
@@ -67,8 +70,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
   timer.start();
 
   subgraph_id_to_lid_.resize(num_subgraph_nodes_);
-  subgraph_out_degrees_.resize(num_subgraph_nodes_);
-  subgraph_in_degrees_.resize(num_subgraph_nodes_);
+  local_subgraph_out_degrees_.resize(num_subgraph_nodes_);
+  local_subgraph_in_degrees_.resize(num_subgraph_nodes_);
 
   galois::do_all(
       galois::iterate(gnn_graph.begin(), gnn_graph.end()),
@@ -83,7 +86,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
               out_degrees++;
             }
           }
-          subgraph_out_degrees_[subgraph_id] = out_degrees;
+          local_subgraph_out_degrees_[subgraph_id] = out_degrees;
 
           uint32_t in_degrees = 0;
           for (auto in_edge_iter : gnn_graph.in_edges(node_id)) {
@@ -91,7 +94,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
               in_degrees++;
             }
           }
-          subgraph_in_degrees_[subgraph_id] = in_degrees;
+          local_subgraph_in_degrees_[subgraph_id] = in_degrees;
           // galois::gDebug("Local ID ", node_id, " SID ", subgraph_id, " out ",
           //               out_degrees, " in ", in_degrees);
         }
@@ -109,21 +112,21 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
 
   // prefix sum over subgraph degrees from previous phase to get starting points
   for (size_t i = 1; i < num_subgraph_nodes_; i++) {
-    subgraph_out_degrees_[i] += subgraph_out_degrees_[i - 1];
-    subgraph_in_degrees_[i] += subgraph_in_degrees_[i - 1];
+    local_subgraph_out_degrees_[i] += local_subgraph_out_degrees_[i - 1];
+    local_subgraph_in_degrees_[i] += local_subgraph_in_degrees_[i - 1];
   }
 
   // allocate then set node endpoints
-  num_subgraph_edges_ = subgraph_out_degrees_.back();
+  num_subgraph_edges_ = local_subgraph_out_degrees_.back();
   underlying_graph_.DeallocateOnly();
   underlying_graph_.allocateFrom(num_subgraph_nodes_, num_subgraph_edges_);
   underlying_graph_.CSCAllocate();
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),
                  [&](uint32_t subgraph_id) {
                    underlying_graph_.fixEndEdge(
-                       subgraph_id, subgraph_out_degrees_[subgraph_id]);
+                       subgraph_id, local_subgraph_out_degrees_[subgraph_id]);
                    underlying_graph_.FixEndInEdge(
-                       subgraph_id, subgraph_in_degrees_[subgraph_id]);
+                       subgraph_id, local_subgraph_in_degrees_[subgraph_id]);
                  });
   subedge_to_original_edge_.resize(num_subgraph_edges_);
   in_subedge_to_original_edge_.resize(num_subgraph_edges_);
@@ -138,8 +141,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
           uint32_t out_location = 0;
           uint32_t in_location  = 0;
           if (subgraph_id != 0) {
-            out_location = subgraph_out_degrees_[subgraph_id - 1];
-            in_location  = subgraph_in_degrees_[subgraph_id - 1];
+            out_location = local_subgraph_out_degrees_[subgraph_id - 1];
+            in_location  = local_subgraph_in_degrees_[subgraph_id - 1];
           }
 
           for (auto out_edge_iter : gnn_graph.edges(node_id)) {
@@ -160,8 +163,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
                   lid_to_subgraph_id_[gnn_graph.GetInEdgeDest(in_edge_iter)]);
             }
           }
-          assert(out_location == subgraph_out_degrees_[subgraph_id]);
-          assert(in_location == subgraph_in_degrees_[subgraph_id]);
+          assert(out_location == local_subgraph_out_degrees_[subgraph_id]);
+          assert(in_location == local_subgraph_in_degrees_[subgraph_id]);
         }
       },
       galois::steal());
@@ -182,12 +185,6 @@ void galois::graphs::GNNGraph::GNNSubgraph::NodeFeatureCreation(
         &(subgraph_node_features_[subgraph_node_id * feat_length]),
         &((gnn_graph.GetLocalFeatures().data())[local_id * feat_length]),
         feat_length * sizeof(GNNFeature));
-    // for (unsigned i = 0; i < feat_length; i++) {
-    //  galois::gPrint(feat_length * sizeof(GNNFeature) , " ", subgraph_node_id,
-    //  " local id " , local_id, " feat at ", i, " is ",
-    //  subgraph_node_features_[subgraph_node_id * feat_length + i], " ",
-    //  gnn_graph.GetLocalFeatures()[local_id * feat_length + i], "\n");
-    //}
   });
   timer.stop();
 }
