@@ -2,6 +2,7 @@ set(sources
   src/GNNMath.cpp
   src/GNNOptimizers.cpp
   src/GraphNeuralNetwork.cpp
+  src/MinibatchGenerator.cpp
   src/graphs/GNNGraph.cpp
   src/graphs/GNNSubgraph.cpp
   src/layers/DenseLayer.cpp

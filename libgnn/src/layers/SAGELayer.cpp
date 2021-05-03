@@ -187,7 +187,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   galois::StatTimer timer("BackwardPhase", kRegionName);
   timer.start();
 
-  assert(layer_phase_ == GNNPhase::kTrain);
+  assert(layer_phase_ == GNNPhase::kTrain || layer_phase_ == GNNPhase::kBatch);
 
   // derivative of activation
   if (!config_.disable_activation) {

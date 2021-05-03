@@ -92,6 +92,7 @@ public:
   }
 
   bool do_sampling() const { return do_sampling_; }
+  unsigned train_minibatch_size() const { return train_minibatch_size_; }
 
   //! Get the default layer config of layers in this GNN
   const GNNLayerConfig& default_layer_config() const {
@@ -107,6 +108,7 @@ public:
   unsigned validation_interval_{0};
   //! Interval to run testing set on network at; 0 = no run
   unsigned test_interval_{0};
+  unsigned train_minibatch_size_{0};
 
 private:
   //! Number of layers to construct in the GNN not including the output

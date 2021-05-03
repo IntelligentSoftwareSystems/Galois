@@ -99,6 +99,10 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   // init norm factors (involves a sync call)
   InitNormFactor();
 
+  // XXX remove this
+  test_batcher_ =
+      std::make_unique<MinibatchGenerator>(local_testing_mask_, 2000);
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     // allocate/copy data structures over to GPU
@@ -158,7 +162,7 @@ bool galois::graphs::GNNGraph::IsValidForPhaseCompleteRange(
 bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
     const unsigned lid, const galois::GNNPhase current_phase) const {
   // select mask to use based on phase
-  const std::vector<char>* mask_to_use;
+  const GNNMask* mask_to_use;
   switch (current_phase) {
   case GNNPhase::kTrain:
     mask_to_use = &local_training_mask_;
@@ -174,6 +178,9 @@ bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
       return false;
     }
     mask_to_use = &other_mask_;
+    break;
+  case GNNPhase::kBatch:
+    mask_to_use = &local_minibatch_mask_;
     break;
   default:
     GALOIS_LOG_FATAL("Invalid phase used");
@@ -245,84 +252,6 @@ void galois::graphs::GNNGraph::AggregateSync(
   }
 }
 #endif
-
-void galois::graphs::GNNGraph::UniformNodeSample(float droprate) {
-  galois::do_all(
-      galois::iterate(begin_owned(), end_owned()), [&](const NodeIterator& x) {
-        partitioned_graph_->getData(*x) = sample_rng_.DoBernoulli(droprate);
-      });
-  // TODO(loc) GPU
-  // TODO(loc) sync the flags across all machines to have same sample on all of
-  // them
-}
-
-// TODO(loc) does not work in a distributed setting: assumes the partitioned
-// graph is the entire graph
-void galois::graphs::GNNGraph::GraphSAINTSample(size_t num_roots,
-                                                size_t walk_depth) {
-  // reset sample
-  galois::do_all(galois::iterate(begin(), end()),
-                 [&](size_t n) { partitioned_graph_->getData(n) = 0; });
-
-  galois::on_each([&](size_t thread_id, size_t num_threads) {
-    size_t my_start = 0;
-    size_t my_end   = 0;
-    std::tie(my_start, my_end) =
-        galois::block_range(size_t{0}, num_roots, thread_id, num_threads);
-    size_t thread_roots = my_end - my_start;
-    size_t train_range  = global_training_mask_range_.size;
-    // init RNG
-    drand48_data seed_struct;
-    srand48_r(sample_rng_.GetRandomNumber() * thread_id * num_threads,
-              &seed_struct);
-
-    for (size_t root_num = 0; root_num < thread_roots; root_num++) {
-      // pick a random training node root at random (with replacement);
-      size_t root = 0;
-      while (true) {
-        long int rand_num;
-        lrand48_r(&seed_struct, &rand_num);
-        root = global_training_mask_range_.begin + (rand_num % train_range);
-        if (IsValidForPhase(root, GNNPhase::kTrain)) {
-          break;
-        }
-      }
-      // mark this root as sampled
-      SetSampledNode(root);
-      assert(IsInSampledGraph(root));
-
-      // sample more nodes based on depth of the walk
-      for (size_t current_depth = 0; current_depth < walk_depth;
-           current_depth++) {
-        // pick random edge, mark sampled, swap roots
-        EdgeIterator first_edge = edge_begin(root);
-        size_t num_edges        = std::distance(first_edge, edge_end(root));
-        if (num_edges == 0) {
-          break;
-        }
-
-        // must select training neighbor: if it doesn't, then ignore and
-        // continue
-        // To prevent infinite loop in case node has NO training neighbor,
-        // this implementation will not loop until one is found and will
-        // not find full depth if it doesn't find any training nodes randomly
-        long int rand_num;
-        lrand48_r(&seed_struct, &rand_num);
-        EdgeIterator selected_edge = first_edge + (rand_num % num_edges);
-        size_t candidate_dest      = GetEdgeDest(selected_edge);
-
-        // TODO(loc) another possibility is to just pick it anyways regardless
-        // but don't mark it as sampled, though this would lead to disconnected
-        // graph
-        if (IsValidForPhase(candidate_dest, GNNPhase::kTrain)) {
-          SetSampledNode(candidate_dest);
-          assert(IsInSampledGraph(candidate_dest));
-          root = candidate_dest;
-        }
-      }
-    }
-  });
-}
 
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
@@ -470,7 +399,7 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
 //! given a name, mask type, and arrays to save into
 size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
     const std::string& dataset_name, const std::string& mask_type,
-    GNNRange* mask_range, char* masks) {
+    GNNRange* mask_range, std::vector<char>* masks) {
   size_t range_begin;
   size_t range_end;
 
@@ -504,7 +433,7 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
       if (mask == 1) {
         valid_count++;
         if (partitioned_graph_->isLocal(cur_line_num)) {
-          masks[partitioned_graph_->getLID(cur_line_num)] = 1;
+          (*masks)[partitioned_graph_->getLID(cur_line_num)] = 1;
           local_sample_count++;
         }
       }
@@ -587,13 +516,13 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
     // XXX i can get local sample counts from here if i need it
     size_t valid_train = ReadLocalMasksFromFile(dataset_name, "train",
                                                 &global_training_mask_range_,
-                                                local_training_mask_.data());
+                                                &local_training_mask_);
     size_t valid_val   = ReadLocalMasksFromFile(dataset_name, "val",
                                               &global_validation_mask_range_,
-                                              local_validation_mask_.data());
+                                              &local_validation_mask_);
     size_t valid_test  = ReadLocalMasksFromFile(dataset_name, "test",
                                                &global_testing_mask_range_,
-                                               local_testing_mask_.data());
+                                               &local_testing_mask_);
     valid_other_       = FindOtherMask();
     // the "other" set of nodes that don't fall into any classification
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -671,13 +600,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
       galois::iterate(begin_owned(), end_owned()),
       // this is possibly the subgraph id
       [&](const unsigned node_id) {
-        unsigned lid = node_id;
-        if (use_subgraph_) {
-          // convert SID over to LID
-          lid = subgraph_->SIDToLID(node_id);
-        }
-
-        if (IsValidForPhase(lid, phase)) {
+        if (IsValidForPhase(node_id, phase)) {
           total_checked_ += 1;
           // get prediction by getting max
           // note the use of node_id here: lid only used to check original
@@ -687,7 +610,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
           // check against ground truth and track accordingly
           // TODO static cast used here is dangerous
           if (predicted_label ==
-              static_cast<size_t>(GetSingleClassLabel(lid))) {
+              static_cast<size_t>(GetSingleClassLabel(node_id))) {
             num_correct_ += 1;
           }
         }
@@ -839,14 +762,14 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   }
 }
 
-void galois::graphs::GNNGraph::SetupNeighborhoodSample() {
+void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   use_subgraph_ = false;
   new_sampled_nodes_.resize(size());
   new_sampled_nodes_.reset();
 
   // for now, if training node, it goes into seed node
   galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
-    if (IsValidForPhase(*x, GNNPhase::kTrain)) {
+    if (IsValidForPhase(*x, seed_phase)) {
       SetSampledNode(*x);
     } else {
       UnsetSampledNode(*x);
@@ -1004,6 +927,11 @@ size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
   // after this, this graph is a subgraph
   use_subgraph_ = true;
   return num_subgraph_nodes;
+}
+
+void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
+  train_batcher_->GetNextMinibatch(&local_minibatch_mask_);
+  SetupNeighborhoodSample(GNNPhase::kBatch);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

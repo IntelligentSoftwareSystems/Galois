@@ -115,6 +115,11 @@ llvm::cl::opt<bool>
                           cll::init(false));
 
 llvm::cl::opt<unsigned>
+    train_minibatch_size("trainMinibatchSize",
+                         cll::desc("Size of training minibatch (default 0)"),
+                         cll::init(0));
+
+llvm::cl::opt<unsigned>
     val_interval("valInterval",
                  cll::desc("# of epochs to test validation set (default 0)"),
                  cll::init(0));
@@ -264,9 +269,11 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   galois::GraphNeuralNetworkConfig gnn_config(
       num_layers, layer_types, layer_sizes_vector, output_layer_type,
       do_graph_sampling, layer_config);
-  gnn_config.inductive_training_  = do_inductive_training;
-  gnn_config.validation_interval_ = val_interval;
-  gnn_config.test_interval_       = test_interval;
+  gnn_config.inductive_training_   = do_inductive_training;
+  gnn_config.validation_interval_  = val_interval;
+  gnn_config.test_interval_        = test_interval;
+  gnn_config.train_minibatch_size_ = train_minibatch_size;
+
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());
 

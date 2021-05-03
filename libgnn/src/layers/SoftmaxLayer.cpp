@@ -20,6 +20,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       [&](const unsigned i) {
         if (IsSampledLayer()) {
           if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i)) {
+            // XXX
             VectorZero(feature_length,
                        &p_backward_output_matrix_[i * feature_length]);
             return;

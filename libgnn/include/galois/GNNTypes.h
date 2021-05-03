@@ -19,13 +19,15 @@ using GNNFloat = float;
 using GNNLabel = uint8_t;
 //! Type of a feature on vertices
 using GNNFeature = float;
+//! Type of mask
+using GNNMask = std::vector<char>;
 //! Type of node index on gpus
 using GPUNodeIndex = uint32_t;
 //! Type of edge index on gpus
 using GPUEdgeIndex = uint64_t;
 
 //! Phase of GNN computation
-enum class GNNPhase { kTrain, kValidate, kTest, kOther };
+enum class GNNPhase { kTrain, kValidate, kTest, kOther, kBatch };
 
 //! Vector like wrapper over a pointer and size; exists solely to pass around
 //! raw pointers with size (because vectors are a no-go due to the code

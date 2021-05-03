@@ -106,11 +106,19 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       break;
     }
   }
-  if (config_.do_sampling() || config_.inductive_training_) {
+
+  // XXX test minibatch
+  if (config_.do_sampling() || config_.inductive_training_ ||
+      config.train_minibatch_size()) {
     // output layer not included; it will never involve sampling
     graph_->InitializeSamplingData(num_graph_user_layers_,
                                    config_.inductive_training_);
   }
+
+  if (config_.train_minibatch_size()) {
+    graph_->SetupTrainBatcher(config_.train_minibatch_size());
+  }
+  // XXX test minibatch size
 
   // create the output layer
   GNNLayerDimensions output_dims = {
@@ -156,7 +164,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
   float train_accuracy{0.f};
   size_t inductive_nodes = 0;
-  if (config_.inductive_training_) {
+  if (config_.inductive_training_ && !config_.train_minibatch_size()) {
     // Setup the subgraph to only be the training graph
     graph_->SetupNeighborhoodSample();
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
@@ -179,10 +187,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   galois::StatTimer validation_timer("ValidationTime", "GraphNeuralNetwork");
   galois::StatTimer epoch_test_timer("TestTime", "GraphNeuralNetwork");
 
-  // TODO incorporate validation/test intervals
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     epoch_timer.start();
-    if (config_.inductive_training_) {
+    if (config_.inductive_training_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
            layer++) {
@@ -190,7 +197,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
 
-    if (config_.do_sampling()) {
+    if (config_.do_sampling() && !config_.train_minibatch_size()) {
       graph_->SetupNeighborhoodSample();
       size_t num_sampled_layers = 0;
 
@@ -201,7 +208,11 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         GNNLayerType layer_type = (*back_iter)->layer_type();
         if (layer_type == GNNLayerType::kGraphConvolutional ||
             layer_type == GNNLayerType::kSAGE) {
-          graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 5);
+          if (num_sampled_layers == 0) {
+            graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 10);
+          } else {
+            graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 25);
+          }
           num_sampled_layers++;
         }
       }
@@ -215,11 +226,59 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
 
-    const PointerWithSize<galois::GNNFloat> predictions = DoInference();
-    // have to get accuracy here because gradient prop destroys the predictions
-    // matrix
-    train_accuracy = GetGlobalAccuracy(predictions);
-    GradientPropagation();
+    if (!config_.train_minibatch_size()) {
+      // no minibatching, full batch
+      const PointerWithSize<galois::GNNFloat> predictions = DoInference();
+      // have to get accuracy here because gradient prop destroys the
+      // predictions matrix
+      train_accuracy = GetGlobalAccuracy(predictions);
+      GradientPropagation();
+    } else {
+      graph_->ResetTrainMinibatcher();
+      SetLayerPhases(galois::GNNPhase::kBatch);
+
+      size_t batch_num = 0;
+
+      // XXX
+      // create mini batch graphs and loop until minibatches on all hosts done
+      while (true) {
+        galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
+        // break when all hosts are done with minibatches
+        graph_->PrepareNextTrainMinibatch();
+        size_t num_sampled_layers = 0;
+        for (auto back_iter = gnn_layers_.rbegin();
+             back_iter != gnn_layers_.rend(); back_iter++) {
+          GNNLayerType layer_type = (*back_iter)->layer_type();
+          if (layer_type == GNNLayerType::kGraphConvolutional ||
+              layer_type == GNNLayerType::kSAGE) {
+            if (num_sampled_layers == 0) {
+              graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 10);
+            } else {
+              graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 25);
+            }
+            num_sampled_layers++;
+          }
+        }
+        // resize layer matrices
+        size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
+        galois::gPrint(num_subgraph_nodes, "\n");
+        for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+             layer++) {
+          (*layer)->ResizeRows(num_subgraph_nodes);
+        }
+
+        const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
+        DoInference();
+        train_accuracy = GetGlobalAccuracy(batch_pred);
+        GradientPropagation();
+        galois::gPrint("Epoch ", epoch, " Batch ", batch_num,
+                       ": Train accuracy/F1 micro is ", train_accuracy, "\n");
+        // XXX sync across all hosts minibatcher state
+        if (!graph_->MoreTrainMinibatches()) {
+          break;
+        }
+      }
+    }
     epoch_timer.stop();
 
     if (this_host == 0) {

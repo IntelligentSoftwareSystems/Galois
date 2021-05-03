@@ -5,6 +5,7 @@
 #include "galois/graphs/CuSPPartitioner.h"
 #include "galois/graphs/GluonSubstrate.h"
 #include "galois/graphs/GraphAggregationSyncStructures.h"
+#include "galois/MinibatchGenerator.h"
 
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/graphs/GNNGraph.cuh"
@@ -261,7 +262,8 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   //! Set seed nodes, i.e., nodes that are being predicted on
-  void SetupNeighborhoodSample();
+  void SetupNeighborhoodSample() { SetupNeighborhoodSample(GNNPhase::kTrain); }
+  void SetupNeighborhoodSample(GNNPhase seed_phase);
 
   //! Choose all edges from sampled nodes
   void SampleAllEdges(size_t agg_layer_num);
@@ -310,7 +312,24 @@ public:
   }
 
   //////////////////////////////////////////////////////////////////////////////
+  void SetupTrainBatcher(size_t train_batch_size) {
+    if (train_batcher_) {
+      // clear before remake
+      train_batcher_.reset();
+    }
+    train_batcher_ = std::make_unique<MinibatchGenerator>(local_training_mask_,
+                                                          train_batch_size);
+    local_minibatch_mask_.resize(partitioned_graph_->size());
+  }
 
+  void ResetTrainMinibatcher() { train_batcher_->ResetMinibatchState(); }
+
+  //! Setup the state for the next minibatch sampling call by using the
+  //! minibatcher to pick up the next set batch of nodes
+  void PrepareNextTrainMinibatch();
+  //! Returns true if there are still more minibatches in this graph
+  bool MoreTrainMinibatches() { return !train_batcher_->NoMoreMinibatches(); };
+  //////////////////////////////////////////////////////////////////////////////
   GNNFloat GetGCNNormFactor(GraphNode lid) const {
     if (global_degrees_[lid]) {
       return 1.0 / std::sqrt(static_cast<float>(global_degrees_[lid]) + 1);
@@ -416,7 +435,11 @@ public:
     if (use_subgraph_) {
       to_use = subgraph_->SIDToLID(lid);
     }
-    if (!incomplete_masks_ && current_phase != GNNPhase::kOther) {
+    // re: phase checks in this if: ranges are not used for these
+    // phases even if they might exist; it's something to look into
+    // possibly, though at the same time it may not be worth it
+    if (!incomplete_masks_ && current_phase != GNNPhase::kOther &&
+        current_phase != GNNPhase::kBatch) {
       return IsValidForPhaseCompleteRange(to_use, current_phase);
     } else {
       return IsValidForPhaseMasked(to_use, current_phase);
@@ -443,17 +466,6 @@ public:
   //////////////////////////////////////////////////////////////////////////////
   // Sampling related
   //////////////////////////////////////////////////////////////////////////////
-
-  //! Loops through all master nodes and determines if it is "on" or "off"
-  //! (the meaning of on and off depends on how it is used; for now, it is used
-  //! to indicate subgraph presence); droprate controls chance of being dropped
-  //! (e.g. if 0.8, a node is 80% likely to not be included in subgraph)
-  void UniformNodeSample() { UniformNodeSample(0.5); }
-  void UniformNodeSample(float droprate);
-
-  //! Use the sampling method present in GraphSAINT
-  void GraphSAINTSample() { GraphSAINTSample(3000, 2); };
-  void GraphSAINTSample(size_t num_roots, size_t walk_depth);
 
   //! Makes a node "sampled"; used for debugging/testing
   void SetSampledNode(size_t node) { partitioned_graph_->getData(node) = 1; }
@@ -514,7 +526,7 @@ private:
   //! given a name, mask type, and arrays to save into
   size_t ReadLocalMasksFromFile(const std::string& dataset_name,
                                 const std::string& mask_type,
-                                GNNRange* mask_range, char* masks);
+                                GNNRange* mask_range, std::vector<char>* masks);
   //! Finds nodes that aren't part of the 3 main GNN phase classifications
   size_t FindOtherMask();
   //! Read masks of local nodes only for training, validation, and testing
@@ -589,14 +601,17 @@ private:
 
   // TODO maybe revisit this and use an actual bitset
   //! Bitset indicating which nodes are training nodes
-  std::vector<char> local_training_mask_;
+  GNNMask local_training_mask_;
   //! Bitset indicating which nodes are validation nodes
-  std::vector<char> local_validation_mask_;
+  GNNMask local_validation_mask_;
   //! Bitset indicating which nodes are testing nodes
-  std::vector<char> local_testing_mask_;
-  size_t valid_other_{0};
+  GNNMask local_testing_mask_;
   //! Bitset indicating which nodes don't fall anywhere
-  std::vector<char> other_mask_;
+  GNNMask other_mask_;
+  //! Bitset indicating which nodes are part of the minibatch
+  GNNMask local_minibatch_mask_;
+
+  size_t valid_other_{0};
 
   //! Global mask range for training nodes; must convert to LIDs when using
   //! in this class
@@ -623,6 +638,9 @@ private:
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
   bool subgraph_is_inductive_{false};
+
+  std::unique_ptr<MinibatchGenerator> train_batcher_;
+  std::unique_ptr<MinibatchGenerator> test_batcher_;
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things
