@@ -3,16 +3,18 @@
 
 void galois::MinibatchGenerator::GetNextMinibatch(
     std::vector<char>* batch_mask) {
-  std::fill(batch_mask->begin(), batch_mask->end(), 0);
   assert(current_position_ <= mask_to_minibatch_.size());
+  assert(current_position_ <= master_bound_);
   assert(batch_mask->size() == mask_to_minibatch_.size());
-  if (current_position_ >= mask_to_minibatch_.size()) {
+
+  std::fill(batch_mask->begin(), batch_mask->end(), 0);
+  if (current_position_ >= master_bound_) {
     return;
   }
 
   size_t current_count = 0;
   // start from last positiion
-  while (current_position_ < mask_to_minibatch_.size()) {
+  while (current_position_ < master_bound_) {
     if (mask_to_minibatch_[current_position_]) {
       // XXX and a master node; seed nodes only exist locally
       (*batch_mask)[current_position_] = 1;
@@ -27,7 +29,7 @@ void galois::MinibatchGenerator::GetNextMinibatch(
   // advance current position to next set bit for next call (or to end to detect
   // no more minibatches
   while (!mask_to_minibatch_[current_position_] &&
-         (current_position_ < mask_to_minibatch_.size())) {
+         (current_position_ < master_bound_)) {
     current_position_++;
   }
 }

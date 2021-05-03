@@ -100,10 +100,6 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   // init norm factors (involves a sync call)
   InitNormFactor();
 
-  // XXX remove this
-  test_batcher_ =
-      std::make_unique<MinibatchGenerator>(local_testing_mask_, 2000);
-
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     // allocate/copy data structures over to GPU
@@ -936,6 +932,15 @@ size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
 
 void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
   train_batcher_->GetNextMinibatch(&local_minibatch_mask_);
+#ifndef NDEBUG
+  galois::gPrint("Minibatch : ");
+  for (unsigned i = 0; i < local_minibatch_mask_.size(); i++) {
+    if (local_minibatch_mask_[i]) {
+      galois::gPrint(i, ",");
+    }
+  }
+  galois::gPrint("\n");
+#endif
   SetupNeighborhoodSample(GNNPhase::kBatch);
 }
 
