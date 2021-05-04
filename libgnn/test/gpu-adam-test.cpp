@@ -1,4 +1,4 @@
-//! @file adam-test.cpp
+//! @file gpu-adam-test.cpp
 //! Tests the adam optimizer
 #include "galois/DistGalois.h"
 #include "galois/GNNOptimizers.h"
@@ -32,8 +32,12 @@ int main() {
   dimension_0.input_rows     = 7;
   dimension_0.input_columns  = test_graph.GetNumLabelClasses();
   dimension_0.output_columns = test_graph.GetNumLabelClasses();
-  auto alloc_layer =
-      std::make_unique<galois::SoftmaxLayer>(3, test_graph, dimension_0);
+  std::vector<galois::GNNFloat> output_matrix;
+  output_matrix.resize(dimension_0.input_rows * dimension_0.input_columns);
+
+  galois::PointerWithSize<galois::GNNFloat> output_layer(output_matrix);
+  auto alloc_layer = std::make_unique<galois::SoftmaxLayer>(
+      3, test_graph, &output_layer, dimension_0);
 
   std::vector<galois::GNNFloat> weights1 = {1, 1};
   std::vector<galois::GNNFloat> weights2 = {10};

@@ -3,7 +3,7 @@
 #include "galois/layers/GradientSyncStructures.h"
 
 #ifdef GALOIS_ENABLE_GPU
-// TODO(loc/hochan)
+#include "galois/layers/SAGELayer.cuh"
 #endif
 
 namespace galois {
@@ -53,9 +53,21 @@ public:
   }
 
   void InitSelfWeightsTo1() {
-    if (layer_weights_2_.size()) {
-      layer_weights_2_.assign(layer_weights_2_.size(), 1);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      size_t layer_weights_2_size = p_layer_weights_2_.size();
+      if (layer_weights_2_size > 0) {
+        base_gpu_object_.InitGPUVectorTo1(gpu_object_.layer_weights_2(),
+                                          layer_weights_2_size);
+      }
+    } else {
+#endif
+      if (layer_weights_2_.size()) {
+        layer_weights_2_.assign(layer_weights_2_.size(), 1);
+      }
+#ifdef GALOIS_ENABLE_GPU
     }
+#endif
   }
 
   //! Returns the 2nd set of weight gradients
@@ -70,6 +82,17 @@ public:
   PointerWithSize<galois::GNNFloat>
   BackwardPhase(PointerWithSize<galois::GNNFloat> prev_layer_input,
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
+
+#ifdef GALOIS_ENABLE_GPU
+  //! Copies over self weight gradients to CPU from GPU
+  const std::vector<GNNFloat>& CopyWeight2GradientsFromGPU() {
+    if (!layer_weight_gradients_2_.size()) {
+      layer_weight_gradients_2_.resize(p_layer_weight_gradients_2_.size());
+    }
+    gpu_object_.CopyWeight2GradientsToCPU(&layer_weight_gradients_2_);
+    return layer_weight_gradients_2_;
+  }
+#endif
 
 private:
   static const constexpr char* kRegionName = "SAGELayer";
@@ -143,8 +166,7 @@ private:
       output_column_intermediates_;
 
 #ifdef GALOIS_ENABLE_GPU
-  // TODO(loc/hochan)
-  GCNGPUAllocations gpu_object_;
+  SAGEGPUAllocations gpu_object_;
 #endif
 };
 

@@ -6,6 +6,8 @@
 #include "galois/runtime/cuda/DeviceSync.h"
 #include "galois/GNNCudaContextHostDecls.h"
 
+extern Shared<DynamicBitset> cuda_bitset_graph_aggregate;
+
 // The forward declaration is in the original Context.h file; as long as
 // pointers to it are used it shouldn't be an issue (since space usage is
 // unknown at that point)
@@ -120,7 +122,7 @@ void batch_set_mirror_node_layer_input_matrix_cuda(
 void batch_get_reset_node_layer_input_matrix_cuda(
     struct CUDA_Context* ctx, unsigned from_id, uint8_t* buf, size_t* buf_size,
     DataCommMode* mode, size_t column_size, unsigned layer_number) {
-  batch_get_shared_field<GNNFloat, sharedMaster, true>(
+  batch_get_shared_field<GNNFloat, sharedMirror, true>(
       ctx, &ctx->layer_input_matrix[layer_number], from_id, buf, buf_size, mode,
       column_size);
 }
@@ -130,7 +132,7 @@ void batch_get_reset_node_layer_input_matrix_cuda(struct CUDA_Context* ctx,
                                                   uint8_t* buf,
                                                   size_t column_size,
                                                   unsigned layer_number) {
-  batch_get_shared_field<GNNFloat, sharedMaster, true>(
+  batch_get_shared_field<GNNFloat, sharedMirror, true>(
       ctx, &ctx->layer_input_matrix[layer_number], from_id, buf, column_size);
 }
 
@@ -189,7 +191,7 @@ void batch_set_mirror_node_layer_output_matrix_cuda(
 void batch_get_reset_node_layer_output_matrix_cuda(
     struct CUDA_Context* ctx, unsigned from_id, uint8_t* buf, size_t* buf_size,
     DataCommMode* mode, size_t column_size, unsigned layer_number) {
-  batch_get_shared_field<GNNFloat, sharedMaster, true>(
+  batch_get_shared_field<GNNFloat, sharedMirror, true>(
       ctx, &ctx->layer_output_matrix[layer_number], from_id, buf, buf_size,
       mode, column_size);
 }
@@ -199,8 +201,18 @@ void batch_get_reset_node_layer_output_matrix_cuda(struct CUDA_Context* ctx,
                                                    uint8_t* buf,
                                                    size_t column_size,
                                                    unsigned layer_number) {
-  batch_get_shared_field<GNNFloat, sharedMaster, true>(
+  batch_get_shared_field<GNNFloat, sharedMirror, true>(
       ctx, &ctx->layer_output_matrix[layer_number], from_id, buf, column_size);
+}
+
+void get_bitset_graph_aggregate_cuda(struct CUDA_Context*,
+                                     uint64_t* bitset_compute) {
+  cuda_bitset_graph_aggregate.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_graph_aggregate_reset_cuda(struct CUDA_Context*, size_t begin,
+                                       size_t end) {
+  reset_bitset_field(cuda_bitset_graph_aggregate, begin, end);
 }
 
 void cudaSetLayerInputOutput(struct CUDA_Context* ctx, GNNFloat* layer_matrix,

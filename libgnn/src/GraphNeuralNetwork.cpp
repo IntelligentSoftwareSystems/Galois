@@ -23,7 +23,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    graph_->ResizeLayerVector(config_.num_intermediate_layers());
+    graph_->ResizeGPULayerVector(config_.num_intermediate_layers());
   }
 #endif
   // used for chaining layers together; begins as nullptr
@@ -54,13 +54,6 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
           i, *graph_, &prev_output_layer, layer_dims,
           config_.default_layer_config())));
       gnn_layers_.back()->SetGraphUserLayerNumber(num_graph_user_layers_++);
-#ifdef GALOIS_ENABLE_GPU
-      if (device_personality == DevicePersonality::GPU_CUDA) {
-        graph_->InitLayerVectorMetaObjects(
-            i, galois::runtime::getSystemNetworkInterface().Num,
-            layer_dims.input_columns, layer_dims.output_columns);
-      }
-#endif
       break;
     case GNNLayerType::kSAGE:
       gnn_layers_.push_back(std::move(std::make_unique<SAGELayer>(
@@ -75,23 +68,25 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       gnn_layers_.push_back(std::move(std::make_unique<L2NormLayer>(
           i, *graph_, &prev_output_layer, layer_dims,
           config_.default_layer_config())));
-#ifdef GALOIS_ENABLE_GPU
-      // TODO(loc/hochan) l2 layer gpu
-#endif
       break;
     case GNNLayerType::kDense:
       gnn_layers_.push_back(std::move(std::make_unique<DenseLayer>(
           i, *graph_, &prev_output_layer, layer_dims,
           config_.default_layer_config())));
-#ifdef GALOIS_ENABLE_GPU
-      // TODO(loc/hochan) dense layer gpu
-#endif
       break;
     default:
       GALOIS_LOG_FATAL("Invalid layer type during network construction");
     }
+
     // update output layer for next layer
     prev_output_layer = gnn_layers_.back()->GetForwardOutput();
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      graph_->InitLayerVectorMetaObjects(
+          i, galois::runtime::getSystemNetworkInterface().Num,
+          layer_dims.input_columns, layer_dims.output_columns);
+    }
+#endif
   }
 
   // loop backward and find last GCN/SAGE (main) layer to disable activation
@@ -385,6 +380,7 @@ galois::GraphNeuralNetwork::DoInference() {
   // start with graph features and pass it through all layers of the network
   galois::PointerWithSize<galois::GNNFloat> layer_input =
       graph_->GetLocalFeatures();
+
   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
     layer_input = ptr->ForwardPhase(layer_input);
   }

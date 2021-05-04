@@ -25,6 +25,12 @@ void CBlasSGEMMGPU(const cublasOperation_t trans_a,
                    size_t input_columns, size_t output_columns,
                    const GNNFloat* a, const GNNFloat* b, GNNFloat* output);
 
+void CBlasSGEMMGPU(const cublasOperation_t trans_a,
+                   const cublasOperation_t trans_b, size_t input_rows,
+                   size_t input_columns, size_t output_columns,
+                   const GNNFloat* a, const GNNFloat* b, GNNFloat* output,
+                   bool accumulate);
+
 //! Runs softmax + cross entropy on masked nodes. Will not overwrite all of
 //! the output, so make sure it's been zero'd out beforehand.
 //! At this point in time cross entropy is ignored because it only calculates a
@@ -48,5 +54,6 @@ SoftmaxCrossEntropyBackward(char* mask, size_t num_nodes, size_t feature_length,
 __device__ void DoSoftmax(size_t vector_length, const GNNFloat* input,
                           GNNFloat* output);
 
+__device__ void GPUVectorZero(size_t vector_length, GNNFloat* vec);
 } // namespace galois
 #endif

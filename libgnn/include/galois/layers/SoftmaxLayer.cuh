@@ -20,6 +20,8 @@ public:
                         size_t feature_length, const GNNFloat* predictions,
                         GNNFloat* output_gradient);
 
+  void CopyToCPU(GNNFloat* input, size_t size);
+
 private:
   char* train_mask_;
   char* val_mask_;

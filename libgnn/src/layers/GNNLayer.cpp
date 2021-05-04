@@ -38,9 +38,10 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     GlorotBengioInit(&layer_weights_);
   }
 
+  size_t num_output_elements =
+      layer_dimensions_.input_rows * layer_dimensions_.output_columns;
+
   if (!config_.disable_output) {
-    size_t num_output_elements =
-        layer_dimensions_.input_rows * layer_dimensions_.output_columns;
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", forward output matrix ", num_output_elements, " (",
                   FloatElementsToGB(num_output_elements), " GB)");
@@ -75,7 +76,8 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
                                   layer_weight_gradients_.size());
     p_forward_output_matrix_ = PointerWithSize<GNNFloat>(
         base_gpu_object_.forward_output(), forward_output_matrix_.size());
-    p_backward_output_matrix_ = *backward_output_matrix;
+    p_backward_output_matrix_ = PointerWithSize<GNNFloat>(
+        base_gpu_object_.backward_output(), backward_output_matrix->size());
     // TODO can clear the cpu side vectors/don't use .size() since optimally
     // they aren't initialized
   } else {
@@ -127,9 +129,8 @@ void galois::GNNLayer::PairGlorotBengioInit(std::vector<GNNFloat>* vector1,
   for (size_t i = 0; i < vector2->size(); i++) {
     (*vector2)[i] = dist(rng);
   }
+
 #ifdef GALOIS_ENABLE_GPU
-  // TODO
-  GALOIS_LOG_FATAL("TODO: copy both not 1");
   if (device_personality == DevicePersonality::GPU_CUDA) {
     CopyLayerWeightsToGPU();
   }
@@ -200,15 +201,15 @@ void galois::GNNLayer::ReconstructDropoutMatrix(
     PointerWithSize<GNNFloat>* output_matrix) {
   galois::StatTimer timer("ReconstructDropoutMatrix", "GNNLayer");
   timer.start();
+  // reuse the dropout mask from a previous dropout call
+  size_t num_elements = output_matrix->size();
+  GNNFloat scale      = 1. / (1. - config_.dropout_rate);
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    // TODO(hochan)
-    GALOIS_LOG_FATAL("Implement me");
+    base_gpu_object_.ReconstructDropoutMatrixGPU(
+        input_to_dropout, output_matrix, num_elements, scale);
   } else {
 #endif
-    // reuse the dropout mask from a previous dropout call
-    size_t num_elements = output_matrix->size();
-    GNNFloat scale      = 1. / (1. - config_.dropout_rate);
     galois::do_all(
         galois::iterate(static_cast<size_t>(0), num_elements),
         [&](size_t i) {
@@ -254,59 +255,69 @@ void galois::GNNLayer::Activation() {
   galois::StatTimer timer("ForwardActivation", "GNNLayer");
   timer.start();
 
-  if (activation_memo_.size() == 0) {
-    activation_memo_.resize(forward_output_matrix_.size());
-  }
-  activation_memo_.reset();
-
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
-  galois::do_all(
-      galois::iterate(static_cast<size_t>(0),
-                      layer_dimensions_.input_rows *
-                          layer_dimensions_.output_columns),
-      [&](size_t i) {
-        if (forward_output_matrix_[i] > 0.0) {
-          // do nothing, keep value; set the memo though
-          activation_memo_.set(i);
-        } else {
-          forward_output_matrix_[i] = 0;
-        }
-      },
-      galois::loopname("ReLU"));
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.ActivationGPU(p_forward_output_matrix_.size());
+  } else {
+#endif
+    if (activation_memo_.size() == 0) {
+      activation_memo_.resize(forward_output_matrix_.size());
+    }
+    activation_memo_.reset();
+
+    galois::do_all(
+        galois::iterate(static_cast<size_t>(0),
+                        layer_dimensions_.input_rows *
+                            layer_dimensions_.output_columns),
+        [&](size_t i) {
+          if (forward_output_matrix_[i] > 0.0) {
+            // do nothing, keep value; set the memo though
+            activation_memo_.set(i);
+          } else {
+            forward_output_matrix_[i] = 0;
+          }
+        },
+        galois::loopname("ReLU"));
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
   timer.stop();
 }
 
 void galois::GNNLayer::ActivationDerivative(
     PointerWithSize<GNNFloat>* gradient) {
-  galois::StatTimer timer("BackwardActivation", "GNNLayer");
-  timer.start();
-
-  // TODO only does relu at the moment; should check user specified activation
-  // and act accordingly
-  // keep gradient if the original output was greater than 0
-  galois::do_all(
-      galois::iterate(static_cast<size_t>(0),
-                      layer_dimensions_.input_rows *
-                          layer_dimensions_.output_columns),
-      [&](size_t i) {
-        // it was <= 0 before; set back to 0
-        if (!activation_memo_.test(i)) {
-          (*gradient)[i] = 0;
-        }
-      },
-      galois::loopname("ReLU-Derivative"));
-  timer.stop();
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.ActivationDerivativeGPU(gradient->data(),
+                                             gradient->size());
+  } else {
+#endif
+    // TODO only does relu at the moment; should check user specified activation
+    // and act accordingly
+    // keep gradient if the original output was greater than 0
+    galois::do_all(
+        galois::iterate(static_cast<size_t>(0),
+                        layer_dimensions_.input_rows *
+                            layer_dimensions_.output_columns),
+        [&](size_t i) {
+          // it was <= 0 before; set back to 0
+          if (!activation_memo_.test(i)) {
+            (*gradient)[i] = 0;
+          }
+        },
+        galois::loopname("ReLU-Derivative"));
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
 }
 
 void galois::GNNLayer::WeightGradientSyncSum() {
   galois::StatTimer t("Sync_WeightGradientsSum", "GNNLayer");
   t.start();
-#ifdef GALOIS_ENABLE_GPU
-  // TODO(hochan) collectives here rather than gluon sync if possible like the
-  // CPU code
-  // preferably without needing to do a gpu->cpu copy
-#else
+  int weight_size = static_cast<int>(p_layer_weight_gradients_.size());
+
   // TODO(loc) remove this limitation later; can just do a loop over the weight
   // matrix
   if (p_layer_weight_gradients_.size() >
@@ -314,54 +325,73 @@ void galois::GNNLayer::WeightGradientSyncSum() {
     GALOIS_LOG_FATAL("Weight sync code does not handle size larger than max "
                      "int at the moment");
   }
-  MPI_Allreduce(MPI_IN_PLACE,
-                static_cast<void*>(p_layer_weight_gradients_.data()),
-                static_cast<int>(p_layer_weight_gradients_.size()), MPI_FLOAT,
-                MPI_SUM, MPI_COMM_WORLD);
+#ifdef GALOIS_ENABLE_GPU
+  // TODO(lhc) make this clang option later
+  bool gpu_direct_enabled = false;
+  if (device_personality == DevicePersonality::GPU_CUDA &&
+      !gpu_direct_enabled) {
+    base_gpu_object_.CopyWeightGradientsToCPU(&layer_weight_gradients_);
+    MPI_Allreduce(MPI_IN_PLACE, layer_weight_gradients_.data(), weight_size,
+                  MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    base_gpu_object_.CopyToWeightGradients(layer_weight_gradients_);
+  } else {
+#endif
+    MPI_Allreduce(MPI_IN_PLACE,
+                  static_cast<void*>(p_layer_weight_gradients_.data()),
+                  weight_size, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
   t.stop();
 }
 
 void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
-#ifdef GALOIS_ENABLE_GPU
-  // TODO(hochan) mask away the **non** masters on gpu
-  GALOIS_LOG_FATAL("implement this");
-#else
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.input_columns;
   assert((row_index * layer_dimensions_.input_rows) <= input->size());
-  galois::do_all(
-      galois::iterate(start_node, end_node),
-      [&](size_t non_master) {
-        // TODO(loc) use a std function for this for max efficiency
-        for (size_t i = 0; i < row_index; i++) {
-          (*input)[non_master * row_index + i] = 0;
-        }
-      },
-      galois::loopname("MaskInputNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.MaskNonMastersGPU(input, start_node, end_node, row_index);
+  } else {
+#endif
+    galois::do_all(
+        galois::iterate(start_node, end_node),
+        [&](size_t non_master) {
+          // TODO(loc) use a std function for this for max efficiency
+          for (size_t i = 0; i < row_index; i++) {
+            (*input)[non_master * row_index + i] = 0;
+          }
+        },
+        galois::loopname("MaskInputNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }
 
 void galois::GNNLayer::MaskGradientNonMasters(
     PointerWithSize<GNNFloat>* gradient) {
-#ifdef GALOIS_ENABLE_GPU
-  // TODO(hochan) mask away the **non** masters on gpu
-  GALOIS_LOG_FATAL("implement this");
-#else
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.output_columns;
-  galois::do_all(
-      galois::iterate(start_node, end_node),
-      [&](size_t non_master) {
-        // TODO(loc) use a std function for this for max efficiency
-        for (size_t i = 0; i < row_index; i++) {
-          (*gradient)[non_master * row_index + i] = 0;
-        }
-      },
-      galois::loopname("MaskGradientNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.MaskNonMastersGPU(gradient, start_node, end_node,
+                                       row_index);
+  } else {
+#endif
+    galois::do_all(
+        galois::iterate(start_node, end_node),
+        [&](size_t non_master) {
+          // TODO(loc) use a std function for this for max efficiency
+          for (size_t i = 0; i < row_index; i++) {
+            (*gradient)[non_master * row_index + i] = 0;
+          }
+        },
+        galois::loopname("MaskGradientNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  }
 #endif
 }

@@ -1,4 +1,4 @@
-//! @file epoch-test.cpp
+//! @file gpu-epoch-test.cpp
 //! Run 50 epochs of training to see if results improve.
 
 #include "galois/Logging.h"
@@ -23,9 +23,7 @@ int main() {
   std::vector<size_t> layer_output_sizes = {
       16, test_graph->GetNumLabelClasses(), test_graph->GetNumLabelClasses()};
   galois::GNNLayerConfig layer_config;
-  layer_config.do_dropout       = true;
-  layer_config.do_activation    = false;
-  layer_config.do_normalization = true;
+  layer_config.DebugConfig();
   // XXX Activation kills accuracy compared to old code, esp. for cora
   galois::GraphNeuralNetworkConfig gnn_config(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
@@ -49,22 +47,18 @@ int main() {
   main_timer.start();
   for (size_t epoch = 0; epoch < 100; epoch++) {
     galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
-    if (cpu_pred.size() != predictions.size()) {
-      cpu_pred.resize(predictions.size());
-    }
     gnn->GradientPropagation();
     // copy to cpu
     // TODO currently adam has this helper function; it should be handled
     // by other class though
-    adam->CopyToVector(cpu_pred, predictions);
     galois::gPrint("Epoch ", epoch, ": Accuracy is ",
-                   gnn->GetGlobalAccuracy(cpu_pred), "\n");
+                   gnn->GetGlobalAccuracy(predictions), "\n");
   }
 
   // check test accuracy
   gnn->SetLayerPhases(galois::GNNPhase::kTest);
   galois::PointerWithSize<galois::GNNFloat> predictions = gnn->DoInference();
-  adam->CopyToVector(cpu_pred, predictions);
-  galois::gPrint("Test accuracy is ", gnn->GetGlobalAccuracy(cpu_pred), "\n");
+  galois::gPrint("Test accuracy is ", gnn->GetGlobalAccuracy(predictions),
+                 "\n");
   main_timer.stop();
 }

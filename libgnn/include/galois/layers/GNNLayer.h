@@ -8,6 +8,9 @@
 #include "galois/layers/GNNLayer.cuh"
 #endif
 
+//#define PRINT_VEC_LOG_
+//#define PRINT_GPU_VEC_
+
 namespace galois {
 
 //! Supported layer types in the GNN
@@ -185,16 +188,29 @@ public:
   PointerWithSize<GNNFloat> AllocateGPU(const std::vector<GNNFloat>& v) {
     return PointerWithSize<GNNFloat>(base_gpu_object_.Allocate(v), v.size());
   }
+
   //! Copies over forward output results to CPU from GPU
-  const std::vector<GNNFloat>& CopyForwardOutputFromGPU() {
-    base_gpu_object_.CopyForwardOutputToCPU(&forward_output_matrix_);
-    return forward_output_matrix_;
+  const std::vector<GNNFloat> CopyForwardOutputFromGPU() {
+    size_t cpu_forward_output_size = p_forward_output_matrix_.size();
+    GNNFloat* cpu_forward_output =
+        (GNNFloat*)malloc(cpu_forward_output_size * sizeof(GNNFloat));
+    base_gpu_object_.CopyForwardOutputToCPU(cpu_forward_output,
+                                            cpu_forward_output_size);
+    return std::vector<GNNFloat>(cpu_forward_output,
+                                 cpu_forward_output + cpu_forward_output_size);
   }
+
   //! Copies over backward output results to CPU from GPU
-  const std::vector<GNNFloat>& CopyBackwardOutputFromGPU() {
-    base_gpu_object_.CopyBackwardOutputToCPU(&backward_output_matrix_);
-    return backward_output_matrix_;
+  const PointerWithSize<GNNFloat> CopyBackwardOutputFromGPU() {
+    size_t cpu_backward_output_size = p_backward_output_matrix_.size();
+    GNNFloat* cpu_backward_output =
+        (GNNFloat*)malloc(cpu_backward_output_size * sizeof(GNNFloat));
+    base_gpu_object_.CopyBackwardOutputToCPU(cpu_backward_output,
+                                             cpu_backward_output_size);
+    return PointerWithSize<GNNFloat>(cpu_backward_output,
+                                     cpu_backward_output_size);
   }
+
   //! Copies over weight gradients to CPU from GPU
   const std::vector<GNNFloat>& CopyWeightGradientsFromGPU() {
     base_gpu_object_.CopyWeightGradientsToCPU(&layer_weight_gradients_);
@@ -203,6 +219,10 @@ public:
 
   void PrintForwardOutputGPU() {
     base_gpu_object_.PrintForwardOutput(forward_output_matrix_.size());
+  }
+
+  void PrintBackwardOutputGPU() {
+    base_gpu_object_.PrintBackwardOutput(p_backward_output_matrix_.size());
   }
 #endif
 
@@ -293,6 +313,7 @@ protected:
   //! Does some activation function based on configuration on forward output
   //! matrix
   void Activation();
+  void ActivationCPU();
   //! Calculate derivative of activation function based on config on the matrix
   void ActivationDerivative(PointerWithSize<GNNFloat>* matrix);
 
@@ -317,6 +338,9 @@ protected:
   double FloatElementsToGB(size_t num_of_floats) const {
     return num_of_floats * double{4} / (1 << 30);
   }
+
+  void MaskNonMastersGPU(PointerWithSize<GNNFloat>* input, size_t start_node,
+                         size_t end_node, size_t row_index);
 };
 
 } // namespace galois

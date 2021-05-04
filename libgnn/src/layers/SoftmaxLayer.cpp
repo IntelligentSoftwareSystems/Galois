@@ -72,8 +72,8 @@ galois::SoftmaxLayer::ForwardPhase(
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.ForwardPhaseGPU(
         layer_phase_, graph_.size(), layer_dimensions_.input_columns,
-        input_embeddings.data(), p_forward_output_matrix_.data());
-    return p_forward_output_matrix_;
+        input_embeddings.data(), p_backward_output_matrix_.data());
+    return p_backward_output_matrix_;
   }
 #endif
   return ForwardPhaseCPU(input_embeddings);

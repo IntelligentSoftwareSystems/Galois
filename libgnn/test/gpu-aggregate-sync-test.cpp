@@ -29,17 +29,22 @@ int main() {
   l_config.disable_aggregate_after_update = true;
 
   unsigned num_layers = 2;
-  test_graph->ResizeLayerVector(num_layers);
+  test_graph->ResizeGPULayerVector(num_layers);
   test_graph->InitLayerVectorMetaObjects(
       0, galois::runtime::getSystemNetworkInterface().Num,
       dimension_0.input_columns, dimension_0.output_columns);
   test_graph->InitLayerVectorMetaObjects(
       1, galois::runtime::getSystemNetworkInterface().Num,
       dimension_0.input_columns, dimension_0.output_columns);
+
+  galois::PointerWithSize<galois::GNNFloat> p_null(nullptr, 0);
+  std::vector<galois::GNNFloat> back_matrix(21);
+  galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
+
   // create the layer, no norm factor
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(0, *(test_graph.get()),
-                                                        dimension_0, l_config);
+      std::make_unique<galois::GraphConvolutionalLayer>(
+          0, *(test_graph.get()), &p_null, dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
   layer_0->ForwardPhase(test_graph->GetLocalFeatures());
@@ -110,7 +115,7 @@ int main() {
   // layer 0 means that an empty weight matrix is returned since there is no
   // point passing back anything
   layer_0->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
-  const std::vector<galois::GNNFloat>& layer_0_backward_output =
+  const galois::PointerWithSize<galois::GNNFloat>& layer_0_backward_output =
       layer_0->CopyBackwardOutputFromGPU();
 
   //////////////////////////////////////////////////////////////////////////////
@@ -126,8 +131,8 @@ int main() {
   // layer 1 to check backward output
   //////////////////////////////////////////////////////////////////////////////
   std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, *(test_graph.get()),
-                                                        dimension_0, l_config);
+      std::make_unique<galois::GraphConvolutionalLayer>(
+          1, *(test_graph.get()), &p_back, dimension_0, l_config);
   layer_1->InitAllWeightsTo1();
   layer_1->ForwardPhase(test_graph->GetLocalFeatures());
   const std::vector<galois::GNNFloat>& layer_1_forward_output =
@@ -176,7 +181,7 @@ int main() {
   // since layer isn't 0 anymore, backward phase will actually return something
   dummy_ones_v.assign(test_graph->size() * 2, 1);
   layer_1->BackwardPhase(test_graph->GetLocalFeatures(), &dummy_ones);
-  const std::vector<galois::GNNFloat>& layer_1_backward_output =
+  const galois::PointerWithSize<galois::GNNFloat>& layer_1_backward_output =
       layer_1->CopyBackwardOutputFromGPU();
 
   for (size_t row = 0; row < test_graph->size(); row++) {

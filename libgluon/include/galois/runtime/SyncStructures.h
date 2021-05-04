@@ -1920,17 +1920,17 @@ public:
     static bool is_valid() { return true; }                                    \
                                                                                \
     static galois::DynamicBitSet& get() {                                      \
-      if (personality == GPU_CUDA)                                             \
+      if (device_personality == DevicePersonality::GPU_CUDA)                   \
         get_bitset_##fieldname##_cuda(                                         \
             cuda_ctx, (uint64_t*)bitset_##fieldname.get_vec().data());         \
       return bitset_##fieldname;                                               \
     }                                                                          \
                                                                                \
     static void reset_range(size_t begin, size_t end) {                        \
-      if (personality == GPU_CUDA) {                                           \
+      if (device_personality == DevicePersonality::GPU_CUDA) {                 \
         bitset_##fieldname##_reset_cuda(cuda_ctx, begin, end);                 \
       } else {                                                                 \
-        assert(personality == CPU);                                            \
+        assert(device_personality == DevicePersonality::CPU);                  \
         bitset_##fieldname.reset(begin, end);                                  \
       }                                                                        \
     }                                                                          \
@@ -2079,5 +2079,4 @@ public:
     }                                                                          \
   };
 #endif
-
 #endif // header guard

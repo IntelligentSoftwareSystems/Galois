@@ -97,10 +97,12 @@ void galois::DenseLayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
                                           GNNFloat* output) {
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
+    /* TODO(lhc) implement this
     gpu_object_.UpdateEmbeddingsGPU(
         layer_dimensions_.input_rows, layer_dimensions_.input_columns,
         layer_dimensions_.output_columns, node_embeddings,
         base_gpu_object_.layer_weights(), output);
+        */
   } else {
 #endif
     // CPU version is just a call into CBlas
@@ -119,10 +121,12 @@ void galois::DenseLayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
+    /* TODO(lhc) implement this
     gpu_object_.UpdateEmbeddingsDerivativeGPU(
         layer_dimensions_.input_rows, layer_dimensions_.input_columns,
         layer_dimensions_.output_columns, gradients,
         base_gpu_object_.layer_weights(), output);
+        */
   } else {
 #endif
     // difference is Trans for B matrix (data) to get z by y (weights is y by z

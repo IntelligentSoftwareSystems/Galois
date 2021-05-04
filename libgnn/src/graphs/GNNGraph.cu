@@ -1,5 +1,13 @@
+#include "gg.h"
+#include "ggcuda.h"
+
+#include "galois/cuda/DynamicBitset.h"
+
 #include "galois/CUDAUtil.h"
 #include "galois/graphs/GNNGraph.cuh"
+#include "sharedptr.h"
+
+Shared<DynamicBitset> cuda_bitset_graph_aggregate;
 
 galois::graphs::GNNGraphGPUAllocations::~GNNGraphGPUAllocations() {
   GALOIS_LOG_VERBOSE("Freeing GPU graph allocations");
@@ -13,6 +21,8 @@ galois::graphs::GNNGraphGPUAllocations::~GNNGraphGPUAllocations() {
   CUDA_FREE(local_training_mask_);
   CUDA_FREE(local_validation_mask_);
   CUDA_FREE(local_testing_mask_);
+  CUDA_FREE(global_degrees_);
+  CUDA_FREE(global_train_degrees_);
 }
 
 void galois::graphs::GNNGraphGPUAllocations::SetGraphTopology(
@@ -83,11 +93,96 @@ void galois::graphs::GNNGraphGPUAllocations::SetMasks(
                         test.size() * sizeof(char), cudaMemcpyHostToDevice));
 }
 
-void galois::graphs::GNNGraphGPUAllocations::SetNormFactors(
-    const std::vector<GNNFloat> norm_factors) {
-  CUDA_CHECK(cudaMalloc((void**)(&norm_factors_),
-                        norm_factors.size() * sizeof(GNNFloat)));
-  CUDA_CHECK(cudaMemcpy(norm_factors_, norm_factors.data(),
-                        norm_factors.size() * sizeof(GNNFloat),
+void galois::graphs::GNNGraphGPUAllocations::InitNormFactor(size_t num_nodes) {
+  GALOIS_LOG_ASSERT(global_degrees_ == nullptr);
+  GALOIS_LOG_ASSERT(global_train_degrees_ == nullptr);
+
+  CUDA_CHECK(
+      cudaMalloc((void**)(&global_degrees_), sizeof(uint32_t) * num_nodes));
+  CUDA_CHECK(cudaMalloc((void**)(&global_train_degrees_),
+                        sizeof(uint32_t) * num_nodes));
+  global_degree_size_       = num_nodes;
+  global_train_degree_size_ = num_nodes;
+}
+
+#if 0 // TODO(lhc) will be added
+__global__ void CalculateFullNormFactorGPU() {
+  const unsigned thread_id =
+      BLOCK_SIZE * blockIdx.x + threadIdx.x; // global thread index
+  const unsigned thread_lane =
+      threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
+  const unsigned warp_id = thread_id / WARP_SIZE; // global warp index
+  const unsigned warp_lane =
+    threadIdx.x / WARP_SIZE; // warp index within the CTA
+  const unsigned num_warps =
+    (BLOCK_SIZE / WARP_SIZE) * gridDim.x; // total number of active warps
+
+  // each warp gets a source: this var holds the first/last edge worked on by
+  // that warp
+  __shared__ int edge_begin_end[BLOCK_SIZE / WARP_SIZE][2];
+
+  // each warp works on a source: threads in warp split the feature
+  for (int src = warp_id; src < static_cast<int>(num_nodes); src += num_warps) {
+    if (thread_lane < 2) {
+      edge_begin_end[warp_lane][thread_lane] = edge_index[src + thread_lane];
+    }
+    __syncthreads();
+
+    const int edge_begin = edge_begin_end[warp_lane][0];
+    const int edge_end   = edge_begin_end[warp_lane][1];
+    for (int offest = edge_begin; offset < edge_end; offset++) {
+
+    }
+  }
+}
+
+void galois::graphs::GNNGraphGPUAllocations::CalculateFullNormFactor() {
+
+}
+#endif
+
+void galois::graphs::GNNGraphGPUAllocations::SetGlobalDegrees(
+    const std::vector<uint32_t> global_degrees) {
+  if (global_degree_size_ < global_degrees.size()) {
+    if (global_degree_size_ > 0) {
+      CUDA_CHECK(cudaFree(global_degrees_));
+    }
+    CUDA_CHECK(cudaMalloc((void**)(&global_degrees_),
+                          global_degrees.size() * sizeof(uint32_t)));
+    global_degree_size_ = global_degrees.size();
+  }
+
+  CUDA_CHECK(cudaMemcpy(global_degrees_, global_degrees.data(),
+                        global_degrees.size() * sizeof(uint32_t),
                         cudaMemcpyHostToDevice));
+}
+
+void galois::graphs::GNNGraphGPUAllocations::SetGlobalTrainDegrees(
+    const std::vector<uint32_t> global_train_degrees) {
+  if (global_train_degree_size_ < global_train_degrees.size()) {
+    if (global_train_degree_size_ > 0) {
+      CUDA_CHECK(cudaFree(global_train_degrees_));
+    }
+    CUDA_CHECK(cudaMalloc((void**)(&global_train_degrees_),
+                          global_train_degrees.size() * sizeof(uint32_t)));
+    global_train_degree_size_ = global_train_degrees.size();
+  }
+
+  CUDA_CHECK(cudaMemcpy(global_train_degrees_, global_train_degrees.data(),
+                        global_train_degrees.size() * sizeof(uint32_t),
+                        cudaMemcpyHostToDevice));
+}
+
+void galois::graphs::GNNGraphGPUAllocations::AllocAggregateBitset(size_t size) {
+  cuda_bitset_graph_aggregate.alloc(1);
+  cuda_bitset_graph_aggregate.cpu_wr_ptr()->alloc(size);
+}
+
+void galois::graphs::GNNGraphGPUAllocations::CopyToCPU(
+    const PointerWithSize<GNNFloat>& input) {
+  GNNFloat* cpu_input = (GNNFloat*)malloc(sizeof(GNNFloat) * input.size());
+  cudaMemcpy(cpu_input, input.data(), sizeof(GNNFloat) * input.size(),
+             cudaMemcpyDeviceToHost);
+  for (size_t i = 0; i < input.size(); i++)
+    fprintf(stdout, "** %lu is %f\n", i, cpu_input[i]);
 }

@@ -1,3 +1,4 @@
+
 #pragma once
 #include "galois/layers/GNNLayer.h"
 
@@ -50,7 +51,7 @@ private:
 
 #ifdef GALOIS_ENABLE_GPU
   // TODO(hochan/loc) replace with dense gpu object
-  GCNGPUAllocations gpu_object_;
+  // GCNGPUAllocations gpu_object_;
 #endif
 };
 

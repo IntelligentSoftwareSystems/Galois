@@ -23,8 +23,8 @@ public:
   //! Copy over masks for the 3 sets to GPU
   void SetMasks(const std::vector<char>& train, const std::vector<char>& val,
                 const std::vector<char>& test);
-  //! Copy over norm factors
-  void SetNormFactors(const std::vector<GNNFloat> norm_factors);
+
+  void AllocAggregateBitset(size_t size);
 
   GNNFeature* feature_vector() const { return feature_vector_; };
   int* edge_index() const { return edge_index_; }
@@ -33,7 +33,19 @@ public:
   char* local_training_mask() const { return local_training_mask_; }
   char* local_validation_mask() const { return local_validation_mask_; }
   char* local_testing_mask() const { return local_testing_mask_; }
-  GNNFloat* norm_factors() const { return norm_factors_; }
+
+  //! Get the total degree of the partitioned graph
+  uint32_t* get_global_degrees() const { return global_degrees_; }
+  //! Get the total degree of the sampled subgraph
+  uint32_t* get_global_train_degrees() const { return global_train_degrees_; }
+  //! Allocate memory to objects related to normalization
+  void InitNormFactor(size_t num_nodes);
+  //! Copy degree of the partitioned graph from CPU
+  void SetGlobalDegrees(const std::vector<uint32_t> global_degrees);
+  //! Copy degree of the sampled subgraph from CPU
+  void SetGlobalTrainDegrees(const std::vector<uint32_t> global_train_degrees);
+
+  void CopyToCPU(const PointerWithSize<GNNFloat>& input);
 
 private:
   // ALL THESE VARIABLES ARE DEVICE SIDE (GPU) POINTERS
@@ -53,14 +65,19 @@ private:
   int* edge_destinations_{nullptr};
   //! (Local) feature vector
   GNNFeature* feature_vector_{nullptr};
+
   //! (Local) ground truth vector
   GNNLabel* ground_truth_{nullptr};
+
   // masks for phases
   char* local_training_mask_{nullptr};
   char* local_validation_mask_{nullptr};
   char* local_testing_mask_{nullptr};
-  //! Norm factors used during aggregation
-  GNNFloat* norm_factors_;
+
+  uint32_t* global_degrees_{nullptr};
+  size_t global_degree_size_{0};
+  uint32_t* global_train_degrees_{nullptr};
+  size_t global_train_degree_size_{0};
 };
 
 } // namespace graphs

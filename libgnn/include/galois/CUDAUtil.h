@@ -58,8 +58,8 @@ inline int CUDA_GET_BLOCKS(const int N) {
 
 //! Basic kernel loop for CUDA threads
 //! Caffe describes it as "grid stride"
-#define CUDA_KERNEL_LOOP(i, n)                                                 \
-  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < (n);                 \
+#define CUDA_KERNEL_LOOP(i, s, e)                                              \
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x + s; i < (e);             \
        i += blockDim.x * gridDim.x)
 
 //! Wrap a CuBLAS call with this to check if it threw any errors

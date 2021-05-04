@@ -86,6 +86,10 @@ if (NOT GALOIS_ENABLE_GPU)
   target_link_libraries(sample-bit-test galois_gnn)
   add_test(NAME sample-bit-test COMMAND sample-bit-test)
 else()
+  add_executable(gpu-sage-layer-test gpu-sage-layer-test.cpp)
+  target_link_libraries(gpu-sage-layer-test galois_gnn)
+  add_test(NAME gpu-sage-layer-test COMMAND gpu-sage-layer-test)
+
   add_executable(gpu-convlayer-test gpu-convlayer-test.cpp)
   target_link_libraries(gpu-convlayer-test galois_gnn)
   add_test(NAME gpu-convlayer-test COMMAND gpu-convlayer-test)
@@ -104,6 +108,27 @@ else()
 
   add_executable(gpu-aggregate-sync-test gpu-aggregate-sync-test.cpp)
   target_link_libraries(gpu-aggregate-sync-test galois_gnn)
+
+  set(gpu_hosts)
+  set(gpu_host 3) #TODO(lhc) more than 4 gpus, test failed
+                  #          seems like it happened due to graph size 0.
+                  #          so let me postpone this
+  while (${gpu_host} GREATER 1)
+    list(APPEND gpu_hosts ${gpu_host})
+    math(EXPR gpu_host "${gpu_host} - 1")
+  endwhile()
+  list(APPEND gpu_hosts "1")
+
+  add_executable(gpu-back-conv-test gpu-back-conv-test.cpp)
+  target_link_libraries(gpu-back-conv-test galois_gnn)
+  foreach(gpu_host_count ${gpu_hosts})
+    set(PSET "-pset=")
+    foreach(iter RANGE 1 ${gpu_host_count})
+      set(PSET "${PSET}g")
+    endforeach()
+    add_test(NAME run-gpu-back-conv-${gpu_host_count} COMMAND mpiexec --bind-to none -n ${gpu_host_count} ./gpu-back-conv-test ${PSET} -numNodes=1)
+    set_tests_properties(run-gpu-back-conv-${gpu_host_count} PROPERTIES ENVIRONMENT "GALOIS_DO_NOT_BIND_THREADS=1")
+  endforeach()
 endif()
 
 # TODO multi host tests?

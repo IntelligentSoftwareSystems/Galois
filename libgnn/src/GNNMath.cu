@@ -30,20 +30,29 @@ void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
                            size_t input_columns, size_t output_columns,
                            const GNNFloat* a, const GNNFloat* b,
                            GNNFloat* output) {
+  CBlasSGEMMGPU(trans_a, trans_b, input_rows, input_columns, output_columns, a,
+                b, output, false);
+}
+
+void galois::CBlasSGEMMGPU(const cublasOperation_t trans_a,
+                           const cublasOperation_t trans_b, size_t input_rows,
+                           size_t input_columns, size_t output_columns,
+                           const GNNFloat* a, const GNNFloat* b,
+                           GNNFloat* output, bool accumulate) {
   if (!cublas_is_init) {
     InitCuBLAS();
   }
   size_t lead_dim_a = (trans_a == CUBLAS_OP_N) ? input_columns : input_rows;
   size_t lead_dim_b = (trans_b == CUBLAS_OP_N) ? output_columns : input_columns;
-  float dummy0      = 0.0;
-  float dummy1      = 1.0;
+  float beta        = (accumulate) ? 1.0 : 0.0;
+  float dummy0      = 1.0;
   // because cusparse assumes column major even though we're passing in row
   // major, the order of multiply is reversed so that it does what we
   // want anyways
   // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
   CUBLAS_CHECK(cublasSgemm(global_cublas_handle, trans_b, trans_a,
-                           output_columns, input_rows, input_columns, &dummy1,
-                           b, lead_dim_b, a, lead_dim_a, &dummy0, output,
+                           output_columns, input_rows, input_columns, &dummy0,
+                           b, lead_dim_b, a, lead_dim_a, &beta, output,
                            output_columns));
   CUDA_TEST("cublas sgemm failure");
 }
@@ -54,13 +63,15 @@ __global__ void galois::SoftmaxCrossEntropyForward(
 
   // NOTE: assumes that output is already 0'd out as it will not overwrite the
   // entire thing
-  CUDA_KERNEL_LOOP(i, num_nodes) {
+  CUDA_KERNEL_LOOP(i, 0, num_nodes) {
     if (mask[i] == 1) {
       galois::DoSoftmax(feature_length, input_embeddings + feature_length * i,
                         output + feature_length * i);
       // ignoring crossentropy loss calculation for now because I'm not using
       // loss for anything + didn't bother allocating an array to store loss
       // anyways
+    } else {
+      galois::GPUVectorZero(feature_length, output + feature_length * i);
     }
   }
 }
@@ -168,5 +179,11 @@ __device__ void galois::DoSoftmax(size_t vector_length, const GNNFloat* input,
   // denominator scale
   for (size_t i = 0; i < vector_length; i++) {
     output[i] /= denominator;
+  }
+}
+
+__device__ void galois::GPUVectorZero(size_t vector_length, GNNFloat* vec) {
+  for (size_t i = 0; i < vector_length; i++) {
+    vec[i] = 0;
   }
 }

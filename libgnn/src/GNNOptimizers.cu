@@ -42,7 +42,7 @@ __global__ void DoAdamUpdate(const galois::GNNFloat* derivatives,
                              galois::GNNFloat alpha, galois::GNNFloat beta1,
                              galois::GNNFloat beta2, galois::GNNFloat epsilon,
                              galois::GNNFloat beta1t, galois::GNNFloat beta2t) {
-  CUDA_KERNEL_LOOP(i, matrix_size) {
+  CUDA_KERNEL_LOOP(i, 0, matrix_size) {
     first_moment[i]  = beta1 * first_moment[i] + (1.0 - beta1) * derivatives[i];
     second_moment[i] = beta2 * second_moment[i] +
                        (1.0 - beta2) * (derivatives[i] * derivatives[i]);

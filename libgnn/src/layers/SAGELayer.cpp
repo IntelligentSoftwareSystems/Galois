@@ -20,21 +20,44 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", SAGE second layer weights ", num_weight_elements, " (",
                   FloatElementsToGB(num_weight_elements), " GB)");
+    // TODO(lhc) for now, allocate dummy cpu weight2 for copying to GPU
     layer_weights_2_.resize(num_weight_elements);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateWeight2(num_weight_elements);
+    }
+#endif
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", SAGE second layer gradients ", num_weight_elements, " (",
                   FloatElementsToGB(num_weight_elements), " GB)");
     layer_weight_gradients_2_.resize(num_weight_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateWeightGradient2(num_weight_elements);
+    }
+#endif
 
     // reinit both weight matrices as one unit
     PairGlorotBengioInit(&layer_weights_, &layer_weights_2_);
-
-    // update the pointers to them as well as realloc will require it
-    p_layer_weights_2_ = PointerWithSize<GNNFloat>(layer_weights_2_);
-    p_layer_weight_gradients_2_ =
-        PointerWithSize<GNNFloat>(layer_weight_gradients_2_);
-    // initialize the optimizer
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      // copy weight2 to GPU
+      gpu_object_.CopyToWeights2(layer_weights_2_);
+      p_layer_weights_2_ = PointerWithSize<GNNFloat>(
+          gpu_object_.layer_weights_2(), num_weight_elements);
+      p_layer_weight_gradients_2_ = PointerWithSize<GNNFloat>(
+          gpu_object_.layer_weight_gradients_2(), num_weight_elements);
+    } else {
+#endif
+      // update the pointers to them as well as realloc will require it
+      p_layer_weights_2_ = PointerWithSize<GNNFloat>(layer_weights_2_);
+      p_layer_weight_gradients_2_ =
+          PointerWithSize<GNNFloat>(layer_weight_gradients_2_);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
     std::vector<size_t> weight_size = {num_weight_elements};
+    // initialize the optimizer
     second_weight_optimizer_ = std::make_unique<AdamOptimizer>(weight_size, 1);
   }
 
@@ -47,7 +70,15 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", SAGE input temp var 1 ", num_input_elements, " (",
                   FloatElementsToGB(num_input_elements), " GB)");
-    in_temp_1_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateInTemp1(num_input_elements);
+    } else {
+#endif
+      in_temp_1_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   // only on in dropout case + if in temp is smaller than out temp
@@ -57,40 +88,52 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", SAGE input temp var 2 ", num_input_elements, " (",
                   FloatElementsToGB(num_input_elements), " GB)");
-    in_temp_2_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateInTemp2(num_input_elements);
+    } else {
+#endif
+      in_temp_2_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
-
   // only needed if out temp would be smaller than intemp
   if (!config_.disable_aggregate_after_update &&
       layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", SAGE output temp var ", num_output_elements, " (",
                   FloatElementsToGB(num_output_elements), " GB)");
-    out_temp_.resize(num_output_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateOutTemp(num_output_elements);
+    } else {
+#endif
+      out_temp_.resize(num_output_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   layer_type_ = galois::GNNLayerType::kSAGE;
 #ifdef GALOIS_ENABLE_GPU
-  // TODO(loc/hochan) GPU SAGE
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    gpu_object_.Allocate(num_input_elements, num_output_elements);
     // init pointers with size
     p_in_temp_1_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), in_temp_1_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), num_input_elements);
     p_in_temp_2_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), in_temp_2_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), num_input_elements);
     p_out_temp_ =
-        PointerWithSize<GNNFloat>(gpu_object_.out_temp(), out_temp_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.out_temp(), num_output_elements);
   } else {
 #endif
     p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
     p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
     p_out_temp_  = PointerWithSize<GNNFloat>(out_temp_);
 #ifdef GALOIS_ENABLE_GPU
-    // TODO concat parameters
   }
 #endif
 
@@ -100,22 +143,30 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
 void galois::SAGELayer::WeightGradientSyncSum2() {
   galois::StatTimer t("Sync_WeightGradientsSum2", kRegionName);
   t.start();
+  int weight_size = static_cast<int>(p_layer_weight_gradients_2_.size());
 #ifdef GALOIS_ENABLE_GPU
-  // TODO(hochan) collectives here rather than gluon sync if possible like the
-  // CPU code
-  GALOIS_LOG_FATAL("implement me");
-#else
-  // TODO(loc) remove this limitation later; can just do a loop over the weight
-  // matrix
-  if (p_layer_weight_gradients_2_.size() >
-      size_t{std::numeric_limits<int>::max()}) {
-    GALOIS_LOG_FATAL("Weight sync code does not handle size larger than max "
-                     "int at the moment");
+  bool gpu_direct_enabled = false;
+  if (device_personality == DevicePersonality::GPU_CUDA &&
+      !gpu_direct_enabled) {
+    gpu_object_.CopyWeight2GradientsToCPU(&layer_weight_gradients_2_);
+    MPI_Allreduce(MPI_IN_PLACE,
+                  static_cast<void*>(layer_weight_gradients_2_.data()),
+                  weight_size, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    gpu_object_.CopyToWeight2Gradients(layer_weight_gradients_2_);
+  } else {
+#endif
+    // TODO(loc) remove this limitation later; can just do a loop over the
+    // weight matrix
+    if (p_layer_weight_gradients_2_.size() >
+        size_t{std::numeric_limits<int>::max()}) {
+      GALOIS_LOG_FATAL("Weight sync code does not handle size larger than max "
+                       "int at the moment");
+    }
+    MPI_Allreduce(MPI_IN_PLACE,
+                  static_cast<void*>(p_layer_weight_gradients_2_.data()),
+                  weight_size, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+#ifdef GALOIS_ENABLE_GPU
   }
-  MPI_Allreduce(MPI_IN_PLACE,
-                static_cast<void*>(p_layer_weight_gradients_2_.data()),
-                static_cast<int>(p_layer_weight_gradients_2_.size()), MPI_FLOAT,
-                MPI_SUM, MPI_COMM_WORLD);
 #endif
   t.stop();
 }
@@ -226,18 +277,28 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       // this is fine because gradient won't be used to get feature gradients
       MaskGradientNonMasters(input_gradient);
     }
-    // input data (prev layer input or temp1) or gradient need mask
-    // can mask gradient if layer == 0
-    // otherwise must mask other
-    galois::CBlasSGEMM(
-        CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
-        input_data.data(), input_gradient->data(),
-        p_layer_weight_gradients_2_.data());
+
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.UpdateWeight2DerivativeGPU(
+          layer_dimensions_.input_columns, layer_dimensions_.input_rows,
+          layer_dimensions_.output_columns, input_data.data(),
+          input_gradient->data(), p_layer_weight_gradients_2_.data());
+    } else {
+#endif
+      // input data (prev layer input or temp1) or gradient need mask
+      // can mask gradient if layer == 0
+      // otherwise must mask other
+      galois::CBlasSGEMM(
+          CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
+          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+          input_data.data(), input_gradient->data(),
+          p_layer_weight_gradients_2_.data());
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
   WeightGradientSyncSum2();
-
-  // AFW = O
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
@@ -369,12 +430,12 @@ void galois::SAGELayer::AggregateAll(
     if (!IsSampledLayer()) {
       gpu_object_.AggregateAllGPU(
           graph_.GetGPUGraph(), graph_.size(), column_length, node_embeddings,
-          aggregate_output, !config_.disable_normalization);
+          aggregate_output, !config_.disable_normalization, is_backward);
     } else {
       // TODO(hochan)
       GALOIS_LOG_FATAL("SAMPLING IMPLEMENTATION");
     }
-    graph_.AggregateSync(aggregate_output, column_length, layer_number_);
+    graph_.AggregateSyncGPU(aggregate_output, column_length, layer_number_);
   } else {
 #endif
     AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts,
@@ -519,17 +580,21 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
   galois::StatTimer timer("SelfForwardXForm", kRegionName);
   timer.start();
 #ifdef GALOIS_ENABLE_GPU
-  // TODO self change
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.SelfFeatureUpdateEmbeddingsGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.input_columns,
+        layer_dimensions_.output_columns, node_embeddings, output);
+  } else {
 #endif
-  // note use of layer weights 2 differentiates this from above
-  galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
-                     layer_dimensions_.input_columns,
-                     layer_dimensions_.output_columns, node_embeddings,
-                     layer_weights_2_.data(), output, true);
+    // note use of layer weights 2 differentiates this from above
+    galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
+                       layer_dimensions_.input_columns,
+                       layer_dimensions_.output_columns, node_embeddings,
+                       layer_weights_2_.data(), output, true);
 #ifdef GALOIS_ENABLE_GPU
-}
+  }
 #endif
-timer.stop();
+  timer.stop();
 }
 
 void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
@@ -567,16 +632,21 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
   assert(p_layer_weights_.size() >=
          layer_dimensions_.input_columns * layer_dimensions_.output_columns);
 #ifdef GALOIS_ENABLE_GPU
-  // TODO gpu self
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_object_.SelfFeatureUpdateEmbeddingsDerivativeGPU(
+        layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+        layer_dimensions_.input_columns, gradients, output);
+  } else {
 #endif
-  // difference is Trans for B matrix (data) to get z by y (weights is y by z
-  // normally); result is x by y
-  // true at end -> accumulate
-  galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
-                     layer_dimensions_.output_columns,
-                     layer_dimensions_.input_columns, gradients,
-                     layer_weights_2_.data(), output, true);
+    // difference is Trans for B matrix (data) to get z by y (weights is y by z
+    // normally); result is x by y
+    // true at end -> accumulate
+    galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
+                       layer_dimensions_.output_columns,
+                       layer_dimensions_.input_columns, gradients,
+                       layer_weights_2_.data(), output, true);
 #ifdef GALOIS_ENABLE_GPU
+  }
 #endif
   timer.stop();
 }

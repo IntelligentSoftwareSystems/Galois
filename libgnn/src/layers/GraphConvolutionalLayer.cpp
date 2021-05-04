@@ -16,7 +16,15 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", GCN input temp var 1 ", num_input_elements, " (",
                   FloatElementsToGB(num_input_elements), " GB)");
-    in_temp_1_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateInTemp1(num_input_elements);
+    } else {
+#endif
+      in_temp_1_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   // only on in dropout case + if in temp is smaller than out temp
@@ -26,7 +34,15 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", GCN input temp var 2 ", num_input_elements, " (",
                   FloatElementsToGB(num_input_elements), " GB)");
-    in_temp_2_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateInTemp2(num_input_elements);
+    } else {
+#endif
+      in_temp_2_.resize(num_input_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   size_t num_output_elements =
@@ -39,20 +55,27 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
                   ", GCN output temp var ", num_output_elements, " (",
                   FloatElementsToGB(num_output_elements), " GB)");
-    out_temp_.resize(num_output_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    if (device_personality == DevicePersonality::GPU_CUDA) {
+      gpu_object_.AllocateOutTemp(num_output_elements);
+    } else {
+#endif
+      out_temp_.resize(num_output_elements, 0);
+#ifdef GALOIS_ENABLE_GPU
+    }
+#endif
   }
 
   layer_type_ = galois::GNNLayerType::kGraphConvolutional;
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
-    gpu_object_.Allocate(num_input_elements, num_output_elements);
     // init pointers with size
     p_in_temp_1_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), in_temp_1_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), num_input_elements);
     p_in_temp_2_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), in_temp_2_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), num_input_elements);
     p_out_temp_ =
-        PointerWithSize<GNNFloat>(gpu_object_.out_temp(), out_temp_.size());
+        PointerWithSize<GNNFloat>(gpu_object_.out_temp(), num_output_elements);
   } else {
 #endif
     p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
@@ -270,10 +293,12 @@ void galois::GraphConvolutionalLayer::AggregateAll(
 
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
+    size_t last_master = *(graph_.end_owned());
     gpu_object_.AggregateAllGPU(
         graph_.GetGPUGraph(), graph_.size(), column_length, node_embeddings,
-        aggregate_output, !config_.disable_normalization);
-    graph_.AggregateSync(aggregate_output, column_length, layer_number_);
+        aggregate_output, !config_.disable_normalization,
+        config_.disable_self_aggregate, last_master);
+    graph_.AggregateSyncGPU(aggregate_output, column_length, layer_number_);
   } else {
 #endif
     AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);

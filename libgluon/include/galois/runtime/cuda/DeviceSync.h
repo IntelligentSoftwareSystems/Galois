@@ -425,6 +425,80 @@ void reset_bitset_field(struct CUDA_Context_Field<DataType>* field,
                                           mask1, test2, bit_index2, mask2);
 }
 
+// TODO(lhc) we may not need this later, but for now just use this
+void reset_bitset_field(Shared<DynamicBitset>& bitset, size_t begin,
+                        size_t end) {
+  dim3 blocks;
+  dim3 threads;
+  kernel_sizing(blocks, threads);
+  const DynamicBitset* bitset_cpu = bitset.cpu_rd_ptr();
+  assert(begin <= (bitset_cpu->size() - 1));
+  assert(end <= (bitset_cpu->size() - 1));
+
+  size_t vec_begin = (begin + 63) / 64;
+  size_t vec_end;
+
+  if (end == (bitset_cpu->size() - 1))
+    vec_end = bitset_cpu->vec_size();
+  else
+    vec_end = (end + 1) / 64; // floor
+
+  size_t begin2 = vec_begin * 64;
+  size_t end2   = vec_end * 64;
+
+  bool test1;
+  size_t bit_index1;
+  uint64_t mask1;
+
+  bool test2;
+  size_t bit_index2;
+  uint64_t mask2;
+
+  if (begin2 > end2) {
+    test2 = false;
+
+    if (begin < begin2) {
+      test1       = true;
+      bit_index1  = begin / 64;
+      size_t diff = begin2 - begin;
+      assert(diff < 64);
+      mask1 = ((uint64_t)1 << (64 - diff)) - 1;
+
+      // create or mask
+      size_t diff2 = end - end2 + 1;
+      assert(diff2 < 64);
+      mask2 = ~(((uint64_t)1 << diff2) - 1);
+      mask1 |= ~mask2;
+    } else {
+      test1 = false;
+    }
+  } else {
+    if (begin < begin2) {
+      test1       = true;
+      bit_index1  = begin / 64;
+      size_t diff = begin2 - begin;
+      assert(diff < 64);
+      mask1 = ((uint64_t)1 << (64 - diff)) - 1;
+    } else {
+      test1 = false;
+    }
+
+    if (end >= end2) {
+      test2       = true;
+      bit_index2  = end / 64;
+      size_t diff = end - end2 + 1;
+      assert(diff < 64);
+      mask2 = ~(((uint64_t)1 << diff) - 1);
+    } else {
+      test2 = false;
+    }
+  }
+
+  bitset_reset_range<<<blocks, threads>>>(bitset.gpu_rd_ptr(), vec_begin,
+                                          vec_end, test1, bit_index1, mask1,
+                                          test2, bit_index2, mask2);
+}
+
 template <typename DataType>
 void reset_data_field(struct CUDA_Context_Field<DataType>* field, size_t begin,
                       size_t end, DataType val) {

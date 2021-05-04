@@ -489,13 +489,14 @@ public:
   void CalculateFullNormFactor();
 
 #ifdef GALOIS_ENABLE_GPU
-  void AggregateSync(GNNFloat* matrix_to_sync, const size_t matrix_column_size,
-                     const unsigned layer_number) const;
+  void AggregateSyncGPU(GNNFloat* matrix_to_sync,
+                        const size_t matrix_column_size,
+                        const unsigned layer_number) const;
 
   void InitLayerVectorMetaObjects(size_t layer_number, unsigned num_hosts,
                                   size_t infl_in_size, size_t infl_out_size);
 
-  void ResizeLayerVector(size_t num_layers);
+  void ResizeGPULayerVector(size_t num_layers);
 
   const GNNGraphGPUAllocations& GetGPUGraph() const { return gpu_memory_; }
 

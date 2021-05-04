@@ -41,6 +41,7 @@ if (GALOIS_ENABLE_GPU)
     src/layers/GNNLayer.cu
     src/layers/GraphConvolutionalLayer.cu
     src/layers/SoftmaxLayer.cu
+    src/layers/SAGELayer.cu
     src/GraphNeuralNetwork.cu
     src/GNNOptimizers.cu
     src/GNNCudaContext.cu

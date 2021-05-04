@@ -53,6 +53,7 @@ std::vector<galois::LargeArray<uint32_t>>* gnn_sampled_out_degrees_;
 
 #ifdef GALOIS_ENABLE_GPU
 struct CUDA_Context* cuda_ctx_for_sync;
+struct CUDA_Context* cuda_ctx;
 unsigned layer_number_to_sync;
 #endif
 } // namespace graphs
@@ -222,7 +223,7 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
 }
 
 #ifdef GALOIS_ENABLE_GPU
-void galois::graphs::GNNGraph::AggregateSync(
+void galois::graphs::GNNGraph::AggregateSyncGPU(
     GNNFloat* matrix_to_sync, const size_t matrix_column_size,
     const unsigned layer_number) const {
   size_t layer_input_mtx_column_size =
@@ -539,11 +540,11 @@ void galois::graphs::GNNGraph::InitNormFactor() {
   global_degrees_.resize(partitioned_graph_->size(), 0.0);
   global_train_degrees_.resize(partitioned_graph_->size(), 0.0);
   CalculateFullNormFactor();
+  gpu_memory_.InitNormFactor(partitioned_graph_->size());
 }
 
 void galois::graphs::GNNGraph::CalculateFullNormFactor() {
   // TODO(loc) reset all degrees if this is called multiple times?
-
   // get the norm factor contribution for each node based on the GLOBAL graph
   galois::do_all(
       galois::iterate(static_cast<size_t>(0), partitioned_graph_->size()),
@@ -983,7 +984,9 @@ void galois::graphs::GNNGraph::InitGPUMemory() {
   gpu_memory_.SetLabels(local_ground_truth_labels_);
   gpu_memory_.SetMasks(local_training_mask_, local_validation_mask_,
                        local_testing_mask_);
-  gpu_memory_.SetNormFactors(norm_factors_);
+  gpu_memory_.AllocAggregateBitset(partitioned_graph_->size());
+  gpu_memory_.SetGlobalTrainDegrees(global_train_degrees_);
+  gpu_memory_.SetGlobalDegrees(global_degrees_);
 }
 
 void galois::graphs::GNNGraph::InitLayerVectorMetaObjects(
@@ -993,7 +996,7 @@ void galois::graphs::GNNGraph::InitLayerVectorMetaObjects(
                                   infl_in_size, infl_out_size);
 }
 
-void galois::graphs::GNNGraph::ResizeLayerVector(size_t num_layers) {
+void galois::graphs::GNNGraph::ResizeGPULayerVector(size_t num_layers) {
   resize_CUDA_layer_vector(cuda_ctx_, num_layers);
 }
 #endif
