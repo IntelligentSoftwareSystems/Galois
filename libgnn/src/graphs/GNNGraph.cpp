@@ -540,7 +540,11 @@ void galois::graphs::GNNGraph::InitNormFactor() {
   global_degrees_.resize(partitioned_graph_->size(), 0.0);
   global_train_degrees_.resize(partitioned_graph_->size(), 0.0);
   CalculateFullNormFactor();
-  gpu_memory_.InitNormFactor(partitioned_graph_->size());
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    gpu_memory_.InitNormFactor(partitioned_graph_->size());
+  }
+#endif
 }
 
 void galois::graphs::GNNGraph::CalculateFullNormFactor() {
