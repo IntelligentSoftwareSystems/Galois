@@ -237,6 +237,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       // XXX
       // create mini batch graphs and loop until minibatches on all hosts done
       while (true) {
+        work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
         // break when all hosts are done with minibatches
         graph_->PrepareNextTrainMinibatch();
@@ -263,13 +264,13 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         }
 
         const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
-        DoInference();
         train_accuracy = GetGlobalAccuracy(batch_pred);
         GradientPropagation();
         galois::gPrint("Epoch ", epoch, " Batch ", batch_num,
                        ": Train accuracy/F1 micro is ", train_accuracy, "\n");
+        work_left_ += graph_->MoreTrainMinibatches();
         // XXX sync across all hosts minibatcher state
-        if (!graph_->MoreTrainMinibatches()) {
+        if (!work_left_.reduce()) {
           break;
         }
       }

@@ -137,7 +137,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
       [&](uint32_t node_id) {
         if (gnn_graph.IsInSampledGraph(node_id)) {
           uint32_t subgraph_id = lid_to_subgraph_id_[node_id];
-
+          assert(subgraph_id != std::numeric_limits<uint32_t>::max());
           uint32_t out_location = 0;
           uint32_t in_location  = 0;
           if (subgraph_id != 0) {
@@ -147,7 +147,11 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
 
           for (auto out_edge_iter : gnn_graph.edges(node_id)) {
             if (gnn_graph.IsEdgeSampledAny(out_edge_iter)) {
+              assert(
+                  lid_to_subgraph_id_[gnn_graph.GetEdgeDest(out_edge_iter)] !=
+                  std::numeric_limits<uint32_t>::max());
               subedge_to_original_edge_[out_location] = *out_edge_iter;
+
               underlying_graph_.constructEdge(
                   out_location++,
                   lid_to_subgraph_id_[gnn_graph.GetEdgeDest(out_edge_iter)]);

@@ -23,10 +23,8 @@ struct SampleFlagSync {
   //! return a vector of floats to sync
   static ValTy extract(uint32_t, char& i) { return i; }
 
-  //! reduction is addition in this case; add received vector to
-  //! own vector
   static bool reduce(uint32_t, char& i, ValTy y) {
-    if (y > i) {
+    if (y) {
       i = y;
       assert(i == 1);
       return true;

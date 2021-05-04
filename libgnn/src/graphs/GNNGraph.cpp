@@ -510,7 +510,6 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
       }
     }
   } else {
-    // XXX i can get local sample counts from here if i need it
     size_t valid_train = ReadLocalMasksFromFile(dataset_name, "train",
                                                 &global_training_mask_range_,
                                                 &local_training_mask_);
@@ -837,11 +836,13 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
   // continue the exploration
   galois::do_all(
       galois::iterate(new_nodes),
-      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
+      [&](uint32_t new_node_id) {
+        SetSampledNode(new_node_id);
+      },
       galois::loopname("NeighborhoodSampleSet"));
-
   // XXX(loc) bitset; can readAny be weaker?
-  sync_substrate_->sync<writeSource, readAny, SampleFlagSync>("SampleSync");
+  sync_substrate_->sync<writeDestination, readAny, SampleFlagSync>(
+      "SampleSync");
 }
 
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
@@ -865,7 +866,7 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
           // times (degree norm is 1 / degree)
           // XXX training degree + other norm, not global
           double probability_of_reject =
-              std::pow(1 - GetGlobalDegreeNorm(*src_iter), num_to_sample);
+              std::pow(1 - GetGlobalTrainDegreeNorm(*src_iter), num_to_sample);
           // loop through edges, turn "on" edge with some probability
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
             if (sample_rng_.DoBernoulli(probability_of_reject)) {
@@ -911,7 +912,8 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
       galois::loopname("NeighborhoodSampleSet"));
 
   // XXX(loc) bitset; can readAny be weaker?
-  sync_substrate_->sync<writeSource, readAny, SampleFlagSync>("SampleSync");
+  sync_substrate_->sync<writeDestination, readAny, SampleFlagSync>(
+      "SampleSync");
 }
 
 //! Construct the subgraph from sampled edges and corresponding nodes
@@ -933,13 +935,16 @@ size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
 void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
   train_batcher_->GetNextMinibatch(&local_minibatch_mask_);
 #ifndef NDEBUG
-  galois::gPrint("Minibatch : ");
+  size_t count = 0;
+  // galois::gPrint("Minibatch : ");
   for (unsigned i = 0; i < local_minibatch_mask_.size(); i++) {
     if (local_minibatch_mask_[i]) {
-      galois::gPrint(i, ",");
+      // galois::gPrint(partitioned_graph_->getGID(i), ",");
+      count++;
     }
   }
-  galois::gPrint("\n");
+  // galois::gPrint("\n");
+  galois::gInfo(host_prefix(), "num batched nodes ", count);
 #endif
   SetupNeighborhoodSample(GNNPhase::kBatch);
 }

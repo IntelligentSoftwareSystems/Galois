@@ -203,6 +203,9 @@ private:
   //! Number of layers that use the graph (e.g. SAGE, GCN)
   size_t num_graph_user_layers_;
 
+  //! Termination detection for minibatching
+  galois::DGAccumulator<uint32_t> work_left_;
+
 #ifdef GALOIS_ENABLE_GPU
   //! Holds all GPU functions
   GraphNeuralNetworkGPU gpu_object_;
