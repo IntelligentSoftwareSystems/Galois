@@ -168,7 +168,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
       if (layer_type == GNNLayerType::kGraphConvolutional ||
           layer_type == GNNLayerType::kSAGE) {
-        graph_->SampleAllEdges((*back_iter)->graph_user_layer_number());
+        graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(),
+                               config_.inductive_subgraph_);
       }
     }
     // resize layer matrices
@@ -207,7 +208,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         if (layer_type == GNNLayerType::kGraphConvolutional ||
             layer_type == GNNLayerType::kSAGE) {
           graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
-                              config_.fan_out_vector_[num_sampled_layers]);
+                              config_.fan_out_vector_[num_sampled_layers],
+                              config_.inductive_subgraph_);
           num_sampled_layers++;
         }
       }
@@ -252,9 +254,11 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             // relevant neighbors
             if (config_.do_sampling()) {
               graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
-                                  config_.fan_out_vector_[num_sampled_layers]);
+                                  config_.fan_out_vector_[num_sampled_layers],
+                                  config_.inductive_subgraph_);
             } else {
-              graph_->SampleAllEdges((*back_iter)->graph_user_layer_number());
+              graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(),
+                                     config_.inductive_subgraph_);
             }
             num_sampled_layers++;
           }

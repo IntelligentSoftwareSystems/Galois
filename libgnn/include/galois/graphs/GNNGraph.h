@@ -266,9 +266,10 @@ public:
   void SetupNeighborhoodSample(GNNPhase seed_phase);
 
   //! Choose all edges from sampled nodes
-  void SampleAllEdges(size_t agg_layer_num);
+  void SampleAllEdges(size_t agg_layer_num, bool inductive_subgraph);
   //! Sample neighbors of nodes that are marked as ready for sampling
-  void SampleEdges(size_t sample_layer_num, size_t num_to_sample);
+  void SampleEdges(size_t sample_layer_num, size_t num_to_sample,
+                   bool inductive_subgraph);
 
   //! Construct the subgraph from sampled edges and corresponding nodes
   size_t ConstructSampledSubgraph();

@@ -121,6 +121,12 @@ llvm::cl::opt<bool> use_train_subgraph(
         "only compute minimum required for training nodes in training phase"),
     cll::init(false));
 
+llvm::cl::opt<bool> inductive_subgraph(
+    "inductiveSubgraph",
+    cll::desc("If true (off by default), only sample training/other nodes when "
+              "constructing subgraph"),
+    cll::init(false));
+
 llvm::cl::opt<unsigned>
     train_minibatch_size("trainMinibatchSize",
                          cll::desc("Size of training minibatch (default 0)"),
@@ -265,7 +271,9 @@ std::vector<unsigned> CreateFanOutVector() {
   if (do_graph_sampling) {
     // assert fan out size is the same
     if (cl_fan_out_vector.size() == num_layers) {
-
+      for (unsigned i = 0; i < num_layers; i++) {
+        fan_out.emplace_back(cl_fan_out_vector[i]);
+      }
     } else {
       galois::gWarn("Fan out specification does not equal number of layers: "
                     "using default 10 followed by 25s");
@@ -298,6 +306,7 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   gnn_config.validation_interval_  = val_interval;
   gnn_config.test_interval_        = test_interval;
   gnn_config.train_minibatch_size_ = train_minibatch_size;
+  gnn_config.inductive_subgraph_   = inductive_subgraph;
   gnn_config.fan_out_vector_       = CreateFanOutVector();
 
   // optimizer

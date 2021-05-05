@@ -102,11 +102,11 @@ public:
   // public because they are independent of other settings
   //! Graph sampling
   bool do_sampling_{false};
-  // XXX Change the name of this var; it just means to create subgraph
-  // based on training nodes
   //! Creates subgraph that is only composed of training nodes (reduces
   //! redundant work since you won't calculate things you don't need)
   bool use_train_subgraph_{false};
+  //! If on, subgraphs cannot pick up val/test nodes
+  bool inductive_subgraph_{false};
   //! Interval to run validation set on network at; 0 = no run
   unsigned validation_interval_{0};
   //! Interval to run testing set on network at; 0 = no run

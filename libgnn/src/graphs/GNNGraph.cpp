@@ -796,7 +796,8 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   bitset_sampled_degrees_.reset();
 }
 
-void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
+void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
+                                              bool inductive_subgraph) {
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;
@@ -811,19 +812,22 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
         if (IsInSampledGraph(src_iter)) {
           // marks ALL edges of nodes that connect to train/other nodes
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
-            if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
-                                GNNPhase::kTrain) ||
-                IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
-                                GNNPhase::kOther)) {
-              MakeEdgeSampled(edge_iter, agg_layer_num);
-              if (!IsInSampledGraph(
-                      partitioned_graph_->getEdgeDst(edge_iter))) {
-                bitset_sample_flag_.set(
-                    partitioned_graph_->getEdgeDst(edge_iter));
-              }
-              sampled += 1;
-            }
             total += 1;
+            if (inductive_subgraph) {
+              if (!IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                   GNNPhase::kTrain) &&
+                  !IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                   GNNPhase::kOther)) {
+                continue;
+              }
+            }
+
+            MakeEdgeSampled(edge_iter, agg_layer_num);
+            if (!IsInSampledGraph(partitioned_graph_->getEdgeDst(edge_iter))) {
+              bitset_sample_flag_.set(
+                  partitioned_graph_->getEdgeDst(edge_iter));
+            }
+            sampled += 1;
           }
         }
       },
@@ -845,7 +849,8 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
 }
 
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
-                                           size_t num_to_sample) {
+                                           size_t num_to_sample,
+                                           bool inductive_subgraph) {
   assert(!subgraph_is_train_);
   use_subgraph_ = false;
 
@@ -863,33 +868,43 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
         if (IsInSampledGraph(src_iter)) {
           // chance of not uniformly choosing an edge of this node num_to_sample
           // times (degree norm is 1 / degree)
-          // XXX training degree + other norm, not global
-          double probability_of_reject =
-              std::pow(1 - GetGlobalTrainDegreeNorm(*src_iter), num_to_sample);
+          double probability_of_reject;
+          if (!inductive_subgraph) {
+            probability_of_reject =
+                std::pow(1 - GetGlobalDegreeNorm(*src_iter), num_to_sample);
+          } else {
+            probability_of_reject = std::pow(
+                1 - GetGlobalTrainDegreeNorm(*src_iter), num_to_sample);
+          }
+
           // loop through edges, turn "on" edge with some probability
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
-            if (sample_rng_.DoBernoulli(probability_of_reject)) {
-              // only take if node is training node or a node not classified
-              // into train/test/val
-              if (IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
-                                  GNNPhase::kTrain) ||
-                  IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
-                                  GNNPhase::kOther)) {
-                // if here, it means edge accepted; set sampled on, mark source
-                // as part of next set
-                MakeEdgeSampled(edge_iter, sample_layer_num);
-                if (!IsInSampledGraph(
-                        partitioned_graph_->getEdgeDst(edge_iter))) {
-                  bitset_sample_flag_.set(
-                      partitioned_graph_->getEdgeDst(edge_iter));
-                }
-                bitset_sampled_degrees_.set(*src_iter);
-                // degree increment
-                sampled_out_degrees_[sample_layer_num][*src_iter]++;
-                sampled += 1;
-              }
-            }
             total += 1;
+            if (sample_rng_.DoBernoulli(probability_of_reject)) {
+              if (inductive_subgraph) {
+                // only take if node is training node or a node not classified
+                // into train/test/val
+                if (!IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                     GNNPhase::kTrain) &&
+                    !IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
+                                     GNNPhase::kOther)) {
+                  continue;
+                }
+              }
+
+              // if here, it means edge accepted; set sampled on, mark source
+              // as part of next set
+              MakeEdgeSampled(edge_iter, sample_layer_num);
+              if (!IsInSampledGraph(
+                      partitioned_graph_->getEdgeDst(edge_iter))) {
+                bitset_sample_flag_.set(
+                    partitioned_graph_->getEdgeDst(edge_iter));
+              }
+              bitset_sampled_degrees_.set(*src_iter);
+              // degree increment
+              sampled_out_degrees_[sample_layer_num][*src_iter]++;
+              sampled += 1;
+            }
           }
           // total_nodes += 1;
         }
