@@ -104,8 +104,9 @@ public:
   bool do_sampling_{false};
   // XXX Change the name of this var; it just means to create subgraph
   // based on training nodes
-  //! Inductive = training ignores test/val set
-  bool inductive_training_{false};
+  //! Creates subgraph that is only composed of training nodes (reduces
+  //! redundant work since you won't calculate things you don't need)
+  bool use_train_subgraph_{false};
   //! Interval to run validation set on network at; 0 = no run
   unsigned validation_interval_{0};
   //! Interval to run testing set on network at; 0 = no run

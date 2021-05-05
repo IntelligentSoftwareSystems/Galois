@@ -65,8 +65,6 @@ struct GNNLayerConfig {
   bool disable_self_aggregate{false};
   //! Graph sampling flag in use or not
   bool do_sampling{false};
-  //! Inductive layer means for aggregation all non-training nodes are ignored
-  bool inductive_training_{false};
   // TODO activation type; for now default is softmax
 
   //! Sets settings such that testing is easy
@@ -178,7 +176,6 @@ public:
   //! Flip sampling switch on
   void EnableSampling() { config_.do_sampling = true; }
   bool IsSampledLayer() const { return config_.do_sampling; }
-  bool IsInductiveLayer() const { return config_.inductive_training_; }
   //! Sets the graph user layer number; important for sampling as this index
   //! determines which index to use when checking for sampled edges
   void SetGraphUserLayerNumber(size_t num) { graph_user_layer_number_ = num; }

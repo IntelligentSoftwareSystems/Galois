@@ -13,9 +13,9 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     galois::GraphNeuralNetworkConfig&& config)
     : graph_(std::move(graph)), optimizer_(std::move(optimizer)),
       config_(std::move(config)) {
-  if (config_.do_sampling_ && config_.inductive_training_) {
-    GALOIS_LOG_FATAL("Do not set inductive training and sampling at same time "
-                     "(sampling is inductive already)");
+  if (config_.do_sampling_ && config_.use_train_subgraph_) {
+    GALOIS_LOG_FATAL("Do not set train subgraph and sampling at same time "
+                     "(sampling uses training subgraph already)");
   }
   // max number of rows that can be passed as inputs; allocate space for it as
   // this will be the # of rows for each layer
@@ -103,11 +103,11 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   }
 
   // XXX test minibatch
-  if (config_.do_sampling() || config_.inductive_training_ ||
+  if (config_.do_sampling() || config_.use_train_subgraph_ ||
       config.train_minibatch_size()) {
     // output layer not included; it will never involve sampling
     graph_->InitializeSamplingData(num_graph_user_layers_,
-                                   config_.inductive_training_);
+                                   config_.use_train_subgraph_);
   }
 
   if (config_.train_minibatch_size()) {
@@ -158,9 +158,9 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
   float train_accuracy{0.f};
-  size_t inductive_nodes = 0;
+  size_t train_subgraph_nodes = 0;
   // this subgraph only needs to be created once
-  if (config_.inductive_training_ && !config_.train_minibatch_size()) {
+  if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
     // Setup the subgraph to only be the training graph
     graph_->SetupNeighborhoodSample();
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
@@ -172,10 +172,10 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
     // resize layer matrices
-    inductive_nodes = graph_->ConstructSampledSubgraph();
+    train_subgraph_nodes = graph_->ConstructSampledSubgraph();
     for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
          layer++) {
-      (*layer)->ResizeRows(inductive_nodes);
+      (*layer)->ResizeRows(train_subgraph_nodes);
     }
   }
 
@@ -185,12 +185,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     epoch_timer.start();
-    // swap to inductive graph
-    if (config_.inductive_training_ && !config_.train_minibatch_size()) {
+    // swap to train subgraph
+    if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
            layer++) {
-        (*layer)->ResizeRows(inductive_nodes);
+        (*layer)->ResizeRows(train_subgraph_nodes);
       }
     }
 
@@ -297,7 +297,6 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     bool do_test =
         config_.test_interval_ ? epoch % config_.test_interval_ == 0 : false;
 
-    // get real norm factor back if altered by sampling or inductive training
     if (do_validate || do_test) {
       // disable subgraph
       graph_->DisableSubgraph();
@@ -348,8 +347,6 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           epoch_timer.get());
       // revert to training phase for next epoch
       SetLayerPhases(galois::GNNPhase::kTrain);
-      // get back inductive norm factor as necessary; sampling norm is handled
-      // at beginning of every iteration
     }
   }
 

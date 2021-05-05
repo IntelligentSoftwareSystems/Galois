@@ -358,7 +358,7 @@ public:
   GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
     if (use_subgraph_) {
       size_t degree;
-      if (!subgraph_is_inductive_) {
+      if (!subgraph_is_train_) {
         // case because degrees in each layer differ
         degree =
             sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
@@ -638,7 +638,7 @@ private:
 
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
-  bool subgraph_is_inductive_{false};
+  bool subgraph_is_train_{false};
 
   std::unique_ptr<MinibatchGenerator> train_batcher_;
   std::unique_ptr<MinibatchGenerator> test_batcher_;

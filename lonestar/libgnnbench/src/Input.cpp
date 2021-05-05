@@ -114,11 +114,12 @@ llvm::cl::opt<bool>
                                 "use every epoch at a 50\% drop rate"),
                       cll::init(false));
 
-llvm::cl::opt<bool>
-    do_inductive_training("doInductiveTraining",
-                          cll::desc("If true (off by default), during training "
-                                    "all non-train nodes are ignored"),
-                          cll::init(false));
+llvm::cl::opt<bool> use_train_subgraph(
+    "useTrainingSubgraph",
+    cll::desc(
+        "If true (off by default), during training "
+        "only compute minimum required for training nodes in training phase"),
+    cll::init(false));
 
 llvm::cl::opt<unsigned>
     train_minibatch_size("trainMinibatchSize",
@@ -219,7 +220,6 @@ galois::GNNLayerConfig CreateLayerConfig() {
   layer_config.disable_normalization          = disable_normalization;
   layer_config.disable_aggregate_after_update = disable_agg_after_update;
   layer_config.disable_self_aggregate         = disable_self_aggregate;
-  layer_config.inductive_training_            = do_inductive_training;
   return layer_config;
 }
 
@@ -294,7 +294,7 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   galois::GraphNeuralNetworkConfig gnn_config(
       num_layers, layer_types, layer_sizes_vector, output_layer_type,
       do_graph_sampling, layer_config);
-  gnn_config.inductive_training_   = do_inductive_training;
+  gnn_config.use_train_subgraph_   = use_train_subgraph;
   gnn_config.validation_interval_  = val_interval;
   gnn_config.test_interval_        = test_interval;
   gnn_config.train_minibatch_size_ = train_minibatch_size;

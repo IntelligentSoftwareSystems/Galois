@@ -760,7 +760,7 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
       array.create(partitioned_graph_->size());
     }
   } else {
-    subgraph_is_inductive_ = true;
+    subgraph_is_train_ = true;
   }
 }
 
@@ -784,7 +784,7 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                              edge_sample_status_[edge_id].end(), 0);
                  });
   // reset all degrees
-  if (!subgraph_is_inductive_) {
+  if (!subgraph_is_train_) {
     galois::do_all(
         galois::iterate(sampled_out_degrees_),
         [&](galois::LargeArray<uint32_t>& array) {
@@ -846,7 +846,7 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
 
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                                            size_t num_to_sample) {
-  assert(!subgraph_is_inductive_);
+  assert(!subgraph_is_train_);
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;

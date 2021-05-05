@@ -326,12 +326,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
         }
 
         if (layer_phase_ == GNNPhase::kTrain) {
-          if (IsInductiveLayer()) {
-            // if inductive, all non-training nodes do not exist
-            if (!graph_.IsValidForPhase(src, GNNPhase::kTrain))
-              return;
-          }
-
           if (IsSampledLayer()) {
             // XXX(loc)
             GALOIS_LOG_WARN(
@@ -367,12 +361,6 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
           graphs::bitset_graph_aggregate.set(src);
 
           if (layer_phase_ == GNNPhase::kTrain) {
-            if (IsInductiveLayer()) {
-              // if inductive, all non-training nodes do not exist
-              if (!graph_.IsValidForPhase(dst, GNNPhase::kTrain))
-                return;
-            }
-
             if (IsSampledLayer()) {
               // ignore non-sampled nodes
               if (layer_phase_ == GNNPhase::kTrain &&
