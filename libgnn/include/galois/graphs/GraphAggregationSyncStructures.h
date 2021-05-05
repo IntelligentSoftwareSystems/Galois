@@ -12,6 +12,7 @@ extern GNNFloat* gnn_matrix_to_sync_;
 extern size_t gnn_matrix_to_sync_column_length_;
 extern galois::DynamicBitSet bitset_graph_aggregate;
 extern galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_;
+extern galois::DynamicBitSet bitset_sample_flag_;
 #ifdef GALOIS_ENABLE_GPU
 extern struct CUDA_Context* cuda_ctx_for_sync;
 extern unsigned layer_number_to_sync;
@@ -53,6 +54,15 @@ struct SampleFlagSync {
     return false;
   }
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
+};
+
+struct SampleFlagBitset {
+  static constexpr bool is_vector_bitset() { return false; }
+  static constexpr bool is_valid() { return true; }
+  static galois::DynamicBitSet& get() { return bitset_sample_flag_; }
+  static void reset_range(size_t begin, size_t end) {
+    bitset_sample_flag_.reset(begin, end);
+  }
 };
 
 struct GNNSumAggregate {

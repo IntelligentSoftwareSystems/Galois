@@ -102,6 +102,8 @@ public:
   // public because they are independent of other settings
   //! Graph sampling
   bool do_sampling_{false};
+  // XXX Change the name of this var; it just means to create subgraph
+  // based on training nodes
   //! Inductive = training ignores test/val set
   bool inductive_training_{false};
   //! Interval to run validation set on network at; 0 = no run
@@ -109,6 +111,8 @@ public:
   //! Interval to run testing set on network at; 0 = no run
   unsigned test_interval_{0};
   unsigned train_minibatch_size_{0};
+  //! Fan out used for sampling (if sampling is enabled)
+  std::vector<unsigned> fan_out_vector_;
 
 private:
   //! Number of layers to construct in the GNN not including the output

@@ -26,13 +26,13 @@ llvm::cl::opt<galois::graphs::GNNPartitionScheme> partition_scheme(
                            "Original Cartesian Vertex-Cut")),
     cll::init(galois::graphs::GNNPartitionScheme::kOEC));
 
-llvm::cl::opt<size_t> num_layers(
+llvm::cl::opt<unsigned> num_layers(
     "numLayers",
     cll::desc(
         "Number of intermediate layers in the neural network (default 2))"),
     cll::init(2));
 
-llvm::cl::list<size_t> layer_sizes(
+llvm::cl::list<unsigned> layer_sizes(
     "layerSizes",
     cll::desc(
         "Comma separated list of numbers specifying "
@@ -51,6 +51,12 @@ llvm::cl::list<galois::GNNLayerType> cl_layer_types(
                    "SAGE layer (GCN with concat + mean)"),
         clEnumValN(galois::GNNLayerType::kL2Norm, "l2norm", "L2 norm layer"),
         clEnumValN(galois::GNNLayerType::kDense, "dense", "Dense layer")),
+    cll::CommaSeparated);
+
+llvm::cl::list<unsigned> cl_fan_out_vector(
+    "samplingFanOut",
+    cll::desc(
+        "Comma separated list of layer fanout if sampling/batching is used"),
     cll::CommaSeparated);
 
 llvm::cl::opt<bool>
@@ -253,6 +259,25 @@ CreateOptimizer(const galois::graphs::GNNGraph* gnn_graph) {
   return std::make_unique<galois::AdamOptimizer>(opt_sizes, num_layers);
 }
 
+std::vector<unsigned> CreateFanOutVector() {
+  std::vector<unsigned> fan_out;
+  // fan out only matters if graph sampling is enabled
+  if (do_graph_sampling) {
+    // assert fan out size is the same
+    if (cl_fan_out_vector.size() == num_layers) {
+
+    } else {
+      galois::gWarn("Fan out specification does not equal number of layers: "
+                    "using default 10 followed by 25s");
+      fan_out.emplace_back(10);
+      for (unsigned i = 1; i < num_layers; i++) {
+        fan_out.emplace_back(25);
+      }
+    }
+  }
+  return fan_out;
+}
+
 std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   // partition/load graph
   auto gnn_graph = std::make_unique<galois::graphs::GNNGraph>(
@@ -273,6 +298,7 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   gnn_config.validation_interval_  = val_interval;
   gnn_config.test_interval_        = test_interval;
   gnn_config.train_minibatch_size_ = train_minibatch_size;
+  gnn_config.fan_out_vector_       = CreateFanOutVector();
 
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());

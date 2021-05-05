@@ -159,6 +159,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
   float train_accuracy{0.f};
   size_t inductive_nodes = 0;
+  // this subgraph only needs to be created once
   if (config_.inductive_training_ && !config_.train_minibatch_size()) {
     // Setup the subgraph to only be the training graph
     graph_->SetupNeighborhoodSample();
@@ -184,6 +185,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     epoch_timer.start();
+    // swap to inductive graph
     if (config_.inductive_training_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
@@ -192,6 +194,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
 
+    // beginning of epoch sampling
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
       graph_->SetupNeighborhoodSample();
       size_t num_sampled_layers = 0;
@@ -203,16 +206,11 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         GNNLayerType layer_type = (*back_iter)->layer_type();
         if (layer_type == GNNLayerType::kGraphConvolutional ||
             layer_type == GNNLayerType::kSAGE) {
-          if (num_sampled_layers == 0) {
-            graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 10);
-          } else {
-            graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 25);
-          }
+          graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
+                              config_.fan_out_vector_[num_sampled_layers]);
           num_sampled_layers++;
         }
       }
-      galois::gDebug("Number of sampled layers is ", num_sampled_layers);
-
       // resize layer matrices
       size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
@@ -234,9 +232,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
       size_t batch_num = 0;
 
-      // XXX
       // create mini batch graphs and loop until minibatches on all hosts done
       while (true) {
+        const std::string btime_name("Epoch" + std::to_string(epoch) + "Batch" +
+                                     std::to_string(batch_num));
+        galois::StatTimer batch_timer(btime_name.c_str(), "GraphNeuralNetwork");
+        batch_timer.start();
         work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
         // break when all hosts are done with minibatches
@@ -247,17 +248,19 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           GNNLayerType layer_type = (*back_iter)->layer_type();
           if (layer_type == GNNLayerType::kGraphConvolutional ||
               layer_type == GNNLayerType::kSAGE) {
-            if (num_sampled_layers == 0) {
-              graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 10);
+            // you can minibatch with sampling or minibatch and grab all
+            // relevant neighbors
+            if (config_.do_sampling()) {
+              graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
+                                  config_.fan_out_vector_[num_sampled_layers]);
             } else {
-              graph_->SampleEdges((*back_iter)->graph_user_layer_number(), 25);
+              graph_->SampleAllEdges((*back_iter)->graph_user_layer_number());
             }
             num_sampled_layers++;
           }
         }
         // resize layer matrices
         size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
-        galois::gPrint(num_subgraph_nodes, "\n");
         for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
              layer++) {
           (*layer)->ResizeRows(num_subgraph_nodes);
@@ -266,11 +269,13 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
         train_accuracy = GetGlobalAccuracy(batch_pred);
         GradientPropagation();
-        galois::gPrint("Epoch ", epoch, " Batch ", batch_num,
+
+        galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
                        ": Train accuracy/F1 micro is ", train_accuracy, "\n");
         work_left_ += graph_->MoreTrainMinibatches();
-        // XXX sync across all hosts minibatcher state
-        if (!work_left_.reduce()) {
+        char global_work_left = work_left_.reduce();
+        batch_timer.stop();
+        if (!global_work_left) {
           break;
         }
       }

@@ -47,6 +47,8 @@ galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_ = nullptr;
 uint32_t* gnn_degree_vec_1_;
 uint32_t* gnn_degree_vec_2_;
 
+galois::DynamicBitSet bitset_sample_flag_;
+
 //! For synchronization of sampled degrees
 galois::DynamicBitSet bitset_sampled_degrees_;
 std::vector<galois::LargeArray<uint32_t>>* gnn_sampled_out_degrees_;
@@ -764,8 +766,8 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
 
 void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   use_subgraph_ = false;
-  new_sampled_nodes_.resize(size());
-  new_sampled_nodes_.reset();
+  bitset_sample_flag_.resize(size());
+  bitset_sample_flag_.reset();
 
   // for now, if training node, it goes into seed node
   galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
@@ -795,7 +797,6 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
 }
 
 void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
-  assert(subgraph_is_inductive_);
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;
@@ -817,7 +818,7 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
               MakeEdgeSampled(edge_iter, agg_layer_num);
               if (!IsInSampledGraph(
                       partitioned_graph_->getEdgeDst(edge_iter))) {
-                new_sampled_nodes_.set(
+                bitset_sample_flag_.set(
                     partitioned_graph_->getEdgeDst(edge_iter));
               }
               sampled += 1;
@@ -831,18 +832,16 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num) {
   galois::gPrint("Num sampled edges in inductive graph is ", sampled.reduce(),
                  " out of ", total.reduce(), "\n");
 
-  std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
+  std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
   galois::do_all(
       galois::iterate(new_nodes),
-      [&](uint32_t new_node_id) {
-        SetSampledNode(new_node_id);
-      },
+      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
       galois::loopname("NeighborhoodSampleSet"));
-  // XXX(loc) bitset; can readAny be weaker?
-  sync_substrate_->sync<writeDestination, readAny, SampleFlagSync>(
-      "SampleSync");
+  sync_substrate_
+      ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+          "SampleSync");
 }
 
 void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
@@ -881,7 +880,7 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 MakeEdgeSampled(edge_iter, sample_layer_num);
                 if (!IsInSampledGraph(
                         partitioned_graph_->getEdgeDst(edge_iter))) {
-                  new_sampled_nodes_.set(
+                  bitset_sample_flag_.set(
                       partitioned_graph_->getEdgeDst(edge_iter));
                 }
                 bitset_sampled_degrees_.set(*src_iter);
@@ -902,7 +901,7 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   galois::gDebug("Num sampled edges for layer ", sample_layer_num, " is ",
                  sampled.reduce(), " out of ", total.reduce());
 
-  std::vector<uint32_t> new_nodes = new_sampled_nodes_.getOffsets();
+  std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
 
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
@@ -911,9 +910,9 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
       [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
       galois::loopname("NeighborhoodSampleSet"));
 
-  // XXX(loc) bitset; can readAny be weaker?
-  sync_substrate_->sync<writeDestination, readAny, SampleFlagSync>(
-      "SampleSync");
+  sync_substrate_
+      ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+          "SampleSync");
 }
 
 //! Construct the subgraph from sampled edges and corresponding nodes
@@ -944,7 +943,7 @@ void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
     }
   }
   // galois::gPrint("\n");
-  galois::gInfo(host_prefix(), "num batched nodes ", count);
+  galois::gInfo(host_prefix(), "Batched nodes ", count);
 #endif
   SetupNeighborhoodSample(GNNPhase::kBatch);
 }
