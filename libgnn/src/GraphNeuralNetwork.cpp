@@ -46,7 +46,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
     GNNLayerDimensions layer_dims = {.input_rows    = max_rows,
                                      .input_columns = prev_layer_columns,
                                      .output_columns =
-                                         config_.intermediate_layer_size(i)};
+                                         config_.intermediate_layer_size(i),
+                                     .output_rows = max_rows};
 
     switch (layer_type) {
     case GNNLayerType::kGraphConvolutional:
@@ -121,7 +122,8 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       // get last intermediate layer column size
       .input_columns = config_.intermediate_layer_size(
           config_.num_intermediate_layers() - 1),
-      .output_columns = config_.output_layer_size()};
+      .output_columns = config_.output_layer_size(),
+      .output_rows    = max_rows};
 
   switch (config_.output_layer_type()) {
   case (GNNOutputLayerType::kSoftmax):

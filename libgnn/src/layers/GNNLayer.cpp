@@ -9,6 +9,11 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
                            const GNNLayerConfig& config)
     : layer_number_(layer_num), graph_(graph), layer_dimensions_(dimensions),
       config_(config) {
+  // TODO(loc)
+  // this is currently a backward-compatibility hack, need to have caller
+  // set output rows rather than created here
+  layer_dimensions_.output_rows = layer_dimensions_.input_rows;
+
   if (config_.allocate_weights) {
     // dropout allocation; dropout is same as input
     if (!config_.disable_dropout) {
@@ -38,6 +43,10 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
     GlorotBengioInit(&layer_weights_);
   }
 
+  // TODO(loc) optimize this and layer creation in general
+  // this does not use output_rows and assumes the worst case where
+  // all nodes are generated
+  // for now it's kept as input_rows so as to not break things
   size_t num_output_elements =
       layer_dimensions_.input_rows * layer_dimensions_.output_columns;
 
@@ -269,7 +278,7 @@ void galois::GNNLayer::Activation() {
 
     galois::do_all(
         galois::iterate(static_cast<size_t>(0),
-                        layer_dimensions_.input_rows *
+                        layer_dimensions_.output_rows *
                             layer_dimensions_.output_columns),
         [&](size_t i) {
           if (forward_output_matrix_[i] > 0.0) {
@@ -299,7 +308,7 @@ void galois::GNNLayer::ActivationDerivative(
     // keep gradient if the original output was greater than 0
     galois::do_all(
         galois::iterate(static_cast<size_t>(0),
-                        layer_dimensions_.input_rows *
+                        layer_dimensions_.output_rows *
                             layer_dimensions_.output_columns),
         [&](size_t i) {
           // it was <= 0 before; set back to 0

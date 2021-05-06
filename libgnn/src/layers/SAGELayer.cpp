@@ -100,7 +100,7 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   }
 
   size_t num_output_elements =
-      layer_dimensions_.input_rows * layer_dimensions_.output_columns;
+      layer_dimensions_.output_rows * layer_dimensions_.output_columns;
   // only needed if out temp would be smaller than intemp
   if (!config_.disable_aggregate_after_update &&
       layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
@@ -179,7 +179,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   assert(input_embeddings.size() >=
          (layer_dimensions_.input_rows * layer_dimensions_.input_columns));
   assert(p_forward_output_matrix_.size() >=
-         (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
+         (layer_dimensions_.output_rows * layer_dimensions_.output_columns));
 
   // pointer to input to operate on
   const GNNFloat* input_data = input_embeddings.data();
@@ -225,7 +225,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   }
 
   assert(p_forward_output_matrix_.size() >=
-         (layer_dimensions_.input_rows * layer_dimensions_.output_columns));
+         (layer_dimensions_.output_rows * layer_dimensions_.output_columns));
 
   timer.stop();
 

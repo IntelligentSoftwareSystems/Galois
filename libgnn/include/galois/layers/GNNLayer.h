@@ -41,6 +41,8 @@ struct GNNLayerDimensions {
   size_t input_columns;
   //! Number of columns output of this layer
   size_t output_columns;
+  //! If rows change, this is set. Otherwise, ignored.
+  size_t output_rows;
 };
 
 //! Config options for operations that can occur in a layer
