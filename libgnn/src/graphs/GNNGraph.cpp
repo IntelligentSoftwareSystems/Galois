@@ -86,6 +86,11 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
   // reverse edges
   partitioned_graph_->ConstructIncomingEdges();
 
+  galois::gInfo(host_prefix_, "Number of local proxies is ",
+                partitioned_graph_->size());
+  galois::gInfo(host_prefix_, "Number of local edges is ",
+                partitioned_graph_->sizeEdges());
+
   // read additional graph data
   ReadLocalLabels(dataset_name, has_single_class_label);
   ReadLocalFeatures(dataset_name);
@@ -750,6 +755,8 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
 void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
                                                       bool is_inductive) {
   subgraph_ = std::make_unique<GNNSubgraph>(partitioned_graph_->size());
+  sample_node_timestamps_.create(partitioned_graph_->size(),
+                                 std::numeric_limits<uint32_t>::max());
   edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers, 0);
   // this is to hold the *global* degree of a sampled graph; yes, memory wise
   // this is slightly problematic possibly, but each layer is its own
@@ -764,19 +771,25 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   }
 }
 
-void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
+size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   use_subgraph_ = false;
   bitset_sample_flag_.resize(size());
   bitset_sample_flag_.reset();
 
   // for now, if training node, it goes into seed node
-  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
-    if (IsValidForPhase(*x, seed_phase)) {
-      SetSampledNode(*x);
-    } else {
-      UnsetSampledNode(*x);
-    }
-  });
+  galois::do_all(galois::iterate(begin_owned(), end_owned()),
+                 [&](const NodeIterator& x) {
+                   if (IsValidForPhase(*x, seed_phase)) {
+                     SetSampledNode(*x);
+                     bitset_sample_flag_.set(*x);
+                   } else {
+                     UnsetSampledNode(*x);
+                   }
+                 });
+
+  // clear node timestamps
+  std::fill(sample_node_timestamps_.begin(), sample_node_timestamps_.end(),
+            std::numeric_limits<uint32_t>::max());
   // clear all sampled edges
   galois::do_all(galois::iterate(size_t{0}, partitioned_graph_->sizeEdges()),
                  [&](size_t edge_id) {
@@ -794,10 +807,28 @@ void galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   }
   bitset_sampled_degrees_.resize(partitioned_graph_->size());
   bitset_sampled_degrees_.reset();
+
+  // Write source = masters
+  sync_substrate_->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
+      "SampleSync");
+
+  galois::GAccumulator<unsigned> local_seed_count;
+  local_seed_count.reset();
+  // count # of seed nodes
+  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
+    if (IsInSampledGraph(x)) {
+      local_seed_count += 1;
+      // 0 = seed node
+      sample_node_timestamps_[*x] = 0;
+    }
+  });
+
+  return local_seed_count.reduce();
 }
 
-void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
-                                              bool inductive_subgraph) {
+size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
+                                                bool inductive_subgraph,
+                                                size_t timestamp) {
   use_subgraph_ = false;
 
   galois::GAccumulator<size_t> sampled;
@@ -846,11 +877,26 @@ void galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
   sync_substrate_
       ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
           "SampleSync");
+
+  galois::GAccumulator<unsigned> local_sample_count;
+  local_sample_count.reset();
+  // count # of seed nodes
+  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
+    if (IsInSampledGraph(x)) {
+      local_sample_count += 1;
+      if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
+        sample_node_timestamps_[*x] = timestamp;
+      }
+    }
+  });
+
+  return local_sample_count.reduce();
 }
 
-void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
-                                           size_t num_to_sample,
-                                           bool inductive_subgraph) {
+size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
+                                             size_t num_to_sample,
+                                             bool inductive_subgraph,
+                                             size_t timestamp) {
   assert(!subgraph_is_train_);
   use_subgraph_ = false;
 
@@ -928,10 +974,26 @@ void galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   sync_substrate_
       ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
           "SampleSync");
+
+  // count sampled node size
+  galois::GAccumulator<unsigned> local_sample_count;
+  local_sample_count.reset();
+  // count # of seed nodes
+  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
+    if (IsInSampledGraph(x)) {
+      local_sample_count += 1;
+      if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
+        sample_node_timestamps_[*x] = timestamp;
+      }
+    }
+  });
+
+  return local_sample_count.reduce();
 }
 
 //! Construct the subgraph from sampled edges and corresponding nodes
-size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
+size_t
+galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers) {
   // false first so that the build process can use functions to access the
   // real graph
   use_subgraph_            = false;
@@ -940,13 +1002,14 @@ size_t galois::graphs::GNNGraph::ConstructSampledSubgraph() {
   sync_substrate_
       ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
           "SubgraphDegree");
-  size_t num_subgraph_nodes = subgraph_->BuildSubgraph(*this);
+  size_t num_subgraph_nodes =
+      subgraph_->BuildSubgraph(*this, num_sampled_layers);
   // after this, this graph is a subgraph
   use_subgraph_ = true;
   return num_subgraph_nodes;
 }
 
-void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
+size_t galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
   train_batcher_->GetNextMinibatch(&local_minibatch_mask_);
 #ifndef NDEBUG
   size_t count = 0;
@@ -960,7 +1023,7 @@ void galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
   // galois::gPrint("\n");
   galois::gInfo(host_prefix(), "Batched nodes ", count);
 #endif
-  SetupNeighborhoodSample(GNNPhase::kBatch);
+  return SetupNeighborhoodSample(GNNPhase::kBatch);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

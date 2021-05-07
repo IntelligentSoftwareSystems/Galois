@@ -1,11 +1,11 @@
 #include "galois/graphs/GNNGraph.h"
 #include <limits>
 
-size_t
-galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(GNNGraph& gnn_graph) {
+size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(
+    GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("BuildSubgraph", kRegionName);
   timer.start();
-  CreateLocalToSubgraphMapping(gnn_graph);
+  CreateLocalToSubgraphMapping(gnn_graph, num_sampled_layers);
   if (num_subgraph_nodes_ == 0) {
     return 0;
   }
@@ -19,7 +19,7 @@ galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(GNNGraph& gnn_graph) {
 }
 
 void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
-    const GNNGraph& gnn_graph) {
+    const GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("LIDToSIDMapping", kRegionName);
   timer.start();
 
@@ -27,6 +27,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
   // clear all mappings
   std::fill(lid_to_subgraph_id_.begin(), lid_to_subgraph_id_.end(),
             std::numeric_limits<uint32_t>::max());
+
   // TODO(loc) depending on overhead, can parallelize this with a prefix sum
   // serial loop over LIDs to construct lid -> subgraph id mapping
   uint32_t current_sid = 0;
@@ -35,31 +36,44 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateLocalToSubgraphMapping(
   size_t last_owned_node = *(gnn_graph.end_owned());
   for (size_t local_node_id = 0; local_node_id < last_owned_node;
        local_node_id++) {
-    if (gnn_graph.IsInSampledGraph(local_node_id)) {
+    if (gnn_graph.SampleNodeTimestamp(local_node_id) == 0) {
       // TODO should bound check the SID to max uint32_t
       // note: if SID is max uint32t, then it's not valid
-      // galois::gInfo(local_node_id, " maps to ", current_sid);
       lid_to_subgraph_id_[local_node_id] = current_sid++;
     }
   }
 
-  // all nodes before this SID are master nodes
+  // all nodes before this SID are master nodes *that matter*
+  // NOTE: there is a very subtle distinction here implementation wise
+  // that needs to be resolved in slightly more detail than this
   subgraph_master_boundary_ = current_sid;
 
   for (size_t local_node_id = last_owned_node; local_node_id < gnn_graph.size();
        local_node_id++) {
-    if (gnn_graph.IsInSampledGraph(local_node_id)) {
+    if (gnn_graph.SampleNodeTimestamp(local_node_id) == 0) {
       // TODO should bound check the SID to max uint32_t
       // note: if SID is max uint32t, then it's not valid
-      // galois::gInfo(local_node_id, " maps to ", current_sid);
       lid_to_subgraph_id_[local_node_id] = current_sid++;
     }
   }
-  galois::gDebug("Number of sampled nodes for subgraph construction is ",
-                 current_sid);
+  galois::gDebug(
+      "Number of sampled nodes for subgraph construction layer 0 is ",
+      current_sid);
+
+  // XXX each sampled layer can be queried in parallel (think prefix sum); do
+  // this if this becomes a bottleneck
+  for (size_t i = 1; i < num_sampled_layers + 1; i++) {
+    for (size_t local_node_id = 0; local_node_id < gnn_graph.size();
+         local_node_id++) {
+      if (gnn_graph.SampleNodeTimestamp(local_node_id) == i) {
+        lid_to_subgraph_id_[local_node_id] = current_sid++;
+      }
+    }
+    galois::gDebug("Number of sampled nodes for subgraph construction, layer ",
+                   i, " is ", current_sid);
+  }
 
   num_subgraph_nodes_ = current_sid;
-
   timer.stop();
 }
 

@@ -150,7 +150,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
   }
 
   // flip sampling on layers
-  if (config_.do_sampling()) {
+  if (config_.do_sampling() || config_.train_minibatch_size()) {
     for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
       ptr->EnableSampling();
     }
@@ -164,18 +164,30 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   // this subgraph only needs to be created once
   if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
     // Setup the subgraph to only be the training graph
-    graph_->SetupNeighborhoodSample();
+    size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+    galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
+                   local_seed_node_count);
+    size_t num_sampled_layers = 0;
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
          back_iter++) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
       if (layer_type == GNNLayerType::kGraphConvolutional ||
           layer_type == GNNLayerType::kSAGE) {
-        graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(),
-                               config_.inductive_subgraph_);
+        size_t current_sample_size = graph_->SampleAllEdges(
+            (*back_iter)->graph_user_layer_number(),
+            config_.inductive_subgraph_, num_sampled_layers + 1);
+        galois::gDebug(graph_->host_prefix(),
+                       "Number of local nodes for train subgraph for layer ",
+                       (*back_iter)->graph_user_layer_number(), " is ",
+                       current_sample_size);
+        num_sampled_layers++;
+        // XXX resizing of layers
       }
     }
+
     // resize layer matrices
-    train_subgraph_nodes = graph_->ConstructSampledSubgraph();
+    // XXX resizing of layers should be done above, not here
+    train_subgraph_nodes = graph_->ConstructSampledSubgraph(num_sampled_layers);
     for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
          layer++) {
       (*layer)->ResizeRows(train_subgraph_nodes);
@@ -191,6 +203,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     // swap to train subgraph
     if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
+      // XXX resizing based on sampled per layer
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
            layer++) {
         (*layer)->ResizeRows(train_subgraph_nodes);
@@ -199,7 +212,10 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
     // beginning of epoch sampling
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
-      graph_->SetupNeighborhoodSample();
+      size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+      galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
+                     local_seed_node_count);
+
       size_t num_sampled_layers = 0;
 
       // work backwards on GCN/SAGE layers
@@ -209,14 +225,20 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         GNNLayerType layer_type = (*back_iter)->layer_type();
         if (layer_type == GNNLayerType::kGraphConvolutional ||
             layer_type == GNNLayerType::kSAGE) {
-          graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
-                              config_.fan_out_vector_[num_sampled_layers],
-                              config_.inductive_subgraph_);
+          size_t current_sample_size = graph_->SampleEdges(
+              (*back_iter)->graph_user_layer_number(),
+              config_.fan_out_vector_[num_sampled_layers],
+              config_.inductive_subgraph_, num_sampled_layers + 1);
+          galois::gDebug(graph_->host_prefix(),
+                         "Number of local nodes for layer ",
+                         (*back_iter)->graph_user_layer_number(), " is ",
+                         current_sample_size);
           num_sampled_layers++;
         }
       }
       // resize layer matrices
-      size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
+      size_t num_subgraph_nodes =
+          graph_->ConstructSampledSubgraph(num_sampled_layers);
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
            layer++) {
         (*layer)->ResizeRows(num_subgraph_nodes);
@@ -245,7 +267,15 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
         // break when all hosts are done with minibatches
-        graph_->PrepareNextTrainMinibatch();
+        size_t seed_node_count = graph_->PrepareNextTrainMinibatch();
+        galois::gDebug(graph_->host_prefix(),
+                       "Number of local seed nodes is for batch is ",
+                       seed_node_count);
+
+        // last layer input size/output rows becomes seed node size
+        gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
+                                                  seed_node_count);
+
         size_t num_sampled_layers = 0;
         for (auto back_iter = gnn_layers_.rbegin();
              back_iter != gnn_layers_.rend(); back_iter++) {
@@ -254,33 +284,51 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
               layer_type == GNNLayerType::kSAGE) {
             // you can minibatch with sampling or minibatch and grab all
             // relevant neighbors
+            size_t current_sample_size;
             if (config_.do_sampling()) {
-              graph_->SampleEdges((*back_iter)->graph_user_layer_number(),
-                                  config_.fan_out_vector_[num_sampled_layers],
-                                  config_.inductive_subgraph_);
+              current_sample_size = graph_->SampleEdges(
+                  (*back_iter)->graph_user_layer_number(),
+                  config_.fan_out_vector_[num_sampled_layers],
+                  config_.inductive_subgraph_, num_sampled_layers + 1);
             } else {
-              graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(),
-                                     config_.inductive_subgraph_);
+              current_sample_size = graph_->SampleAllEdges(
+                  (*back_iter)->graph_user_layer_number(),
+                  config_.inductive_subgraph_, num_sampled_layers + 1);
             }
+            galois::gDebug(graph_->host_prefix(),
+                           "Number of local nodes for layer ",
+                           (*back_iter)->graph_user_layer_number(), " is ",
+                           current_sample_size);
+            // resize this layer, change seed node count
+            (*back_iter)
+                ->ResizeInputOutputRows(current_sample_size, seed_node_count);
+            seed_node_count = current_sample_size;
             num_sampled_layers++;
           }
         }
+
         // resize layer matrices
-        size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
-        for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-             layer++) {
-          (*layer)->ResizeRows(num_subgraph_nodes);
-        }
+        // size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
+        graph_->ConstructSampledSubgraph(num_sampled_layers);
+        // XXX resizes above only work for SAGE layers; will break if other
+        // layers are tested
+
+        // for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+        //     layer++) {
+        //  (*layer)->ResizeRows(num_subgraph_nodes);
+        //}
 
         const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
         train_accuracy = GetGlobalAccuracy(batch_pred);
         GradientPropagation();
 
-        galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
-                       ": Train accuracy/F1 micro is ", train_accuracy, "\n");
         work_left_ += graph_->MoreTrainMinibatches();
         char global_work_left = work_left_.reduce();
         batch_timer.stop();
+        galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
+                       ": Train accuracy/F1 micro is ", train_accuracy,
+                       " time ", batch_timer.get(), "\n");
+
         if (!global_work_left) {
           break;
         }

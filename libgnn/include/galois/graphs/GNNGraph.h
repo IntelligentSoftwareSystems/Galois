@@ -262,17 +262,24 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   //! Set seed nodes, i.e., nodes that are being predicted on
-  void SetupNeighborhoodSample() { SetupNeighborhoodSample(GNNPhase::kTrain); }
-  void SetupNeighborhoodSample(GNNPhase seed_phase);
+  size_t SetupNeighborhoodSample() {
+    return SetupNeighborhoodSample(GNNPhase::kTrain);
+  }
+  size_t SetupNeighborhoodSample(GNNPhase seed_phase);
 
   //! Choose all edges from sampled nodes
-  void SampleAllEdges(size_t agg_layer_num, bool inductive_subgraph);
+  size_t SampleAllEdges(size_t agg_layer_num, bool inductive_subgraph,
+                        size_t timestamp);
   //! Sample neighbors of nodes that are marked as ready for sampling
-  void SampleEdges(size_t sample_layer_num, size_t num_to_sample,
-                   bool inductive_subgraph);
+  size_t SampleEdges(size_t sample_layer_num, size_t num_to_sample,
+                     bool inductive_subgraph, size_t timestamp);
 
   //! Construct the subgraph from sampled edges and corresponding nodes
-  size_t ConstructSampledSubgraph();
+  size_t ConstructSampledSubgraph(size_t num_sampled_layers);
+
+  unsigned SampleNodeTimestamp(unsigned lid) const {
+    return sample_node_timestamps_[lid];
+  }
 
   void EnableSubgraph() { use_subgraph_ = true; }
   void DisableSubgraph() { use_subgraph_ = false; }
@@ -327,7 +334,7 @@ public:
 
   //! Setup the state for the next minibatch sampling call by using the
   //! minibatcher to pick up the next set batch of nodes
-  void PrepareNextTrainMinibatch();
+  size_t PrepareNextTrainMinibatch();
   //! Returns true if there are still more minibatches in this graph
   bool MoreTrainMinibatches() { return !train_batcher_->NoMoreMinibatches(); };
   //////////////////////////////////////////////////////////////////////////////
@@ -595,6 +602,10 @@ private:
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;
+  // TODO use a char maybe? unlikely anyone will go over 2^8 layers...
+  //! What timestep a node was added to sampled set; used to determine
+  //! size of subgraph at each layer
+  galois::LargeArray<unsigned> sample_node_timestamps_;
   //! Indicates newly sampled nodes (for distributed synchronization of sampling
   //! status
   galois::DynamicBitSet new_sampled_nodes_;

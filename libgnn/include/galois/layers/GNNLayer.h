@@ -102,6 +102,12 @@ public:
     // TODO(loc) output matrix should be resized if space becomes an issue,
     // else just use first S rows (S = subgraph size)
   }
+  virtual void ResizeInputOutputRows(size_t input_row, size_t output_row) {
+    layer_dimensions_.input_rows  = input_row;
+    layer_dimensions_.output_rows = output_row;
+    // TODO(loc) output matrix should be resized if space becomes an issue,
+    // else just use first S rows (S = subgraph size)
+  }
 
   GNNPhase layer_phase() { return layer_phase_; }
   //! Changes this layer's phase

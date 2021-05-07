@@ -15,7 +15,7 @@ public:
   }
   //! Given sampled bits set on gnn_graph, builds an explicit subgraph
   //! for the sampled bits
-  size_t BuildSubgraph(GNNGraph& gnn_graph);
+  size_t BuildSubgraph(GNNGraph& gnn_graph, size_t num_sampled_layers);
 
   galois::gstl::Vector<GNNFeature>& GetLocalFeatures() {
     return subgraph_node_features_;
@@ -99,7 +99,8 @@ public:
 private:
   //! Creates subgraph ID mapping from the number of sampled nodes from the
   //! original graph. Should be done every epoch when sampled graph changes.
-  void CreateLocalToSubgraphMapping(const GNNGraph& gnn_graph);
+  void CreateLocalToSubgraphMapping(const GNNGraph& gnn_graph,
+                                    size_t num_sampled_layers);
   //! Counts in and out degrees of all sampled nodes in the graph
   void DegreeCounting(const GNNGraph& gnn_graph);
   //! Creates edges

@@ -270,6 +270,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   }
 
   if (!sage_config_.disable_concat) {
+    // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0) {
       MaskInputNonMasters(&input_data);
     } else {
@@ -291,7 +292,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       // otherwise must mask other
       galois::CBlasSGEMM(
           CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+          layer_dimensions_.output_rows, layer_dimensions_.output_columns,
           input_data.data(), input_gradient->data(),
           p_layer_weight_gradients_2_.data());
 #ifdef GALOIS_ENABLE_GPU
@@ -306,6 +307,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     // aggdata can == p_intemp1; in other words, need to use before overwrite
     // mask it, then use it
+    // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 || sage_config_.disable_concat) {
       MaskInputNonMasters(&agg_data);
     }
@@ -314,16 +316,17 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
 
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
+      // XXX output rows
       gpu_object_.GetWeightGradientsGPU(
           layer_dimensions_.input_rows, layer_dimensions_.input_columns,
           layer_dimensions_.output_columns, agg_data.data(),
           input_gradient->data(), p_layer_weight_gradients_.data());
     } else {
 #endif
-      // temp 2 holds aggregated feature vectors from forward phase
+      // agg data holds aggregated feature vectors from forward phase
       galois::CBlasSGEMM(
           CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
-          layer_dimensions_.input_rows, layer_dimensions_.output_columns,
+          layer_dimensions_.output_rows, layer_dimensions_.output_columns,
           agg_data.data(), input_gradient->data(),
           p_layer_weight_gradients_.data());
 #ifdef GALOIS_ENABLE_GPU
@@ -349,6 +352,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   } else {
     // --unmasked--
     // disable concat part is here because otherwise it would get done elsewhere
+    // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 && sage_config_.disable_concat) {
       MaskInputNonMasters(&input_data);
     } else {
@@ -367,6 +371,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
           p_out_temp_.data(), p_layer_weight_gradients_.data());
     } else {
 #endif
+      // input col x input row * input row x output col
       galois::CBlasSGEMM(CblasTrans, CblasNoTrans,
                          layer_dimensions_.input_columns,
                          layer_dimensions_.input_rows,
@@ -451,8 +456,16 @@ void galois::SAGELayer::AggregateAllCPU(
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
     bool is_backward) {
+  // aggregation causes a row count change
+  size_t num_rows_to_handle;
+  if (!is_backward) {
+    num_rows_to_handle = layer_dimensions_.output_rows;
+  } else {
+    num_rows_to_handle = layer_dimensions_.input_rows;
+  }
+
   galois::do_all(
-      galois::iterate(graph_.begin(), graph_.end()),
+      galois::iterate(*(graph_.begin()), num_rows_to_handle),
       [&](size_t src) {
         size_t index_to_src_feature = src * column_length;
         // zero out src feature first
@@ -469,10 +482,8 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.edge_begin(src); e != graph_.edge_end(src);
                e++) {
-            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
-            size_t dst = graph_.GetEdgeDest(e);
-
-            if (layer_phase_ == GNNPhase::kTrain) {
+            if (layer_phase_ == GNNPhase::kTrain ||
+                layer_phase_ == GNNPhase::kBatch) {
               // XXX
               if (IsSampledLayer()) {
                 if (!graph_.IsEdgeSampled(e, layer_number_)) {
@@ -480,7 +491,8 @@ void galois::SAGELayer::AggregateAllCPU(
                 }
               }
             }
-
+            size_t dst = graph_.GetEdgeDest(e);
+            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
             size_t index_to_dst_feature = dst * column_length;
 
             if (!config_.disable_normalization) {
@@ -508,10 +520,8 @@ void galois::SAGELayer::AggregateAllCPU(
           // loop through all destinations to grab the feature to aggregate
           for (auto e = graph_.in_edge_begin(src); e != graph_.in_edge_end(src);
                e++) {
-            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
-            size_t dst = graph_.GetInEdgeDest(e);
-
-            if (layer_phase_ == GNNPhase::kTrain) {
+            if (layer_phase_ == GNNPhase::kTrain ||
+                layer_phase_ == GNNPhase::kBatch) {
               // XXX
               if (IsSampledLayer()) {
                 if (!graph_.IsInEdgeSampled(e, layer_number_)) {
@@ -519,6 +529,13 @@ void galois::SAGELayer::AggregateAllCPU(
                 }
               }
             }
+            size_t dst = graph_.GetInEdgeDest(e);
+            graphs::bitset_graph_aggregate.set(graph_.ConvertToLID(src));
+
+            // input row x output row in backward means that i shouldn't be
+            // touching nodes past output rows; the above sample check
+            // should deal with this where this matters
+            assert(dst < layer_dimensions_.output_rows);
 
             size_t index_to_dst_feature = dst * column_length;
 
@@ -553,6 +570,7 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
   timer.start();
 #ifdef GALOIS_ENABLE_GPU
   // TODO self change
+  // XXX(hochan) output rows
   if (device_personality == DevicePersonality::GPU_CUDA) {
     gpu_object_.UpdateEmbeddingsGPU(
         layer_dimensions_.input_rows, layer_dimensions_.input_columns,
@@ -561,14 +579,14 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
   } else {
 #endif
     galois::gDebug("Layer ", graph_user_layer_number_, " ",
-                   layer_dimensions_.input_rows, " ",
+                   layer_dimensions_.output_rows, " ",
                    layer_dimensions_.input_columns, " ",
                    layer_dimensions_.output_columns);
     // CPU version is just a call into CBlas
-    galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
-                       layer_dimensions_.input_columns,
-                       layer_dimensions_.output_columns, node_embeddings,
-                       layer_weights_.data(), output);
+    galois::CBlasSGEMM(
+        CblasNoTrans, CblasNoTrans, layer_dimensions_.output_rows,
+        layer_dimensions_.input_columns, layer_dimensions_.output_columns,
+        node_embeddings, layer_weights_.data(), output);
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
@@ -587,10 +605,10 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
   } else {
 #endif
     // note use of layer weights 2 differentiates this from above
-    galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
-                       layer_dimensions_.input_columns,
-                       layer_dimensions_.output_columns, node_embeddings,
-                       layer_weights_2_.data(), output, true);
+    galois::CBlasSGEMM(
+        CblasNoTrans, CblasNoTrans, layer_dimensions_.output_rows,
+        layer_dimensions_.input_columns, layer_dimensions_.output_columns,
+        node_embeddings, layer_weights_2_.data(), output, true);
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
@@ -614,6 +632,7 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
 #endif
     // difference is Trans for B matrix (data) to get z by y (weights is y by z
     // normally); result is x by y
+    // note input rows is used here due to transpose of aggregation
     galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
                        layer_dimensions_.output_columns,
                        layer_dimensions_.input_columns, gradients,
@@ -641,7 +660,7 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
     // difference is Trans for B matrix (data) to get z by y (weights is y by z
     // normally); result is x by y
     // true at end -> accumulate
-    galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
+    galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.output_rows,
                        layer_dimensions_.output_columns,
                        layer_dimensions_.input_columns, gradients,
                        layer_weights_2_.data(), output, true);
