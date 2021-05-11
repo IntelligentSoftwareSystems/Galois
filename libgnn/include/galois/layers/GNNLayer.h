@@ -99,6 +99,7 @@ public:
 
   virtual void ResizeRows(size_t new_row_count) {
     layer_dimensions_.input_rows = new_row_count;
+    layer_dimensions_.output_rows = new_row_count;
     // TODO(loc) output matrix should be resized if space becomes an issue,
     // else just use first S rows (S = subgraph size)
   }

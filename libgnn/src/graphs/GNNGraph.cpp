@@ -628,9 +628,8 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
 
-  // GALOIS_LOG_WARN("Sub: {}, Accuracy: {} / {}", use_subgraph_,
-  // global_correct,
-  //                global_checked);
+  galois::gDebug("Sub: {}, Accuracy: {} / {}", use_subgraph_, global_correct,
+                 global_checked);
 
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
@@ -786,6 +785,12 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                      UnsetSampledNode(*x);
                    }
                  });
+  // unsets nodes set in previous iterations; for some reason they get
+  // synchronized along  with everything else even though bitset sample flag
+  // should prevent it (that, or it's because they don't get sync'd that they
+  // remain the same)
+  galois::do_all(galois::iterate(end_owned(), end()),
+                 [&](const NodeIterator& x) { UnsetSampledNode(*x); });
 
   // clear node timestamps
   std::fill(sample_node_timestamps_.begin(), sample_node_timestamps_.end(),
@@ -958,9 +963,9 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
       galois::steal(), galois::loopname("NeighborhoodSample"));
 
   // galois::gInfo(host_prefix(), "sampled nodes for layer ", sample_layer_num,
-  // " is ", total_nodes.reduce());
-  galois::gDebug("Num sampled edges for layer ", sample_layer_num, " is ",
-                 sampled.reduce(), " out of ", total.reduce());
+  //              " is ", total_nodes.reduce());
+  // galois::gInfo("Num sampled edges for layer ", sample_layer_num, " is ",
+  //              sampled.reduce(), " out of ", total.reduce());
 
   std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
 
