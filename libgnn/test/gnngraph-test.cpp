@@ -22,5 +22,16 @@ int main() {
   galois::graphs::GNNGraph("cora", galois::graphs::GNNPartitionScheme::kCVC,
                            true);
 
+  // below for when I want to check the remapper
+  // galois::graphs::GNNGraph remapper("ogbn-papers100M",
+  // galois::graphs::GNNPartitionScheme::kOEC, true);
+  // remapper.ContiguousRemap("ogbn-papers100M-remap");
+  // galois::graphs::GNNGraph remapper("ogbn-papers100M-remap",
+  // galois::graphs::GNNPartitionScheme::kOEC, true);
+
+  // galois::graphs::GNNGraph remapper("yelp",
+  // galois::graphs::GNNPartitionScheme::kOEC, true);
+  // remapper.ContiguousRemap("yelp-remap");
+
   return 0;
 }

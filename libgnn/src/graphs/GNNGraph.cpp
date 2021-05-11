@@ -92,7 +92,12 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
                 partitioned_graph_->sizeEdges());
 
   // read additional graph data
-  ReadLocalLabels(dataset_name, has_single_class_label);
+  if (dataset_name != "ogbn-papers100M-remap") {
+    ReadLocalLabels(dataset_name, has_single_class_label);
+  } else {
+    galois::gInfo("Remapped ogbn 100M");
+    ReadLocalLabelsBin(dataset_name);
+  }
   ReadLocalFeatures(dataset_name);
   ReadLocalMasks(dataset_name);
 
@@ -256,6 +261,49 @@ void galois::graphs::GNNGraph::AggregateSyncGPU(
   }
 }
 #endif
+void galois::graphs::GNNGraph::ReadLocalLabelsBin(
+    const std::string& dataset_name) {
+  GALOIS_LOG_VERBOSE("[{}] Reading labels from disk...", host_id_);
+
+  std::ifstream file_stream;
+  file_stream.open(input_directory_ + dataset_name + "-labels-dims.txt",
+                   std::ios::in);
+  size_t num_nodes;
+  file_stream >> num_nodes >> num_label_classes_ >> std::ws;
+  assert(num_nodes == partitioned_graph_->globalSize());
+  if (host_id_ == 0) {
+    galois::gInfo("Number of label classes is ", num_label_classes_);
+  }
+  file_stream.close();
+
+  std::string filename = input_directory_ + dataset_name + "-labels.bin";
+  std::ifstream file_stream_bin;
+  file_stream_bin.open(filename, std::ios::binary | std::ios::in);
+
+  std::vector<GNNLabel> all_labels(num_nodes);
+  // read all labels into a vector
+  file_stream_bin.read((char*)all_labels.data(), sizeof(GNNLabel) * num_nodes);
+
+  using_single_class_labels_ = true;
+  local_ground_truth_labels_.resize(partitioned_graph_->size());
+
+  galois::GAccumulator<size_t> found_local_vertices;
+  found_local_vertices.reset();
+
+  // save only local ones; can do in parallel as well
+  // assumes -1 already dealt with
+  galois::do_all(galois::iterate(size_t{0}, partitioned_graph_->size()),
+                 [&](size_t lid) {
+                   local_ground_truth_labels_[lid] = all_labels[GetGID(lid)];
+                   found_local_vertices += 1;
+                 });
+
+  size_t fli = found_local_vertices.reduce();
+  galois::gInfo(host_prefix_, "Read ", fli, " labels (",
+                local_ground_truth_labels_.size() * double{4} / (1 << 30),
+                " GB)");
+  GALOIS_LOG_ASSERT(fli == partitioned_graph_->size());
+}
 
 void galois::graphs::GNNGraph::ReadLocalLabels(const std::string& dataset_name,
                                                bool has_single_class_label) {
@@ -380,23 +428,25 @@ void galois::graphs::GNNGraph::ReadLocalFeatures(
                               node_feature_length_);
 
   // copy over features for local nodes only
-  size_t num_kept_vertices = 0;
-  for (size_t gid = 0; gid < num_global_vertices; gid++) {
-    if (partitioned_graph_->isLocal(gid)) {
-      // copy over feature vector
-      std::copy(full_feature_set.get() + gid * node_feature_length_,
-                full_feature_set.get() + (gid + 1) * node_feature_length_,
-                &local_node_features_[partitioned_graph_->getLID(gid) *
-                                      node_feature_length_]);
-      num_kept_vertices++;
-    }
-  }
+  galois::GAccumulator<size_t> num_kept_vertices;
+  num_kept_vertices.reset();
+  galois::do_all(
+      galois::iterate(size_t{0}, num_global_vertices), [&](size_t gid) {
+        if (partitioned_graph_->isLocal(gid)) {
+          // copy over feature vector
+          std::copy(full_feature_set.get() + gid * node_feature_length_,
+                    full_feature_set.get() + (gid + 1) * node_feature_length_,
+                    &local_node_features_[partitioned_graph_->getLID(gid) *
+                                          node_feature_length_]);
+          num_kept_vertices += 1;
+        }
+      });
   full_feature_set.reset();
 
   galois::gInfo(host_prefix_, "Read ", local_node_features_.size(),
                 " features (",
                 local_node_features_.size() * double{4} / (1 << 30), " GB)");
-  GALOIS_LOG_ASSERT(num_kept_vertices == partitioned_graph_->size());
+  GALOIS_LOG_ASSERT(num_kept_vertices.reduce() == partitioned_graph_->size());
 }
 
 //! Helper function to read masks from file into the appropriate structures
@@ -516,6 +566,35 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
         local_testing_mask_[partitioned_graph_->getLID(i)] = 1;
       }
     }
+  } else if (dataset_name == "ogbn-papers100M-remap") {
+    global_training_mask_range_ = {.begin = 0, .end = 1207178, .size = 1207178};
+    global_validation_mask_range_ = {
+        .begin = 1207178, .end = 1207178 + 125264, .size = 125264};
+    global_testing_mask_range_ = {
+        .begin = 1332442, .end = 1332442 + 214337, .size = 214337};
+    // training
+    for (size_t i = global_training_mask_range_.begin;
+         i < global_training_mask_range_.end; i++) {
+      if (partitioned_graph_->isLocal(i)) {
+        local_training_mask_[partitioned_graph_->getLID(i)] = 1;
+      }
+    }
+    // validation
+    for (size_t i = global_validation_mask_range_.begin;
+         i < global_validation_mask_range_.end; i++) {
+      if (partitioned_graph_->isLocal(i)) {
+        local_validation_mask_[partitioned_graph_->getLID(i)] = 1;
+      }
+    }
+    // testing
+    for (size_t i = global_testing_mask_range_.begin;
+         i < global_testing_mask_range_.end; i++) {
+      if (partitioned_graph_->isLocal(i)) {
+        local_testing_mask_[partitioned_graph_->getLID(i)] = 1;
+      }
+    }
+    valid_other_ = FindOtherMask();
+    GALOIS_LOG_ASSERT(valid_other_ == 109513177);
   } else {
     size_t valid_train = ReadLocalMasksFromFile(dataset_name, "train",
                                                 &global_training_mask_range_,
@@ -1096,3 +1175,145 @@ void galois::graphs::GNNGraph::ResizeGPULayerVector(size_t num_layers) {
   resize_CUDA_layer_vector(cuda_ctx_, num_layers);
 }
 #endif
+void galois::graphs::GNNGraph::ContiguousRemap(const std::string& new_name) {
+  node_remapping_.resize(partitioned_graph_->size());
+
+  uint32_t new_node_id = 0;
+
+  // serial loops because new ID needs to be kept consistent
+  // first, train nodes
+  for (size_t cur_node = 0; cur_node < partitioned_graph_->size(); cur_node++) {
+    if (IsValidForPhase(cur_node, GNNPhase::kTrain)) {
+      node_remapping_[new_node_id++] = cur_node;
+    }
+  }
+  galois::gInfo("Train nodes are from 0 to ", new_node_id);
+
+  // second, val nodes
+  uint32_t val_start = new_node_id;
+  for (size_t cur_node = 0; cur_node < partitioned_graph_->size(); cur_node++) {
+    if (IsValidForPhase(cur_node, GNNPhase::kValidate)) {
+      node_remapping_[new_node_id++] = cur_node;
+    }
+  }
+  galois::gInfo("Val nodes are from ", val_start, " to ", new_node_id, "(",
+                new_node_id - val_start, ")");
+
+  // third, test nodes
+  uint32_t test_start = new_node_id;
+  for (size_t cur_node = 0; cur_node < partitioned_graph_->size(); cur_node++) {
+    if (IsValidForPhase(cur_node, GNNPhase::kTest)) {
+      node_remapping_[new_node_id++] = cur_node;
+    }
+  }
+  galois::gInfo("Test nodes are from ", test_start, " to ", new_node_id, "(",
+                new_node_id - test_start, ")");
+
+  // last, everything else
+  uint32_t other_start = new_node_id;
+  for (size_t cur_node = 0; cur_node < partitioned_graph_->size(); cur_node++) {
+    if (IsValidForPhase(cur_node, GNNPhase::kOther)) {
+      node_remapping_[new_node_id++] = cur_node;
+    }
+  }
+  galois::gInfo("Other nodes are from ", other_start, " to ", new_node_id, "(",
+                new_node_id - other_start, ")");
+  GALOIS_LOG_ASSERT(new_node_id == partitioned_graph_->size());
+
+  // remap features to match new node mapping, save to disk
+  // std::vector<GNNFeature> remapped_features(local_node_features_.size());
+  //// do all works because can copy in parallel
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    std::memcpy(
+  //        &(remapped_features[remap_node_id * node_feature_length_]),
+  //        &((local_node_features_.data())[node_remapping_[remap_node_id] *
+  //        node_feature_length_]), node_feature_length_ * sizeof(GNNFeature));
+  //  }
+  //);
+  //// sanity check
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    for (size_t i = 0; i < node_feature_length_; i++) {
+  //      GALOIS_LOG_ASSERT(remapped_features[remap_node_id *
+  //      node_feature_length_ + i] ==
+  //                        local_node_features_[node_remapping_[remap_node_id]
+  //                        * node_feature_length_ + i]);
+  //    }
+  //  }
+  //);
+  //// save to disk
+  // std::ofstream write_file_stream;
+  // std::string feature_file = input_directory_ + new_name + "-feats.bin";
+  // galois::gPrint(feature_file, "\n");
+  // write_file_stream.open(feature_file, std::ios::binary | std::ios::out);
+  // write_file_stream.write((char*)remapped_features.data(), sizeof(GNNFeature)
+  // *
+  //                                                   partitioned_graph_->size()
+  //                                                   * node_feature_length_);
+  // write_file_stream.close();
+
+  // std::ifstream file_stream;
+  // file_stream.open(feature_file, std::ios::binary | std::ios::in);
+  // file_stream.read((char*)remapped_features.data(), sizeof(GNNFloat) *
+  //                                                  partitioned_graph_->size()
+  //                                                  * node_feature_length_);
+  // file_stream.close();
+  //// sanity check again
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    for (size_t i = 0; i < node_feature_length_; i++) {
+  //      GALOIS_LOG_ASSERT(remapped_features[remap_node_id *
+  //      node_feature_length_ + i] ==
+  //                        local_node_features_[node_remapping_[remap_node_id]
+  //                        * node_feature_length_ + i]);
+  //    }
+  //  }
+  //);
+  // remapped_features.clear();
+
+  // std::vector<GNNLabel> remapped_labels(local_ground_truth_labels_.size());
+  //// save new labels order to disk (binary file)
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    remapped_labels[remap_node_id] =
+  //    local_ground_truth_labels_[node_remapping_[remap_node_id]];
+  //  }
+  //);
+
+  // std::string label_filename = input_directory_ + new_name + "-labels.bin";
+  // std::ofstream label_write_stream;
+  // label_write_stream.open(label_filename, std::ios::binary | std::ios::out);
+  // label_write_stream.write((char*)remapped_labels.data(), sizeof(GNNLabel) *
+  //                                                        partitioned_graph_->size());
+  // label_write_stream.close();
+
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    remapped_labels[remap_node_id] =
+  //    local_ground_truth_labels_[remap_node_id];
+  //  }
+  //);
+  // ReadLocalLabelsBin(new_name);
+  // galois::do_all(
+  //  galois::iterate(size_t{0}, partitioned_graph_->size()),
+  //  [&] (size_t remap_node_id) {
+  //    GALOIS_LOG_ASSERT(local_ground_truth_labels_[remap_node_id] ==
+  //    remapped_labels[node_remapping_[remap_node_id]]);
+  //  }
+  //);
+
+  // save the mapping to a binary file for use by graph convert to deal with
+  // the gr
+  std::string label_filename = input_directory_ + new_name + "-mapping.bin";
+  std::ofstream label_write_stream;
+  label_write_stream.open(label_filename, std::ios::binary | std::ios::out);
+  label_write_stream.write((char*)node_remapping_.data(),
+                           sizeof(uint32_t) * node_remapping_.size());
+  label_write_stream.close();
+}

@@ -119,6 +119,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // this is entire graph: amazon's mask isn't contiguous
       bps.push_back(0);
       bps.push_back(86618);
+    } else if (filename.find("ogbn-papers100M-remap") != std::string::npos) {
+      galois::gInfo("papers remap being used");
+      // whole graph (non contiguous mask)
+      bps.push_back(0);
+      bps.push_back(1207178);
     } else if (filename.find("ogbn-papers100M") != std::string::npos) {
       // whole graph (non contiguous mask)
       bps.push_back(0);

@@ -517,6 +517,8 @@ public:
   }
 #endif
 
+  void ContiguousRemap(const std::string& new_name);
+
 private:
 // included like this to avoid cyclic dependency issues + not used anywhere but
 // in this class anyways
@@ -526,6 +528,7 @@ private:
   // Initialization
   //////////////////////////////////////////////////////////////////////////////
 
+  void ReadLocalLabelsBin(const std::string& dataset_name);
   //! Read labels of local nodes only
   void ReadLocalLabels(const std::string& dataset_name,
                        bool has_single_class_label);
@@ -654,6 +657,8 @@ private:
 
   std::unique_ptr<MinibatchGenerator> train_batcher_;
   std::unique_ptr<MinibatchGenerator> test_batcher_;
+
+  std::vector<uint32_t> node_remapping_;
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things

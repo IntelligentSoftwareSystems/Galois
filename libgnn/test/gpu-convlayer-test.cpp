@@ -139,8 +139,8 @@ int main() {
   // since layer isn't 0 anymore, backward phase will actually return something
   dummy_ones = layer_1->AllocateGPU(dummy_ones_v);
   layer_1->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
-  const galois::PointerWithSize<galois::GNNFloat>&
-      layer_1_backward_output = layer_1->CopyBackwardOutputFromGPU();
+  const galois::PointerWithSize<galois::GNNFloat>& layer_1_backward_output =
+      layer_1->CopyBackwardOutputFromGPU();
 
   //////////////////////////////////////////////////////////////////////////////
   // check that multiplies go as expected
