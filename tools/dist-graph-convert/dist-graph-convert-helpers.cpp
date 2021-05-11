@@ -269,7 +269,7 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
       continue;
     galois::runtime::SendBuffer b;
     galois::runtime::gSerialize(b, chunkCounts);
-    net.sendTagged(h, galois::runtime::evilPhase, b);
+    net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
   }
 
   // receive chunk counts
@@ -279,10 +279,10 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID)
       continue;
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
+    decltype(net.recieveTagged(galois::runtime::evilPhase)) rBuffer;
 
     do {
-      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      rBuffer = net.recieveTagged(galois::runtime::evilPhase);
     } while (!rBuffer);
 
     galois::runtime::gDeserialize(rBuffer->second, recvChunkCounts);
@@ -416,12 +416,12 @@ uint64_t receiveEdgeCounts() {
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID)
       continue;
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
+    decltype(net.recieveTagged(galois::runtime::evilPhase)) rBuffer;
 
     uint64_t recvCount;
 
     do {
-      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      rBuffer = net.recieveTagged(galois::runtime::evilPhase);
     } while (!rBuffer);
     galois::runtime::gDeserialize(rBuffer->second, recvCount);
 
@@ -450,9 +450,8 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
         std::vector<uint32_t> recvDataVector;
 
         while (edgesToReceive) {
-          decltype(
-              net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
-          rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          decltype(net.recieveTagged(galois::runtime::evilPhase)) rBuffer;
+          rBuffer = net.recieveTagged(galois::runtime::evilPhase);
 
           // the buffer will have edge data as well if localsrctodata is
           // nonempty (it will be nonempty if initialized to non-empty by the
@@ -460,7 +459,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
           // going to send edge data
           if (rBuffer) {
             auto& receiveBuffer = rBuffer->second;
-            while (receiveBuffer.r_size() > 0) {
+            while (receiveBuffer.size() > 0) {
               uint64_t src;
               if (localSrcToData.empty()) {
                 // receive only dest data
@@ -514,7 +513,7 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
       continue;
     galois::runtime::SendBuffer b;
     galois::runtime::gSerialize(b, localAssignedEdges);
-    net.sendTagged(h, galois::runtime::evilPhase, b);
+    net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
   }
 
   // receive
@@ -524,10 +523,10 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
       continue;
     }
 
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
+    decltype(net.recieveTagged(galois::runtime::evilPhase)) rBuffer;
     uint64_t otherAssignedEdges;
     do {
-      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      rBuffer = net.recieveTagged(galois::runtime::evilPhase);
     } while (!rBuffer);
     galois::runtime::gDeserialize(rBuffer->second, otherAssignedEdges);
 

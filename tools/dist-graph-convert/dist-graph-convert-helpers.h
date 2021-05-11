@@ -838,7 +838,7 @@ void sendEdgeCounts(const std::vector<Uint64Pair>& hostToNodes,
       continue;
     galois::runtime::SendBuffer b;
     galois::runtime::gSerialize(b, numEdgesPerHost[h].reduce());
-    net.sendTagged(h, galois::runtime::evilPhase, b);
+    net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
   }
 };
 
@@ -929,8 +929,9 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
               dstVector.clear();
               if (hostSendBuffer.size() > 1400) {
                 net.sendTagged(edgeOwner, galois::runtime::evilPhase,
-                               hostSendBuffer);
-                hostSendBuffer.getVec().clear();
+                               std::move(hostSendBuffer));
+                (*(sendBuffers.getLocal()))[edgeOwner] =
+                    galois::runtime::SendBuffer();
               }
             }
 
@@ -966,8 +967,9 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
           }
 
           if (hostSendBuffer.size() > 0) {
-            net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
-            hostSendBuffer.getVec().clear();
+            net.sendTagged(h, galois::runtime::evilPhase,
+                           std::move(hostSendBuffer));
+            (*(sendBuffers.getLocal()))[h] = galois::runtime::SendBuffer();
           }
         }
       },
@@ -1049,8 +1051,9 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
               dataVector.clear();
               if (hostSendBuffer.size() > 1400) {
                 net.sendTagged(edgeOwner, galois::runtime::evilPhase,
-                               hostSendBuffer);
-                hostSendBuffer.getVec().clear();
+                               std::move(hostSendBuffer));
+                (*(sendBuffers.getLocal()))[edgeOwner] =
+                    galois::runtime::SendBuffer();
               }
             }
 
@@ -1090,8 +1093,9 @@ void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
           }
 
           if (hostSendBuffer.size() > 0) {
-            net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
-            hostSendBuffer.getVec().clear();
+            net.sendTagged(h, galois::runtime::evilPhase,
+                           std::move(hostSendBuffer));
+            (*(sendBuffers.getLocal()))[h] = galois::runtime::SendBuffer();
           }
         }
       },
