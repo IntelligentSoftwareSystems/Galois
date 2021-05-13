@@ -220,9 +220,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     // beginning of epoch sampling
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
       size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+      gnn_layers_.back()->ResizeRows(local_seed_node_count);
       galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                      local_seed_node_count);
-
       size_t num_sampled_layers = 0;
 
       // work backwards on GCN/SAGE layers
@@ -240,16 +240,16 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                          "Number of local nodes for layer ",
                          (*back_iter)->graph_user_layer_number(), " is ",
                          current_sample_size);
+
+          (*back_iter)
+              ->ResizeInputOutputRows(current_sample_size,
+                                      local_seed_node_count);
+          local_seed_node_count = current_sample_size;
           num_sampled_layers++;
         }
       }
       // resize layer matrices
-      size_t num_subgraph_nodes =
-          graph_->ConstructSampledSubgraph(num_sampled_layers);
-      for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-           layer++) {
-        (*layer)->ResizeRows(num_subgraph_nodes);
-      }
+      graph_->ConstructSampledSubgraph(num_sampled_layers);
     }
 
     if (!config_.train_minibatch_size()) {
@@ -315,15 +315,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         }
 
         // resize layer matrices
-        // size_t num_subgraph_nodes = graph_->ConstructSampledSubgraph();
         graph_->ConstructSampledSubgraph(num_sampled_layers);
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
-
-        // for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-        //     layer++) {
-        //  (*layer)->ResizeRows(num_subgraph_nodes);
-        //}
 
         const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
         train_accuracy = GetGlobalAccuracy(batch_pred);
@@ -335,6 +329,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
                        ": Train accuracy/F1 micro is ", train_accuracy,
                        " time ", batch_timer.get(), "\n");
+
+        // XXX mid batch test accuracy checking?
 
         if (!global_work_left) {
           break;
