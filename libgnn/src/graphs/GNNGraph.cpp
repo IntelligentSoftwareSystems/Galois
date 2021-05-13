@@ -204,7 +204,7 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
                                              bool is_backward) const {
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
-  if (!use_subgraph_) {
+  if (!use_subgraph_ && !use_subgraph_view_) {
     // set globals for the sync substrate
     if (!is_backward) {
       sync_substrate_
@@ -594,7 +594,7 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
       }
     }
     valid_other_ = FindOtherMask();
-    GALOIS_LOG_ASSERT(valid_other_ == 109513177);
+    GALOIS_LOG_ASSERT(valid_other_ <= 109513177);
   } else {
     size_t valid_train = ReadLocalMasksFromFile(dataset_name, "train",
                                                 &global_training_mask_range_,
@@ -707,8 +707,8 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
 
-  galois::gDebug("Sub: {}, Accuracy: {} / {}", use_subgraph_, global_correct,
-                 global_checked);
+  GALOIS_LOG_DEBUG("Sub: {}, Accuracy: {} / {}", use_subgraph_, global_correct,
+                   global_checked);
 
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
@@ -850,7 +850,9 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
 }
 
 size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
-  use_subgraph_ = false;
+  use_subgraph_      = false;
+  use_subgraph_view_ = false;
+
   bitset_sample_flag_.resize(size());
   bitset_sample_flag_.reset();
 
@@ -913,7 +915,8 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
 size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
                                                 bool inductive_subgraph,
                                                 size_t timestamp) {
-  use_subgraph_ = false;
+  use_subgraph_      = false;
+  use_subgraph_view_ = false;
 
   galois::GAccumulator<size_t> sampled;
   galois::GAccumulator<size_t> total;
@@ -982,7 +985,8 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                                              bool inductive_subgraph,
                                              size_t timestamp) {
   assert(!subgraph_is_train_);
-  use_subgraph_ = false;
+  use_subgraph_      = false;
+  use_subgraph_view_ = false;
 
   galois::GAccumulator<size_t> sampled;
   galois::GAccumulator<size_t> total;
@@ -1077,19 +1081,36 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
 
 //! Construct the subgraph from sampled edges and corresponding nodes
 size_t
-galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers) {
+galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
+                                                   bool use_view) {
   // false first so that the build process can use functions to access the
   // real graph
   use_subgraph_            = false;
+  use_subgraph_view_       = false;
   gnn_sampled_out_degrees_ = &sampled_out_degrees_;
+
   // first, sync the degres of the sampled edges across all hosts
   sync_substrate_
       ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
           "SubgraphDegree");
-  size_t num_subgraph_nodes =
-      subgraph_->BuildSubgraph(*this, num_sampled_layers);
+  size_t num_subgraph_nodes;
+  // use_view = true;
+  if (!use_view) {
+    num_subgraph_nodes = subgraph_->BuildSubgraph(*this, num_sampled_layers);
+  } else {
+    // a view only has lid<->sid mappings
+    num_subgraph_nodes =
+        subgraph_->BuildSubgraphView(*this, num_sampled_layers);
+    //SortAllInEdgesBySID();
+  }
+
   // after this, this graph is a subgraph
-  use_subgraph_ = true;
+  if (!use_view) {
+    use_subgraph_ = true;
+  } else {
+    use_subgraph_view_ = true;
+  }
+
   return num_subgraph_nodes;
 }
 

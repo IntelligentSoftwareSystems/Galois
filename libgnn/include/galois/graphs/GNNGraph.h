@@ -34,11 +34,14 @@ enum class GNNPartitionScheme { kOEC, kCVC, kOCVC };
 class GNNGraph {
 public:
   using GNNDistGraph = galois::graphs::DistGraph<char, void>;
-  using WholeGraph   = galois::graphs::LC_CSR_Graph<char, void>;
   using GraphNode    = GNNDistGraph::GraphNode;
   // defined as such because dist graph range objects used long unsigned
   using NodeIterator = boost::counting_iterator<size_t>;
   using EdgeIterator = GNNDistGraph::edge_iterator;
+
+  // using GNNEdgeSortIterator = internal::EdgeSortIterator<GraphNode,
+  //  uint64_t, galois::LargeArray<uint32_t>,
+  //  galois::LargeArray<std::vector<bool>>>;
 
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
            bool has_single_class_label);
@@ -68,7 +71,7 @@ public:
   size_t size() const { return partitioned_graph_->size(); }
   //! Returns # of nodes in the *graph that is currently active*.
   size_t active_size() const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->size();
     } else {
       return subgraph_->size();
@@ -81,7 +84,7 @@ public:
 
   //! Node begin for all local nodes
   NodeIterator begin() const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->allNodesRange().begin();
     } else {
       return subgraph_->begin();
@@ -89,7 +92,7 @@ public:
   }
   //! Node end for all local nodes
   NodeIterator end() const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->allNodesRange().end();
     } else {
       return subgraph_->end();
@@ -97,7 +100,7 @@ public:
   }
 
   NodeIterator begin_owned() const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->masterNodesRange().begin();
     } else {
       return subgraph_->begin_owned();
@@ -105,7 +108,7 @@ public:
   }
 
   NodeIterator end_owned() const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->masterNodesRange().end();
     } else {
       return subgraph_->end_owned();
@@ -126,32 +129,46 @@ public:
 
   // All following functions take a local node id
   EdgeIterator edge_begin(GraphNode n) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->edge_begin(n);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->edge_begin(ConvertToLID(n));
     } else {
       return subgraph_->edge_begin(n);
     }
   };
 
   EdgeIterator edge_end(GraphNode n) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->edge_end(n);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->edge_end(ConvertToLID(n));
     } else {
       return subgraph_->edge_end(n);
     }
   };
   GraphNode GetEdgeDest(EdgeIterator ei) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->getEdgeDst(ei);
+    } else if (use_subgraph_view_) {
+      // WARNING: this may return max of uint32 if the edge destination doesn't
+      // exist in the subgraph view
+      // get edge dest should NOT be called in that case
+      GraphNode rv = ConvertToSID(partitioned_graph_->getEdgeDst(ei));
+      assert(rv != std::numeric_limits<uint32_t>::max());
+      return rv;
     } else {
       return subgraph_->GetEdgeDest(ei);
     }
   };
+
   galois::runtime::iterable<
       galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
   edges(GraphNode N) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->edges(N);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->edges(ConvertToLID(N));
     } else {
       return subgraph_->edges(N);
     }
@@ -166,14 +183,16 @@ public:
   }
   bool IsEdgeSampled(uint32_t ei, size_t layer_num) const {
     if (!use_subgraph_) {
+      // view uses original graph edge iterators
       return edge_sample_status_[ei][layer_num];
     } else {
-      GALOIS_LOG_FATAL("This shouldn't be called with subgraph");
+      return subgraph_->OutEdgeSampled(ei, layer_num, *this);
       return false;
     }
   };
   bool IsEdgeSampled(EdgeIterator ei, size_t layer_num) const {
     if (!use_subgraph_) {
+      // view uses original graph edge iterators
       return edge_sample_status_[*ei][layer_num];
     } else {
       return subgraph_->OutEdgeSampled(ei, layer_num, *this);
@@ -193,19 +212,32 @@ public:
     edge_sample_status_[*ei][layer_num] = 0;
   };
 
+  // GNNEdgeSortIterator EdgeSortBegin(GraphNode n) {
+  //  return GNNEdgeSortIterator(*edge_begin(n),
+  //  partitioned_graph_->edge_dst_ptr_LA(), &edge_sample_status_);
+  //}
+  // GNNEdgeSortIterator EdgeSortEnd(GraphNode n) {
+  //  return GNNEdgeSortIterator(*edge_begin(n),
+  //  partitioned_graph_->edge_dst_ptr_LA(), &edge_sample_status_);
+  //}
+
   //////////////////////////////////////////////////////////////////////////////
   // in edges
   //////////////////////////////////////////////////////////////////////////////
   EdgeIterator in_edge_begin(GraphNode n) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->in_edge_begin(n);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->in_edge_begin(ConvertToLID(n));
     } else {
       return subgraph_->in_edge_begin(n);
     }
   }
   EdgeIterator in_edge_end(GraphNode n) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->in_edge_end(n);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->in_edge_end(ConvertToLID(n));
     } else {
       return subgraph_->in_edge_end(n);
     }
@@ -213,15 +245,22 @@ public:
   galois::runtime::iterable<
       galois::NoDerefIterator<GNNDistGraph::edge_iterator>>
   in_edges(GraphNode N) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->in_edges(N);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->in_edges(ConvertToLID(N));
     } else {
       return subgraph_->in_edges(N);
     }
   }
   GraphNode GetInEdgeDest(EdgeIterator ei) const {
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->GetInEdgeDest(ei);
+    } else if (use_subgraph_view_) {
+      return partitioned_graph_->GetInEdgeDest(ei);
+      GraphNode rv = ConvertToSID(partitioned_graph_->GetInEdgeDest(ei));
+      assert(rv != std::numeric_limits<uint32_t>::max());
+      return rv;
     } else {
       return subgraph_->GetInEdgeDest(ei);
     }
@@ -241,6 +280,7 @@ public:
   };
   bool IsInEdgeSampled(EdgeIterator ei, size_t layer_num) const {
     if (!use_subgraph_) {
+      // view can use this fine + requires it
       return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
                                 [layer_num];
     } else {
@@ -274,20 +314,28 @@ public:
   size_t SampleEdges(size_t sample_layer_num, size_t num_to_sample,
                      bool inductive_subgraph, size_t timestamp);
 
+  size_t ConstructSampledSubgraph(size_t num_sampled_layers) {
+    return ConstructSampledSubgraph(num_sampled_layers, false);
+  };
   //! Construct the subgraph from sampled edges and corresponding nodes
-  size_t ConstructSampledSubgraph(size_t num_sampled_layers);
+  size_t ConstructSampledSubgraph(size_t num_sampled_layers, bool use_view);
 
   unsigned SampleNodeTimestamp(unsigned lid) const {
     return sample_node_timestamps_[lid];
   }
 
   void EnableSubgraph() { use_subgraph_ = true; }
-  void DisableSubgraph() { use_subgraph_ = false; }
+  void EnableSubgraphView() { use_subgraph_view_ = true; }
+  void DisableSubgraph() {
+    use_subgraph_      = false;
+    use_subgraph_view_ = false;
+  }
   bool IsSubgraphOn() const { return use_subgraph_; }
+  bool IsSubgraphViewOn() const { return use_subgraph_view_; }
 
   //! Converts an id to an lid for the graph if subgraphs are in use
   uint32_t ConvertToLID(GraphNode sid) const {
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       return subgraph_->SIDToLID(sid);
     } else {
       return sid;
@@ -295,7 +343,7 @@ public:
   }
   //! Converts an LID to an SID if subgraphs are in use
   uint32_t ConvertToSID(GraphNode lid) const {
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       return subgraph_->LIDToSID(lid);
     } else {
       return lid;
@@ -303,7 +351,7 @@ public:
   }
   //! Converts SID to GID if subgraphs in use (else just return GID)
   uint32_t SIDToGID(GraphNode sid) const {
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       return GetGID(subgraph_->SIDToLID(sid));
     } else {
       return GetGID(sid);
@@ -312,12 +360,33 @@ public:
   //! Returns a pointer to the LID to SID map from the subgraph if subgraphs
   //! are in use
   galois::LargeArray<uint32_t>* GetLIDToSIDPointer() {
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       return subgraph_->GetLIDToSIDPointer();
     } else {
       return nullptr;
     }
   }
+
+  // void SortAllInEdgesBySID() {
+  //  // check it out for node 0
+  //  //for (auto iter : in_edges(0)) {
+  //  //  galois::gInfo("0 to ", GetInEdgeDest(*iter), " with in out edge map ",
+  //  *InEdgeToOutEdge(iter), " SID ",
+  //  subgraph_->LIDToSID(GetInEdgeDest(*iter)));
+  //  //}
+  //  //galois::gInfo("Starting sort");
+  //  galois::StatTimer t("SortBySID");
+  //  t.start();
+  //  partitioned_graph_->SortAllInEdgesBySID(*(subgraph_->GetLIDToSIDPointer()));
+  //  t.stop();
+  //  galois::gInfo("sort took ", t.get());
+  //  //galois::gInfo("End Sort");
+  //  //for (auto iter : in_edges(0)) {
+  //  //  galois::gInfo("0 to ", GetInEdgeDest(*iter), " with in out edge map ",
+  //  *InEdgeToOutEdge(iter), " SID ",
+  //  subgraph_->LIDToSID(GetInEdgeDest(*iter)));
+  //  //}
+  //}
 
   //////////////////////////////////////////////////////////////////////////////
   void SetupTrainBatcher(size_t train_batch_size) {
@@ -364,7 +433,7 @@ public:
 
   //! Get degree norm of subgraph for particular layer (i.e. includes training)
   GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       size_t degree;
       if (!subgraph_is_train_) {
         // case because degrees in each layer differ
@@ -373,6 +442,7 @@ public:
       } else {
         degree = global_train_degrees_[subgraph_->SIDToLID(n)];
       }
+
       if (degree) {
         return 1.0 / degree;
       } else {
@@ -394,7 +464,7 @@ public:
   GNNFloat GetSingleClassLabel(const unsigned lid) const {
     assert(using_single_class_labels_);
     unsigned to_use = lid;
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       to_use = subgraph_->SIDToLID(lid);
     }
 
@@ -424,7 +494,7 @@ public:
                              local_node_features_.size());
     }
 #endif
-    if (!use_subgraph_) {
+    if (!use_subgraph_ && !use_subgraph_view_) {
       return PointerWithSize(local_node_features_);
     } else {
       return PointerWithSize(subgraph_->GetLocalFeatures().data(),
@@ -440,7 +510,7 @@ public:
     // XXX maybe just map this all over to subgraph, though in that case
     // issue is that subgraph doesn't necessarily know about test/val
     unsigned to_use = lid;
-    if (use_subgraph_) {
+    if (use_subgraph_ || use_subgraph_view_) {
       to_use = subgraph_->SIDToLID(lid);
     }
     // re: phase checks in this if: ranges are not used for these
@@ -653,6 +723,7 @@ private:
 
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
+  bool use_subgraph_view_{false};
   bool subgraph_is_train_{false};
 
   std::unique_ptr<MinibatchGenerator> train_batcher_;
