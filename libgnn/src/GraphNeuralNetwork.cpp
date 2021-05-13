@@ -160,14 +160,16 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   const size_t this_host = graph_->host_id();
   float train_accuracy{0.f};
-  size_t train_subgraph_nodes = 0;
+  std::vector<size_t> subgraph_layer_sizes;
   // this subgraph only needs to be created once
   if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
     // Setup the subgraph to only be the training graph
     size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+    subgraph_layer_sizes.emplace_back(local_seed_node_count);
     galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                    local_seed_node_count);
     size_t num_sampled_layers = 0;
+    gnn_layers_.back()->ResizeRows(local_seed_node_count);
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
          back_iter++) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
@@ -180,18 +182,15 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                        "Number of local nodes for train subgraph for layer ",
                        (*back_iter)->graph_user_layer_number(), " is ",
                        current_sample_size);
+        // resizing
+        (*back_iter)
+            ->ResizeInputOutputRows(current_sample_size, local_seed_node_count);
+        local_seed_node_count = current_sample_size;
+        subgraph_layer_sizes.emplace_back(local_seed_node_count);
         num_sampled_layers++;
-        // XXX resizing of layers
       }
     }
-
-    // resize layer matrices
-    // XXX resizing of layers should be done above, not here
-    train_subgraph_nodes = graph_->ConstructSampledSubgraph(num_sampled_layers);
-    for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-         layer++) {
-      (*layer)->ResizeRows(train_subgraph_nodes);
-    }
+    graph_->ConstructSampledSubgraph(num_sampled_layers);
   }
 
   galois::StatTimer epoch_timer("TrainingTime", "GraphNeuralNetwork");
@@ -203,10 +202,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     // swap to train subgraph
     if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
-      // XXX resizing based on sampled per layer
-      for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-           layer++) {
-        (*layer)->ResizeRows(train_subgraph_nodes);
+      size_t l_count = 0;
+      gnn_layers_.back()->ResizeRows(subgraph_layer_sizes[0]);
+      for (auto back_iter = gnn_layers_.rbegin();
+           back_iter != gnn_layers_.rend(); back_iter++) {
+        GNNLayerType layer_type = (*back_iter)->layer_type();
+        if (layer_type == GNNLayerType::kGraphConvolutional ||
+            layer_type == GNNLayerType::kSAGE) {
+          (*back_iter)
+              ->ResizeInputOutputRows(subgraph_layer_sizes[l_count + 1],
+                                      subgraph_layer_sizes[l_count]);
+          l_count++;
+        }
       }
     }
 
@@ -354,7 +361,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     if (do_validate || do_test) {
       // disable subgraph
       graph_->DisableSubgraph();
-      // TODO only do this when necessary
+      // XXX test batching
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
            layer++) {
         (*layer)->ResizeRows(graph_->size());
@@ -415,6 +422,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   }
 
   // check test accuracy
+  // XXX test batching
   galois::StatTimer test_timer("FinalTestRun", "GraphNeuralNetwork");
   test_timer.start();
   SetLayerPhases(galois::GNNPhase::kTest);

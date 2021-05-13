@@ -440,7 +440,9 @@ public:
         degree =
             sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
       } else {
-        degree = global_train_degrees_[subgraph_->SIDToLID(n)];
+        // XXX if inductive
+        // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
+        degree = global_degrees_[subgraph_->SIDToLID(n)];
       }
 
       if (degree) {
