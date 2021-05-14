@@ -406,6 +406,25 @@ public:
   size_t PrepareNextTrainMinibatch();
   //! Returns true if there are still more minibatches in this graph
   bool MoreTrainMinibatches() { return !train_batcher_->NoMoreMinibatches(); };
+
+  //////////////////////////////////////////////////////////////////////////////
+
+  void SetupTestBatcher(size_t test_batch_size) {
+    if (test_batcher_) {
+      // clear before remake
+      test_batcher_.reset();
+    }
+    test_batcher_ = std::make_unique<MinibatchGenerator>(
+        local_testing_mask_, test_batch_size, *end_owned());
+    local_minibatch_mask_.resize(partitioned_graph_->size());
+  }
+  void ResetTestMinibatcher() { test_batcher_->ResetMinibatchState(); }
+  //! Setup the state for the next minibatch sampling call by using the
+  //! minibatcher to pick up the next set batch of nodes
+  size_t PrepareNextTestMinibatch();
+  //! Returns true if there are still more minibatches in this graph
+  bool MoreTestMinibatches() { return !test_batcher_->NoMoreMinibatches(); };
+
   //////////////////////////////////////////////////////////////////////////////
   GNNFloat GetGCNNormFactor(GraphNode lid) const {
     if (global_degrees_[lid]) {
@@ -460,6 +479,9 @@ public:
                           GNNPhase phase);
   float GetGlobalAccuracy(PointerWithSize<GNNFloat> predictions, GNNPhase phase,
                           bool sampling);
+
+  std::pair<uint32_t, uint32_t>
+  GetBatchAccuracy(PointerWithSize<GNNFloat> predictions);
 
   //! Returns the ground truth label of some local id assuming labels are single
   //! class labels.

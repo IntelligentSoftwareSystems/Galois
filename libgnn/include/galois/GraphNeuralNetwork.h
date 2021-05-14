@@ -93,6 +93,7 @@ public:
 
   bool do_sampling() const { return do_sampling_; }
   unsigned train_minibatch_size() const { return train_minibatch_size_; }
+  unsigned test_minibatch_size() const { return test_minibatch_size_; }
 
   //! Get the default layer config of layers in this GNN
   const GNNLayerConfig& default_layer_config() const {
@@ -112,6 +113,7 @@ public:
   //! Interval to run testing set on network at; 0 = no run
   unsigned test_interval_{0};
   unsigned train_minibatch_size_{0};
+  unsigned test_minibatch_size_{0};
   //! Fan out used for sampling (if sampling is enabled)
   std::vector<unsigned> fan_out_vector_;
 
@@ -172,6 +174,8 @@ public:
 
   //! Returns the output layer
   galois::GNNLayer* GetOutputLayer() { return gnn_layers_.back().get(); }
+
+  float MinibatchedTesting();
 
   //! Do training for a specified # of epochs and return test accuracy at the
   //! end of it

@@ -713,6 +713,36 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
   return static_cast<float>(global_correct) /
          static_cast<float>(global_checked);
 }
+std::pair<uint32_t, uint32_t> galois::graphs::GNNGraph::GetBatchAccuracy(
+    PointerWithSize<GNNFloat> predictions) {
+  // check owned nodes' accuracy
+  assert((num_label_classes_ * size()) == predictions.size());
+  num_correct_.reset();
+  total_checked_.reset();
+
+  galois::do_all(
+      // will only loop over sampled nodes if sampling is on
+      galois::iterate(begin_owned(), end_owned()),
+      // this is possibly the subgraph id
+      [&](const unsigned node_id) {
+        if (IsValidForPhase(node_id, GNNPhase::kBatch)) {
+          total_checked_ += 1;
+          size_t predicted_label = galois::MaxIndex(
+              num_label_classes_, &(predictions[node_id * num_label_classes_]));
+          if (predicted_label ==
+              static_cast<size_t>(GetSingleClassLabel(node_id))) {
+            num_correct_ += 1;
+          }
+        }
+      },
+      // steal on as some threads may have nothing to work on
+      galois::steal(), galois::loopname("GlobalAccuracy"));
+
+  size_t global_correct = num_correct_.reduce();
+  size_t global_checked = total_checked_.reduce();
+
+  return std::make_pair(global_correct, global_checked);
+}
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
     PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
@@ -918,10 +948,10 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
   use_subgraph_      = false;
   use_subgraph_view_ = false;
 
-  galois::GAccumulator<size_t> sampled;
-  galois::GAccumulator<size_t> total;
-  sampled.reset();
-  total.reset();
+  // galois::GAccumulator<size_t> sampled;
+  // galois::GAccumulator<size_t> total;
+  // sampled.reset();
+  // total.reset();
 
   galois::do_all(
       galois::iterate(begin(), end()),
@@ -930,7 +960,7 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
         if (IsInSampledGraph(src_iter)) {
           // marks ALL edges of nodes that connect to train/other nodes
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
-            total += 1;
+            // total += 1;
             if (inductive_subgraph) {
               if (!IsValidForPhase(partitioned_graph_->getEdgeDst(edge_iter),
                                    GNNPhase::kTrain) &&
@@ -945,14 +975,15 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
               bitset_sample_flag_.set(
                   partitioned_graph_->getEdgeDst(edge_iter));
             }
-            sampled += 1;
+            // sampled += 1;
           }
         }
       },
       galois::steal(), galois::loopname("ChooseAllEdges"));
 
-  galois::gPrint("Num sampled edges in inductive graph is ", sampled.reduce(),
-                 " out of ", total.reduce(), "\n");
+  // galois::gPrint("Num sampled edges in inductive graph is ",
+  // sampled.reduce(),
+  //               " out of ", total.reduce(), "\n");
 
   std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
   // update nodes, then communicate update to all hosts so that they can
@@ -1101,7 +1132,7 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
     // a view only has lid<->sid mappings
     num_subgraph_nodes =
         subgraph_->BuildSubgraphView(*this, num_sampled_layers);
-    //SortAllInEdgesBySID();
+    // SortAllInEdgesBySID();
   }
 
   // after this, this graph is a subgraph
@@ -1128,6 +1159,11 @@ size_t galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {
   // galois::gPrint("\n");
   galois::gInfo(host_prefix(), "Batched nodes ", count);
 #endif
+  return SetupNeighborhoodSample(GNNPhase::kBatch);
+}
+
+size_t galois::graphs::GNNGraph::PrepareNextTestMinibatch() {
+  test_batcher_->GetNextMinibatch(&local_minibatch_mask_);
   return SetupNeighborhoodSample(GNNPhase::kBatch);
 }
 
