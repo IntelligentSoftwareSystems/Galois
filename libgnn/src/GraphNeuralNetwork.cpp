@@ -384,11 +384,51 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         work_left_ += graph_->MoreTrainMinibatches();
         char global_work_left = work_left_.reduce();
         batch_timer.stop();
+        epoch_timer.stop();
         galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
                        ": Train accuracy/F1 micro is ", train_accuracy,
                        " time ", batch_timer.get(), "\n");
 
-        // XXX mid batch test accuracy checking?
+        bool test_eval =
+            config_.minibatch_test_interval_
+                ? (batch_num - 1) % config_.minibatch_test_interval_ == 0
+                : false;
+
+        if (test_eval) {
+          float test_acc;
+          if (!config_.test_minibatch_size()) {
+            graph_->DisableSubgraph();
+            for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+                 layer++) {
+              (*layer)->ResizeRows(graph_->size());
+            }
+            SetLayerPhases(galois::GNNPhase::kTest);
+            const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
+            test_acc = GetGlobalAccuracy(test_pred);
+          } else {
+            test_acc = MinibatchedTesting();
+          }
+
+          if (this_host == 0) {
+            galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
+                           ": Test accuracy is ", test_acc, "\n");
+            const std::string test_name_acc =
+                "TestEpoch" + std::to_string(epoch) + "Batch" +
+                std::to_string(batch_num - 1) + "Accuracy";
+            galois::runtime::reportStat_Single("GraphNeuralNetwork",
+                                               test_name_acc, test_acc);
+          }
+          // report the training time elapsed at this point in time
+          galois::runtime::reportStat_Single(
+              "GraphNeuralNetwork",
+              "ElapsedTrainTimeEpoch" + std::to_string(epoch) + "Batch" +
+                  std::to_string(batch_num - 1),
+              epoch_timer.get());
+          // revert to training phase for next epoch
+          SetLayerPhases(galois::GNNPhase::kTrain);
+        }
+
+        epoch_timer.start();
 
         if (!global_work_left) {
           break;

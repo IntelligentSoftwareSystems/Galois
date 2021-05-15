@@ -137,6 +137,11 @@ llvm::cl::opt<unsigned>
                         cll::desc("Size of test minibatch (default 0)"),
                         cll::init(0));
 
+llvm::cl::opt<unsigned> minibatch_test_interval(
+    "minibatchTestInterval",
+    cll::desc("Size of test intervals for minibatch (default 0)"),
+    cll::init(0));
+
 llvm::cl::opt<unsigned>
     val_interval("valInterval",
                  cll::desc("# of epochs to test validation set (default 0)"),
@@ -307,13 +312,14 @@ std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   galois::GraphNeuralNetworkConfig gnn_config(
       num_layers, layer_types, layer_sizes_vector, output_layer_type,
       do_graph_sampling, layer_config);
-  gnn_config.use_train_subgraph_   = use_train_subgraph;
-  gnn_config.validation_interval_  = val_interval;
-  gnn_config.test_interval_        = test_interval;
-  gnn_config.train_minibatch_size_ = train_minibatch_size;
-  gnn_config.test_minibatch_size_  = test_minibatch_size;
-  gnn_config.inductive_subgraph_   = inductive_subgraph;
-  gnn_config.fan_out_vector_       = CreateFanOutVector();
+  gnn_config.use_train_subgraph_      = use_train_subgraph;
+  gnn_config.validation_interval_     = val_interval;
+  gnn_config.test_interval_           = test_interval;
+  gnn_config.train_minibatch_size_    = train_minibatch_size;
+  gnn_config.test_minibatch_size_     = test_minibatch_size;
+  gnn_config.minibatch_test_interval_ = minibatch_test_interval;
+  gnn_config.inductive_subgraph_      = inductive_subgraph;
+  gnn_config.fan_out_vector_          = CreateFanOutVector();
 
   // optimizer
   std::unique_ptr<galois::BaseOptimizer> opt = CreateOptimizer(gnn_graph.get());

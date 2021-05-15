@@ -112,6 +112,7 @@ public:
   unsigned validation_interval_{0};
   //! Interval to run testing set on network at; 0 = no run
   unsigned test_interval_{0};
+  unsigned minibatch_test_interval_{10};
   unsigned train_minibatch_size_{0};
   unsigned test_minibatch_size_{0};
   //! Fan out used for sampling (if sampling is enabled)
