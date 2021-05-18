@@ -9,6 +9,13 @@
 #ifdef USE_DIST_GALOIS
 #include "galois/DistGalois.h"
 #endif
+#ifdef USE_SHARED_GALOIS_DELETE
+#include "galois/Galois.h"
+#endif
+
+#ifdef USE_OMP
+#include "omp.h"
+#endif
 
 // MKL wrapper
 void CBlasSGEMM(const CBLAS_TRANSPOSE trans_a, const CBLAS_TRANSPOSE trans_b,
@@ -40,6 +47,21 @@ int main(int argc, char* argv[]) {
   galois::setActiveThreads(std::stoi(argv[1]));
   printf("Initialized Galois Shared Mem with %u threads\n",
          galois::getActiveThreads());
+#endif
+
+#ifdef USE_SHARED_GALOIS_DELETE
+  std::unique_ptr<galois::SharedMemSys> G;
+  G = std::make_unique<galois::SharedMemSys>();
+
+  if (argc != 2) {
+    printf("Thread arg not specified\n");
+    exit(1);
+  }
+  galois::setActiveThreads(std::stoi(argv[1]));
+  printf("Initialized Galois Shared Mem with %u threads\n",
+         galois::getActiveThreads());
+  printf("Deleting galois\n");
+  G.reset();
 #endif
 
 #ifdef USE_DIST_GALOIS
@@ -85,6 +107,14 @@ int main(int argc, char* argv[]) {
     very_big_matrix.resize(kBigSize);
     // cache flush
     CacheFlush(&very_big_matrix);
+
+    // dummy OMP TBB loop
+#ifdef USE_OMP
+#pragma omp parallel
+    for (size_t i = 0; i < very_big_matrix.size(); i++) {
+      very_big_matrix[i] = i;
+    }
+#endif
 
     printf("Rep %lu\n", reps);
 

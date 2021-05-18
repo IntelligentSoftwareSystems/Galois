@@ -5,6 +5,14 @@ target_include_directories(mkl_micro PUBLIC
 )
 target_link_libraries(mkl_micro ${INTEL_LIBS})
 
+add_executable(mkl_micro_omp mkl_micro.cpp)
+target_link_directories(mkl_micro_omp PUBLIC ${MKL_LIBRARIES})
+target_include_directories(mkl_micro_omp PUBLIC
+  ${MKL_INCLUDE_DIRS}
+)
+target_link_libraries(mkl_micro_omp ${INTEL_LIBS})
+target_link_libraries(mkl_micro_omp -fopenmp)
+
 add_executable(mkl_micro_sgalois mkl_micro.cpp)
 target_link_libraries(mkl_micro_sgalois galois_gnn)
 target_compile_definitions(mkl_micro_sgalois PUBLIC USE_SHARED_GALOIS=1)
@@ -12,6 +20,10 @@ target_compile_definitions(mkl_micro_sgalois PUBLIC USE_SHARED_GALOIS=1)
 add_executable(mkl_micro_dgalois mkl_micro.cpp)
 target_link_libraries(mkl_micro_dgalois galois_gnn)
 target_compile_definitions(mkl_micro_dgalois PUBLIC USE_DIST_GALOIS=1)
+
+add_executable(mkl_micro_delete_galois mkl_micro.cpp)
+target_link_libraries(mkl_micro_delete_galois galois_gnn)
+target_compile_definitions(mkl_micro_delete_galois PUBLIC USE_SHARED_GALOIS_DELETE=1)
 
 ################################################################################
 
