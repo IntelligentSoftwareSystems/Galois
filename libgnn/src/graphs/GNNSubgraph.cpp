@@ -47,7 +47,9 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
                    }
                  });
   num_subgraph_nodes_ = subgraph_count.reduce();
-  subgraph_id_to_lid_.resize(num_subgraph_nodes_, 0);
+  if (subgraph_id_to_lid_.size() < num_subgraph_nodes_) {
+    subgraph_id_to_lid_.resize(num_subgraph_nodes_ * 1.02);
+  }
 
   // TODO(loc) depending on overhead, can parallelize this with a prefix sum
   // serial loop over LIDs to construct lid -> subgraph id mapping
@@ -112,8 +114,13 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
   galois::StatTimer timer("DegreeCounting", kRegionName);
   timer.start();
 
-  local_subgraph_out_degrees_.resize(num_subgraph_nodes_);
-  local_subgraph_in_degrees_.resize(num_subgraph_nodes_);
+  if (local_subgraph_out_degrees_.size() < num_subgraph_nodes_) {
+    local_subgraph_out_degrees_.resize(num_subgraph_nodes_ * 1.02);
+  }
+
+  if (local_subgraph_in_degrees_.size() < num_subgraph_nodes_) {
+    local_subgraph_in_degrees_.resize(num_subgraph_nodes_ * 1.02);
+  }
 
   galois::do_all(
       galois::iterate(begin(), end()),
@@ -155,10 +162,15 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
   }
 
   // allocate then set node endpoints
-  num_subgraph_edges_ = local_subgraph_out_degrees_.back();
+  num_subgraph_edges_ = local_subgraph_out_degrees_[num_subgraph_nodes_ - 1];
+
+  galois::StatTimer alloc_time("EdgeCreationAlloc", kRegionName);
+  alloc_time.start();
   underlying_graph_.DeallocateOnly();
   underlying_graph_.allocateFrom(num_subgraph_nodes_, num_subgraph_edges_);
   underlying_graph_.CSCAllocate();
+  alloc_time.stop();
+
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),
                  [&](uint32_t subgraph_id) {
                    underlying_graph_.fixEndEdge(
@@ -166,8 +178,12 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
                    underlying_graph_.FixEndInEdge(
                        subgraph_id, local_subgraph_in_degrees_[subgraph_id]);
                  });
-  subedge_to_original_edge_.resize(num_subgraph_edges_);
-  in_subedge_to_original_edge_.resize(num_subgraph_edges_);
+  if (subedge_to_original_edge_.size() < num_subgraph_edges_) {
+    subedge_to_original_edge_.resize(num_subgraph_edges_ * 1.02);
+  }
+  if (in_subedge_to_original_edge_.size() < num_subgraph_edges_) {
+    in_subedge_to_original_edge_.resize(num_subgraph_edges_ * 1.02);
+  }
 
   // save edges + save reference to layer sample status
   galois::do_all(

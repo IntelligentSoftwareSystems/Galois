@@ -19,7 +19,7 @@ public:
 
   size_t BuildSubgraphView(GNNGraph& gnn_graph, size_t num_sampled_layers);
 
-  galois::gstl::Vector<GNNFeature>& GetLocalFeatures() {
+  galois::PODResizeableArray<GNNFeature>& GetLocalFeatures() {
     return subgraph_node_features_;
   }
 
@@ -124,20 +124,20 @@ private:
   //! Features corresponding only to this subgraph; copied from main graph
   //! (in other words, redundant; would be nice if there was a way to
   //! fake contiguous memory
-  galois::gstl::Vector<GNNFeature> subgraph_node_features_;
+  galois::PODResizeableArray<GNNFeature> subgraph_node_features_;
   //! Dense array mapping local ids to subgraph id (not space efficient)
   galois::LargeArray<uint32_t> lid_to_subgraph_id_;
   //! Map subgraph ids back to local graph ids
   //! gstl vector because this will get resized every epoch (LargeArray
   //! is for static)
-  galois::gstl::Vector<uint32_t> subgraph_id_to_lid_;
+  galois::PODResizeableArray<uint32_t> subgraph_id_to_lid_;
   // intermediate degrees used for edge construction
-  galois::gstl::Vector<uint32_t> local_subgraph_out_degrees_;
-  galois::gstl::Vector<uint32_t> local_subgraph_in_degrees_;
+  galois::PODResizeableArray<uint32_t> local_subgraph_out_degrees_;
+  galois::PODResizeableArray<uint32_t> local_subgraph_in_degrees_;
   //! Maps from subgraph out-edge id to original graph edge id (used to check if
   //! edge exists in particular layer)
-  galois::gstl::Vector<uint32_t> subedge_to_original_edge_;
+  galois::PODResizeableArray<uint32_t> subedge_to_original_edge_;
   //! Maps from subgraph in-edge id to original graph edge id (used to check if
   //! edge exists in particular layer)
-  galois::gstl::Vector<uint32_t> in_subedge_to_original_edge_;
+  galois::PODResizeableArray<uint32_t> in_subedge_to_original_edge_;
 };

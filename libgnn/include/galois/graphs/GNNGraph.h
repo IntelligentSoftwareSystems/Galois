@@ -522,7 +522,7 @@ public:
       return PointerWithSize(local_node_features_);
     } else {
       return PointerWithSize(subgraph_->GetLocalFeatures().data(),
-                             subgraph_->GetLocalFeatures().size());
+                             subgraph_->size() * node_feature_length_);
     }
   }
 
