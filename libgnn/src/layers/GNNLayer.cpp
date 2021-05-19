@@ -192,7 +192,7 @@ void galois::GNNLayer::DoDropout(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
   galois::StatTimer timer("ForwardDropout", "GNNLayer");
-  timer.start();
+  TimerStart(&timer);
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.DoDropoutGPU(input_to_dropout, *output_matrix,
@@ -203,14 +203,14 @@ void galois::GNNLayer::DoDropout(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
-  timer.stop();
+  TimerStop(&timer);
 }
 
 void galois::GNNLayer::ReconstructDropoutMatrix(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
   galois::StatTimer timer("ReconstructDropoutMatrix", "GNNLayer");
-  timer.start();
+  TimerStart(&timer);
   // reuse the dropout mask from a previous dropout call
   size_t num_elements = output_matrix->size();
   GNNFloat scale      = 1. / (1. - config_.dropout_rate);
@@ -230,12 +230,12 @@ void galois::GNNLayer::ReconstructDropoutMatrix(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
-  timer.stop();
+  TimerStop(&timer);
 }
 
 void galois::GNNLayer::DoDropoutDerivative() {
   galois::StatTimer timer("BackwardDropout", "GNNLayer");
-  timer.start();
+  TimerStart(&timer);
   assert(p_backward_output_matrix_.size() == dropout_mask_.size());
   GNNFloat scale = 1. / (1. - config_.dropout_rate);
 
@@ -258,12 +258,12 @@ void galois::GNNLayer::DoDropoutDerivative() {
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
-  timer.stop();
+  TimerStop(&timer);
 }
 
 void galois::GNNLayer::Activation() {
   galois::StatTimer timer("ForwardActivation", "GNNLayer");
-  timer.start();
+  TimerStart(&timer);
 
   // TODO only does relu at the moment; should check user specified activation
   // and act accordingly
@@ -277,27 +277,28 @@ void galois::GNNLayer::Activation() {
     }
     activation_memo_.reset();
 
-    galois::do_all(
-        galois::iterate(static_cast<size_t>(0),
-                        layer_dimensions_.output_rows *
-                            layer_dimensions_.output_columns),
-        [&](size_t i) {
-          if (forward_output_matrix_[i] > 0.0) {
-            // do nothing, keep value; set the memo though
-            activation_memo_.set(i);
-          } else {
-            forward_output_matrix_[i] = 0;
-          }
-        },
-        galois::loopname("ReLU"));
+    galois::do_all(galois::iterate(static_cast<size_t>(0),
+                                   layer_dimensions_.output_rows *
+                                       layer_dimensions_.output_columns),
+                   [&](size_t i) {
+                     if (forward_output_matrix_[i] > 0.0) {
+                       // do nothing, keep value; set the memo though
+                       activation_memo_.set(i);
+                     } else {
+                       forward_output_matrix_[i] = 0;
+                     }
+                   });
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
-  timer.stop();
+  TimerStop(&timer);
 }
 
 void galois::GNNLayer::ActivationDerivative(
     PointerWithSize<GNNFloat>* gradient) {
+  galois::StatTimer timer("BackwardActivation", "GNNLayer");
+  TimerStart(&timer);
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.ActivationDerivativeGPU(gradient->data(),
@@ -321,11 +322,12 @@ void galois::GNNLayer::ActivationDerivative(
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
+  TimerStop(&timer);
 }
 
 void galois::GNNLayer::WeightGradientSyncSum() {
   galois::StatTimer t("Sync_WeightGradientsSum", "GNNLayer");
-  t.start();
+  TimerStart(&t);
   int weight_size = static_cast<int>(p_layer_weight_gradients_.size());
 
   // TODO(loc) remove this limitation later; can just do a loop over the weight
@@ -352,7 +354,7 @@ void galois::GNNLayer::WeightGradientSyncSum() {
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
-  t.stop();
+  TimerStop(&t);
 }
 
 void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {

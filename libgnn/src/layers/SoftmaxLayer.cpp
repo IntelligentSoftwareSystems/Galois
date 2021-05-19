@@ -5,6 +5,9 @@
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::ForwardPhaseCPU(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  galois::StatTimer timer("SoftmaxForward", "SoftmaxLayer");
+  TimerStart(&timer);
+
   // note: p_backward == input_embeddings
   input_loss_.assign(input_loss_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;
@@ -62,6 +65,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
   galois::gPrint("Loss is ", reduced_loss / t, " ", reduced_loss, " ", t, "\n");
 #endif
 
+  TimerStop(&timer);
   return p_backward_output_matrix_;
 }
 
@@ -81,6 +85,9 @@ galois::SoftmaxLayer::ForwardPhase(
 
 galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhaseCPU() {
+  galois::StatTimer timer("SoftmaxForward", "SoftmaxLayer");
+  TimerStart(&timer);
+
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
@@ -113,6 +120,8 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
         }
       },
       galois::steal(), galois::loopname("SoftmaxBackward"));
+
+  TimerStop(&timer);
 
   return p_backward_output_matrix_;
 }

@@ -207,9 +207,13 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
   if (!use_subgraph_ && !use_subgraph_view_) {
     // set globals for the sync substrate
     if (!is_backward) {
-      sync_substrate_
-          ->sync<writeSource, readAny, GNNSumAggregate, Bitset_graph_aggregate>(
-              "GraphAggregateSync");
+      if (use_timer_) {
+        sync_substrate_->sync<writeSource, readAny, GNNSumAggregate,
+                              Bitset_graph_aggregate>("GraphAggregateSync");
+      } else {
+        sync_substrate_->sync<writeSource, readAny, GNNSumAggregate,
+                              Bitset_graph_aggregate>("Ignore");
+      }
     } else {
       sync_substrate_->sync<writeDestination, readAny, GNNSumAggregate,
                             Bitset_graph_aggregate>(
@@ -220,8 +224,13 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
     gnn_lid_to_sid_pointer_ = subgraph_->GetLIDToSIDPointer();
 
     if (!is_backward) {
-      sync_substrate_->sync<writeSource, readAny, GNNSampleSumAggregate,
-                            Bitset_graph_aggregate>("GraphAggregateSync");
+      if (use_timer_) {
+        sync_substrate_->sync<writeSource, readAny, GNNSampleSumAggregate,
+                              Bitset_graph_aggregate>("GraphAggregateSync");
+      } else {
+        sync_substrate_->sync<writeSource, readAny, GNNSampleSumAggregate,
+                              Bitset_graph_aggregate>("Ignore");
+      }
     } else {
       sync_substrate_->sync<writeDestination, readAny, GNNSampleSumAggregate,
                             Bitset_graph_aggregate>(
@@ -248,13 +257,24 @@ void galois::graphs::GNNGraph::AggregateSyncGPU(
   cudaSetLayerInputOutput(cuda_ctx_, matrix_to_sync, matrix_column_size, size(),
                           layer_number);
 
+  // XXX no timer if use_timer is off
   if (gnn_matrix_to_sync_column_length_ == layer_input_mtx_column_size) {
-    sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_input>(
-        "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+    if (use_timer_) {
+      sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_input>(
+          "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+    } else {
+      sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_input>(
+          "Ignore", gnn_matrix_to_sync_column_length_);
+    }
   } else if (gnn_matrix_to_sync_column_length_ ==
              layer_output_mtx_column_size) {
-    sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_output>(
-        "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+    if (use_timer_) {
+      sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_output>(
+          "GraphAggregateSync", gnn_matrix_to_sync_column_length_);
+    } else {
+      sync_substrate_->sync<writeSource, readAny, GNNSumAggregate_layer_output>(
+          "Ignore", gnn_matrix_to_sync_column_length_);
+    }
   } else {
     GALOIS_LOG_FATAL("Column size of the synchronized matrix does not"
                      " match to the column size of the CUDA context");
@@ -924,10 +944,16 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   bitset_sampled_degrees_.resize(partitioned_graph_->size());
   bitset_sampled_degrees_.reset();
 
-  // Write source = masters
-  sync_substrate_->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
-      "SampleSync");
-
+  // Seed nodes sync
+  if (use_timer_) {
+    sync_substrate_
+        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
+            "SeedNodeSample");
+  } else {
+    sync_substrate_
+        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
+            "Ignore");
+  }
   galois::GAccumulator<unsigned> local_seed_count;
   local_seed_count.reset();
   // count # of seed nodes
@@ -985,16 +1011,26 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
   // sampled.reduce(),
   //               " out of ", total.reduce(), "\n");
 
-  std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
   galois::do_all(
-      galois::iterate(new_nodes),
-      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
+      galois::iterate(size_t{0}, bitset_sample_flag_.size()),
+      [&](uint32_t new_node_id) {
+        if (bitset_sample_flag_.test(new_node_id)) {
+          SetSampledNode(new_node_id);
+        }
+      },
       galois::loopname("NeighborhoodSampleSet"));
-  sync_substrate_
-      ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
-          "SampleSync");
+
+  if (use_timer_) {
+    sync_substrate_
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+            "SampleFlag");
+  } else {
+    sync_substrate_
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+            "Ignore");
+  }
 
   galois::GAccumulator<unsigned> local_sample_count;
   local_sample_count.reset();
@@ -1081,18 +1117,29 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   // galois::gInfo("Num sampled edges for layer ", sample_layer_num, " is ",
   //              sampled.reduce(), " out of ", total.reduce());
 
-  std::vector<uint32_t> new_nodes = bitset_sample_flag_.getOffsets();
-
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
   galois::do_all(
-      galois::iterate(new_nodes),
-      [&](uint32_t new_node_id) { SetSampledNode(new_node_id); },
+      galois::iterate(size_t{0}, bitset_sample_flag_.size()),
+      [&](uint32_t new_node_id) {
+        if (bitset_sample_flag_.test(new_node_id)) {
+          SetSampledNode(new_node_id);
+        }
+      },
       galois::loopname("NeighborhoodSampleSet"));
 
-  sync_substrate_
-      ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
-          "SampleSync");
+  // why not read source? even if it doesn't need to sample anything, it needs
+  // to know that it's active so that subgraph construction can proceed
+  // correctly
+  if (use_timer_) {
+    sync_substrate_
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+            "SampleFlag");
+  } else {
+    sync_substrate_
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+            "Ignore");
+  }
 
   // count sampled node size
   galois::GAccumulator<unsigned> local_sample_count;
@@ -1121,9 +1168,15 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
   gnn_sampled_out_degrees_ = &sampled_out_degrees_;
 
   // first, sync the degres of the sampled edges across all hosts
-  sync_substrate_
-      ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
-          "SubgraphDegree");
+  if (use_timer_) {
+    sync_substrate_
+        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
+            "SubgraphDegree");
+  } else {
+    sync_substrate_
+        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
+            "Ignore");
+  }
   size_t num_subgraph_nodes;
   // use_view = true;
   if (!use_view) {

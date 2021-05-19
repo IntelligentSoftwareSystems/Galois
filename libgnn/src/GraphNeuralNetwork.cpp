@@ -216,6 +216,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
 }
 
 float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
+  EnableTimers();
   const size_t this_host = graph_->host_id();
   float train_accuracy{0.f};
   std::vector<size_t> subgraph_layer_sizes;
@@ -251,9 +252,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     graph_->ConstructSampledSubgraph(num_sampled_layers);
   }
 
-  galois::StatTimer epoch_timer("TrainingTime", "GraphNeuralNetwork");
-  galois::StatTimer validation_timer("ValidationTime", "GraphNeuralNetwork");
-  galois::StatTimer epoch_test_timer("TestTime", "GraphNeuralNetwork");
+  galois::StatTimer epoch_timer("TrainingTime", kRegionName);
+  galois::StatTimer validation_timer("ValidationTime", kRegionName);
+  galois::StatTimer epoch_test_timer("TestTime", kRegionName);
 
   for (size_t epoch = 0; epoch < num_epochs; epoch++) {
     epoch_timer.start();
@@ -277,6 +278,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
     // beginning of epoch sampling
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
+      galois::StatTimer mb_timer("EpochSubgraphCreation", kRegionName);
+      mb_timer.start();
+
       size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
       gnn_layers_.back()->ResizeRows(local_seed_node_count);
       galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
@@ -308,6 +312,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
       // resize layer matrices
       graph_->ConstructSampledSubgraph(num_sampled_layers);
+
+      mb_timer.stop();
     }
 
     if (!config_.train_minibatch_size()) {
@@ -325,9 +331,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
       // create mini batch graphs and loop until minibatches on all hosts done
       while (true) {
+        galois::StatTimer mb_timer("MinibatchSubgraphCreation", kRegionName);
+        mb_timer.start();
+
         const std::string btime_name("Epoch" + std::to_string(epoch) + "Batch" +
                                      std::to_string(batch_num));
-        galois::StatTimer batch_timer(btime_name.c_str(), "GraphNeuralNetwork");
+        galois::StatTimer batch_timer(btime_name.c_str(), kRegionName);
         batch_timer.start();
         work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
@@ -377,6 +386,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
 
+        mb_timer.stop();
+
         const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
         train_accuracy = GetGlobalAccuracy(batch_pred);
         GradientPropagation();
@@ -395,6 +406,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                 : false;
 
         if (test_eval) {
+          DisableTimers();
           float test_acc;
           if (!config_.test_minibatch_size()) {
             graph_->DisableSubgraph();
@@ -415,17 +427,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             const std::string test_name_acc =
                 "TestEpoch" + std::to_string(epoch) + "Batch" +
                 std::to_string(batch_num - 1) + "Accuracy";
-            galois::runtime::reportStat_Single("GraphNeuralNetwork",
-                                               test_name_acc, test_acc);
+            galois::runtime::reportStat_Single(kRegionName, test_name_acc,
+                                               test_acc);
           }
           // report the training time elapsed at this point in time
           galois::runtime::reportStat_Single(
-              "GraphNeuralNetwork",
+              kRegionName,
               "ElapsedTrainTimeEpoch" + std::to_string(epoch) + "Batch" +
                   std::to_string(batch_num - 1),
               epoch_timer.get());
           // revert to training phase for next epoch
           SetLayerPhases(galois::GNNPhase::kTrain);
+          EnableTimers();
         }
 
         epoch_timer.start();
@@ -442,7 +455,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           "TrainEpoch" + std::to_string(epoch) + "Accuracy";
       galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                      train_accuracy, "\n");
-      galois::runtime::reportStat_Single("GraphNeuralNetwork", t_name_acc,
+      galois::runtime::reportStat_Single(kRegionName, t_name_acc,
                                          train_accuracy);
     }
 
@@ -453,6 +466,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         config_.test_interval_ ? epoch % config_.test_interval_ == 0 : false;
 
     if (do_validate || do_test) {
+      DisableTimers();
       // disable subgraph
       graph_->DisableSubgraph();
       for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
@@ -473,8 +487,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                        "\n");
         const std::string v_name_acc =
             "ValEpoch" + std::to_string(epoch) + "Accuracy";
-        galois::runtime::reportStat_Single("GraphNeuralNetwork", v_name_acc,
-                                           val_acc);
+        galois::runtime::reportStat_Single(kRegionName, v_name_acc, val_acc);
       }
     }
 
@@ -497,7 +510,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::gPrint("Epoch ", epoch, ": Test accuracy is ", test_acc, "\n");
         const std::string test_name_acc =
             "TestEpoch" + std::to_string(epoch) + "Accuracy";
-        galois::runtime::reportStat_Single("GraphNeuralNetwork", test_name_acc,
+        galois::runtime::reportStat_Single(kRegionName, test_name_acc,
                                            test_acc);
       }
     }
@@ -505,7 +518,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     if (do_validate || do_test) {
       // report the training time elapsed at this point in time
       galois::runtime::reportStat_Single(
-          "GraphNeuralNetwork", "ElapsedTrainTimeEpoch" + std::to_string(epoch),
+          kRegionName, "ElapsedTrainTimeEpoch" + std::to_string(epoch),
           epoch_timer.get());
       // revert to training phase for next epoch
       SetLayerPhases(galois::GNNPhase::kTrain);
@@ -538,11 +551,13 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         }
         graph_->ConstructSampledSubgraph(num_sampled_layers);
       }
+
+      EnableTimers();
     }
   }
 
   uint64_t average_epoch_time = epoch_timer.get() / num_epochs;
-  galois::runtime::reportStat_Tavg("GraphNeuralNetwork", "AverageEpochTime",
+  galois::runtime::reportStat_Tavg(kRegionName, "AverageEpochTime",
                                    average_epoch_time);
   // disable subgraph
   graph_->DisableSubgraph();
@@ -553,7 +568,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
   // check test accuracy
   // XXX test batching
-  galois::StatTimer test_timer("FinalTestRun", "GraphNeuralNetwork");
+  galois::StatTimer test_timer("FinalTestRun", kRegionName);
   float global_accuracy;
 
   test_timer.start();
@@ -570,8 +585,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
   if (this_host == 0) {
     galois::gPrint("Final test accuracy is ", global_accuracy, "\n");
-    galois::runtime::reportStat_Single("GraphNeuralNetwork",
-                                       "FinalTestAccuracy", global_accuracy);
+    galois::runtime::reportStat_Single(kRegionName, "FinalTestAccuracy",
+                                       global_accuracy);
   }
 
   // return global_accuracy;

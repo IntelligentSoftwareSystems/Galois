@@ -98,7 +98,7 @@ public:
                  GNNLayerConfig()) {}
 
   virtual void ResizeRows(size_t new_row_count) {
-    layer_dimensions_.input_rows = new_row_count;
+    layer_dimensions_.input_rows  = new_row_count;
     layer_dimensions_.output_rows = new_row_count;
     // TODO(loc) output matrix should be resized if space becomes an issue,
     // else just use first S rows (S = subgraph size)
@@ -231,6 +231,8 @@ public:
     base_gpu_object_.PrintBackwardOutput(p_backward_output_matrix_.size());
   }
 #endif
+  void EnableTimers() { use_timer_ = true; }
+  void DisableTimers() { use_timer_ = false; }
 
 protected:
   //! Layer order (starts from 0); used in backward to shortcut output as layer
@@ -286,6 +288,16 @@ protected:
   galois::DGAccumulator<float> float_accumulator_;
 
   //////////////////////////////////////////////////////////////////////////////
+
+  bool use_timer_{true};
+  void TimerStart(galois::StatTimer* t) {
+    if (use_timer_)
+      t->start();
+  }
+  void TimerStop(galois::StatTimer* t) {
+    if (use_timer_)
+      t->stop();
+  }
 
   //! Init based from following paper
   //! http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf

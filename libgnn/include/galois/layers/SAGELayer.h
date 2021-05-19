@@ -96,6 +96,7 @@ public:
 
 private:
   static const constexpr char* kRegionName = "SAGELayer";
+
   //! CPU aggregation
   void AggregateAllCPU(
       size_t column_length, const GNNFloat* node_embeddings,

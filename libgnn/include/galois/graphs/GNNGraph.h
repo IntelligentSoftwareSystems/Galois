@@ -613,6 +613,19 @@ public:
 
   void ContiguousRemap(const std::string& new_name);
 
+  void EnableTimers() {
+    use_timer_ = true;
+    if (subgraph_) {
+      subgraph_->EnableTimers();
+    }
+  }
+  void DisableTimers() {
+    use_timer_ = false;
+    if (subgraph_) {
+      subgraph_->DisableTimers();
+    }
+  }
+
 private:
 // included like this to avoid cyclic dependency issues + not used anywhere but
 // in this class anyways
@@ -776,6 +789,8 @@ private:
   DGAccumulator<size_t> local_true_negative_;
   DGAccumulator<size_t> local_false_positive_;
   DGAccumulator<size_t> local_false_negative_;
+
+  bool use_timer_{true};
 };
 
 } // namespace graphs

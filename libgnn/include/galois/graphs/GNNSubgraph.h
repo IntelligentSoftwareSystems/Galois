@@ -97,8 +97,20 @@ public:
   galois::LargeArray<uint32_t>* GetLIDToSIDPointer() {
     return &lid_to_subgraph_id_;
   }
+  void EnableTimers() { use_timer_ = true; }
+  void DisableTimers() { use_timer_ = false; }
 
 private:
+  bool use_timer_{true};
+  void TimerStart(galois::StatTimer* t) {
+    if (use_timer_)
+      t->start();
+  }
+  void TimerStop(galois::StatTimer* t) {
+    if (use_timer_)
+      t->stop();
+  }
+
   //! Creates subgraph ID mapping from the number of sampled nodes from the
   //! original graph. Should be done every epoch when sampled graph changes.
   void CreateSubgraphMapping(const GNNGraph& gnn_graph,

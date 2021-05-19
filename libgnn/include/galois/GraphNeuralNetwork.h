@@ -200,6 +200,22 @@ public:
   void GradientPropagation();
 
 private:
+  static const constexpr char* kRegionName = "GraphNeuralNetwork";
+
+  void EnableTimers() {
+    galois::gDebug("Enabling timers");
+    graph_->EnableTimers();
+    for (auto& layer : gnn_layers_)
+      layer->EnableTimers();
+  }
+
+  void DisableTimers() {
+    galois::gDebug("Disabling timers");
+    graph_->DisableTimers();
+    for (auto& layer : gnn_layers_)
+      layer->DisableTimers();
+  }
+
   //! Underlying graph to train
   std::unique_ptr<graphs::GNNGraph> graph_;
   //! Optimizer object for weight updates

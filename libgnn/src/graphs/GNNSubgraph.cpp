@@ -4,7 +4,7 @@
 size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(
     GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("BuildSubgraph", kRegionName);
-  timer.start();
+  TimerStart(&timer);
   CreateSubgraphMapping(gnn_graph, num_sampled_layers);
   if (num_subgraph_nodes_ == 0) {
     return 0;
@@ -14,24 +14,24 @@ size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(
   NodeFeatureCreation(gnn_graph);
   // loop over each node, grab out/in edges, construct them in LC_CSR_CSC
   // no edge data, just topology
-  timer.stop();
+  TimerStop(&timer);
   return num_subgraph_nodes_;
 }
 
 size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraphView(
     GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("BuildSubgraphView", kRegionName);
-  timer.start();
+  TimerStart(&timer);
   CreateSubgraphMapping(gnn_graph, num_sampled_layers);
   NodeFeatureCreation(gnn_graph);
-  timer.stop();
+  TimerStop(&timer);
   return num_subgraph_nodes_;
 }
 
 void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
     const GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("SIDMapping", kRegionName);
-  timer.start();
+  TimerStart(&timer);
 
   assert(gnn_graph.size() == lid_to_subgraph_id_.size());
   // clear all mappings
@@ -105,14 +105,14 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
 
   GALOIS_LOG_ASSERT(num_subgraph_nodes_ == current_sid);
   // num_subgraph_nodes_ = current_sid;
-  timer.stop();
+  TimerStop(&timer);
 }
 
 // TODO optimize further?
 void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
     const GNNGraph& gnn_graph) {
   galois::StatTimer timer("DegreeCounting", kRegionName);
-  timer.start();
+  TimerStart(&timer);
 
   if (local_subgraph_out_degrees_.size() < num_subgraph_nodes_) {
     local_subgraph_out_degrees_.resize(num_subgraph_nodes_ * 1.02);
@@ -146,14 +146,14 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
       },
       galois::steal());
 
-  timer.stop();
+  TimerStop(&timer);
 }
 
 // TODO optimize further?
 void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
     const GNNGraph& gnn_graph) {
   galois::StatTimer timer("EdgeConstruction", kRegionName);
-  timer.start();
+  TimerStart(&timer);
 
   // prefix sum over subgraph degrees from previous phase to get starting points
   for (size_t i = 1; i < num_subgraph_nodes_; i++) {
@@ -165,11 +165,11 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
   num_subgraph_edges_ = local_subgraph_out_degrees_[num_subgraph_nodes_ - 1];
 
   galois::StatTimer alloc_time("EdgeCreationAlloc", kRegionName);
-  alloc_time.start();
+  TimerStart(&alloc_time);
   underlying_graph_.DeallocateOnly();
   underlying_graph_.allocateFrom(num_subgraph_nodes_, num_subgraph_edges_);
   underlying_graph_.CSCAllocate();
-  alloc_time.stop();
+  TimerStop(&alloc_time);
 
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),
                  [&](uint32_t subgraph_id) {
@@ -223,13 +223,13 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
         assert(in_location == local_subgraph_in_degrees_[subgraph_id]);
       },
       galois::steal());
-  timer.stop();
+  TimerStop(&timer);
 }
 
 void galois::graphs::GNNGraph::GNNSubgraph::NodeFeatureCreation(
     GNNGraph& gnn_graph) {
   galois::StatTimer timer("NodeFeatureCreation", kRegionName);
-  timer.start();
+  TimerStart(&timer);
   size_t feat_length = gnn_graph.node_feature_length();
   // assumes everything is already setup
   subgraph_node_features_.resize(feat_length * num_subgraph_nodes_);
@@ -241,5 +241,5 @@ void galois::graphs::GNNGraph::GNNSubgraph::NodeFeatureCreation(
         &((gnn_graph.GetLocalFeatures().data())[local_id * feat_length]),
         feat_length * sizeof(GNNFeature));
   });
-  timer.stop();
+  TimerStop(&timer);
 }
