@@ -5,9 +5,11 @@
 
 #ifdef USE_SHARED_GALOIS
 #include "galois/Galois.h"
+#include "galois/LargeArray.h"
 #endif
 #ifdef USE_DIST_GALOIS
 #include "galois/DistGalois.h"
+#include "galois/LargeArray.h"
 #endif
 #ifdef USE_SHARED_GALOIS_DELETE
 #include "galois/Galois.h"
@@ -82,11 +84,23 @@ int main(int argc, char* argv[]) {
   size_t b_dim = 128;
   size_t c_dim = 16;
 
+#if defined(USE_SHARED_GALOIS) || defined(USE_DIST_GALOIS)
+  printf("Using Galois large arrays\n");
+  // inputs
+  galois::LargeArray<float> matrix_1;
+  matrix_1.create(a_dim * b_dim);
+  galois::LargeArray<float> matrix_2;
+  matrix_2.create(a_dim * c_dim);
+  // output
+  galois::LargeArray<float> matrix_3;
+  matrix_3.create(b_dim * c_dim);
+#else
   // inputs
   std::vector<float> matrix_1(a_dim * b_dim);
   std::vector<float> matrix_2(a_dim * c_dim);
   // output
   std::vector<float> matrix_3(b_dim * c_dim);
+#endif
 
   size_t kBigSize = 1000000000;
   std::vector<float> very_big_matrix(kBigSize);
