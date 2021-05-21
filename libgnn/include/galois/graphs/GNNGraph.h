@@ -451,33 +451,26 @@ public:
   }
 
   //! Get degree norm of subgraph for particular layer (i.e. includes training)
-  // GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
-  GNNFloat GetDegreeNorm(GraphNode n, size_t) const {
+  GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
     if (use_subgraph_ || use_subgraph_view_) {
-      // TODO(loc) this is impresise: subgraph degrees differ from global
-      // degrees, but going to always use global degree -> not correct
-      return GetGlobalDegreeNorm(subgraph_->SIDToLID(n));
+      size_t degree;
+      if (!subgraph_choose_all_) {
+        // case because degrees in each layer differ
+        degree =
+            sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
+      } else {
+        // XXX if inductive
+        // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
+        degree = global_degrees_[subgraph_->SIDToLID(n)];
+      }
+      if (degree) {
+        return 1.0 / degree;
+      } else {
+        return 0;
+      }
     } else {
       return GetGlobalDegreeNorm(n);
     }
-
-    //  size_t degree;
-    //  if (!subgraph_is_train_) {
-    //    // case because degrees in each layer differ
-    //    degree =
-    //        sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
-    //  } else {
-    //    // XXX if inductive
-    //    // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
-    //    degree = global_degrees_[subgraph_->SIDToLID(n)];
-    //  }
-    //  //degree = global_degrees_[subgraph_->SIDToLID(n)];
-
-    //  if (degree) {
-    //    return 1.0 / degree;
-    //  } else {
-    //    return 0;
-    //  }
   }
 
   // Get accuracy: sampling is by default false
@@ -632,6 +625,11 @@ public:
     }
   }
 
+  bool SubgraphChooseAllStatus() { return subgraph_choose_all_; }
+  void EnableSubgraphChooseAll() { subgraph_choose_all_ = true; }
+  void DisableSubgraphChooseAll() { subgraph_choose_all_ = false; }
+  void SetSubgraphChooseAll(bool a) { subgraph_choose_all_ = a; }
+
 private:
 // included like this to avoid cyclic dependency issues + not used anywhere but
 // in this class anyways
@@ -714,8 +712,7 @@ private:
 
   std::unique_ptr<GNNSubgraph> subgraph_;
   // Degrees for sampled subgraph
-  // std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
-  // std::vector<galois::LargeArray<uint32_t>> sampled_in_degrees_;
+  std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;
@@ -768,7 +765,7 @@ private:
   // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
   bool use_subgraph_view_{false};
-  bool subgraph_is_train_{false};
+  bool subgraph_choose_all_{false};
 
   std::unique_ptr<MinibatchGenerator> train_batcher_;
   std::unique_ptr<MinibatchGenerator> test_batcher_;

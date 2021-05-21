@@ -19,7 +19,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
 #endif
 
   galois::do_all(
-      galois::iterate(graph_.begin(), graph_.end()),
+      galois::iterate(size_t{0}, layer_dimensions_.input_rows),
       [&](const unsigned i) {
         if (IsSampledLayer()) {
           if ((layer_phase_ == GNNPhase::kTrain ||

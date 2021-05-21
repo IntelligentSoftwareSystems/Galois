@@ -160,9 +160,11 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 }
 
 float galois::GraphNeuralNetwork::MinibatchedTesting() {
-  galois::gDebug("minibatched testing");
+  galois::gDebug("Minibatched Testing");
   graph_->ResetTestMinibatcher();
   SetLayerPhases(galois::GNNPhase::kBatch);
+
+  bool choose_all_status = graph_->SubgraphChooseAllStatus();
 
   uint32_t correct = 0;
   uint32_t total   = 0;
@@ -196,6 +198,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
 
     // resize layer matrices
     graph_->ConstructSampledSubgraph(num_sampled_layers);
+    graph_->EnableSubgraphChooseAll();
 
     const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
     std::pair<uint32_t, uint32_t> correct_total =
@@ -211,7 +214,13 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
     }
   }
 
-  galois::gDebug("correct / total ", correct, " ", total);
+  galois::gDebug("Minibatching Correct / Total ", correct, " ", total);
+
+  if (choose_all_status) {
+    graph_->EnableSubgraphChooseAll();
+  } else {
+    graph_->DisableSubgraphChooseAll();
+  }
 
   return (1.0 * correct) / (1.0 * total);
 }
@@ -410,14 +419,17 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           DisableTimers();
           float test_acc;
           if (!config_.test_minibatch_size()) {
+            bool f = graph_->SubgraphChooseAllStatus();
             graph_->DisableSubgraph();
             for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
                  layer++) {
               (*layer)->ResizeRows(graph_->size());
             }
             SetLayerPhases(galois::GNNPhase::kTest);
+            graph_->EnableSubgraphChooseAll();
             const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
             test_acc = GetGlobalAccuracy(test_pred);
+            graph_->SetSubgraphChooseAll(f);
           } else {
             test_acc = MinibatchedTesting();
           }
@@ -466,6 +478,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     bool do_test =
         config_.test_interval_ ? epoch % config_.test_interval_ == 0 : false;
 
+    bool subgraph_choose_all_status = graph_->SubgraphChooseAllStatus();
+
     if (do_validate || do_test) {
       DisableTimers();
       // disable subgraph
@@ -474,6 +488,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
            layer++) {
         (*layer)->ResizeRows(graph_->size());
       }
+      graph_->EnableSubgraphChooseAll();
     }
 
     if (do_validate) {
@@ -522,6 +537,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           epoch_timer.get());
       // revert to training phase for next epoch
       SetLayerPhases(galois::GNNPhase::kTrain);
+      graph_->SetSubgraphChooseAll(subgraph_choose_all_status);
 
       // TODO too much code dupe
       // Resconstruct the train subgraph since it was replaced by test subgraph

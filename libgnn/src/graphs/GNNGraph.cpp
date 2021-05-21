@@ -881,21 +881,21 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUMulti(
 ////////////////////////////////////////////////////////////////////////////////
 
 void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
-                                                      bool is_inductive) {
+                                                      bool choose_all) {
   subgraph_ = std::make_unique<GNNSubgraph>(partitioned_graph_->size());
   sample_node_timestamps_.create(partitioned_graph_->size(),
                                  std::numeric_limits<uint32_t>::max());
   edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers, 0);
-  // this is to hold the *global* degree of a sampled graph; yes, memory wise
-  // this is slightly problematic possibly, but each layer is its own
-  // subgraph
-  if (!is_inductive) {
-    // sampled_out_degrees_.resize(num_layers);
-    // for (galois::LargeArray<uint32_t>& array : sampled_out_degrees_) {
-    //  array.create(partitioned_graph_->size());
-    //}
+  // this is to hold the degree of a sampled graph considering all hosts; yes,
+  // memory wise this is slightly problematic possibly, but each layer is its
+  // own subgraph
+  if (!choose_all) {
+    sampled_out_degrees_.resize(num_layers);
+    for (galois::LargeArray<uint32_t>& array : sampled_out_degrees_) {
+      array.create(partitioned_graph_->size());
+    }
   } else {
-    subgraph_is_train_ = true;
+    subgraph_choose_all_ = true;
   }
 }
 
@@ -932,16 +932,17 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                              edge_sample_status_[edge_id].end(), 0);
                  });
   // reset all degrees
-  // if (!subgraph_is_train_) {
-  //  galois::do_all(
-  //      galois::iterate(sampled_out_degrees_),
-  //      [&](galois::LargeArray<uint32_t>& array) {
-  //        std::fill(array.begin(), array.end(), 0);
-  //      },
-  //      galois::chunk_size<1>());
-  //}
-  // bitset_sampled_degrees_.resize(partitioned_graph_->size());
-  // bitset_sampled_degrees_.reset();
+  if (!subgraph_choose_all_) {
+    galois::do_all(
+        galois::iterate(sampled_out_degrees_),
+        [&](galois::LargeArray<uint32_t>& array) {
+          std::fill(array.begin(), array.end(), 0);
+        },
+        galois::chunk_size<1>());
+  }
+
+  bitset_sampled_degrees_.resize(partitioned_graph_->size());
+  bitset_sampled_degrees_.reset();
 
   // Seed nodes sync
   if (use_timer_) {
@@ -1050,16 +1051,8 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                                              size_t num_to_sample,
                                              bool inductive_subgraph,
                                              size_t timestamp) {
-  assert(!subgraph_is_train_);
   use_subgraph_      = false;
   use_subgraph_view_ = false;
-
-  galois::GAccumulator<size_t> sampled;
-  galois::GAccumulator<size_t> total;
-  // galois::GAccumulator<size_t> total_nodes;
-  sampled.reset();
-  total.reset();
-  // total_nodes.reset();
 
   galois::do_all(
       galois::iterate(begin(), end()),
@@ -1079,7 +1072,6 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
 
           // loop through edges, turn "on" edge with some probability
           for (auto edge_iter : partitioned_graph_->edges(*src_iter)) {
-            total += 1;
             if (sample_rng_.DoBernoulli(probability_of_reject)) {
               if (inductive_subgraph) {
                 // only take if node is training node or a node not classified
@@ -1100,21 +1092,14 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 bitset_sample_flag_.set(
                     partitioned_graph_->getEdgeDst(edge_iter));
               }
-              // bitset_sampled_degrees_.set(*src_iter);
+              bitset_sampled_degrees_.set(*src_iter);
               // degree increment
-              // sampled_out_degrees_[sample_layer_num][*src_iter]++;
-              sampled += 1;
+              sampled_out_degrees_[sample_layer_num][*src_iter]++;
             }
           }
-          // total_nodes += 1;
         }
       },
       galois::steal(), galois::loopname("NeighborhoodSample"));
-
-  // galois::gInfo(host_prefix(), "sampled nodes for layer ", sample_layer_num,
-  //              " is ", total_nodes.reduce());
-  // galois::gInfo("Num sampled edges for layer ", sample_layer_num, " is ",
-  //              sampled.reduce(), " out of ", total.reduce());
 
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
@@ -1162,22 +1147,21 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
                                                    bool use_view) {
   // false first so that the build process can use functions to access the
   // real graph
-  use_subgraph_      = false;
-  use_subgraph_view_ = false;
-  // gnn_sampled_out_degrees_ = &sampled_out_degrees_;
+  use_subgraph_            = false;
+  use_subgraph_view_       = false;
+  gnn_sampled_out_degrees_ = &sampled_out_degrees_;
 
-  //// first, sync the degres of the sampled edges across all hosts
-  // if (use_timer_) {
-  //  sync_substrate_
-  //      ->sync<writeSource, readAny, SubgraphDegreeSync,
-  //      SubgraphDegreeBitset>(
-  //          "SubgraphDegree");
-  //} else {
-  //  sync_substrate_
-  //      ->sync<writeSource, readAny, SubgraphDegreeSync,
-  //      SubgraphDegreeBitset>(
-  //          "Ignore");
-  //}
+  // first, sync the degres of the sampled edges across all hosts
+  // read any because destinations need it to for reverse phase
+  if (use_timer_) {
+    sync_substrate_
+        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
+            "SubgraphDegree");
+  } else {
+    sync_substrate_
+        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
+            "Ignore");
+  }
   size_t num_subgraph_nodes;
   if (!use_view) {
     num_subgraph_nodes = subgraph_->BuildSubgraph(*this, num_sampled_layers);

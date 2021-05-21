@@ -184,6 +184,7 @@ public:
 
   //! Flip sampling switch on
   void EnableSampling() { config_.do_sampling = true; }
+  void DisableSampling() { config_.do_sampling = false; }
   bool IsSampledLayer() const { return config_.do_sampling; }
   //! Sets the graph user layer number; important for sampling as this index
   //! determines which index to use when checking for sampled edges

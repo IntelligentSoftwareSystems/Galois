@@ -499,8 +499,9 @@ void galois::SAGELayer::AggregateAllCPU(
             if (layer_phase_ == GNNPhase::kTrain ||
                 layer_phase_ == GNNPhase::kBatch) {
               // XXX
+              // galois::gDebug("In here");
               if (IsSampledLayer()) {
-                if (!graph_.IsEdgeSampled(e, layer_number_)) {
+                if (!graph_.IsEdgeSampled(e, graph_user_layer_number_)) {
                   continue;
                 }
               }
@@ -511,6 +512,7 @@ void galois::SAGELayer::AggregateAllCPU(
 
             if (!config_.disable_normalization) {
               GNNFloat norm_scale = source_norm;
+              assert(norm_scale != 0);
 
               galois::VectorMulAdd(
                   column_length, &aggregate_output[index_to_src_feature],
@@ -532,7 +534,7 @@ void galois::SAGELayer::AggregateAllCPU(
                 layer_phase_ == GNNPhase::kBatch) {
               // XXX
               if (IsSampledLayer()) {
-                if (!graph_.IsInEdgeSampled(e, layer_number_)) {
+                if (!graph_.IsInEdgeSampled(e, graph_user_layer_number_)) {
                   continue;
                 }
               }
@@ -550,6 +552,8 @@ void galois::SAGELayer::AggregateAllCPU(
             if (!config_.disable_normalization) {
               GNNFloat norm_scale =
                   graph_.GetDegreeNorm(dst, graph_user_layer_number_);
+
+              assert(norm_scale != 0);
 
               galois::VectorMulAdd(
                   column_length, &aggregate_output[index_to_src_feature],
