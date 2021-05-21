@@ -61,21 +61,22 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
     second_weight_optimizer_ = std::make_unique<AdamOptimizer>(weight_size, 1);
   }
 
-  size_t num_input_elements =
-      layer_dimensions_.input_rows * layer_dimensions_.input_columns;
+  // TODO(loc) dropout uses input rows; this won't work if dropout is enabled
+  size_t num_in_temp_elements =
+      layer_dimensions_.output_rows * layer_dimensions_.input_columns;
 
   // if in temp is smaller than out temp, or if dropout exists
   if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                  ", SAGE input temp var 1 ", num_input_elements, " (",
-                  FloatElementsToGB(num_input_elements), " GB)");
+                  ", SAGE input temp var 1 ", num_in_temp_elements, " (",
+                  FloatElementsToGB(num_in_temp_elements), " GB)");
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
-      gpu_object_.AllocateInTemp1(num_input_elements);
+      gpu_object_.AllocateInTemp1(num_in_temp_elements);
     } else {
 #endif
-      in_temp_1_.resize(num_input_elements, 0);
+      in_temp_1_.resize(num_in_temp_elements, 0);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -86,33 +87,33 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
       (config_.disable_aggregate_after_update ||
        layer_dimensions_.input_columns <= layer_dimensions_.output_columns)) {
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                  ", SAGE input temp var 2 ", num_input_elements, " (",
-                  FloatElementsToGB(num_input_elements), " GB)");
+                  ", SAGE input temp var 2 ", num_in_temp_elements, " (",
+                  FloatElementsToGB(num_in_temp_elements), " GB)");
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
-      gpu_object_.AllocateInTemp2(num_input_elements);
+      gpu_object_.AllocateInTemp2(num_in_temp_elements);
     } else {
 #endif
-      in_temp_2_.resize(num_input_elements, 0);
+      in_temp_2_.resize(num_in_temp_elements, 0);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
   }
 
-  size_t num_output_elements =
-      layer_dimensions_.output_rows * layer_dimensions_.output_columns;
+  size_t num_out_temp =
+      layer_dimensions_.input_rows * layer_dimensions_.output_columns;
   // only needed if out temp would be smaller than intemp
   if (!config_.disable_aggregate_after_update &&
       layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
     galois::gInfo(graph_.host_prefix(), "Creating layer ", layer_number_,
-                  ", SAGE output temp var ", num_output_elements, " (",
-                  FloatElementsToGB(num_output_elements), " GB)");
+                  ", SAGE output temp var ", num_out_temp, " (",
+                  FloatElementsToGB(num_out_temp), " GB)");
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
-      gpu_object_.AllocateOutTemp(num_output_elements);
+      gpu_object_.AllocateOutTemp(num_out_temp);
     } else {
 #endif
-      out_temp_.resize(num_output_elements, 0);
+      out_temp_.resize(num_out_temp, 0);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -122,10 +123,10 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     // init pointers with size
-    p_in_temp_1_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(), num_input_elements);
-    p_in_temp_2_ =
-        PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(), num_input_elements);
+    p_in_temp_1_ = PointerWithSize<GNNFloat>(gpu_object_.in_temp_1(),
+                                             num_in_temp_elements);
+    p_in_temp_2_ = PointerWithSize<GNNFloat>(gpu_object_.in_temp_2(),
+                                             num_in_temp_elements);
     p_out_temp_ =
         PointerWithSize<GNNFloat>(gpu_object_.out_temp(), num_output_elements);
   } else {
@@ -202,11 +203,11 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     // aggregation and update
     AggregateAll(layer_dimensions_.input_columns, input_data, agg_data,
                  &input_column_intermediates_);
-    UpdateEmbeddings(agg_data, p_forward_output_matrix_.data());
+    UpdateEmbeddings(agg_data, p_forward_output_matrix_.data(), true);
   } else {
     // update to aggregate
     // FW
-    UpdateEmbeddings(input_data, p_out_temp_.data());
+    UpdateEmbeddings(input_data, p_out_temp_.data(), false);
     // A(FW)
     AggregateAll(layer_dimensions_.output_columns, p_out_temp_.data(),
                  p_forward_output_matrix_.data(),
@@ -272,11 +273,11 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   if (!sage_config_.disable_concat) {
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0) {
-      MaskInputNonMasters(&input_data);
+      MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
     } else {
       // if 0 then no input to mask: mask the gradient
       // this is fine because gradient won't be used to get feature gradients
-      MaskGradientNonMasters(input_gradient);
+      MaskGradientNonMasters(input_gradient, layer_dimensions_.output_rows);
     }
 
 #ifdef GALOIS_ENABLE_GPU
@@ -313,7 +314,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // mask it, then use it
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 || sage_config_.disable_concat) {
-      MaskInputNonMasters(&agg_data);
+      MaskInputNonMasters(&agg_data, layer_dimensions_.output_rows);
     }
     // if concat is disabled, then input grad isn't masked; therefore, mask
     // this to get the same effect
@@ -345,11 +346,12 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       // ---unmasked---
       // transposed sgemm for derivative; in_temp is output
       assert(input_gradient->size() >=
-             layer_dimensions_.input_rows * layer_dimensions_.output_columns);
+             layer_dimensions_.output_rows * layer_dimensions_.output_columns);
       // pintemp1 contains (AF)'
       // overwrites the dropout matrix that was in ptemp1 (needed for second
       // weight matrix)
-      UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
+      UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data(),
+                                 true);
       // pback contains F'
       // derivative of aggregate is the same due to symmetric graph
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
@@ -361,11 +363,11 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // disable concat part is here because otherwise it would get done elsewhere
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 && sage_config_.disable_concat) {
-      MaskInputNonMasters(&input_data);
+      MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
     } else {
       // if 0 then no input to mask: mask the gradient
       // this is fine because gradient won't be used to get feature gradients
-      MaskGradientNonMasters(&p_out_temp_);
+      MaskGradientNonMasters(&p_out_temp_, layer_dimensions_.input_rows);
     }
 
     // W' = F^T (FW)'
@@ -395,7 +397,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       // derivative for update
       // backout = F'
       UpdateEmbeddingsDerivative(p_out_temp_.data(),
-                                 p_backward_output_matrix_.data());
+                                 p_backward_output_matrix_.data(), false);
     }
   }
   WeightGradientSyncSum();
@@ -567,7 +569,7 @@ void galois::SAGELayer::AggregateAllCPU(
 }
 
 void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
-                                         GNNFloat* output) {
+                                         GNNFloat* output, bool after) {
   galois::StatTimer timer("ForwardXForm", kRegionName);
   TimerStart(&timer);
 #ifdef GALOIS_ENABLE_GPU
@@ -585,10 +587,17 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
                    layer_dimensions_.input_columns, " ",
                    layer_dimensions_.output_columns);
     // CPU version is just a call into CBlas
-    galois::CBlasSGEMM(
-        CblasNoTrans, CblasNoTrans, layer_dimensions_.output_rows,
-        layer_dimensions_.input_columns, layer_dimensions_.output_columns,
-        node_embeddings, layer_weights_.data(), output);
+    if (after) {
+      galois::CBlasSGEMM(
+          CblasNoTrans, CblasNoTrans, layer_dimensions_.output_rows,
+          layer_dimensions_.input_columns, layer_dimensions_.output_columns,
+          node_embeddings, layer_weights_.data(), output);
+    } else {
+      galois::CBlasSGEMM(
+          CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
+          layer_dimensions_.input_columns, layer_dimensions_.output_columns,
+          node_embeddings, layer_weights_.data(), output);
+    }
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
@@ -618,7 +627,8 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddings(
 }
 
 void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
-                                                   GNNFloat* output) {
+                                                   GNNFloat* output,
+                                                   bool after) {
   galois::StatTimer timer("BackwardXForm", kRegionName);
   TimerStart(&timer);
 
@@ -635,10 +645,17 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
     // difference is Trans for B matrix (data) to get z by y (weights is y by z
     // normally); result is x by y
     // note input rows is used here due to transpose of aggregation
-    galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
-                       layer_dimensions_.output_columns,
-                       layer_dimensions_.input_columns, gradients,
-                       layer_weights_.data(), output);
+    if (after) {
+      galois::CBlasSGEMM(
+          CblasNoTrans, CblasTrans, layer_dimensions_.output_rows,
+          layer_dimensions_.output_columns, layer_dimensions_.input_columns,
+          gradients, layer_weights_.data(), output);
+    } else {
+      galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
+                         layer_dimensions_.output_columns,
+                         layer_dimensions_.input_columns, gradients,
+                         layer_weights_.data(), output);
+    }
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif

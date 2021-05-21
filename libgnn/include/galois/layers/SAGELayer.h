@@ -118,12 +118,14 @@ private:
                bool is_backward);
 
   //! Do embedding update via mxm with this layer's weights (forward)
-  void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output);
+  void UpdateEmbeddings(const GNNFloat* node_embeddings, GNNFloat* output,
+                        bool after);
   //! Same as above but uses the second set of weights (self feature weights)
   void SelfFeatureUpdateEmbeddings(const GNNFloat* node_embeddings,
                                    GNNFloat* output);
   //! Calculate graident via mxm with last layer's gradients (backward)
-  void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output);
+  void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output,
+                                  bool after);
   //! Same as above but uses the second set of weights (self feature weights)
   void SelfFeatureUpdateEmbeddingsDerivative(const GNNFloat* gradients,
                                              GNNFloat* output);

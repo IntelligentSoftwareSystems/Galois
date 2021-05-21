@@ -348,9 +348,16 @@ protected:
 #endif
 
   //! Mask a input size'd matrix's rows that correspond to mirrors
-  void MaskInputNonMasters(PointerWithSize<GNNFloat>* input);
+  void MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
+    MaskInputNonMasters(input, std::numeric_limits<size_t>::max());
+  }
+  void MaskInputNonMasters(PointerWithSize<GNNFloat>* input, size_t max_rows);
   //! Mask a gradient size'd matrix's rows that correspond to mirrors
-  void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients);
+  void MaskGradientNonMasters(PointerWithSize<GNNFloat>* input) {
+    MaskGradientNonMasters(input, std::numeric_limits<size_t>::max());
+  }
+  void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients,
+                              size_t max_rows);
 
   //! Does some math to get GB used by some # of floats
   double FloatElementsToGB(size_t num_of_floats) const {

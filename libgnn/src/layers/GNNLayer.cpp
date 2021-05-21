@@ -357,12 +357,21 @@ void galois::GNNLayer::WeightGradientSyncSum() {
   TimerStop(&t);
 }
 
-void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
+void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,
+                                           size_t max_rows) {
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.input_columns;
   assert((row_index * layer_dimensions_.input_rows) <= input->size());
+
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.MaskNonMastersGPU(input, start_node, end_node, row_index);
@@ -383,11 +392,19 @@ void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
 }
 
 void galois::GNNLayer::MaskGradientNonMasters(
-    PointerWithSize<GNNFloat>* gradient) {
+    PointerWithSize<GNNFloat>* gradient, size_t max_rows) {
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
   size_t row_index  = layer_dimensions_.output_columns;
+
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
     base_gpu_object_.MaskNonMastersGPU(gradient, start_node, end_node,
