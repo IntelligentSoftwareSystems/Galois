@@ -22,7 +22,9 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       galois::iterate(graph_.begin(), graph_.end()),
       [&](const unsigned i) {
         if (IsSampledLayer()) {
-          if (layer_phase_ == GNNPhase::kTrain && !graph_.IsInSampledGraph(i)) {
+          if ((layer_phase_ == GNNPhase::kTrain ||
+               layer_phase_ == GNNPhase::kBatch) &&
+              !graph_.IsInSampledGraph(i)) {
             // XXX
             VectorZero(feature_length,
                        &p_backward_output_matrix_[i * feature_length]);

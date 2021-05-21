@@ -451,27 +451,33 @@ public:
   }
 
   //! Get degree norm of subgraph for particular layer (i.e. includes training)
-  GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
+  // GNNFloat GetDegreeNorm(GraphNode n, size_t graph_user_layer_num) const {
+  GNNFloat GetDegreeNorm(GraphNode n, size_t) const {
     if (use_subgraph_ || use_subgraph_view_) {
-      size_t degree;
-      if (!subgraph_is_train_) {
-        // case because degrees in each layer differ
-        degree =
-            sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
-      } else {
-        // XXX if inductive
-        // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
-        degree = global_degrees_[subgraph_->SIDToLID(n)];
-      }
-
-      if (degree) {
-        return 1.0 / degree;
-      } else {
-        return 0;
-      }
+      // TODO(loc) this is impresise: subgraph degrees differ from global
+      // degrees, but going to always use global degree -> not correct
+      return GetGlobalDegreeNorm(subgraph_->SIDToLID(n));
     } else {
       return GetGlobalDegreeNorm(n);
     }
+
+    //  size_t degree;
+    //  if (!subgraph_is_train_) {
+    //    // case because degrees in each layer differ
+    //    degree =
+    //        sampled_out_degrees_[graph_user_layer_num][subgraph_->SIDToLID(n)];
+    //  } else {
+    //    // XXX if inductive
+    //    // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
+    //    degree = global_degrees_[subgraph_->SIDToLID(n)];
+    //  }
+    //  //degree = global_degrees_[subgraph_->SIDToLID(n)];
+
+    //  if (degree) {
+    //    return 1.0 / degree;
+    //  } else {
+    //    return 0;
+    //  }
   }
 
   // Get accuracy: sampling is by default false
@@ -708,7 +714,8 @@ private:
 
   std::unique_ptr<GNNSubgraph> subgraph_;
   // Degrees for sampled subgraph
-  std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
+  // std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
+  // std::vector<galois::LargeArray<uint32_t>> sampled_in_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
   galois::LargeArray<std::vector<bool>> edge_sample_status_;

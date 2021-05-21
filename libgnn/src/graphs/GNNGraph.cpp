@@ -890,10 +890,10 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   // this is slightly problematic possibly, but each layer is its own
   // subgraph
   if (!is_inductive) {
-    sampled_out_degrees_.resize(num_layers);
-    for (galois::LargeArray<uint32_t>& array : sampled_out_degrees_) {
-      array.create(partitioned_graph_->size());
-    }
+    // sampled_out_degrees_.resize(num_layers);
+    // for (galois::LargeArray<uint32_t>& array : sampled_out_degrees_) {
+    //  array.create(partitioned_graph_->size());
+    //}
   } else {
     subgraph_is_train_ = true;
   }
@@ -906,7 +906,6 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   bitset_sample_flag_.resize(size());
   bitset_sample_flag_.reset();
 
-  // for now, if training node, it goes into seed node
   galois::do_all(galois::iterate(begin_owned(), end_owned()),
                  [&](const NodeIterator& x) {
                    if (IsValidForPhase(*x, seed_phase)) {
@@ -933,16 +932,16 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                              edge_sample_status_[edge_id].end(), 0);
                  });
   // reset all degrees
-  if (!subgraph_is_train_) {
-    galois::do_all(
-        galois::iterate(sampled_out_degrees_),
-        [&](galois::LargeArray<uint32_t>& array) {
-          std::fill(array.begin(), array.end(), 0);
-        },
-        galois::chunk_size<1>());
-  }
-  bitset_sampled_degrees_.resize(partitioned_graph_->size());
-  bitset_sampled_degrees_.reset();
+  // if (!subgraph_is_train_) {
+  //  galois::do_all(
+  //      galois::iterate(sampled_out_degrees_),
+  //      [&](galois::LargeArray<uint32_t>& array) {
+  //        std::fill(array.begin(), array.end(), 0);
+  //      },
+  //      galois::chunk_size<1>());
+  //}
+  // bitset_sampled_degrees_.resize(partitioned_graph_->size());
+  // bitset_sampled_degrees_.reset();
 
   // Seed nodes sync
   if (use_timer_) {
@@ -1093,7 +1092,7 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 }
               }
 
-              // if here, it means edge accepted; set sampled on, mark source
+              // if here, it means edge accepted; set sampled on, mark
               // as part of next set
               MakeEdgeSampled(edge_iter, sample_layer_num);
               if (!IsInSampledGraph(
@@ -1101,9 +1100,9 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 bitset_sample_flag_.set(
                     partitioned_graph_->getEdgeDst(edge_iter));
               }
-              bitset_sampled_degrees_.set(*src_iter);
+              // bitset_sampled_degrees_.set(*src_iter);
               // degree increment
-              sampled_out_degrees_[sample_layer_num][*src_iter]++;
+              // sampled_out_degrees_[sample_layer_num][*src_iter]++;
               sampled += 1;
             }
           }
@@ -1163,29 +1162,29 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
                                                    bool use_view) {
   // false first so that the build process can use functions to access the
   // real graph
-  use_subgraph_            = false;
-  use_subgraph_view_       = false;
-  gnn_sampled_out_degrees_ = &sampled_out_degrees_;
+  use_subgraph_      = false;
+  use_subgraph_view_ = false;
+  // gnn_sampled_out_degrees_ = &sampled_out_degrees_;
 
-  // first, sync the degres of the sampled edges across all hosts
-  if (use_timer_) {
-    sync_substrate_
-        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
-            "SubgraphDegree");
-  } else {
-    sync_substrate_
-        ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
-            "Ignore");
-  }
+  //// first, sync the degres of the sampled edges across all hosts
+  // if (use_timer_) {
+  //  sync_substrate_
+  //      ->sync<writeSource, readAny, SubgraphDegreeSync,
+  //      SubgraphDegreeBitset>(
+  //          "SubgraphDegree");
+  //} else {
+  //  sync_substrate_
+  //      ->sync<writeSource, readAny, SubgraphDegreeSync,
+  //      SubgraphDegreeBitset>(
+  //          "Ignore");
+  //}
   size_t num_subgraph_nodes;
-  // use_view = true;
   if (!use_view) {
     num_subgraph_nodes = subgraph_->BuildSubgraph(*this, num_sampled_layers);
   } else {
     // a view only has lid<->sid mappings
     num_subgraph_nodes =
         subgraph_->BuildSubgraphView(*this, num_sampled_layers);
-    // SortAllInEdgesBySID();
   }
 
   // after this, this graph is a subgraph

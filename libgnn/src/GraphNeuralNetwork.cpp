@@ -172,6 +172,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
     // last layer input size/output rows becomes seed node size
     gnn_layers_.back()->ResizeInputOutputRows(seed_node_count, seed_node_count);
     size_t num_sampled_layers = 0;
+
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
          back_iter++) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
@@ -499,7 +500,6 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         SetLayerPhases(galois::GNNPhase::kTest);
         const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
         epoch_test_timer.stop();
-
         test_acc = GetGlobalAccuracy(test_pred);
       } else {
         test_acc = MinibatchedTesting();
@@ -559,6 +559,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   uint64_t average_epoch_time = epoch_timer.get() / num_epochs;
   galois::runtime::reportStat_Tavg(kRegionName, "AverageEpochTime",
                                    average_epoch_time);
+  DisableTimers();
   // disable subgraph
   graph_->DisableSubgraph();
   // TODO only do this when necessary

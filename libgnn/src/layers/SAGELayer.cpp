@@ -508,13 +508,7 @@ void galois::SAGELayer::AggregateAllCPU(
             size_t index_to_dst_feature = dst * column_length;
 
             if (!config_.disable_normalization) {
-              GNNFloat norm_scale;
-              if (!is_backward) {
-                norm_scale = source_norm;
-              } else {
-                norm_scale =
-                    graph_.GetDegreeNorm(dst, graph_user_layer_number_);
-              }
+              GNNFloat norm_scale = source_norm;
 
               galois::VectorMulAdd(
                   column_length, &aggregate_output[index_to_src_feature],

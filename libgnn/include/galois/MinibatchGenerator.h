@@ -12,7 +12,7 @@ public:
   MinibatchGenerator(const GNNMask& mask_to_minibatch, size_t minibatch_size,
                      size_t master_bound)
       : mask_to_minibatch_{mask_to_minibatch}, minibatch_size_{minibatch_size},
-        master_bound_{master_bound} {
+        current_position_{0}, master_bound_{master_bound} {
     GALOIS_LOG_ASSERT(master_bound_ <= mask_to_minibatch_.size());
   }
   void GetNextMinibatch(std::vector<char>* batch_mask);
