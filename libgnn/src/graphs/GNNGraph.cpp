@@ -1044,6 +1044,7 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
     }
   });
 
+  EnableSubgraphChooseAll();
   return local_sample_count.reduce();
 }
 
@@ -1138,6 +1139,7 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
     }
   });
 
+  DisableSubgraphChooseAll();
   return local_sample_count.reduce();
 }
 
